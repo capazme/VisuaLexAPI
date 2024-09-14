@@ -26,31 +26,31 @@ class BrocardiScraper:
         self.knowledge = [BROCARDI_CODICI]
 
     @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def do_know(self, norma):
-        logging.info(f"Checking if knowledge exists for norma: {norma}")
+    def do_know(self, norma_visitata):
+        logging.info(f"Checking if knowledge exists for norma: {norma_visitata}")
         
-        strcmp = self._build_norma_string(norma)
+        strcmp = self._build_norma_string(norma_visitata)
         if strcmp is None:
             logging.error("Invalid norma format")
             raise ValueError("Formato norma non valido")
 
         for txt, link in self.knowledge[0].items():
             if strcmp.lower() in txt.lower():
-                logging.info(f"Knowledge found for norma: {norma}")
+                logging.info(f"Knowledge found for norma: {norma_visitata}")
                 return txt, link
 
-        logging.warning(f"No knowledge found for norma: {norma}")
+        logging.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
 
     @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def look_up(self, norma):
-        logging.info(f"Looking up norma: {norma}")
+    def look_up(self, norma_visitata):
+        logging.info(f"Looking up norma: {norma_visitata}")
 
-        if not isinstance(norma, NormaVisitata):
+        if not isinstance(norma_visitata, NormaVisitata):
             logging.error("Invalid input type for norma")
             return None
 
-        norma_info = self.do_know(norma)
+        norma_info = self.do_know(norma_visitata)
         if not norma_info:
             return None
 
@@ -66,7 +66,7 @@ class BrocardiScraper:
             logging.error(f"Failed to retrieve content for norma link: {link}: {e}")
             return None
 
-        numero_articolo = norma.numero_articolo.replace('-', '') if norma.numero_articolo else None
+        numero_articolo = norma_visitata.numero_articolo.replace('-', '') if norma_visitata.numero_articolo else None
         if numero_articolo:
             return self._find_article_link(soup, base_url, numero_articolo)
 
@@ -74,7 +74,7 @@ class BrocardiScraper:
         return None
 
     def _find_article_link(self, soup, base_url, numero_articolo):
-        pattern = re.compile(rf'href=["\']([^"\']*art{re.escape(numero_articolo)}.html)["\']')
+        pattern = re.compile(rf'href=["\']([^"\']*art{re.escape(numero_articolo)}\.html)["\']')
 
         logging.info("Searching for target link in the main page content")
         matches = pattern.findall(soup.prettify())
@@ -103,14 +103,14 @@ class BrocardiScraper:
         logging.info("No matching article found")
         return None
 
-    def get_info(self, norma):
-        logging.info(f"Getting info for norma: {norma}")
+    def get_info(self, norma_visitata):
+        logging.info(f"Getting info for norma: {norma_visitata}")
 
-        if not isinstance(norma, NormaVisitata):
+        if not isinstance(norma_visitata, NormaVisitata):
             logging.error("Invalid input type for norma")
             return None
 
-        norma_link = self.look_up(norma)
+        norma_link = self.look_up(norma_visitata)
         if not norma_link:
             return None
 
@@ -166,18 +166,18 @@ class BrocardiScraper:
             if massime_content:
                 info['Massime'] = [massima.get_text(strip=False) for massima in massime_content]
 
-    def _build_norma_string(self, norma):
-        if isinstance(norma, NormaVisitata):
-            atts = norma.to_dict()
-            tipo_norm = normalize_act_type(atts['tipo_atto'], True, 'brocardi')
+    def _build_norma_string(self, norma_visitata):
+        if isinstance(norma_visitata, NormaVisitata):
+            norma = norma_visitata.norma
+            tipo_norm = normalize_act_type(norma.tipo_atto_str, True, 'brocardi')
             components = [tipo_norm]
 
-            if atts['data']:
-                components.append(f"{atts['data']},")
-            if atts['numero_atto']:
-                components.append(f"n. {atts['numero_atto']}")
+            if norma.data:
+                components.append(f"{norma.data},")
+            if norma.numero_atto:
+                components.append(f"n. {norma.numero_atto}")
 
             return " ".join(components).strip()
-        elif isinstance(norma, str):
-            return norma.strip()
+        elif isinstance(norma_visitata, str):
+            return norma_visitata.strip()
         return None

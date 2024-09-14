@@ -15,11 +15,11 @@ logging.basicConfig(level=logging.INFO,
 def save_html(html_data, save_html_path):
     """
     Saves HTML data to a specified file path.
-    
+
     Arguments:
     html_data -- The HTML data to save
     save_html_path -- The path to save the HTML file
-    
+
     Returns:
     str -- Path where the HTML is saved or an error message
     """
@@ -36,11 +36,11 @@ def save_html(html_data, save_html_path):
 def estrai_da_html(atto, comma=None):
     """
     Extracts text of a specific article from an HTML document.
-    
+
     Arguments:
     atto -- The HTML content of the document
     comma -- The comma number to extract (optional)
-    
+
     Returns:
     str -- The extracted text or an error message
     """
@@ -74,10 +74,10 @@ def estrai_da_html(atto, comma=None):
 def extract_html_article(norma_visitata):
     """
     Extracts an HTML article from a NormaVisitata object.
-    
+
     Arguments:
     norma_visitata -- The NormaVisitata object containing the URN
-    
+
     Returns:
     str -- The extracted article text or None if not found
     """
@@ -86,7 +86,12 @@ def extract_html_article(norma_visitata):
 
     try:
         if "eur-lex" in urn:
-            response = get_eurlex(urn=urn, article=norma_visitata.numero_articolo, year=norma_visitata.data, num=norma_visitata.numero_atto)
+            response = get_eurlex(
+                urn=urn,
+                article=norma_visitata.numero_articolo,
+                year=norma_visitata.norma.data,
+                num=norma_visitata.norma.numero_atto
+            )
             return response[0]
         else:
             response = requests.get(urn, timeout=30)

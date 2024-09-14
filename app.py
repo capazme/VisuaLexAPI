@@ -65,7 +65,7 @@ def create_norma_visitata_from_data(data):
     """
     allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'Regolamento UE', 'Direttiva UE', 'regio decreto']
     if data['act_type'] in allowed_types:
-        data_completa = complete_date_or_parse(date = data.get('date'), act_type = data['act_type'], act_number=data.get('act_number'))
+        data_completa = complete_date_or_parse(date=data.get('date'), act_type=data['act_type'], act_number=data.get('act_number'))
         data_completa_estesa = format_date_to_extended(data_completa)
     else:
         data_completa_estesa = data.get('date')
@@ -111,30 +111,53 @@ async def fetch_data():
         log.error("Error in fetch_data", error=str(e))
         return jsonify({'error': str(e)}), 500
 
-@lru_cache(maxsize=128)  # Cache results for 60 seconds
+async_cache = {}
+
 async def get_cached_brocardi_info(normavisitata):
     """Fetch and cache Brocardi information asynchronously."""
-    # Extract article text asynchronously
-    norma_art_text = await asyncio.to_thread(extract_html_article, normavisitata)
-    log.info("Extracted article text", norma_art_text=norma_art_text)
+    # Create a unique key based on the attributes of `normavisitata`
+    cache_key = (
+        normavisitata.norma.tipo_atto_urn,
+        normavisitata.norma.data,
+        normavisitata.norma.numero_atto,
+        normavisitata.numero_articolo,
+        normavisitata.versione,
+        normavisitata.data_versione
+    )
 
-    # Get Brocardi information asynchronously
-    brocardi_info = await asyncio.to_thread(brocardi_scraper.get_info, normavisitata)
-    position, info, norma_link = brocardi_info or ("Not Available", {}, "Not Available")
+    # If the result is cached, return it
+    if cache_key in async_cache:
+        return async_cache[cache_key]
 
-    # Build response
-    response = {
-        'result': norma_art_text,
-        'urn': normavisitata.urn,
-        'norma_data': normavisitata.to_dict(),
-        'brocardi_info': {
-            'position': position,
-            'info': info,
-            'link': norma_link
+    # Otherwise, perform the fetching logic
+    try:
+        # Extract article text asynchronously
+        norma_art_text = await asyncio.to_thread(extract_html_article, normavisitata)
+        log.info("Extracted article text", norma_art_text=norma_art_text)
+
+        # Get Brocardi information asynchronously
+        brocardi_info = await asyncio.to_thread(brocardi_scraper.get_info, normavisitata)
+        position, info, norma_link = brocardi_info or ("Not Available", {}, "Not Available")
+
+        # Build response
+        response = {
+            'result': norma_art_text,
+            'urn': normavisitata.urn,
+            'norma_data': normavisitata.to_dict(),
+            'brocardi_info': {
+                'position': position,
+                'info': info,
+                'link': norma_link
+            }
         }
-    }
 
-    return response
+        # Cache the result
+        async_cache[cache_key] = response
+
+        return response
+    except Exception as e:
+        log.error(f"Error fetching Brocardi information: {e}", exc_info=True)
+        return None
 
 @app.route('/history', methods=['GET'])
 async def get_history():
