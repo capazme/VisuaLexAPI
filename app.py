@@ -79,7 +79,8 @@ def create_norma_visitata_from_data(data):
         norma=norma,
         numero_articolo=data.get('article'),
         versione=data.get('version'),
-        data_versione=data.get('version_date')
+        data_versione=data.get('version_date'),
+        allegato = data.get('annex')
     )
 
 @app.route('/')
@@ -118,11 +119,12 @@ async def get_cached_brocardi_info(normavisitata):
     # Create a unique key based on the attributes of `normavisitata`
     cache_key = (
         normavisitata.norma.tipo_atto_urn,
-        normavisitata.norma.data,
-        normavisitata.norma.numero_atto,
         normavisitata.numero_articolo,
         normavisitata.versione,
-        normavisitata.data_versione
+        normavisitata.norma.data,
+        normavisitata.norma.numero_atto,
+        normavisitata.data_versione,
+        normavisitata.allegato
     )
 
     # If the result is cached, return it

@@ -55,7 +55,7 @@ def complete_date(act_type, date, act_number):
         driver_manager.close_drivers()
 
 @lru_cache(maxsize=MAX_CACHE_SIZE)
-def generate_urn(act_type, date=None, act_number=None, article=None, extension=None, version=None, version_date=None, urn_flag=True):
+def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None, version_date=None, urn_flag=True):
     """
     Generates the URN for a legal norm.
 
@@ -64,7 +64,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, extension=N
     date -- Date of the act
     act_number -- Number of the act
     article -- Article number (optional)
-    extension -- Article extension (optional)
+    annex -- Annex to the law (optional)
     version -- Version of the act (optional)
     version_date -- Date of the version (optional)
     urn_flag -- Boolean flag to include full URN or not
@@ -72,31 +72,44 @@ def generate_urn(act_type, date=None, act_number=None, article=None, extension=N
     Returns:
     str -- The generated URN
     """
-    logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, extension: {extension}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
-    codici_urn = NORMATTIVA_URN_CODICI
+    logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
+    codici_urn = NORMATTIVA_URN_CODICI  # Assuming this is a dictionary defined elsewhere
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
-    normalized_act_type = normalize_act_type(act_type)
+    normalized_act_type = normalize_act_type(act_type)  # Assuming this function is defined elsewhere
 
-    if normalized_act_type in EURLEX:
+    # Check if 'article' is a valid string before attempting to split it
+    extension = None
+    if article and '-' in article:
+        parts = article.split('-')
+        article = parts[0]
+        extension = parts[1]
+    
+    # Handle EURLEX cases
+    if normalized_act_type in EURLEX:  # Assuming EURLEX is a dictionary defined elsewhere
         if normalized_act_type in {"CFDUE", "TUE", "TFUE"}:
             logging.info(f"Returning EURLEX URN for trattato: {EURLEX[normalized_act_type]}")
             return EURLEX[normalized_act_type]
         else:
-            return eurlex.get_eur_uri(act_type=EURLEX[normalized_act_type], year=date, num=act_number)
+            return eurlex.get_eur_uri(act_type=EURLEX[normalized_act_type], year=date, num=act_number)  # Assuming eurlex is defined
 
+    # Handle other cases with codici_urn
     if normalized_act_type in codici_urn:
         urn = codici_urn[normalized_act_type]
         logging.info(f"URN found in codici_urn: {urn}")
     else:
         try:
-            formatted_date = complete_date_or_parse(date, act_type, act_number)
+            formatted_date = complete_date_or_parse(date, act_type, act_number)  # Assuming this function is defined
             urn = f"{normalized_act_type}:{formatted_date};{act_number}"
             logging.info(f"Generated base URN: {urn}")
         except Exception as e:
             logging.error(f"Error generating URN: {e}", exc_info=True)
             return None
-
-    urn = append_article_info(urn, article, extension)
+    
+    if annex:
+        urn = urn + f':{annex.strip()}'
+    
+    # Assuming these functions are defined elsewhere
+    urn = append_article_info(urn, article, extension)  
     urn = append_version_info(urn, version, version_date)
 
     final_urn = base_url + urn
