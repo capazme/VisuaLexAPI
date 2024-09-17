@@ -35,7 +35,7 @@ NORMATTIVA_URN_CODICI = {
     "codice del processo amministrativo": "decreto.legislativo:2010-07-02;104:2",
     "codice del turismo": "decreto.legislativo:2011-05-23;79",
     "codice antimafia": "decreto.legislativo:2011-09-06;159",
-    "codice di giustizia contabile": "decreto.legislativo:2016-08-26;174",
+    "codice di giustizia contabile": "decreto.legislativo:2016-08-26;174:1",
     "codice del Terzo settore": "decreto.legislativo:2017-07-03;117",
     "codice della protezione civile": "decreto.legislativo:2018-01-02;1",
     "codice della crisi d'impresa e dell'insolvenza": "decreto.legislativo:2019-01-12;14"
