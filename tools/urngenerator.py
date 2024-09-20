@@ -73,10 +73,10 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     str -- The generated URN
     """
     logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
-    codici_urn = NORMATTIVA_URN_CODICI  # Assuming this is a dictionary defined elsewhere
+    codici_urn = NORMATTIVA_URN_CODICI  
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
-    normalized_act_type = normalize_act_type(act_type)  # Assuming this function is defined elsewhere
-
+    normalized_act_type = normalize_act_type(act_type)  
+    
     # Check if 'article' is a valid string before attempting to split it
     extension = None
     if article and '-' in article:
@@ -85,8 +85,9 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         extension = parts[1]
     
     # Handle EURLEX cases
-    if normalized_act_type in EURLEX:  # Assuming EURLEX is a dictionary defined elsewhere
-        if normalized_act_type in {"CFDUE", "TUE", "TFUE"}:
+    if EURLEX[normalized_act_type]:
+        
+        if normalized_act_type in {"CDFUE", "TUE", "TFUE"}:
             logging.info(f"Returning EURLEX URN for trattato: {EURLEX[normalized_act_type]}")
             return EURLEX[normalized_act_type]
         else:
