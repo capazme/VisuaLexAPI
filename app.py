@@ -57,7 +57,6 @@ async def rate_limit_middleware():
         request_counts[client_ip] = {'count': 1, 'time': current_time}
 
 # Utility function to process Norma data
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def create_norma_visitata_from_data(data):
     """
     Creates and returns a NormaVisitata instance from request data.
