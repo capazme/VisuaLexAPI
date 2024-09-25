@@ -10,7 +10,7 @@ from tools.brocardi import BrocardiScraper
 from tools.pdfextractor import extract_pdf
 from tools.sys_op import WebDriverManager
 from tools.urngenerator import complete_date_or_parse, urn_to_filename
-from tools.text_op import format_date_to_extended
+from tools.text_op import format_date_to_extended, clean_text
 import structlog
 
 # Configure structured logging
@@ -24,7 +24,7 @@ log = structlog.get_logger()
 # Constants
 MAX_CACHE_SIZE = 1000
 HISTORY_LIMIT = 50
-RATE_LIMIT = 10  # Limit to 10 requests per minute
+RATE_LIMIT = 100  # Limit to 10 requests per minute
 RATE_LIMIT_WINDOW = 60  # Window size in seconds
 
 # Rate limiting storage
@@ -36,6 +36,11 @@ app = Quart(__name__)
 history = deque(maxlen=HISTORY_LIMIT)
 brocardi_scraper = BrocardiScraper()
 driver_manager = WebDriverManager()
+
+@app.route('/')
+async def home():
+    """Serve the homepage with the form."""
+    return await render_template('index.html')
 
 # Middleware for simple rate limiting
 @app.before_request
@@ -81,11 +86,6 @@ def create_norma_visitata_from_data(data):
         data_versione=data.get('version_date'),
         allegato = data.get('annex')
     )
-
-@app.route('/')
-async def home():
-    """Renders the home page."""
-    return await render_template('index.html')
 
 @app.route('/fetch_norm', methods=['POST'])
 async def fetch_data():
@@ -134,6 +134,7 @@ async def get_cached_brocardi_info(normavisitata):
     try:
         # Extract article text asynchronously
         norma_art_text = await asyncio.to_thread(extract_html_article, normavisitata)
+        norma_art_text_cleaned = clean_text(norma_art_text)
         log.info("Extracted article text", norma_art_text=norma_art_text)
 
         # Get Brocardi information asynchronously
@@ -142,7 +143,7 @@ async def get_cached_brocardi_info(normavisitata):
 
         # Build response
         response = {
-            'result': norma_art_text,
+            'result': norma_art_text_cleaned,
             'urn': normavisitata.urn,
             'norma_data': normavisitata.to_dict(),
             'brocardi_info': {
