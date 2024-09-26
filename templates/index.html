@@ -24,18 +24,44 @@
                         <div class="mb-3">
                             <label for="act_type" class="form-label">Tipo atto:</label>
                             <select id="act_type" name="act_type" class="form-select" required>
+                                <option value="costituzione">Costituzione</option>
                                 <option value="legge">Legge</option>
                                 <option value="decreto legge">Decreto Legge</option>
-                                <option value="decreto legislativo">Decreto Legislativo</option>
-                                <option value="d.p.r.">D.P.R.</option>
+                                <option value="decreto legge">Decreto Legge</option>
                                 <option value="Regolamento UE">Regolamento UE</option>
                                 <option value="Direttiva UE">Direttiva UE</option>
-                                <option value="regio decreto">Regio Decreto</option>
-                                <option value="costituzione">Costituzione</option>
                                 <option value="codice civile">Codice Civile</option>
+                                <option value="preleggi">Preleggi</option>
                                 <option value="codice penale">Codice Penale</option>
+                                <option value="codice di procedura civile">Codice di Procedura Civile</option>
+                                <option value="codice di procedura penale">Codice di Procedura Penale</option>
+                                <option value="TUE">TUE</option>
+                                <option value="TFUE">TFUE</option>
+                                <option value="CDFUE">CDFUE</option>
+                                <option value="codice della navigazione">Codice della Navigazione</option>
+                                <option value="codice postale e delle telecomunicazioni">Codice Postale e delle Telecomunicazioni</option>
                                 <option value="codice della strada">Codice della Strada</option>
+                                <option value="codice del processo tributario">Codice del Processo Tributario</option>
+                                <option value="codice in materia di protezione dei dati personali">Codice in Materia di Protezione dei Dati Personali</option>
+                                <option value="codice delle comunicazioni elettroniche">Codice delle Comunicazioni Elettroniche</option>
+                                <option value="codice dei beni culturali e del paesaggio">Codice dei Beni Culturali e del Paesaggio</option>
+                                <option value="codice della proprietà industriale">Codice della Proprietà Industriale</option>
+                                <option value="codice dell'amministrazione digitale">Codice dell'Amministrazione Digitale</option>
+                                <option value="codice della nautica da diporto">Codice della Nautica da Diporto</option>
+                                <option value="codice del consumo">Codice del Consumo</option>
+                                <option value="codice delle assicurazioni private">Codice delle Assicurazioni Private</option>
+                                <option value="norme in materia ambientale">Norme in Materia Ambientale</option>
+                                <option value="codice dei contratti pubblici">Codice dei Contratti Pubblici</option>
+                                <option value="codice delle pari opportunità">Codice delle Pari Opportunità</option>
+                                <option value="codice dell'ordinamento militare">Codice dell'Ordinamento Militare</option>
+                                <option value="codice del processo amministrativo">Codice del Processo Amministrativo</option>
+                                <option value="codice del turismo">Codice del Turismo</option>
+                                <option value="codice antimafia">Codice Antimafia</option>
+                                <option value="codice di giustizia contabile">Codice di Giustizia Contabile</option>
+                                <option value="codice del terzo settore">Codice del Terzo Settore</option>
+                                <option value="codice della protezione civile">Codice della Protezione Civile</option>
                                 <option value="codice della crisi d'impresa e dell'insolvenza">Codice della Crisi d'Impresa e dell'Insolvenza</option>
+
                             </select>
                         </div>
 
@@ -51,11 +77,14 @@
 
                         <div class="mb-3">
                             <label for="article" class="form-label">Articolo:</label>
-                            <div class="input-group">
-                                <button type="button" class="btn btn-outline-secondary decrement">-</button>
-                                <input type="text" id="article" name="article" class="form-control text-center" value="1" aria-label="Numero articolo">
-                                <button type="button" class="btn btn-outline-secondary increment">+</button>
+
+                            <div class="number-input">
+                                <button type="button" class="decrement">-</button>
+                                <input type="text" id="article" name="article" value="1" aria-label="Numero articolo">
+                                <button type="button" class="increment">+</button>
                             </div>
+                            
+
                         </div>
 
                         <div class="mb-3">
@@ -95,18 +124,24 @@
             <div id="norma-data" class="mb-4"></div>
             <div id="result" class="mb-4"></div>
 
-            <!-- Collapsible Brocardi Info -->
-            <div id="brocardi-info-container" style="display:none;">
-                <button class="btn btn-primary mb-3" data-bs-toggle="collapse" data-bs-target="#brocardi-info" aria-expanded="false" aria-controls="brocardi-info">
-                    Mostra informazioni Brocardi
-                </button>
-                <div class="collapse" id="brocardi-info">
-                    <div class="card card-body">
-                        <div id="brocardi-info-content"></div>
+        <!-- Collapsible Brocardi Info -->
+        <div id="brocardi-info-container" style="display:none;">
+            <button class="btn btn-primary mb-3" data-bs-toggle="collapse" data-bs-target="#brocardi-info" aria-expanded="false" aria-controls="brocardi-info">
+                Mostra informazioni Brocardi
+            </button>
+            <div class="collapse" id="brocardi-info">
+                <div class="card card-body">
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs" id="brocardi-tabs" role="tablist">
+                        <!-- Tab items will be inserted dynamically -->
+                    </ul>
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="brocardi-tab-content">
+                        <!-- Tab panes will be inserted dynamically -->
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
         <!-- History Section -->
         <section class="history-container">

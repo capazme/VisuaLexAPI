@@ -78,28 +78,51 @@ input:focus {
     background-color: #ffffff;
 }
 
+/* Aggiusta la dimensione e il layout dei pulsanti nella number-input */
 .number-input {
     display: flex;
     align-items: center;
+    justify-content: center;
 }
 
 .number-input input[type="text"] {
     width: 60px;
     text-align: center;
+    border: 1px solid #ced4da;
+    padding: 5px;
+    background-color: #f8f9fa;
 }
 
 .number-input button {
-    background-color: #007bff;
+    background-color: #dc3545;
     border: none;
     color: white;
     font-size: 1.2rem;
-    padding: 10px;
+    padding: 10px 12px;
     cursor: pointer;
     border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .number-input button:disabled {
     background-color: #b0c4de;
+}
+
+.number-input button:hover:not(:disabled) {
+    background-color: #c82333;
+}
+
+/* Riduci la larghezza dei pulsanti per evitare l'allungamento */
+.number-input button {
+    min-width: 40px; /* Regola questa larghezza per evitare allungamento */
+}
+
+/* Aggiungi un bordo intorno all'input per separarlo chiaramente dai pulsanti */
+.number-input input {
+    border-left: none;
+    border-right: none;
 }
 
 /* Button styles */
@@ -231,4 +254,89 @@ button[type="button"]:hover {
     font-weight: bold;
     color: #007bff;
     text-align: center;
+}
+
+#copy-button {
+    margin-bottom: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+}
+
+#copy-button:hover {
+    background-color: #0056b3;
+}
+
+/* Brocardi Tab styles */
+.nav-tabs .nav-link {
+    background-color: #f1f1f1;
+    color: #007bff;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.tab-pane {
+    padding: 15px;
+}
+
+/* Styles for scrollbars in the tab content */
+.tab-pane.scrollable {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+/* Styles for individual Massime elements */
+.massima-item {
+    max-height: 100px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+/* Collapsible button */
+button[data-bs-toggle="collapse"] {
+    width: 100%;
+    text-align: left;
+}
+
+/* General styles for buttons */
+button {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+button.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+button.btn-primary.collapsed::after {
+    content: '\002B'; /* Plus sign */
+    float: right;
+}
+
+button.btn-primary::after {
+    content: "\2212"; /* Minus sign */
+    float: right;
+}
+
+/* Style adjustments for Brocardi content */
+.card-body {
+    padding: 20px;
 }

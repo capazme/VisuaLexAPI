@@ -173,51 +173,173 @@ function displayNormaData(normaData) {
 
 function displayArticleText(articleText) {
     const resultContainer = document.getElementById('result');
+
+    // Aggiungi il pulsante "Copia"
+    const copyButton = `<button id="copy-button" class="btn btn-primary mb-2">Copia Testo</button>`;
     
     // Usa <pre> per mantenere la formattazione originale del testo
-    resultContainer.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word;">${articleText}</pre>`;
+    const articleContent = `<pre id="article-text" style="white-space: pre-wrap; word-wrap: break-word;">${articleText}</pre>`;
+    
+    resultContainer.innerHTML = copyButton + articleContent;
+
+    // Aggiungi l'evento di copia al pulsante
+    document.getElementById('copy-button').addEventListener('click', function() {
+        copyToClipboard();
+    });
+}
+
+
+/*******************************
+ * FUNZIONE PER LA COPIA NEGLI APPUNTI
+ *******************************/
+function copyToClipboard() {
+    const articleText = document.getElementById('article-text').innerText;
+
+    // Verifica se l'API clipboard è supportata
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(articleText).then(() => {
+            alert("Testo copiato negli appunti!");
+        }).catch(err => {
+            console.error("Errore nella copia del testo: ", err);
+            alert("Errore nella copia del testo.");
+        });
+    } else {
+        // Fallback per browser che non supportano navigator.clipboard
+        fallbackCopyText(articleText);
+    }
+}
+
+/*******************************
+ * FALLBACK PER LA COPIA MANUALE DEL TESTO
+ *******************************/
+function fallbackCopyText(text) {
+    // Crea un elemento textarea temporaneo
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+
+    // Aggiungi il textarea alla pagina (non visibile all'utente)
+    document.body.appendChild(textarea);
+
+    // Seleziona il testo nel textarea
+    textarea.select();
+    textarea.setSelectionRange(0, 99999); // Per dispositivi mobili
+
+    // Copia il testo selezionato
+    try {
+        document.execCommand('copy');
+        alert("Testo copiato negli appunti!");
+    } catch (err) {
+        console.error("Errore durante la copia del testo con execCommand: ", err);
+        alert("Errore nella copia del testo.");
+    }
+
+    // Rimuovi il textarea temporaneo
+    document.body.removeChild(textarea);
 }
 
 /*******************************
  * VISUALIZZAZIONE INFORMAZIONI BROCARDI
  *******************************/
 function displayBrocardiInfo(brocardiInfo) {
-    const brocardiInfoContainer = document.getElementById('brocardi-info');
-    if (!brocardiInfo || !brocardiInfo.info) {
-        document.getElementById('brocardi-info-container').style.display = 'none';
+    const brocardiInfoContainer = document.getElementById('brocardi-info-container');
+    const brocardiTabs = document.getElementById('brocardi-tabs');
+    const brocardiTabContent = document.getElementById('brocardi-tab-content');
+
+    // Svuota contenuto precedente
+    brocardiTabs.innerHTML = '';
+    brocardiTabContent.innerHTML = '';
+
+    if (!brocardiInfo || !brocardiInfo.position) {
+        // Nascondi il pulsante e la sezione Brocardi se non esiste una posizione
+        brocardiInfoContainer.style.display = 'none';
         return;
     }
 
-    const { position, info } = brocardiInfo;
-    let content = '';
+    const { position, info, link } = brocardiInfo;
+    let hasContent = false;
 
+    // Tab per Posizione e Link
     if (position) {
-        content += `<h2>Posizione:</h2><p>${position}</p>`;
+        brocardiTabs.innerHTML += `
+            <li class="nav-item">
+                <a class="nav-link active" id="tab-posizione" data-bs-toggle="tab" href="#posizione" role="tab">Posizione</a>
+            </li>`;
+        brocardiTabContent.innerHTML += `
+            <div class="tab-pane fade show active" id="posizione" role="tabpanel">
+                <p><strong>Posizione:</strong> ${position}</p>
+                <p><strong>Link:</strong> <a href="${link}" target="_blank">${link}</a></p>
+            </div>`;
+        hasContent = true;
     }
 
+    // Tab per Brocardi
     if (info.Brocardi && info.Brocardi.length > 0) {
-        content += `<h3>Brocardi:</h3><ul>${info.Brocardi.map(text => `<li>${text}</li>`).join('')}</ul>`;
+        brocardiTabs.innerHTML += `
+            <li class="nav-item">
+                <a class="nav-link" id="tab-brocardi" data-bs-toggle="tab" href="#brocardi" role="tab">Brocardi</a>
+            </li>`;
+        brocardiTabContent.innerHTML += `
+            <div class="tab-pane fade" id="brocardi" role="tabpanel">
+                <ul>${info.Brocardi.map(text => `<li>${text}</li>`).join('')}</ul>
+            </div>`;
+        hasContent = true;
     }
 
+    // Tab per Ratio
     if (info.Ratio) {
-        content += `<h3>Ratio:</h3><p>${info.Ratio}</p>`;
+        brocardiTabs.innerHTML += `
+            <li class="nav-item">
+                <a class="nav-link" id="tab-ratio" data-bs-toggle="tab" href="#ratio" role="tab">Ratio</a>
+            </li>`;
+        brocardiTabContent.innerHTML += `
+            <div class="tab-pane fade scrollable" id="ratio" role="tabpanel">
+                <p>${info.Ratio}</p>
+            </div>`;
+        hasContent = true;
     }
 
+    // Tab per Spiegazione
     if (info.Spiegazione) {
-        content += `<h3>Spiegazione:</h3><p>${info.Spiegazione}</p>`;
+        brocardiTabs.innerHTML += `
+            <li class="nav-item">
+                <a class="nav-link" id="tab-spiegazione" data-bs-toggle="tab" href="#spiegazione" role="tab">Spiegazione</a>
+            </li>`;
+        brocardiTabContent.innerHTML += `
+            <div class="tab-pane fade scrollable" id="spiegazione" role="tabpanel">
+                <p>${info.Spiegazione}</p>
+            </div>`;
+        hasContent = true;
     }
 
+    // Tab per Massime, ogni massima ha una scrollbar separata
     if (info.Massime && info.Massime.length > 0) {
-        content += `<h3>Massime:</h3><ul>${info.Massime.map(text => `<li>${text}</li>`).join('')}</ul>`;
+        const validMassime = info.Massime.filter(text => text && text.trim() !== ''); // Filtra solo massime con contenuto
+        if (validMassime.length > 0) {
+            brocardiTabs.innerHTML += `
+                <li class="nav-item">
+                    <a class="nav-link" id="tab-massime" data-bs-toggle="tab" href="#massime" role="tab">Massime</a>
+                </li>`;
+            brocardiTabContent.innerHTML += `
+                <div class="tab-pane fade" id="massime" role="tabpanel">
+                    ${validMassime.map((text, index) => `
+                        <div class="massima-item">
+                            <h5>Massima ${index + 1}</h5>
+                            <div class="scrollable-content">${text}</div>
+                        </div>
+                    `).join('')}
+                </div>`;
+            hasContent = true;
+        }
     }
 
-    if (content) {
-        brocardiInfoContainer.innerHTML = content;
-        document.getElementById('brocardi-info-container').style.display = 'block';
+    // Mostra la sezione Brocardi se ha contenuto
+    if (hasContent) {
+        brocardiInfoContainer.style.display = 'block';
     } else {
-        document.getElementById('brocardi-info-container').style.display = 'none';
+        brocardiInfoContainer.style.display = 'none';
     }
 }
+
 
 /*******************************
  * GESTIONE UI E FUNZIONI DI SUPPORTO
