@@ -36,7 +36,7 @@ def complete_date(act_type, date, act_number):
         driver = driver_manager.setup_driver()
         driver.get("https://www.normattiva.it/")
         search_box = driver.find_element(By.CSS_SELECTOR, "#testoRicerca")
-        search_criteria = f"{act_type} {act_number} {date}"
+        search_criteria = f"{normalize_act_type(input_type=act_type, search=False, source='normattiva')} {act_number} {date}"
         logging.info(f"Search criteria: {search_criteria}")
         
         search_box.send_keys(search_criteria)

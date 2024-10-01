@@ -10,7 +10,7 @@ from tools.brocardi import BrocardiScraper
 from tools.pdfextractor import extract_pdf
 from tools.sys_op import WebDriverManager
 from tools.urngenerator import complete_date_or_parse, urn_to_filename
-from tools.text_op import format_date_to_extended, clean_text
+from tools.text_op import format_date_to_extended, clean_text, parse_articles
 import structlog
 
 # Configure structured logging
@@ -95,18 +95,35 @@ async def fetch_data():
         data = await request.get_json()
         log.info("Received data for fetch_norm", data=data)
 
-        # Process data into NormaVisitata object
-        normavisitata = create_norma_visitata_from_data(data)
-        log.info("Created NormaVisitata", normavisitata=normavisitata.to_dict())
+        # Parse articles, handling both single and multiple articles
+        articles = parse_articles(data.get('article'))
+        log.info("Parsed articles", articles=articles)
 
-        # Fetch results
-        result = await get_cached_brocardi_info(normavisitata)
+        results = []
+        for article in articles:
+            # Update the article number in the data
+            data['article'] = str(article)
 
-        # Save to history
-        history.append(normavisitata)
+            # Process data into NormaVisitata object
+            normavisitata = create_norma_visitata_from_data(data)
+            log.info("Created NormaVisitata", normavisitata=normavisitata.to_dict())
+
+            # Fetch results for each article
+            result = await get_cached_brocardi_info(normavisitata)
+
+            # Append result to results list
+            if result:
+                results.append(result)
+            else:
+                log.error(f"Failed to fetch data for article {article}")
+        
+        # Save all to history
+        for normavisitata in results:
+            history.append(normavisitata)
+        
         log.info("Appended NormaVisitata to history", history_size=len(history))
 
-        return jsonify(result)
+        return jsonify(results)  # Return the list of results
     except Exception as e:
         log.error("Error in fetch_data", error=str(e))
         return jsonify({'error': str(e)}), 500
@@ -115,7 +132,7 @@ async_cache = {}
 
 async def get_cached_brocardi_info(normavisitata):
     """Fetch and cache Brocardi information asynchronously."""
-    # Create a unique key based on the attributes of `normavisitata`
+        # Create a unique key based on the attributes of `normavisitata`
     cache_key = (
         normavisitata.norma.tipo_atto_urn,
         normavisitata.numero_articolo,
@@ -125,7 +142,7 @@ async def get_cached_brocardi_info(normavisitata):
         normavisitata.data_versione,
         normavisitata.allegato
     )
-
+    
     # If the result is cached, return it
     if cache_key in async_cache:
         return async_cache[cache_key]

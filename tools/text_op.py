@@ -11,6 +11,21 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
+def parse_articles(article_str):
+    """
+    Parse a string of articles which can contain ranges (e.g., "1-5") or comma-separated values (e.g., "1,2,3").
+    Returns a list of individual article numbers.
+    """
+    articles = set()
+    parts = article_str.split(',')
+    for part in parts:
+        if '-' in part:
+            start, end = part.split('-')
+            articles.update(range(int(start), int(end) + 1))
+        else:
+            articles.add(int(part.strip()))
+    return sorted(articles)
+
 def nospazi(text):
     """
     Removes multiple spaces from a string.
