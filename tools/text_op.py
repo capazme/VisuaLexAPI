@@ -5,26 +5,40 @@ from .config import MAX_CACHE_SIZE
 from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
 import logging
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-def parse_articles(article_str):
-    """
-    Parse a string of articles which can contain ranges (e.g., "1-5") or comma-separated values (e.g., "1,2,3").
-    Returns a list of individual article numbers.
-    """
-    articles = set()
-    parts = article_str.split(',')
+def parse_article_input(article_string):
+    """Pulisce e valida la stringa degli articoli, supporta range e articoli separati da virgole."""
+    articles = []
+    
+    # Rimuovi spazi extra e dividi per virgole
+    parts = article_string.strip().split(',')
+    
     for part in parts:
+        part = part.strip()
         if '-' in part:
+            # Gestione dei range (es. "1-5")
             start, end = part.split('-')
-            articles.update(range(int(start), int(end) + 1))
+            try:
+                start = int(start)
+                end = int(end)
+                articles.extend(list(range(start, end + 1)))  # Genera la lista di articoli nel range
+            except ValueError:
+                raise ValueError(f"Invalid range: {part}")
+        elif part.isdigit():
+            # Gestione degli articoli singoli
+            articles.append(int(part))
         else:
-            articles.add(int(part.strip()))
-    return sorted(articles)
+            raise ValueError(f"Invalid article: {part}")
+    
+    return articles
+
+
 
 def nospazi(text):
     """

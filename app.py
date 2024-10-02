@@ -10,7 +10,7 @@ from tools.brocardi import BrocardiScraper
 from tools.pdfextractor import extract_pdf
 from tools.sys_op import WebDriverManager
 from tools.urngenerator import complete_date_or_parse, urn_to_filename
-from tools.text_op import format_date_to_extended, clean_text, parse_articles
+from tools.text_op import format_date_to_extended, clean_text, parse_article_input
 import structlog
 
 # Configure structured logging
@@ -67,7 +67,7 @@ def create_norma_visitata_from_data(data):
     Creates and returns a NormaVisitata instance from request data.
     This function centralizes the logic for creating Norma and NormaVisitata objects.
     """
-    allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'Regolamento UE', 'Direttiva UE', 'regio decreto']
+    allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
     if data['act_type'] in allowed_types:
         data_completa = complete_date_or_parse(date=data.get('date'), act_type=data['act_type'], act_number=data.get('act_number'))
         data_completa_estesa = format_date_to_extended(data_completa)
@@ -96,7 +96,7 @@ async def fetch_data():
         log.info("Received data for fetch_norm", data=data)
 
         # Parse articles, handling both single and multiple articles
-        articles = parse_articles(data.get('article'))
+        articles = parse_article_input(data.get('article'))
         log.info("Parsed articles", articles=articles)
 
         results = []
