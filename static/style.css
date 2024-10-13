@@ -1,10 +1,11 @@
-/* General styles */
+/* General Reset and Box Sizing */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
 
+/* Base Body Styling */
 body {
     font-family: 'Roboto', sans-serif;
     background-color: #f8f9fa;
@@ -12,10 +13,15 @@ body {
     line-height: 1.6;
 }
 
+/* Typography */
 h1, h2 {
     font-weight: 700;
-    margin-bottom: 20px;
     color: #343a40;
+    margin-bottom: 1rem;
+}
+
+h1 {
+    font-size: 2.5rem;
 }
 
 h2 {
@@ -23,53 +29,50 @@ h2 {
 }
 
 p {
-    margin-bottom: 10px;
+    margin-bottom: 1rem;
     color: #495057;
 }
 
+/* Container */
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
 }
 
-/* Header styling */
+/* Header Styling */
 header {
     background-color: #007bff;
-    padding: 20px 0;
-    text-align: center;
     color: white;
+    text-align: center;
+    padding: 20px 0;
 }
 
-header h1 {
-    font-size: 2rem;
-}
-
-/* Form styles */
+/* Form Section Styling */
 .form-container {
     background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    margin-bottom: 40px;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
 }
 
 label {
     font-weight: bold;
-    margin-bottom: 5px;
-    display: block;
+    margin-bottom: 0.5rem;
 }
 
 input[type="text"],
 input[type="date"],
 select {
     width: 100%;
-    padding: 10px;
-    margin-bottom: 20px;
+    padding: 0.75rem;
+    margin-bottom: 1.25rem;
     border: 1px solid #ced4da;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     font-size: 1rem;
-    background-color: #f1f1f1;
+    background-color: #f8f9fa;
+    transition: border-color 0.3s ease, background-color 0.3s ease;
 }
 
 input:focus {
@@ -78,243 +81,116 @@ input:focus {
     background-color: #ffffff;
 }
 
-/* Aggiusta la dimensione e il layout dei pulsanti nella number-input */
+/* Row Layout for Form Fields */
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.form-row .form-group {
+    flex: 1;
+    min-width: 220px;
+}
+
+/* Number Input Styling */
 .number-input {
     display: flex;
     align-items: center;
-    justify-content: center;
-}
-
-.number-input input[type="text"] {
-    width: 60px;
-    text-align: center;
-    border: 1px solid #ced4da;
-    padding: 5px;
-    background-color: #f8f9fa;
+    justify-content: space-between;
+    max-width: 200px;
+    width: 100%;
 }
 
 .number-input button {
-    background-color: #dc3545;
+    background-color: #28a745;
     border: none;
     color: white;
     font-size: 1.2rem;
-    padding: 10px 12px;
+    padding: 0.5rem;
     cursor: pointer;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border-radius: 0.25rem;
+    transition: background-color 0.3s ease;
+    flex: 0 0 40px;
+    height: 100%;
+}
+
+.number-input input[type="text"] {
+    text-align: center;
+    border: 1px solid #ced4da;
+    padding: 0.5rem;
+    background-color: #ffffff;
+    flex: 1;
+    height: 100%;
+}
+
+.number-input button:hover:not(:disabled) {
+    background-color: #218838;
 }
 
 .number-input button:disabled {
     background-color: #b0c4de;
 }
 
-.number-input button:hover:not(:disabled) {
-    background-color: #c82333;
-}
-
-/* Riduci la larghezza dei pulsanti per evitare l'allungamento */
-.number-input button {
-    min-width: 40px; /* Regola questa larghezza per evitare allungamento */
-}
-
-/* Aggiungi un bordo intorno all'input per separarlo chiaramente dai pulsanti */
-.number-input input {
-    border-left: none;
-    border-right: none;
-}
-
-/* Button styles */
-button[type="submit"],
-button[type="button"] {
-    background-color: #28a745;
+/* Button Styling */
+button {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
     border: none;
     color: white;
-    padding: 10px 15px;
+    padding: 0.75rem 1.25rem;
     font-size: 1rem;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.3s ease;
+    border-radius: 0.25rem;
 }
 
-button[type="submit"]:hover,
-button[type="button"]:hover {
-    background-color: #218838;
+button[type="submit"] {
+    background-color: #007bff;
 }
 
-button[type="button"] {
+button[type="submit"]:hover {
+    background-color: #0056b3;
+}
+
+button#reset-button {
     background-color: #dc3545;
 }
 
-button[type="button"]:hover {
+button#reset-button:hover {
     background-color: #c82333;
 }
 
-/* Result section styling */
+button#reset-history {
+    background-color: #ffc107;
+    color: black;
+}
+
+button#reset-history:hover {
+    background-color: #e0a800;
+}
+
+/* Checkbox Styling */
+.form-check-input {
+    margin-right: 0.5rem;
+}
+
+/* Result Section Styling */
 .results-container {
     background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    margin-bottom: 40px;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
 }
 
 #result {
     font-size: 1.1rem;
-    margin-top: 20px;
+    margin-top: 1.5rem;
+    color: #212529;
 }
 
+/* Collapsible Brocardi Info */
 #brocardi-info-container {
-    margin-top: 20px;
-    display: none;
-}
-
-.collapsible {
-    background-color: #007bff;
-    color: white;
-    cursor: pointer;
-    padding: 10px;
-    width: 100%;
-    border: none;
-    text-align: left;
-    outline: none;
-    font-size: 1.25rem;
-}
-
-.collapsible:hover {
-    background-color: #0056b3;
-}
-
-.collapsible:after {
-    content: '\002B'; /* Unicode plus symbol */
-    color: white;
-    font-weight: bold;
-    float: right;
-    margin-left: 5px;
-}
-
-.collapsible.active:after {
-    content: "\2212"; /* Unicode minus symbol */
-}
-
-.content {
-    padding: 0 18px;
-    display: none;
-    overflow: hidden;
-    background-color: #f1f1f1;
-}
-
-.content p {
-    margin: 10px 0;
-}
-
-/* History section styling */
-.history-container {
-    background-color: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.history-container h2 {
-    margin-bottom: 20px;
-}
-
-#history-list {
-    list-style-type: none;
-}
-
-#history-list li {
-    padding: 10px;
-    border-bottom: 1px solid #e9ecef;
-}
-
-#history-list li:last-child {
-    border-bottom: none;
-}
-
-#reset-history {
-    background-color: #ffc107;
-    color: black;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-#reset-history:hover {
-    background-color: #e0a800;
-}
-
-/* Loading indicator */
-#loading {
-    font-size: 1.25rem;
-    font-weight: bold;
-    color: #007bff;
-    text-align: center;
-}
-
-#copy-button {
-    margin-bottom: 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-}
-
-#copy-button:hover {
-    background-color: #0056b3;
-}
-
-/* Brocardi Tab styles */
-.nav-tabs .nav-link {
-    background-color: #f1f1f1;
-    color: #007bff;
-}
-
-.nav-tabs .nav-link.active {
-    background-color: #007bff;
-    color: white;
-}
-
-.tab-pane {
-    padding: 15px;
-}
-
-/* Styles for scrollbars in the tab content */
-.tab-pane.scrollable {
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid #ced4da;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 15px;
-}
-
-/* Styles for individual Massime elements */
-.massima-item {
-    max-height: 100px;
-    overflow-y: auto;
-    border: 1px solid #ced4da;
-    padding: 10px;
-    margin-bottom: 10px;
-    background-color: #f8f9fa;
-    border-radius: 5px;
-}
-
-/* Collapsible button */
-button[data-bs-toggle="collapse"] {
-    width: 100%;
-    text-align: left;
-}
-
-/* General styles for buttons */
-button {
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+    margin-top: 1.5rem;
 }
 
 button.btn-primary {
@@ -326,17 +202,96 @@ button.btn-primary:hover {
     background-color: #0056b3;
 }
 
-button.btn-primary.collapsed::after {
-    content: '\002B'; /* Plus sign */
-    float: right;
+/* History Section Styling */
+.history-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-button.btn-primary::after {
-    content: "\2212"; /* Minus sign */
-    float: right;
+.history-container h2 {
+    margin-bottom: 1.5rem;
 }
 
-/* Style adjustments for Brocardi content */
-.card-body {
-    padding: 20px;
+#history-list {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+#history-list li {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.3s ease;
+}
+
+#history-list li:last-child {
+    border-bottom: none;
+}
+
+#history-list li:hover {
+    background-color: #f8f9fa;
+}
+
+/* Loading Indicator */
+#loading {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #007bff;
+    text-align: center;
+}
+
+/* Brocardi Tabs Styling */
+.nav-tabs .nav-link {
+    background-color: #f8f9fa;
+    color: #007bff;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.tab-pane {
+    padding: 1rem;
+}
+
+/* Scrollable Content in Brocardi */
+.tab-pane.scrollable {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+/* Massime Items */
+.massima-item {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 2rem;
+    }
+
+    .form-container, .results-container, .history-container {
+        padding: 1.5rem;
+    }
+
+    button[type="submit"],
+    button[type="button"],
+    button#reset-history {
+        width: 100%;
+        margin-bottom: 0.75rem;
+    }
 }

@@ -20,91 +20,105 @@
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h2 class="card-title mb-4">Inserisci i dettagli della norma</h2>
-                    <form id="scrape-form">
-                        <div class="mb-3">
-                            <label for="act_type" class="form-label">Tipo atto:</label>
-                            <select id="act_type" name="act_type" class="form-select" required>
-                                <option value="costituzione">Costituzione</option>
-                                <option value="legge">Legge</option>
-                                <option value="decreto legge">Decreto Legge</option>
-                                <option value="decreto legge">Decreto Legge</option>
-                                <option value="Regolamento UE">Regolamento UE</option>
-                                <option value="Direttiva UE">Direttiva UE</option>
-                                <option value="codice civile">Codice Civile</option>
-                                <option value="preleggi">Preleggi</option>
-                                <option value="codice penale">Codice Penale</option>
-                                <option value="codice di procedura civile">Codice di Procedura Civile</option>
-                                <option value="codice di procedura penale">Codice di Procedura Penale</option>
-                                <option value="TUE">TUE</option>
-                                <option value="TFUE">TFUE</option>
-                                <option value="CDFUE">CDFUE</option>
-                                <option value="codice della navigazione">Codice della Navigazione</option>
-                                <option value="codice postale e delle telecomunicazioni">Codice Postale e delle Telecomunicazioni</option>
-                                <option value="codice della strada">Codice della Strada</option>
-                                <option value="codice del processo tributario">Codice del Processo Tributario</option>
-                                <option value="codice in materia di protezione dei dati personali">Codice in Materia di Protezione dei Dati Personali</option>
-                                <option value="codice delle comunicazioni elettroniche">Codice delle Comunicazioni Elettroniche</option>
-                                <option value="codice dei beni culturali e del paesaggio">Codice dei Beni Culturali e del Paesaggio</option>
-                                <option value="codice della proprietà industriale">Codice della Proprietà Industriale</option>
-                                <option value="codice dell'amministrazione digitale">Codice dell'Amministrazione Digitale</option>
-                                <option value="codice della nautica da diporto">Codice della Nautica da Diporto</option>
-                                <option value="codice del consumo">Codice del Consumo</option>
-                                <option value="codice delle assicurazioni private">Codice delle Assicurazioni Private</option>
-                                <option value="norme in materia ambientale">Norme in Materia Ambientale</option>
-                                <option value="codice dei contratti pubblici">Codice dei Contratti Pubblici</option>
-                                <option value="codice delle pari opportunità">Codice delle Pari Opportunità</option>
-                                <option value="codice dell'ordinamento militare">Codice dell'Ordinamento Militare</option>
-                                <option value="codice del processo amministrativo">Codice del Processo Amministrativo</option>
-                                <option value="codice del turismo">Codice del Turismo</option>
-                                <option value="codice antimafia">Codice Antimafia</option>
-                                <option value="codice di giustizia contabile">Codice di Giustizia Contabile</option>
-                                <option value="codice del terzo settore">Codice del Terzo Settore</option>
-                                <option value="codice della protezione civile">Codice della Protezione Civile</option>
-                                <option value="codice della crisi d'impresa e dell'insolvenza">Codice della Crisi d'Impresa e dell'Insolvenza</option>
-
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="date" class="form-label">Data:</label>
-                            <input type="text" id="date" name="date" class="form-control" placeholder="gg/mm/aaaa">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="act_number" class="form-label">Numero atto:</label>
-                            <input type="text" id="act_number" name="act_number" class="form-control" placeholder="Inserisci il numero dell'atto">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="article" class="form-label">Articolo:</label>
-
-                            <div class="number-input">
-                                <button type="button" class="decrement">-</button>
-                                <input type="text" id="article" name="article" value="1" aria-label="Numero articolo">
-                                <button type="button" class="increment">+</button>
+                    <form id="scrape-form" class="needs-validation" novalidate>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="act_type" class="form-label">Tipo atto:</label>
+                                <select id="act_type" name="act_type" class="form-select" required>
+                                    <option value="">Seleziona un tipo di atto...</option>
+                                    <option value="costituzione">Costituzione</option>
+                                    <option value="legge">Legge</option>
+                                    <option value="decreto legge">Decreto Legge</option>
+                                    <option value="decreto legislativo">Decreto Legislativo</option>
+                                    <option value="Regolamento UE">Regolamento UE</option>
+                                    <option value="Direttiva UE">Direttiva UE</option>
+                                    <option value="codice civile">Codice Civile</option>
+                                    <option value="preleggi">Preleggi</option>
+                                    <option value="codice penale">Codice Penale</option>
+                                    <option value="codice di procedura civile">Codice di Procedura Civile</option>
+                                    <option value="codice di procedura penale">Codice di Procedura Penale</option>
+                                    <option value="TUE">TUE</option>
+                                    <option value="TFUE">TFUE</option>
+                                    <option value="CDFUE">CDFUE</option>
+                                    <option value="codice della navigazione">Codice della Navigazione</option>
+                                    <option value="codice postale e delle telecomunicazioni">Codice Postale e delle Telecomunicazioni</option>
+                                    <option value="codice della strada">Codice della Strada</option>
+                                    <option value="codice del processo tributario">Codice del Processo Tributario</option>
+                                    <option value="codice in materia di protezione dei dati personali">Codice in Materia di Protezione dei Dati Personali</option>
+                                    <option value="codice delle comunicazioni elettroniche">Codice delle Comunicazioni Elettroniche</option>
+                                    <option value="codice dei beni culturali e del paesaggio">Codice dei Beni Culturali e del Paesaggio</option>
+                                    <option value="codice della proprietà industriale">Codice della Proprietà Industriale</option>
+                                    <option value="codice dell'amministrazione digitale">Codice dell'Amministrazione Digitale</option>
+                                    <option value="codice della nautica da diporto">Codice della Nautica da Diporto</option>
+                                    <option value="codice del consumo">Codice del Consumo</option>
+                                    <option value="codice delle assicurazioni private">Codice delle Assicurazioni Private</option>
+                                    <option value="norme in materia ambientale">Norme in Materia Ambientale</option>
+                                    <option value="codice dei contratti pubblici">Codice dei Contratti Pubblici</option>
+                                    <option value="codice delle pari opportunità">Codice delle Pari Opportunità</option>
+                                    <option value="codice dell'ordinamento militare">Codice dell'Ordinamento Militare</option>
+                                    <option value="codice del processo amministrativo">Codice del Processo Amministrativo</option>
+                                    <option value="codice del turismo">Codice del Turismo</option>
+                                    <option value="codice antimafia">Codice Antimafia</option>
+                                    <option value="codice di giustizia contabile">Codice di Giustizia Contabile</option>
+                                    <option value="codice del terzo settore">Codice del Terzo Settore</option>
+                                    <option value="codice della protezione civile">Codice della Protezione Civile</option>
+                                    <option value="codice della crisi d'impresa e dell'insolvenza">Codice della Crisi d'Impresa e dell'Insolvenza</option>
+                                </select>
+                                <div class="invalid-feedback">
+                                    Seleziona un tipo di atto.
+                                </div>
                             </div>
-                            
-
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Versione:</label>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" id="vigente" name="version" value="vigente" checked>
-                                <label class="form-check-label" for="vigente">Vigente</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" id="originale" name="version" value="originale">
-                                <label class="form-check-label" for="originale">Originale</label>
+                            <div class="col-md-6">
+                                <label for="date" class="form-label">Data:</label>
+                                <input type="text" id="date" name="date" class="form-control" placeholder="gg/mm/aaaa" required>
+                                <div class="invalid-feedback">
+                                    Inserisci una data valida.
+                                </div>
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="version_date" class="form-label">Data versione:</label>
-                            <input type="date" id="version_date" name="version_date" class="form-control" disabled>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="act_number" class="form-label">Numero atto:</label>
+                                <input type="text" id="act_number" name="act_number" class="form-control" placeholder="Inserisci il numero dell'atto" required>
+                                <div class="invalid-feedback">
+                                    Inserisci il numero dell'atto.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="article" class="form-label">Articolo:</label>
+                                <div class="input-group">
+                                    <button type="button" class="btn btn-outline-secondary decrement" style="min-width: 45px;">-</button>
+                                    <input type="text" id="article" name="article" value="1" class="form-control text-center" aria-label="Numero articolo">
+                                    <button type="button" class="btn btn-outline-secondary increment" style="min-width: 45px;">+</button>
+                                </div>
+                            </div>
                         </div>
 
-                        <div class="d-grid gap-2 d-md-block">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Versione:</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="vigente" name="version" value="vigente" checked>
+                                    <label class="form-check-label" for="vigente">Vigente</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="originale" name="version" value="originale">
+                                    <label class="form-check-label" for="originale">Originale</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="version_date" class="form-label">Data versione:</label>
+                                <input type="date" id="version_date" name="version_date" class="form-control" disabled>
+                            </div>
+                        </div>
+
+                        <div class="mb-4 form-check">
+                            <input class="form-check-input" type="checkbox" id="show_brocardi_info" name="show_brocardi_info">
+                            <label class="form-check-label" for="show_brocardi_info">Visualizza informazioni Brocardi</label>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <button type="submit" class="btn btn-success">Estrai Dati</button>
                             <button type="button" id="reset-button" class="btn btn-danger">Reset</button>
                         </div>
@@ -124,24 +138,25 @@
             <div id="norma-data" class="mb-4"></div>
             <div id="result" class="mb-4"></div>
 
-        <!-- Collapsible Brocardi Info -->
-        <div id="brocardi-info-container" style="display:none;">
-            <button class="btn btn-primary mb-3" data-bs-toggle="collapse" data-bs-target="#brocardi-info" aria-expanded="false" aria-controls="brocardi-info">
-                Mostra informazioni Brocardi
-            </button>
-            <div class="collapse" id="brocardi-info">
-                <div class="card card-body">
-                    <!-- Tab Navigation -->
-                    <ul class="nav nav-tabs" id="brocardi-tabs" role="tablist">
-                        <!-- Tab items will be inserted dynamically -->
-                    </ul>
-                    <!-- Tab Content -->
-                    <div class="tab-content" id="brocardi-tab-content">
-                        <!-- Tab panes will be inserted dynamically -->
+            <!-- Collapsible Brocardi Info -->
+            <div id="brocardi-info-container" style="display:none;">
+                <button class="btn btn-primary mb-3" data-bs-toggle="collapse" data-bs-target="#brocardi-info" aria-expanded="false" aria-controls="brocardi-info">
+                    Mostra informazioni Brocardi
+                </button>
+                <div class="collapse" id="brocardi-info">
+                    <div class="card card-body">
+                        <!-- Tab Navigation -->
+                        <ul class="nav nav-tabs" id="brocardi-tabs" role="tablist">
+                            <!-- Tab items will be inserted dynamically -->
+                        </ul>
+                        <!-- Tab Content -->
+                        <div class="tab-content" id="brocardi-tab-content">
+                            <!-- Tab panes will be inserted dynamically -->
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- History Section -->
         <section class="history-container">
