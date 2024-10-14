@@ -58,7 +58,8 @@ def _parse_normattiva_tree(soup, normurn, link):
         return "No 'ul' element found within the 'albero' div", 0
 
     article_part_pattern = re.compile(r'art\d+')
-    result = []
+    result = []  # List to preserve the order
+    seen = set()  # Set to track seen articles
     count = 0
 
     for ul in uls:
@@ -69,31 +70,37 @@ def _parse_normattiva_tree(soup, normurn, link):
                 continue
 
             text_content = a.get_text(separator=" ", strip=True).replace("art. ", "")
-            
-            if link:
-                article_part = article_part_pattern.search(normurn)
-                modified_url = normurn.replace(article_part.group(), 'art' + text_content.split()[0]) if article_part else normurn
-                result.append({text_content: modified_url})
-            else:
-                result.append(text_content)
-            
-            count += 1
 
-    logging.info(f"Extracted {count} articles from Normattiva")
-    return result, count
+            if text_content not in seen:  # Check for duplicates
+                seen.add(text_content)  # Add to the set to track duplicates
+                if link:
+                    article_part = article_part_pattern.search(normurn)
+                    modified_url = normurn.replace(article_part.group(), 'art' + text_content.split()[0]) if article_part else normurn
+                    result.append({text_content: modified_url})  # Add as dictionary if link is true
+                else:
+                    result.append(text_content)  # Add text content to the list
+                
+                count += 1
+
+    logging.info(f"Extracted {count} unique articles from Normattiva")
+    return result, count  # Return the list and count
 
 @lru_cache(maxsize=MAX_CACHE_SIZE)
 def _parse_eurlex_tree(soup):
     """Parses the Eurlex-specific tree structure."""
     logging.info("Parsing Eurlex structure")
-    result = []
+    result = []  # List to preserve the order
+    seen = set()  # Set to track seen articles
 
     for a_tag in soup.find_all('a'):
         if 'Articolo' in a_tag.text:
             match = re.search(r'Articolo\s+(\d+\s*\w*)', a_tag.get_text(strip=True))
             if match:
-                result.append(match.group(1).strip())
+                article_number = match.group(1).strip()
+                if article_number not in seen:  # Check for duplicates
+                    seen.add(article_number)  # Add to the set to track duplicates
+                    result.append(article_number)  # Add to the list
     
     count = len(result)
-    logging.info(f"Extracted {count} articles from Eurlex")
-    return result, count
+    logging.info(f"Extracted {count} unique articles from Eurlex")
+    return result, count  # Return the list and count
