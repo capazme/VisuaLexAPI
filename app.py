@@ -203,7 +203,7 @@ def generate_cache_key(normavisitata):
     return f"{normavisitata.norma.tipo_atto_urn}:{normavisitata.numero_articolo}:{normavisitata.versione}:{normavisitata.norma.data}:{normavisitata.norma.numero_atto}:{normavisitata.data_versione}:{normavisitata.allegato}"
 
 @app.route('/fetch_norm', methods=['POST'])
-async def fetch_norm():
+async def fetch_data():
     """Endpoint to fetch the details of a legal norm, including Brocardi info."""
     try:
         # Extract data from request
@@ -279,7 +279,7 @@ async def get_cached_brocardi_info(normavisitata):
             'result': norma_art_text_cleaned,
             'urn': normavisitata.urn,
             'norma_data': normavisitata.to_dict(),
-            'barocardi_info': {
+            'brocardi_info': {
                 'position': position,
                 'info': info,
                 'link': norma_link
@@ -297,6 +297,57 @@ async def get_cached_brocardi_info(normavisitata):
 @app.route('/')
 async def home():
     return await render_template('index.html')
+
+@app.route('/history', methods=['GET'])
+async def get_history():
+    """Endpoint to get the history of visited norms."""
+    try:
+        log.info("Fetching history")
+        history_list = [norma.to_dict() for norma in history]
+        return jsonify(history_list)
+    except Exception as e:
+        log.error("Error in get_history", error=str(e))
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/export_pdf', methods=['POST'])
+async def export_pdf():
+    """Endpoint to export the legal norm as a PDF."""
+    try:
+        # Extract data from request
+        data = await request.get_json()
+        urn = data['urn']
+        log.info("Received data for export_pdf", urn=urn)
+
+        # Generate filename and check if the PDF already exists
+        filename = urn_to_filename(urn)
+        if not filename:
+            raise ValueError("Invalid URN")
+
+        pdf_path = os.path.join(os.getcwd(), "download", filename)
+        log.info("PDF path", pdf_path=pdf_path)
+
+        # If PDF already exists, serve it
+        if os.path.exists(pdf_path):
+            log.info("PDF already exists", pdf_path=pdf_path)
+            return await send_file(pdf_path, as_attachment=True)
+
+        # Generate PDF if not present
+        driver = await asyncio.to_thread(driver_manager.setup_driver)
+        pdf_path = await asyncio.to_thread(extract_pdf, driver, urn, 30)
+        if not pdf_path:
+            raise ValueError("Error generating PDF")
+
+        # Rename and save the PDF to the correct path
+        os.rename(os.path.join(os.getcwd(), "download", pdf_path), pdf_path)
+        log.info("PDF generated and saved", pdf_path=pdf_path)
+
+        return await send_file(pdf_path, as_attachment=True)
+    except Exception as e:
+        log.error("Error in export_pdf", error=str(e))
+        return jsonify({'error': str(e)})
+    finally:
+        await asyncio.to_thread(driver_manager.close_drivers)
+        log.info("Driver closed")
 
 if __name__ == '__main__':
     log.info("Starting Quart app in async mode")
