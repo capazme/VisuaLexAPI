@@ -292,7 +292,9 @@ class NormaController:
         
         out = []
 
-        for article in articles: 
+        for article in articles:
+            if ' ' in article.strip():
+                article = article.replace(' ', '-') 
             out.append(NormaVisitata(
                 norma=norma,
                 numero_articolo=article,

@@ -1,16 +1,14 @@
-import re
-import os
+import requests
 import logging
 from bs4 import BeautifulSoup
 from functools import lru_cache
-from .config import MAX_CACHE_SIZE
 from .map import BROCARDI_CODICI
 from .norma import NormaVisitata
 from .text_op import normalize_act_type
 from .sys_op import BaseScraper
-import requests
-
-CURRENT_APP_PATH = os.path.dirname(os.path.abspath(__file__))
+from .config import MAX_CACHE_SIZE
+import re
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -18,15 +16,17 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("brocardi_scraper.log"),
                               logging.StreamHandler()])
 
+CURRENT_APP_PATH = os.path.dirname(os.path.abspath(__file__))
 
 class BrocardiScraper(BaseScraper):
     def __init__(self):
         logging.info("Initializing BrocardiScraper")
         self.knowledge = [BROCARDI_CODICI]
 
+    @lru_cache(maxsize=MAX_CACHE_SIZE)
     def do_know(self, norma_visitata: NormaVisitata):
         logging.info(f"Checking if knowledge exists for norma: {norma_visitata}")
-        
+
         strcmp = self._build_norma_string(norma_visitata)
         if strcmp is None:
             logging.error("Invalid norma format")
@@ -40,6 +40,7 @@ class BrocardiScraper(BaseScraper):
         logging.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
 
+    @lru_cache(maxsize=MAX_CACHE_SIZE)
     def look_up(self, norma_visitata: NormaVisitata):
         logging.info(f"Looking up norma: {norma_visitata}")
 
@@ -66,6 +67,7 @@ class BrocardiScraper(BaseScraper):
         logging.info("No article number provided")
         return None
 
+    @lru_cache(maxsize=MAX_CACHE_SIZE)
     def _find_article_link(self, soup, base_url, numero_articolo):
         pattern = re.compile(rf'href=["\']([^"\']*art{re.escape(numero_articolo)}\.html)["\']')
 
@@ -101,7 +103,7 @@ class BrocardiScraper(BaseScraper):
 
         norma_link = self.look_up(norma_visitata)
         if not norma_link:
-            return None
+            return None, {}, None
 
         try:
             response = requests.get(norma_link)
@@ -109,7 +111,7 @@ class BrocardiScraper(BaseScraper):
             soup = BeautifulSoup(response.text, 'html.parser')
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to retrieve content for norma link: {norma_link}: {e}")
-            return None
+            return None, {}, None
 
         info = {}
         info['Position'] = self._extract_position(soup)
@@ -129,26 +131,22 @@ class BrocardiScraper(BaseScraper):
             logging.warning("Main content section not found")
             return
 
-        # Extract Brocardi sections
         brocardi_sections = corpo.find_all('div', class_='brocardi-content')
         if brocardi_sections:
             info['Brocardi'] = [section.get_text(strip=False) for section in brocardi_sections]
 
-        # Extract Ratio section
         ratio_section = corpo.find('div', class_='container-ratio')
         if ratio_section:
             ratio_text = ratio_section.find('div', class_='corpoDelTesto')
             if ratio_text:
                 info['Ratio'] = ratio_text.get_text(strip=False)
 
-        # Extract Explanation section
         spiegazione_header = corpo.find('h3', string=lambda text: 'Spiegazione dell\'art' in text)
         if spiegazione_header:
             spiegazione_content = spiegazione_header.find_next_sibling('div', class_='text')
             if spiegazione_content:
                 info['Spiegazione'] = spiegazione_content.get_text(strip=False)
 
-        # Extract Maxims section
         massime_header = corpo.find('h3', string=lambda text: 'Massime relative all\'art' in text)
         if massime_header:
             massime_content = massime_header.find_next_sibling('div', class_='text')
