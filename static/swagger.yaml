@@ -1,0 +1,286 @@
+openapi: 3.0.0
+info:
+  title: VisuaLex API
+  version: 1.0.0
+  description: API per il recupero e la gestione delle norme giuridiche.
+servers:
+  - url: http://localhost:8000
+    description: Server locale per VisuaLex
+paths:
+  /fetch_norma_data:
+    post:
+      summary: Recupera dati sulle norme
+      description: Recupera informazioni su una norma giuridica specificata.
+      requestBody:
+        description: Dati della norma
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                act_type:
+                  type: string
+                  description: Tipo di atto giuridico (es. legge, decreto, etc.)
+                  example: "legge"
+                date:
+                  type: string
+                  description: Data dell'atto giuridico
+                  example: "2022-01-01"
+                act_number:
+                  type: string
+                  description: Numero dell'atto giuridico
+                  example: "123"
+                article:
+                  type: string
+                  description: Numero dell'articolo da recuperare
+                  example: "1-bis"
+      responses:
+        '200':
+          description: Dati della norma recuperati correttamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  norma_data:
+                    type: object
+                    description: Dati completi della norma.
+  /fetch_article_text:
+    post:
+      summary: Recupera il testo di un articolo
+      description: Recupera il testo di un articolo specificato di una norma giuridica.
+      requestBody:
+        description: Dati della norma e articolo
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                act_type:
+                  type: string
+                  description: Tipo di atto giuridico
+                  example: "legge"
+                date:
+                  type: string
+                  description: Data dell'atto giuridico
+                  example: "2022-01-01"
+                act_number:
+                  type: string
+                  description: Numero dell'atto giuridico
+                  example: "123"
+                article:
+                  type: string
+                  description: Numero dell'articolo da recuperare
+                  example: "1-bis"
+      responses:
+        '200':
+          description: Testo dell'articolo recuperato correttamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  article_text:
+                    type: string
+                    description: Testo dell'articolo.
+  /fetch_brocardi_info:
+    post:
+      summary: Recupera informazioni da Brocardi
+      description: Recupera informazioni dettagliate da Brocardi riguardanti una norma giuridica.
+      requestBody:
+        description: Dati della norma
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                act_type:
+                  type: string
+                  description: Tipo di atto giuridico
+                  example: "legge"
+                date:
+                  type: string
+                  description: Data dell'atto giuridico
+                  example: "2022-01-01"
+                act_number:
+                  type: string
+                  description: Numero dell'atto giuridico
+                  example: "123"
+      responses:
+        '200':
+          description: Informazioni Brocardi recuperate correttamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  position:
+                    type: string
+                    description: Posizione dell'informazione.
+                  brocardi:
+                    type: string
+                    description: Informazioni Brocardi, se presenti.
+                  ratio:
+                    type: string
+                    description: Ratio della norma giuridica, se presente.
+                  spiegazione:
+                    type: string
+                    description: Spiegazione della norma giuridica, se presente.
+                  massime:
+                    type: array
+                    description: Massime giuridiche correlate, se presenti.
+                    items:
+                      type: string
+                  norma_data:
+                    type: object
+                    description: Dati completi della norma.
+      responses:
+        '200':
+          description: Informazioni Brocardi recuperate correttamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  brocardi_info:
+                    type: object
+                    properties:
+                      position:
+                        type: string
+                        description: Posizione dell'informazione.
+                      info:
+                        type: object
+                        description: Dettagli sull'informazione.
+                      link:
+                        type: string
+                        description: Link alla norma su Brocardi.
+  /fetch_all_data:
+    post:
+      summary: Recupera tutte le informazioni relative a una norma
+      description: Recupera informazioni complete su una norma, inclusi articoli e dati aggiuntivi.
+      requestBody:
+        description: Dati della norma
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                act_type:
+                  type: string
+                  description: Tipo di atto giuridico
+                  example: "legge"
+                date:
+                  type: string
+                  description: Data dell'atto giuridico
+                  example: "2022-01-01"
+                act_number:
+                  type: string
+                  description: Numero dell'atto giuridico
+                  example: "123"
+      responses:
+        '200':
+          description: Dati completi della norma recuperati correttamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    norma_data:
+                      type: object
+                      description: Dati completi della norma.
+                    article_text:
+                      type: string
+                      description: Testo dell'articolo.
+                    brocardi_info:
+                      type: object
+                      properties:
+                        position:
+                          type: string
+                          description: Posizione dell'informazione.
+                        info:
+                          type: object
+                          description: Dettagli sull'informazione.
+                        link:
+                          type: string
+                          description: Link alla norma su Brocardi.
+  /fetch_norm:
+    post:
+      summary: Recupera i dettagli di una norma giuridica
+      description: Recupera i dettagli di una norma, inclusi articoli e informazioni correlate.
+      requestBody:
+        description: Dati della norma
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                act_type:
+                  type: string
+                  description: Tipo di atto giuridico
+                  example: "legge"
+                date:
+                  type: string
+                  description: Data dell'atto giuridico
+                  example: "2022-01-01"
+                act_number:
+                  type: string
+                  description: Numero dell'atto giuridico
+                  example: "123"
+      responses:
+        '200':
+          description: Dettagli della norma recuperati correttamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    norma_data:
+                      type: object
+                      description: Dati completi della norma.
+                    brocardi_info:
+                      type: object
+                      properties:
+                        position:
+                          type: string
+                          description: Posizione dell'informazione.
+                        info:
+                          type: object
+                          description: Dettagli sull'informazione.
+                        link:
+                          type: string
+                          description: Link alla norma su Brocardi.
+  /history:
+    get:
+      summary: Recupera la cronologia delle norme visitate
+      description: Restituisce una lista delle norme recentemente visitate.
+      responses:
+        '200':
+          description: Cronologia recuperata correttamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    tipo_atto:
+                      type: string
+                      description: Tipo di atto giuridico.
+                    data:
+                      type: string
+                      description: Data dell'atto giuridico.
+                    numero_atto:
+                      type: string
+                      description: Numero dell'atto giuridico.
+                    url:
+                      type: string
+                      description: URL dell'atto giuridico.

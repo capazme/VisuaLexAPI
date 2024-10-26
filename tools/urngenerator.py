@@ -8,7 +8,7 @@ from .config import MAX_CACHE_SIZE
 from .text_op import normalize_act_type, parse_date, estrai_data_da_denominazione
 from .map import NORMATTIVA_URN_CODICI, EURLEX
 from .sys_op import WebDriverManager
-from . import eurlex
+from .eurlex_scraper import EurlexScraper
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
+
 def complete_date(act_type, date, act_number):
     """
     Completes the date of a legal norm using the Normattiva website.
@@ -54,7 +54,7 @@ def complete_date(act_type, date, act_number):
     finally:
         driver_manager.close_drivers()
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
+
 def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None, version_date=None, urn_flag=True):
     """
     Generates the URN for a legal norm.
@@ -86,12 +86,8 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     
     # Handle EURLEX cases
     if normalized_act_type in EURLEX:
-        
-        if normalized_act_type in {"CDFUE", "TUE", "TFUE"}:
-            logging.info(f"Returning EURLEX URN for trattato: {EURLEX[normalized_act_type]}")
-            return EURLEX[normalized_act_type]
-        else:
-            return eurlex.get_eur_uri(act_type=EURLEX[normalized_act_type], year=date, num=act_number)  # Assuming eurlex is defined
+        eurlex_scraper = EurlexScraper()
+        return eurlex_scraper.get_uri(act_type=normalized_act_type, year=date, num=act_number)
 
     # Handle other cases with codici_urn
     if normalized_act_type in codici_urn:
@@ -118,6 +114,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     logging.info(f"Final URN: {result}")
     
     return result
+
 
 def complete_date_or_parse(date, act_type, act_number):
     """

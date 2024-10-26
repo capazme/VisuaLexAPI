@@ -24,6 +24,7 @@ class Norma:
         logging.debug(f"Norma initialized: {self}")
 
     @property
+     
     def url(self):
         if not self._url:
             logging.debug("Generating URL for Norma.")
@@ -36,7 +37,7 @@ class Norma:
         return self._url
 
     @property
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
+     
     def tree(self):
         if not self._tree:
             logging.debug("Fetching tree structure for Norma.")
@@ -86,7 +87,7 @@ class NormaVisitata:
         logging.debug(f"NormaVisitata initialized: {self}")
 
     @property
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
+     
     def urn(self):
         if not self._urn:
             logging.debug("Generating URN for NormaVisitata.")

@@ -2,6 +2,8 @@ import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import logging
+from bs4 import BeautifulSoup
+import requests
 
 class WebDriverManager:
     def __init__(self):
@@ -58,6 +60,21 @@ class WebDriverManager:
         self.drivers.clear()
         logging.info("All WebDriver instances closed and cleared")
 
+class BaseScraper:
+    def request_document(self, url):
+        logging.info(f"Consulting source - URL: {url}")
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error during consultation: {e}")
+            raise ValueError(f"Problem with download: {e}")
+        return response.text
+
+    def parse_document(self, html_content):
+        logging.info("Parsing document content")
+        return BeautifulSoup(html_content, 'html.parser')
+    
 # Usage example:
 # driver_manager = WebDriverManager()
 # driver = driver_manager.setup_driver()

@@ -13,12 +13,11 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-
 def parse_article_input(article_string, normurn):
     """
     Pulisce e valida la stringa degli articoli, supporta range e articoli separati da virgole.
     Supporta estensioni degli articoli (es. 1-bis, 2-ter).
-    Utilizza get_tree per gestire correttamente i range con articoli aggiuntivi.
+    Utilizza get_tree per gestire correttamente i range con articoli aggiuntivi solo quando necessario.
     
     Arguments:
     article_string -- Stringa contenente gli articoli (es. "1, 2-bis, 3, 4-6, 7-ter")
@@ -28,16 +27,19 @@ def parse_article_input(article_string, normurn):
     logging.debug(f"Article string: {article_string}")
     logging.debug(f"Norm URN: {normurn}")
 
+    # Se la stringa degli articoli è vuota, restituisci la lista completa
+    if not article_string.strip():
+        try:
+            all_articles, _ = get_tree(normurn)
+            logging.info("Returning complete list of articles from norm")
+            logging.debug(f"All articles retrieved: {all_articles}")
+            return all_articles
+        except Exception as e:
+            error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"
+            logging.error(error_message, exc_info=True)
+            return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
+
     articles = []
-    
-    # Ottieni la lista degli articoli dall'atto
-    try:
-        all_articles, _ = get_tree(normurn)
-        logging.info("Successfully retrieved article list from norm")
-        logging.debug(f"All articles retrieved: {all_articles}")
-    except Exception as e:
-        logging.error(f"Failed to retrieve articles from norm URN: {normurn}", exc_info=True)
-        raise e
 
     # Rimuovi spazi extra e dividi per virgole
     parts = article_string.strip().split(',')
@@ -54,11 +56,15 @@ def parse_article_input(article_string, normurn):
         # Regex per verificare se la parte è un range (numero-numero)
         range_match = re.match(r'^(\d+)-(\d+)$', part)
         if range_match:
-            start, end = range_match.groups()
+            start, end = map(int, range_match.groups())  # Converti start e end in interi
             logging.debug(f"Found range: start={start}, end={end}")
+
+            # Chiamata a get_tree solo in caso di range
             try:
-                start = int(start)
-                end = int(end)
+                all_articles, _ = get_tree(normurn)
+                logging.info("Successfully retrieved article list from norm")
+                logging.debug(f"All articles retrieved: {all_articles}")
+
                 # Aggiungi tutti gli articoli nel range, inclusi quelli con estensioni
                 for article in all_articles:
                     article_number = re.match(r'^(\d+)', article)
@@ -67,23 +73,23 @@ def parse_article_input(article_string, normurn):
                         if start <= article_num <= end:
                             logging.debug(f"Adding article from range: {article}")
                             articles.append(article)
-            except ValueError:
-                logging.error(f"Invalid range value: {part}", exc_info=True)
-                raise ValueError(f"Invalid range: {part}")
+
+            except Exception as e:
+                error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"
+                logging.error(error_message, exc_info=True)
+                return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
+
         else:
             # Regex per verificare se la parte è un articolo con estensione (es. 1-bis, 2-ter)
             single_article_match = re.match(r'^(\d+(-[a-z]+)?)$', part, re.IGNORECASE)
             if single_article_match:
                 logging.debug(f"Found single article: {part}")
-                if part in all_articles:
-                    logging.debug(f"Adding article: {part}")
-                    articles.append(part)
-                else:
-                    logging.error(f"Article not found in norm: {part}")
-                    raise ValueError(f"Article not found: {part}")
+                # Aggiungi l'articolo direttamente senza chiamare get_tree
+                articles.append(part)  # Aggiungiamo l'articolo, supponendo che la validità venga gestita successivamente
             else:
-                logging.error(f"Invalid article format: {part}")
-                raise ValueError(f"Invalid article: {part}")
+                error_message = f"Invalid article format: {part}"
+                logging.error(error_message)
+                return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
 
     logging.info("Article parsing completed successfully")
     logging.debug(f"Parsed articles: {articles}")
@@ -104,7 +110,6 @@ def nospazi(text):
     logging.debug(f"Text after removing spaces: {textout}")
     return textout
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def parse_date(input_date):
     """
     Converts a date string in extended format or YYYY-MM-DD to the format YYYY-MM-DD.
@@ -143,7 +148,6 @@ def parse_date(input_date):
         logging.error("Invalid date format")
         raise ValueError("Formato data non valido")
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def format_date_to_extended(input_date):
     """
     Converts a date string in the format YYYY-MM-DD to its extended format in Italian.
@@ -175,7 +179,6 @@ def format_date_to_extended(input_date):
         logging.error("Invalid date format")
         raise ValueError("Formato data non valido")
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def normalize_act_type(input_type, search=False, source='normattiva'):
     """
     Normalizes the type of legislative act based on the input.
@@ -202,7 +205,6 @@ def normalize_act_type(input_type, search=False, source='normattiva'):
     logging.debug(f"Normalized act type: {normalized_type}")
     return normalized_type
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def estrai_data_da_denominazione(denominazione):
     """
     Extracts a date from a denomination string.
@@ -226,7 +228,6 @@ def estrai_data_da_denominazione(denominazione):
     logging.debug("No date found in denomination")
     return denominazione
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def estrai_numero_da_estensione(estensione):
     """
     Extracts the corresponding number from an extension (e.g., 'bis', 'tris').
@@ -276,7 +277,6 @@ def get_annex_from_urn(urn):
     logging.debug("No annex found in URN")
     return None
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
 def clean_text(article_text):
     """
     Pulisce il testo dell'articolo:

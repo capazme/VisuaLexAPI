@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
+ 
 def get_tree(normurn, link=False):
     """
     Retrieves the article tree from a given norm URN and extracts article information.
@@ -42,7 +42,7 @@ def get_tree(normurn, link=False):
     logging.warning(f"Unrecognized norm URN format: {normurn}")
     return "Unrecognized norm URN format"
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
+ 
 def _parse_normattiva_tree(soup, normurn, link):
     """Parses the Normattiva-specific tree structure."""
     logging.info("Parsing Normattiva structure")
@@ -85,7 +85,7 @@ def _parse_normattiva_tree(soup, normurn, link):
     logging.info(f"Extracted {count} unique articles from Normattiva")
     return result, count  # Return the list and count
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
+ 
 def _parse_eurlex_tree(soup):
     """Parses the Eurlex-specific tree structure."""
     logging.info("Parsing Eurlex structure")

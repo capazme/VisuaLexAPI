@@ -7,6 +7,7 @@ from .config import MAX_CACHE_SIZE
 from .map import BROCARDI_CODICI
 from .norma import NormaVisitata
 from .text_op import normalize_act_type
+from .sys_op import BaseScraper
 import requests
 
 CURRENT_APP_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -17,22 +18,19 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("brocardi_scraper.log"),
                               logging.StreamHandler()])
 
-class BrocardiScraper:
-    """
-    Scraper for Brocardi.it to search for legal terms and provide links.
-    """
+
+class BrocardiScraper(BaseScraper):
     def __init__(self):
         logging.info("Initializing BrocardiScraper")
         self.knowledge = [BROCARDI_CODICI]
 
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def do_know(self, norma_visitata):
+    def do_know(self, norma_visitata: NormaVisitata):
         logging.info(f"Checking if knowledge exists for norma: {norma_visitata}")
         
         strcmp = self._build_norma_string(norma_visitata)
         if strcmp is None:
             logging.error("Invalid norma format")
-            raise ValueError("Formato norma non valido")
+            raise ValueError("Invalid norma format")
 
         for txt, link in self.knowledge[0].items():
             if strcmp.lower() in txt.lower():
@@ -42,13 +40,8 @@ class BrocardiScraper:
         logging.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
 
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def look_up(self, norma_visitata):
+    def look_up(self, norma_visitata: NormaVisitata):
         logging.info(f"Looking up norma: {norma_visitata}")
-
-        if not isinstance(norma_visitata, NormaVisitata):
-            logging.error("Invalid input type for norma")
-            return None
 
         norma_info = self.do_know(norma_visitata)
         if not norma_info:
@@ -103,12 +96,8 @@ class BrocardiScraper:
         logging.info("No matching article found")
         return None
 
-    def get_info(self, norma_visitata):
+    def get_info(self, norma_visitata: NormaVisitata):
         logging.info(f"Getting info for norma: {norma_visitata}")
-
-        if not isinstance(norma_visitata, NormaVisitata):
-            logging.error("Invalid input type for norma")
-            return None
 
         norma_link = self.look_up(norma_visitata)
         if not norma_link:
@@ -166,7 +155,7 @@ class BrocardiScraper:
             if massime_content:
                 info['Massime'] = [massima.get_text(strip=False) for massima in massime_content]
 
-    def _build_norma_string(self, norma_visitata):
+    def _build_norma_string(self, norma_visitata: NormaVisitata):
         if isinstance(norma_visitata, NormaVisitata):
             norma = norma_visitata.norma
             tipo_norm = normalize_act_type(norma.tipo_atto_str, True, 'brocardi')

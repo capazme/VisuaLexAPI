@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-@lru_cache(maxsize=MAX_CACHE_SIZE)
+ 
 def extract_pdf(driver, urn, timeout=30):
     """
     Extracts a PDF from a given URN using Selenium WebDriver.
