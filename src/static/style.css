@@ -194,48 +194,67 @@ button#reset-history:hover {
     overflow-x: auto;
 }
 
-/* Collapsible Brocardi Info */
-#brocardi-info-container {
-    margin-top: 2rem;
+/* Stili per le informazioni Brocardi */
+.brocardi-info {
+    padding: 10px;
+    background-color: #f8f9fa; /* Sfondo leggermente grigio */
+    border: 1px solid #dee2e6; /* Bordo leggero */
+    border-radius: 5px;
 }
 
+/* Box per ogni sezione (Brocardi, Ratio, Spiegazione, Massime, Link) */
 .brocardi-section {
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid #dee2e6;
-    padding: 1rem;
-    background-color: #f8f9fa;
-    border-radius: 0.25rem;
-    margin-bottom: 1rem;
+    margin-bottom: 15px;
+    padding: 15px;
+    background-color: #ffffff; /* Sfondo bianco */
+    border: 1px solid #ced4da; /* Bordo grigio chiaro */
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Leggera ombra */
 }
 
+/* Box per ogni elemento della lista */
 .brocardi-item {
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid #ced4da;
-    padding: 0.75rem;
-    background-color: #ffffff;
-    border-radius: 0.25rem;
-    margin-bottom: 1rem;
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #e9ecef; /* Sfondo grigio chiaro */
+    border: 1px solid #ced4da; /* Bordo grigio */
+    border-radius: 5px;
+    overflow-y: auto; /* Scrollbar verticale */
+    max-height: 100px; /* Altezza massima */
+    white-space: pre-wrap; /* Avvolgimento del testo */
+    word-wrap: break-word; /* Suddivide parole troppo lunghe */
 }
 
-.brocardi-item h5 {
-    font-weight: bold;
-    margin-bottom: 0.5rem;
+/* Miglioramento della leggibilità delle liste */
+.brocardi-content ul {
+    list-style-type: none; /* Rimuove i bullet points */
+    padding-left: 0;
 }
 
-.brocardi-item p {
-    margin-bottom: 0.5rem;
+.brocardi-content li::before {
+    content: '• '; /* Aggiunge un bullet personalizzato */
+    color: #0d6efd; /* Colore blu per i bullet */
 }
 
-.brocardi-item a {
-    color: #007bff;
+.brocardi-content a {
+    color: #0d6efd;
     text-decoration: none;
 }
 
-.brocardi-item a:hover {
+.brocardi-content a:hover {
     text-decoration: underline;
 }
+
+/* Stili specifici per Ratio, Massime e Spiegazione per renderli scrollabili */
+.scrollable-section {
+    max-height: 200px; /* Imposta l'altezza massima desiderata */
+    overflow-y: auto;  /* Abilita lo scrolling verticale */
+    padding: 10px;
+    background-color: #f1f3f5; /* Sfondo leggermente diverso per distinguere */
+    border: 1px solid #ced4da; /* Bordo grigio */
+    border-radius: 5px;
+}
+
 
 /* Tabs Styling */
 .nav-tabs .nav-link {
@@ -308,4 +327,26 @@ button#reset-history:hover {
         width: 100%;
         margin-bottom: 0.75rem;
     }
+}
+
+/* Aggiungi uno sfondo leggermente più scuro per gli elementi ridimensionabili */
+.resizable {
+    background-color: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: relative; /* Necessario per la maniglia di ridimensionamento */
+}
+
+/* Maniglia di ridimensionamento */
+.resizable::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 10px;
+    height: 10px;
+    background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMu/b3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMyA3bC0zIDMgMCA4IDMgLTNsLTMgMyIgZmlsbD0iIzAwMCIvPgo8L3N2Zz4=')
+        no-repeat center center;
+    cursor: se-resize;
 }

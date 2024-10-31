@@ -74,6 +74,15 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    /**
+     * Sanifica una stringa per utilizzarla come ID HTML valido.
+     * @param {string} str - La stringa da sanificare.
+     * @returns {string} - La stringa sanificata.
+     */
+    function sanitize(str) {
+        return str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
+    }
+
     function savePinnedTabs() {
         if (localStorage) {
             localStorage.setItem('pinnedTabs', JSON.stringify(pinnedTabs));
@@ -139,6 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return string.charAt(0).toUpperCase() + string.slice(1);
     }
 
+    /**
+     * Aggiunge le informazioni Brocardi a un elemento specificato.
+     * @param {Object} brocardiInfo - Le informazioni Brocardi da visualizzare.
+     * @param {HTMLElement} brocardiInfoDiv - Il contenitore dove inserire le informazioni.
+     */
     function populateBrocardiInfo(brocardiInfo, brocardiInfoDiv) {
         if (!brocardiInfoDiv) return;
         const brocardiContentDiv = brocardiInfoDiv.querySelector('.brocardi-content');
@@ -146,34 +160,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
         brocardiContentDiv.innerHTML = ''; // Resetta il contenuto
 
-        if (brocardiInfo.Brocardi) {
-            if (Array.isArray(brocardiInfo.Brocardi)) {
-                brocardiInfo.Brocardi.forEach(brocardo => {
-                    brocardiContentDiv.innerHTML += `<p>${brocardo}</p>`;
-                });
-            } else {
-                brocardiContentDiv.innerHTML += `<p>${brocardiInfo.Brocardi}</p>`;
+        // Funzione per creare una sezione
+        function createSection(title, content, isList = false) {
+            const sectionDiv = document.createElement('div');
+            sectionDiv.classList.add('brocardi-section', 'resizable'); // Aggiungi 'resizable'
+
+            // Aggiungi classe specifica se la sezione è Brocardi, Massime o Spiegazione
+            if (title === 'Brocardi' || title === 'Massime' || title === 'Spiegazione') {
+                sectionDiv.classList.add('scrollable-section');
             }
+
+            const heading = document.createElement('h6');
+            heading.textContent = title + ':';
+            sectionDiv.appendChild(heading);
+
+            if (isList && Array.isArray(content)) {
+                content.forEach(item => {
+                    const itemBox = document.createElement('div');
+                    itemBox.classList.add('brocardi-item');
+                    itemBox.innerHTML = item.trim();
+                    sectionDiv.appendChild(itemBox);
+                });
+            } else if (typeof content === 'string') {
+                const paragraph = document.createElement('p');
+                paragraph.innerHTML = content.trim();
+                sectionDiv.appendChild(paragraph);
+            }
+
+            brocardiContentDiv.appendChild(sectionDiv);
         }
 
+        // Sezione Brocardi
+        if (brocardiInfo.Brocardi && brocardiInfo.Brocardi.length > 0) {
+            createSection('Brocardi', brocardiInfo.Brocardi, true);
+        }
+
+        // Sezione Ratio
         if (brocardiInfo.Ratio) {
-            brocardiContentDiv.innerHTML += `<p><strong>Ratio:</strong> ${brocardiInfo.Ratio}</p>`;
+            createSection('Ratio', `<strong>Ratio:</strong> ${brocardiInfo.Ratio}`);
         }
 
+        // Sezione Spiegazione
         if (brocardiInfo.Spiegazione) {
-            brocardiContentDiv.innerHTML += `<p><strong>Spiegazione:</strong> ${brocardiInfo.Spiegazione}</p>`;
+            createSection('Spiegazione', `<strong>Spiegazione:</strong> ${brocardiInfo.Spiegazione}`);
         }
 
+        // Sezione Massime
         if (brocardiInfo.Massime && brocardiInfo.Massime.length > 0) {
-            brocardiContentDiv.innerHTML += `<h6>Massime:</h6>`;
-            brocardiInfo.Massime.forEach(massima => {
-                brocardiContentDiv.innerHTML += `<p>${massima}</p>`;
-            });
+            createSection('Massime', brocardiInfo.Massime, true);
         }
 
+        // Sezione Link
         if (brocardiInfo.link) {
-            brocardiContentDiv.innerHTML += `<p><strong>Link:</strong> <a href="${brocardiInfo.link}" target="_blank">${brocardiInfo.link}</a></p>`;
+            createSection('Link', `<strong>Link:</strong> <a href="${brocardiInfo.link}" target="_blank">${brocardiInfo.link}</a>`);
         }
+
         console.log('Informazioni Brocardi popolate.');
     }
 
@@ -221,14 +262,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Crea un nuovo tab per un articolo.
+     * @param {Object} result - I dati dell'articolo.
+     * @param {boolean} isPinned - Se il tab deve essere pinnato.
+     */
     function createArticleTab(result, isPinned = false) {
         if (!result.norma_data) {
             console.warn('Dati della norma mancanti:', result);
             return;
         }
 
-        const articleId = result.norma_data.numero_articolo || 'unknown';
-        const actType = result.norma_data.tipo_atto || 'unknown';
+        const articleIdRaw = result.norma_data.numero_articolo || 'unknown';
+        const actTypeRaw = result.norma_data.tipo_atto || 'unknown';
+        const articleId = sanitize(articleIdRaw);
+        const actType = sanitize(actTypeRaw);
         const articleTabId = `article-${actType}-${articleId}`;
         const key = `article-${actType}-${articleId}`;
 
@@ -248,7 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const navLink = tabItem.querySelector('.nav-link');
         navLink.id = `${articleTabId}-tab`;
         navLink.href = `#${articleTabId}`;
-        navLink.textContent = `Articolo ${articleId} (${capitalizeFirstLetter(actType)})`;
+        navLink.setAttribute('aria-controls', articleTabId);
+        navLink.textContent = `Articolo ${articleIdRaw} (${capitalizeFirstLetter(actTypeRaw)})`;
 
         // Configura il pulsante di pin
         const pinButton = tabItem.querySelector('.pin-button');
@@ -283,8 +332,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const tabPane = paneTemplate.content.cloneNode(true);
         const paneDiv = tabPane.querySelector('.tab-pane');
         paneDiv.id = articleTabId;
+        paneDiv.setAttribute('aria-labelledby', `${articleTabId}-tab`);
         paneDiv.role = 'tabpanel';
-        paneDiv.querySelector('pre').textContent = result.article_text || 'N/A';
+        const preElement = paneDiv.querySelector('pre');
+        preElement.textContent = result.article_text || 'N/A';
+        preElement.classList.add('resizable'); // Aggiungi 'resizable' alla <pre>
 
         // Aggiungi le informazioni Brocardi se disponibili
         if (isPinned || (result.brocardi_info && result.brocardi_info.position !== 'Not Available')) {
@@ -368,6 +420,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+        // Applica il ridimensionamento a tutti gli elementi resizable
+        applyResizable()
     }
 
     function displayResults(results, showBrocardi) {
@@ -678,6 +733,52 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Event listener aggiunto per la ricerca nella cronologia.");
     } else {
         console.error("Elemento 'history-search' non trovato nel DOM.");
+    }
+
+    // ============================
+    // Funzioni di Ridimensionamento con interact.js
+    // ============================
+
+    // Funzione per abilitare il ridimensionamento con interact.js
+    function makeResizable(element) {
+        interact(element)
+            .resizable({
+                edges: { bottom: true, right: true },
+                listeners: {
+                    move(event) {
+                        let { x, y } = event.target.dataset
+
+                        x = (parseFloat(x) || 0) + event.deltaRect.left
+                        y = (parseFloat(y) || 0) + event.deltaRect.top
+
+                        Object.assign(event.target.style, {
+                            width: `${event.rect.width}px`,
+                            height: `${event.rect.height}px`,
+                            transform: `translate(${x}px, ${y}px)`
+                        })
+
+                        Object.assign(event.target.dataset, { x, y })
+                    }
+                },
+                modifiers: [
+                    // Impedisce all'elemento di essere ridimensionato più piccolo di 100x50
+                    interact.modifiers.restrictSize({
+                        min: { width: 100, height: 50 }
+                    })
+                ],
+                inertia: true
+            })
+            .styleCursor(false) // Mantiene il cursore personalizzato
+    }
+
+    // Applica il ridimensionamento agli elementi desiderati dopo che sono stati aggiunti al DOM
+    function applyResizable() {
+        // Seleziona tutti gli elementi che desideri rendere ridimensionabili
+        const resizableElements = document.querySelectorAll('.resizable')
+
+        resizableElements.forEach(element => {
+            makeResizable(element)
+        })
     }
 
     // ============================

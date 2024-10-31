@@ -10,6 +10,68 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        /* Stili per le informazioni Brocardi */
+        .brocardi-info {
+            padding: 10px;
+            background-color: #f8f9fa; /* Sfondo leggermente grigio */
+            border: 1px solid #dee2e6; /* Bordo leggero */
+            border-radius: 5px;
+        }
+
+        /* Box per ogni sezione (Brocardi, Ratio, Spiegazione, Massime, Link) */
+        .brocardi-section {
+            margin-bottom: 15px;
+            padding: 15px;
+            background-color: #ffffff; /* Sfondo bianco */
+            border: 1px solid #ced4da; /* Bordo grigio chiaro */
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Leggera ombra */
+        }
+
+        /* Box per ogni elemento della lista */
+        .brocardi-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #e9ecef; /* Sfondo grigio chiaro */
+            border: 1px solid #ced4da; /* Bordo grigio */
+            border-radius: 5px;
+            overflow-y: auto; /* Scrollbar verticale */
+            max-height: 100px; /* Altezza massima */
+            white-space: pre-wrap; /* Avvolgimento del testo */
+            word-wrap: break-word; /* Suddivide parole troppo lunghe */
+        }
+
+        /* Miglioramento della leggibilità delle liste */
+        .brocardi-content ul {
+            list-style-type: none; /* Rimuove i bullet points */
+            padding-left: 0;
+        }
+
+        .brocardi-content li::before {
+            content: '• '; /* Aggiunge un bullet personalizzato */
+            color: #0d6efd; /* Colore blu per i bullet */
+        }
+
+        .brocardi-content a {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+
+        .brocardi-content a:hover {
+            text-decoration: underline;
+        }
+
+        /* Stili specifici per Ratio, Massime e Spiegazione per renderli scrollabili */
+        .scrollable-section {
+            max-height: 200px; /* Imposta l'altezza massima desiderata */
+            overflow-y: auto;  /* Abilita lo scrolling verticale */
+            padding: 10px;
+            background-color: #f1f3f5; /* Sfondo leggermente diverso per distinguere */
+            border: 1px solid #ced4da; /* Bordo grigio */
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
     <!-- Header -->
@@ -34,7 +96,7 @@
                                     <option value="">Seleziona un tipo di atto...</option>
                                     <option value="costituzione">Costituzione</option>
                                     <option value="legge">Legge</option>
-                                    <option value="decreto legge">Decreto Legge</option>
+                                    <option value="codice civile">COdice civile</option>
                                     <option value="decreto legislativo">Decreto Legislativo</option>
                                     <option value="Regolamento UE">Regolamento UE</option>
                                     <option value="Direttiva UE">Direttiva UE</option>
@@ -156,11 +218,13 @@
                 </div>
             </div>
         </template>
-
-
+        
+        <!-- interact.js CDN -->
+        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
         <!-- Bootstrap JS (with Popper.js) -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <!-- Custom Script -->
-        <script src="/static/script.js"></script>
-    </body>
+        <script src="/static/script.js" defer></script>
+    </div>
+</body>
 </html>
