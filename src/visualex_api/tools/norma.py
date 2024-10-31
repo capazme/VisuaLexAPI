@@ -4,10 +4,10 @@ from functools import lru_cache
 import logging
 
 # Assuming these functions are defined elsewhere in your code
-from tools.urngenerator import generate_urn
-from tools.text_op import normalize_act_type
-from tools.treextractor import get_tree
-from tools.config import MAX_CACHE_SIZE
+from .urngenerator import generate_urn
+from .text_op import normalize_act_type
+from .treextractor import get_tree
+from .config import MAX_CACHE_SIZE
 
 @dataclass
 class Norma:

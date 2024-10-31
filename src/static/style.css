@@ -1,0 +1,311 @@
+/* General Reset and Box Sizing */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Base Body Styling */
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+    line-height: 1.6;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5 {
+    font-weight: 700;
+    color: #343a40;
+    margin-bottom: 1rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+}
+
+h2 {
+    font-size: 1.75rem;
+}
+
+h3 {
+    font-size: 1.5rem;
+}
+
+h4 {
+    font-size: 1.25rem;
+}
+
+h5 {
+    font-size: 1rem;
+}
+
+p {
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+/* Container */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header Styling */
+header {
+    background-color: #007bff;
+    color: white;
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* Form Section Styling */
+.form-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+/* Disabilitato */
+input.disabled,
+select.disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+/* Number Input Styling */
+.number-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 200px;
+    width: 100%;
+}
+
+.number-input button {
+    background-color: #28a745;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    transition: background-color 0.3s ease;
+    flex: 0 0 40px;
+    height: 100%;
+}
+
+.number-input input[type="text"] {
+    text-align: center;
+    border: 1px solid #ced4da;
+    padding: 0.5rem;
+    background-color: #ffffff;
+    flex: 1;
+    height: 100%;
+}
+
+.number-input button:hover:not(:disabled) {
+    background-color: #218838;
+}
+
+.number-input button:disabled {
+    background-color: #b0c4de;
+}
+
+/* Button Styling */
+button {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    border: none;
+    color: white;
+    padding: 0.75rem 1.25rem;
+    font-size: 1rem;
+    border-radius: 0.25rem;
+}
+
+button[type="submit"] {
+    background-color: #28a745;
+}
+
+button[type="submit"]:hover {
+    background-color: #218838;
+}
+
+button#reset-button {
+    background-color: #dc3545;
+}
+
+button#reset-button:hover {
+    background-color: #c82333;
+}
+
+button#reset-history {
+    background-color: #ffc107;
+    color: black;
+}
+
+button#reset-history:hover {
+    background-color: #e0a800;
+}
+
+/* Checkbox Styling */
+.form-check-input {
+    margin-right: 0.5rem;
+}
+
+/* Result Section Styling */
+.results-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+/* Norma Data Styling */
+#norma-data {
+    margin-bottom: 2rem;
+}
+
+/* Article Text Container */
+#article-text-container {
+    margin-top: 2rem;
+}
+
+#article-tab-content .tab-pane {
+    padding: 1rem;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-top: none;
+}
+
+#article-tab-content pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
+}
+
+/* Collapsible Brocardi Info */
+#brocardi-info-container {
+    margin-top: 2rem;
+}
+
+.brocardi-section {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.brocardi-item {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 0.75rem;
+    background-color: #ffffff;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.brocardi-item h5 {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.brocardi-item p {
+    margin-bottom: 0.5rem;
+}
+
+.brocardi-item a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.brocardi-item a:hover {
+    text-decoration: underline;
+}
+
+/* Tabs Styling */
+.nav-tabs .nav-link {
+    background-color: #f8f9fa;
+    color: #007bff;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.tab-pane {
+    padding: 1rem;
+}
+
+/* Loading Indicator */
+#loading {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #007bff;
+    text-align: center;
+}
+
+/* History Section Styling */
+.history-container {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.history-container h2 {
+    margin-bottom: 1.5rem;
+}
+
+#history-list {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+#history-list li {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.3s ease;
+}
+
+#history-list li:last-child {
+    border-bottom: none;
+}
+
+#history-list li:hover {
+    background-color: #f8f9fa;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 2rem;
+    }
+
+    .form-container, .results-container, .history-container {
+        padding: 1.5rem;
+    }
+
+    button[type="submit"],
+    button[type="button"],
+    button#reset-history {
+        width: 100%;
+        margin-bottom: 0.75rem;
+    }
+}

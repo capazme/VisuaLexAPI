@@ -1,8 +1,9 @@
 import logging
-from .norma import NormaVisitata
-from .sys_op import BaseScraper
-from functools import lru_cache
-from .config import MAX_CACHE_SIZE
+from aiocache import cached, Cache
+from aiocache.serializers import JsonSerializer
+from ..tools.norma import NormaVisitata
+from ..tools.sys_op import BaseScraper
+
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
@@ -14,25 +15,25 @@ class NormattivaScraper(BaseScraper):
         self.base_url = "https://www.normattiva.it/"
         logging.info("NormattivaScraper initialized")
 
-    def get_document(self, normavisitata: NormaVisitata):
+    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
+    async def get_document(self, normavisitata: NormaVisitata):
         logging.info(f"Fetching Normattiva document for: {normavisitata}")
         urn = normavisitata.urn
         logging.info(f"Requesting URL: {urn}")
 
-        html_content = self.request_document(urn)
+        html_content = await self.request_document(urn)
 
         if not html_content:
             logging.error("Document not found or malformed")
             raise ValueError("Document not found or malformed")
 
         if normavisitata.numero_articolo:
-            return self.estrai_da_html(html_content), urn
+            return await self.estrai_da_html(html_content), urn
         else:
             logging.info("Returning full document text")
             return html_content, urn
 
-    
-    def estrai_da_html(self, atto, comma=None):
+    async def estrai_da_html(self, atto, comma=None):
         try:
             soup = self.parse_document(atto)
             corpo = soup.find('div', class_='bodyTesto')
@@ -42,7 +43,7 @@ class NormattivaScraper(BaseScraper):
 
             if not comma:
                 return corpo.get_text(strip=False, separator="\n")
-            
+
             parsed_corp = corpo.find('div', class_='art-commi-div-akn')
             if parsed_corp is None:
                 logging.warning("Parsed body for comma extraction not found")

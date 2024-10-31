@@ -8,7 +8,7 @@ from .config import MAX_CACHE_SIZE
 from .text_op import normalize_act_type, parse_date, estrai_data_da_denominazione
 from .map import NORMATTIVA_URN_CODICI, EURLEX
 from .sys_op import WebDriverManager
-from .eurlex_scraper import EurlexScraper
+from ..services.eurlex_scraper import EurlexScraper
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,

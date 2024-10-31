@@ -4,3 +4,5 @@ quart
 structlog
 selenium
 chromium
+aiocache
+aiohttp

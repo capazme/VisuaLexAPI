@@ -1,9 +1,9 @@
 import logging
 import os
-from .config import MAX_CACHE_SIZE
-from functools import lru_cache
-from .map import EURLEX
-from .sys_op import BaseScraper
+from aiocache import cached, Cache
+from aiocache.serializers import JsonSerializer
+from ..tools.map import EURLEX
+from ..tools.sys_op import BaseScraper
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -28,7 +28,8 @@ class EurlexScraper(BaseScraper):
         
         return uri
 
-    def get_document(self, normavisitata=None, act_type=None, article=None, year=None, num=None, urn=None):
+    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
+    async def get_document(self, normavisitata=None, act_type=None, article=None, year=None, num=None, urn=None):
         logging.info(f"Fetching EUR-Lex document with parameters: act_type={act_type}, article={article}, year={year}, num={num}, urn={urn}")
 
         if normavisitata:
@@ -47,17 +48,17 @@ class EurlexScraper(BaseScraper):
         else:
             url = urn
 
-        html_content = self.request_document(url)
+        html_content = await self.request_document(url)
         soup = self.parse_document(html_content)
 
         if article:
             logging.info(f"Extracting text for article {article}")
-            return self.extract_article_text(soup, article), url
+            return await self.extract_article_text(soup, article), url
         else:
             logging.info("Returning full document text")
             return soup.get_text(), url
 
-    def extract_article_text(self, soup, article):
+    async def extract_article_text(self, soup, article):
         logging.info(f"Searching for article {article} in the document")
         search_query = f"Articolo {article}"
         article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(search_query))
@@ -95,7 +96,6 @@ class EurlexScraper(BaseScraper):
 
         logging.debug("Table text extracted successfully")
         return table_text
-
 
 # Configure production logging differently
 if __name__ == "__main__":

@@ -1,12 +1,13 @@
-import requests
 import logging
+import aiohttp
+import requests
 from bs4 import BeautifulSoup
-from functools import lru_cache
-from .map import BROCARDI_CODICI
-from .norma import NormaVisitata
-from .text_op import normalize_act_type
-from .sys_op import BaseScraper
-from .config import MAX_CACHE_SIZE
+from aiocache import cached, Cache
+from aiocache.serializers import JsonSerializer
+from ..tools.map import BROCARDI_CODICI
+from ..tools.norma import NormaVisitata
+from ..tools.text_op import normalize_act_type
+from ..tools.sys_op import BaseScraper
 import re
 import os
 
@@ -16,15 +17,13 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("brocardi_scraper.log"),
                               logging.StreamHandler()])
 
-CURRENT_APP_PATH = os.path.dirname(os.path.abspath(__file__))
-
 class BrocardiScraper(BaseScraper):
     def __init__(self):
         logging.info("Initializing BrocardiScraper")
         self.knowledge = [BROCARDI_CODICI]
 
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def do_know(self, norma_visitata: NormaVisitata):
+    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
+    async def do_know(self, norma_visitata: NormaVisitata):
         logging.info(f"Checking if knowledge exists for norma: {norma_visitata}")
 
         strcmp = self._build_norma_string(norma_visitata)
@@ -40,78 +39,80 @@ class BrocardiScraper(BaseScraper):
         logging.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
 
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def look_up(self, norma_visitata: NormaVisitata):
+    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
+    async def look_up(self, norma_visitata: NormaVisitata):
         logging.info(f"Looking up norma: {norma_visitata}")
 
-        norma_info = self.do_know(norma_visitata)
+        norma_info = await self.do_know(norma_visitata)
         if not norma_info:
             return None
 
         base_url = "https://brocardi.it"
         link = norma_info[1]
 
-        try:
-            logging.info(f"Requesting main link: {link}")
-            response = requests.get(link)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Failed to retrieve content for norma link: {link}: {e}")
-            return None
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+            try:
+                logging.info(f"Requesting main link: {link}")
+                async with session.get(link) as response:
+                    response.raise_for_status()
+                    soup = BeautifulSoup(await response.text(), 'html.parser')
+            except aiohttp.ClientError as e:
+                logging.error(f"Failed to retrieve content for norma link: {link}: {e}")
+                return None
 
         numero_articolo = norma_visitata.numero_articolo.replace('-', '') if norma_visitata.numero_articolo else None
         if numero_articolo:
-            return self._find_article_link(soup, base_url, numero_articolo)
+            return await self._find_article_link(soup, base_url, numero_articolo)
 
         logging.info("No article number provided")
         return None
 
-    @lru_cache(maxsize=MAX_CACHE_SIZE)
-    def _find_article_link(self, soup, base_url, numero_articolo):
+    async def _find_article_link(self, soup, base_url, numero_articolo):
         pattern = re.compile(rf'href=["\']([^"\']*art{re.escape(numero_articolo)}\.html)["\']')
 
         logging.info("Searching for target link in the main page content")
         matches = pattern.findall(soup.prettify())
 
         if matches:
-            return requests.compat.urljoin(base_url, matches[0])
+            return aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)).get(requests.compat.urljoin(base_url, matches[0]))
 
         logging.info("No direct match found, searching in 'section-title' divs")
         section_titles = soup.find_all('div', class_='section-title')
 
-        for section in section_titles:
-            for a_tag in section.find_all('a', href=True):
-                sub_link = requests.compat.urljoin(base_url, a_tag['href'])
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+            for section in section_titles:
+                for a_tag in section.find_all('a', href=True):
+                    sub_link = requests.compat.urljoin(base_url, a_tag['href'])
 
-                try:
-                    sub_response = requests.get(sub_link)
-                    sub_response.raise_for_status()
-                    sub_soup = BeautifulSoup(sub_response.text, 'html.parser')
-                    sub_matches = pattern.findall(sub_soup.prettify())
-                    if sub_matches:
-                        return requests.compat.urljoin(base_url, sub_matches[0])
-                except requests.exceptions.RequestException as e:
-                    logging.warning(f"Failed to retrieve content for subsection link: {sub_link}: {e}")
-                    continue
+                    try:
+                        async with session.get(sub_link) as sub_response:
+                            sub_response.raise_for_status()
+                            sub_soup = BeautifulSoup(await sub_response.text(), 'html.parser')
+                            sub_matches = pattern.findall(sub_soup.prettify())
+                            if sub_matches:
+                                return requests.compat.urljoin(base_url, sub_matches[0])
+                    except aiohttp.ClientError as e:
+                        logging.warning(f"Failed to retrieve content for subsection link: {sub_link}: {e}")
+                        continue
 
         logging.info("No matching article found")
         return None
 
-    def get_info(self, norma_visitata: NormaVisitata):
+    async def get_info(self, norma_visitata: NormaVisitata):
         logging.info(f"Getting info for norma: {norma_visitata}")
 
-        norma_link = self.look_up(norma_visitata)
+        norma_link = await self.look_up(norma_visitata)
         if not norma_link:
             return None, {}, None
 
-        try:
-            response = requests.get(norma_link)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Failed to retrieve content for norma link: {norma_link}: {e}")
-            return None, {}, None
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+            try:
+                async with session.get(norma_link) as response:
+                    response.raise_for_status()
+                    soup = BeautifulSoup(await response.text(), 'html.parser')
+            except aiohttp.ClientError as e:
+                logging.error(f"Failed to retrieve content for norma link: {norma_link}: {e}")
+                return None, {}, None
 
         info = {}
         info['Position'] = self._extract_position(soup)
