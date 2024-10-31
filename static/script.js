@@ -205,7 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleVersionDate();
     });
 
-    // Funzione per visualizzare i risultati
     function displayResults(results, showBrocardi) {
         results.forEach(result => {
             if (result.norma_data) {
@@ -216,49 +215,97 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><strong>Articolo:</strong> ${result.norma_data.numero_articolo || 'N/A'}</div>
                 `;
                 normaDataContainer.innerHTML = normaInfo;
-
+    
                 if (result.article_text) {
                     resultContainer.innerHTML = `<div><strong>Testo Articolo:</strong><pre>${result.article_text || 'N/A'}</pre></div>`;
                 }
-
+    
                 if (showBrocardi && result.brocardi_info && result.brocardi_info.position !== 'Not Available') {
                     brocardiInfoContainer.style.display = 'block';
                     const tabId = `brocardi-${result.norma_data.numero_articolo || 'N/A'}`;
-
+    
                     // Crea tab item
                     const tabItem = document.createElement('li');
                     tabItem.className = 'nav-item';
                     tabItem.innerHTML = `<a class="nav-link" id="${tabId}-tab" data-bs-toggle="tab" href="#${tabId}" role="tab">${result.norma_data.numero_articolo || 'N/A'}</a>`;
                     brocardiTabs.appendChild(tabItem);
-
+    
                     // Crea tab pane
                     const tabPane = document.createElement('div');
                     tabPane.className = 'tab-pane fade';
                     tabPane.id = tabId;
                     tabPane.role = 'tabpanel';
-
+    
                     // Popola il tab pane con le informazioni Brocardi
                     let brocardiContent = '';
-                    if (result.brocardi_info.Brocardi) {
-                        brocardiContent += `<div><strong>Brocardi:</strong> ${result.brocardi_info.Brocardi}</div>`;
-                    }
-                    if (result.brocardi_info.Ratio) {
-                        brocardiContent += `<div><strong>Ratio:</strong> ${result.brocardi_info.Ratio}</div>`;
-                    }
-                    if (result.brocardi_info.Spiegazione) {
-                        brocardiContent += `<div><strong>Spiegazione:</strong> ${result.brocardi_info.Spiegazione}</div>`;
-                    }
-                    if (result.brocardi_info.Massime) {
-                        brocardiContent += `<div><strong>Massime:</strong><ul>`;
-                        result.brocardi_info.Massime.forEach(massima => {
-                            brocardiContent += `<li>${massima}</li>`;
+    
+                    // Box principale per le informazioni Brocardi
+                    brocardiContent += `<div class="brocardi-section">`;
+    
+                    // Se 'Brocardi' è una lista
+                    if (Array.isArray(result.brocardi_info.Brocardi)) {
+                        brocardiContent += `<h4>Brocardi:</h4>`;
+                        result.brocardi_info.Brocardi.forEach(brocardo => {
+                            brocardiContent += `
+                                <div class="brocardi-item">
+                                    <p>${brocardo}</p>
+                                </div>
+                            `;
                         });
-                        brocardiContent += `</ul></div>`;
+                    } else if (result.brocardi_info.Brocardi) {
+                        brocardiContent += `
+                            <div class="brocardi-item">
+                                <h5>Brocardi:</h5>
+                                <p>${result.brocardi_info.Brocardi}</p>
+                            </div>
+                        `;
                     }
+    
+                    // 'Ratio'
+                    if (result.brocardi_info.Ratio) {
+                        brocardiContent += `
+                            <div class="brocardi-item">
+                                <h5>Ratio:</h5>
+                                <p>${result.brocardi_info.Ratio}</p>
+                            </div>
+                        `;
+                    }
+    
+                    // 'Spiegazione'
+                    if (result.brocardi_info.Spiegazione) {
+                        brocardiContent += `
+                            <div class="brocardi-item">
+                                <h5>Spiegazione:</h5>
+                                <p>${result.brocardi_info.Spiegazione}</p>
+                            </div>
+                        `;
+                    }
+    
+                    // 'Massime' è una lista
+                    if (Array.isArray(result.brocardi_info.Massime) && result.brocardi_info.Massime.length > 0) {
+                        brocardiContent += `<h4>Massime:</h4>`;
+                        result.brocardi_info.Massime.forEach(massima => {
+                            brocardiContent += `
+                                <div class="brocardi-item">
+                                    <p>${massima}</p>
+                                </div>
+                            `;
+                        });
+                    }
+    
+                    // Link
                     if (result.brocardi_info.link) {
-                        brocardiContent += `<div><strong>Link:</strong> <a href="${result.brocardi_info.link}" target="_blank">${result.brocardi_info.link}</a></div>`;
+                        brocardiContent += `
+                            <div class="brocardi-item">
+                                <h5>Link:</h5>
+                                <a href="${result.brocardi_info.link}" target="_blank">${result.brocardi_info.link}</a>
+                            </div>
+                        `;
                     }
-
+    
+                    // Chiudi il box principale
+                    brocardiContent += `</div>`;
+    
                     tabPane.innerHTML = brocardiContent;
                     brocardiTabContent.appendChild(tabPane);
                 }
@@ -266,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('Dati della norma mancanti nel risultato:', result);
             }
         });
-
+    
         // Attiva il primo tab se esiste
         const firstTab = brocardiTabs.querySelector('.nav-link');
         if (firstTab) {
@@ -277,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+    
 
     // Funzione per salvare nella cronologia
     function saveToHistory(data) {

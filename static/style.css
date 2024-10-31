@@ -354,3 +354,86 @@ button.btn-primary:hover {
     border-top: none;
 }
 
+/* Mantieni lo stile precedente e aggiungi eventuali modifiche per migliorare la grafica del tab Brocardi */
+
+/* Brocardi Tabs Styling */
+.nav-tabs .nav-link {
+    background-color: #f8f9fa;
+    color: #007bff;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.tab-pane {
+    padding: 1rem;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-top: none;
+}
+
+.tab-pane h4 {
+    margin-top: 1rem;
+}
+
+.tab-pane a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.tab-pane a:hover {
+    text-decoration: underline;
+}
+
+/* Massime Items */
+.massima-item {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+/* Stili per i box scrollabili nelle informazioni Brocardi */
+.brocardi-section {
+    max-height: 400px; /* Altezza massima del box principale */
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.brocardi-item {
+    max-height: 200px; /* Altezza massima per ogni elemento della lista */
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 0.75rem;
+    background-color: #ffffff;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+}
+
+.brocardi-item h5 {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.brocardi-item p {
+    margin-bottom: 0.5rem;
+}
+
+.brocardi-item a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.brocardi-item a:hover {
+    text-decoration: underline;
+}
