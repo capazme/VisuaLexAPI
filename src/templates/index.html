@@ -30,7 +30,7 @@
         }
 
         /* Box per ogni elemento della lista */
-        .brocardi-item {
+        .brocardi-item, .massime-item {
             margin-bottom: 10px;
             padding: 10px;
             background-color: #e9ecef; /* Sfondo grigio chiaro */
@@ -40,36 +40,70 @@
             max-height: 100px; /* Altezza massima */
             white-space: pre-wrap; /* Avvolgimento del testo */
             word-wrap: break-word; /* Suddivide parole troppo lunghe */
+            resize: vertical; /* Abilita il ridimensionamento verticale */
         }
 
         /* Miglioramento della leggibilità delle liste */
-        .brocardi-content ul {
+        .brocardi-content ul, .massime-content ul {
             list-style-type: none; /* Rimuove i bullet points */
             padding-left: 0;
         }
 
-        .brocardi-content li::before {
+        .brocardi-content li::before, .massime-content li::before {
             content: '• '; /* Aggiunge un bullet personalizzato */
             color: #0d6efd; /* Colore blu per i bullet */
         }
 
-        .brocardi-content a {
+        .brocardi-content a, .massime-content a {
             color: #0d6efd;
             text-decoration: none;
         }
 
-        .brocardi-content a:hover {
+        .brocardi-content a:hover, .massime-content a:hover {
             text-decoration: underline;
         }
 
-        /* Stili specifici per Ratio, Massime e Spiegazione per renderli scrollabili */
-        .scrollable-section {
+        /* Stili specifici per Ratio e Spiegazione per renderli scrollabili e ridimensionabili */
+        .ratio-section, .spiegazione-section {
             max-height: 200px; /* Imposta l'altezza massima desiderata */
             overflow-y: auto;  /* Abilita lo scrolling verticale */
             padding: 10px;
             background-color: #f1f3f5; /* Sfondo leggermente diverso per distinguere */
             border: 1px solid #ced4da; /* Bordo grigio */
             border-radius: 5px;
+            resize: vertical; /* Abilita il ridimensionamento verticale */
+            min-height: 150px;
+            max-height: 500px;
+        }
+
+        /* Abilita il ridimensionamento per il contenitore del Testo Articolo */
+        .tab-pane pre {
+            resize: vertical;
+            overflow: auto;
+            min-height: 100px;
+            max-height: 600px;
+        }
+
+        /* Aggiungi uno sfondo leggermente più scuro per gli elementi ridimensionabili */
+        .resizable {
+            background-color: #ffffff;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative; /* Necessario per la maniglia di ridimensionamento */
+        }
+
+        /* Maniglia di ridimensionamento */
+        .resizable::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 10px;
+            height: 10px;
+            background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMu/b3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMyA3bC0zIDMgMCA4IDMgLTNsLTMgMyIgZmlsbD0iIzAwMCIvPgo8L3N2Zz4=')
+                no-repeat center center;
+            cursor: se-resize;
         }
     </style>
 </head>
@@ -96,7 +130,7 @@
                                     <option value="">Seleziona un tipo di atto...</option>
                                     <option value="costituzione">Costituzione</option>
                                     <option value="legge">Legge</option>
-                                    <option value="codice civile">COdice civile</option>
+                                    <option value="codice civile">Codice civile</option>
                                     <option value="decreto legislativo">Decreto Legislativo</option>
                                     <option value="Regolamento UE">Regolamento UE</option>
                                     <option value="Direttiva UE">Direttiva UE</option>
@@ -208,7 +242,7 @@
 
         <template id="article-tab-pane-template">
             <div class="tab-pane fade" role="tabpanel">
-                <div class="mb-3">
+                <div class="mb-3 resizable">
                     <h5>Testo Articolo:</h5>
                     <pre></pre>
                 </div>
@@ -218,11 +252,11 @@
                 </div>
             </div>
         </template>
-        
-        <!-- interact.js CDN -->
-        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
         <!-- Bootstrap JS (with Popper.js) -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- interact.js CDN -->
+        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
         <!-- Custom Script -->
         <script src="/static/script.js" defer></script>
     </div>

@@ -163,11 +163,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Funzione per creare una sezione
         function createSection(title, content, isList = false) {
             const sectionDiv = document.createElement('div');
-            sectionDiv.classList.add('brocardi-section', 'resizable'); // Aggiungi 'resizable'
+            sectionDiv.classList.add('brocardi-section'); // Classe comune
 
-            // Aggiungi classe specifica se la sezione è Brocardi, Massime o Spiegazione
-            if (title === 'Brocardi' || title === 'Massime' || title === 'Spiegazione') {
-                sectionDiv.classList.add('scrollable-section');
+            // Aggiungi classe specifica se la sezione è Brocardi, Massime, Ratio o Spiegazione
+            if (title === 'Brocardi') {
+                // Nessuna classe aggiuntiva necessaria oltre 'brocardi-section'
+            } else if (title === 'Massime') {
+                sectionDiv.classList.add('massime-section');
+            } else if (title === 'Ratio') {
+                sectionDiv.classList.add('ratio-section');
+            } else if (title === 'Spiegazione') {
+                sectionDiv.classList.add('spiegazione-section');
             }
 
             const heading = document.createElement('h6');
@@ -175,12 +181,19 @@ document.addEventListener('DOMContentLoaded', () => {
             sectionDiv.appendChild(heading);
 
             if (isList && Array.isArray(content)) {
+                const listContainer = document.createElement('div');
+                listContainer.classList.add(`${title.toLowerCase()}-content`); // e.g., brocardi-content, massime-content
                 content.forEach(item => {
                     const itemBox = document.createElement('div');
-                    itemBox.classList.add('brocardi-item');
+                    if (title === 'Massime') {
+                        itemBox.classList.add('massime-item', 'resizable'); // Aggiungi le classi separatamente
+                    } else {
+                        itemBox.classList.add('brocardi-item', 'resizable'); // Aggiungi le classi separatamente
+                    }
                     itemBox.innerHTML = item.trim();
-                    sectionDiv.appendChild(itemBox);
+                    listContainer.appendChild(itemBox);
                 });
+                sectionDiv.appendChild(listContainer);
             } else if (typeof content === 'string') {
                 const paragraph = document.createElement('p');
                 paragraph.innerHTML = content.trim();
@@ -197,12 +210,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Sezione Ratio
         if (brocardiInfo.Ratio) {
-            createSection('Ratio', `<strong>Ratio:</strong> ${brocardiInfo.Ratio}`);
+            createSection('Ratio', `${brocardiInfo.Ratio}`);
         }
 
         // Sezione Spiegazione
         if (brocardiInfo.Spiegazione) {
-            createSection('Spiegazione', `<strong>Spiegazione:</strong> ${brocardiInfo.Spiegazione}`);
+            createSection('Spiegazione', `${brocardiInfo.Spiegazione}`);
         }
 
         // Sezione Massime
@@ -210,12 +223,25 @@ document.addEventListener('DOMContentLoaded', () => {
             createSection('Massime', brocardiInfo.Massime, true);
         }
 
-        // Sezione Link
+        // Sezione Link (non ridimensionabile)
         if (brocardiInfo.link) {
-            createSection('Link', `<strong>Link:</strong> <a href="${brocardiInfo.link}" target="_blank">${brocardiInfo.link}</a>`);
+            const linkDiv = document.createElement('div');
+            linkDiv.classList.add('brocardi-section'); // Senza classi di ridimensionamento
+            const heading = document.createElement('h6');
+            heading.textContent = 'Link:';
+            linkDiv.appendChild(heading);
+            const link = document.createElement('a');
+            link.href = brocardiInfo.link;
+            link.target = '_blank';
+            link.textContent = brocardiInfo.link;
+            linkDiv.appendChild(link);
+            brocardiContentDiv.appendChild(linkDiv);
         }
 
         console.log('Informazioni Brocardi popolate.');
+
+        // Applica il ridimensionamento agli elementi appena creati
+        applyResizable();
     }
 
     // ============================
@@ -422,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Applica il ridimensionamento a tutti gli elementi resizable
-        applyResizable()
+        applyResizable();
     }
 
     function displayResults(results, showBrocardi) {
@@ -736,7 +762,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ============================
-    // Funzioni di Ridimensionamento con interact.js
+    // Funzioni di Ridimensionamento con interact.js (Opzionale)
     // ============================
 
     // Funzione per abilitare il ridimensionamento con interact.js
@@ -746,18 +772,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 edges: { bottom: true, right: true },
                 listeners: {
                     move(event) {
-                        let { x, y } = event.target.dataset
+                        let { x, y } = event.target.dataset;
 
-                        x = (parseFloat(x) || 0) + event.deltaRect.left
-                        y = (parseFloat(y) || 0) + event.deltaRect.top
+                        x = (parseFloat(x) || 0) + event.deltaRect.left;
+                        y = (parseFloat(y) || 0) + event.deltaRect.top;
 
                         Object.assign(event.target.style, {
                             width: `${event.rect.width}px`,
                             height: `${event.rect.height}px`,
                             transform: `translate(${x}px, ${y}px)`
-                        })
+                        });
 
-                        Object.assign(event.target.dataset, { x, y })
+                        Object.assign(event.target.dataset, { x, y });
                     }
                 },
                 modifiers: [
@@ -768,17 +794,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 ],
                 inertia: true
             })
-            .styleCursor(false) // Mantiene il cursore personalizzato
+            .styleCursor(false); // Mantiene il cursore personalizzato
     }
 
     // Applica il ridimensionamento agli elementi desiderati dopo che sono stati aggiunti al DOM
     function applyResizable() {
         // Seleziona tutti gli elementi che desideri rendere ridimensionabili
-        const resizableElements = document.querySelectorAll('.resizable')
+        const resizableElements = document.querySelectorAll('.resizable');
 
         resizableElements.forEach(element => {
-            makeResizable(element)
-        })
+            makeResizable(element);
+        });
     }
 
     // ============================
