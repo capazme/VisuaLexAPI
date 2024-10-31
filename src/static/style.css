@@ -1,345 +1,329 @@
-/* General Reset and Box Sizing */
-* {
+/* ============================
+   Variabili CSS
+   ============================ */
+   :root {
+    /* Colori */
+    --color-background: #f9f9f9;
+    --color-primary: #007bff;
+    --color-primary-dark: #0056b3;
+    --color-secondary: #28a745;
+    --color-secondary-dark: #218838;
+    --color-danger: #dc3545;
+    --color-danger-dark: #c82333;
+    --color-warning: #f6ad55;
+    --color-warning-dark: #dd6b20;
+    --color-text: #333333;
+    --color-text-light: #718096;
+    --color-header-bg: var(--color-primary);
+    --color-header-text: #ffffff;
+    --color-form-bg: #ffffff;
+    --color-form-border: #e2e8f0;
+    --color-form-disabled: #edf2f7;
+    --color-button-hover: rgba(0, 0, 0, 0.1);
+    --color-alert-bg: #f8d7da;
+    --color-alert-text: #721c24;
+    --color-alert-border: #f5c6cb;
+  
+    /* Font */
+    --font-family: 'Roboto', sans-serif;
+  
+    /* Spaziature */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+  
+    /* Transizioni */
+    --transition-speed: 0.3s;
+    --transition-ease: ease;
+  
+    /* Dimensioni */
+    --max-container-width: 1200px;
+    --button-height: 3rem;
+    --button-padding: 0.75rem 1.25rem;
+    --input-padding: 0.5rem;
+  }
+  
+  /* ============================
+     Reset
+     ============================ */
+  *,
+  *::before,
+  *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-}
-
-/* Base Body Styling */
-body {
-    font-family: 'Roboto', sans-serif;
-    background-color: #f8f9fa;
-    color: #333;
+  }
+  
+  /* ============================
+     Body Styling
+     ============================ */
+  body {
+    font-family: var(--font-family);
+    background-color: var(--color-background);
+    color: var(--color-text);
     line-height: 1.6;
-}
-
-/* Typography */
-h1, h2, h3, h4, h5 {
+    min-height: 100vh;
+  }
+  
+  /* ============================
+     Typography
+     ============================ */
+  h1, h2, h3, h4, h5 {
     font-weight: 700;
-    color: #343a40;
-    margin-bottom: 1rem;
-}
-
-h1 {
-    font-size: 2.5rem;
-}
-
-h2 {
-    font-size: 1.75rem;
-}
-
-h3 {
-    font-size: 1.5rem;
-}
-
-h4 {
-    font-size: 1.25rem;
-}
-
-h5 {
-    font-size: 1rem;
-}
-
-p {
-    margin-bottom: 1rem;
-    color: #495057;
-}
-
-/* Container */
-.container {
-    max-width: 1200px;
+    color: #4a5568;
+    margin-bottom: var(--spacing-md);
+  }
+  
+  h1 { font-size: 2.25rem; }
+  h2 { font-size: 1.75rem; }
+  h3 { font-size: 1.5rem; }
+  h4 { font-size: 1.25rem; }
+  h5 { font-size: 1rem; }
+  
+  p {
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-light);
+  }
+  
+  /* ============================
+     Container
+     ============================ */
+  .container {
+    max-width: var(--max-container-width);
     margin: 0 auto;
-    padding: 20px;
-}
-
-/* Header Styling */
-header {
-    background-color: #007bff;
-    color: white;
+    padding: var(--spacing-lg);
+  }
+  
+  /* ============================
+     Header Styling
+     ============================ */
+  header {
+    background-color: var(--color-header-bg);
+    color: var(--color-header-text);
     text-align: center;
-    padding: 20px 0;
-}
-
-/* Form Section Styling */
-.form-container {
-    background-color: white;
-    padding: 2rem;
+    padding: var(--spacing-lg) 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* ============================
+     Form Section Styling
+     ============================ */
+  .form-container {
+    background-color: var(--color-form-bg);
+    padding: var(--spacing-xl);
     border-radius: 0.5rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-}
-
-label {
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-}
-
-/* Disabilitato */
-input.disabled,
-select.disabled {
-    background-color: #e9ecef;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.05);
+    margin-bottom: var(--spacing-xl);
+  }
+  
+  label {
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+    color: #2d3748;
+  }
+  
+  /* ============================
+     Disabled Inputs
+     ============================ */
+  input.disabled,
+  select.disabled {
+    background-color: var(--color-form-disabled);
     cursor: not-allowed;
-}
-
-/* Number Input Styling */
-.number-input {
+  }
+  
+  /* ============================
+     Number Input Styling
+     ============================ */
+  .number-input {
     display: flex;
     align-items: center;
     justify-content: space-between;
     max-width: 200px;
     width: 100%;
-}
-
-.number-input button {
-    background-color: #28a745;
+  }
+  
+  .number-input button {
+    background-color: #3182ce;
     border: none;
     color: white;
-    font-size: 1.2rem;
-    padding: 0.5rem;
+    font-size: 1rem;
+    padding: var(--spacing-sm);
     cursor: pointer;
     border-radius: 0.25rem;
-    transition: background-color 0.3s ease;
-    flex: 0 0 40px;
-    height: 100%;
-}
-
-.number-input input[type="text"] {
-    text-align: center;
-    border: 1px solid #ced4da;
-    padding: 0.5rem;
-    background-color: #ffffff;
-    flex: 1;
-    height: 100%;
-}
-
-.number-input button:hover:not(:disabled) {
-    background-color: #218838;
-}
-
-.number-input button:disabled {
-    background-color: #b0c4de;
-}
-
-/* Button Styling */
-button {
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+    flex: 0 0 45px;
+    height: var(--button-height);
+    transition: background-color var(--transition-speed) var(--transition-ease);
+  }
+  
+  .number-input button:hover {
+    background-color: #2b6cb0;
+  }
+  
+  /* ============================
+     Button Styling
+     ============================ */
+  button {
+    transition: background-color var(--transition-speed) var(--transition-ease), box-shadow var(--transition-speed) var(--transition-ease);
     border: none;
     color: white;
-    padding: 0.75rem 1.25rem;
+    padding: var(--button-padding);
     font-size: 1rem;
     border-radius: 0.25rem;
-}
-
-button[type="submit"] {
-    background-color: #28a745;
-}
-
-button[type="submit"]:hover {
-    background-color: #218838;
-}
-
-button#reset-button {
-    background-color: #dc3545;
-}
-
-button#reset-button:hover {
-    background-color: #c82333;
-}
-
-button#reset-history {
-    background-color: #ffc107;
-    color: black;
-}
-
-button#reset-history:hover {
-    background-color: #e0a800;
-}
-
-/* Checkbox Styling */
-.form-check-input {
-    margin-right: 0.5rem;
-}
-
-/* Result Section Styling */
-.results-container {
-    background-color: white;
-    padding: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+  }
+  
+  button[type="submit"] { background-color: var(--color-secondary); }
+  button[type="submit"]:hover { background-color: var(--color-secondary-dark); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
+  
+  button#reset-button { background-color: var(--color-danger); }
+  button#reset-button:hover { background-color: var(--color-danger-dark); }
+  
+  button#reset-history { background-color: var(--color-warning); color: #2d3748; }
+  button#reset-history:hover { background-color: var(--color-warning-dark); }
+  
+  /* ============================
+     Checkbox Styling
+     ============================ */
+  .form-check-input { 
+    margin-right: var(--spacing-sm); 
+  }
+  
+  /* ============================
+     Result Section Styling
+     ============================ */
+  .results-container {
+    background-color: var(--color-form-bg);
+    padding: var(--spacing-xl);
     border-radius: 0.5rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 2rem;
-}
-
-/* Norma Data Styling */
-#norma-data {
-    margin-bottom: 2rem;
-}
-
-/* Article Text Container */
-#article-text-container {
-    margin-top: 2rem;
-}
-
-#article-tab-content .tab-pane {
-    padding: 1rem;
-    background-color: #ffffff;
-    border: 1px solid #dee2e6;
-    border-top: none;
-}
-
-#article-tab-content pre {
-    background-color: #f8f9fa;
-    padding: 1rem;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.05);
+    margin-bottom: var(--spacing-xl);
+  }
+  
+  /* ============================
+     Norma Data Styling
+     ============================ */
+  #norma-data { 
+    margin-bottom: var(--spacing-xl); 
+  }
+  
+  /* ============================
+     Tabbed Articles Styling
+     ============================ */
+  .nav-tabs .nav-link {
+    background-color: #e2e8f0;
+    color: #3182ce;
+    transition: color var(--transition-speed) var(--transition-ease), background-color var(--transition-speed) var(--transition-ease);
+    position: relative;
+  }
+  
+  .nav-tabs .nav-link.active {
+    background-color: #3182ce;
+    color: white;
+  }
+  
+  .nav-tabs .nav-link.pinned {
+    font-weight: 700;
+  }
+  
+  .tab-pane { 
+    padding: var(--spacing-md); 
+  }
+  
+  /* ============================
+     Preformatted Text Styling
+     ============================ */
+  #article-tab-content pre {
+    background-color: #edf2f7;
+    padding: var(--spacing-md);
     border-radius: 0.25rem;
     overflow-x: auto;
-}
-
-/* Stili per le informazioni Brocardi */
-.brocardi-info {
-    padding: 10px;
-    background-color: #f8f9fa; /* Sfondo leggermente grigio */
-    border: 1px solid #dee2e6; /* Bordo leggero */
-    border-radius: 5px;
-}
-
-/* Box per ogni sezione (Brocardi, Ratio, Spiegazione, Massime, Link) */
-.brocardi-section {
-    margin-bottom: 15px;
-    padding: 15px;
-    background-color: #ffffff; /* Sfondo bianco */
-    border: 1px solid #ced4da; /* Bordo grigio chiaro */
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Leggera ombra */
-}
-
-/* Box per ogni elemento della lista */
-.brocardi-item {
-    margin-bottom: 10px;
-    padding: 10px;
-    background-color: #e9ecef; /* Sfondo grigio chiaro */
-    border: 1px solid #ced4da; /* Bordo grigio */
-    border-radius: 5px;
-    overflow-y: auto; /* Scrollbar verticale */
-    max-height: 100px; /* Altezza massima */
-    white-space: pre-wrap; /* Avvolgimento del testo */
-    word-wrap: break-word; /* Suddivide parole troppo lunghe */
-}
-
-/* Miglioramento della leggibilità delle liste */
-.brocardi-content ul {
-    list-style-type: none; /* Rimuove i bullet points */
-    padding-left: 0;
-}
-
-.brocardi-content li::before {
-    content: '• '; /* Aggiunge un bullet personalizzato */
-    color: #0d6efd; /* Colore blu per i bullet */
-}
-
-.brocardi-content a {
-    color: #0d6efd;
-    text-decoration: none;
-}
-
-.brocardi-content a:hover {
-    text-decoration: underline;
-}
-
-/* Stili specifici per Ratio, Massime e Spiegazione per renderli scrollabili */
-.scrollable-section {
-    max-height: 200px; /* Imposta l'altezza massima desiderata */
-    overflow-y: auto;  /* Abilita lo scrolling verticale */
-    padding: 10px;
-    background-color: #f1f3f5; /* Sfondo leggermente diverso per distinguere */
-    border: 1px solid #ced4da; /* Bordo grigio */
-    border-radius: 5px;
-}
-
-
-/* Tabs Styling */
-.nav-tabs .nav-link {
-    background-color: #f8f9fa;
-    color: #007bff;
-    transition: background-color 0.3s ease, color 0.3s ease;
-}
-
-.nav-tabs .nav-link.active {
-    background-color: #007bff;
-    color: white;
-}
-
-.tab-pane {
-    padding: 1rem;
-}
-
-/* Loading Indicator */
-#loading {
-    font-size: 1.25rem;
-    font-weight: bold;
-    color: #007bff;
-    text-align: center;
-}
-
-/* History Section Styling */
-.history-container {
-    background-color: white;
-    padding: 2rem;
+  }
+  
+  /* ============================
+     Brocardi Styling
+     ============================ */
+  .brocardi-info {
+    padding: var(--spacing-md);
+    background-color: #edf2f7;
+    border: 1px solid #cbd5e0;
     border-radius: 0.5rem;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.history-container h2 {
-    margin-bottom: 1.5rem;
-}
-
-#history-list {
-    list-style-type: none;
-    padding-left: 0;
-}
-
-#history-list li {
-    padding: 0.75rem;
-    border-bottom: 1px solid #e9ecef;
-    transition: background-color 0.3s ease;
-}
-
-#history-list li:last-child {
-    border-bottom: none;
-}
-
-#history-list li:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* ============================
+     Brocardi Sections
+     ============================ */
+  .brocardi-section {
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--color-form-bg);
+    border: 1px solid var(--color-form-border);
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* ============================
+     Resizable Brocardi and Massime Boxes
+     ============================ */
+  .brocardi-item, .massime-item {
+    resize: vertical;
+    overflow: auto;
+    min-height: 150px;
     background-color: #f8f9fa;
-}
-
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    header h1 {
-        font-size: 2rem;
-    }
-
-    .form-container, .results-container, .history-container {
-        padding: 1.5rem;
-    }
-
-    button[type="submit"],
-    button[type="button"],
-    button#reset-history {
-        width: 100%;
-        margin-bottom: 0.75rem;
-    }
-}
-
-/* Aggiungi uno sfondo leggermente più scuro per gli elementi ridimensionabili */
-.resizable {
-    background-color: #ffffff;
+    padding: var(--spacing-sm);
+    border-radius: 0.25rem;
     border: 1px solid #ced4da;
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    position: relative; /* Necessario per la maniglia di ridimensionamento */
-}
-
-/* Maniglia di ridimensionamento */
-.resizable::after {
+    transition: box-shadow var(--transition-speed) var(--transition-ease);
+  }
+  
+  .brocardi-item:hover, .massime-item:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* ============================
+     Massime Items Styling
+     ============================ */
+  .massime-item:nth-child(odd) {
+    display: none;
+  }
+  
+  /* ============================
+     Scrollable Sections
+     ============================ */
+  .scrollable-section {
+    max-height: 250px;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    background-color: #f7fafc;
+    border: 1px solid var(--color-form-border);
+    border-radius: 0.5rem;
+  }
+  
+  /* ============================
+     Resizable Elements with Handles
+     ============================ */
+  .resizable {
+    background-color: var(--color-form-bg);
+    border: 1px solid var(--color-form-border);
+    border-radius: 0.5rem;
+    position: relative;
+    padding: var(--spacing-sm);
+    overflow-x: hidden;
+    min-height: 100px;
+    max-height: 400px;
+    overflow-y: auto;
+    transition: box-shadow var(--transition-speed) var(--transition-ease);
+  }
+  
+  .resizable:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Maniglia di ridimensionamento */
+  .resizable::after {
     content: "";
     position: absolute;
     right: 0;
@@ -347,6 +331,149 @@ button#reset-history:hover {
     width: 10px;
     height: 10px;
     background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMu/b3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMyA3bC0zIDMgMCA4IDMgLTNsLTMgMyIgZmlsbD0iIzAwMCIvPgo8L3N2Zz4=')
-        no-repeat center center;
+      no-repeat center center;
     cursor: se-resize;
-}
+  }
+  
+  /* ============================
+     Enhanced Hover Effects
+     ============================ */
+  button:hover,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.3);
+    transition: box-shadow var(--transition-speed) var(--transition-ease);
+  }
+  
+  /* ============================
+     Error Message Styling
+     ============================ */
+  .invalid-feedback {
+    color: #e53e3e;
+    font-size: 0.875rem;
+    margin-top: var(--spacing-sm);
+  }
+  
+  /* ============================
+     Alert Styling
+     ============================ */
+  .alert {
+    border-radius: 0.5rem;
+    padding: var(--spacing-md);
+    font-size: 1rem;
+    color: var(--color-alert-text);
+    background-color: var(--color-alert-bg);
+    border: 1px solid var(--color-alert-border);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: var(--spacing-md);
+  }
+  
+  /* ============================
+     Enhanced History List
+     ============================ */
+  #history-list li {
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-form-border);
+    transition: background-color var(--transition-speed) var(--transition-ease);
+  }
+  
+  #history-list li:hover {
+    background-color: #f7fafc;
+  }
+  
+  /* ============================
+     Interactive Elements Transitions
+     ============================ */
+  .nav-link,
+  .form-check-input:checked + .form-check-label,
+  button,
+  #reset-button,
+  #reset-history {
+    transition: all var(--transition-speed) var(--transition-ease);
+  }
+  
+  /* ============================
+     Box Spiegazione e Articolo Ridimensionabili
+     ============================ */
+  .spiegazione-section,
+  #article-tab-content pre {
+    resize: vertical;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    min-height: 150px;
+    background-color: #f1f3f5;
+    border: 1px solid #ced4da;
+    border-radius: 0.5rem;
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: box-shadow var(--transition-speed) var(--transition-ease);
+  }
+  
+  .spiegazione-section::after,
+  #article-tab-content pre::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 10px;
+    height: 10px;
+    background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMu/b3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMyA3bC0zIDMgMCA4IDMgLTNsLTMgMyIgZmlsbD0iIzAwMCIvPgo8L3N2Zz4=')
+      no-repeat center center;
+    cursor: se-resize;
+  }
+    
+  /* ============================
+     Loading Indicator
+     ============================ */
+  #loading {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #3182ce;
+    text-align: center;
+  }
+  
+  /* ============================
+     History Section
+     ============================ */
+  .history-container {
+    background-color: var(--color-form-bg);
+    padding: var(--spacing-xl);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  }
+  
+  #history-list li {
+    padding: var(--spacing-sm);
+    border-bottom: 1px solid var(--color-form-border);
+    transition: background-color var(--transition-speed) var(--transition-ease);
+  }
+  
+  #history-list li:hover {
+    background-color: #f7fafc;
+  }
+  
+  /* ============================
+     Responsive Adjustments
+     ============================ */
+  @media (max-width: 768px) {
+    .form-container, .results-container, .history-container { 
+      padding: var(--spacing-lg); 
+    }
+  
+    button[type="submit"], 
+    button[type="button"], 
+    button#reset-history {
+      width: 100%;
+      margin-bottom: var(--spacing-sm);
+    }
+  
+    .number-input {
+      max-width: 100%;
+    }
+  }
+  

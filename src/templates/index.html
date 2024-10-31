@@ -10,102 +10,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/style.css">
-    <style>
-        /* Stili per le informazioni Brocardi */
-        .brocardi-info {
-            padding: 10px;
-            background-color: #f8f9fa; /* Sfondo leggermente grigio */
-            border: 1px solid #dee2e6; /* Bordo leggero */
-            border-radius: 5px;
-        }
-
-        /* Box per ogni sezione (Brocardi, Ratio, Spiegazione, Massime, Link) */
-        .brocardi-section {
-            margin-bottom: 15px;
-            padding: 15px;
-            background-color: #ffffff; /* Sfondo bianco */
-            border: 1px solid #ced4da; /* Bordo grigio chiaro */
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Leggera ombra */
-        }
-
-        /* Box per ogni elemento della lista */
-        .brocardi-item, .massime-item {
-            margin-bottom: 10px;
-            padding: 10px;
-            background-color: #e9ecef; /* Sfondo grigio chiaro */
-            border: 1px solid #ced4da; /* Bordo grigio */
-            border-radius: 5px;
-            overflow-y: auto; /* Scrollbar verticale */
-            max-height: 100px; /* Altezza massima */
-            white-space: pre-wrap; /* Avvolgimento del testo */
-            word-wrap: break-word; /* Suddivide parole troppo lunghe */
-            resize: vertical; /* Abilita il ridimensionamento verticale */
-        }
-
-        /* Miglioramento della leggibilità delle liste */
-        .brocardi-content ul, .massime-content ul {
-            list-style-type: none; /* Rimuove i bullet points */
-            padding-left: 0;
-        }
-
-        .brocardi-content li::before, .massime-content li::before {
-            content: '• '; /* Aggiunge un bullet personalizzato */
-            color: #0d6efd; /* Colore blu per i bullet */
-        }
-
-        .brocardi-content a, .massime-content a {
-            color: #0d6efd;
-            text-decoration: none;
-        }
-
-        .brocardi-content a:hover, .massime-content a:hover {
-            text-decoration: underline;
-        }
-
-        /* Stili specifici per Ratio e Spiegazione per renderli scrollabili e ridimensionabili */
-        .ratio-section, .spiegazione-section {
-            max-height: 200px; /* Imposta l'altezza massima desiderata */
-            overflow-y: auto;  /* Abilita lo scrolling verticale */
-            padding: 10px;
-            background-color: #f1f3f5; /* Sfondo leggermente diverso per distinguere */
-            border: 1px solid #ced4da; /* Bordo grigio */
-            border-radius: 5px;
-            resize: vertical; /* Abilita il ridimensionamento verticale */
-            min-height: 150px;
-            max-height: 500px;
-        }
-
-        /* Abilita il ridimensionamento per il contenitore del Testo Articolo */
-        .tab-pane pre {
-            resize: vertical;
-            overflow: auto;
-            min-height: 100px;
-            max-height: 600px;
-        }
-
-        /* Aggiungi uno sfondo leggermente più scuro per gli elementi ridimensionabili */
-        .resizable {
-            background-color: #ffffff;
-            border: 1px solid #ced4da;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            position: relative; /* Necessario per la maniglia di ridimensionamento */
-        }
-
-        /* Maniglia di ridimensionamento */
-        .resizable::after {
-            content: "";
-            position: absolute;
-            right: 0;
-            bottom: 0;
-            width: 10px;
-            height: 10px;
-            background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMu/b3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMyA3bC0zIDMgMCA4IDMgLTNsLTMgMyIgZmlsbD0iIzAwMCIvPgo8L3N2Zz4=')
-                no-repeat center center;
-            cursor: se-resize;
-        }
-    </style>
 </head>
 <body>
     <!-- Header -->
@@ -124,6 +28,7 @@
                     <h2 class="card-title mb-4">Inserisci i dettagli della norma</h2>
                     <form id="scrape-form" class="needs-validation" novalidate>
                         <div class="row mb-3">
+                            <!-- Tipo Atto -->
                             <div class="col-md-6">
                                 <label for="act_type" class="form-label">Tipo atto:</label>
                                 <select id="act_type" name="act_type" class="form-select" required>
@@ -134,12 +39,12 @@
                                     <option value="decreto legislativo">Decreto Legislativo</option>
                                     <option value="Regolamento UE">Regolamento UE</option>
                                     <option value="Direttiva UE">Direttiva UE</option>
-                                    <!-- Altri tipi di atto... -->
                                 </select>
                                 <div class="invalid-feedback">
                                     Seleziona un tipo di atto.
                                 </div>
                             </div>
+                            <!-- Data -->
                             <div class="col-md-6">
                                 <label for="date" class="form-label">Data:</label>
                                 <input type="text" id="date" name="date" class="form-control" placeholder="gg/mm/aaaa">
@@ -150,6 +55,7 @@
                         </div>
 
                         <div class="row mb-3">
+                            <!-- Numero Atto -->
                             <div class="col-md-6">
                                 <label for="act_number" class="form-label">Numero atto:</label>
                                 <input type="text" id="act_number" name="act_number" class="form-control" placeholder="Inserisci il numero dell'atto">
@@ -157,6 +63,7 @@
                                     Inserisci il numero dell'atto.
                                 </div>
                             </div>
+                            <!-- Articolo -->
                             <div class="col-md-6">
                                 <label for="article" class="form-label">Articolo:</label>
                                 <div class="input-group">
@@ -168,6 +75,7 @@
                         </div>
 
                         <div class="row mb-3">
+                            <!-- Versione -->
                             <div class="col-md-6">
                                 <label class="form-label">Versione:</label>
                                 <div class="form-check">
@@ -179,19 +87,20 @@
                                     <label class="form-check-label" for="originale">Originale</label>
                                 </div>
                             </div>
+                            <!-- Data Versione -->
                             <div class="col-md-6">
                                 <label for="version_date" class="form-label">Data versione:</label>
                                 <input type="date" id="version_date" name="version_date" class="form-control">
                             </div>
                         </div>
 
-                        <!-- Checkbox per mostrare informazioni Brocardi -->
+                        <!-- Checkbox per Brocardi -->
                         <div class="mb-4 form-check">
                             <input class="form-check-input" type="checkbox" id="show_brocardi_info" name="show_brocardi_info">
                             <label class="form-check-label" for="show_brocardi_info">Visualizza informazioni Brocardi</label>
                         </div>
 
-                        <!-- Pulsanti -->
+                        <!-- Bottoni di azione -->
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <button type="submit" class="btn btn-success">Estrai Dati</button>
                             <button type="button" id="reset-button" class="btn btn-danger">Reset</button>
@@ -244,7 +153,7 @@
             <div class="tab-pane fade" role="tabpanel">
                 <div class="mb-3 resizable">
                     <h5>Testo Articolo:</h5>
-                    <pre></pre>
+                    <pre class="article-text"></pre>
                 </div>
                 <div class="brocardi-info" style="display:none;">
                     <h5>Informazioni Brocardi:</h5>
