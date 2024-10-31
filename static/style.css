@@ -62,23 +62,11 @@ label {
     margin-bottom: 0.5rem;
 }
 
-input[type="text"],
-input[type="date"],
-select {
-    width: 100%;
-    padding: 0.75rem;
-    margin-bottom: 1.25rem;
-    border: 1px solid #ced4da;
-    border-radius: 0.25rem;
-    font-size: 1rem;
-    background-color: #f8f9fa;
-    transition: border-color 0.3s ease, background-color 0.3s ease;
-}
-
-input:focus {
-    outline: none;
-    border-color: #007bff;
-    background-color: #ffffff;
+/* Disabilitato */
+input.disabled,
+select.disabled {
+    background-color: #e9ecef;
+    cursor: not-allowed;
 }
 
 /* Row Layout for Form Fields */
@@ -144,11 +132,11 @@ button {
 }
 
 button[type="submit"] {
-    background-color: #007bff;
+    background-color: #28a745;
 }
 
 button[type="submit"]:hover {
-    background-color: #0056b3;
+    background-color: #218838;
 }
 
 button#reset-button {
@@ -186,6 +174,13 @@ button#reset-history:hover {
     font-size: 1.1rem;
     margin-top: 1.5rem;
     color: #212529;
+}
+
+#result pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
 }
 
 /* Collapsible Brocardi Info */
@@ -295,3 +290,67 @@ button.btn-primary:hover {
         margin-bottom: 0.75rem;
     }
 }
+
+/* Brocardi Tabs Styling */
+.nav-tabs .nav-link {
+    background-color: #f8f9fa;
+    color: #007bff;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.tab-pane {
+    padding: 1rem;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-top: none;
+}
+
+.tab-pane h4 {
+    margin-top: 1rem;
+}
+
+.tab-pane a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.tab-pane a:hover {
+    text-decoration: underline;
+}
+
+/* Massime Items */
+.massima-item {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #ced4da;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+
+/* Stili per i tab del testo degli articoli */
+#article-text-container .nav-tabs .nav-link {
+    background-color: #f8f9fa;
+    color: #28a745;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#article-text-container .nav-tabs .nav-link.active {
+    background-color: #28a745;
+    color: white;
+}
+
+#article-text-container .tab-pane {
+    padding: 1rem;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-top: none;
+}
+

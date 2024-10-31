@@ -39,7 +39,7 @@ class NormaController:
         self.app = Quart(__name__)
 
         # Middleware for rate limiting
-        self.app.before_request(self.rate_limit_middleware)
+        #self.app.before_request(self.rate_limit_middleware)
 
         # Define routes
         self.setup_routes()
