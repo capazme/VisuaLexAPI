@@ -1,9 +1,8 @@
-import requests
+import asyncio
+import aiohttp
 from bs4 import BeautifulSoup
-from functools import lru_cache
 import logging
 import re
-from .config import MAX_CACHE_SIZE
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -11,10 +10,9 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
- 
-def get_tree(normurn, link=False):
+async def get_tree(normurn, link=False):
     """
-    Retrieves the article tree from a given norm URN and extracts article information.
+    Retrieves the article tree from a given norm URN and extracts article information asynchronously.
     
     Arguments:
     normurn -- The URL of the norm page
@@ -25,26 +23,26 @@ def get_tree(normurn, link=False):
     """
     logging.info(f"Fetching tree for norm URN: {normurn}")
     try:
-        # Sending HTTP GET request to the provided URL
-        response = requests.get(normurn, timeout=30)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+            async with session.get(normurn, timeout=30) as response:
+                response.raise_for_status()
+                text = await response.text()
+    except Exception as e:
         logging.error(f"Failed to retrieve the page: {e}", exc_info=True)
-        return f"Failed to retrieve the page: {e}"
-    
-    soup = BeautifulSoup(response.text, 'html.parser')
+        return f"Failed to retrieve the page: {e}", 0
+
+    soup = BeautifulSoup(text, 'html.parser')
 
     if "normattiva" in normurn:
-        return _parse_normattiva_tree(soup, normurn, link)
+        return await _parse_normattiva_tree(soup, normurn, link)
     elif "eur-lex" in normurn:
-        return _parse_eurlex_tree(soup)
+        return await _parse_eurlex_tree(soup)
 
     logging.warning(f"Unrecognized norm URN format: {normurn}")
-    return "Unrecognized norm URN format"
+    return "Unrecognized norm URN format", 0
 
- 
-def _parse_normattiva_tree(soup, normurn, link):
-    """Parses the Normattiva-specific tree structure."""
+async def _parse_normattiva_tree(soup, normurn, link):
+    """Parses the Normattiva-specific tree structure asynchronously."""
     logging.info("Parsing Normattiva structure")
     tree = soup.find('div', id='albero')
     
@@ -75,7 +73,10 @@ def _parse_normattiva_tree(soup, normurn, link):
                 seen.add(text_content)  # Add to the set to track duplicates
                 if link:
                     article_part = article_part_pattern.search(normurn)
-                    modified_url = normurn.replace(article_part.group(), 'art' + text_content.split()[0]) if article_part else normurn
+                    if article_part:
+                        modified_url = normurn.replace(article_part.group(), 'art' + text_content.split()[0])
+                    else:
+                        modified_url = normurn
                     result.append({text_content: modified_url})  # Add as dictionary if link is true
                 else:
                     result.append(text_content)  # Add text content to the list
@@ -85,9 +86,8 @@ def _parse_normattiva_tree(soup, normurn, link):
     logging.info(f"Extracted {count} unique articles from Normattiva")
     return result, count  # Return the list and count
 
- 
-def _parse_eurlex_tree(soup):
-    """Parses the Eurlex-specific tree structure."""
+async def _parse_eurlex_tree(soup):
+    """Parses the Eurlex-specific tree structure asynchronously."""
     logging.info("Parsing Eurlex structure")
     result = []  # List to preserve the order
     seen = set()  # Set to track seen articles
@@ -104,3 +104,14 @@ def _parse_eurlex_tree(soup):
     count = len(result)
     logging.info(f"Extracted {count} unique articles from Eurlex")
     return result, count  # Return the list and count
+
+# Se vuoi chiamare la funzione get_tree e gestire l'asincronia
+async def main():
+    normurn = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:2010-12-13;220'
+    result, count = await get_tree(normurn, link=True)
+    print(f"Found {count} articles.")
+    print(result)
+
+# Esegui l'evento loop
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -14,13 +14,29 @@ from visualex_api.tools.map import NORMATTIVA_URN_CODICI, EURLEX
 from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
 from visualex_api.tools.text_op import format_date_to_extended, clean_text, parse_article_input
+import logging
+import sys
 
-# Configure structured logging
+# Configurazione di logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Imposta il livello di log su DEBUG
+    format="%(message)s",
+    stream=sys.stdout,
+)
+
+# Configurazione di structlog
 structlog.configure(
     processors=[
-        structlog.processors.JSONRenderer()
-    ]
+        structlog.processors.TimeStamper(fmt="iso"),   # Aggiunge un timestamp in formato ISO
+        structlog.processors.StackInfoRenderer(),      # Aggiunge informazioni sullo stack se disponibile
+        structlog.processors.format_exc_info,          # Formatta le eccezioni per renderle leggibili
+        structlog.dev.ConsoleRenderer()                # Formattazione leggibile per debugging
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    cache_logger_on_first_use=True,
 )
+
 log = structlog.get_logger()
 
 # Rate limiting storage
@@ -70,14 +86,18 @@ class NormaController:
     async def home(self):
         return await render_template('index.html')
 
-    def create_norma_visitata_from_data(self, data):
+    async def create_norma_visitata_from_data(self, data):
         """
         Creates and returns a list of NormaVisitata instances from request data.
         """
         allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         
         if data['act_type'] in allowed_types:
-            data_completa = complete_date_or_parse(date=data.get('date'), act_type=data['act_type'], act_number=data.get('act_number'))
+            data_completa = complete_date_or_parse(
+                date=data.get('date'), 
+                act_type=data['act_type'], 
+                act_number=data.get('act_number')
+            )
             data_completa_estesa = format_date_to_extended(data_completa)
         else:
             data_completa_estesa = data.get('date')  # Assegna comunque la data se non è in allowed_types
@@ -88,7 +108,7 @@ class NormaController:
             numero_atto=data.get('act_number')
         )
         
-        articles = parse_article_input(str(data['article']), norma.url)
+        articles = await parse_article_input(str(data['article']), norma.url)
         
         out = []
 
@@ -118,7 +138,7 @@ class NormaController:
             data = await request.get_json()
             log.info("Received data for fetch_norma_data", data=data)
 
-            normavisitate = self.create_norma_visitata_from_data(data)
+            normavisitate = await self.create_norma_visitata_from_data(data)
             response = {
                 'norma_data': [nv.to_dict() for nv in normavisitate]
             }
@@ -133,7 +153,7 @@ class NormaController:
             data = await request.get_json()
             log.info("Received data for fetch_article_text", data=data)
 
-            normavisitate = self.create_norma_visitata_from_data(data)
+            normavisitate = await self.create_norma_visitata_from_data(data)
             log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
             async def fetch_text(normavisitata):
@@ -159,7 +179,6 @@ class NormaController:
             # Fetch all article texts concurrently
             results = await asyncio.gather(*(fetch_text(nv) for nv in normavisitate), return_exceptions=True)
 
-            # Process results and log each one
             processed_results = []
             for result in results:
                 if isinstance(result, Exception):
@@ -179,7 +198,7 @@ class NormaController:
             data = await request.get_json()
             log.info("Received data for fetch_brocardi_info", data=data)
 
-            normavisitate = self.create_norma_visitata_from_data(data)
+            normavisitate = await self.create_norma_visitata_from_data(data)
 
             async def fetch_info(normavisitata):
                 act_type_normalized = normavisitata.norma.tipo_atto.lower()
@@ -187,7 +206,7 @@ class NormaController:
                     return {'norma_data': normavisitata.to_dict(), 'brocardi_info': None}
 
                 try:
-                    brocardi_info = await brocardi_scraper.get_info(normavisitata)  # await the async method
+                    brocardi_info = await brocardi_scraper.get_info(normavisitata)
                     response = {
                         'norma_data': normavisitata.to_dict(),
                         'brocardi_info': {
@@ -206,7 +225,6 @@ class NormaController:
 
             results = await asyncio.gather(*(fetch_info(nv) for nv in normavisitate), return_exceptions=True)
 
-            # Handle exceptions in results
             processed_results = []
             for result in results:
                 if isinstance(result, Exception):
@@ -224,7 +242,7 @@ class NormaController:
             data = await request.get_json()
             log.info("Received data for fetch_all_data", data=data)
 
-            normavisitate = self.create_norma_visitata_from_data(data)
+            normavisitate = await self.create_norma_visitata_from_data(data)
             log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
             async def fetch_data(normavisitata):
@@ -235,15 +253,11 @@ class NormaController:
 
                 try:
                     article_text, url = await scraper.get_document(normavisitata)
-                    log.info("Document fetched successfully", article_text=article_text, url=url)
                     article_text_cleaned = clean_text(article_text)
-                    log.info("Article text cleaned", cleaned_text=article_text_cleaned)
-
                     brocardi_info = None
                     if scraper == normattiva_scraper:
                         try:
                             brocardi_info = await brocardi_scraper.get_info(normavisitata)
-                            log.info("Brocardi info fetched successfully", brocardi_info=brocardi_info)
                             brocardi_info = {
                                 'position': brocardi_info[0] if brocardi_info[0] else None,
                                 'link': brocardi_info[2],
@@ -266,10 +280,8 @@ class NormaController:
                     log.error("Error fetching all data", error=str(e))
                     return {'error': str(e), 'norma_data': normavisitata.to_dict()}
 
-            # Fetch all data concurrently
             results = await asyncio.gather(*(fetch_data(nv) for nv in normavisitate), return_exceptions=True)
 
-            # Process results and log each one
             processed_results = []
             for result in results:
                 if isinstance(result, Exception):
@@ -277,7 +289,6 @@ class NormaController:
                     log.error("Exception during fetching all data", exception=str(result))
                 else:
                     processed_results.append(result)
-                    log.info("Fetched complete data result", result=result)
 
             return jsonify(processed_results)
         except Exception as e:
@@ -292,37 +303,30 @@ class NormaController:
             log.error("Error in get_history", error=str(e))
             return jsonify({'error': str(e)}), 500
 
-    def export_pdf(self):
+    async def export_pdf(self):
         try:
-            data =  request.get_json()
+            data = await request.get_json()
             log.info("Received data for export_pdf", data=data)
 
-            # Extract necessary information to generate PDF
-            # This is a placeholder implementation; adjust as needed
-            pdf_content =  extract_pdf(data)
-            pdf_path = urn_to_filename(data.get('urn', 'exported'))  # Example filename generation
+            pdf_content = extract_pdf(data)
+            pdf_path = urn_to_filename(data.get('urn', 'exported')) 
 
-            # Save PDF to a temporary location
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_content)
 
-            # Send the PDF file
-            return send_file(pdf_path, mimetype='application/pdf', as_attachment=True, attachment_filename=os.path.basename(pdf_path))
+            return await send_file(pdf_path, mimetype='application/pdf', as_attachment=True, attachment_filename=os.path.basename(pdf_path))
         except Exception as e:
             log.error("Error in export_pdf", error=str(e))
             return jsonify({'error': str(e)}), 500
-
 
 # Entry point to run the Quart app
 def main():
     controller = NormaController()
     app = controller.app
 
-    # Optionally, set host and port from environment variables or defaults
     host = os.getenv('HOST', '0.0.0.0')
     port = int(os.getenv('PORT', 5000))
 
-    # Run the Quart app
     app.run(host=host, port=port)
 
 if __name__ == '__main__':

@@ -15078,7 +15078,6 @@ EURLEX = {
     'regolamento ue': 'reg',
     'direttiva ue': 'dir',
 }
-
 FONTI_PRINCIPALI = [
             'legge', 'decreto legge', 'decreto legislativo', 'costituzione', 'd.p.r.', 'TUE', 'TFUE', 'CDFUE','Regolamento UE','Direttiva UE','regio decreto',
             'codice civile', 'preleggi', 'codice penale', 'codice di procedura civile',

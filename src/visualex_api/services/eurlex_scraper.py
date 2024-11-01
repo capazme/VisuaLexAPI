@@ -23,14 +23,14 @@ class EurlexScraper(BaseScraper):
             uri = EURLEX[act_type]
             logging.info(f"Act type is a treaty. Using predefined URI: {uri}")
         else:
-            uri = f'{self.base_url}/{act_type}/{year}/{num}/oj/ita'
+            uri = f'{self.base_url}/{EURLEX[act_type]}/{year}/{num}/oj/ita'
             logging.info(f"Constructed URI for regulation or directive: {uri}")
         
         return uri
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata=None, act_type=None, article=None, year=None, num=None, urn=None):
-        logging.info(f"Fetching EUR-Lex document with parameters: act_type={act_type}, article={article}, year={year}, num={num}, urn={urn}")
+        logging.info(f"Fetching EUR-Lex document with parameters {normavisitata.to_dict()}: act_type={act_type}, article={article}, year={year}, num={num}, urn={urn}")
 
         if normavisitata:
             urn = normavisitata.urn

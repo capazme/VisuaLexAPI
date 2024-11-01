@@ -5,9 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEBUG = true; // Imposta su false per disabilitare i log di debug
 
     const logger = {
-        log: (...args) => { if (DEBUG) console.log(...args); },
-        error: (...args) => { console.error(...args); },
-        warn: (...args) => { if (DEBUG) console.warn(...args); },
+        log: (...args) => DEBUG && console.log(...args),
+        error: (...args) => console.error(...args),
+        warn: (...args) => DEBUG && console.warn(...args),
     };
 
     const ACT_TYPES_REQUIRING_DETAILS = [
@@ -15,15 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
         'decreto legge',
         'decreto legislativo',
         'Regolamento UE',
-        'Direttiva UE'
+        'Direttiva UE',
     ];
 
     const SELECTORS = {
         scrapeForm: '#scrape-form',
-        normaDataContainer: '#norma-data',
-        articlesContainer: '#articles-container',
-        articlesTabs: '#articles-tabs',
-        articlesTabContent: '#articles-tab-content',
+        normeContainer: '#norme-container',
         loadingIndicator: '#loading',
         errorContainer: '#error-container',
         historyList: '#history-list',
@@ -44,28 +41,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================
     // Riferimenti agli Elementi del DOM
     // ============================
-    const elements = {
-        scrapeForm: document.querySelector(SELECTORS.scrapeForm),
-        normaDataContainer: document.querySelector(SELECTORS.normaDataContainer),
-        articlesContainer: document.querySelector(SELECTORS.articlesContainer),
-        articlesTabs: document.querySelector(SELECTORS.articlesTabs),
-        articlesTabContent: document.querySelector(SELECTORS.articlesTabContent),
-        loadingIndicator: document.querySelector(SELECTORS.loadingIndicator),
-        errorContainer: document.querySelector(SELECTORS.errorContainer),
-        historyList: document.querySelector(SELECTORS.historyList),
-        resetHistoryButton: document.querySelector(SELECTORS.resetHistoryButton),
-        resetButton: document.querySelector(SELECTORS.resetButton),
-        clearSearchFieldsButton: document.querySelector(SELECTORS.clearSearchFieldsButton),
-        historySearchInput: document.querySelector(SELECTORS.historySearchInput),
-        actTypeSelect: document.querySelector(SELECTORS.actTypeSelect),
-        actNumberInput: document.querySelector(SELECTORS.actNumberInput),
-        dateInput: document.querySelector(SELECTORS.dateInput),
-        versionRadios: document.querySelectorAll(SELECTORS.versionRadios),
-        versionDateInput: document.querySelector(SELECTORS.versionDateInput),
-        articleInput: document.querySelector(SELECTORS.articleInput),
-        incrementButton: document.querySelector(SELECTORS.incrementButton),
-        decrementButton: document.querySelector(SELECTORS.decrementButton),
-    };
+    const elements = Object.fromEntries(
+        Object.entries(SELECTORS).map(([key, selector]) => [
+            key,
+            key === 'versionRadios' ? document.querySelectorAll(selector) : document.querySelector(selector),
+        ])
+    );
 
     // ============================
     // Verifica degli Elementi
@@ -82,14 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Variabili e Stato
     // ============================
     let pinnedTabs = {};
+    let normaContainers = {};
 
     // ============================
     // Funzioni di Utilità
     // ============================
-    /**
-     * Mostra un messaggio di errore.
-     * @param {string} message - Il messaggio di errore da mostrare.
-     */
     const showError = (message) => {
         if (elements.errorContainer) {
             elements.errorContainer.textContent = message;
@@ -100,9 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * Nasconde il messaggio di errore.
-     */
     const hideError = () => {
         if (elements.errorContainer) {
             elements.errorContainer.textContent = '';
@@ -110,41 +85,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * Crea una funzione che ritarda l'esecuzione fino a quando non viene chiamata nuovamente entro il periodo di ritardo.
-     * @param {Function} func - La funzione da debouncizzare.
-     * @param {number} delay - Il ritardo in millisecondi.
-     * @returns {Function} - La funzione debouncizzata.
-     */
     const debounce = (func, delay) => {
         let debounceTimer;
-        return function(...args) {
+        return (...args) => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => func.apply(this, args), delay);
         };
     };
 
-    /**
-     * Sanifica una stringa per utilizzarla come ID HTML valido.
-     * @param {string} str - La stringa da sanificare.
-     * @returns {string} - La stringa sanificata.
-     */
-    const sanitize = (str) => {
-        return str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
-    };
+    const sanitize = (str) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
 
-    /**
-     * Capitalizza la prima lettera di una stringa.
-     * @param {string} string - La stringa da capitalizzare.
-     * @returns {string} - La stringa capitalizzata.
-     */
-    const capitalizeFirstLetter = (string) => {
-        return string.charAt(0).toUpperCase() + string.slice(1);
-    };
+    const capitalizeFirstLetter = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 
-    /**
-     * Salva i tab pinnati nel localStorage.
-     */
     const savePinnedTabs = () => {
         try {
             localStorage.setItem('pinnedTabs', JSON.stringify(pinnedTabs));
@@ -154,55 +106,57 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * Carica i tab pinnati dal localStorage.
-     */
     const loadPinnedTabs = () => {
-        if (localStorage && elements.articlesTabs && elements.articlesTabContent) {
-            try {
-                const savedPinnedTabs = localStorage.getItem('pinnedTabs');
-                if (savedPinnedTabs) {
-                    pinnedTabs = JSON.parse(savedPinnedTabs);
-                    logger.log('Tab pinnati trovati:', pinnedTabs);
-                    Object.values(pinnedTabs).forEach(result => {
-                        createArticleTab(result, true); // Passa true per indicare che è pinnato
+        if (!localStorage || !elements.normeContainer) return;
+
+        try {
+            const savedPinnedTabs = localStorage.getItem('pinnedTabs');
+            if (savedPinnedTabs) {
+                pinnedTabs = JSON.parse(savedPinnedTabs);
+                logger.log('Tab pinnati trovati:', pinnedTabs);
+
+                // Raggruppa i tab pinnati per norma
+                const normaDict = {};
+
+                Object.values(pinnedTabs).forEach((articleData) => {
+                    const { norma_data: normaData } = articleData;
+                    if (!normaData) {
+                        logger.warn('Dati della norma mancanti nell\'articolo pinnato:', articleData);
+                        return;
+                    }
+                    const normaKey = `${normaData.tipo_atto}-${normaData.numero_atto || ''}-${normaData.data || ''}`;
+
+                    normaDict[normaKey] = normaDict[normaKey] || {
+                        norma_data: normaData,
+                        articles: [],
+                    };
+
+                    normaDict[normaKey].articles.push(articleData);
+                });
+
+                // Crea i contenitori delle norme e aggiungi i tab pinnati
+                Object.entries(normaDict).forEach(([normaKey, norma]) => {
+                    let normElements = normaContainers[normaKey];
+
+                    if (!normElements) {
+                        normElements = createNormContainer(norma.norma_data);
+                        normaContainers[normaKey] = normElements;
+                    }
+
+                    norma.articles.forEach((articleData) => {
+                        createArticleTab(articleData, normElements, true);
                     });
-                    activateFirstPinnedTab();
-                } else {
-                    logger.log("Nessun tab pinnato salvato.");
-                }
-            } catch (error) {
-                logger.error('Errore nel caricamento dei tab pinnati:', error);
-            }
-        } else {
-            if (!localStorage) logger.warn("localStorage non è supportato.");
-            if (!elements.articlesTabs) logger.error("Elemento 'articles-tabs' non trovato nel DOM.");
-            if (!elements.articlesTabContent) logger.error("Elemento 'articles-tab-content' non trovato nel DOM.");
-        }
-    };
+                });
 
-    /**
-     * Attiva il primo tab pinnato disponibile.
-     */
-    const activateFirstPinnedTab = () => {
-        const firstPinnedTab = elements.articlesTabs.querySelector('.nav-link.pinned');
-        if (firstPinnedTab) {
-            firstPinnedTab.classList.add('active');
-            const firstPinnedPaneId = firstPinnedTab.getAttribute('href');
-            const firstPinnedPane = elements.articlesTabContent.querySelector(firstPinnedPaneId);
-            if (firstPinnedPane) {
-                firstPinnedPane.classList.add('show', 'active');
-                logger.log(`Pane attivato: ${firstPinnedPaneId}`);
+                logger.log('Tab pinnati caricati.');
             } else {
-                logger.warn(`Pane con id '${firstPinnedPaneId}' non trovato.`);
+                logger.log('Nessun tab pinnato salvato.');
             }
+        } catch (error) {
+            logger.error('Errore nel caricamento dei tab pinnati:', error);
         }
     };
 
-    /**
-     * Salva una ricerca nella cronologia.
-     * @param {Object} data - I dati della ricerca.
-     */
     const saveToHistory = (data) => {
         if (!elements.historyList) return;
         const listItem = document.createElement('li');
@@ -212,11 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
         logger.log('Ricerca salvata nella cronologia:', listItem.textContent);
     };
 
-    /**
-     * Popola le informazioni Brocardi in un elemento specificato.
-     * @param {Object} brocardiInfo - Le informazioni Brocardi da visualizzare.
-     * @param {HTMLElement} brocardiInfoDiv - Il contenitore dove inserire le informazioni.
-     */
     const populateBrocardiInfo = (brocardiInfo, brocardiInfoDiv) => {
         if (!brocardiInfoDiv) return;
         const brocardiContentDiv = brocardiInfoDiv.querySelector('.brocardi-content');
@@ -224,23 +173,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         brocardiContentDiv.innerHTML = ''; // Resetta il contenuto
 
-        /**
-         * Crea e aggiunge una sezione al contenuto Brocardi.
-         * @param {string} title - Il titolo della sezione.
-         * @param {string|Array} content - Il contenuto della sezione.
-         * @param {boolean} isList - Indica se il contenuto è una lista.
-         */
         const createSection = (title, content, isList = false) => {
+            if (!content || (Array.isArray(content) && content.length === 0)) return;
+
             const sectionDiv = document.createElement('div');
             sectionDiv.classList.add('brocardi-section');
-
-            if (title === 'Massime') {
-                sectionDiv.classList.add('massime-section');
-            } else if (title === 'Ratio') {
-                sectionDiv.classList.add('ratio-section');
-            } else if (title === 'Spiegazione') {
-                sectionDiv.classList.add('spiegazione-section');
-            }
 
             const heading = document.createElement('h6');
             heading.textContent = `${title}:`;
@@ -248,39 +185,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isList && Array.isArray(content)) {
                 const listContainer = document.createElement('div');
-                listContainer.classList.add(`${title.toLowerCase()}-content`);
-                content.forEach(item => {
-                    const itemBox = document.createElement('div');
-                    itemBox.classList.add(title === 'Massime' ? 'massime-item' : 'brocardi-item', 'resizable');
-                    itemBox.innerHTML = item.trim();
-                    listContainer.appendChild(itemBox);
-                });
-                sectionDiv.appendChild(listContainer);
-            } else if (typeof content === 'string') {
-                const paragraph = document.createElement('p');
-                paragraph.innerHTML = content.trim();
-                sectionDiv.appendChild(paragraph);
-            }
+                listContainer.classList.add(`${title.toLowerCase()}-list`);
 
-            brocardiContentDiv.appendChild(sectionDiv);
+                content.forEach((item) => {
+                    const trimmedItem = item.trim();
+                    if (trimmedItem !== '') {
+                        const itemBox = document.createElement('div');
+                        itemBox.classList.add('brocardi-item', 'resizable');
+                        itemBox.innerHTML = trimmedItem;
+                        listContainer.appendChild(itemBox);
+                    }
+                });
+
+                if (listContainer.children.length > 0) {
+                    sectionDiv.appendChild(listContainer);
+                    brocardiContentDiv.appendChild(sectionDiv);
+                }
+            } else if (typeof content === 'string') {
+                const trimmedContent = content.trim();
+                if (trimmedContent !== '') {
+                    const paragraph = document.createElement('p');
+                    paragraph.innerHTML = trimmedContent;
+                    sectionDiv.appendChild(paragraph);
+                    brocardiContentDiv.appendChild(sectionDiv);
+                }
+            }
         };
 
-        // Sezioni Brocardi
-        if (brocardiInfo.Brocardi && brocardiInfo.Brocardi.length > 0) {
-            createSection('Brocardi', brocardiInfo.Brocardi, true);
-        }
-
-        if (brocardiInfo.Ratio) {
-            createSection('Ratio', brocardiInfo.Ratio);
-        }
-
-        if (brocardiInfo.Spiegazione) {
-            createSection('Spiegazione', brocardiInfo.Spiegazione);
-        }
-
-        if (brocardiInfo.Massime && brocardiInfo.Massime.length > 0) {
-            createSection('Massime', brocardiInfo.Massime, true);
-        }
+        createSection('Brocardi', brocardiInfo.Brocardi, true);
+        createSection('Ratio', brocardiInfo.Ratio);
+        createSection('Spiegazione', brocardiInfo.Spiegazione);
+        createSection('Massime', brocardiInfo.Massime, true);
 
         if (brocardiInfo.link) {
             const linkDiv = document.createElement('div');
@@ -297,84 +232,112 @@ document.addEventListener('DOMContentLoaded', () => {
             brocardiContentDiv.appendChild(linkDiv);
         }
 
+        // Nascondi le massime in posizione dispari
+        const massimeSection = brocardiContentDiv.querySelector('.massime-list');
+        if (massimeSection) {
+            const massimeItems = massimeSection.querySelectorAll('.brocardi-item');
+            massimeItems.forEach((item, index) => {
+                if ((index + 1) % 2 !== 0) {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
         logger.log('Informazioni Brocardi popolate.');
     };
 
     // ============================
     // Funzioni Principali
     // ============================
-    /**
-     * Abilita o disabilita i campi 'Numero Atto' e 'Data' in base al tipo di atto selezionato.
-     */
     const toggleActDetails = () => {
         if (!elements.actTypeSelect || !elements.actNumberInput || !elements.dateInput) return;
         const selectedActType = elements.actTypeSelect.value;
 
-        if (ACT_TYPES_REQUIRING_DETAILS.includes(selectedActType)) {
-            elements.actNumberInput.disabled = false;
-            elements.actNumberInput.required = true;
-            elements.dateInput.disabled = false;
-            elements.dateInput.required = true;
-            elements.actNumberInput.classList.remove('disabled');
-            elements.dateInput.classList.remove('disabled');
-            logger.log(`Campi 'Numero Atto' e 'Data' abilitati per tipo atto: ${selectedActType}`);
-        } else {
-            elements.actNumberInput.disabled = true;
-            elements.actNumberInput.required = false;
+        const requiresDetails = ACT_TYPES_REQUIRING_DETAILS.includes(selectedActType);
+
+        elements.actNumberInput.disabled = !requiresDetails;
+        elements.actNumberInput.required = requiresDetails;
+        elements.dateInput.disabled = !requiresDetails;
+        elements.dateInput.required = requiresDetails;
+
+        elements.actNumberInput.classList.toggle('disabled', !requiresDetails);
+        elements.dateInput.classList.toggle('disabled', !requiresDetails);
+
+        if (!requiresDetails) {
             elements.actNumberInput.value = '';
-            elements.dateInput.disabled = true;
-            elements.dateInput.required = false;
             elements.dateInput.value = '';
-            elements.actNumberInput.classList.add('disabled');
-            elements.dateInput.classList.add('disabled');
-            logger.log(`Campi 'Numero Atto' e 'Data' disabilitati per tipo atto: ${selectedActType}`);
         }
+
+        logger.log(`Campi 'Numero Atto' e 'Data' ${requiresDetails ? 'abilitati' : 'disabilitati'} per tipo atto: ${selectedActType}`);
     };
 
-    /**
-     * Abilita o disabilita il campo 'Data versione' in base alla versione selezionata.
-     */
     const toggleVersionDate = () => {
         if (!elements.versionRadios || !elements.versionDateInput) return;
         const selectedVersion = document.querySelector('input[name="version"]:checked')?.value;
 
-        if (selectedVersion === 'originale') {
-            elements.versionDateInput.disabled = true;
+        const disableVersionDate = selectedVersion === 'originale';
+        elements.versionDateInput.disabled = disableVersionDate;
+        elements.versionDateInput.classList.toggle('disabled', disableVersionDate);
+
+        if (disableVersionDate) {
             elements.versionDateInput.value = '';
-            elements.versionDateInput.classList.add('disabled');
-            logger.log("Campo 'Data versione' disabilitato.");
-        } else {
-            elements.versionDateInput.disabled = false;
-            elements.versionDateInput.classList.remove('disabled');
-            logger.log("Campo 'Data versione' abilitato.");
         }
+
+        logger.log(`Campo 'Data versione' ${disableVersionDate ? 'disabilitato' : 'abilitato'}.`);
     };
 
-    /**
-     * Crea un nuovo tab per un articolo.
-     * @param {Object} result - I dati dell'articolo.
-     * @param {boolean} isPinned - Se il tab deve essere pinnato.
-     */
-    const createArticleTab = (result, isPinned = false) => {
-        if (!result.norma_data) {
-            logger.warn('Dati della norma mancanti:', result);
+    const createNormContainer = (normaData) => {
+        const template = document.getElementById('norm-collapsible-template');
+        if (!template || !elements.normeContainer) {
+            logger.error("Template 'norm-collapsible-template' o 'norme-container' non trovato.");
             return;
         }
 
-        const articleIdRaw = result.norma_data.numero_articolo || 'unknown';
-        const actTypeRaw = result.norma_data.tipo_atto || 'unknown';
-        const articleId = sanitize(articleIdRaw);
-        const actType = sanitize(actTypeRaw);
-        const articleTabId = `article-${actType}-${articleId}`;
-        const key = `article-${actType}-${articleId}`;
+        const normContainerFragment = template.content.cloneNode(true);
+        const normContainer = normContainerFragment.querySelector('.norm-collapsible');
+        const normTitle = normContainer.querySelector('.norm-title');
+        const collapseElement = normContainer.querySelector('.norm-content');
+        const normaKey = `${normaData.tipo_atto}-${normaData.numero_atto || ''}-${normaData.data || ''}`;
+        const collapseId = `collapse-${sanitize(normaData.tipo_atto)}-${sanitize(normaData.numero_atto || '')}-${Date.now()}`;
 
-        // Evita di duplicare i tab già presenti
-        if (document.getElementById(`${articleTabId}-tab`)) {
+        normTitle.textContent = `${capitalizeFirstLetter(normaData.tipo_atto)} ${normaData.numero_atto || ''} ${normaData.data || ''}`;
+        collapseElement.id = collapseId;
+        normContainer.querySelector('.norm-header').setAttribute('data-bs-target', `#${collapseId}`);
+        normContainer.setAttribute('data-norma-key', normaKey);
+
+        elements.normeContainer.appendChild(normContainerFragment);
+        logger.log(`Contenitore per la norma creato: ${normTitle.textContent}`);
+
+        return {
+            normContainer,
+            normTabs: normContainer.querySelector('.norm-tabs'),
+            normTabContent: normContainer.querySelector('.norm-tab-content'),
+            normaKey,
+        };
+    };
+
+    const createArticleTab = (articleData, normElements, isPinned = false) => {
+        const { normTabs, normTabContent, normaKey } = normElements;
+        const { norma_data: normaData } = articleData;
+
+        if (!normaData) {
+            logger.warn('Dati della norma mancanti:', articleData);
+            return;
+        }
+
+        const articleIdRaw = normaData.numero_articolo || 'unknown';
+        const articleId = sanitize(articleIdRaw);
+        const actTypeRaw = normaData.tipo_atto || 'unknown';
+        const actType = sanitize(actTypeRaw);
+        const timestamp = Date.now();
+        const articleTabId = `article-${actType}-${articleId}-${timestamp}`;
+        const key = `article-${actType}-${articleId}-${timestamp}`;
+
+        if (normTabs.querySelector(`#${articleTabId}-tab`)) {
             logger.log(`Tab già presente: ${articleTabId}-tab`);
             return;
         }
 
-        // Clona il template per il tab articolo
         const tabTemplate = document.getElementById('article-tab-template');
         if (!tabTemplate) {
             logger.error("Template 'article-tab-template' non trovato.");
@@ -382,40 +345,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const tabItem = tabTemplate.content.cloneNode(true);
         const navLink = tabItem.querySelector('.nav-link');
-        
-        // Rimuovi data-bs-toggle se presente per evitare conflitti con la gestione manuale
-        navLink.removeAttribute('data-bs-toggle');
 
         navLink.id = `${articleTabId}-tab`;
         navLink.href = `#${articleTabId}`;
         navLink.setAttribute('aria-controls', articleTabId);
-        navLink.textContent = `Articolo ${articleIdRaw} (${capitalizeFirstLetter(actTypeRaw)})`;
+        navLink.textContent = `Articolo ${articleIdRaw}`;
 
-        // Configura il pulsante di pin
         const pinButton = tabItem.querySelector('.pin-button');
         pinButton.dataset.key = key;
-        if (isPinned) {
-            pinButton.textContent = '📌';
-            navLink.classList.add('pinned');
-        } else {
-            pinButton.textContent = '📍';
-            navLink.classList.remove('pinned');
-        }
+        pinButton.textContent = isPinned ? '📌' : '📍';
+        navLink.classList.toggle('pinned', isPinned);
 
-        // Configura il pulsante di chiusura
         const closeButton = tabItem.querySelector('.close-button');
         closeButton.dataset.key = key;
 
-        // Aggiungi il tab alla navigazione
-        if (elements.articlesTabs) {
-            elements.articlesTabs.appendChild(tabItem);
-            logger.log(`Tab aggiunto: ${navLink.textContent}`);
-        } else {
-            logger.error("Elemento 'articles-tabs' non trovato nel DOM.");
-            return;
-        }
+        articleData.tabElement = navLink;
+        articleData.paneElementId = `#${articleTabId}`;
 
-        // Clona il template per il contenuto del tab articolo
+        normTabs.appendChild(tabItem);
+        logger.log(`Tab aggiunto: ${navLink.textContent}`);
+
         const paneTemplate = document.getElementById('article-tab-pane-template');
         if (!paneTemplate) {
             logger.error("Template 'article-tab-pane-template' non trovato.");
@@ -425,52 +374,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const paneDiv = tabPane.querySelector('.tab-pane');
         paneDiv.id = articleTabId;
         paneDiv.setAttribute('aria-labelledby', `${articleTabId}-tab`);
-        paneDiv.role = 'tabpanel';
+
+        const articleTextContainer = paneDiv.querySelector('.article-text-container');
         const preElement = paneDiv.querySelector('pre.article-text');
-        preElement.textContent = result.article_text || 'N/A';
-        preElement.classList.add('resizable');
-
-        // Aggiungi le informazioni Brocardi se disponibili
-        if (isPinned || (result.brocardi_info && result.brocardi_info.position !== 'Not Available')) {
-            const brocardiInfoDiv = paneDiv.querySelector('.brocardi-info');
-            if (brocardiInfoDiv && result.brocardi_info) {
-                brocardiInfoDiv.style.display = 'block';
-                populateBrocardiInfo(result.brocardi_info, brocardiInfoDiv);
-                logger.log(`Informazioni Brocardi aggiunte per: ${articleTabId}`);
-            }
-        }
-
-        // Aggiungi il contenuto del tab
-        if (elements.articlesTabContent) {
-            elements.articlesTabContent.appendChild(tabPane);
-            logger.log(`Pane aggiunto: ${paneDiv.id}`);
+        if (articleData.article_text) {
+            preElement.textContent = articleData.article_text;
         } else {
-            logger.error("Elemento 'articles-tab-content' non trovato nel DOM.");
-            return;
+            articleTextContainer.style.display = 'none';
         }
 
-        // ============================
-        // Event Listeners per i Pulsanti
-        // ============================
+        const brocardiInfoDiv = paneDiv.querySelector('.brocardi-info');
+        if (articleData.brocardi_info && Object.keys(articleData.brocardi_info).length > 0) {
+            brocardiInfoDiv.style.display = 'block';
+            populateBrocardiInfo(articleData.brocardi_info, brocardiInfoDiv);
+            logger.log(`Informazioni Brocardi aggiunte per: ${articleTabId}`);
+        } else {
+            brocardiInfoDiv.style.display = 'none';
+        }
 
-        /**
-         * Gestisce il toggle attivo della tab.
-         */
+        normTabContent.appendChild(paneDiv);
+        logger.log(`Pane aggiunto: ${paneDiv.id}`);
+
         const handleTabClick = (event) => {
-            event.preventDefault(); // Previene il comportamento predefinito
+            event.preventDefault();
 
             if (navLink.classList.contains('active')) {
-                // Se la tab è già attiva, disattivala
                 navLink.classList.remove('active');
                 paneDiv.classList.remove('show', 'active');
                 logger.log(`Tab disattivato: ${navLink.textContent}`);
             } else {
-                // Altrimenti, attiva questa tab e disattiva le altre
-                const activeTab = elements.articlesTabs.querySelector('.nav-link.active');
+                const activeTab = normTabs.querySelector('.nav-link.active');
                 if (activeTab) {
                     activeTab.classList.remove('active');
                     const activePaneId = activeTab.getAttribute('href');
-                    const activePane = elements.articlesTabContent.querySelector(activePaneId);
+                    const activePane = normTabContent.querySelector(activePaneId);
                     if (activePane) {
                         activePane.classList.remove('show', 'active');
                         logger.log(`Tab disattivato: ${activeTab.textContent}`);
@@ -482,28 +419,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 logger.log(`Tab attivato: ${navLink.textContent}`);
             }
 
-            // Mantieni il contenitore degli articoli visibile
-            if (elements.articlesContainer) {
-                elements.articlesContainer.style.display = 'block';
-                logger.log('Contenitore articoli mostrato.');
+            const collapseElement = normElements.normContainer.querySelector('.collapse');
+            if (collapseElement && !collapseElement.classList.contains('show')) {
+                const collapseInstance = new bootstrap.Collapse(collapseElement);
+                collapseInstance.show();
+                logger.log('Contenitore norma mostrato.');
             }
         };
 
-        // Aggiungi il listener per il toggle delle tab
         navLink.addEventListener('click', handleTabClick);
 
-        // Pulsante di pin
         pinButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Previene l'attivazione/disattivazione della tab
+            event.stopPropagation();
             if (pinnedTabs[key]) {
-                // Unpin
                 delete pinnedTabs[key];
                 pinButton.textContent = '📍';
                 navLink.classList.remove('pinned');
                 logger.log(`Tab ${key} unpinned.`);
             } else {
-                // Pin
-                pinnedTabs[key] = result;
+                pinnedTabs[key] = articleData;
                 pinButton.textContent = '📌';
                 navLink.classList.add('pinned');
                 logger.log(`Tab ${key} pinned.`);
@@ -511,83 +445,91 @@ document.addEventListener('DOMContentLoaded', () => {
             savePinnedTabs();
         });
 
-        // Pulsante di chiusura
         closeButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Previene l'attivazione/disattivazione della tab
-            // Rimuovi il tab e il contenuto
+            event.stopPropagation();
             const tabElement = closeButton.closest('li');
-            if (!tabElement) return;
             const paneId = navLink.getAttribute('href');
-            const paneElement = elements.articlesTabContent.querySelector(paneId);
+            const paneElement = normTabContent.querySelector(paneId);
 
-            if (tabElement) {
-                tabElement.remove();
-                logger.log(`Tab rimosso: ${paneId}`);
-            }
-            if (paneElement) {
-                paneElement.remove();
-                logger.log(`Pane rimosso: ${paneId}`);
-            }
+            tabElement?.remove();
+            paneElement?.remove();
+            logger.log(`Tab e pane rimossi: ${paneId}`);
 
-            // Rimuovi dal pinnedTabs se presente
             if (pinnedTabs[key]) {
                 delete pinnedTabs[key];
                 savePinnedTabs();
-                logger.log(`Tab ${key} rimosso dai pinnati.`);
+                logger.log(`Tab ${key} rimossa dai pinnati.`);
             }
 
-            // Se la tab chiusa era attiva, nessuna tab sarà attiva
-            // Puoi decidere se attivare un'altra tab o lasciare nessuna attiva
-            // In questo esempio, nessuna tab sarà attiva
+            if (normTabs.querySelectorAll('.nav-link').length === 0) {
+                normElements.normContainer.remove();
+                delete normaContainers[normaKey];
+                logger.log(`Norma rimossa: ${normaKey}`);
+            }
         });
     };
 
-    /**
-     * Visualizza i risultati della ricerca.
-     * @param {Array} results - I risultati da visualizzare.
-     * @param {boolean} showBrocardi - Indica se mostrare le informazioni Brocardi.
-     */
-    const displayResults = (results, showBrocardi) => {
-        // Mostra il contenitore degli articoli
-        if (elements.articlesContainer) {
-            elements.articlesContainer.style.display = 'block';
-            logger.log('Contenitore articoli mostrato.');
+    const displayResults = (results) => {
+        if (!elements.normeContainer) {
+            logger.error("Elemento 'norme-container' non trovato nel DOM.");
+            return;
         }
 
-        // Pulisci i contenuti precedenti
-        if (elements.normaDataContainer) elements.normaDataContainer.innerHTML = '';
-        if (elements.articlesTabs) elements.articlesTabs.innerHTML = '';
-        if (elements.articlesTabContent) elements.articlesTabContent.innerHTML = '';
-        logger.log('Contenuti precedenti puliti.');
+        removeNonPinnedArticles();
 
-        // Opzionale: Aggiungi un messaggio predefinito quando nessuna tab è attiva
-        const defaultMessage = document.createElement('div');
-        defaultMessage.className = 'text-center text-muted';
-        elements.articlesTabContent.appendChild(defaultMessage);
+        const normaDict = {};
 
-        // Aggiungi i tab pinnati
-        Object.values(pinnedTabs).forEach(result => {
-            createArticleTab(result, true); // Tab pinnati
+        results.forEach((result) => {
+            const normaData = result.norma_data;
+            const key = `${normaData.tipo_atto}-${normaData.numero_atto || ''}-${normaData.data || ''}`;
+
+            normaDict[key] = normaDict[key] || {
+                norma_data: normaData,
+                articles: [],
+            };
+
+            normaDict[key].articles.push(result);
         });
 
-        // Itera sui risultati e crea tab per ogni articolo
-        results.forEach((result, index) => {
-            if (result.norma_data) {
-                // Aggiorna le informazioni sulla norma solo una volta
-                if (index === 0 && elements.normaDataContainer) {
-                    const normaInfo = `
-                        <div><strong>Tipo Atto:</strong> ${capitalizeFirstLetter(result.norma_data.tipo_atto) || 'N/A'}</div>
-                        <div><strong>Numero Atto:</strong> ${result.norma_data.numero_atto || 'N/A'}</div>
-                        <div><strong>Data:</strong> ${result.norma_data.data || 'N/A'}</div>
-                    `;
-                    elements.normaDataContainer.innerHTML = normaInfo;
-                    logger.log('Informazioni sulla norma aggiornate.');
-                }
+        Object.values(normaDict).forEach((norma) => {
+            const normaKey = `${norma.norma_data.tipo_atto}-${norma.norma_data.numero_atto || ''}-${norma.norma_data.data || ''}`;
+            let normElements = normaContainers[normaKey];
 
-                // **Correzione Importante: Passa isPinned = false per i nuovi tab**
-                createArticleTab(result, false);
-            } else {
-                logger.warn('Dati della norma mancanti nel risultato:', result);
+            if (!normElements) {
+                normElements = createNormContainer(norma.norma_data);
+                normaContainers[normaKey] = normElements;
+            }
+
+            norma.articles.forEach((articleData) => {
+                createArticleTab(articleData, normElements);
+            });
+        });
+
+        logger.log('Risultati visualizzati.');
+    };
+
+    const removeNonPinnedArticles = () => {
+        Object.entries(normaContainers).forEach(([normaKey, normElements]) => {
+            const { normContainer, normTabs, normTabContent } = normElements;
+
+            normTabs.querySelectorAll('.nav-link').forEach((navLink) => {
+                const key = navLink.querySelector('.pin-button')?.dataset.key;
+                if (key && !pinnedTabs[key]) {
+                    const tabElement = navLink.closest('li');
+                    const paneId = navLink.getAttribute('href');
+                    const paneElement = normTabContent.querySelector(paneId);
+
+                    tabElement?.remove();
+                    paneElement?.remove();
+
+                    logger.log(`Articolo non pinnato rimosso: ${key}`);
+                }
+            });
+
+            if (normTabs.querySelectorAll('.nav-link').length === 0) {
+                normContainer.remove();
+                delete normaContainers[normaKey];
+                logger.log(`Norma rimossa perché vuota: ${normaKey}`);
             }
         });
     };
@@ -595,39 +537,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================
     // Gestione degli Eventi
     // ============================
-    /**
-     * Gestisce l'invio del form di scraping.
-     * @param {Event} event - L'evento di submit del form.
-     */
     const handleFormSubmit = async (event) => {
         event.preventDefault();
         hideError();
-        logger.log("Form inviato.");
+        logger.log('Form inviato.');
 
         if (!elements.scrapeForm.checkValidity()) {
             event.stopPropagation();
             elements.scrapeForm.classList.add('was-validated');
-            logger.log("Form non valido.");
+            logger.log('Form non valido.');
             return;
         }
 
         elements.scrapeForm.classList.remove('was-validated');
-        logger.log("Form validato.");
+        logger.log('Form validato.');
 
-        // Pulisci i contenuti precedenti
-        if (elements.normaDataContainer) elements.normaDataContainer.innerHTML = '';
-        if (elements.articlesContainer) elements.articlesContainer.style.display = 'none';
-        if (elements.articlesTabs) elements.articlesTabs.innerHTML = '';
-        if (elements.articlesTabContent) elements.articlesTabContent.innerHTML = '';
-        logger.log("Contenuti precedenti puliti.");
+        elements.loadingIndicator.style.display = 'block';
+        logger.log('Loading indicator mostrato.');
 
-        // Mostra il loading indicator
-        if (elements.loadingIndicator) {
-            elements.loadingIndicator.style.display = 'block';
-            logger.log('Loading indicator mostrato.');
-        }
-
-        // Raccogli i dati del form
         const formData = new FormData(elements.scrapeForm);
         const data = Object.fromEntries(formData.entries());
         data.article = elements.articleInput.value;
@@ -635,91 +562,40 @@ document.addEventListener('DOMContentLoaded', () => {
         logger.log('Dati raccolti dal form:', data);
 
         try {
-            let results;
-            if (data.show_brocardi_info) {
-                // Se l'utente ha richiesto le informazioni Brocardi, chiama /fetch_all_data
-                const response = await fetch('/fetch_all_data', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
+            const response = await fetch('/fetch_all_data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
 
-                if (!response.ok) {
-                    throw new Error('Errore durante la richiesta al server.');
-                }
-
-                results = await response.json();
-                logger.log('Risultati fetch_all_data:', results);
-            } else {
-                // Altrimenti, chiama separatamente /fetch_norma_data e /fetch_article_text
-                const [normaDataResponse, articleTextResponse] = await Promise.all([
-                    fetch('/fetch_norma_data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    }),
-                    fetch('/fetch_article_text', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    })
-                ]);
-
-                if (!normaDataResponse.ok || !articleTextResponse.ok) {
-                    throw new Error('Errore durante la richiesta al server.');
-                }
-
-                const normaDataResult = await normaDataResponse.json();
-                const articleTextResult = await articleTextResponse.json();
-
-                // Combina i risultati
-                results = articleTextResult.map((article, index) => ({
-                    norma_data: normaDataResult.norma_data[index],
-                    article_text: article.article_text
-                }));
-                logger.log('Risultati combinati:', results);
+            if (!response.ok) {
+                throw new Error('Errore durante la richiesta al server.');
             }
+
+            const results = await response.json();
+            logger.log('Risultati fetch_all_data:', results);
 
             if (!results || results.length === 0) {
                 throw new Error('Nessun risultato trovato.');
             }
 
-            // Visualizza i risultati
-            displayResults(results, data.show_brocardi_info);
-            logger.log('Risultati visualizzati.');
-
-            // Salva nella cronologia
+            displayResults(results);
             saveToHistory(data);
         } catch (error) {
             showError(error.message || 'Si è verificato un errore. Riprova più tardi.');
             logger.error('Errore:', error);
         } finally {
-            // Nascondi il loading indicator
-            if (elements.loadingIndicator) {
-                elements.loadingIndicator.style.display = 'none';
-                logger.log('Loading indicator nascosto.');
-            }
+            elements.loadingIndicator.style.display = 'none';
+            logger.log('Loading indicator nascosto.');
         }
     };
 
-    /**
-     * Gestisce l'incremento del numero dell'articolo.
-     */
     const handleIncrement = () => {
         const currentValue = parseInt(elements.articleInput.value, 10);
         elements.articleInput.value = isNaN(currentValue) ? 1 : currentValue + 1;
         logger.log(`Articolo incrementato a: ${elements.articleInput.value}`);
     };
 
-    /**
-     * Gestisce il decremento del numero dell'articolo.
-     */
     const handleDecrement = () => {
         const currentValue = parseInt(elements.articleInput.value, 10);
         if (!isNaN(currentValue) && currentValue > 1) {
@@ -728,140 +604,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * Resetta il form e ripristina lo stato iniziale.
-     */
     const handleResetForm = () => {
-        if (elements.scrapeForm) {
-            elements.scrapeForm.reset();
-            elements.scrapeForm.classList.remove('was-validated');
-            logger.log('Form resettato.');
-        }
-        if (elements.normaDataContainer) elements.normaDataContainer.innerHTML = '';
-        if (elements.articlesContainer) {
-            elements.articlesContainer.style.display = 'none';
-            logger.log('Contenitore articoli nascosto.');
-        }
-        if (elements.articlesTabs) elements.articlesTabs.innerHTML = '';
-        if (elements.articlesTabContent) elements.articlesTabContent.innerHTML = '';
+        elements.scrapeForm.reset();
+        elements.scrapeForm.classList.remove('was-validated');
+        logger.log('Form resettato.');
+
         toggleActDetails();
         toggleVersionDate();
-        logger.log('Form resettato e campi aggiornati.');
+
+        // Rimuove tutti gli articoli non pinnati e le norme vuote
+        removeNonPinnedArticles();
+
+        logger.log('Form resettato e stato aggiornato, elementi pinnati mantenuti.');
     };
 
-    /**
-     * Cancella i campi di ricerca senza resettare l'intero form.
-     */
     const handleClearSearchFields = () => {
-        if (elements.scrapeForm) {
-            elements.scrapeForm.reset();
-            elements.scrapeForm.classList.remove('was-validated');
-            logger.log('Campi di ricerca cancellati.');
-        }
+        elements.scrapeForm.reset();
+        elements.scrapeForm.classList.remove('was-validated');
+        logger.log('Campi di ricerca cancellati.');
+
         toggleActDetails();
         toggleVersionDate();
-        logger.log('Campi di ricerca cancellati e campi aggiornati.');
     };
 
-    /**
-     * Resetta la cronologia delle ricerche.
-     */
     const handleResetHistory = () => {
-        if (elements.historyList) {
-            elements.historyList.innerHTML = '';
-            logger.log('Cronologia resettata.');
-        }
+        elements.historyList.innerHTML = '';
+        logger.log('Cronologia resettata.');
     };
 
-    /**
-     * Filtra la cronologia delle ricerche in base alla query.
-     */
     const handleHistorySearch = debounce(() => {
         const query = elements.historySearchInput.value.toLowerCase();
-        const listItems = elements.historyList.querySelectorAll('li');
-
-        listItems.forEach(item => {
-            const text = item.textContent.toLowerCase();
-            item.style.display = text.includes(query) ? '' : 'none';
+        elements.historyList.querySelectorAll('li').forEach((item) => {
+            item.style.display = item.textContent.toLowerCase().includes(query) ? '' : 'none';
         });
-
         logger.log(`Filtrata la cronologia con la query: ${query}`);
     }, 300);
-
-    /**
-     * Sincronizza lo stato del pin per tutti i tab pinnati.
-     */
-    const syncPinStates = () => {
-        Object.keys(pinnedTabs).forEach(key => {
-            const tabId = key.replace('article-', '');
-            const navLink = document.getElementById(`${key}-tab`);
-            if (navLink) {
-                navLink.classList.add('pinned');
-                const pinButton = navLink.parentElement.querySelector('.pin-button');
-                if (pinButton) {
-                    pinButton.textContent = '📌';
-                }
-            }
-        });
-    };
 
     // ============================
     // Inizializzazione degli Event Listeners
     // ============================
     const initializeEventListeners = () => {
-        // Cambio del Tipo di Atto
-        if (elements.actTypeSelect) {
-            elements.actTypeSelect.addEventListener('change', toggleActDetails);
-            logger.log("Event listener aggiunto per 'act_type'.");
-        }
-
-        // Cambio della Versione
-        if (elements.versionRadios && elements.versionRadios.length > 0) {
-            elements.versionRadios.forEach(radio => {
-                radio.addEventListener('change', toggleVersionDate);
-            });
-            logger.log("Event listener aggiunti per 'version'.");
-        }
-
-        // Invio del Form
-        if (elements.scrapeForm) {
-            elements.scrapeForm.addEventListener('submit', handleFormSubmit);
-            logger.log("Event listener aggiunto per l'invio del form.");
-        }
-
-        // Incremento e Decremento Articolo
-        if (elements.incrementButton && elements.articleInput) {
-            elements.incrementButton.addEventListener('click', handleIncrement);
-            logger.log("Event listener aggiunto per il pulsante di incremento.");
-        }
-
-        if (elements.decrementButton && elements.articleInput) {
-            elements.decrementButton.addEventListener('click', handleDecrement);
-            logger.log("Event listener aggiunto per il pulsante di decremento.");
-        }
-
-        // Pulsanti di Reset e Cancellazione
-        if (elements.resetButton) {
-            elements.resetButton.addEventListener('click', handleResetForm);
-            logger.log("Event listener aggiunto per il pulsante di reset del form.");
-        }
-
-        if (elements.clearSearchFieldsButton) {
-            elements.clearSearchFieldsButton.addEventListener('click', handleClearSearchFields);
-            logger.log("Event listener aggiunto per il pulsante di cancellazione dei campi di ricerca.");
-        }
-
-        // Reset Cronologia
-        if (elements.resetHistoryButton) {
-            elements.resetHistoryButton.addEventListener('click', handleResetHistory);
-            logger.log("Event listener aggiunto per il pulsante di reset della cronologia.");
-        }
-
-        // Ricerca nella Cronologia
-        if (elements.historySearchInput) {
-            elements.historySearchInput.addEventListener('input', handleHistorySearch);
-            logger.log("Event listener aggiunto per la ricerca nella cronologia.");
-        }
+        elements.actTypeSelect?.addEventListener('change', toggleActDetails);
+        elements.versionRadios?.forEach((radio) => radio.addEventListener('change', toggleVersionDate));
+        elements.scrapeForm?.addEventListener('submit', handleFormSubmit);
+        elements.incrementButton?.addEventListener('click', handleIncrement);
+        elements.decrementButton?.addEventListener('click', handleDecrement);
+        elements.resetButton?.addEventListener('click', handleResetForm);
+        elements.clearSearchFieldsButton?.addEventListener('click', handleClearSearchFields);
+        elements.resetHistoryButton?.addEventListener('click', handleResetHistory);
+        elements.historySearchInput?.addEventListener('input', handleHistorySearch);
+        logger.log('Event listeners inizializzati.');
     };
 
     // ============================
@@ -875,6 +667,5 @@ document.addEventListener('DOMContentLoaded', () => {
         logger.log('Inizializzazione completata.');
     };
 
-    // Avvia l'inizializzazione
     initialize();
 });

@@ -1,7 +1,6 @@
 import re
 import datetime
-from functools import lru_cache
-from .config import MAX_CACHE_SIZE
+import asyncio
 from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
 from .treextractor import get_tree
 import logging
@@ -13,7 +12,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-def parse_article_input(article_string, normurn):
+async def parse_article_input(article_string, normurn):
     """
     Pulisce e valida la stringa degli articoli, supporta range e articoli separati da virgole.
     Supporta estensioni degli articoli (es. 1-bis, 2-ter).
@@ -30,7 +29,7 @@ def parse_article_input(article_string, normurn):
     # Se la stringa degli articoli è vuota, restituisci la lista completa
     if not article_string.strip():
         try:
-            all_articles, _ = get_tree(normurn)
+            all_articles, _ = await get_tree(normurn)
             logging.info("Returning complete list of articles from norm")
             logging.debug(f"All articles retrieved: {all_articles}")
             return all_articles
@@ -61,15 +60,15 @@ def parse_article_input(article_string, normurn):
 
             # Chiamata a get_tree solo in caso di range
             try:
-                all_articles, _ = get_tree(normurn)
+                all_articles, _ = await get_tree(normurn)
                 logging.info("Successfully retrieved article list from norm")
                 logging.debug(f"All articles retrieved: {all_articles}")
 
                 # Aggiungi tutti gli articoli nel range, inclusi quelli con estensioni
                 for article in all_articles:
-                    article_number = re.match(r'^(\d+)', article)
-                    if article_number:
-                        article_num = int(article_number.group(1))
+                    article_number_match = re.match(r'^(\d+)', article)
+                    if article_number_match:
+                        article_num = article_number_match.group(1)
                         if start <= article_num <= end:
                             logging.debug(f"Adding article from range: {article}")
                             articles.append(article)
