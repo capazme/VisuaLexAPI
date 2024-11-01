@@ -97,6 +97,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const capitalizeFirstLetter = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 
+    /**
+     * Genera una chiave unica per una norma includendo solo i campi presenti.
+     * @param {Object} normaData - Dati della norma.
+     * @returns {string} - NormaKey generata.
+     */
+    const generateNormaKey = (normaData) => {
+        const parts = [normaData.tipo_atto];
+
+        if (normaData.numero_atto && normaData.numero_atto.trim() !== '') {
+            parts.push(normaData.numero_atto);
+        }
+
+        if (normaData.data && normaData.data.trim() !== '') {
+            parts.push(normaData.data);
+        }
+
+        return parts.map(part => sanitize(part)).join('--');
+    };
+
+    /**
+     * Genera una chiave unica per un articolo includendo i campi della norma più numero_articolo.
+     * @param {Object} normaData - Dati della norma.
+     * @returns {string} - ArticleKey generata.
+     */
+    const generateArticleKey = (normaData) => {
+        const parts = [normaData.tipo_atto];
+
+        if (normaData.numero_atto && normaData.numero_atto.trim() !== '') {
+            parts.push(normaData.numero_atto);
+        }
+
+        if (normaData.data && normaData.data.trim() !== '') {
+            parts.push(normaData.data);
+        }
+
+        if (normaData.numero_articolo && normaData.numero_articolo.trim() !== '') {
+            parts.push(normaData.numero_articolo);
+        }
+
+        return parts.map(part => sanitize(part)).join('--');
+    };
+
     const savePinnedTabs = () => {
         try {
             localStorage.setItem('pinnedTabs', JSON.stringify(pinnedTabs));
@@ -115,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 pinnedTabs = JSON.parse(savedPinnedTabs);
                 logger.log('Tab pinnati trovati:', pinnedTabs);
 
-                // Raggruppa i tab pinnati per norma
+                // Raggruppa i tab pinnati per norma (senza numero_articolo)
                 const normaDict = {};
 
                 Object.values(pinnedTabs).forEach((articleData) => {
@@ -124,7 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         logger.warn('Dati della norma mancanti nell\'articolo pinnato:', articleData);
                         return;
                     }
-                    const normaKey = `${normaData.tipo_atto}-${normaData.numero_atto || ''}-${normaData.data || ''}`;
+                    // Genera una chiave consistente senza numero_articolo
+                    const normaKey = generateNormaKey(normaData);
 
                     normaDict[normaKey] = normaDict[normaKey] || {
                         norma_data: normaData,
@@ -249,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================
     // Funzioni Principali
     // ============================
+
     const toggleActDetails = () => {
         if (!elements.actTypeSelect || !elements.actNumberInput || !elements.dateInput) return;
         const selectedActType = elements.actTypeSelect.value;
@@ -286,6 +330,65 @@ document.addEventListener('DOMContentLoaded', () => {
         logger.log(`Campo 'Data versione' ${disableVersionDate ? 'disabilitato' : 'abilitato'}.`);
     };
 
+    // ==== NUOVE FUNZIONI ==== //
+    /**
+     * Gestisce il pin/unpin di un articolo.
+     * @param {string} key - La chiave dell'articolo.
+     * @param {Object} articleData - I dati dell'articolo.
+     */
+    const togglePin = (key, articleData) => {
+        if (pinnedTabs[key]) {
+            delete pinnedTabs[key];
+            updatePinIcon(false, key); // Aggiorna l'icona come non pinnata
+            logger.log(`Tab ${key} unpinned.`);
+        } else {
+            pinnedTabs[key] = articleData;
+            updatePinIcon(true, key); // Aggiorna l'icona come pinnata
+            logger.log(`Tab ${key} pinned.`);
+        }
+        savePinnedTabs(); // Salva lo stato aggiornato
+    };
+
+    /**
+     * Aggiorna l'icona del pin e la classe 'pinned' sull'elemento .nav-link.
+     * @param {boolean} isPinned - Se true, imposta l'icona come pinnata.
+     * @param {string} key - La chiave dell'articolo.
+     */
+    const updatePinIcon = (isPinned, key) => {
+        const pinButton = document.querySelector(`.pin-button[data-key="${key}"]`);
+        if (!pinButton) {
+            logger.error(`Pin button non trovato per la chiave: ${key}`);
+            return;
+        }
+
+        // Log per verificare il pinButton
+        logger.log(`Pin button trovato per la chiave: ${key}`, pinButton);
+
+        // Aggiorna l'icona del pin
+        pinButton.textContent = isPinned ? '📌' : '📍';
+        logger.log(`Icona del pin aggiornata per la chiave: ${key} a ${isPinned ? '📌' : '📍'}`);
+
+        // Trova l'elemento .nav-link più vicino
+        const navLink = pinButton.closest('.nav-link');
+        if (!navLink) {
+            logger.error(`Elemento '.nav-link' non trovato per la chiave: ${key}`);
+            return;
+        }
+
+        // Log per verificare il navLink
+        logger.log(`Elemento '.nav-link' trovato per la chiave: ${key}`, navLink);
+
+        // Aggiorna la classe 'pinned'
+        navLink.classList.toggle('pinned', isPinned);
+        logger.log(`Classe 'pinned' ${isPinned ? 'aggiunta' : 'rimossa'} per la chiave: ${key}`);
+    };
+    // ==== FINE NUOVE FUNZIONI ==== //
+
+    /**
+     * Crea un contenitore per una norma.
+     * @param {Object} normaData - Dati della norma.
+     * @returns {Object} - Riferimenti agli elementi creati.
+     */
     const createNormContainer = (normaData) => {
         const template = document.getElementById('norm-collapsible-template');
         if (!template || !elements.normeContainer) {
@@ -297,10 +400,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const normContainer = normContainerFragment.querySelector('.norm-collapsible');
         const normTitle = normContainer.querySelector('.norm-title');
         const collapseElement = normContainer.querySelector('.norm-content');
-        const normaKey = `${normaData.tipo_atto}-${normaData.numero_atto || ''}-${normaData.data || ''}`;
-        const collapseId = `collapse-${sanitize(normaData.tipo_atto)}-${sanitize(normaData.numero_atto || '')}-${Date.now()}`;
+        // Genera una chiave consistente senza numero_articolo
+        const normaKey = generateNormaKey(normaData);
+        const collapseId = `collapse-${normaKey}`;
 
-        normTitle.textContent = `${capitalizeFirstLetter(normaData.tipo_atto)} ${normaData.numero_atto || ''} ${normaData.data || ''}`;
+        normTitle.textContent = `${capitalizeFirstLetter(normaData.tipo_atto)} ${normaData.numero_atto || ''} ${normaData.data || ''}`.trim();
         collapseElement.id = collapseId;
         normContainer.querySelector('.norm-header').setAttribute('data-bs-target', `#${collapseId}`);
         normContainer.setAttribute('data-norma-key', normaKey);
@@ -316,6 +420,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
+    /**
+     * Crea un tab per un articolo all'interno di una norma.
+     * @param {Object} articleData - Dati dell'articolo.
+     * @param {Object} normElements - Riferimenti agli elementi della norma.
+     * @param {boolean} isPinned - Se true, il tab viene creato come pinnato.
+     */
     const createArticleTab = (articleData, normElements, isPinned = false) => {
         const { normTabs, normTabContent, normaKey } = normElements;
         const { norma_data: normaData } = articleData;
@@ -325,14 +435,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const articleIdRaw = normaData.numero_articolo || 'unknown';
-        const articleId = sanitize(articleIdRaw);
-        const actTypeRaw = normaData.tipo_atto || 'unknown';
-        const actType = sanitize(actTypeRaw);
-        const timestamp = Date.now();
-        const articleTabId = `article-${actType}-${articleId}-${timestamp}`;
-        const key = `article-${actType}-${articleId}-${timestamp}`;
+        // Genera la chiave per l'articolo
+        const key = generateArticleKey(normaData);
+        const articleTabId = `article-${sanitize(key)}`;
 
+        // Verifica se il tab esiste già
         if (normTabs.querySelector(`#${articleTabId}-tab`)) {
             logger.log(`Tab già presente: ${articleTabId}-tab`);
             return;
@@ -349,12 +456,10 @@ document.addEventListener('DOMContentLoaded', () => {
         navLink.id = `${articleTabId}-tab`;
         navLink.href = `#${articleTabId}`;
         navLink.setAttribute('aria-controls', articleTabId);
-        navLink.textContent = `Articolo ${articleIdRaw}`;
+        navLink.textContent = `Articolo ${normaData.numero_articolo || 'N/A'}`.trim();
 
         const pinButton = tabItem.querySelector('.pin-button');
         pinButton.dataset.key = key;
-        pinButton.textContent = isPinned ? '📌' : '📍';
-        navLink.classList.toggle('pinned', isPinned);
 
         const closeButton = tabItem.querySelector('.close-button');
         closeButton.dataset.key = key;
@@ -362,8 +467,12 @@ document.addEventListener('DOMContentLoaded', () => {
         articleData.tabElement = navLink;
         articleData.paneElementId = `#${articleTabId}`;
 
+        // Aggiungi il tab al DOM prima di aggiornare l'icona del pin
         normTabs.appendChild(tabItem);
         logger.log(`Tab aggiunto: ${navLink.textContent}`);
+
+        // Usa la funzione per aggiornare l'icona del pin
+        updatePinIcon(isPinned, key);
 
         const paneTemplate = document.getElementById('article-tab-pane-template');
         if (!paneTemplate) {
@@ -429,22 +538,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         navLink.addEventListener('click', handleTabClick);
 
+        // Gestisci il click sul pin
         pinButton.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (pinnedTabs[key]) {
-                delete pinnedTabs[key];
-                pinButton.textContent = '📍';
-                navLink.classList.remove('pinned');
-                logger.log(`Tab ${key} unpinned.`);
-            } else {
-                pinnedTabs[key] = articleData;
-                pinButton.textContent = '📌';
-                navLink.classList.add('pinned');
-                logger.log(`Tab ${key} pinned.`);
-            }
-            savePinnedTabs();
+            togglePin(key, articleData);
         });
 
+        // Gestisci il click sul close
         closeButton.addEventListener('click', (event) => {
             event.stopPropagation();
             const tabElement = closeButton.closest('li');
@@ -455,12 +555,14 @@ document.addEventListener('DOMContentLoaded', () => {
             paneElement?.remove();
             logger.log(`Tab e pane rimossi: ${paneId}`);
 
+            // Rimuovi il pin se presente
             if (pinnedTabs[key]) {
                 delete pinnedTabs[key];
                 savePinnedTabs();
-                logger.log(`Tab ${key} rimossa dai pinnati.`);
+                logger.log(`Tab ${key} rimosso dai pinnati.`);
             }
 
+            // Se non ci sono più tab, rimuovi il contenitore della norma
             if (normTabs.querySelectorAll('.nav-link').length === 0) {
                 normElements.normContainer.remove();
                 delete normaContainers[normaKey];
@@ -469,30 +571,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    /**
+     * Visualizza i risultati ottenuti dalla ricerca.
+     * @param {Array} results - Array di risultati.
+     */
     const displayResults = (results) => {
         if (!elements.normeContainer) {
             logger.error("Elemento 'norme-container' non trovato nel DOM.");
             return;
         }
 
-        removeNonPinnedArticles();
-
         const normaDict = {};
 
         results.forEach((result) => {
             const normaData = result.norma_data;
-            const key = `${normaData.tipo_atto}-${normaData.numero_atto || ''}-${normaData.data || ''}`;
+            if (!normaData) {
+                logger.warn('Dati della norma mancanti nel risultato:', result);
+                return;
+            }
+            // Genera normaKey senza numero_articolo
+            const normaKey = generateNormaKey(normaData);
 
-            normaDict[key] = normaDict[key] || {
+            normaDict[normaKey] = normaDict[normaKey] || {
                 norma_data: normaData,
                 articles: [],
             };
 
-            normaDict[key].articles.push(result);
+            normaDict[normaKey].articles.push(result);
         });
 
         Object.values(normaDict).forEach((norma) => {
-            const normaKey = `${norma.norma_data.tipo_atto}-${norma.norma_data.numero_atto || ''}-${norma.norma_data.data || ''}`;
+            const normaKey = generateNormaKey(norma.norma_data);
             let normElements = normaContainers[normaKey];
 
             if (!normElements) {
@@ -508,6 +617,9 @@ document.addEventListener('DOMContentLoaded', () => {
         logger.log('Risultati visualizzati.');
     };
 
+    /**
+     * Rimuove tutti gli articoli non pinnati e le norme vuote.
+     */
     const removeNonPinnedArticles = () => {
         Object.entries(normaContainers).forEach(([normaKey, normElements]) => {
             const { normContainer, normTabs, normTabContent } = normElements;
@@ -605,17 +717,77 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleResetForm = () => {
-        elements.scrapeForm.reset();
-        elements.scrapeForm.classList.remove('was-validated');
-        logger.log('Form resettato.');
+        // Mostra il modal di conferma
+        const resetModalElement = document.getElementById('resetConfirmationModal');
+        if (!resetModalElement) {
+            logger.error("Modal di conferma 'resetConfirmationModal' non trovato nel DOM.");
+            return;
+        }
+        const resetModal = new bootstrap.Modal(resetModalElement);
+        resetModal.show();
 
-        toggleActDetails();
-        toggleVersionDate();
+        // Aggiungi un listener per il pulsante di conferma nel modal
+        const confirmResetButton = document.getElementById('confirmResetButton');
+        if (!confirmResetButton) {
+            logger.error("Pulsante 'confirmResetButton' non trovato nel DOM.");
+            return;
+        }
 
-        // Rimuove tutti gli articoli non pinnati e le norme vuote
-        removeNonPinnedArticles();
+        const handleConfirmReset = () => {
+            // Resetta il modulo e rimuove la validazione
+            elements.scrapeForm.reset();
+            elements.scrapeForm.classList.remove('was-validated');
+            logger.log('Form resettato.');
 
-        logger.log('Form resettato e stato aggiornato, elementi pinnati mantenuti.');
+            // Aggiorna i dettagli dell'atto e la data della versione
+            toggleActDetails();
+            toggleVersionDate();
+
+            // Rimuove tutti gli articoli non pinnati e le norme vuote
+            removeNonPinnedArticles();
+            logger.log('Articoli non pinnati rimossi.');
+
+            // Svuota i pinnedTabs e aggiorna l'interfaccia
+            pinnedTabs = {}; // Resetta la variabile
+            savePinnedTabs(); // Salva lo stato aggiornato (cancellando 'pinnedTabs' in localStorage)
+            logger.log('Pinned tabs svuotati.');
+
+            // Rimuovi tutti i tab pinnati dall'interfaccia
+            Object.values(normaContainers).forEach(({ normTabs, normTabContent }) => {
+                normTabs.querySelectorAll('.nav-link.pinned').forEach((navLink) => {
+                    const key = navLink.querySelector('.pin-button')?.dataset.key;
+                    if (key) {
+                        const tabElement = navLink.closest('li');
+                        const paneId = navLink.getAttribute('href');
+                        const paneElement = normTabContent.querySelector(paneId);
+
+                        tabElement?.remove();
+                        paneElement?.remove();
+                        logger.log(`Tab pinnato rimosso: ${key}`);
+                    }
+                });
+
+                // Se dopo la rimozione non ci sono più tab, rimuovi il contenitore della norma
+                if (normTabs.querySelectorAll('.nav-link.pinned').length === 0) {
+                    const normaKey = Object.keys(normaContainers).find(key => normaContainers[key].normTabs === normTabs);
+                    if (normaKey) {
+                        normaContainers[normaKey].normContainer.remove();
+                        delete normaContainers[normaKey];
+                        logger.log(`Norma rimossa perché non ci sono più tab pinnati: ${normaKey}`);
+                    }
+                }
+            });
+
+            logger.log('Form resettato, localStorage svuotato e tab pinnati rimossi.');
+
+            // Rimuovi l'evento listener per evitare duplicazioni
+            confirmResetButton.removeEventListener('click', handleConfirmReset);
+
+            // Nascondi il modal
+            resetModal.hide();
+        };
+
+        confirmResetButton.addEventListener('click', handleConfirmReset);
     };
 
     const handleClearSearchFields = () => {
@@ -628,11 +800,17 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleResetHistory = () => {
+        if (!elements.historyList) {
+            logger.error("Elemento 'history-list' non trovato nel DOM.");
+            return;
+        }
         elements.historyList.innerHTML = '';
         logger.log('Cronologia resettata.');
     };
 
     const handleHistorySearch = debounce(() => {
+        if (!elements.historySearchInput || !elements.historyList) return;
+
         const query = elements.historySearchInput.value.toLowerCase();
         elements.historyList.querySelectorAll('li').forEach((item) => {
             item.style.display = item.textContent.toLowerCase().includes(query) ? '' : 'none';
@@ -644,15 +822,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inizializzazione degli Event Listeners
     // ============================
     const initializeEventListeners = () => {
-        elements.actTypeSelect?.addEventListener('change', toggleActDetails);
-        elements.versionRadios?.forEach((radio) => radio.addEventListener('change', toggleVersionDate));
-        elements.scrapeForm?.addEventListener('submit', handleFormSubmit);
-        elements.incrementButton?.addEventListener('click', handleIncrement);
-        elements.decrementButton?.addEventListener('click', handleDecrement);
-        elements.resetButton?.addEventListener('click', handleResetForm);
-        elements.clearSearchFieldsButton?.addEventListener('click', handleClearSearchFields);
-        elements.resetHistoryButton?.addEventListener('click', handleResetHistory);
-        elements.historySearchInput?.addEventListener('input', handleHistorySearch);
+        if (elements.actTypeSelect) {
+            elements.actTypeSelect.addEventListener('change', toggleActDetails);
+        }
+
+        if (elements.versionRadios) {
+            elements.versionRadios.forEach((radio) => radio.addEventListener('change', toggleVersionDate));
+        }
+
+        if (elements.scrapeForm) {
+            elements.scrapeForm.addEventListener('submit', handleFormSubmit);
+        }
+
+        if (elements.incrementButton) {
+            elements.incrementButton.addEventListener('click', handleIncrement);
+        }
+
+        if (elements.decrementButton) {
+            elements.decrementButton.addEventListener('click', handleDecrement);
+        }
+
+        if (elements.resetButton) {
+            elements.resetButton.addEventListener('click', handleResetForm);
+        }
+
+        if (elements.clearSearchFieldsButton) {
+            elements.clearSearchFieldsButton.addEventListener('click', handleClearSearchFields);
+        }
+
+        if (elements.resetHistoryButton) {
+            elements.resetHistoryButton.addEventListener('click', handleResetHistory);
+        }
+
+        if (elements.historySearchInput) {
+            elements.historySearchInput.addEventListener('input', handleHistorySearch);
+        }
+
         logger.log('Event listeners inizializzati.');
     };
 
@@ -662,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialize = () => {
         toggleActDetails();
         toggleVersionDate();
-        loadPinnedTabs();
+        loadPinnedTabs(); // Carica i tab pinnati all'avvio
         initializeEventListeners();
         logger.log('Inizializzazione completata.');
     };
