@@ -382,6 +382,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const tabItem = tabTemplate.content.cloneNode(true);
         const navLink = tabItem.querySelector('.nav-link');
+        
+        // Rimuovi data-bs-toggle se presente per evitare conflitti con la gestione manuale
+        navLink.removeAttribute('data-bs-toggle');
+
         navLink.id = `${articleTabId}-tab`;
         navLink.href = `#${articleTabId}`;
         navLink.setAttribute('aria-controls', articleTabId);
@@ -448,8 +452,49 @@ document.addEventListener('DOMContentLoaded', () => {
         // ============================
         // Event Listeners per i Pulsanti
         // ============================
+
+        /**
+         * Gestisce il toggle attivo della tab.
+         */
+        const handleTabClick = (event) => {
+            event.preventDefault(); // Previene il comportamento predefinito
+
+            if (navLink.classList.contains('active')) {
+                // Se la tab è già attiva, disattivala
+                navLink.classList.remove('active');
+                paneDiv.classList.remove('show', 'active');
+                logger.log(`Tab disattivato: ${navLink.textContent}`);
+            } else {
+                // Altrimenti, attiva questa tab e disattiva le altre
+                const activeTab = elements.articlesTabs.querySelector('.nav-link.active');
+                if (activeTab) {
+                    activeTab.classList.remove('active');
+                    const activePaneId = activeTab.getAttribute('href');
+                    const activePane = elements.articlesTabContent.querySelector(activePaneId);
+                    if (activePane) {
+                        activePane.classList.remove('show', 'active');
+                        logger.log(`Tab disattivato: ${activeTab.textContent}`);
+                    }
+                }
+
+                navLink.classList.add('active');
+                paneDiv.classList.add('show', 'active');
+                logger.log(`Tab attivato: ${navLink.textContent}`);
+            }
+
+            // Mantieni il contenitore degli articoli visibile
+            if (elements.articlesContainer) {
+                elements.articlesContainer.style.display = 'block';
+                logger.log('Contenitore articoli mostrato.');
+            }
+        };
+
+        // Aggiungi il listener per il toggle delle tab
+        navLink.addEventListener('click', handleTabClick);
+
         // Pulsante di pin
-        pinButton.addEventListener('click', () => {
+        pinButton.addEventListener('click', (event) => {
+            event.stopPropagation(); // Previene l'attivazione/disattivazione della tab
             if (pinnedTabs[key]) {
                 // Unpin
                 delete pinnedTabs[key];
@@ -467,7 +512,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Pulsante di chiusura
-        closeButton.addEventListener('click', () => {
+        closeButton.addEventListener('click', (event) => {
+            event.stopPropagation(); // Previene l'attivazione/disattivazione della tab
             // Rimuovi il tab e il contenuto
             const tabElement = closeButton.closest('li');
             if (!tabElement) return;
@@ -490,22 +536,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 logger.log(`Tab ${key} rimosso dai pinnati.`);
             }
 
-            // Attiva il primo tab rimasto
-            const remainingTab = elements.articlesTabs.querySelector('.nav-link:not(.pinned)');
-            if (remainingTab) {
-                remainingTab.classList.add('active');
-                const remainingPaneId = remainingTab.getAttribute('href');
-                const remainingPane = elements.articlesTabContent.querySelector(remainingPaneId);
-                if (remainingPane) {
-                    remainingPane.classList.add('show', 'active');
-                    logger.log(`Pane attivato: ${remainingPaneId}`);
-                }
-            } else {
-                if (elements.articlesContainer) {
-                    elements.articlesContainer.style.display = 'none';
-                    logger.log('Nessun tab rimasto. Contenitore articoli nascosto.');
-                }
-            }
+            // Se la tab chiusa era attiva, nessuna tab sarà attiva
+            // Puoi decidere se attivare un'altra tab o lasciare nessuna attiva
+            // In questo esempio, nessuna tab sarà attiva
         });
     };
 
@@ -526,6 +559,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.articlesTabs) elements.articlesTabs.innerHTML = '';
         if (elements.articlesTabContent) elements.articlesTabContent.innerHTML = '';
         logger.log('Contenuti precedenti puliti.');
+
+        // Opzionale: Aggiungi un messaggio predefinito quando nessuna tab è attiva
+        const defaultMessage = document.createElement('div');
+        defaultMessage.className = 'text-center text-muted';
+        elements.articlesTabContent.appendChild(defaultMessage);
 
         // Aggiungi i tab pinnati
         Object.values(pinnedTabs).forEach(result => {
@@ -552,18 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 logger.warn('Dati della norma mancanti nel risultato:', result);
             }
         });
-
-        // Attiva il primo tab non pinnato se presente
-        const firstArticleTab = elements.articlesTabs.querySelector('.nav-link:not(.pinned)');
-        if (firstArticleTab) {
-            firstArticleTab.classList.add('active');
-            const paneId = firstArticleTab.getAttribute('href');
-            const firstArticleTabPane = elements.articlesTabContent.querySelector(paneId);
-            if (firstArticleTabPane) {
-                firstArticleTabPane.classList.add('show', 'active');
-                logger.log(`Pane attivato: ${paneId}`);
-            }
-        }
     };
 
     // ============================

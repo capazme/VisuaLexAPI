@@ -143,9 +143,9 @@
         <!-- Tab Templates -->
         <template id="article-tab-template">
             <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="" role="tab"></a>
-                <button class="btn btn-sm btn-outline-secondary ms-2 pin-button" data-key="" title="Pin">📍</button>
-                <button class="btn btn-sm btn-outline-danger ms-1 close-button" data-key="" title="Chiudi">✖️</button>
+                <a class="nav-link" href="" role="tab"></a>
+                <button class="btn btn-sm btn-outline-secondary ms-2 pin-button" data-key="" title="Pin" aria-label="Pinna il tab">📍</button>
+                <button class="btn btn-sm btn-outline-danger ms-1 close-button" data-key="" title="Chiudi" aria-label="Chiudi il tab">✖️</button>
             </li>
         </template>
 
@@ -153,7 +153,7 @@
             <div class="tab-pane fade" role="tabpanel">
                 <div class="mb-3 resizable">
                     <h5>Testo Articolo:</h5>
-                    <pre class="article-text"></pre>
+                    <pre class="article-text resizable"></pre>
                 </div>
                 <div class="brocardi-info" style="display:none;">
                     <h5>Informazioni Brocardi:</h5>
