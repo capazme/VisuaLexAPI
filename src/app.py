@@ -13,7 +13,7 @@ from visualex_api.services.pdfextractor import extract_pdf
 from visualex_api.tools.map import NORMATTIVA_URN_CODICI, EURLEX
 from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
-from visualex_api.tools.text_op import format_date_to_extended, clean_text, parse_article_input
+from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
 import logging
 import sys
 

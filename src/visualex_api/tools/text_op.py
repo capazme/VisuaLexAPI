@@ -276,7 +276,7 @@ def get_annex_from_urn(urn):
     logging.debug("No annex found in URN")
     return None
 
-def clean_text(article_text):
+""" def clean_text(article_text): """
     """
     Pulisce il testo dell'articolo:
     - Rimuove le newline inutili.
