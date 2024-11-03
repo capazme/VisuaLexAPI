@@ -276,14 +276,14 @@ def get_annex_from_urn(urn):
     logging.debug("No annex found in URN")
     return None
 
-""" def clean_text(article_text): """
-    """
+"""  def clean_text(article_text): 
+    
     Pulisce il testo dell'articolo:
     - Rimuove le newline inutili.
     - Non va a capo dopo il numero del comma.
     - Mantiene le newline significative.
     - Rimuove le newline all'interno delle doppie parentesi (( ... )).
-    """
+ 
     if not article_text:
         return ''
 
@@ -310,4 +310,4 @@ def get_annex_from_urn(urn):
     # Step 7: Elimina eventuali newline all'inizio o alla fine del testo
     cleaned_text = cleaned_text.strip()
 
-    return cleaned_text
+    return cleaned_text """

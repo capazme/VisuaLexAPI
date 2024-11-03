@@ -165,7 +165,7 @@ class NormaController:
                 try:
                     article_text, url = await scraper.get_document(normavisitata)
                     log.info("Document fetched successfully", article_text=article_text, url=url)
-                    article_text_cleaned = clean_text(article_text)
+                    article_text_cleaned = article_text
                     log.info("Article text cleaned", cleaned_text=article_text_cleaned)
                     return {
                         'article_text': article_text_cleaned,
@@ -253,7 +253,7 @@ class NormaController:
 
                 try:
                     article_text, url = await scraper.get_document(normavisitata)
-                    article_text_cleaned = clean_text(article_text)
+                    article_text_cleaned = article_text
                     brocardi_info = None
                     if scraper == normattiva_scraper:
                         try:

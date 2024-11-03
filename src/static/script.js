@@ -255,11 +255,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        // Aggiungi le sezioni esistenti
         createSection('Brocardi', brocardiInfo.Brocardi, true);
         createSection('Ratio', brocardiInfo.Ratio);
         createSection('Spiegazione', brocardiInfo.Spiegazione);
         createSection('Massime', brocardiInfo.Massime, true);
 
+        // Aggiungi il link se presente
         if (brocardiInfo.link) {
             const linkDiv = document.createElement('div');
             linkDiv.classList.add('brocardi-section');
@@ -273,6 +275,19 @@ document.addEventListener('DOMContentLoaded', () => {
             link.textContent = brocardiInfo.link;
             linkDiv.appendChild(link);
             brocardiContentDiv.appendChild(linkDiv);
+        }
+
+        // Aggiungi la posizione se presente
+        if (brocardiInfo.position) {
+            const positionDiv = document.createElement('div');
+            positionDiv.classList.add('brocardi-section');
+            const heading = document.createElement('h6');
+            heading.textContent = 'Posizione:';
+            positionDiv.appendChild(heading);
+            const positionParagraph = document.createElement('p');
+            positionParagraph.textContent = brocardiInfo.position;
+            positionDiv.appendChild(positionParagraph);
+            brocardiContentDiv.appendChild(positionDiv);
         }
 
         // Nascondi le massime in posizione dispari
@@ -499,6 +514,23 @@ document.addEventListener('DOMContentLoaded', () => {
             logger.log(`Informazioni Brocardi aggiunte per: ${articleTabId}`);
         } else {
             brocardiInfoDiv.style.display = 'none';
+        }
+
+        // Aggiungi il link Normattiva se presente
+        if (normaData.urn) {
+            const normattivaLinkDiv = document.createElement('div');
+            normattivaLinkDiv.classList.add('normattiva-link');
+            const normattivaHeading = document.createElement('h6');
+            normattivaHeading.textContent = 'Fonte Normattiva:';
+            const normattivaLink = document.createElement('a');
+            normattivaLink.href = normaData.urn;
+            normattivaLink.target = '_blank';
+            normattivaLink.rel = 'noopener noreferrer';
+            normattivaLink.textContent = 'Visualizza su Normattiva';
+            normattivaLinkDiv.appendChild(normattivaHeading);
+            normattivaLinkDiv.appendChild(normattivaLink);
+            paneDiv.appendChild(normattivaLinkDiv);
+            logger.log(`Link Normattiva aggiunto per: ${articleTabId}`);
         }
 
         normTabContent.appendChild(paneDiv);
