@@ -15072,9 +15072,9 @@ BROCARDI_SEARCH = {
 }
 
 EURLEX = {
-    'TUE': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016M/TXT',
-    'TFUE': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016E/TXT',
-    'CDFUE': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016P/TXT',
+    'tue': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016M/TXT',
+    'tfue': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016E/TXT',
+    'cdfue': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016P/TXT',
     'regolamento ue': 'reg',
     'direttiva ue': 'dir',
 }

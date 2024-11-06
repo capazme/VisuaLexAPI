@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 import os
 from time import time
 from quart import Quart, request, jsonify, render_template, send_file
+from quart_cors import cors
 import structlog
 from visualex_api.tools.config import HISTORY_LIMIT, RATE_LIMIT, RATE_LIMIT_WINDOW
 from visualex_api.tools.norma import Norma, NormaVisitata
@@ -52,7 +53,7 @@ driver_manager = WebDriverManager()
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
-
+        self.app = cors(self.app, allow_origin="http://localhost:3000")
         # Middleware for rate limiting
         self.app.before_request(self.rate_limit_middleware)
 

@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-
+lru_cache(maxsize=MAX_CACHE_SIZE)
 def complete_date(act_type, date, act_number):
     """
     Completes the date of a legal norm using the Normattiva website.

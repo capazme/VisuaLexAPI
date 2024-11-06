@@ -68,7 +68,7 @@ async def parse_article_input(article_string, normurn):
                 for article in all_articles:
                     article_number_match = re.match(r'^(\d+)', article)
                     if article_number_match:
-                        article_num = article_number_match.group(1)
+                        article_num = int(article_number_match.group(1))
                         if start <= article_num <= end:
                             logging.debug(f"Adding article from range: {article}")
                             articles.append(article)
@@ -275,39 +275,3 @@ def get_annex_from_urn(urn):
     
     logging.debug("No annex found in URN")
     return None
-
-"""  def clean_text(article_text): 
-    
-    Pulisce il testo dell'articolo:
-    - Rimuove le newline inutili.
-    - Non va a capo dopo il numero del comma.
-    - Mantiene le newline significative.
-    - Rimuove le newline all'interno delle doppie parentesi (( ... )).
- 
-    if not article_text:
-        return ''
-
-    # Step 1: Rimuovi newline all'interno delle parentesi doppie (( ... ))
-    article_text = re.sub(r'\(\([\n\s]*(.*?)\n*\)\)', r'((\1))', article_text, flags=re.DOTALL)
-
-    # Step 2: Mantieni newline dopo Articoli (es. "Art. 1") ma non dopo i commi (es. "1.", "1-bis.")
-    cleaned_text = re.sub(r'(\bArt\.\s*\d+)\n+', r'\1\n\n', article_text)
-
-    # Step 3: Non rimuovere newline dopo numeri di commi se seguiti da un punto (numero di fine frase)
-    # Rimuovi newline solo se segue del testo che non è un numero e non è una nuova frase (che termina con un punto)
-    cleaned_text = re.sub(r'(\b\d+(-[a-z]+)?\.)\s*\n(?!\d+\.|\S*\.)', r'\1 ', cleaned_text)
-
-    # Step 4: Mantieni le newline dopo la fine dei commi (che terminano con un punto)
-    cleaned_text = re.sub(r'(?<=\.)\n+', '\n\n', cleaned_text)
-
-    # Step 5: Rimuovi multiple newline (più di 2) e sostituisci con singole newline
-    cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text)
-
-    # Step 6: Rimuovi spazi vuoti che precedono o seguono una newline
-    cleaned_text = re.sub(r'[ \t]+\n', '\n', cleaned_text)  # Rimuovi spazi alla fine di una riga
-    cleaned_text = re.sub(r'\n[ \t]+', '\n', cleaned_text)  # Rimuovi spazi all'inizio di una nuova riga
-
-    # Step 7: Elimina eventuali newline all'inizio o alla fine del testo
-    cleaned_text = cleaned_text.strip()
-
-    return cleaned_text """

@@ -1,286 +1,481 @@
-openapi: 3.0.0
+openapi: 3.0.3
 info:
-  title: VisuaLex API
+  title: Norma Controller API
+  description: API for managing and retrieving norma data, including fetching articles, Brocardi information, and exporting PDFs.
   version: 1.0.0
-  description: API per il recupero e la gestione delle norme giuridiche.
 servers:
-  - url: http://localhost:8000
-    description: Server locale per VisuaLex
+  - url: http://localhost:5000
+    description: Local server
+
+tags:
+  - name: Home
+    description: Home page
+  - name: Norma
+    description: Operations related to norma data
+  - name: History
+    description: Retrieve history of requests
+  - name: PDF
+    description: Export data as PDF
+
 paths:
+  /:
+    get:
+      tags:
+        - Home
+      summary: Render the home page
+      responses:
+        '200':
+          description: Successfully rendered home page
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /fetch_norma_data:
     post:
-      summary: Recupera dati sulle norme
-      description: Recupera informazioni su una norma giuridica specificata.
+      tags:
+        - Norma
+      summary: Fetch norma data based on provided parameters
       requestBody:
-        description: Dati della norma
+        description: Norma request payload
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                act_type:
-                  type: string
-                  description: Tipo di atto giuridico (es. legge, decreto, etc.)
-                  example: "legge"
-                date:
-                  type: string
-                  description: Data dell'atto giuridico
-                  example: "2022-01-01"
-                act_number:
-                  type: string
-                  description: Numero dell'atto giuridico
-                  example: "123"
-                article:
-                  type: string
-                  description: Numero dell'articolo da recuperare
-                  example: "1-bis"
+              $ref: '#/components/schemas/NormaRequest'
       responses:
         '200':
-          description: Dati della norma recuperati correttamente.
+          description: Successfully fetched norma data
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   norma_data:
-                    type: object
-                    description: Dati completi della norma.
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NormaVisitata'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /fetch_article_text:
     post:
-      summary: Recupera il testo di un articolo
-      description: Recupera il testo di un articolo specificato di una norma giuridica.
+      tags:
+        - Norma
+      summary: Fetch article text based on provided norma data
       requestBody:
-        description: Dati della norma e articolo
+        description: Norma request payload
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                act_type:
-                  type: string
-                  description: Tipo di atto giuridico
-                  example: "legge"
-                date:
-                  type: string
-                  description: Data dell'atto giuridico
-                  example: "2022-01-01"
-                act_number:
-                  type: string
-                  description: Numero dell'atto giuridico
-                  example: "123"
-                article:
-                  type: string
-                  description: Numero dell'articolo da recuperare
-                  example: "1-bis"
+              $ref: '#/components/schemas/NormaRequest'
       responses:
         '200':
-          description: Testo dell'articolo recuperato correttamente.
+          description: Successfully fetched article texts
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  article_text:
-                    type: string
-                    description: Testo dell'articolo.
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/ArticleTextResponse'
+                    - $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /fetch_brocardi_info:
     post:
-      summary: Recupera informazioni da Brocardi
-      description: Recupera informazioni dettagliate da Brocardi riguardanti una norma giuridica.
+      tags:
+        - Norma
+      summary: Fetch Brocardi information based on provided norma data
       requestBody:
-        description: Dati della norma
+        description: Norma request payload
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                act_type:
-                  type: string
-                  description: Tipo di atto giuridico
-                  example: "legge"
-                date:
-                  type: string
-                  description: Data dell'atto giuridico
-                  example: "2022-01-01"
-                act_number:
-                  type: string
-                  description: Numero dell'atto giuridico
-                  example: "123"
+              $ref: '#/components/schemas/NormaRequest'
       responses:
         '200':
-          description: Informazioni Brocardi recuperate correttamente.
+          description: Successfully fetched Brocardi information
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  position:
-                    type: string
-                    description: Posizione dell'informazione.
-                  brocardi:
-                    type: string
-                    description: Informazioni Brocardi, se presenti.
-                  ratio:
-                    type: string
-                    description: Ratio della norma giuridica, se presente.
-                  spiegazione:
-                    type: string
-                    description: Spiegazione della norma giuridica, se presente.
-                  massime:
-                    type: array
-                    description: Massime giuridiche correlate, se presenti.
-                    items:
-                      type: string
-                  norma_data:
-                    type: object
-                    description: Dati completi della norma.
-      responses:
-        '200':
-          description: Informazioni Brocardi recuperate correttamente.
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/BrocardiInfoResponse'
+                    - $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid input
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  brocardi_info:
-                    type: object
-                    properties:
-                      position:
-                        type: string
-                        description: Posizione dell'informazione.
-                      info:
-                        type: object
-                        description: Dettagli sull'informazione.
-                      link:
-                        type: string
-                        description: Link alla norma su Brocardi.
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /fetch_all_data:
     post:
-      summary: Recupera tutte le informazioni relative a una norma
-      description: Recupera informazioni complete su una norma, inclusi articoli e dati aggiuntivi.
+      tags:
+        - Norma
+      summary: Fetch all data (article text and Brocardi info) based on provided norma data
       requestBody:
-        description: Dati della norma
+        description: Norma request payload
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                act_type:
-                  type: string
-                  description: Tipo di atto giuridico
-                  example: "legge"
-                date:
-                  type: string
-                  description: Data dell'atto giuridico
-                  example: "2022-01-01"
-                act_number:
-                  type: string
-                  description: Numero dell'atto giuridico
-                  example: "123"
+              $ref: '#/components/schemas/NormaRequest'
       responses:
         '200':
-          description: Dati completi della norma recuperati correttamente.
+          description: Successfully fetched all data
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    norma_data:
-                      type: object
-                      description: Dati completi della norma.
-                    article_text:
-                      type: string
-                      description: Testo dell'articolo.
-                    brocardi_info:
-                      type: object
-                      properties:
-                        position:
-                          type: string
-                          description: Posizione dell'informazione.
-                        info:
-                          type: object
-                          description: Dettagli sull'informazione.
-                        link:
-                          type: string
-                          description: Link alla norma su Brocardi.
-  /fetch_norm:
-    post:
-      summary: Recupera i dettagli di una norma giuridica
-      description: Recupera i dettagli di una norma, inclusi articoli e informazioni correlate.
-      requestBody:
-        description: Dati della norma
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                act_type:
-                  type: string
-                  description: Tipo di atto giuridico
-                  example: "legge"
-                date:
-                  type: string
-                  description: Data dell'atto giuridico
-                  example: "2022-01-01"
-                act_number:
-                  type: string
-                  description: Numero dell'atto giuridico
-                  example: "123"
-      responses:
-        '200':
-          description: Dettagli della norma recuperati correttamente.
+                  oneOf:
+                    - $ref: '#/components/schemas/AllDataResponse'
+                    - $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid input
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    norma_data:
-                      type: object
-                      description: Dati completi della norma.
-                    brocardi_info:
-                      type: object
-                      properties:
-                        position:
-                          type: string
-                          description: Posizione dell'informazione.
-                        info:
-                          type: object
-                          description: Dettagli sull'informazione.
-                        link:
-                          type: string
-                          description: Link alla norma su Brocardi.
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /history:
     get:
-      summary: Recupera la cronologia delle norme visitate
-      description: Restituisce una lista delle norme recentemente visitate.
+      tags:
+        - History
+      summary: Retrieve the history of requests
       responses:
         '200':
-          description: Cronologia recuperata correttamente.
+          description: Successfully retrieved history
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    tipo_atto:
-                      type: string
-                      description: Tipo di atto giuridico.
-                    data:
-                      type: string
-                      description: Data dell'atto giuridico.
-                    numero_atto:
-                      type: string
-                      description: Numero dell'atto giuridico.
-                    url:
-                      type: string
-                      description: URL dell'atto giuridico.
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /export_pdf:
+    post:
+      tags:
+        - PDF
+      summary: Export data as a PDF file
+      requestBody:
+        description: Data required to generate the PDF
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                urn:
+                  type: string
+                  description: Unique Reference Number for the PDF
+              required:
+                - urn
+      responses:
+        '200':
+          description: PDF file generated and sent
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              description: Indicates if the content is expected to be displayed inline or as an attachment.
+              schema:
+                type: string
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    NormaRequest:
+      type: object
+      properties:
+        act_type:
+          type: string
+          description: Type of the act (e.g., legge, decreto legge)
+          enum:
+            - legge
+            - decreto legge
+            - decreto legislativo
+            - d.p.r.
+            - regio decreto
+            - tue
+            - tfue
+            - cdfue
+            - regolamento ue
+            - direttiva ue
+            - codice civile
+            - codice penale
+            - codice di procedura civile
+            - codice di procedura civile
+            - CFDUE
+        date:
+          type: string
+          format: date
+          description: Date of the act
+        act_number:
+          type: string
+          description: Number of the act
+        article:
+          type: string
+          description: Article number(s) to fetch
+        version:
+          type: string
+          description: Version of the act
+        version_date:
+          type: string
+          format: date
+          description: Date of the version
+        annex:
+          type: string
+          description: Annex information
+      required:
+        - act_type
+        - article
+
+    Norma:
+      type: object
+      properties:
+        tipo_atto:
+          type: string
+          description: Type of the act
+        data:
+          type: string
+          format: date
+          description: Date of the act
+        numero_atto:
+          type: string
+          description: Number of the act
+      required:
+        - tipo_atto
+        - data
+
+    NormaVisitata:
+      type: object
+      properties:
+        norma:
+          $ref: '#/components/schemas/Norma'
+        numero_articolo:
+          type: string
+          description: Article number
+        versione:
+          type: string
+          description: Version of the act
+        data_versione:
+          type: string
+          format: date
+          description: Date of the version
+        allegato:
+          type: string
+          description: Annex information
+      required:
+        - norma
+        - numero_articolo
+
+    ArticleTextResponse:
+      type: object
+      properties:
+        article_text:
+          type: string
+          description: Text of the article
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+        url:
+          type: string
+          format: uri
+          description: URL of the document
+      required:
+        - article_text
+        - norma_data
+        - url
+
+    BrocardiInfo:
+      type: object
+      properties:
+        position:
+          type: string
+          nullable: true
+          description: Position information
+        link:
+          type: string
+          format: uri
+          nullable: true
+          description: Link to more information
+        Brocardi:
+          type: string
+          nullable: true
+          description: Brocardi information
+        Ratio:
+          type: string
+          nullable: true
+          description: Ratio information
+        Spiegazione:
+          type: string
+          nullable: true
+          description: Explanation
+        Massime:
+          type: string
+          nullable: true
+          description: Maxims
+      description: Brocardi information related to a norma
+
+    BrocardiInfoResponse:
+      type: object
+      properties:
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+        brocardi_info:
+          $ref: '#/components/schemas/BrocardiInfo'
+      required:
+        - norma_data
+        - brocardi_info
+
+    AllDataResponse:
+      type: object
+      properties:
+        article_text:
+          type: string
+          description: Text of the article
+        url:
+          type: string
+          format: uri
+          description: URL of the document
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+        brocardi_info:
+          oneOf:
+            - $ref: '#/components/schemas/BrocardiInfo'
+            - type: object
+              properties:
+                error:
+                  type: string
+                  description: Error message
+          nullable: true
+      required:
+        - article_text
+        - url
+        - norma_data
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      required:
+        - error
+
+  responses:
+    RateLimitExceeded:
+      description: Rate limit has been exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+security:
+  - RateLimit: []
+
