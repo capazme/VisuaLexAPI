@@ -3,6 +3,8 @@ import aiohttp
 from bs4 import BeautifulSoup
 import logging
 import re
+from aiocache import cached
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -10,6 +12,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
+@cached(ttl=3600)
 async def get_tree(normurn, link=False):
     """
     Retrieves the article tree from a given norm URN and extracts article information asynchronously.
@@ -24,7 +27,7 @@ async def get_tree(normurn, link=False):
     logging.info(f"Fetching tree for norm URN: {normurn}")
     try:
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            async with session.get(normurn, timeout=30) as response:
+            async with session.get(normurn, timeout=3000) as response:
                 response.raise_for_status()
                 text = await response.text()
     except Exception as e:

@@ -68,7 +68,11 @@ class NormattivaScraper(BaseScraper):
 
             # Estrarre il titolo dell'articolo
             article_title_tag = corpo.find('div', class_='article-heading-akn')
-            article_title = article_title_tag.get_text(strip=True) if article_title_tag else "Titolo non trovato"
+            if article_title_tag:
+                article_title = article_title_tag.get_text(strip=True)
+            elif not article_title_tag:
+                article_title_tag = corpo.find('div', class_='article-pre-comma-text-akn')
+                article_title = article_title_tag.get_text(strip=True) if article_title_tag else ""
 
             # Inizializza il testo finale con il numero e il titolo dell'articolo
             final_text = [f"{article_number}\n{article_title}"]
