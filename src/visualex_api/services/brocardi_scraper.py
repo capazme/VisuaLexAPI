@@ -63,7 +63,7 @@ class BrocardiScraper(BaseScraper):
         numero_articolo = norma_visitata.numero_articolo.replace('-', '') if norma_visitata.numero_articolo else None
         if numero_articolo:
             article_link = await self._find_article_link(soup, base_url, numero_articolo)
-            return {"article_link": article_link} if article_link else None
+            return article_link if article_link else None
 
         logging.info("No article number provided")
         return None
