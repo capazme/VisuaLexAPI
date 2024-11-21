@@ -62,7 +62,8 @@ class BrocardiScraper(BaseScraper):
 
         numero_articolo = norma_visitata.numero_articolo.replace('-', '') if norma_visitata.numero_articolo else None
         if numero_articolo:
-            return await self._find_article_link(soup, base_url, numero_articolo)
+            article_link = await self._find_article_link(soup, base_url, numero_articolo)
+            return {"article_link": article_link} if article_link else None
 
         logging.info("No article number provided")
         return None
@@ -72,9 +73,9 @@ class BrocardiScraper(BaseScraper):
 
         logging.info("Searching for target link in the main page content")
         matches = pattern.findall(soup.prettify())
-
+        
         if matches:
-            return aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)).get(requests.compat.urljoin(base_url, matches[0]))
+            return requests.compat.urljoin(base_url, matches[0])
 
         logging.info("No direct match found, searching in 'section-title' divs")
         section_titles = soup.find_all('div', class_='section-title')

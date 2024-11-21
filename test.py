@@ -78,5 +78,53 @@ async def save_articles_in_ranges():
                 logging.info(f"Attesa di 10 secondi prima di procedere con il prossimo batch di articoli.")
                 await asyncio.sleep(10)
 
+async def fetch_single_article(art_num = None):
+    # Parametri di esempio per l'articolo
+    article_number = input("Inserisci il numero dell'articolo da recuperare: ") if not art_num else art_num
+
+    data = {
+        "act_type": "ccp",
+        "date": "",
+        "act_number": "",
+        "version": "vigente",
+        "version_date": "2024-10-31",
+        "show_brocardi_info": True,
+        "article": article_number
+    }
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            # Recupera i dati con retry e backoff
+            articles_data = await fetch_data(session, url, data)
+            logging.info(f"Articolo {article_number} recuperato con successo.")
+
+            # Verifica se la risposta è una lista
+            if isinstance(articles_data, list):
+                for article in articles_data:
+                    article_text = article.get("article_text", "Testo non disponibile")
+                    article_url = article.get("url", "URL non disponibile")
+                    norma_data = article.get("norma_data", {})
+                    brocardi_info = article.get("brocardi_info", {})
+
+                    print(f"\n--- Articolo {article_number} ---")
+                    print(f"Testo: {article_text}")
+                    print(f"URL: {article_url}")
+                    print("Dettagli della norma:")
+                    for key, value in norma_data.items():
+                        print(f"  {key.capitalize()}: {value}")
+                    if brocardi_info:
+                        print("Informazioni Brocardi:")
+                        for key, value in brocardi_info.items():
+                            print(f"  {key.capitalize()}: {value}")
+                    print("\n" + "="*50 + "\n")
+            else:
+                logging.error("La risposta non è del tipo previsto (lista).")
+
+        except aiohttp.ClientError as e:
+            logging.error(f"Errore nella richiesta per l'articolo {article_number}:", exc_info=True)
+
 # Esegui la funzione asincrona
-asyncio.run(save_articles_in_ranges())
+asyncio.run(fetch_single_article('94'))
+
+# Esegui la funzione asincrona
+#asyncio.run(save_articles_in_ranges())
