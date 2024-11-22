@@ -486,6 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
         normTabs.appendChild(tabItem);
         logger.log(`Tab aggiunto: ${navLink.textContent}`);
 
+        enableTabSorting();
+
         // Usa la funzione per aggiornare l'icona del pin
         updatePinIcon(isPinned, key);
 
@@ -850,6 +852,38 @@ document.addEventListener('DOMContentLoaded', () => {
         logger.log(`Filtrata la cronologia con la query: ${query}`);
     }, 300);
 
+        // Aggiungi la funzione enableTabSorting con SortableJS
+        const enableTabSorting = () => {
+            const navTabsLists = document.querySelectorAll('.nav-tabs');
+    
+            navTabsLists.forEach((navTabs) => {
+                new Sortable(navTabs, {
+                    animation: 150,
+                    handle: '.nav-item',
+                    direction: 'horizontal',
+                    onEnd: function (evt) {
+                        // Aggiorna l'ordine dei contenuti delle tab
+                        updateTabContentOrder(navTabs);
+                        logger.log('Ordine delle tab aggiornato con SortableJS.');
+                    },
+                });
+            });
+        };
+    
+        // Assicurati che la funzione updateTabContentOrder sia presente
+        const updateTabContentOrder = (navTabs) => {
+            const tabContent = navTabs.closest('.norm-content').querySelector('.tab-content');
+            const tabs = navTabs.querySelectorAll('.nav-link');
+    
+            tabs.forEach((tab) => {
+                const paneId = tab.getAttribute('href');
+                const pane = tabContent.querySelector(paneId);
+                if (pane) {
+                    tabContent.appendChild(pane);
+                }
+            });
+        };
+    
     // ============================
     // Inizializzazione degli Event Listeners
     // ============================
@@ -900,6 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleActDetails();
         toggleVersionDate();
         loadPinnedTabs(); // Carica i tab pinnati all'avvio
+        enableTabSorting(); // Abilita il riordino delle tab
         initializeEventListeners();
         logger.log('Inizializzazione completata.');
     };

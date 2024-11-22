@@ -165,68 +165,64 @@
             <button id="reset-history" class="btn btn-warning">Pulisci cronologia</button>
         </section>
 
-<!-- Template per la Tab dell'Articolo -->
-<template id="article-tab-template">
-    <li class="nav-item">
-        <a class="nav-link" href="" role="tab"></a>
-        <button class="btn btn-sm btn-outline-secondary ms-2 pin-button" data-key="" title="Pin" aria-label="Pinna il tab">📍</button>
-        <button class="btn btn-sm btn-outline-danger ms-1 close-button" data-key="" title="Chiudi" aria-label="Chiudi il tab">✖️</button>
-    </li>
-</template>
+        <!-- Templates -->
+        <template id="article-tab-template">
+            <li class="nav-item">
+                <a class="nav-link" href="" role="tab"></a>
+                <button class="btn btn-sm btn-outline-secondary ms-2 pin-button" data-key="" title="Pin" aria-label="Pinna il tab">📍</button>
+                <button class="btn btn-sm btn-outline-danger ms-1 close-button" data-key="" title="Chiudi" aria-label="Chiudi il tab">✖️</button>
+            </li>
+        </template>
 
-<!-- Template per il Contenuto della Tab dell'Articolo -->
-<template id="article-tab-pane-template">
-    <div class="tab-pane fade" role="tabpanel">
-        <div class="mb-3 resizable article-text-container">
-            <h5>Testo Articolo:</h5>
-            <pre class="article-text resizable"></pre>
-        </div>
-        <div class="brocardi-info" style="display:none;">
-            <h5>Informazioni Brocardi:</h5>
-            <div class="brocardi-content"></div>
-        </div>
-    </div>
-</template>
+        <template id="article-tab-pane-template">
+            <div class="tab-pane fade" role="tabpanel">
+                <div class="mb-3 resizable article-text-container">
+                    <h5>Testo Articolo:</h5>
+                    <pre class="article-text resizable"></pre>
+                </div>
+                <div class="brocardi-info d-none">
+                    <h5>Informazioni Brocardi:</h5>
+                    <div class="brocardi-content"></div>
+                </div>
+            </div>
+        </template>
 
+        <template id="norm-collapsible-template">
+            <div class="norm-collapsible mb-4">
+                <div class="norm-header bg-primary text-white p-2" role="button" data-bs-toggle="collapse" data-bs-target="">
+                    <h3 class="norm-title mb-0"></h3>
+                </div>
+                <div class="collapse norm-content" id="">
+                    <ul class="nav nav-tabs norm-tabs" role="tablist"></ul>
+                    <div class="tab-content norm-tab-content"></div>
+                </div>
+            </div>
+        </template>
 
-        <!-- Template per il Contenitore Collassabile della Norma -->
-<template id="norm-collapsible-template">
-    <div class="norm-collapsible mb-4">
-        <div class="norm-header bg-primary text-white p-2" role="button" data-bs-toggle="collapse" data-bs-target="">
-            <h3 class="norm-title mb-0"></h3>
+        <!-- Modal di Conferma -->
+        <div class="modal fade" id="resetConfirmationModal" tabindex="-1" aria-labelledby="resetConfirmationModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h1 class="modal-title fs-5" id="resetConfirmationModalLabel">Conferma Reset</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                Sei sicuro di voler resettare il modulo? Questo eliminerà anche i tab pinnati.
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-danger" id="confirmResetButton">Resetta</button>
+                </div>
+            </div>
+            </div>
         </div>
-        <div class="collapse norm-content" id="">
-            <!-- Tabs per gli articoli della norma -->
-            <ul class="nav nav-tabs norm-tabs" role="tablist"></ul>
-            <div class="tab-content norm-tab-content"></div>
-        </div>
-    </div>
-</template>
-
-<!-- Modal di Conferma -->
-<div class="modal fade" id="resetConfirmationModal" tabindex="-1" aria-labelledby="resetConfirmationModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h1 class="modal-title fs-5" id="resetConfirmationModalLabel">Conferma Reset</h1>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          Sei sicuro di voler resettare il modulo? Questo eliminerà anche i tab pinnati.
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-          <button type="button" class="btn btn-danger" id="confirmResetButton">Resetta</button>
-        </div>
-      </div>
-    </div>
-  </div>
   
 
         <!-- Bootstrap JS (with Popper.js) -->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <!-- interact.js CDN -->
-        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+        <!-- SortableJS CDN -->
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
         <!-- Custom Script -->
         <script src="/static/script.js" defer></script>
     </div>

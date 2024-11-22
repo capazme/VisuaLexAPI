@@ -54,7 +54,6 @@ def complete_date(act_type, date, act_number):
     finally:
         driver_manager.close_drivers()
 
-
 def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None, version_date=None, urn_flag=True):
     """
     Generates the URN for a legal norm.
@@ -114,7 +113,6 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     logging.info(f"Final URN: {result}")
     
     return result
-
 
 def complete_date_or_parse(date, act_type, act_number):
     """

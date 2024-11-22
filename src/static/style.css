@@ -500,3 +500,27 @@ header h1 {
         margin: var(--spacing-xs) 0;
     }
 }
+
+/* Aggiungi questo stile al tuo file style.css */
+.nav-tabs {
+    display: flex;
+    /* flex-wrap: nowrap; */
+    overflow-x: auto;
+}
+
+.nav-tabs .nav-item {
+    user-select: none; /* Evita la selezione del testo durante il drag */
+    cursor: grab;
+}
+
+.nav-tabs .nav-item:active {
+    cursor: grabbing;
+}
+
+.nav-tabs .nav-item.dragging {
+    opacity: 0.5; /* Riduce l'opacità della tab durante il drag */
+}
+
+.nav-tabs .nav-item.sortable-ghost {
+    opacity: 0;
+}
