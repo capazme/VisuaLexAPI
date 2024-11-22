@@ -866,12 +866,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Aggiungi la funzione enableTabSorting con SortableJS
         const enableTabSorting = () => {
             const navTabsLists = document.querySelectorAll('.nav-tabs');
-    
+        
             navTabsLists.forEach((navTabs) => {
                 new Sortable(navTabs, {
+                    group: 'shared-tabs', // Se vuoi permettere il drag-and-drop tra gruppi
                     animation: 150,
                     handle: '.nav-item',
-                    direction: 'horizontal',
+                    direction: 'vertical', // Modifica la direzione in 'vertical' per il drag verticale
                     onEnd: function (evt) {
                         // Aggiorna l'ordine dei contenuti delle tab
                         updateTabContentOrder(navTabs);
@@ -880,6 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         };
+        
     
         // Assicurati che la funzione updateTabContentOrder sia presente
         const updateTabContentOrder = (navTabs) => {

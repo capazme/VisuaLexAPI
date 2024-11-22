@@ -1,6 +1,6 @@
 /* ==========================================================================
-   CSS Stylesheet - [Nome del Progetto]
-   Descrizione: Stili per l'applicazione web.
+   CSS Stylesheet - NormaScraper Web
+   Descrizione: Stili per l'applicazione web NormaScraper.
    Autore: [Il Tuo Nome]
    Ultimo aggiornamento: [Data]
    ========================================================================== */
@@ -45,6 +45,7 @@
     --border-radius: 0.5rem;
   }
   
+  /* Modalità Chiara */
   @media (prefers-color-scheme: light) {
     :root {
       --color-background: #f2f2f7;
@@ -303,40 +304,82 @@
     display: block;
   }
   
-  /* Tabs */
-  .norm-tabs {
-    display: flex;
-    overflow-x: auto;
+  /* ============================
+     Contenitore delle Tab con Max-Height e Scroll Verticale
+     ============================ */
+  .tabs-container {
+    max-width: 100%; /* Adatta al contenitore padre */
+    max-height: 30vh; /* Altezza massima del contenitore delle tab */
+    overflow-y: auto; /* Abilita lo scroll verticale */
+    overflow-x: hidden; /* Nasconde lo scroll orizzontale */
     margin-bottom: var(--spacing-md);
-    flex-wrap: wrap;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+    background-color: var(--color-surface);
+    position: relative;
   }
   
-  .norm-tabs .nav-link {
+  .tabs-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .tabs-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+/* ============================
+   Stili per le Tab
+   ============================ */
+   .tabs-container .nav-tabs {
+    display: flex;
+    flex-wrap: wrap; /* Permette alle tab di andare a capo */
+    width: 100%;
+    gap: var(--spacing-xs); /* Aggiunge spazio tra le tab */
+  }
+  
+  .tabs-container .nav-tabs .nav-item {
+    flex: 0 0 auto; /* Impedisce alle tab di crescere o restringersi */
+    user-select: none;
+    cursor: grab;
+    margin-bottom: var(--spacing-xs);
+  }
+  
+  .tabs-container .nav-tabs .nav-item:active {
+    cursor: grabbing;
+  }
+  
+  .tabs-container .nav-tabs .nav-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     background-color: var(--color-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
-    margin-right: var(--spacing-xs);
     border-radius: var(--border-radius);
     padding: var(--spacing-sm) var(--spacing-md);
-    display: flex;
-    align-items: center;
     transition: background-color var(--transition-duration) var(--transition-timing),
       color var(--transition-duration) var(--transition-timing);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 150px; /* Imposta una larghezza minima per mantenere la forma */
+    box-sizing: border-box;
   }
   
-  .norm-tabs .nav-link.active {
+  .tabs-container .nav-tabs .nav-link.active {
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
   }
   
-  .norm-tabs .nav-link:hover {
+  .tabs-container .nav-tabs .nav-link:hover {
     background-color: var(--color-border);
     color: var(--color-text);
   }
   
-  .pin-button,
-  .close-button {
+  .tabs-container .nav-tabs .nav-link .pin-button,
+  .tabs-container .nav-tabs .nav-link .close-button {
     background: none;
     border: none;
     color: var(--color-text-muted);
@@ -346,15 +389,8 @@
     transition: color var(--transition-duration) var(--transition-timing);
   }
   
-  .pin-button:hover,
-  .close-button:hover {
-    color: var(--color-text);
-  }
-  
-  .tab-pane {
-    background-color: var(--color-background);
-    padding: var(--spacing-md);
-    border-radius: var(--border-radius);
+  .tabs-container .nav-tabs .nav-link .pin-button:hover,
+  .tabs-container .nav-tabs .nav-link .close-button:hover {
     color: var(--color-text);
   }
   
@@ -505,15 +541,21 @@
       padding: var(--spacing-lg);
     }
   
-    .norm-tabs {
-      flex-wrap: wrap;
+    /* Modifica del Contenitore delle Tab su Mobile */
+    .tabs-container {
+      max-height: 10vh; /* Mantiene l'altezza massima di 10vh */
     }
   
-    .norm-tabs .nav-link {
-      margin-bottom: var(--spacing-xs);
-      flex: 1 1 calc(50% - var(--spacing-xs));
+    .tabs-container .nav-tabs {
+      flex-direction: row; /* Dispone le tab orizzontalmente */
     }
   
+    .tabs-container .nav-tabs .nav-link {
+      padding: var(--spacing-sm) var(--spacing-md);
+      min-width: 120px; /* Adatta la larghezza minima per dispositivi mobili */
+    }
+  
+    /* Bottoni e Input */
     .btn,
     .number-input button {
       width: 100%;
@@ -533,25 +575,11 @@
   /* ============================
      Stili per Drag-and-Drop delle Tab
      ============================ */
-  .nav-tabs {
-    display: flex;
-    overflow-x: auto;
-  }
-  
-  .nav-tabs .nav-item {
-    user-select: none; /* Evita la selezione del testo durante il drag */
-    cursor: grab;
-  }
-  
-  .nav-tabs .nav-item:active {
-    cursor: grabbing;
-  }
-  
-  .nav-tabs .nav-item.sortable-chosen {
+  .tabs-container .nav-tabs .nav-item.sortable-chosen {
     opacity: 0.5; /* Riduce l'opacità della tab durante il drag */
   }
   
-  .nav-tabs .nav-item.sortable-ghost {
+  .tabs-container .nav-tabs .nav-item.sortable-ghost {
     opacity: 0; /* Nasconde la tab fantasma durante il drag */
   }
   
