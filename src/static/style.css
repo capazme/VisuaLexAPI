@@ -1,3 +1,10 @@
+/* ==========================================================================
+   CSS Stylesheet - [Nome del Progetto]
+   Descrizione: Stili per l'applicazione web.
+   Autore: [Il Tuo Nome]
+   Ultimo aggiornamento: [Data]
+   ========================================================================== */
+
 /* ============================
    Variabili CSS
    ============================ */
@@ -16,152 +23,164 @@
     --color-text-inverse: #ffffff;
     --color-text-muted: #a1a1aa;
     --color-border: #3a3a3c;
-
-    /* Font */
+  
+    /* Tipografia */
     --font-family: 'Roboto', sans-serif;
     --font-size-base: 16px;
-
+    --line-height-base: 1.6;
+  
     /* Spaziature */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
-
+  
     /* Transizioni */
-    --transition-speed: 0.3s;
-    --transition-ease: ease-in-out;
-
-    /* Dimensioni */
+    --transition-duration: 0.3s;
+    --transition-timing: ease-in-out;
+  
+    /* Layout */
     --max-container-width: 1200px;
     --border-radius: 0.5rem;
-}
-
-@media (prefers-color-scheme: light) {
+  }
+  
+  @media (prefers-color-scheme: light) {
     :root {
-        --color-background: #f2f2f7;
-        --color-surface: #ffffff;
-        --color-primary: #007aff;
-        --color-secondary: #5856d6;
-        --color-accent: #34c759;
-        --color-danger: #ff3b30;
-        --color-danger-hover: #d70015;
-        --color-warning: #ffcc00;
-        --color-warning-hover: #e6b800;
-        --color-text: #1c1c1e;
-        --color-text-inverse: #ffffff;
-        --color-text-muted: #6e6e73;
-        --color-border: #d1d1d6;
+      --color-background: #f2f2f7;
+      --color-surface: #ffffff;
+      --color-primary: #007aff;
+      --color-secondary: #5856d6;
+      --color-accent: #34c759;
+      --color-danger: #ff3b30;
+      --color-danger-hover: #d70015;
+      --color-warning: #ffcc00;
+      --color-warning-hover: #e6b800;
+      --color-text: #1c1c1e;
+      --color-text-inverse: #ffffff;
+      --color-text-muted: #6e6e73;
+      --color-border: #d1d1d6;
     }
-}
-
-/* ============================
-   Reset e Base
-   ============================ */
-*, *::before, *::after {
+  }
+  
+  /* ============================
+     Reset e Stili Base
+     ============================ */
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
-}
-
-body {
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
     font-family: var(--font-family);
     font-size: var(--font-size-base);
+    line-height: var(--line-height-base);
     background-color: var(--color-background);
     color: var(--color-text);
-    margin: 0;
-    line-height: 1.6;
-}
-
-h1, h2, h3, h4, h5, h6 {
+  }
+  
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     color: var(--color-text);
-    margin-bottom: var(--spacing-md);
     font-weight: 700;
-}
-
-p {
+    margin-bottom: var(--spacing-md);
+  }
+  
+  p {
     margin-bottom: var(--spacing-md);
     color: var(--color-text-muted);
-}
-
-.container {
+  }
+  
+  .container {
     max-width: var(--max-container-width);
     margin: 0 auto;
     padding: 0 var(--spacing-md);
-}
-
-/* ============================
-   Header
-   ============================ */
-header {
+  }
+  
+  /* ============================
+     Header
+     ============================ */
+  header {
     background-color: var(--color-surface);
     padding: var(--spacing-lg) 0;
     text-align: center;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-header h1 {
+  }
+  
+  header h1 {
     color: var(--color-primary);
     font-size: 2.5rem;
     margin: 0;
-}
-
-/* ============================
-   Form Section
-   ============================ */
-.form-container {
+  }
+  
+  /* ============================
+     Sezione Form
+     ============================ */
+  .form-container {
     background-color: var(--color-surface);
     padding: var(--spacing-xl);
     border-radius: var(--border-radius);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     margin-bottom: var(--spacing-xl);
-}
-
-.form-container h2 {
+  }
+  
+  .form-container h2 {
     color: var(--color-primary);
     margin-bottom: var(--spacing-lg);
-}
-
-.form-label {
+  }
+  
+  .form-label {
     color: var(--color-text);
     margin-bottom: var(--spacing-xs);
-}
-
-.form-control, .form-select {
+  }
+  
+  .form-control,
+  .form-select {
     background-color: var(--color-background);
     color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     padding: var(--spacing-sm);
-    transition: border-color var(--transition-speed) var(--transition-ease);
-}
-
-.form-control::placeholder, .form-select::placeholder {
+    transition: border-color var(--transition-duration) var(--transition-timing);
+  }
+  
+  .form-control::placeholder,
+  .form-select::placeholder {
     color: var(--color-text-muted);
-}
-
-.form-control:focus, .form-select:focus {
+  }
+  
+  .form-control:focus,
+  .form-select:focus {
     border-color: var(--color-primary);
     outline: none;
     box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.3);
-}
-
-.form-check-label {
+  }
+  
+  .form-check-label {
     color: var(--color-text);
-}
-
-.form-check-input {
+  }
+  
+  .form-check-input {
     background-color: var(--color-background);
     border: 1px solid var(--color-border);
-}
-
-.form-check-input:checked {
+  }
+  
+  .form-check-input:checked {
     background-color: var(--color-primary);
     border-color: var(--color-primary);
-}
-
-/* ============================
-   Button Styling
-   ============================ */
-.btn {
+  }
+  
+  /* ============================
+     Stile dei Bottoni
+     ============================ */
+  .btn {
     display: inline-block;
     font-weight: 500;
     color: var(--color-text-inverse);
@@ -173,59 +192,60 @@ header h1 {
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: 1rem;
     border-radius: var(--border-radius);
-    transition: background-color var(--transition-speed) var(--transition-ease), border-color var(--transition-speed) var(--transition-ease);
-}
-
-.btn:hover {
+    transition: background-color var(--transition-duration) var(--transition-timing),
+      border-color var(--transition-duration) var(--transition-timing);
+    cursor: pointer;
+  }
+  
+  .btn:hover {
     background-color: var(--color-secondary);
     border-color: var(--color-secondary);
-    cursor: pointer;
-}
-
-.btn-danger {
+  }
+  
+  .btn-danger {
     background-color: var(--color-danger);
     border-color: var(--color-danger);
     color: var(--color-text-inverse);
-}
-
-.btn-danger:hover {
+  }
+  
+  .btn-danger:hover {
     background-color: var(--color-danger-hover);
     border-color: var(--color-danger-hover);
-}
-
-.btn-warning {
+  }
+  
+  .btn-warning {
     background-color: var(--color-warning);
     border-color: var(--color-warning);
     color: var(--color-text-inverse);
-}
-
-.btn-warning:hover {
+  }
+  
+  .btn-warning:hover {
     background-color: var(--color-warning-hover);
     border-color: var(--color-warning-hover);
-}
-
-/* ============================
-   Number Input Styling
-   ============================ */
-.number-input {
+  }
+  
+  /* ============================
+     Stile Input Numerico
+     ============================ */
+  .number-input {
     display: flex;
     align-items: center;
-}
-
-.number-input button {
+  }
+  
+  .number-input button {
     background-color: var(--color-background);
     border: 1px solid var(--color-border);
     color: var(--color-text);
     padding: var(--spacing-xs) var(--spacing-sm);
     cursor: pointer;
-    transition: background-color var(--transition-speed) var(--transition-ease);
-}
-
-.number-input button:hover {
+    transition: background-color var(--transition-duration) var(--transition-timing);
+  }
+  
+  .number-input button:hover {
     background-color: var(--color-border);
-}
-
-.number-input input {
+  }
+  
+  .number-input input {
     width: 60px;
     text-align: center;
     background-color: var(--color-background);
@@ -233,65 +253,65 @@ header h1 {
     color: var(--color-text);
     margin: 0 var(--spacing-xs);
     border-radius: var(--border-radius);
-}
-
-/* ============================
-   Results Section
-   ============================ */
-.results-container {
+  }
+  
+  /* ============================
+     Sezione Risultati
+     ============================ */
+  .results-container {
     background-color: var(--color-surface);
     padding: var(--spacing-xl);
     border-radius: var(--border-radius);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     margin-bottom: var(--spacing-xl);
-}
-
-.norm-collapsible {
+  }
+  
+  .norm-collapsible {
     margin-bottom: var(--spacing-lg);
-}
-
-.norm-header {
+  }
+  
+  .norm-header {
     background-color: var(--color-background);
+    color: var(--color-text);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    color: var(--color-text);
-}
-.norm-header h3 {
-    color: var(--color-text-inverse); /* Assicurati che questa variabile sia bianca */
-}
-.norm-header:hover {
-    background-color: var(--color-border);
-}
-
-.norm-title {
+  }
+  
+  .norm-header h3 {
     margin: 0;
     font-size: 1.25rem;
-    color: var(--color-primary);
-}
-
-.norm-content {
+    color: var(--color-background);
+  }
+  
+  .norm-header:hover {
+    background-color: var(--color-border);
+  }
+  
+  .norm-content {
     background-color: var(--color-background);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     margin-top: var(--spacing-sm);
     display: none;
-}
-
-.norm-content.show {
+  }
+  
+  .norm-content.show {
     display: block;
-}
-
-.norm-tabs {
+  }
+  
+  /* Tabs */
+  .norm-tabs {
     display: flex;
     overflow-x: auto;
     margin-bottom: var(--spacing-md);
-}
-
-.norm-tabs .nav-link {
+    flex-wrap: wrap;
+  }
+  
+  .norm-tabs .nav-link {
     background-color: var(--color-surface);
     color: var(--color-text);
     border: 1px solid var(--color-border);
@@ -300,78 +320,83 @@ header h1 {
     padding: var(--spacing-sm) var(--spacing-md);
     display: flex;
     align-items: center;
-    transition: background-color var(--transition-speed) var(--transition-ease), color var(--transition-speed) var(--transition-ease);
-}
-
-.norm-tabs .nav-link.active {
+    transition: background-color var(--transition-duration) var(--transition-timing),
+      color var(--transition-duration) var(--transition-timing);
+    white-space: nowrap;
+  }
+  
+  .norm-tabs .nav-link.active {
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
-}
-
-.norm-tabs .nav-link:hover {
+  }
+  
+  .norm-tabs .nav-link:hover {
     background-color: var(--color-border);
     color: var(--color-text);
-}
-
-.pin-button, .close-button {
+  }
+  
+  .pin-button,
+  .close-button {
     background: none;
     border: none;
     color: var(--color-text-muted);
     cursor: pointer;
     margin-left: var(--spacing-xs);
     font-size: 1rem;
-    transition: color var(--transition-speed) var(--transition-ease);
-}
-
-.pin-button:hover, .close-button:hover {
+    transition: color var(--transition-duration) var(--transition-timing);
+  }
+  
+  .pin-button:hover,
+  .close-button:hover {
     color: var(--color-text);
-}
-
-.tab-pane {
+  }
+  
+  .tab-pane {
     background-color: var(--color-background);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     color: var(--color-text);
-}
-
-/* ============================
-   Article Text Styling
-   ============================ */
-.article-text-container {
+  }
+  
+  /* ============================
+     Stile del Testo Articolo
+     ============================ */
+  .article-text-container {
     margin-bottom: var(--spacing-md);
-}
-
-.article-text-container h5 {
+  }
+  
+  .article-text-container h5 {
     color: var(--color-primary);
     margin-bottom: var(--spacing-sm);
-}
-
-.article-text {
+  }
+  
+  .article-text {
     background-color: var(--color-surface);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     border: 1px solid var(--color-border);
     max-height: 300px;
-    overflow-y: auto;      /* Scrolling verticale se necessario */
-    overflow-x: hidden;    /* Impedisce lo scrolling orizzontale */
+    overflow-y: auto;
+    overflow-x: hidden;
     resize: vertical;
     color: var(--color-text);
     font-family: 'Courier New', monospace;
-    white-space: pre-wrap; /* Mantiene gli a capo e permette il wrapping */
-    word-wrap: break-word; /* Spezza le parole lunghe */
-    overflow-wrap: break-word; /* Compatibilità per diversi browser */
-}
-
-.brocardi-info {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Informazioni Brocardi */
+  .brocardi-info {
     margin-top: var(--spacing-lg);
-}
-
-.brocardi-info h5 {
+  }
+  
+  .brocardi-info h5 {
     color: var(--color-primary);
     margin-bottom: var(--spacing-md);
-}
-
-.brocardi-section {
+  }
+  
+  .brocardi-section {
     margin-bottom: var(--spacing-md);
     background-color: var(--color-surface);
     padding: var(--spacing-md);
@@ -381,14 +406,15 @@ header h1 {
     overflow: auto;
     resize: vertical;
     color: var(--color-text);
-}
-
-.brocardi-section h6 {
+  }
+  
+  .brocardi-section h6 {
     color: var(--color-secondary);
     margin-bottom: var(--spacing-sm);
-}
-
-.brocardi-item, .massime-item {
+  }
+  
+  .brocardi-item,
+  .massime-item {
     background-color: var(--color-background);
     padding: var(--spacing-sm);
     border-radius: var(--border-radius);
@@ -398,129 +424,134 @@ header h1 {
     max-height: 150px;
     overflow: auto;
     resize: vertical;
-}
-
-/* ============================
-   Loading Indicator
-   ============================ */
-#loading {
+  }
+  
+  /* ============================
+     Indicatore di Caricamento
+     ============================ */
+  #loading {
     font-size: 1.25rem;
     font-weight: bold;
     color: var(--color-primary);
     text-align: center;
     margin: var(--spacing-lg) 0;
-}
-
-/* ============================
-   Error Message
-   ============================ */
-#error-container {
+  }
+  
+  /* ============================
+     Messaggio di Errore
+     ============================ */
+  #error-container {
     background-color: var(--color-danger);
     color: var(--color-text-inverse);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     margin-bottom: var(--spacing-md);
-}
-
-/* ============================
-   History Section
-   ============================ */
-.history-container {
+  }
+  
+  /* ============================
+     Sezione Cronologia
+     ============================ */
+  .history-container {
     background-color: var(--color-surface);
     padding: var(--spacing-xl);
     border-radius: var(--border-radius);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-}
-
-.history-container h2 {
+  }
+  
+  .history-container h2 {
     color: var(--color-primary);
     margin-bottom: var(--spacing-lg);
-}
-
-#history-list {
+  }
+  
+  #history-list {
     list-style: none;
     padding: 0;
     margin-bottom: var(--spacing-md);
-}
-
-#history-list li {
+  }
+  
+  #history-list li {
     background-color: var(--color-background);
     padding: var(--spacing-sm);
     border-radius: var(--border-radius);
     margin-bottom: var(--spacing-xs);
     color: var(--color-text);
-    transition: background-color var(--transition-speed) var(--transition-ease);
-}
-
-#history-list li:hover {
+    transition: background-color var(--transition-duration) var(--transition-timing);
+  }
+  
+  #history-list li:hover {
     background-color: var(--color-border);
-}
-
-#history-search {
+  }
+  
+  #history-search {
     background-color: var(--color-background);
     border: 1px solid var(--color-border);
     color: var(--color-text);
     border-radius: var(--border-radius);
     padding: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
-}
-
-#history-search::placeholder {
+  }
+  
+  #history-search::placeholder {
     color: var(--color-text-muted);
-}
-
-/* ============================
-   Responsive Design
-   ============================ */
-@media (max-width: 768px) {
-    .form-container, .results-container, .history-container {
-        padding: var(--spacing-lg);
+  }
+  
+  /* ============================
+     Responsive Design
+     ============================ */
+  @media (max-width: 768px) {
+    .form-container,
+    .results-container,
+    .history-container {
+      padding: var(--spacing-lg);
     }
-
+  
     .norm-tabs {
-        flex-wrap: wrap;
+      flex-wrap: wrap;
     }
-
+  
     .norm-tabs .nav-link {
-        margin-bottom: var(--spacing-xs);
-        flex: 1 1 calc(50% - var(--spacing-xs));
+      margin-bottom: var(--spacing-xs);
+      flex: 1 1 calc(50% - var(--spacing-xs));
     }
-
-    .btn, .number-input button {
-        width: 100%;
-        margin-bottom: var(--spacing-sm);
+  
+    .btn,
+    .number-input button {
+      width: 100%;
+      margin-bottom: var(--spacing-sm);
     }
-
+  
     .number-input {
-        flex-direction: column;
+      flex-direction: column;
     }
-
+  
     .number-input input {
-        width: 100%;
-        margin: var(--spacing-xs) 0;
+      width: 100%;
+      margin: var(--spacing-xs) 0;
     }
-}
-
-/* Aggiungi questo stile al tuo file style.css */
-.nav-tabs {
+  }
+  
+  /* ============================
+     Stili per Drag-and-Drop delle Tab
+     ============================ */
+  .nav-tabs {
     display: flex;
-    /* flex-wrap: nowrap; */
     overflow-x: auto;
-}
-
-.nav-tabs .nav-item {
+  }
+  
+  .nav-tabs .nav-item {
     user-select: none; /* Evita la selezione del testo durante il drag */
     cursor: grab;
-}
-
-.nav-tabs .nav-item:active {
+  }
+  
+  .nav-tabs .nav-item:active {
     cursor: grabbing;
-}
-
-.nav-tabs .nav-item.dragging {
+  }
+  
+  .nav-tabs .nav-item.sortable-chosen {
     opacity: 0.5; /* Riduce l'opacità della tab durante il drag */
-}
-
-.nav-tabs .nav-item.sortable-ghost {
-    opacity: 0;
-}
+  }
+  
+  .nav-tabs .nav-item.sortable-ghost {
+    opacity: 0; /* Nasconde la tab fantasma durante il drag */
+  }
+  
