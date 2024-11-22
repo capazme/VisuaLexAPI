@@ -379,12 +379,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Log per verificare il pinButton
         logger.log(`Pin button trovato per la chiave: ${key}`, pinButton);
 
-        // Aggiorna l'icona del pin
-        pinButton.textContent = isPinned ? '📌' : '📍';
-        logger.log(`Icona del pin aggiornata per la chiave: ${key} a ${isPinned ? '📌' : '📍'}`);
-
         // Trova l'elemento .nav-link più vicino
-        const navLink = pinButton.closest('.nav-link');
+        let navLink = pinButton.closest('.nav-link');
+        if (!navLink) {
+            // Se .nav-link non è un antenato diretto, cerca all'interno del genitore .nav-item
+            const navItem = pinButton.closest('.nav-item');
+            if (navItem) {
+                navLink = navItem.querySelector('.nav-link');
+            }
+        }
+
         if (!navLink) {
             logger.error(`Elemento '.nav-link' non trovato per la chiave: ${key}`);
             return;
@@ -393,10 +397,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Log per verificare il navLink
         logger.log(`Elemento '.nav-link' trovato per la chiave: ${key}`, navLink);
 
+        // Aggiorna l'icona del pin
+        pinButton.textContent = isPinned ? '📌' : '📍';
+        logger.log(`Icona del pin aggiornata per la chiave: ${key} a ${isPinned ? '📌' : '📍'}`);
+
         // Aggiorna la classe 'pinned'
         navLink.classList.toggle('pinned', isPinned);
         logger.log(`Classe 'pinned' ${isPinned ? 'aggiunta' : 'rimossa'} per la chiave: ${key}`);
     };
+
+
+
     // ==== FINE NUOVE FUNZIONI ==== //
 
     /**
