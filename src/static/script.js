@@ -455,22 +455,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const createArticleTab = (articleData, normElements, isPinned = false) => {
         const { normTabs, normTabContent, normaKey } = normElements;
         const { norma_data: normaData } = articleData;
-
+    
         if (!normaData) {
             logger.warn('Dati della norma mancanti:', articleData);
             return;
         }
-
-        // Genera la chiave per l'articolo
+    
+        // Genera la chiave unica per l'articolo
         const key = generateArticleKey(normaData);
         const articleTabId = `article-${sanitize(key)}`;
-
-        // Verifica se il tab esiste già
+    
+        // Verifica se il tab già esiste
         if (normTabs.querySelector(`#${articleTabId}-tab`)) {
             logger.log(`Tab già presente: ${articleTabId}-tab`);
             return;
         }
-
+    
+        // Creazione del tab
         const tabTemplate = document.getElementById('article-tab-template');
         if (!tabTemplate) {
             logger.error("Template 'article-tab-template' non trovato.");
@@ -478,30 +479,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const tabItem = tabTemplate.content.cloneNode(true);
         const navLink = tabItem.querySelector('.nav-link');
-
         navLink.id = `${articleTabId}-tab`;
         navLink.href = `#${articleTabId}`;
         navLink.setAttribute('aria-controls', articleTabId);
         navLink.textContent = `Articolo ${normaData.numero_articolo || 'N/A'}`.trim();
-
+    
         const pinButton = tabItem.querySelector('.pin-button');
         pinButton.dataset.key = key;
-
+    
         const closeButton = tabItem.querySelector('.close-button');
         closeButton.dataset.key = key;
-
-        articleData.tabElement = navLink;
-        articleData.paneElementId = `#${articleTabId}`;
-
-        // Aggiungi il tab al DOM prima di aggiornare l'icona del pin
+    
+        // Aggiungi il tab al DOM
         normTabs.appendChild(tabItem);
         logger.log(`Tab aggiunto: ${navLink.textContent}`);
-
         enableTabSorting();
-
-        // Usa la funzione per aggiornare l'icona del pin
+    
+        // Aggiorna l'icona del pin
         updatePinIcon(isPinned, key);
-
+    
+        // Creazione del contenuto del tab
         const paneTemplate = document.getElementById('article-tab-pane-template');
         if (!paneTemplate) {
             logger.error("Template 'article-tab-pane-template' non trovato.");
@@ -511,15 +508,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const paneDiv = tabPane.querySelector('.tab-pane');
         paneDiv.id = articleTabId;
         paneDiv.setAttribute('aria-labelledby', `${articleTabId}-tab`);
-
-        const articleTextContainer = paneDiv.querySelector('.article-text-container');
-        const preElement = paneDiv.querySelector('pre.article-text');
-        if (articleData.article_text) {
-            preElement.textContent = articleData.article_text;
-        } else {
-            articleTextContainer.style.display = 'none';
+    
+        // Inizializza CKEditor nel contenitore dell'articolo
+        const textArea = paneDiv.querySelector('.article-text');
+        
+        // Verifica se il testo dell'articolo è in formato HTML o testo puro
+        let formattedText = articleData.article_text || '';
+    
+        // Se il testo contiene caratteri di nuova riga e non è già in HTML, convertili in <br>
+        if (!formattedText.includes('<br>') && !formattedText.includes('<p>')) {
+            formattedText = formattedText.replace(/\n/g, '<br>');
         }
-
+    
+        // Imposta il valore del textarea con l'HTML corretto
+        textArea.value = formattedText;
+    
+        ClassicEditor.create(textArea, {
+            toolbar: ['bold', 'italic', 'underline', 'highlight', 'link', 'undo', 'redo']
+        })
+        .then(editor => {
+            logger.log(`Editor CKEditor inizializzato per: ${articleTabId}`, editor);
+    
+            // Salva il riferimento all'editor (opzionale)
+            articleData.editor = editor;
+    
+            // Listener per gestire modifiche
+            editor.model.document.on('change:data', () => {
+                logger.log(`Contenuto modificato per: ${articleTabId}`);
+                // Puoi aggiungere logica per salvare automaticamente le modifiche se necessario
+            });
+        })
+        .catch(error => {
+            logger.error(`Errore durante l'inizializzazione di CKEditor per: ${articleTabId}`, error);
+        });
+    
+        // Popola informazioni aggiuntive (Brocardi, link Normattiva)
         const brocardiInfoDiv = paneDiv.querySelector('.brocardi-info');
         if (articleData.brocardi_info && Object.keys(articleData.brocardi_info).length > 0) {
             brocardiInfoDiv.style.display = 'block';
@@ -528,8 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             brocardiInfoDiv.style.display = 'none';
         }
-
-        // Aggiungi il link Normattiva se presente
+    
         if (normaData.urn) {
             const normattivaLinkDiv = document.createElement('div');
             normattivaLinkDiv.classList.add('normattiva-link');
@@ -543,19 +565,18 @@ document.addEventListener('DOMContentLoaded', () => {
             normattivaLinkDiv.appendChild(normattivaHeading);
             normattivaLinkDiv.appendChild(normattivaLink);
             paneDiv.appendChild(normattivaLinkDiv);
-            logger.log(`Link Normattiva aggiunto per: ${articleTabId}`);
         }
-
+    
+        // Aggiungi il pane al contenitore
         normTabContent.appendChild(paneDiv);
         logger.log(`Pane aggiunto: ${paneDiv.id}`);
-
+    
+        // Gestione eventi tab
         const handleTabClick = (event) => {
             event.preventDefault();
-
             if (navLink.classList.contains('active')) {
                 navLink.classList.remove('active');
                 paneDiv.classList.remove('show', 'active');
-                logger.log(`Tab disattivato: ${navLink.textContent}`);
             } else {
                 const activeTab = normTabs.querySelector('.nav-link.active');
                 if (activeTab) {
@@ -564,58 +585,51 @@ document.addEventListener('DOMContentLoaded', () => {
                     const activePane = normTabContent.querySelector(activePaneId);
                     if (activePane) {
                         activePane.classList.remove('show', 'active');
-                        logger.log(`Tab disattivato: ${activeTab.textContent}`);
                     }
                 }
-
                 navLink.classList.add('active');
                 paneDiv.classList.add('show', 'active');
-                logger.log(`Tab attivato: ${navLink.textContent}`);
-            }
-
-            const collapseElement = normElements.normContainer.querySelector('.collapse');
-            if (collapseElement && !collapseElement.classList.contains('show')) {
-                const collapseInstance = new bootstrap.Collapse(collapseElement);
-                collapseInstance.show();
-                logger.log('Contenitore norma mostrato.');
             }
         };
-
+    
         navLink.addEventListener('click', handleTabClick);
-
-        // Gestisci il click sul pin
+    
+        // Gestione pin
         pinButton.addEventListener('click', (event) => {
             event.stopPropagation();
             togglePin(key, articleData);
         });
-
-        // Gestisci il click sul close
+    
+        // Gestione chiusura
         closeButton.addEventListener('click', (event) => {
             event.stopPropagation();
             const tabElement = closeButton.closest('li');
             const paneId = navLink.getAttribute('href');
             const paneElement = normTabContent.querySelector(paneId);
-
+    
+            // Distruggi l'istanza di CKEditor prima di rimuovere il tab
+            if (articleData.editor) {
+                articleData.editor.destroy()
+                    .then(() => logger.log(`Editor CKEditor distrutto per: ${paneId}`))
+                    .catch(error => logger.error(`Errore durante la distruzione di CKEditor per: ${paneId}`, error));
+            }
+    
             tabElement?.remove();
             paneElement?.remove();
             logger.log(`Tab e pane rimossi: ${paneId}`);
-
-            // Rimuovi il pin se presente
+    
             if (pinnedTabs[key]) {
                 delete pinnedTabs[key];
                 savePinnedTabs();
-                logger.log(`Tab ${key} rimosso dai pinnati.`);
             }
-
-            // Se non ci sono più tab, rimuovi il contenitore della norma
+    
             if (normTabs.querySelectorAll('.nav-link').length === 0) {
                 normElements.normContainer.remove();
                 delete normaContainers[normaKey];
-                logger.log(`Norma rimossa: ${normaKey}`);
             }
         });
-    };
-
+    };    
+    
     /**
      * Visualizza i risultati ottenuti dalla ricerca.
      * @param {Array} results - Array di risultati.
