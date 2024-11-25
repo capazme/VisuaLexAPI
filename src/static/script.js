@@ -694,58 +694,74 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================
     // Gestione degli Eventi
     // ============================
-    const handleFormSubmit = async (event) => {
-        event.preventDefault();
-        hideError();
-        logger.log('Form inviato.');
+/**
+ * Gestisce l'invio del form per estrarre dati delle norme.
+ * Utilizza l'endpoint '/fetch_all_data' se 'show_brocardi_info' è attivo,
+ * altrimenti utilizza l'endpoint '/fetch_article_text'.
+ * @param {Event} event - Evento di submit del form.
+ */
+const handleFormSubmit = async (event) => {
+    event.preventDefault(); // Previene il comportamento predefinito del form
+    hideError(); // Nasconde eventuali messaggi di errore precedenti
+    logger.log('Form inviato.');
 
-        if (!elements.scrapeForm.checkValidity()) {
-            event.stopPropagation();
-            elements.scrapeForm.classList.add('was-validated');
-            logger.log('Form non valido.');
-            return;
+    // Verifica la validità del form
+    if (!elements.scrapeForm.checkValidity()) {
+        event.stopPropagation();
+        elements.scrapeForm.classList.add('was-validated'); // Aggiunge classe per validazione Bootstrap
+        logger.log('Form non valido.');
+        return; // Esce dalla funzione se il form non è valido
+    }
+
+    elements.scrapeForm.classList.remove('was-validated'); // Rimuove la classe di validazione
+    logger.log('Form validato.');
+
+    elements.loadingIndicator.style.display = 'block'; // Mostra l'indicatore di caricamento
+    logger.log('Loading indicator mostrato.');
+
+    // Raccoglie i dati dal form
+    const formData = new FormData(elements.scrapeForm);
+    const data = Object.fromEntries(formData.entries());
+    data.article = elements.articleInput.value; // Aggiunge il valore dell'input 'article'
+    data.show_brocardi_info = formData.has('show_brocardi_info'); // Verifica se il checkbox è attivo
+    logger.log('Dati raccolti dal form:', data);
+
+    // Seleziona l'endpoint basandosi sullo stato del checkbox
+    const endpoint = data.show_brocardi_info ? '/fetch_all_data' : '/fetch_article_text';
+    logger.log(`Endpoint selezionato: ${endpoint}`);
+
+    try {
+        // Effettua la richiesta fetch all'endpoint selezionato
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+
+        // Verifica se la risposta è OK
+        if (!response.ok) {
+            throw new Error('Errore durante la richiesta al server.');
         }
 
-        elements.scrapeForm.classList.remove('was-validated');
-        logger.log('Form validato.');
+        const results = await response.json(); // Parsing della risposta JSON
+        logger.log(`Risultati da ${endpoint}:`, results);
 
-        elements.loadingIndicator.style.display = 'block';
-        logger.log('Loading indicator mostrato.');
-
-        const formData = new FormData(elements.scrapeForm);
-        const data = Object.fromEntries(formData.entries());
-        data.article = elements.articleInput.value;
-        data.show_brocardi_info = formData.has('show_brocardi_info');
-        logger.log('Dati raccolti dal form:', data);
-
-        try {
-            const response = await fetch('/fetch_all_data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
-
-            if (!response.ok) {
-                throw new Error('Errore durante la richiesta al server.');
-            }
-
-            const results = await response.json();
-            logger.log('Risultati fetch_all_data:', results);
-
-            if (!results || results.length === 0) {
-                throw new Error('Nessun risultato trovato.');
-            }
-
-            displayResults(results);
-            saveToHistory(data);
-        } catch (error) {
-            showError(error.message || 'Si è verificato un errore. Riprova più tardi.');
-            logger.error('Errore:', error);
-        } finally {
-            elements.loadingIndicator.style.display = 'none';
-            logger.log('Loading indicator nascosto.');
+        // Verifica se ci sono risultati
+        if (!results || results.length === 0) {
+            throw new Error('Nessun risultato trovato.');
         }
-    };
+
+        displayResults(results); // Visualizza i risultati nella UI
+        saveToHistory(data); // Salva la ricerca nella cronologia
+    } catch (error) {
+        // Gestisce gli errori durante la richiesta o il parsing
+        showError(error.message || 'Si è verificato un errore. Riprova più tardi.');
+        logger.error('Errore:', error);
+    } finally {
+        elements.loadingIndicator.style.display = 'none'; // Nasconde l'indicatore di caricamento
+        logger.log('Loading indicator nascosto.');
+    }
+};
 
     const handleIncrement = () => {
         const currentValue = parseInt(elements.articleInput.value, 10);

@@ -48,25 +48,26 @@
   /* Modalità Chiara */
   @media (prefers-color-scheme: light) {
     :root {
-      --color-background: #f2f2f7;
-      --color-surface: #ffffff;
-      --color-primary: #007aff;
-      --color-secondary: #5856d6;
-      --color-accent: #34c759;
-      --color-danger: #ff3b30;
-      --color-danger-hover: #d70015;
-      --color-warning: #ffcc00;
-      --color-warning-hover: #e6b800;
-      --color-text: #1c1c1e;
-      --color-text-inverse: #ffffff;
-      --color-text-muted: #6e6e73;
-      --color-border: #d1d1d6;
-    }
+        --color-background: #faf3e0; /* Giallo chiaro, effetto carta antica */
+        --color-surface: #fffaf0; /* Bianco caldo e naturale */
+        --color-primary: #59513a; /* Grigio profondo e neutro */
+        --color-secondary: #5d99c6; /* Blu soft per interazioni */
+        --color-accent: #76b041; /* Verde naturale e rilassante */
+        --color-danger: #c0392b; /* Rosso intenso per errori */
+        --color-danger-hover: #a93226;
+        --color-warning: #f1c40f; /* Giallo classico per avvisi */
+        --color-warning-hover: #d4ac0d;
+        --color-text: #3a3a3a; /* Testo ben leggibile */
+        --color-text-inverse: #faf3e0;
+        --color-text-muted: #7f7f7f; /* Grigio morbido per elementi secondari */
+        --color-border: #e0dbc5; /* Linee sottili con tono carta */
+    }      
   }
   
   /* ============================
      Reset e Stili Base
      ============================ */
+  
   *,
   *::before,
   *::after {
@@ -116,7 +117,7 @@
   }
   
   header h1 {
-    color: var(--color-primary);
+    color: var(--color-background);
     font-size: 2.5rem;
     margin: 0;
   }
@@ -307,27 +308,31 @@
   /* ============================
      Contenitore delle Tab con Max-Height e Scroll Verticale
      ============================ */
-  .tabs-container {
-    max-width: 100%; /* Adatta al contenitore padre */
-    max-height: 30vh; /* Altezza massima del contenitore delle tab */
-    overflow-y: auto; /* Abilita lo scroll verticale */
-    overflow-x: hidden; /* Nasconde lo scroll orizzontale */
-    margin-bottom: var(--spacing-md);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-sm);
-    background-color: var(--color-surface);
-    position: relative;
-  }
-  
-  .tabs-container::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .tabs-container::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-  }
+  /* Contenitore delle Tab - Resizable */
+.tabs-container {
+  max-width: 100%; /* Adatta al contenitore padre */
+  max-height: 30vh; /* Altezza massima iniziale */
+  overflow-y: auto; /* Abilita lo scroll verticale */
+  overflow-x: hidden; /* Nasconde lo scroll orizzontale */
+  margin-bottom: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--spacing-sm);
+  background-color: var(--color-surface);
+  position: relative;
+  resize: vertical; /* Consente il ridimensionamento verticale */
+}
+
+/* Per evitare overflow indesiderati */
+.tabs-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tabs-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
   
 /* ============================
    Stili per le Tab
@@ -411,7 +416,7 @@
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     border: 1px solid var(--color-border);
-    max-height: 300px;
+    max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     resize: vertical;
