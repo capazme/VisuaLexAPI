@@ -477,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logger.error("Template 'article-tab-template' non trovato.");
             return;
         }
+    
         const tabItem = tabTemplate.content.cloneNode(true);
         const navLink = tabItem.querySelector('.nav-link');
         navLink.id = `${articleTabId}-tab`;
@@ -504,6 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logger.error("Template 'article-tab-pane-template' non trovato.");
             return;
         }
+    
         const tabPane = paneTemplate.content.cloneNode(true);
         const paneDiv = tabPane.querySelector('.tab-pane');
         paneDiv.id = articleTabId;
@@ -523,24 +525,45 @@ document.addEventListener('DOMContentLoaded', () => {
         // Imposta il valore del textarea con l'HTML corretto
         textArea.value = formattedText;
     
+        // Inizializza CKEditor
+        const { ClassicEditor, Essentials, Bold, Italic, Underline, Strikethrough, FontSize, Highlight, Paragraph } = CKEDITOR;
+    
         ClassicEditor.create(textArea, {
-            toolbar: ['bold', 'italic', 'underline', 'highlight', 'link', 'undo', 'redo']
+            plugins: [Essentials, Bold, Italic, Underline, Strikethrough, Highlight, Paragraph],
+            toolbar: ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'highlight'],
+            highlight: {
+                options: [
+                    {
+                        model: 'yellowMarker',
+                        class: 'marker-yellow',
+                        title: 'Yellow marker',
+                        color: 'var(--ck-highlight-marker-yellow)',
+                        type: 'marker'
+                    },
+                    {
+                        model: 'greenMarker',
+                        class: 'marker-green',
+                        title: 'Green marker',
+                        color: 'var(--ck-highlight-marker-green)',
+                        type: 'marker'
+                    }
+                ]
+            }
         })
         .then(editor => {
             logger.log(`Editor CKEditor inizializzato per: ${articleTabId}`, editor);
-    
-            // Salva il riferimento all'editor (opzionale)
+        
+            // Salva il riferimento all'editor
             articleData.editor = editor;
-    
-            // Listener per gestire modifiche
+        
             editor.model.document.on('change:data', () => {
                 logger.log(`Contenuto modificato per: ${articleTabId}`);
-                // Puoi aggiungere logica per salvare automaticamente le modifiche se necessario
             });
         })
         .catch(error => {
             logger.error(`Errore durante l'inizializzazione di CKEditor per: ${articleTabId}`, error);
         });
+        
     
         // Popola informazioni aggiuntive (Brocardi, link Normattiva)
         const brocardiInfoDiv = paneDiv.querySelector('.brocardi-info');
@@ -571,8 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
         normTabContent.appendChild(paneDiv);
         logger.log(`Pane aggiunto: ${paneDiv.id}`);
     
-        // Gestione eventi tab
-        const handleTabClick = (event) => {
+        navLink.addEventListener('click', (event) => {
             event.preventDefault();
             if (navLink.classList.contains('active')) {
                 navLink.classList.remove('active');
@@ -590,17 +612,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 navLink.classList.add('active');
                 paneDiv.classList.add('show', 'active');
             }
-        };
+        });
     
-        navLink.addEventListener('click', handleTabClick);
-    
-        // Gestione pin
         pinButton.addEventListener('click', (event) => {
             event.stopPropagation();
             togglePin(key, articleData);
         });
     
-        // Gestione chiusura
         closeButton.addEventListener('click', (event) => {
             event.stopPropagation();
             const tabElement = closeButton.closest('li');
@@ -628,7 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 delete normaContainers[normaKey];
             }
         });
-    };    
+    };
+        
     
     /**
      * Visualizza i risultati ottenuti dalla ricerca.
