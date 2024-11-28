@@ -13,6 +13,7 @@ from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf
 from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
+from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
 import logging
 import sys
@@ -80,6 +81,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_article_text', view_func=self.fetch_article_text, methods=['POST'])
         self.app.add_url_rule('/fetch_brocardi_info', view_func=self.fetch_brocardi_info, methods=['POST'])
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
+        self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
 
@@ -191,6 +193,52 @@ class NormaController:
             return jsonify(processed_results)
         except Exception as e:
             log.error("Error in fetch_article_text", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def fetch_tree(self):
+        try:
+            # Ottenere i dati dalla richiesta JSON
+            data = await request.get_json()
+            log.info("Received data for fetch_tree", data=data)
+
+            # Estrarre il parametro URN
+            urn = data.get('urn')
+            if not urn:
+                log.error("Missing 'urn' in request data")
+                return jsonify({'error': "Missing 'urn' in request data"}), 400
+
+            # Estrarre le flag 'link' e 'details', impostandole a False se non fornite
+            link = data.get('link', False)
+            details = data.get('details', False)
+
+            # Validazione delle flag
+            if not isinstance(link, bool):
+                log.error("'link' must be a boolean")
+                return jsonify({'error': "'link' must be a boolean"}), 400
+
+            if not isinstance(details, bool):
+                log.error("'details' must be a boolean")
+                return jsonify({'error': "'details' must be a boolean"}), 400
+
+            log.debug(f"Flags received - link: {link}, details: {details}")
+
+            # Chiamare la funzione `get_tree` con le flag appropriate
+            articles, count = await get_tree(urn, link=link, details=details)
+
+            # Controllare se ci sono errori
+            if isinstance(articles, str):  # In caso di errore la funzione ritorna una stringa
+                log.error("Error fetching tree", error=articles)
+                return jsonify({'error': articles}), 500
+
+            # Formattare la risposta
+            response = {
+                'articles': articles,
+                'count': count
+            }
+            log.info("Tree fetched successfully", response=response)
+            return jsonify(response)
+        except Exception as e:
+            log.error("Error in fetch_tree", error=str(e), exc_info=True)
             return jsonify({'error': str(e)}), 500
 
     async def fetch_brocardi_info(self):
