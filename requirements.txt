@@ -1,6 +1,7 @@
 beautifulsoup4
 requests
 quart
+quart_cors
 structlog
 selenium
 chromium
