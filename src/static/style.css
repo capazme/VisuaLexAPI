@@ -43,6 +43,12 @@
     /* Layout */
     --max-container-width: 1200px;
     --border-radius: 0.5rem;
+
+    /* Nuove variabili per le animazioni */
+    --animation-speed-fast: 0.2s;
+    --animation-speed-medium: 0.3s;
+    --animation-speed-slow: 0.5s;
+    --animation-curve: cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   /* Modalità Chiara */
@@ -131,6 +137,7 @@
     border-radius: var(--border-radius);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     margin-bottom: var(--spacing-xl);
+    animation: slideUp var(--animation-speed-slow) var(--animation-curve);
   }
   
   .form-container h2 {
@@ -150,7 +157,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     padding: var(--spacing-sm);
-    transition: border-color var(--transition-duration) var(--transition-timing);
+    transition: all var(--animation-speed-medium) var(--animation-curve);
   }
   
   .form-control::placeholder,
@@ -163,6 +170,7 @@
     border-color: var(--color-primary);
     outline: none;
     box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.3);
+    transform: translateY(-1px);
   }
   
   .form-check-label {
@@ -194,14 +202,20 @@
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: 1rem;
     border-radius: var(--border-radius);
-    transition: background-color var(--transition-duration) var(--transition-timing),
-      border-color var(--transition-duration) var(--transition-timing);
+    transition: all var(--animation-speed-medium) var(--animation-curve);
     cursor: pointer;
+    transform: translateY(0);
   }
   
   .btn:hover {
     background-color: var(--color-secondary);
     border-color: var(--color-secondary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn:active {
+    transform: translateY(0);
   }
   
   .btn-danger {
@@ -266,6 +280,7 @@
     border-radius: var(--border-radius);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     margin-bottom: var(--spacing-xl);
+    animation: slideUp var(--animation-speed-slow) var(--animation-curve);
   }
   
   .norm-collapsible {
@@ -364,8 +379,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     padding: var(--spacing-sm) var(--spacing-md);
-    transition: background-color var(--transition-duration) var(--transition-timing),
-      color var(--transition-duration) var(--transition-timing);
+    transition: all var(--animation-speed-medium) var(--animation-curve);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -381,6 +395,7 @@
   .tabs-container .nav-tabs .nav-link:hover {
     background-color: var(--color-border);
     color: var(--color-text);
+    transform: translateY(-2px);
   }
   
   .tabs-container .nav-tabs .nav-link .pin-button,
@@ -476,6 +491,13 @@
     color: var(--color-primary);
     text-align: center;
     margin: var(--spacing-lg) 0;
+    animation: pulse 1.5s infinite var(--animation-curve);
+  }
+  
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
   }
   
   /* ============================
@@ -513,7 +535,7 @@
   #history-list li {
     background-color: var(--color-background);
     padding: var(--spacing-sm);
-    border-radius: var(--border-radius);
+    border-radius: var (--border-radius);
     margin-bottom: var(--spacing-xs);
     color: var(--color-text);
     transition: background-color var(--transition-duration) var(--transition-timing);
@@ -539,7 +561,42 @@
   /* ============================
      Responsive Design
      ============================ */
+  @media (max-width: 1200px) {
+    :root {
+        --font-size-base: 15px;
+        --spacing-xl: 1.75rem;
+        --spacing-lg: 1.25rem;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .container {
+        width: 95%;
+    }
+    
+    .form-container, .results-container {
+        padding: var(--spacing-lg);
+    }
+  }
+
   @media (max-width: 768px) {
+    :root {
+        --font-size-base: 14px;
+        --spacing-xl: 1.5rem;
+        --spacing-lg: 1rem;
+    }
+
+    .tabs-container {
+        max-height: 40vh;
+    }
+
+    .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
     .form-container,
     .results-container,
     .history-container {
@@ -576,6 +633,21 @@
       margin: var(--spacing-xs) 0;
     }
   }
+
+  @media (max-width: 576px) {
+    :root {
+        --font-size-base: 13px;
+    }
+
+    .form-container, .results-container {
+        padding: var(--spacing-md);
+    }
+
+    .tabs-container .nav-tabs .nav-link {
+        min-width: auto;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+  }
   
   /* ============================
      Stili per Drag-and-Drop delle Tab
@@ -587,4 +659,37 @@
   .tabs-container .nav-tabs .nav-item.sortable-ghost {
     opacity: 0; /* Nasconde la tab fantasma durante il drag */
   }
-  
+
+  /* Animazioni per i contenitori */
+  .form-container, .results-container {
+    /* ...existing properties... */
+    animation: slideUp var(--animation-speed-slow) var(--animation-curve);
+  }
+
+  @keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+  }
+
+  /* Smooth scrolling per tutta la pagina */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Ottimizzazioni per dispositivi touch */
+  @media (hover: none) {
+    .btn:hover {
+        transform: none;
+        box-shadow: none;
+    }
+
+    .tabs-container .nav-tabs .nav-link:hover {
+        transform: none;
+    }
+  }

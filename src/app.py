@@ -92,31 +92,40 @@ class NormaController:
         """
         Creates and returns a list of NormaVisitata instances from request data.
         """
+        log.info("Creating NormaVisitata from data", data=data)
         allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         
         if data['act_type'] in allowed_types:
+            log.info("Act type is allowed", act_type=data['act_type'])
             data_completa = complete_date_or_parse(
                 date=data.get('date'), 
                 act_type=data['act_type'], 
                 act_number=data.get('act_number')
             )
+            log.info("Completed date parsed", data_completa=data_completa)
             data_completa_estesa = format_date_to_extended(data_completa)
+            log.info("Extended date formatted", data_completa_estesa=data_completa_estesa)
         else:
+            log.info("Act type is not in allowed types", act_type=data['act_type'])
             data_completa_estesa = data.get('date')  # Assegna comunque la data se non è in allowed_types
+            log.info("Using provided date", data_completa_estesa=data_completa_estesa)
 
         norma = Norma(
             tipo_atto=data['act_type'],
-            data=data_completa_estesa,  # Assicurati che qui tu stia passando la data corretta
+            data=data_completa_estesa if data_completa_estesa else None,  # Assicurati che qui tu stia passando la data corretta
             numero_atto=data.get('act_number')
         )
+        log.info("Norma instance created", norma=norma)
         
         articles = await parse_article_input(str(data['article']), norma.url)
+        log.info("Articles parsed", articles=articles)
         
         out = []
 
         for article in articles:
             if ' ' in article.strip():
                 article = article.replace(' ', '-') 
+            log.info("Processing article", article=article)
             out.append(NormaVisitata(
                 norma=norma,
                 numero_articolo=article,
@@ -124,7 +133,9 @@ class NormaController:
                 data_versione=data.get('version_date'),
                 allegato=data.get('annex')
             ))
+            log.info("NormaVisitata instance created", norma_visitata=out[-1])
 
+        log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in out])
         return out
 
     def get_scraper_for_norma(self, normavisitata):

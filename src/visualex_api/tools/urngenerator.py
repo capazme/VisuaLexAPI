@@ -84,9 +84,9 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         extension = parts[1]
     
     # Handle EURLEX cases
-    if normalized_act_type in EURLEX:
+    if normalized_act_type.lower() in EURLEX:
         eurlex_scraper = EurlexScraper()
-        return eurlex_scraper.get_uri(act_type=normalized_act_type, year=date, num=act_number)
+        return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number)
 
     # Handle other cases with codici_urn
     if normalized_act_type in codici_urn:
