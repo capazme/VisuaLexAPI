@@ -116,6 +116,138 @@ document.addEventListener('DOMContentLoaded', () => {
         return parts.map(part => sanitize(part)).join('--');
     };
 
+    const viewPDF = async (urn) => {
+        try {
+            // Mostra la barra di progresso (progressContainer e progressBar devono essere visibili)
+            const progressContainer = document.getElementById('pdfProgressContainer');
+            const progressBar = document.getElementById('pdfProgressBar');
+            progressContainer.style.display = 'block';
+            // Imposta la barra a 0 e, se non è possibile calcolare la percentuale, rendila indeterminata
+            progressBar.value = 0;
+            progressBar.setAttribute('max', '100');
+            
+            const response = await fetch('/export_pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urn })
+            });
+            if (!response.ok) {
+                throw new Error('Errore durante l\'esportazione del PDF.');
+            }
+            const contentType = response.headers.get('Content-Type');
+            if (!contentType || !contentType.includes('application/pdf')) {
+                const errorText = await response.text();
+                throw new Error(`La risposta non è un PDF valido: ${errorText}`);
+            }
+            
+            // Ottieni il Content-Length se disponibile
+            const contentLengthHeader = response.headers.get('Content-Length');
+            const total = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+            if (!total) {
+                // Se non c'è Content-Length, mostra la barra in modalità indeterminata
+                progressBar.removeAttribute('value');
+            }
+            
+            // Leggi lo stream della response
+            const reader = response.body.getReader();
+            let receivedLength = 0;
+            const chunks = [];
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                receivedLength += value.length;
+                // Se conosciamo il totale, aggiorna la barra
+                if (total) {
+                    progressBar.value = Math.round((receivedLength / total) * 100);
+                }
+            }
+            
+            // Nascondi la barra di progresso ora che il download è completato
+            progressContainer.style.display = 'none';
+            
+            // Combina i chunk in un unico array di bytes
+            let chunksAll = new Uint8Array(receivedLength);
+            let position = 0;
+            for (let chunk of chunks) {
+                chunksAll.set(chunk, position);
+                position += chunk.length;
+            }
+            const blob = new Blob([chunksAll], { type: 'application/pdf' });
+            if (blob.size === 0) {
+                throw new Error("Il PDF è vuoto.");
+            }
+            const url = window.URL.createObjectURL(blob);
+            
+            // Estrai il filename dal Content-Disposition, se presente
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let defaultFilename = `Norma_${urn}.pdf`;
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?([^"]+)"?/);
+                if (match && match[1]) {
+                    defaultFilename = match[1];
+                }
+            }
+            
+            // Imposta l'URL nell'iframe per visualizzare il PDF
+            const pdfIframe = document.getElementById('pdfIframe');
+            pdfIframe.src = url;
+            
+            // Imposta il link per il download con il filename corretto
+            const downloadBtn = document.getElementById('downloadPdfBtn');
+            downloadBtn.href = url;
+            downloadBtn.download = defaultFilename;
+            downloadBtn.textContent = `Download ${defaultFilename}`;
+            
+            // Mostra il modal con il PDF usando Bootstrap
+            const modalElement = document.getElementById('pdfModal');
+            const pdfModal = new bootstrap.Modal(modalElement);
+            pdfModal.show();
+            
+            // Quando il modal viene chiuso, revoca l'object URL per liberare memoria
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                window.URL.revokeObjectURL(url);
+                logger.log("Object URL revocato dopo la chiusura del modal");
+            }, { once: true });
+            
+            logger.log('PDF visualizzato per urn:', urn);
+        } catch (error) {
+            // Assicurati di nascondere sempre la barra di caricamento in caso di errore
+            const progressContainer = document.getElementById('pdfProgressContainer');
+            if (progressContainer) progressContainer.style.display = 'none';
+            showError(error.message || 'Errore durante la visualizzazione del PDF.');
+            logger.error('Errore visualizzazione PDF:', error);
+        }
+    };
+    
+    /**
+ * Aggiunge un singolo risultato (risultato streaming) all'interfaccia.
+ * Raggruppa per norma e crea (se necessario) il contenitore e il tab.
+ * @param {Object} result - Il risultato (un singolo oggetto JSON).
+ */
+const appendResult = (result) => {
+    if (!elements.normeContainer) {
+        logger.error("Elemento 'norme-container' non trovato nel DOM.");
+        return;
+    }
+    const normaData = result.norma_data;
+    if (!normaData) {
+        logger.warn('Dati della norma mancanti nel risultato:', result);
+        return;
+    }
+    // Genera una chiave unica per la norma (senza numero_articolo)
+    const normaKey = generateNormaKey(normaData);
+    let normElements = normaContainers[normaKey];
+    if (!normElements) {
+        normElements = createNormContainer(normaData);
+        normaContainers[normaKey] = normElements;
+    }
+    createArticleTab(result, normElements);
+    logger.log('Risultato aggiunto:', result);
+};
+
+
     /**
      * Genera una chiave unica per un articolo includendo i campi della norma più numero_articolo.
      * @param {Object} normaData - Dati della norma.
@@ -416,35 +548,51 @@ document.addEventListener('DOMContentLoaded', () => {
      * @returns {Object} - Riferimenti agli elementi creati.
      */
     const createNormContainer = (normaData) => {
-        const template = document.getElementById('norm-collapsible-template');
-        if (!template || !elements.normeContainer) {
-            logger.error("Template 'norm-collapsible-template' o 'norme-container' non trovato.");
-            return;
-        }
+    const template = document.getElementById('norm-collapsible-template');
+    if (!template || !elements.normeContainer) {
+        logger.error("Template 'norm-collapsible-template' o 'norme-container' non trovato.");
+        return;
+    }
 
-        const normContainerFragment = template.content.cloneNode(true);
-        const normContainer = normContainerFragment.querySelector('.norm-collapsible');
-        const normTitle = normContainer.querySelector('.norm-title');
-        const collapseElement = normContainer.querySelector('.norm-content');
-        // Genera una chiave consistente senza numero_articolo
-        const normaKey = generateNormaKey(normaData);
-        const collapseId = `collapse-${normaKey}`;
+    const normContainerFragment = template.content.cloneNode(true);
+    const normContainer = normContainerFragment.querySelector('.norm-collapsible');
+    const normHeader = normContainer.querySelector('.norm-header');
+    const normTitle = normHeader.querySelector('.norm-title');
+    const collapseElement = normContainer.querySelector('.norm-content');
+    // Genera una chiave consistente senza numero_articolo
+    const normaKey = generateNormaKey(normaData);
+    const collapseId = `collapse-${normaKey}`;
 
-        normTitle.textContent = `${capitalizeFirstLetter(normaData.tipo_atto)} ${normaData.numero_atto || ''} ${normaData.data || ''}`.trim();
-        collapseElement.id = collapseId;
-        normContainer.querySelector('.norm-header').setAttribute('data-bs-target', `#${collapseId}`);
-        normContainer.setAttribute('data-norma-key', normaKey);
+    normTitle.textContent = `${capitalizeFirstLetter(normaData.tipo_atto)} ${normaData.numero_atto || ''} ${normaData.data || ''}`.trim();
+    collapseElement.id = collapseId;
+    normHeader.setAttribute('data-bs-target', `#${collapseId}`);
+    normContainer.setAttribute('data-norma-key', normaKey);
 
-        elements.normeContainer.appendChild(normContainerFragment);
-        logger.log(`Contenitore per la norma creato: ${normTitle.textContent}`);
+    // Se nei dati della norma è presente 'urn', aggiungi un pulsante per esportare il PDF
+    if (normaData.urn) {
+        const exportBtn = document.createElement('button');
+        exportBtn.classList.add('btn', 'btn-info', 'btn-sm');
+        exportBtn.textContent = 'Esporta PDF';
+        exportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            viewPDF(normaData.urn);
+        });
+        normHeader.appendChild(exportBtn);
+    }
+    
+    
 
-        return {
-            normContainer,
-            normTabs: normContainer.querySelector('.norm-tabs'),
-            normTabContent: normContainer.querySelector('.norm-tab-content'),
-            normaKey,
-        };
+    elements.normeContainer.appendChild(normContainerFragment);
+    logger.log(`Contenitore per la norma creato: ${normTitle.textContent}`);
+
+    return {
+        normContainer,
+        normTabs: normContainer.querySelector('.norm-tabs'),
+        normTabContent: normContainer.querySelector('.norm-tab-content'),
+        normaKey,
     };
+};
+
 
     /**
      * Crea un tab per un articolo all'interno di una norma.
@@ -510,7 +658,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const paneDiv = tabPane.querySelector('.tab-pane');
         paneDiv.id = articleTabId;
         paneDiv.setAttribute('aria-labelledby', `${articleTabId}-tab`);
-    
+        
+        const normaDetailsDiv = document.createElement('div');
+        normaDetailsDiv.classList.add('norma-details', 'mb-3');
+        normaDetailsDiv.innerHTML = `
+        <strong>Versione:</strong> ${articleData.versione || 'N/A'} &nbsp;&nbsp;
+        <strong>Data Versione:</strong> ${articleData.data_versione || 'N/A'} &nbsp;&nbsp;
+        <strong>Allegato:</strong> ${articleData.allegato || 'N/A'}
+        `;
+        paneDiv.insertBefore(normaDetailsDiv, paneDiv.querySelector('.article-text-container'));
+
         // Inizializza CKEditor nel contenitore dell'articolo
         const textArea = paneDiv.querySelector('.article-text');
         
@@ -743,7 +900,7 @@ const handleFormSubmit = async (event) => {
         event.stopPropagation();
         elements.scrapeForm.classList.add('was-validated'); // Aggiunge classe per validazione Bootstrap
         logger.log('Form non valido.');
-        return; // Esce dalla funzione se il form non è valido
+        return;
     }
 
     elements.scrapeForm.classList.remove('was-validated'); // Rimuove la classe di validazione
@@ -756,38 +913,59 @@ const handleFormSubmit = async (event) => {
     const formData = new FormData(elements.scrapeForm);
     const data = Object.fromEntries(formData.entries());
     data.article = elements.articleInput.value; // Aggiunge il valore dell'input 'article'
-    data.show_brocardi_info = formData.has('show_brocardi_info'); // Verifica se il checkbox è attivo
-    logger.log('Dati raccolti dal form:', data);
-
-    // Seleziona l'endpoint basandosi sullo stato del checkbox
-    const endpoint = data.show_brocardi_info ? '/fetch_all_data' : '/fetch_article_text';
+    // In questo caso usiamo l'endpoint streaming
+    const endpoint = '/stream_article_text';
     logger.log(`Endpoint selezionato: ${endpoint}`);
 
     try {
-        // Effettua la richiesta fetch all'endpoint selezionato
+        // Effettua la richiesta fetch all'endpoint streaming
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
 
-        // Verifica se la risposta è OK
         if (!response.ok) {
             throw new Error('Errore durante la richiesta al server.');
         }
 
-        const results = await response.json(); // Parsing della risposta JSON
-        logger.log(`Risultati da ${endpoint}:`, results);
+        // Utilizza lo stream della risposta
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
 
-        // Verifica se ci sono risultati
-        if (!results || results.length === 0) {
-            throw new Error('Nessun risultato trovato.');
+        // Leggi il flusso a chunk
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            // I risultati sono separati da newline
+            const lines = buffer.split("\n");
+            // L'ultimo elemento potrebbe non essere un JSON completo; lo manteniamo nel buffer
+            buffer = lines.pop();
+            for (let line of lines) {
+                if (line.trim()) {
+                    try {
+                        const result = JSON.parse(line);
+                        // Aggiungi subito il risultato alla UI
+                        appendResult(result);
+                    } catch (err) {
+                        logger.error("Errore durante il parsing del JSON:", err);
+                    }
+                }
+            }
         }
-
-        displayResults(results); // Visualizza i risultati nella UI
-        saveToHistory(data); // Salva la ricerca nella cronologia
+        // Processa eventuale dato rimanente
+        if (buffer.trim()) {
+            try {
+                const result = JSON.parse(buffer);
+                appendResult(result);
+            } catch (err) {
+                logger.error("Errore durante il parsing finale del JSON:", err);
+            }
+        }
+        logger.log("Streaming completato.");
     } catch (error) {
-        // Gestisce gli errori durante la richiesta o il parsing
         showError(error.message || 'Si è verificato un errore. Riprova più tardi.');
         logger.error('Errore:', error);
     } finally {
@@ -795,6 +973,7 @@ const handleFormSubmit = async (event) => {
         logger.log('Loading indicator nascosto.');
     }
 };
+
 
     const handleIncrement = () => {
         const currentValue = parseInt(elements.articleInput.value, 10);

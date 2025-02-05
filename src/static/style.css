@@ -1,7 +1,7 @@
 /* ==========================================================================
-   CSS Stylesheet - NormaScraper Web
-   Descrizione: Stili per l'applicazione web NormaScraper.
-   Autore: [Il Tuo Nome]
+   CSS Stylesheet - NormaScraper Web (Versione Dinamica)
+   Descrizione: Stili aggiornati con animazioni e interazioni dinamiche.
+   Autore: Guglielmo
    Ultimo aggiornamento: [Data]
    ========================================================================== */
 
@@ -23,28 +23,28 @@
     --color-text-inverse: #ffffff;
     --color-text-muted: #a1a1aa;
     --color-border: #3a3a3c;
-  
+    
     /* Tipografia */
     --font-family: 'Roboto', sans-serif;
     --font-size-base: 16px;
     --line-height-base: 1.6;
-  
+    
     /* Spaziature */
     --spacing-xs: 0.25rem;
     --spacing-sm: 0.5rem;
     --spacing-md: 1rem;
     --spacing-lg: 1.5rem;
     --spacing-xl: 2rem;
-  
+    
     /* Transizioni */
     --transition-duration: 0.3s;
     --transition-timing: ease-in-out;
-  
+    
     /* Layout */
     --max-container-width: 1200px;
     --border-radius: 0.5rem;
-
-    /* Nuove variabili per le animazioni */
+  
+    /* Animazioni */
     --animation-speed-fast: 0.2s;
     --animation-speed-medium: 0.3s;
     --animation-speed-slow: 0.5s;
@@ -54,26 +54,25 @@
   /* Modalità Chiara */
   @media (prefers-color-scheme: light) {
     :root {
-        --color-background: #faf3e0; /* Giallo chiaro, effetto carta antica */
-        --color-surface: #fffaf0; /* Bianco caldo e naturale */
-        --color-primary: #59513a; /* Grigio profondo e neutro */
-        --color-secondary: #5d99c6; /* Blu soft per interazioni */
-        --color-accent: #76b041; /* Verde naturale e rilassante */
-        --color-danger: #c0392b; /* Rosso intenso per errori */
-        --color-danger-hover: #a93226;
-        --color-warning: #f1c40f; /* Giallo classico per avvisi */
-        --color-warning-hover: #d4ac0d;
-        --color-text: #3a3a3a; /* Testo ben leggibile */
-        --color-text-inverse: #faf3e0;
-        --color-text-muted: #7f7f7f; /* Grigio morbido per elementi secondari */
-        --color-border: #e0dbc5; /* Linee sottili con tono carta */
+      --color-background: #faf3e0;
+      --color-surface: #fffaf0;
+      --color-primary: #59513a;
+      --color-secondary: #5d99c6;
+      --color-accent: #76b041;
+      --color-danger: #c0392b;
+      --color-danger-hover: #a93226;
+      --color-warning: #f1c40f;
+      --color-warning-hover: #d4ac0d;
+      --color-text: #3a3a3a;
+      --color-text-inverse: #faf3e0;
+      --color-text-muted: #7f7f7f;
+      --color-border: #e0dbc5;
     }      
   }
   
   /* ============================
      Reset e Stili Base
      ============================ */
-  
   *,
   *::before,
   *::after {
@@ -88,14 +87,10 @@
     line-height: var(--line-height-base);
     background-color: var(--color-background);
     color: var(--color-text);
+    overflow-x: hidden;
   }
   
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
+  h1, h2, h3, h4, h5, h6 {
     color: var(--color-text);
     font-weight: 700;
     margin-bottom: var(--spacing-md);
@@ -113,23 +108,29 @@
   }
   
   /* ============================
-     Header
+     Header con Gradient Animato
      ============================ */
   header {
-    background-color: var(--color-surface);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    animation: gradientShift 5s infinite ease alternate;
     padding: var(--spacing-lg) 0;
     text-align: center;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
   
+  @keyframes gradientShift {
+    0% { filter: brightness(1); }
+    100% { filter: brightness(1.1); }
+  }
+  
   header h1 {
-    color: var(--color-background);
+    color: var(--color-text-inverse);
     font-size: 2.5rem;
     margin: 0;
   }
   
   /* ============================
-     Sezione Form
+     Sezione Form e Card Hover
      ============================ */
   .form-container {
     background-color: var(--color-surface);
@@ -138,6 +139,12 @@
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     margin-bottom: var(--spacing-xl);
     animation: slideUp var(--animation-speed-slow) var(--animation-curve);
+  }
+  
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease-in-out;
   }
   
   .form-container h2 {
@@ -169,7 +176,7 @@
   .form-select:focus {
     border-color: var(--color-primary);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.3);
+    box-shadow: 0 0 10px var(--color-primary);
     transform: translateY(-1px);
   }
   
@@ -188,7 +195,7 @@
   }
   
   /* ============================
-     Stile dei Bottoni
+     Bottoni con Effetto Ripple
      ============================ */
   .btn {
     display: inline-block;
@@ -204,7 +211,24 @@
     border-radius: var(--border-radius);
     transition: all var(--animation-speed-medium) var(--animation-curve);
     cursor: pointer;
-    transform: translateY(0);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn::after {
+    content: "";
+    position: absolute;
+    background: rgba(255, 255, 255, 0.3);
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: -100%;
+    transition: all 0.5s;
+    transform: skewX(-45deg);
+  }
+  
+  .btn:hover::after {
+    left: 100%;
   }
   
   .btn:hover {
@@ -241,7 +265,7 @@
   }
   
   /* ============================
-     Stile Input Numerico
+     Input Numerico
      ============================ */
   .number-input {
     display: flex;
@@ -296,6 +320,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    transition: background-color var(--transition-duration);
   }
   
   .norm-header h3 {
@@ -308,6 +333,7 @@
     background-color: var(--color-border);
   }
   
+  /* Contenuto norma */
   .norm-content {
     background-color: var(--color-background);
     padding: var(--spacing-md);
@@ -321,46 +347,43 @@
   }
   
   /* ============================
-     Contenitore delle Tab con Max-Height e Scroll Verticale
+     Tabs Container e Scroll
      ============================ */
-  /* Contenitore delle Tab - Resizable */
-.tabs-container {
-  max-width: 100%; /* Adatta al contenitore padre */
-  max-height: 30vh; /* Altezza massima iniziale */
-  overflow-y: auto; /* Abilita lo scroll verticale */
-  overflow-x: hidden; /* Nasconde lo scroll orizzontale */
-  margin-bottom: var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--spacing-sm);
-  background-color: var(--color-surface);
-  position: relative;
-  resize: vertical; /* Consente il ridimensionamento verticale */
-}
-
-/* Per evitare overflow indesiderati */
-.tabs-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.tabs-container::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
+  .tabs-container {
+    max-width: 100%;
+    max-height: 30vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-bottom: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+    background-color: var(--color-surface);
+    position: relative;
+    resize: vertical;
+  }
   
-/* ============================
-   Stili per le Tab
-   ============================ */
-   .tabs-container .nav-tabs {
+  .tabs-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .tabs-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  /* ============================
+     Stili per le Tab
+     ============================ */
+  .tabs-container .nav-tabs {
     display: flex;
-    flex-wrap: wrap; /* Permette alle tab di andare a capo */
+    flex-wrap: wrap;
     width: 100%;
-    gap: var(--spacing-xs); /* Aggiunge spazio tra le tab */
+    gap: var(--spacing-xs);
   }
   
   .tabs-container .nav-tabs .nav-item {
-    flex: 0 0 auto; /* Impedisce alle tab di crescere o restringersi */
+    flex: 0 0 auto;
     user-select: none;
     cursor: grab;
     margin-bottom: var(--spacing-xs);
@@ -383,7 +406,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    min-width: 150px; /* Imposta una larghezza minima per mantenere la forma */
+    min-width: 150px;
     box-sizing: border-box;
   }
   
@@ -415,7 +438,7 @@
   }
   
   /* ============================
-     Stile del Testo Articolo
+     Testo Articolo e Informazioni Brocardi
      ============================ */
   .article-text-container {
     margin-bottom: var(--spacing-md);
@@ -442,7 +465,6 @@
     overflow-wrap: break-word;
   }
   
-  /* Informazioni Brocardi */
   .brocardi-info {
     margin-top: var(--spacing-lg);
   }
@@ -501,7 +523,7 @@
   }
   
   /* ============================
-     Messaggio di Errore
+     Messaggio di Errore con Shake
      ============================ */
   #error-container {
     background-color: var(--color-danger);
@@ -509,6 +531,18 @@
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     margin-bottom: var(--spacing-md);
+  }
+  
+  .shake {
+    animation: shake 0.3s;
+  }
+  
+  @keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
   }
   
   /* ============================
@@ -535,14 +569,15 @@
   #history-list li {
     background-color: var(--color-background);
     padding: var(--spacing-sm);
-    border-radius: var (--border-radius);
+    border-radius: var(--border-radius);
     margin-bottom: var(--spacing-xs);
     color: var(--color-text);
-    transition: background-color var(--transition-duration) var(--transition-timing);
+    transition: background-color var(--transition-duration) var(--transition-timing), transform 0.2s;
   }
   
   #history-list li:hover {
     background-color: var(--color-border);
+    transform: scale(1.02);
   }
   
   #history-search {
@@ -563,133 +598,127 @@
      ============================ */
   @media (max-width: 1200px) {
     :root {
-        --font-size-base: 15px;
-        --spacing-xl: 1.75rem;
-        --spacing-lg: 1.25rem;
+      --font-size-base: 15px;
+      --spacing-xl: 1.75rem;
+      --spacing-lg: 1.25rem;
     }
   }
-
+  
   @media (max-width: 992px) {
     .container {
-        width: 95%;
+      width: 95%;
     }
     
     .form-container, .results-container {
-        padding: var(--spacing-lg);
+      padding: var(--spacing-lg);
     }
   }
-
+  
   @media (max-width: 768px) {
     :root {
-        --font-size-base: 14px;
-        --spacing-xl: 1.5rem;
-        --spacing-lg: 1rem;
+      --font-size-base: 14px;
+      --spacing-xl: 1.5rem;
+      --spacing-lg: 1rem;
     }
-
+    
     .tabs-container {
-        max-height: 40vh;
+      max-height: 40vh;
     }
-
+    
     .nav-tabs {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
     }
-
+    
     .form-container,
     .results-container,
     .history-container {
       padding: var(--spacing-lg);
     }
-  
-    /* Modifica del Contenitore delle Tab su Mobile */
+    
     .tabs-container {
-      max-height: 10vh; /* Mantiene l'altezza massima di 10vh */
+      max-height: 10vh;
     }
-  
+    
     .tabs-container .nav-tabs {
-      flex-direction: row; /* Dispone le tab orizzontalmente */
+      flex-direction: row;
     }
-  
+    
     .tabs-container .nav-tabs .nav-link {
       padding: var(--spacing-sm) var(--spacing-md);
-      min-width: 120px; /* Adatta la larghezza minima per dispositivi mobili */
+      min-width: 120px;
     }
-  
-    /* Bottoni e Input */
+    
     .btn,
     .number-input button {
       width: 100%;
       margin-bottom: var(--spacing-sm);
     }
-  
+    
     .number-input {
       flex-direction: column;
     }
-  
+    
     .number-input input {
       width: 100%;
       margin: var(--spacing-xs) 0;
     }
   }
-
+  
   @media (max-width: 576px) {
     :root {
-        --font-size-base: 13px;
+      --font-size-base: 13px;
     }
-
+    
     .form-container, .results-container {
-        padding: var(--spacing-md);
+      padding: var(--spacing-md);
     }
-
+    
     .tabs-container .nav-tabs .nav-link {
-        min-width: auto;
-        padding: var(--spacing-xs) var(--spacing-sm);
+      min-width: auto;
+      padding: var(--spacing-xs) var(--spacing-sm);
     }
   }
   
   /* ============================
-     Stili per Drag-and-Drop delle Tab
+     Drag-and-Drop delle Tab
      ============================ */
   .tabs-container .nav-tabs .nav-item.sortable-chosen {
-    opacity: 0.5; /* Riduce l'opacità della tab durante il drag */
+    opacity: 0.5;
   }
   
   .tabs-container .nav-tabs .nav-item.sortable-ghost {
-    opacity: 0; /* Nasconde la tab fantasma durante il drag */
+    opacity: 0;
   }
-
-  /* Animazioni per i contenitori */
-  .form-container, .results-container {
-    /* ...existing properties... */
-    animation: slideUp var(--animation-speed-slow) var(--animation-curve);
-  }
-
+  
+  /* Animazione per contenitori */
   @keyframes slideUp {
     from {
-        opacity: 0;
-        transform: translateY(20px);
+      opacity: 0;
+      transform: translateY(20px);
     }
     to {
-        opacity: 1;
-        transform: translateY(0);
+      opacity: 1;
+      transform: translateY(0);
     }
   }
-
-  /* Smooth scrolling per tutta la pagina */
+  
+  /* Smooth scrolling */
   html {
     scroll-behavior: smooth;
   }
-
+  
   /* Ottimizzazioni per dispositivi touch */
   @media (hover: none) {
     .btn:hover {
-        transform: none;
-        box-shadow: none;
+      transform: none;
+      box-shadow: none;
     }
-
+    
     .tabs-container .nav-tabs .nav-link:hover {
-        transform: none;
+      transform: none;
     }
   }
+  
