@@ -1,0 +1,961 @@
+openapi: 3.1.0
+info:
+  title: VisuaLex API
+  description: |
+    # VisuaLex API Documentation
+
+    The VisuaLex API provides access to legal documents from various sources including Normattiva, Brocardi, and EUR-Lex. 
+    
+    It enables searching, retrieving, and exporting legal documents and information about Italian and European legislation.
+    
+    ## Authentication
+    
+    The API supports two authentication methods:
+    
+    1. **JWT Bearer Token** - For user-based access
+    2. **API Key** - For programmatic access
+    
+    Endpoints marked as "public" do not require authentication.
+    
+    ## Rate Limiting
+    
+    API requests are subject to rate limiting to ensure fair usage. The default limits are:
+    
+    - 1000 requests per 10-minute window for authenticated users
+    - 100 requests per 10-minute window for unauthenticated users
+    
+    ## Data Sources
+    
+    - **Normattiva** - Italian legislation
+    - **Brocardi** - Legal commentary and interpretation
+    - **EUR-Lex** - European Union legislation
+    
+    ## Contact
+    
+    For support or questions, please contact support@visualex.example.com
+
+  version: 2.0.0
+  contact:
+    name: VisuaLex Support
+    email: support@visualex.example.com
+    url: https://visualex.example.com/support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.visualex.example.com/v2
+    description: Production server
+  - url: https://staging.visualex.example.com/v2
+    description: Staging server
+  - url: http://localhost:5000
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: Authentication endpoints
+  - name: Documents
+    description: Legal document retrieval and processing
+  - name: Search
+    description: Search for legal documents
+  - name: Metadata
+    description: Metadata about legal documents
+  - name: Export
+    description: Export legal documents to different formats
+  - name: History
+    description: User history and saved documents
+  - name: System
+    description: System information and health checks
+
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check endpoint
+      description: Returns the current status of the API
+      operationId: healthCheck
+      security: []  # Public endpoint
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: number
+                    format: double
+                    example: 1633027200.0
+                  version:
+                    type: string
+                    example: 2.0.0
+        '503':
+          description: API is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login to the API
+      description: Authenticate a user and get a JWT token
+      operationId: login
+      security: []  # Public endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePassword123
+      responses:
+        '200':
+          description: Successfully authenticated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  expires_in:
+                    type: integer
+                    example: 86400
+                  token_type:
+                    type: string
+                    example: Bearer
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh authentication token
+      description: Get a new JWT token using the current token
+      operationId: refreshToken
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully refreshed token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  expires_in:
+                    type: integer
+                    example: 86400
+                  token_type:
+                    type: string
+                    example: Bearer
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/norm:
+    post:
+      tags:
+        - Documents
+      summary: Fetch norm data
+      description: Get metadata about a legal norm
+      operationId: fetchNormData
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormaRequest'
+      responses:
+        '200':
+          description: Norm data successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  norma_data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NormaVisitata'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /documents/article:
+    post:
+      tags:
+        - Documents
+      summary: Fetch article text
+      description: Get the text of a legal article
+      operationId: fetchArticleText
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormaRequest'
+      responses:
+        '200':
+          description: Article text successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/ArticleTextResponse'
+                    - $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/stream-article:
+    post:
+      tags:
+        - Documents
+      summary: Stream article text
+      description: Stream the text of multiple legal articles as they become available
+      operationId: streamArticleText
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormaRequest'
+      responses:
+        '200':
+          description: Articles streaming successfully
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+                description: Stream of JSON objects, one per line
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/brocardi:
+    post:
+      tags:
+        - Documents
+      summary: Fetch Brocardi information
+      description: Get legal commentary and interpretation from Brocardi
+      operationId: fetchBrocardiInfo
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormaRequest'
+      responses:
+        '200':
+          description: Brocardi information successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/BrocardiInfoResponse'
+                    - $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/all:
+    post:
+      tags:
+        - Documents
+      summary: Fetch all document data
+      description: Get article text, Brocardi information, and metadata for legal norms
+      operationId: fetchAllData
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormaRequest'
+      responses:
+        '200':
+          description: All data successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/AllDataResponse'
+                    - $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/tree:
+    post:
+      tags:
+        - Metadata
+      summary: Fetch document tree
+      description: Get the hierarchical structure of a legal document
+      operationId: fetchTree
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TreeRequest'
+      responses:
+        '200':
+          description: Tree structure successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  articles:
+                    type: array
+                    items:
+                      type: string
+                    example: ["1", "2", "3", "4", "5"]
+                  count:
+                    type: integer
+                    example: 5
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /export/pdf:
+    post:
+      tags:
+        - Export
+      summary: Export document as PDF
+      description: Generate a PDF version of a legal document
+      operationId: exportPdf
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PDFExportRequest'
+      responses:
+        '200':
+          description: PDF successfully generated
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="document.pdf"
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /history:
+    get:
+      tags:
+        - History
+      summary: Get user history
+      description: Get the user's recent search and viewing history
+      operationId: getHistory
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: History successfully retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HistoryItem'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    NormaRequest:
+      type: object
+      required:
+        - act_type
+        - article
+      properties:
+        act_type:
+          type: string
+          description: Type of the legislative act
+          enum:
+            - legge
+            - decreto legge
+            - decreto legislativo
+            - d.p.r.
+            - regio decreto
+            - costituzione
+            - codice civile
+            - codice penale
+            - codice di procedura civile
+            - codice di procedura penale
+            - tue
+            - tfue
+            - cdfue
+            - regolamento ue
+            - direttiva ue
+          example: legge
+        act_number:
+          type: string
+          description: Number of the legislative act
+          example: "241"
+        date:
+          type: string
+          description: Date of the legislative act (various formats supported)
+          example: "7 agosto 1990"
+        article:
+          type: string
+          description: Article number(s) to retrieve
+          example: "1-3,5,7"
+        version:
+          type: string
+          description: Version of the act to retrieve
+          enum:
+            - vigente
+            - originale
+          default: vigente
+          example: vigente
+        version_date:
+          type: string
+          description: Date of the version to retrieve (if not the latest)
+          example: "2023-01-01"
+        annex:
+          type: string
+          description: Annex number to retrieve (if applicable)
+          example: "1"
+
+    TreeRequest:
+      type: object
+      required:
+        - urn
+      properties:
+        urn:
+          type: string
+          description: URN of the document to retrieve the tree for
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241"
+        link:
+          type: boolean
+          description: Whether to include links in the response
+          default: false
+          example: false
+        details:
+          type: boolean
+          description: Whether to include section details
+          default: false
+          example: false
+
+    PDFExportRequest:
+      type: object
+      required:
+        - urn
+      properties:
+        urn:
+          type: string
+          description: URN of the document to export as PDF
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241"
+
+    Norma:
+      type: object
+      required:
+        - tipo_atto
+      properties:
+        tipo_atto:
+          type: string
+          description: Type of the legislative act
+          example: legge
+        data:
+          type: string
+          description: Date of the legislative act
+          example: "7 agosto 1990"
+        numero_atto:
+          type: string
+          description: Number of the legislative act
+          example: "241"
+        url:
+          type: string
+          description: URL of the legislative act
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241"
+
+    NormaVisitata:
+      type: object
+      required:
+        - norma
+        - numero_articolo
+      properties:
+        norma:
+          $ref: '#/components/schemas/Norma'
+        numero_articolo:
+          type: string
+          description: Article number
+          example: "1"
+        versione:
+          type: string
+          description: Version of the act
+          example: vigente
+        data_versione:
+          type: string
+          description: Date of the version
+          example: "2023-01-01"
+        allegato:
+          type: string
+          description: Annex number
+          example: "1"
+        urn:
+          type: string
+          description: URN of the article
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1!vig="
+
+    ArticleTextResponse:
+      type: object
+      required:
+        - article_text
+        - norma_data
+        - url
+      properties:
+        article_text:
+          type: string
+          description: Text of the article
+          example: "1. L'attività amministrativa persegue i fini determinati dalla legge ed è retta da criteri di economicità, di efficacia, di imparzialità, di pubblicità e di trasparenza..."
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+        url:
+          type: string
+          description: URL of the article
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1!vig="
+
+    BrocardiInfo:
+      type: object
+      properties:
+        position:
+          type: string
+          nullable: true
+          description: Position information
+          example: "Home / Legge sul procedimento amministrativo / Articolo 1"
+        link:
+          type: string
+          nullable: true
+          description: Link to Brocardi page
+          example: "https://www.brocardi.it/legge-sul-procedimento-amministrativo/art1.html"
+        Brocardi:
+          type: array
+          nullable: true
+          description: Brocardi information
+          items:
+            type: string
+          example: ["Pacta sunt servanda"]
+        Ratio:
+          type: string
+          nullable: true
+          description: Ratio of the article
+          example: "La ratio dell'articolo 1 della legge sul procedimento amministrativo..."
+        Spiegazione:
+          type: string
+          nullable: true
+          description: Explanation of the article
+          example: "L'articolo 1 della legge 241/1990 stabilisce i principi generali dell'attività amministrativa..."
+        Massime:
+          type: array
+          nullable: true
+          description: Notable cases and precedents
+          items:
+            type: string
+          example: ["Consiglio di Stato, sez. IV, 22 marzo 2016, n. 1187"]
+
+    BrocardiInfoResponse:
+      type: object
+      required:
+        - norma_data
+      properties:
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+        brocardi_info:
+          $ref: '#/components/schemas/BrocardiInfo'
+
+    AllDataResponse:
+      type: object
+      required:
+        - article_text
+        - url
+        - norma_data
+      properties:
+        article_text:
+          type: string
+          description: Text of the article
+          example: "1. L'attività amministrativa persegue i fini determinati dalla legge..."
+        url:
+          type: string
+          description: URL of the article
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1!vig="
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+        brocardi_info:
+          oneOf:
+            - $ref: '#/components/schemas/BrocardiInfo'
+            - type: object
+              properties:
+                error:
+                  type: string
+                  description: Error message
+                  example: "Failed to retrieve Brocardi information"
+          nullable: true
+
+    HistoryItem:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Time when the item was accessed
+          example: "2023-09-25T14:30:00Z"
+        act_type:
+          type: string
+          description: Type of the legislative act
+          example: legge
+        act_number:
+          type: string
+          description: Number of the legislative act
+          example: "241"
+        date:
+          type: string
+          description: Date of the legislative act
+          example: "7 agosto 1990"
+        article:
+          type: string
+          description: Article number(s) accessed
+          example: "1"
+        urn:
+          type: string
+          description: URN of the accessed item
+          example: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1!vig="
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Internal server error"
+
+    ValidationError:
+      type: object
+      required:
+        - error
+        - details
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Validation failed"
+        details:
+          type: object
+          description: Detailed validation errors
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            act_type: ["This field is required"]
+            article: ["Invalid article format"]
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - norma_data
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Article not found"
+        norma_data:
+          $ref: '#/components/schemas/NormaVisitata'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from the /auth/login endpoint
+
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for programmatic access
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ServerError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

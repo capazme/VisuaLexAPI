@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Interfaccia utente dinamica per NormaScraper Web con animazioni e stili avanzati.">
+  <title>NormaScraper Web - Interfaccia Dinamica</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.css" />
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="text-white text-center py-4">
+    <h1>VisuaLexWeb DEMO</h1>
+  </header>
+
+  <div class="container my-5">
+    <!-- Error Container -->
+    <div id="error-container" class="alert alert-danger shake" style="display: none;"></div>
+
+    <!-- Form Section -->
+    <section class="form-container mb-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title mb-4">Inserisci i dettagli della norma</h2>
+          <form id="scrape-form" class="needs-validation" novalidate>
+            <div class="row mb-3">
+              <!-- Tipo Atto -->
+              <div class="col-md-6">
+                <label for="act_type" class="form-label">Tipo atto:</label>
+                <select id="act_type" name="act_type" class="form-select" required>
+                  <option value="">Seleziona un tipo di atto...</option>
+                  <option value="costituzione">Costituzione</option>
+                  <option value="legge">Legge</option>
+                  <option value="decreto legge">Decreto Legge</option>
+                  <option value="decreto legislativo">Decreto Legislativo</option>
+                  <option value="Regolamento UE">Regolamento UE</option>
+                  <option value="Direttiva UE">Direttiva UE</option>
+                  <option value="codice civile">Codice Civile</option>
+                  <option value="preleggi">Preleggi</option>
+                  <option value="codice penale">Codice Penale</option>
+                  <option value="codice di procedura civile">Codice di Procedura Civile</option>
+                  <option value="codice di procedura penale">Codice di Procedura Penale</option>
+                  <option value="TUE">TUE</option>
+                  <option value="TFUE">TFUE</option>
+                  <option value="CDFUE">CDFUE</option>
+                  <option value="codice della navigazione">Codice della Navigazione</option>
+                  <option value="codice postale e delle telecomunicazioni">Codice Postale e delle Telecomunicazioni</option>
+                  <option value="codice della strada">Codice della Strada</option>
+                  <option value="codice del processo tributario">Codice del Processo Tributario</option>
+                  <option value="codice in materia di protezione dei dati personali">Codice in Materia di Protezione dei Dati Personali</option>
+                  <option value="codice delle comunicazioni elettroniche">Codice delle Comunicazioni Elettroniche</option>
+                  <option value="codice dei beni culturali e del paesaggio">Codice dei Beni Culturali e del Paesaggio</option>
+                  <option value="codice della proprietà industriale">Codice della Proprietà Industriale</option>
+                  <option value="codice dell'amministrazione digitale">Codice dell'Amministrazione Digitale</option>
+                  <option value="codice della nautica da diporto">Codice della Nautica da Diporto</option>
+                  <option value="codice del consumo">Codice del Consumo</option>
+                  <option value="codice delle assicurazioni private">Codice delle Assicurazioni Private</option>
+                  <option value="norme in materia ambientale">Norme in Materia Ambientale</option>
+                  <option value="codice dei contratti pubblici">Codice dei Contratti Pubblici</option>
+                  <option value="codice delle pari opportunità">Codice delle Pari Opportunità</option>
+                  <option value="codice dell'ordinamento militare">Codice dell'Ordinamento Militare</option>
+                  <option value="codice del processo amministrativo">Codice del Processo Amministrativo</option>
+                  <option value="codice del turismo">Codice del Turismo</option>
+                  <option value="codice antimafia">Codice Antimafia</option>
+                  <option value="codice di giustizia contabile">Codice di Giustizia Contabile</option>
+                  <option value="codice del terzo settore">Codice del Terzo Settore</option>
+                  <option value="codice della protezione civile">Codice della Protezione Civile</option>
+                  <option value="codice della crisi d'impresa e dell'insolvenza">Codice della Crisi d'Impresa e dell'Insolvenza</option>    
+                </select>
+                <div class="invalid-feedback">
+                  Seleziona un tipo di atto.
+                </div>
+              </div>
+              <!-- Data -->
+              <div class="col-md-6">
+                <label for="date" class="form-label">Data:</label>
+                <input type="text" id="date" name="date" class="form-control" placeholder="gg/mm/aaaa">
+                <div class="invalid-feedback">
+                  Inserisci una data valida.
+                </div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <!-- Numero Atto -->
+              <div class="col-md-6">
+                <label for="act_number" class="form-label">Numero atto:</label>
+                <input type="text" id="act_number" name="act_number" class="form-control" placeholder="Inserisci il numero dell'atto">
+                <div class="invalid-feedback">
+                  Inserisci il numero dell'atto.
+                </div>
+              </div>
+              <!-- Articolo -->
+              <div class="col-md-6">
+                <label for="article" class="form-label">Articolo:</label>
+                <div class="input-group">
+                  <button type="button" class="btn btn-outline-secondary decrement" style="min-width: 45px;">-</button>
+                  <input type="text" id="article" name="article" value="1" class="form-control text-center" aria-label="Numero articolo">
+                  <button type="button" class="btn btn-outline-secondary increment" style="min-width: 45px;">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="row mb-3">
+              <!-- Versione -->
+              <div class="col-md-6">
+                <label class="form-label">Versione:</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" id="vigente" name="version" value="vigente" checked>
+                  <label class="form-check-label" for="vigente">Vigente</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" id="originale" name="version" value="originale">
+                  <label class="form-check-label" for="originale">Originale</label>
+                </div>
+              </div>
+              <!-- Data Versione -->
+              <div class="col-md-6">
+                <label for="version_date" class="form-label">Data versione:</label>
+                <input type="date" id="version_date" name="version_date" class="form-control">
+              </div>
+            </div>
+
+            <!-- Checkbox per Brocardi -->
+            <div class="mb-4 form-check">
+              <input class="form-check-input" type="checkbox" id="show_brocardi_info" name="show_brocardi_info">
+              <label class="form-check-label" for="show_brocardi_info">Visualizza informazioni Brocardi</label>
+            </div>
+
+            <!-- Bottoni di azione -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+              <button type="submit" class="btn btn-success">Estrai Dati</button>
+              <button type="button" id="reset-button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#resetConfirmationModal">Reset</button>
+              <button type="button" id="clear-search-fields" class="btn btn-secondary">Cancella Campi di Ricerca</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-container mb-5">
+      <div id="loading" class="text-center my-3" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Caricamento...</span>
+        </div>
+      </div>            
+      <!-- Norme Container -->
+      <div id="norme-container">
+        <!-- Ogni norma verrà inserita qui come contenitore collassabile -->
+      </div>
+    </section>
+
+    <!-- History Section -->
+    <section class="history-container">
+      <h2>Cronologia delle ricerche</h2>
+      <input type="text" id="history-search" class="form-control mb-2" placeholder="Cerca nella cronologia">
+      <ul id="history-list" class="list-group mb-3"></ul>
+      <button id="reset-history" class="btn btn-warning">Pulisci cronologia</button>
+    </section>
+
+    <!-- Templates -->
+    <template id="article-tab-template">
+      <li class="nav-item">
+        <a class="nav-link" href="" role="tab"></a>
+        <button class="btn btn-sm btn-outline-secondary ms-2 pin-button" data-key="" title="Pin" aria-label="Pinna il tab">📍</button>
+        <button class="btn btn-sm btn-outline-danger ms-1 close-button" data-key="" title="Chiudi" aria-label="Chiudi il tab">✖️</button>
+      </li>
+    </template>
+
+    <template id="article-tab-pane-template">
+      <div class="tab-pane fade" role="tabpanel">
+        <div class="mb-3 resizable article-text-container">
+          <h5>Testo Articolo:</h5>
+          <textarea class="article-text resizable"></textarea>
+        </div>
+        <div class="brocardi-info" style="display:none;">
+          <h5>Informazioni Brocardi:</h5>
+          <div class="brocardi-content"></div>
+        </div>
+      </div>
+    </template>        
+
+    <!-- Template per il Contenitore Collassabile della Norma -->
+    <template id="norm-collapsible-template">
+        <div class="norm-collapsible mb-4">
+          <div class="norm-header bg-primary text-white p-2 d-flex justify-content-between align-items-center" role="button" data-bs-toggle="collapse" data-bs-target="">
+            <h3 class="norm-title mb-0"></h3>
+            <!-- Il pulsante PDF verrà aggiunto qui dinamicamente -->
+          </div>
+          <div class="collapse norm-content" id="">
+            <!-- Contenitore per le tab -->
+            <div class="tabs-container">
+              <!-- Tabs per gli articoli della norma -->
+              <ul class="nav nav-tabs norm-tabs" role="tablist"></ul>
+            </div>
+            <div class="tab-content norm-tab-content"></div>
+          </div>
+        </div>
+      </template>
+      
+    <!-- Modal di Conferma -->
+    <div class="modal fade" id="resetConfirmationModal" tabindex="-1" aria-labelledby="resetConfirmationModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h1 class="modal-title fs-5" id="resetConfirmationModalLabel">Conferma Reset</h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Sei sicuro di voler resettare il modulo? Questo eliminerà anche i tab pinnati.
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+            <button type="button" class="btn btn-danger" id="confirmResetButton">Resetta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal per la visualizzazione del PDF -->
+    <div class="modal fade" id="pdfModal" tabindex="-1" aria-labelledby="pdfModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="pdfModalLabel">Visualizza PDF</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+          </div>
+          <div class="modal-body position-relative">
+            <!-- Container per la barra di progresso -->
+            <div id="pdfProgressContainer" class="w-100 mb-3" style="display: none;">
+              <progress id="pdfProgressBar" value="0" max="100" style="width: 100%;"></progress>
+            </div>
+            <!-- Iframe per visualizzare il PDF -->
+            <iframe id="pdfIframe" style="width: 100%; height: 80vh;" frameborder="0"></iframe>
+          </div>
+          <div class="modal-footer">
+            <a id="downloadPdfBtn" class="btn btn-primary" href="" download>Download PDF</a>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+
+    <!-- Bootstrap JS (with Popper.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SortableJS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.ckeditor.com/ckeditor5/43.3.1/ckeditor5.umd.js"></script>
+    <!-- Custom Script -->
+    <script src="/static/script.js" defer></script>
+  </div>
+</body>
+</html>
