@@ -913,12 +913,26 @@ const handleFormSubmit = async (event) => {
     const formData = new FormData(elements.scrapeForm);
     const data = Object.fromEntries(formData.entries());
     data.article = elements.articleInput.value; // Aggiunge il valore dell'input 'article'
-    // In questo caso usiamo l'endpoint streaming
-    const endpoint = '/stream_article_text';
+
+    // Se l'utente vuole anche le info Brocardi, usa l'endpoint non-streaming
+    const wantsBrocardi = document.getElementById('show_brocardi_info')?.checked === true;
+    const endpoint = wantsBrocardi ? '/fetch_all_data' : '/stream_article_text';
     logger.log(`Endpoint selezionato: ${endpoint}`);
 
     try {
-        // Effettua la richiesta fetch all'endpoint streaming
+        if (wantsBrocardi) {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!response.ok) throw new Error('Errore durante la richiesta al server.');
+            const results = await response.json();
+            displayResults(results);
+            return;
+        }
+
+        // Altrimenti mantieni lo streaming per una UX più reattiva
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -929,40 +943,25 @@ const handleFormSubmit = async (event) => {
             throw new Error('Errore durante la richiesta al server.');
         }
 
-        // Utilizza lo stream della risposta
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
 
-        // Leggi il flusso a chunk
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
-            // I risultati sono separati da newline
             const lines = buffer.split("\n");
-            // L'ultimo elemento potrebbe non essere un JSON completo; lo manteniamo nel buffer
             buffer = lines.pop();
             for (let line of lines) {
-                if (line.trim()) {
-                    try {
-                        const result = JSON.parse(line);
-                        // Aggiungi subito il risultato alla UI
-                        appendResult(result);
-                    } catch (err) {
-                        logger.error("Errore durante il parsing del JSON:", err);
-                    }
-                }
+                if (!line.trim()) continue;
+                try { appendResult(JSON.parse(line)); }
+                catch (err) { logger.error("Errore durante il parsing del JSON:", err); }
             }
         }
-        // Processa eventuale dato rimanente
         if (buffer.trim()) {
-            try {
-                const result = JSON.parse(buffer);
-                appendResult(result);
-            } catch (err) {
-                logger.error("Errore durante il parsing finale del JSON:", err);
-            }
+            try { appendResult(JSON.parse(buffer)); }
+            catch (err) { logger.error("Errore durante il parsing finale del JSON:", err); }
         }
         logger.log("Streaming completato.");
     } catch (error) {
