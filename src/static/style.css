@@ -9,20 +9,20 @@
    Variabili CSS
    ============================ */
    :root {
-    /* Colori */
-    --color-background: #1c1c1e;
-    --color-surface: #2c2c2e;
-    --color-primary: #0a84ff;
-    --color-secondary: #5e5ce6;
-    --color-accent: #30d158;
-    --color-danger: #ff453a;
-    --color-danger-hover: #c1272d;
-    --color-warning: #ffd60a;
-    --color-warning-hover: #e0ac08;
-    --color-text: #ffffff;
-    --color-text-inverse: #ffffff;
-    --color-text-muted: #a1a1aa;
-    --color-border: #3a3a3c;
+    /* Palette Chiara (default) */
+    --color-background: #f7f9fc;      /* light neutral */
+    --color-surface: #ffffff;         /* surface */
+    --color-primary: #0f766e;         /* teal-700 */
+    --color-secondary: #0e7490;       /* cyan-700 */
+    --color-accent: #b45309;          /* amber-700 */
+    --color-danger: #b91c1c;          /* red-700 */
+    --color-danger-hover: #991b1b;    /* red-800 */
+    --color-warning: #b45309;         /* amber-700 */
+    --color-warning-hover: #92400e;   /* amber-800 */
+    --color-text: #0f172a;            /* slate-900 */
+    --color-text-inverse: #ffffff;    /* text on colored surfaces */
+    --color-text-muted: #475569;      /* slate-600 */
+    --color-border: #e5e7eb;          /* gray-200 */
     
     /* Tipografia */
     --font-family: 'Roboto', sans-serif;
@@ -51,24 +51,7 @@
     --animation-curve: cubic-bezier(0.4, 0, 0.2, 1);
   }
   
-  /* Modalità Chiara */
-  @media (prefers-color-scheme: light) {
-    :root {
-      --color-background: #faf3e0;
-      --color-surface: #fffaf0;
-      --color-primary: #59513a;
-      --color-secondary: #5d99c6;
-      --color-accent: #76b041;
-      --color-danger: #c0392b;
-      --color-danger-hover: #a93226;
-      --color-warning: #f1c40f;
-      --color-warning-hover: #d4ac0d;
-      --color-text: #3a3a3a;
-      --color-text-inverse: #faf3e0;
-      --color-text-muted: #7f7f7f;
-      --color-border: #e0dbc5;
-    }      
-  }
+  /* Disabilitata variante dark: UI sempre chiara per massima leggibilità */
   
   /* ============================
      Reset e Stili Base
@@ -111,11 +94,11 @@
      Header con Gradient Animato
      ============================ */
   header {
-    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-    animation: gradientShift 5s infinite ease alternate;
+    background: #ffffff;
+    border-bottom: 1px solid var(--color-border);
     padding: var(--spacing-lg) 0;
     text-align: center;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
   }
   
   @keyframes gradientShift {
@@ -136,7 +119,7 @@
     background-color: var(--color-surface);
     padding: var(--spacing-xl);
     border-radius: var(--border-radius);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
     margin-bottom: var(--spacing-xl);
     animation: slideUp var(--animation-speed-slow) var(--animation-curve);
   }
@@ -159,7 +142,7 @@
   
   .form-control,
   .form-select {
-    background-color: var(--color-background);
+    background-color: #ffffff;
     color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
@@ -175,8 +158,8 @@
   .form-control:focus,
   .form-select:focus {
     border-color: var(--color-primary);
-    outline: none;
-    box-shadow: 0 0 10px var(--color-primary);
+    outline: 3px solid color-mix(in oklab, var(--color-primary) 40%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-primary) 30%, transparent);
     transform: translateY(-1px);
   }
   
@@ -234,12 +217,17 @@
   .btn:hover {
     background-color: var(--color-secondary);
     border-color: var(--color-secondary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   }
   
   .btn:active {
     transform: translateY(0);
+  }
+
+  .btn:focus-visible {
+    outline: 3px solid color-mix(in oklab, var(--color-secondary) 50%, transparent);
+    outline-offset: 2px;
   }
   
   .btn-danger {
@@ -312,10 +300,11 @@
   }
   
   .norm-header {
-    background-color: var(--color-background);
+    background-color: #ffffff;
     color: var(--color-text);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
+    border: 1px solid var(--color-border);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -326,7 +315,7 @@
   .norm-header h3 {
     margin: 0;
     font-size: 1.25rem;
-    color: var(--color-background);
+    color: var(--color-text-inverse);
   }
   
   .norm-header:hover {
@@ -335,9 +324,10 @@
   
   /* Contenuto norma */
   .norm-content {
-    background-color: var(--color-background);
+    background-color: #ffffff;
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
+    border: 1px solid var(--color-border);
     margin-top: var(--spacing-sm);
     display: none;
   }
@@ -397,7 +387,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: var(--color-surface);
+    background-color: #ffffff;
     color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
@@ -413,6 +403,7 @@
   .tabs-container .nav-tabs .nav-link.active {
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
+    outline: 2px solid color-mix(in oklab, var(--color-primary) 50%, #0000);
   }
   
   .tabs-container .nav-tabs .nav-link:hover {
