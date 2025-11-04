@@ -1,5 +1,45 @@
+# Virtual environments
 .venv
+venv/
+ENV/
+env/
+
+# Python
 __pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Logs
 *.log
+
+# Certificates
 *.pem
+*.key
+*.crt
+
+# PDF files
 *.pdf
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build
+dist/
+build/
+*.egg-info/

@@ -10,7 +10,10 @@ from quart import Quart, request, jsonify, render_template, send_file, Response,
 from quart_cors import cors
 import structlog
 
-from visualex_api.tools.config import HISTORY_LIMIT, RATE_LIMIT, RATE_LIMIT_WINDOW
+from visualex_api.tools.config import Settings, HISTORY_LIMIT, RATE_LIMIT, RATE_LIMIT_WINDOW
+
+# Initialize settings
+settings = Settings()
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
@@ -66,7 +69,11 @@ driver_manager = WebDriverManager()
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
-        self.app = cors(self.app, allow_origin="http://localhost:3000")
+        # Configure CORS from settings
+        allowed_origins = settings.allowed_origins
+        self.app = cors(self.app, allow_origin=allowed_origins if len(allowed_origins) == 1 else allowed_origins[0])
+        # Secret key from settings
+        self.app.secret_key = settings.secret_key
         
         # Middleware per registrare il tempo di inizio della richiesta
         self.app.before_request(self.record_start_time)
@@ -469,8 +476,9 @@ class NormaController:
 def main():
     controller = NormaController()
     app = controller.app
-    host = os.getenv('HOST', '0.0.0.0')
-    port = int(os.getenv('PORT', 5000))
+    # Use settings for host and port
+    host = settings.get('HOST', '0.0.0.0')
+    port = settings.get_int('PORT', 5000)
     app.run(host=host, port=port)
 
 

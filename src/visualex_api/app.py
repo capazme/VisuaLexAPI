@@ -54,11 +54,11 @@ class NormaController:
         self.app = Quart(__name__)
         
         # Configure CORS
-        allowed_origins = settings.get_list("allowed_origins", ["http://localhost:3000"])
+        allowed_origins = settings.allowed_origins
         self.app = cors(self.app, allow_origin=allowed_origins)
-        
-        # Secret key for sessions
-        self.app.secret_key = settings.get("secret_key", "development-key")
+
+        # Secret key for sessions (from environment variable)
+        self.app.secret_key = settings.secret_key
         
         # Initialize services
         self._init_services()
