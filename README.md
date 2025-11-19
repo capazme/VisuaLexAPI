@@ -20,29 +20,21 @@ source .venv/bin/activate   # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 ```
 
-## Avvio (UI + API non namespaced)
+## Avvio
 ```bash
-cd VisuaLexAPI/src
-# opzionale: HOST e PORT
-HOST=0.0.0.0 PORT=5000 python app.py
-```
-- UI: http://localhost:5000
-- Gli endpoint sono esposti alla root (es. `/fetch_article_text`).
+# Assicurati di essere nella cartella principale del progetto (VisuaLexAPI)
+# e di aver attivato l'ambiente virtuale.
+# Esempio: source .venv/bin/activate
 
-## Avvio alternativo (API namespaced `/api/*` + Swagger)
-```bash
-cd VisuaLexAPI/src
-python -m visualex_api.app
+# Avvia l'applicazione
+python app.py
 ```
-- Health: `GET /api/health`
-- Swagger UI: `GET /api/docs`
-- OpenAPI YAML: `GET /api/openapi.json`
-
-> Nota: le funzionalità sono equivalenti; cambia solo il prefisso degli endpoint.
+- Interfaccia Utente: [http://localhost:5000](http://localhost:5000)
+- Gli endpoint API sono disponibili alla root (es. `/fetch_article_text`).
 
 ---
 
-## Endpoints (istanza di default: `src/app.py`)
+## Endpoints
 
 ### GET `/`
 Rende la pagina web (`templates/index.html`).
@@ -132,38 +124,27 @@ curl -X POST http://localhost:5000/export_pdf \
 
 ---
 
-## Endpoint equivalenti con prefisso `/api/*` (istanza `visualex_api/app.py`)
-- `POST /api/fetch_norma_data`
-- `POST /api/fetch_article_text`
-- `POST /api/stream_article_text`
-- `POST /api/fetch_brocardi_info`
-- `POST /api/fetch_all_data`
-- `POST /api/fetch_tree`
-- `GET  /api/history`
-- `POST /api/export_pdf`
-- Extra: `GET /api/health`, `GET /api/docs`, `GET /api/openapi.json`
-
----
-
 ## Rate limiting
-Configurabile in `src/visualex_api/tools/config.py`:
+Configurabile in `visualex_api/tools/config.py`:
 - `RATE_LIMIT`, `RATE_LIMIT_WINDOW` (per IP). Di default molto permissivo in sviluppo.
 
 ## Note su scraping e compatibilità
 - Lo scraping dipende da Normattiva/EUR‑Lex/Brocardi: modifiche HTML dei siti possono richiedere aggiornamenti.
 - Per `EUR‑Lex` gli atti (TUE/TFUE/CDFUE, regolamenti/direttive) usano mapping dedicato.
 
-## Struttura progetto (estratto)
+## Struttura Progetto
 ```
 VisuaLexAPI/
-  src/
-    app.py                 # app principale (UI + API root)
-    templates/             # pagine HTML
-    static/                # CSS/JS
-    visualex_api/
-      app.py               # variante API con prefisso /api
-      services/            # scraper e pdf
-      tools/               # utilità (urn, parsing, config)
+├── app.py                 # Applicazione principale (UI + API)
+├── requirements.txt
+├── README.md
+├── data/                  # File di testo (es. codice_civile_articoli.txt)
+├── static/                # CSS/JS
+├── templates/             # Pagine HTML
+├── tests/                 # Test
+└── visualex_api/
+    ├── services/          # Scraper e altri servizi
+    └── tools/             # Utilità (URN, parsing, config)
 ```
 
 ## Troubleshooting

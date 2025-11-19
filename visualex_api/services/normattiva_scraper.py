@@ -8,6 +8,7 @@ from aiocache.serializers import JsonSerializer
 
 from ..tools.norma import NormaVisitata
 from ..tools.sys_op import BaseScraper
+from ..tools.cache import PersistentCache
 
 # Configurazione del logger di modulo
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class NormattivaScraper(BaseScraper):
     def __init__(self) -> None:
         self.base_url: str = "https://www.normattiva.it/"
         logger.info("NormattivaScraper initialized")
+        self.cache = PersistentCache("normattiva")
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:
@@ -32,7 +34,14 @@ class NormattivaScraper(BaseScraper):
         urn: str = normavisitata.urn
         logger.info(f"Requesting URL: {urn}")
 
-        html_content: str = await self.request_document(urn)
+        cache_key = urn
+        html_content: str = await self.cache.get(cache_key)
+        if html_content:
+            logger.info("Serving Normattiva document from persistent cache")
+        else:
+            html_content = await self.request_document(urn, source="normattiva")
+            await self.cache.set(cache_key, html_content)
+
         if not html_content:
             logger.error("Document not found or malformed")
             raise ValueError("Document not found or malformed")

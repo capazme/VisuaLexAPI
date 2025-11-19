@@ -3,8 +3,6 @@ import re
 import os
 from typing import Optional, Tuple, Union, Dict, Any, List
 
-import aiohttp
-import asyncio
 import requests
 from bs4 import BeautifulSoup
 from aiocache import cached, Cache
@@ -14,6 +12,8 @@ from ..tools.map import BROCARDI_CODICI
 from ..tools.norma import NormaVisitata
 from ..tools.text_op import normalize_act_type
 from ..tools.sys_op import BaseScraper
+from ..tools.cache import PersistentCache
+from .http_client import http_client
 
 # Configurazione del logger di modulo
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ class BrocardiScraper(BaseScraper):
     def __init__(self) -> None:
         logger.info("Initializing BrocardiScraper")
         self.knowledge: List[Dict[str, Any]] = [BROCARDI_CODICI]
+        self.cache = PersistentCache("brocardi")
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def do_know(self, norma_visitata: NormaVisitata) -> Optional[Tuple[str, str]]:
@@ -63,16 +64,10 @@ class BrocardiScraper(BaseScraper):
 
         link: str = norma_info[1]
         # Recupera il contenuto della pagina principale
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            try:
-                logger.info(f"Requesting main link: {link}")
-                async with session.get(link) as response:
-                    response.raise_for_status()
-                    html_text: str = await response.text()
-                    soup: BeautifulSoup = BeautifulSoup(html_text, 'html.parser')
-            except aiohttp.ClientError as e:
-                logger.error(f"Failed to retrieve content for norma link: {link}: {e}")
-                return None
+        soup = await self._fetch_soup(link, cache_suffix="main", source="brocardi_main")
+        if soup is None:
+            logger.error(f"Failed to retrieve content for norma link: {link}")
+            return None
 
         numero_articolo: Optional[str] = (
             norma_visitata.numero_articolo.replace('-', '')
@@ -96,38 +91,15 @@ class BrocardiScraper(BaseScraper):
 
         logger.info("No direct match found, searching in 'section-title' divs")
         section_titles = soup.find_all('div', class_='section-title')
-        tasks = []
-
-        # Definisce una coroutine helper per controllare ciascun link in modo concorrente
-        async def check_sub_link(a_tag) -> Optional[str]:
-            sub_link = requests.compat.urljoin(base_url, a_tag.get('href', ''))
-            try:
-                async with session.get(sub_link) as sub_response:
-                    sub_response.raise_for_status()
-                    sub_html: str = await sub_response.text()
-                    sub_soup = BeautifulSoup(sub_html, 'html.parser')
-                    sub_matches = pattern.findall(str(sub_soup))
-                    if sub_matches:
-                        return requests.compat.urljoin(base_url, sub_matches[0])
-            except aiohttp.ClientError as e:
-                logger.warning(f"Failed to retrieve content for subsection link: {sub_link}: {e}")
-            return None
-
-        # Crea una sessione condivisa per tutte le richieste in parallelo
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            for section in section_titles:
-                for a_tag in section.find_all('a', href=True):
-                    tasks.append(asyncio.create_task(check_sub_link(a_tag)))
-            if tasks:
-                # Avvia le richieste in parallelo e ritorna al primo risultato non nullo
-                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                for task in done:
-                    result = task.result()
-                    if result:
-                        # Annulla gli altri task se ne trovi uno valido
-                        for t in pending:
-                            t.cancel()
-                        return result
+        for section in section_titles:
+            for a_tag in section.find_all('a', href=True):
+                sub_link = requests.compat.urljoin(base_url, a_tag.get('href', ''))
+                sub_soup = await self._fetch_soup(sub_link, cache_suffix="section", source="brocardi_section")
+                if not sub_soup:
+                    continue
+                sub_matches = pattern.findall(str(sub_soup))
+                if sub_matches:
+                    return requests.compat.urljoin(base_url, sub_matches[0])
 
         logger.info("No matching article found")
         return None
@@ -139,15 +111,10 @@ class BrocardiScraper(BaseScraper):
         if not norma_link:
             return None, {}, None
 
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            try:
-                async with session.get(norma_link) as response:
-                    response.raise_for_status()
-                    html_text = await response.text()
-                    soup = BeautifulSoup(html_text, 'html.parser')
-            except aiohttp.ClientError as e:
-                logger.error(f"Failed to retrieve content for norma link: {norma_link}: {e}")
-                return None, {}, None
+        soup = await self._fetch_soup(norma_link, cache_suffix="article", source="brocardi_article")
+        if soup is None:
+            logger.error(f"Failed to retrieve content for norma link: {norma_link}")
+            return None, {}, None
 
         info: Dict[str, Any] = {}
         info['Position'] = self._extract_position(soup)
@@ -203,3 +170,19 @@ class BrocardiScraper(BaseScraper):
         elif isinstance(norma_visitata, str):
             return norma_visitata.strip()
         return None
+
+    async def _fetch_soup(self, url: str, *, cache_suffix: str, source: str) -> Optional[BeautifulSoup]:
+        cache_key = f"{cache_suffix}:{url}"
+        cached_html = await self.cache.get(cache_key)
+        if cached_html:
+            logger.info(f"Serving cached Brocardi content for {url}")
+            return BeautifulSoup(cached_html, 'html.parser')
+
+        try:
+            result = await http_client.request("GET", url, source=source)
+        except Exception as exc:
+            logger.error(f"Failed to retrieve content for {url}: {exc}")
+            return None
+
+        await self.cache.set(cache_key, result.text)
+        return BeautifulSoup(result.text, 'html.parser')

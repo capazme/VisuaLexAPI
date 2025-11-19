@@ -4,8 +4,9 @@ from selenium.webdriver.chrome.options import Options
 import logging
 from bs4 import BeautifulSoup
 import requests
-import aiohttp
 from aiocache import Cache
+
+from visualex_api.services.http_client import http_client
 
 
 class WebDriverManager:
@@ -64,16 +65,14 @@ class WebDriverManager:
         logging.info("All WebDriver instances closed and cleared")
 
 class BaseScraper:
-    async def request_document(self, url):
+    async def request_document(self, url, *, source: str = "base_scraper"):
         logging.info(f"Consulting source - URL: {url}")
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            try:
-                async with session.get(url, timeout=30) as response:
-                    response.raise_for_status()
-                    return await response.text()
-            except aiohttp.ClientError as e:
-                logging.error(f"Error during consultation: {e}")
-                raise ValueError(f"Problem with download: {e}")
+        try:
+            result = await http_client.request("GET", url, source=source)
+            return result.text
+        except Exception as e:
+            logging.error(f"Error during consultation: {e}")
+            raise ValueError(f"Problem with download: {e}")
 
     def parse_document(self, html_content):
         logging.info("Parsing document content")

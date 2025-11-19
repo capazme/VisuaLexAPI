@@ -10,7 +10,13 @@ from quart import Quart, request, jsonify, render_template, send_file, Response,
 from quart_cors import cors
 import structlog
 
-from visualex_api.tools.config import HISTORY_LIMIT, RATE_LIMIT, RATE_LIMIT_WINDOW
+from visualex_api.tools.config import (
+    HISTORY_LIMIT,
+    RATE_LIMIT,
+    RATE_LIMIT_WINDOW,
+    FETCH_QUEUE_WORKERS,
+    FETCH_QUEUE_DELAY,
+)
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
@@ -63,10 +69,67 @@ eurlex_scraper = EurlexScraper()
 driver_manager = WebDriverManager()
 
 
+class RateLimitedTaskQueue:
+    def __init__(self, workers: int, spacing: float) -> None:
+        self.workers = workers
+        self.spacing = spacing
+        self._queue: asyncio.Queue = asyncio.Queue()
+        self._tasks: list[asyncio.Task] = []
+        self._started = False
+
+    async def start(self) -> None:
+        if self._started:
+            return
+        self._started = True
+        loop = asyncio.get_running_loop()
+        for _ in range(self.workers):
+            self._tasks.append(loop.create_task(self._worker()))
+
+    async def stop(self) -> None:
+        if not self._started:
+            return
+        for _ in self._tasks:
+            await self._queue.put(None)
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks.clear()
+        self._started = False
+
+    async def submit(self, coro_func, *args, **kwargs):
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future = loop.create_future()
+        position = self._queue.qsize()
+        await self._queue.put((coro_func, args, kwargs, future))
+        return position, future
+
+    def size(self) -> int:
+        return self._queue.qsize()
+
+    async def _worker(self):
+        while True:
+            job = await self._queue.get()
+            if job is None:
+                self._queue.task_done()
+                break
+            coro_func, args, kwargs, future = job
+            try:
+                result = await coro_func(*args, **kwargs)
+                if not future.done():
+                    
+                    future.set_result(result)
+            except Exception as exc:
+                if not future.done():
+                    future.set_exception(exc)
+            finally:
+                self._queue.task_done()
+                if self.spacing:
+                    await asyncio.sleep(self.spacing)
+
+
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
         self.app = cors(self.app, allow_origin="http://localhost:3000")
+        self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
         
         # Middleware per registrare il tempo di inizio della richiesta
         self.app.before_request(self.record_start_time)
@@ -76,8 +139,19 @@ class NormaController:
         # Middleware per loggare statistiche (tempo e token) dopo ogni richiesta
         self.app.after_request(self.log_query_stats)
 
+        # Servizi di background
+        self.app.before_serving(self.start_background_services)
+        self.app.after_serving(self.stop_background_services)
+
         # Definizione degli endpoint
         self.setup_routes()
+
+    async def start_background_services(self):
+        await self.fetch_queue.start()
+
+    async def stop_background_services(self):
+        await self.fetch_queue.stop()
+
 
     async def stream_article_text(self):
         """
@@ -141,7 +215,7 @@ class NormaController:
             tokens = None
             if response.content_type and "application/json" in response.content_type:
                 # Estrae il testo della risposta e lo decodifica in JSON
-                text = response.get_data(as_text=True)
+                text = await response.get_data(as_text=True)
                 try:
                     data = json.loads(text)
                     tokens = count_tokens(data)
@@ -389,14 +463,21 @@ class NormaController:
                     log.error("Error fetching all data", error=str(exc))
                     return {'error': str(exc), 'norma_data': nv.to_dict()}
 
-            results = await asyncio.gather(*(fetch_data(nv) for nv in normavisitate), return_exceptions=True)
             processed_results = []
-            for result in results:
-                if isinstance(result, Exception):
-                    processed_results.append({'error': str(result)})
-                    log.error("Exception during fetching all data", exception=str(result))
-                else:
-                    processed_results.append(result)
+            queue_entries = []
+            for nv in normavisitate:
+                position, future = await self.fetch_queue.submit(fetch_data, nv)
+                queue_entries.append((position, future))
+
+            for position, future in queue_entries:
+                try:
+                    result = await future
+                    payload = {'queue_position': position}
+                    payload.update(result)
+                    processed_results.append(payload)
+                except Exception as exc:
+                    log.error("Exception during fetching all data", exception=str(exc))
+                    processed_results.append({'queue_position': position, 'error': str(exc)})
             return jsonify(processed_results)
         except Exception as e:
             log.error("Error in fetch_all_data", error=str(e))

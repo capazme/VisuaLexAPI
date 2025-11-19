@@ -90,9 +90,20 @@ async def parse_article_input(article_string, normurn):
                 logging.error(error_message)
                 return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
 
+    # Deduplica mantenendo l'ordine
+    seen = set()
+    unique_articles = []
+    for article in articles:
+        if article not in seen:
+            seen.add(article)
+            unique_articles.append(article)
+        else:
+            logging.warning(f"Duplicate article found and removed: {article}")
+    
     logging.info("Article parsing completed successfully")
-    logging.debug(f"Parsed articles: {articles}")
-    return articles
+    logging.debug(f"Parsed articles (before dedup): {articles}")
+    logging.debug(f"Unique articles (after dedup): {unique_articles}")
+    return unique_articles
 
 def nospazi(text):
     """
