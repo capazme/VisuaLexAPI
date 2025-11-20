@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: #f8f9fa;
+}
+
+[data-theme='dark'] body {
+    background-color: #212529;
+    color: #f8f9fa;
+}
+
+[data-theme='sepia'] body {
+    background-color: #f4ecd8;
+    color: #5b4636;
+}
+
+[data-theme='high-contrast'] body {
+    background-color: white;
+    color: black;
+}
+
+/* Font Sizes */
+[data-font-size='small'] { font-size: 14px; }
+[data-font-size='medium'] { font-size: 16px; }
+[data-font-size='large'] { font-size: 18px; }
+[data-font-size='xlarge'] { font-size: 22px; }
+
+.dictionary-term {
+  position: relative;
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+}
+
+.dictionary-term::after {
+  content: attr(data-definition);
+  position: absolute;
+  left: 0;
+  bottom: 120%;
+  min-width: 200px;
+  max-width: 280px;
+  background: rgba(0,0,0,0.85);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease;
+  z-index: 50;
+}
+
+.dictionary-term:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cross-reference {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(59,130,246,0.4);
+  color: #2563eb;
+  background-color: rgba(59,130,246,0.08);
+  cursor: pointer;
+  transition: background-color .2s ease;
+}
+
+.cross-reference:hover {
+  background-color: rgba(59,130,246,0.15);
+}
+
+/* Animation for newly added norma cards */
+@keyframes pulse-once {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.01);
+  }
+}
+
+.animate-pulse-once {
+  animation: pulse-once 0.8s ease-in-out 1;
+}

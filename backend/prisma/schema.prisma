@@ -1,0 +1,191 @@
+// VisuaLex Platform Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  isActive  Boolean  @default(true) @map("is_active")
+  isVerified Boolean @default(false) @map("is_verified")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  folders     Folder[]
+  bookmarks   Bookmark[]
+  annotations Annotation[]
+  highlights  Highlight[]
+  dossiers    Dossier[]
+
+  @@map("users")
+}
+
+// ============================================
+// FOLDER HIERARCHY
+// ============================================
+
+model Folder {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  position    Int      @default(0)
+  parentId    String?  @map("parent_id")
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?    @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[]   @relation("FolderHierarchy")
+  bookmarks Bookmark[]
+
+  @@index([userId])
+  @@index([parentId])
+  @@map("folders")
+}
+
+// ============================================
+// BOOKMARKS (Saved Articles)
+// ============================================
+
+model Bookmark {
+  id         String   @id @default(uuid())
+  normaKey   String   @map("norma_key") // e.g., "Art. 1414 c.c."
+  normaData  Json     @map("norma_data") // Full article data from VisualEx API
+  title      String? // Optional custom title
+  notes      String? // User notes
+  tags       String[] // Array of tags
+  folderId   String?  @map("folder_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder      Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  annotations Annotation[]
+  highlights  Highlight[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([normaKey])
+  @@map("bookmarks")
+}
+
+// ============================================
+// ANNOTATIONS (Notes on Articles)
+// ============================================
+
+enum AnnotationType {
+  note
+  question
+  important
+  follow_up
+  summary
+}
+
+model Annotation {
+  id             String         @id @default(uuid())
+  normaKey       String         @map("norma_key")
+  content        String
+  annotationType AnnotationType @default(note) @map("annotation_type")
+  textContext    String?        @map("text_context") // Surrounding text for context
+  position       Int?           // Position in article
+  bookmarkId     String?        @map("bookmark_id")
+  userId         String         @map("user_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // Relationships
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark Bookmark? @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([bookmarkId])
+  @@index([normaKey])
+  @@map("annotations")
+}
+
+// ============================================
+// HIGHLIGHTS (Text Highlighting)
+// ============================================
+
+model Highlight {
+  id          String   @id @default(uuid())
+  normaKey    String   @map("norma_key")
+  text        String // Highlighted text
+  color       String   @default("yellow") // yellow, green, red, blue
+  startOffset Int      @map("start_offset")
+  endOffset   Int      @map("end_offset")
+  note        String? // Optional note
+  bookmarkId  String?  @map("bookmark_id")
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark Bookmark? @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([bookmarkId])
+  @@index([normaKey])
+  @@map("highlights")
+}
+
+// ============================================
+// DOSSIERS (Work Folders / Projects)
+// ============================================
+
+model Dossier {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items DossierItem[]
+
+  @@index([userId])
+  @@map("dossiers")
+}
+
+enum DossierItemType {
+  norm
+  note
+  section
+}
+
+model DossierItem {
+  id         String          @id @default(uuid())
+  dossierId  String          @map("dossier_id")
+  itemType   DossierItemType @map("item_type")
+  title      String
+  content    Json? // Flexible content (norm data, note text, etc.)
+  position   Int             @default(0)
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  // Relationships
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@index([dossierId])
+  @@map("dossier_items")
+}
