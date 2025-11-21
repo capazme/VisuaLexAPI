@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FloatingSearchPanel } from './FloatingSearchPanel';
-import { FloatingPanelManager } from '../workspace/FloatingPanelManager';
+import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
 import { PDFViewer } from '../../ui/PDFViewer';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
@@ -22,7 +22,7 @@ export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { setComparisonArticle, addFloatingPanel, floatingPanels } = useAppStore();
+  const { setComparisonArticle, addWorkspaceTab, addNormaToTab, workspaceTabs } = useAppStore();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[] }>>({});
 
@@ -136,20 +136,43 @@ export function SearchPanel() {
             }
         }
 
-        // After streaming/loading is complete, create floating panels from buffer
-        setResultsBuffer(currentBuffer => {
-            Object.entries(currentBuffer).forEach(([key, group]) => {
-                addFloatingPanel(group.norma, group.articles, key);
-            });
-            return {}; // Clear buffer
-        });
+        // Results buffer will be processed by useEffect below
 
     } catch (err: any) {
         setError(err.message || "Si è verificato un errore.");
     } finally {
         setIsLoading(false);
     }
-  }, [processResults, processResult, addFloatingPanel]);
+  }, [processResults, processResult]);
+
+  // Process results buffer and create workspace tabs
+  useEffect(() => {
+    if (Object.keys(resultsBuffer).length > 0 && !isLoading) {
+      Object.entries(resultsBuffer).forEach(([_, group]) => {
+        // Check if there's an existing tab with this norma
+        const existingTab = workspaceTabs.find(tab =>
+          tab.content.some(item =>
+            item.type === 'norma' &&
+            item.norma.tipo_atto === group.norma.tipo_atto &&
+            item.norma.numero_atto === group.norma.numero_atto &&
+            item.norma.data === group.norma.data
+          )
+        );
+
+        if (existingTab) {
+          // Add articles to existing tab's norma
+          addNormaToTab(existingTab.id, group.norma, group.articles);
+        } else {
+          // Create new tab
+          const label = `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
+          addWorkspaceTab(label, group.norma, group.articles);
+        }
+      });
+
+      // Clear buffer after processing
+      setResultsBuffer({});
+    }
+  }, [resultsBuffer, isLoading, addWorkspaceTab, addNormaToTab, workspaceTabs]);
 
   useEffect(() => {
     const shareValue = searchParams.get('share');
@@ -207,7 +230,7 @@ export function SearchPanel() {
       }
   };
 
-  const hasPanels = floatingPanels.length > 0;
+  const hasTabs = workspaceTabs.length > 0;
 
   return (
     <>
@@ -220,15 +243,15 @@ export function SearchPanel() {
       {/* Floating Search Panel */}
       <FloatingSearchPanel onSearch={handleSearch} isLoading={isLoading} />
 
-      {/* Floating Panels Manager */}
-      <FloatingPanelManager
+      {/* Workspace Manager - renders all tabs */}
+      <WorkspaceManager
         onViewPdf={handleViewPdf}
         onCompareArticle={handleCompareArticle}
         onCrossReference={handleCrossReferenceNavigate}
       />
 
-      {/* Main Content Area - Empty state when no panels */}
-      {!hasPanels && (
+      {/* Main Content Area - Empty state when no tabs */}
+      {!hasTabs && (
         <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 mt-20 lg:mt-0">
           <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
             <Search size={40} className="opacity-50" />
