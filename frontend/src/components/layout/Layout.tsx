@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { Menu, Maximize2, Minimize2, Settings as SettingsIcon, SplitSquareHorizontal } from 'lucide-react';
+import { Menu, Maximize2, Minimize2, Settings as SettingsIcon } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { SettingsModal } from '../ui/SettingsModal';
 import { cn } from '../../lib/utils';
 
 export function Layout() {
-  const { settings, updateSettings } = useAppStore();
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -42,12 +43,11 @@ export function Layout() {
     const handler = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
             e.preventDefault();
-            const select = document.getElementById('search-act-type') as HTMLSelectElement | null;
-            select?.focus();
+            toggleSearchPanel();
         }
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
             e.preventDefault();
-            navigate('/bookmarks');
+            toggleSidebar();
         }
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w') {
             e.preventDefault();
@@ -60,7 +60,7 @@ export function Layout() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, updateSettings, settings.focusMode]);
+  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel]);
 
   const pageTitles: Record<string, string> = {
     '/': 'Ricerca Normativa',
@@ -84,14 +84,33 @@ export function Layout() {
         />
       )}
 
-      {!settings.focusMode && (
-          <Sidebar 
-            theme={settings.theme} 
-            toggleTheme={toggleTheme} 
-            isOpen={sidebarOpen} 
-            closeMobile={() => setSidebarOpen(false)} 
+      {/* Desktop Sidebar - Slide animation */}
+      <div className={cn(
+        "hidden lg:block transition-all duration-300 ease-in-out",
+        sidebarVisible ? "w-64" : "w-0"
+      )}>
+        {sidebarVisible && !settings.focusMode && (
+          <Sidebar
+            theme={settings.theme}
+            toggleTheme={toggleTheme}
+            isOpen={true}
+            closeMobile={() => {}}
             openSettings={() => setSettingsOpen(true)}
           />
+        )}
+      </div>
+
+      {/* Mobile Sidebar */}
+      {!settings.focusMode && (
+        <div className="lg:hidden">
+          <Sidebar
+            theme={settings.theme}
+            toggleTheme={toggleTheme}
+            isOpen={sidebarOpen}
+            closeMobile={() => setSidebarOpen(false)}
+            openSettings={() => setSettingsOpen(true)}
+          />
+        </div>
       )}
 
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
@@ -104,21 +123,21 @@ export function Layout() {
           <div className={cn("flex items-center gap-3 pointer-events-auto", settings.focusMode ? "opacity-0 hover:opacity-100 transition-opacity bg-white/90 dark:bg-black/90 p-2 rounded-lg shadow-sm backdrop-blur" : "")}>
             {!settings.focusMode && (
               <>
-                <button 
-                    onClick={() => updateSettings({ splitView: !settings.splitView })}
-                    className={cn(
-                        "p-2 rounded-md transition-colors text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
-                        settings.splitView && "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300"
-                    )}
-                    title="Vista affiancata"
+                {/* Mobile toggle */}
+                <button
+                  className="lg:hidden p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
                 >
-                    <SplitSquareHorizontal size={20} />
+                  <Menu size={24} className="text-gray-600 dark:text-gray-300" />
                 </button>
-                <button 
-                    className="lg:hidden p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    >
-                    <Menu size={24} className="text-gray-600 dark:text-gray-300" />
+
+                {/* Desktop toggle */}
+                <button
+                  className="hidden lg:block p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                  onClick={toggleSidebar}
+                  title="Toggle Sidebar (Cmd+B)"
+                >
+                  <Menu size={20} className="text-gray-600 dark:text-gray-300" />
                 </button>
               </>
             )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Book, ChevronDown, X, GitBranch } from 'lucide-react';
+import { Book, ChevronDown, X, GitBranch, ExternalLink } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { ArticleTabContent } from './ArticleTabContent';
@@ -12,10 +12,11 @@ interface NormaCardProps {
   onViewPdf: (urn: string) => void;
   onCompareArticle?: (article: ArticleData) => void;
   onCrossReference?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
+  onPopOut?: (articleId: string) => void;
   isNew?: boolean;
 }
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle, onCrossReference, isNew }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle, onCrossReference, onPopOut, isNew }: NormaCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [treeVisible, setTreeVisible] = useState(false);
@@ -153,13 +154,26 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                         onClick={() => setActiveTabId(id)}
                     >
                         <span>Art. {id}</span>
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                            <button 
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                            {onPopOut && articles.length > 1 && (
+                                <button
+                                    className="p-0.5 hover:text-blue-500 rounded"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPopOut(id);
+                                    }}
+                                    title="Estrai in nuova finestra"
+                                >
+                                    <ExternalLink size={12} />
+                                </button>
+                            )}
+                            <button
                                 className="p-0.5 hover:text-red-500 rounded"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onCloseArticle(id);
                                 }}
+                                title="Chiudi articolo"
                             >
                                 <X size={12} />
                             </button>

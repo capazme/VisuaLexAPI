@@ -5,6 +5,9 @@ import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
 import folderRoutes from './routes/folders';
+import bookmarkRoutes from './routes/bookmarks';
+import highlightRoutes from './routes/highlights';
+import annotationRoutes from './routes/annotations';
 
 const app = express();
 
@@ -29,6 +32,9 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api', authRoutes);
 app.use('/api', folderRoutes);
+app.use('/api', bookmarkRoutes);
+app.use('/api', highlightRoutes);
+app.use('/api', annotationRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -53,7 +59,9 @@ app.listen(config.port, () => {
 ║  - Health: http://localhost:${config.port}/api/health            ║
 ║  - Auth: http://localhost:${config.port}/api/auth/*              ║
 ║  - Folders: http://localhost:${config.port}/api/folders/*        ║
-║                                                           ║
+║  - Bookmarks: http://localhost:${config.port}/api/bookmarks/*    ║
+║  - Highlights: http://localhost:${config.port}/api/highlights/*  ║
+║  - Annotations: http://localhost:${config.port}/api/annotations/*║
 ╚═══════════════════════════════════════════════════════════╝
   `);
 });

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SearchForm } from './SearchForm';
-import { NormaCard } from './NormaCard';
+import { FloatingSearchPanel } from './FloatingSearchPanel';
+import { FloatingPanelManager } from '../workspace/FloatingPanelManager';
+import { CommandPalette } from './CommandPalette';
 import { PDFViewer } from '../../ui/PDFViewer';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
-import { SearchX, Search } from 'lucide-react';
+import { SearchX, Search, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 
@@ -18,13 +19,13 @@ const generateNormaKey = (norma: Norma) => {
 };
 
 export function SearchPanel() {
-  const [results, setResults] = useState<Record<string, { norma: Norma, articles: ArticleData[] }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { setComparisonArticle } = useAppStore();
-  const [latestNormaKey, setLatestNormaKey] = useState<string | null>(null);
-  
+  const { setComparisonArticle, addFloatingPanel, floatingPanels } = useAppStore();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[] }>>({});
+
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
     isOpen: false,
@@ -32,48 +33,14 @@ export function SearchPanel() {
     isLoading: false
   });
 
-  // Restore previous session
-  useEffect(() => {
-    try {
-        const saved = localStorage.getItem('visualex-session-results');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && typeof parsed === 'object') {
-                setResults(parsed);
-            }
-        }
-    } catch (e) {
-        console.error('Unable to restore session results', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('visualex-session-results', JSON.stringify(results));
-  }, [results]);
-
-  // Scroll to latest norma when it's added
-  useEffect(() => {
-    if (latestNormaKey) {
-      const timer = setTimeout(() => {
-        const element = document.getElementById(`norma-${latestNormaKey}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        // Clear the highlight after a few seconds
-        setTimeout(() => setLatestNormaKey(null), 3000);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [latestNormaKey]);
-
   const processResult = useCallback((result: ArticleData) => {
       if (result.error) {
           console.error("Backend Error for item:", result.error);
           return;
       }
-      
+
       const normaData = result.norma_data;
-      
+
       if (!normaData) {
           console.error("Received result without norma_data", result);
           return;
@@ -85,16 +52,17 @@ export function SearchPanel() {
           numero_atto: normaData.numero_atto,
           urn: normaData.url
       };
-      
+
       const key = generateNormaKey(norma);
       if (!key) return;
 
-      setResults(prev => {
+      // Buffer results temporarily during streaming
+      setResultsBuffer(prev => {
           const existing = prev[key];
           const newArticles = existing ? [...existing.articles] : [];
-          
+
           const isNewArticle = !newArticles.find(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
-          
+
           if (isNewArticle) {
              newArticles.push(result);
              newArticles.sort((a, b) => {
@@ -107,17 +75,9 @@ export function SearchPanel() {
              newArticles[idx] = result;
           }
 
-          // Mark as latest if it's a new norma or new article
-          if (!existing || isNewArticle) {
-              setLatestNormaKey(key);
-          }
-
-          // Remove the key from prev to avoid being overwritten by spread
-          const { [key]: _, ...restPrev } = prev;
-          
           return {
-              [key]: { norma, articles: newArticles }, 
-              ...restPrev
+              ...prev,
+              [key]: { norma, articles: newArticles }
           };
       });
   }, []);
@@ -129,7 +89,8 @@ export function SearchPanel() {
   const handleSearch = useCallback(async (params: SearchParams) => {
     setIsLoading(true);
     setError(null);
-    
+    setResultsBuffer({}); // Clear buffer before new search
+
     try {
         const endpoint = params.show_brocardi_info ? '/fetch_all_data' : '/stream_article_text';
         const response = await fetch(endpoint, {
@@ -155,7 +116,7 @@ export function SearchPanel() {
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
-                
+
                 for (const line of lines) {
                     if (line.trim()) {
                         try {
@@ -175,12 +136,20 @@ export function SearchPanel() {
             }
         }
 
+        // After streaming/loading is complete, create floating panels from buffer
+        setResultsBuffer(currentBuffer => {
+            Object.entries(currentBuffer).forEach(([key, group]) => {
+                addFloatingPanel(group.norma, group.articles, key);
+            });
+            return {}; // Clear buffer
+        });
+
     } catch (err: any) {
         setError(err.message || "Si è verificato un errore.");
     } finally {
         setIsLoading(false);
     }
-  }, [processResults, processResult]);
+  }, [processResults, processResult, addFloatingPanel]);
 
   useEffect(() => {
     const shareValue = searchParams.get('share');
@@ -216,19 +185,6 @@ export function SearchPanel() {
       handleSearch(params);
   }, [handleSearch]);
 
-  const handleCloseArticle = (normaKey: string, articleId: string) => {
-      setResults(prev => {
-          const newResults = { ...prev };
-          const normaGroup = newResults[normaKey];
-          if (normaGroup) {
-              normaGroup.articles = normaGroup.articles.filter(a => a.norma_data.numero_articolo !== articleId);
-              if (normaGroup.articles.length === 0) {
-                  delete newResults[normaKey];
-              }
-          }
-          return newResults;
-      });
-  };
 
   const handleViewPdf = async (urn: string) => {
       setPdfState({ isOpen: true, url: null, isLoading: true });
@@ -251,65 +207,64 @@ export function SearchPanel() {
       }
   };
 
-  const hasResults = Object.keys(results).length > 0;
+  const hasPanels = floatingPanels.length > 0;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full">
-      {/* Left: Search Form (Sticky handled in component) */}
-      <div className="w-full lg:w-80 xl:w-96 shrink-0">
-        <SearchForm onSearch={handleSearch} isLoading={isLoading} />
-      </div>
+    <>
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onSearch={handleSearch}
+      />
 
-      {/* Right: Results */}
-      <div className="flex-1 min-w-0">
-        {error && (
-             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-md">
-                <div className="flex">
-                    <div className="flex-shrink-0">
-                         <SearchX className="h-5 w-5 text-red-400" />
-                    </div>
-                    <div className="ml-3">
-                        <p className="text-sm text-red-700">{error}</p>
-                    </div>
-                </div>
-            </div>
-        )}
+      {/* Floating Search Panel */}
+      <FloatingSearchPanel onSearch={handleSearch} isLoading={isLoading} />
 
-        {hasResults ? (
-             <div className="space-y-6 pb-10">
-                 {Object.entries(results).map(([key, group]) => (
-                     <div key={key} id={`norma-${key}`} className={latestNormaKey === key ? "animate-pulse-once" : ""}>
-                         <NormaCard 
-                            norma={group.norma} 
-                            articles={group.articles}
-                            onCloseArticle={(articleId) => handleCloseArticle(key, articleId)}
-                            onViewPdf={handleViewPdf}
-                            onPinArticle={() => {}}
-                            onCompareArticle={handleCompareArticle}
-                            onCrossReference={handleCrossReferenceNavigate}
-                            isNew={latestNormaKey === key}
-                         />
-                     </div>
-                 ))}
-             </div>
-        ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 mt-20 lg:mt-0">
-                <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                    <Search size={40} className="opacity-50" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-300">Inizia la ricerca</h3>
-                <p className="text-sm max-w-xs text-center mt-2">Seleziona i parametri nel pannello laterale per visualizzare le norme e i brocardi.</p>
+      {/* Floating Panels Manager */}
+      <FloatingPanelManager
+        onViewPdf={handleViewPdf}
+        onCompareArticle={handleCompareArticle}
+        onCrossReference={handleCrossReferenceNavigate}
+      />
+
+      {/* Main Content Area - Empty state when no panels */}
+      {!hasPanels && (
+        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 mt-20 lg:mt-0">
+          <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+            <Search size={40} className="opacity-50" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-300">Inizia la ricerca</h3>
+          <p className="text-sm max-w-xs text-center mt-2">Premi Cmd+K per aprire la ricerca e visualizzare le norme.</p>
+        </div>
+      )}
+
+      {/* Error display */}
+      {error && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md shadow-lg max-w-md">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <SearchX className="h-5 w-5 text-red-400" />
             </div>
-        )}
-      </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto pl-3"
+            >
+              <X size={16} className="text-red-400 hover:text-red-600" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* PDF Viewer Modal */}
-      <PDFViewer 
-        isOpen={pdfState.isOpen} 
-        onClose={() => setPdfState(s => ({...s, isOpen: false}))} 
-        pdfUrl={pdfState.url} 
-        isLoading={pdfState.isLoading} 
+      <PDFViewer
+        isOpen={pdfState.isOpen}
+        onClose={() => setPdfState(s => ({...s, isOpen: false}))}
+        pdfUrl={pdfState.url}
+        isLoading={pdfState.isLoading}
       />
-    </div>
+    </>
   );
 }

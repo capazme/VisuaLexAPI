@@ -5,6 +5,25 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData } from '../types';
 
+interface FloatingPanel {
+    id: string;
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+    zIndex: number;
+    isMinimized: boolean;
+    isPinned: boolean;
+    normaKey: string;
+    norma: any;
+    articles: ArticleData[];
+    activeArticleId: string | null;
+    label?: string; // Custom label for the panel
+}
+
+interface SearchPanelState {
+    isCollapsed: boolean;
+    position: { x: number; y: number };
+}
+
 interface AppState {
     settings: AppSettings;
     bookmarks: Bookmark[];
@@ -12,9 +31,31 @@ interface AppState {
     annotations: Annotation[];
     highlights: Highlight[];
     comparisonArticle: ArticleData | null;
-    
+
+    // UI State
+    sidebarVisible: boolean;
+    searchPanelState: SearchPanelState;
+    floatingPanels: FloatingPanel[];
+    highestZIndex: number;
+
     // Actions
     updateSettings: (settings: Partial<AppSettings>) => void;
+
+    // UI Actions
+    toggleSidebar: () => void;
+    setSidebarVisible: (visible: boolean) => void;
+    toggleSearchPanel: () => void;
+    setSearchPanelPosition: (position: { x: number; y: number }) => void;
+
+    // Floating Panel Actions
+    addFloatingPanel: (norma: any, articles: ArticleData[], normaKey: string) => void;
+    updateFloatingPanel: (id: string, updates: Partial<FloatingPanel>) => void;
+    removeFloatingPanel: (id: string) => void;
+    bringPanelToFront: (id: string) => void;
+    togglePanelPin: (id: string) => void;
+    togglePanelMinimize: (id: string) => void;
+    setPanelLabel: (id: string, label: string) => void;
+    popOutArticle: (panelId: string, articleId: string) => void;
     
     addBookmark: (norma: NormaVisitata, tags?: string[]) => void;
     updateBookmarkTags: (normaKey: string, tags: string[]) => void;
@@ -65,8 +106,170 @@ const appStore = createStore<AppState>()(
             highlights: [],
             comparisonArticle: null,
 
+            // UI State
+            sidebarVisible: true,
+            searchPanelState: {
+                isCollapsed: false,
+                position: { x: window.innerWidth - 420, y: 20 }
+            },
+            floatingPanels: [],
+            highestZIndex: 100,
+
             updateSettings: (newSettings) => set((state) => {
                 state.settings = { ...state.settings, ...newSettings };
+            }),
+
+            // UI Actions
+            toggleSidebar: () => set((state) => {
+                state.sidebarVisible = !state.sidebarVisible;
+            }),
+
+            setSidebarVisible: (visible) => set((state) => {
+                state.sidebarVisible = visible;
+            }),
+
+            toggleSearchPanel: () => set((state) => {
+                state.searchPanelState.isCollapsed = !state.searchPanelState.isCollapsed;
+            }),
+
+            setSearchPanelPosition: (position) => set((state) => {
+                state.searchPanelState.position = position;
+            }),
+
+            // Floating Panel Actions
+            addFloatingPanel: (norma, articles, normaKey) => set((state) => {
+                const existingPanel = state.floatingPanels.find(p => p.normaKey === normaKey);
+
+                if (existingPanel) {
+                    // Merge new articles with existing ones
+                    const existingArticleIds = new Set(
+                        existingPanel.articles.map(a => a.norma_data.numero_articolo)
+                    );
+
+                    // Add only new articles that don't exist yet
+                    const newArticles = articles.filter(
+                        a => !existingArticleIds.has(a.norma_data.numero_articolo)
+                    );
+
+                    if (newArticles.length > 0) {
+                        existingPanel.articles = [...existingPanel.articles, ...newArticles];
+
+                        // Sort articles by numero_articolo
+                        existingPanel.articles.sort((a, b) => {
+                            const numA = parseInt(a.norma_data.numero_articolo) || 0;
+                            const numB = parseInt(b.norma_data.numero_articolo) || 0;
+                            return numA - numB;
+                        });
+
+                        // Set active article to the first new article
+                        existingPanel.activeArticleId = newArticles[0].norma_data.numero_articolo;
+                    }
+
+                    // Bring to front
+                    existingPanel.zIndex = ++state.highestZIndex;
+                } else {
+                    // Create new panel with cascade positioning
+                    const panelCount = state.floatingPanels.length;
+                    const cascade = (panelCount % 5) * 40;
+
+                    // Sort initial articles
+                    const sortedArticles = [...articles].sort((a, b) => {
+                        const numA = parseInt(a.norma_data.numero_articolo) || 0;
+                        const numB = parseInt(b.norma_data.numero_articolo) || 0;
+                        return numA - numB;
+                    });
+
+                    state.floatingPanels.push({
+                        id: uuidv4(),
+                        normaKey,
+                        norma,
+                        articles: sortedArticles,
+                        position: { x: 100 + cascade, y: 100 + cascade },
+                        size: { width: 700, height: 600 },
+                        zIndex: ++state.highestZIndex,
+                        isMinimized: false,
+                        isPinned: false,
+                        activeArticleId: sortedArticles[0]?.norma_data?.numero_articolo || null
+                    });
+                }
+            }),
+
+            updateFloatingPanel: (id, updates) => set((state) => {
+                const panel = state.floatingPanels.find(p => p.id === id);
+                if (panel) {
+                    Object.assign(panel, updates);
+                }
+            }),
+
+            removeFloatingPanel: (id) => set((state) => {
+                state.floatingPanels = state.floatingPanels.filter(p => p.id !== id);
+            }),
+
+            bringPanelToFront: (id) => set((state) => {
+                const panel = state.floatingPanels.find(p => p.id === id);
+                if (panel && !panel.isPinned) {
+                    panel.zIndex = ++state.highestZIndex;
+                }
+            }),
+
+            togglePanelPin: (id) => set((state) => {
+                const panel = state.floatingPanels.find(p => p.id === id);
+                if (panel) {
+                    panel.isPinned = !panel.isPinned;
+                }
+            }),
+
+            togglePanelMinimize: (id) => set((state) => {
+                const panel = state.floatingPanels.find(p => p.id === id);
+                if (panel) {
+                    panel.isMinimized = !panel.isMinimized;
+                }
+            }),
+
+            setPanelLabel: (id, label) => set((state) => {
+                const panel = state.floatingPanels.find(p => p.id === id);
+                if (panel) {
+                    panel.label = label;
+                }
+            }),
+
+            popOutArticle: (panelId, articleId) => set((state) => {
+                const sourcePanel = state.floatingPanels.find(p => p.id === panelId);
+                if (!sourcePanel) return;
+
+                const article = sourcePanel.articles.find(a => a.norma_data.numero_articolo === articleId);
+                if (!article) return;
+
+                // Remove article from source panel
+                sourcePanel.articles = sourcePanel.articles.filter(
+                    a => a.norma_data.numero_articolo !== articleId
+                );
+
+                // If source panel is now empty, remove it
+                if (sourcePanel.articles.length === 0) {
+                    state.floatingPanels = state.floatingPanels.filter(p => p.id !== panelId);
+                } else {
+                    // Update active article in source panel
+                    sourcePanel.activeArticleId = sourcePanel.articles[0]?.norma_data?.numero_articolo || null;
+                }
+
+                // Create new panel with just this article
+                const panelCount = state.floatingPanels.length;
+                const cascade = (panelCount % 5) * 40;
+
+                state.floatingPanels.push({
+                    id: uuidv4(),
+                    normaKey: `${sourcePanel.normaKey}-art${articleId}`,
+                    norma: sourcePanel.norma,
+                    articles: [article],
+                    position: { x: 140 + cascade, y: 140 + cascade },
+                    size: { width: 700, height: 600 },
+                    zIndex: ++state.highestZIndex,
+                    isMinimized: false,
+                    isPinned: false,
+                    activeArticleId: articleId,
+                    label: `Art. ${articleId}`
+                });
             }),
 
             addBookmark: (norma, tags = []) => set((state) => {
@@ -185,4 +388,7 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
     }
     return useStore(appStore);
 }
+
+// Export types
+export type { FloatingPanel, SearchPanelState };
 

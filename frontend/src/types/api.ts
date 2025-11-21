@@ -111,16 +111,28 @@ export interface BookmarkCreate {
   notes?: string;
 }
 
+export interface BookmarkUpdate {
+  title?: string;
+  notes?: string;
+  tags?: string[];
+  folder_id?: string;
+}
+
 export interface BookmarkResponse {
   id: string;
-  norma_key: string;
-  norma_data: any;
-  folder_id?: string;
+  normaKey: string;
+  normaData: any;
+  title?: string;
+  folderId?: string;
   tags: string[];
   notes?: string;
-  created_at: string;
-  updated_at?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
 }
+
+// Aliases for camelCase
+export type Bookmark = BookmarkResponse;
 
 // ============================================================================
 // Annotation Types (for future implementation)
@@ -137,17 +149,28 @@ export interface AnnotationCreate {
   position?: string;
 }
 
+export interface AnnotationUpdate {
+  content?: string;
+  annotation_type?: AnnotationType;
+  text_context?: string;
+  position?: number;
+}
+
 export interface AnnotationResponse {
   id: string;
-  norma_key: string;
+  normaKey: string;
   content: string;
-  annotation_type: AnnotationType;
-  bookmark_id?: string;
-  text_context?: string;
-  position?: string;
-  created_at: string;
-  updated_at?: string;
+  annotationType: AnnotationType;
+  bookmarkId?: string;
+  textContext?: string;
+  position?: number;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
 }
+
+// Aliases for camelCase
+export type Annotation = AnnotationResponse;
 
 // ============================================================================
 // Highlight Types (for future implementation)
@@ -164,19 +187,26 @@ export interface HighlightCreate {
   bookmark_id?: string;
 }
 
+export interface HighlightUpdate {
+  color?: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
+  note?: string;
+}
+
 export interface HighlightResponse {
   id: string;
-  norma_key: string;
+  normaKey: string;
   text: string;
-  color: string;
-  start_offset?: number;
-  end_offset?: number;
-  container_id?: string;
+  color: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
+  startOffset: number;
+  endOffset: number;
   note?: string;
-  bookmark_id?: string;
-  created_at: string;
-  updated_at?: string;
+  bookmarkId?: string;
+  userId: string;
+  createdAt: string;
 }
+
+// Aliases for camelCase
+export type Highlight = HighlightResponse;
 
 // ============================================================================
 // API Error Types
