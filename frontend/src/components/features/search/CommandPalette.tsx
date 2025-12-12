@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Command } from 'cmdk';
-import { Search, Book, FileText, Globe, X } from 'lucide-react';
+import { Search, Book, FileText, Globe, X, Check } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { cn } from '../../../lib/utils';
 
@@ -119,66 +119,108 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
           label="Command Menu"
         >
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-            <Search className="text-gray-400" size={20} />
-            {step === 'select_act' && (
-              <Command.Input
-                value={inputValue}
-                onValueChange={setInputValue}
-                placeholder="Cerca tipo di atto..."
-                className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 outline-none text-base"
-              />
-            )}
-            {step === 'input_details' && (
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  <span className="font-semibold text-gray-900 dark:text-white">{selectedActLabel}</span>
-                </p>
-                <div className="flex gap-3">
+          <div className="border-b border-gray-200 dark:border-gray-800">
+            {/* Step Indicators */}
+            <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+              <div className={cn(
+                "flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
+                step === 'select_act' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
+                selectedAct ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
+                "bg-gray-100 dark:bg-gray-800 text-gray-500"
+              )}>
+                {selectedAct ? <Check size={14} /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-current" />}
+                <span>Atto</span>
+              </div>
+              {ACT_TYPES_REQUIRING_DETAILS.includes(selectedAct) && (
+                <div className={cn(
+                  "flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
+                  step === 'input_details' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
+                  (actNumber && actDate) ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
+                  "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                )}>
+                  {(actNumber && actDate) ? <Check size={14} /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-current" />}
+                  <span>Dettagli</span>
+                </div>
+              )}
+              <div className={cn(
+                "flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
+                step === 'input_article' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
+                "bg-gray-100 dark:bg-gray-800 text-gray-500"
+              )}>
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-current" />
+                <span>Articolo</span>
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="flex items-center gap-3 px-4 pb-3">
+              <Search className="text-gray-400" size={20} />
+              {step === 'select_act' && (
+                <div className="flex-1">
+                  <Command.Input
+                    value={inputValue}
+                    onValueChange={setInputValue}
+                    placeholder="Cerca 'Art 2043 Codice Civile' o seleziona..."
+                    className="w-full bg-transparent text-gray-900 dark:text-white placeholder-gray-400 outline-none text-base"
+                  />
+                  <div className="mt-1 flex gap-2">
+                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-gray-50 dark:bg-gray-800 px-1.5 text-[10px] font-medium text-gray-500">
+                      <span className="text-xs">⌘</span>K
+                    </kbd>
+                  </div>
+                </div>
+              )}
+              {step === 'input_details' && (
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    <span className="font-semibold text-gray-900 dark:text-white">{selectedActLabel}</span>
+                  </p>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      placeholder="Numero (es. 241)"
+                      value={actNumber}
+                      onChange={(e) => setActNumber(e.target.value)}
+                      className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
+                    />
+                    <input
+                      type="date"
+                      value={actDate}
+                      onChange={(e) => setActDate(e.target.value)}
+                      className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
+                      onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
+                    />
+                  </div>
+                </div>
+              )}
+              {step === 'input_article' && (
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    <span className="font-semibold text-gray-900 dark:text-white">{selectedActLabel}</span>
+                    {actNumber && actDate && (
+                      <span className="ml-2 text-xs text-gray-500">n. {actNumber} del {actDate}</span>
+                    )}
+                  </p>
                   <input
                     type="text"
-                    placeholder="Numero (es. 241)"
-                    value={actNumber}
-                    onChange={(e) => setActNumber(e.target.value)}
-                    className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
+                    placeholder="Numero articolo (es. 1414)"
+                    value={article}
+                    onChange={(e) => setArticle(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
                     autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
-                  />
-                  <input
-                    type="date"
-                    value={actDate}
-                    onChange={(e) => setActDate(e.target.value)}
-                    className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
                   />
                 </div>
-              </div>
-            )}
-            {step === 'input_article' && (
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  <span className="font-semibold text-gray-900 dark:text-white">{selectedActLabel}</span>
-                  {actNumber && actDate && (
-                    <span className="ml-2 text-xs text-gray-500">n. {actNumber} del {actDate}</span>
-                  )}
-                </p>
-                <input
-                  type="text"
-                  placeholder="Numero articolo (es. 1414)"
-                  value={article}
-                  onChange={(e) => setArticle(e.target.value)}
-                  className="w-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
-                />
-              </div>
-            )}
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X size={18} className="text-gray-400" />
-            </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X size={18} className="text-gray-400" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}

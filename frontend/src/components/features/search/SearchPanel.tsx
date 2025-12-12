@@ -279,13 +279,65 @@ export function SearchPanel() {
       />
 
       {/* Main Content Area - Empty state when no tabs */}
-      {!hasTabs && (
-        <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 mt-20 lg:mt-0">
-          <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-            <Search size={40} className="opacity-50" />
+      {!hasTabs && !isLoading && (
+        <div className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700">
+          {/* Interactive Search Icon */}
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => setCommandPaletteOpen(true)}
+            title="Apri ricerca (Cmd+K)"
+          >
+            {/* Blur Background */}
+            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl group-hover:bg-blue-500/30 transition-all duration-500" />
+
+            {/* Icon Container */}
+            <div className="relative w-32 h-32 bg-white dark:bg-gray-800 rounded-3xl shadow-2xl flex items-center justify-center border border-gray-100 dark:border-gray-700 group-hover:scale-105 transition-transform duration-300">
+              <Search size={48} className="text-blue-500 stroke-[1.5]" />
+            </div>
+
+            {/* Keyboard Shortcut Badge */}
+            <div className="absolute -bottom-3 -right-3 bg-gray-900 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border-2 border-white dark:border-gray-800">
+              ⌘K
+            </div>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-300">Inizia la ricerca</h3>
-          <p className="text-sm max-w-xs text-center mt-2">Premi Cmd+K per aprire la ricerca e visualizzare le norme.</p>
+
+          {/* Title and Description */}
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mt-10 mb-3">
+            Ricerca Intelligente
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-sm text-center leading-relaxed">
+            Cerca norme, articoli o concetti giuridici. <br/>
+            Prova con <span className="text-blue-600 font-medium">"Art 2043 cc"</span> o{' '}
+            <span className="text-blue-600 font-medium">"responsabilità oggettiva"</span>.
+          </p>
+        </div>
+      )}
+
+      {/* Loading Skeleton - Shows while search is in progress */}
+      {isLoading && !hasTabs && (
+        <div className="w-full max-w-4xl mx-auto p-8 space-y-6 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+            {/* Skeleton Header */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 space-y-3">
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-3/4" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-1/2" />
+            </div>
+
+            {/* Skeleton Content */}
+            <div className="p-6 space-y-4">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-5/6" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-4/6" />
+            </div>
+          </div>
+
+          {/* Additional Skeleton Cards */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+            <div className="p-6 space-y-4">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-3/4" />
+            </div>
+          </div>
         </div>
       )}
 

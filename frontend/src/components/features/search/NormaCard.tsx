@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, ExternalLink } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { ArticleTabContent } from './ArticleTabContent';
+import { TreeViewPanel } from './TreeViewPanel';
 
 interface NormaCardProps {
   norma: Norma;
@@ -118,43 +120,47 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         </div>
       </div>
 
+      {/* Tree View Side Panel */}
+      <TreeViewPanel
+        isOpen={treeVisible}
+        onClose={() => setTreeVisible(false)}
+        treeData={treeData || []}
+        urn={norma.urn || ''}
+        title="Struttura Atto"
+      />
+
       {/* Content */}
       {isOpen && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
-          {treeVisible && (
-            <div className="px-4 pt-4">
-                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 max-h-60 overflow-y-auto text-sm">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-gray-700 dark:text-gray-200">Struttura Atto</span>
-                        {treeLoading && <span className="text-xs text-gray-400">Caricamento...</span>}
-                    </div>
-                    {treeError && <div className="text-xs text-red-500">{treeError}</div>}
-                    {!treeLoading && !treeError && treeData && renderTreeNodes(treeData)}
-                    {!treeLoading && !treeError && !treeData && (
-                        <div className="text-xs text-gray-400">Struttura non disponibile.</div>
-                    )}
-                </div>
-            </div>
-          )}
-
-          {/* Tabs */}
-          <div className="px-4 pt-4 border-b border-gray-200 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar">
+          {/* Modern Underline Tabs */}
+          <div className="px-5 border-b border-gray-200 dark:border-gray-700 flex gap-0 overflow-x-auto no-scrollbar">
             {articles.map((article) => {
                 const id = article.norma_data.numero_articolo;
                 const isActive = id === activeTabId;
                 return (
-                    <div 
+                    <button
                         key={id}
                         className={cn(
-                            "group flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-medium border-t border-x border-b-0 cursor-pointer transition-all min-w-[100px] justify-between",
-                            isActive 
-                                ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 relative -bottom-px z-10" 
-                                : "bg-gray-100 dark:bg-gray-800/50 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700/50"
+                            "relative px-6 py-3 text-sm font-medium transition-all group flex items-center gap-2",
+                            isActive
+                              ? "text-blue-600 dark:text-blue-400"
+                              : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30"
                         )}
                         onClick={() => setActiveTabId(id)}
                     >
                         <span>Art. {id}</span>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+
+                        {/* Animated underline */}
+                        {isActive && (
+                          <motion.span
+                            layoutId="activeTab"
+                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                          />
+                        )}
+
+                        {/* Actions (visible on hover) */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {onPopOut && articles.length > 1 && (
                                 <button
                                     className="p-0.5 hover:text-blue-500 rounded"
@@ -178,7 +184,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                                 <X size={12} />
                             </button>
                         </div>
-                    </div>
+                    </button>
                 );
             })}
           </div>
@@ -201,27 +207,5 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         </div>
       )}
     </div>
-  );
-}
-
-function renderTreeNodes(nodes: any, depth = 0) {
-  if (!nodes) return null;
-  const list = Array.isArray(nodes) ? nodes : Object.values(nodes);
-  return (
-    <ul className={cn('space-y-1 text-gray-600 dark:text-gray-300', depth > 0 && 'ml-4 text-xs')}>
-      {list.map((node: any, idx: number) => {
-        const label = node?.title || node?.label || node?.name || node?.numero || (typeof node === 'string' ? node : `Nodo ${idx + 1}`);
-        const children = node?.children || node?.items || node?.articoli;
-        return (
-          <li key={node?.id || idx}>
-            <div className="flex items-start gap-2">
-              <span className="mt-1 h-1 w-1 rounded-full bg-gray-400" />
-              <span>{label}</span>
-            </div>
-            {children && renderTreeNodes(children, depth + 1)}
-          </li>
-        );
-      })}
-    </ul>
   );
 }

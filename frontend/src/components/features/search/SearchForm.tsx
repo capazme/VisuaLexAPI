@@ -150,22 +150,33 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="article" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Articolo</label>
-            <div className="flex">
-              <button type="button" onClick={handleDecrementArticle} className="px-3 py-1 border border-r-0 border-gray-300 dark:border-gray-600 rounded-l-md bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300">
-                <Minus size={14} />
+          {/* Modern Article Number Input */}
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-gray-400 uppercase">Articolo</label>
+            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+              <button
+                type="button"
+                onClick={handleDecrementArticle}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400"
+                title="Decrementa articolo"
+              >
+                <Minus size={16} />
               </button>
-              <input 
-                type="text" 
-                id="article" 
-                name="article" 
-                value={formData.article} 
+              <input
+                type="text"
+                id="article"
+                name="article"
+                value={formData.article}
                 onChange={handleChange}
-                className="w-full text-center text-sm font-bold border-y border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-0 focus:border-blue-500 z-10"
+                className="flex-1 bg-transparent text-center font-mono text-xl font-bold border-none focus:ring-0 text-gray-900 dark:text-white outline-none"
               />
-              <button type="button" onClick={handleIncrementArticle} className="px-3 py-1 border border-l-0 border-gray-300 dark:border-gray-600 rounded-r-md bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300">
-                <Plus size={14} />
+              <button
+                type="button"
+                onClick={handleIncrementArticle}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400"
+                title="Incrementa articolo"
+              >
+                <Plus size={16} />
               </button>
             </div>
           </div>
