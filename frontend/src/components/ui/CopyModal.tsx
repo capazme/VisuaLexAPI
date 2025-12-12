@@ -69,108 +69,187 @@ export function CopyModal({
 
         {/* Content */}
         <div className="p-4 space-y-4">
-          {/* Checkboxes */}
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={options.includeText}
-                onChange={(e) => setOptions({ ...options, includeText: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Testo articolo</span>
-            </label>
+          {/* Content Section - Custom Checkboxes */}
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase mb-3">Contenuto</p>
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-1 space-y-1">
+              <label className={cn(
+                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-gray-800"
+              )}>
+                <div className="relative flex items-center justify-center mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={options.includeText}
+                    onChange={(e) => setOptions({ ...options, includeText: e.target.checked })}
+                    className="sr-only"
+                  />
+                  <div className={cn(
+                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                    options.includeText
+                      ? "bg-blue-600 border-blue-600"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                  )}>
+                    {options.includeText && <Check size={14} className="text-white" />}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900 dark:text-white text-sm">Testo articolo</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Include il testo completo dell'articolo</p>
+                </div>
+              </label>
 
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={options.includeCitation}
-                onChange={(e) => setOptions({ ...options, includeCitation: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Citazione</span>
-            </label>
+              <label className={cn(
+                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-gray-800"
+              )}>
+                <div className="relative flex items-center justify-center mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={options.includeCitation}
+                    onChange={(e) => setOptions({ ...options, includeCitation: e.target.checked })}
+                    className="sr-only"
+                  />
+                  <div className={cn(
+                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                    options.includeCitation
+                      ? "bg-blue-600 border-blue-600"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                  )}>
+                    {options.includeCitation && <Check size={14} className="text-white" />}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900 dark:text-white text-sm">Citazione</span>
+                  <p className="text-xs text-gray-500 mt-0.5">Riferimento normativo formale</p>
+                </div>
+              </label>
 
-            <label className={cn(
-              "flex items-center gap-3",
-              hasNotes ? "cursor-pointer" : "opacity-50 cursor-not-allowed"
-            )}>
-              <input
-                type="checkbox"
-                checked={options.includeNotes}
-                onChange={(e) => setOptions({ ...options, includeNotes: e.target.checked })}
-                disabled={!hasNotes}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Note personali {!hasNotes && '(nessuna)'}
-              </span>
-            </label>
+              <label className={cn(
+                "flex items-start gap-3 p-3 rounded-lg transition-colors",
+                hasNotes ? "cursor-pointer hover:bg-white dark:hover:bg-gray-800" : "opacity-50 cursor-not-allowed"
+              )}>
+                <div className="relative flex items-center justify-center mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={options.includeNotes}
+                    onChange={(e) => setOptions({ ...options, includeNotes: e.target.checked })}
+                    disabled={!hasNotes}
+                    className="sr-only"
+                  />
+                  <div className={cn(
+                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                    options.includeNotes
+                      ? "bg-blue-600 border-blue-600"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                  )}>
+                    {options.includeNotes && <Check size={14} className="text-white" />}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900 dark:text-white text-sm">
+                    Note personali {!hasNotes && <span className="text-gray-400">(nessuna)</span>}
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">Include le tue annotazioni</p>
+                </div>
+              </label>
 
-            <label className={cn(
-              "flex items-center gap-3",
-              hasHighlights ? "cursor-pointer" : "opacity-50 cursor-not-allowed"
-            )}>
-              <input
-                type="checkbox"
-                checked={options.includeHighlights}
-                onChange={(e) => setOptions({ ...options, includeHighlights: e.target.checked })}
-                disabled={!hasHighlights}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Evidenziazioni {!hasHighlights && '(nessuna)'}
-              </span>
-            </label>
+              <label className={cn(
+                "flex items-start gap-3 p-3 rounded-lg transition-colors",
+                hasHighlights ? "cursor-pointer hover:bg-white dark:hover:bg-gray-800" : "opacity-50 cursor-not-allowed"
+              )}>
+                <div className="relative flex items-center justify-center mt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={options.includeHighlights}
+                    onChange={(e) => setOptions({ ...options, includeHighlights: e.target.checked })}
+                    disabled={!hasHighlights}
+                    className="sr-only"
+                  />
+                  <div className={cn(
+                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                    options.includeHighlights
+                      ? "bg-blue-600 border-blue-600"
+                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                  )}>
+                    {options.includeHighlights && <Check size={14} className="text-white" />}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <span className="font-medium text-gray-900 dark:text-white text-sm">
+                    Evidenziazioni {!hasHighlights && <span className="text-gray-400">(nessuna)</span>}
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">Include le parti evidenziate</p>
+                </div>
+              </label>
+            </div>
           </div>
 
-          {/* Scope */}
+          {/* Scope Section */}
           {(canCopyNorma || canCopyTab) && (
-            <>
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Ambito:
-                </p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 cursor-pointer">
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase mb-3">Ambito</p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-1 space-y-1">
+                <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
+                  <input
+                    type="radio"
+                    name="scope"
+                    checked={options.scope === 'article'}
+                    onChange={() => setOptions({ ...options, scope: 'article' })}
+                    className="sr-only"
+                  />
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                    options.scope === 'article'
+                      ? "border-blue-600 dark:border-blue-400"
+                      : "border-gray-300 dark:border-gray-600"
+                  )}>
+                    {options.scope === 'article' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">Solo questo articolo</span>
+                </label>
+
+                {canCopyNorma && (
+                  <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
                     <input
                       type="radio"
                       name="scope"
-                      checked={options.scope === 'article'}
-                      onChange={() => setOptions({ ...options, scope: 'article' })}
-                      className="w-4 h-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={options.scope === 'norma'}
+                      onChange={() => setOptions({ ...options, scope: 'norma' })}
+                      className="sr-only"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Solo questo articolo</span>
+                    <div className={cn(
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                      options.scope === 'norma'
+                        ? "border-blue-600 dark:border-blue-400"
+                        : "border-gray-300 dark:border-gray-600"
+                    )}>
+                      {options.scope === 'norma' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">Tutti gli articoli della norma</span>
                   </label>
+                )}
 
-                  {canCopyNorma && (
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="scope"
-                        checked={options.scope === 'norma'}
-                        onChange={() => setOptions({ ...options, scope: 'norma' })}
-                        className="w-4 h-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Tutti gli articoli della norma</span>
-                    </label>
-                  )}
-
-                  {canCopyTab && (
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="scope"
-                        checked={options.scope === 'tab'}
-                        onChange={() => setOptions({ ...options, scope: 'tab' })}
-                        className="w-4 h-4 border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Tutta la tab</span>
-                    </label>
-                  )}
-                </div>
+                {canCopyTab && (
+                  <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
+                    <input
+                      type="radio"
+                      name="scope"
+                      checked={options.scope === 'tab'}
+                      onChange={() => setOptions({ ...options, scope: 'tab' })}
+                      className="sr-only"
+                    />
+                    <div className={cn(
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                      options.scope === 'tab'
+                        ? "border-blue-600 dark:border-blue-400"
+                        : "border-gray-300 dark:border-gray-600"
+                    )}>
+                      {options.scope === 'tab' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">Tutta la tab</span>
+                  </label>
+                )}
               </div>
-            </>
+            </div>
           )}
         </div>
 

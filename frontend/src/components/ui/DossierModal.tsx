@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, FolderPlus, Folder, Check } from 'lucide-react';
+import { X, FolderPlus, Folder, Check, ChevronRight } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { cn } from '../../lib/utils';
 
 interface DossierModalProps {
     isOpen: boolean;
@@ -79,28 +80,42 @@ export function DossierModal({ isOpen, onClose, itemToAdd, itemType = 'norma' }:
                         )}
                     </div>
 
-                    {/* List */}
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {/* List with Rich Cards */}
+                    <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
                         {dossiers.length === 0 ? (
-                            <p className="text-center text-gray-400 text-sm py-4">Nessun dossier presente.</p>
+                            <div className="text-center py-12">
+                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+                                    <Folder size={32} className="text-gray-400" />
+                                </div>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1">Nessun dossier presente</p>
+                                <p className="text-gray-400 text-xs">Crea il tuo primo dossier per iniziare</p>
+                            </div>
                         ) : (
                             dossiers.map(d => (
-                                <button 
+                                <button
                                     key={d.id}
                                     onClick={() => handleAddToDossier(d.id)}
-                                    className="w-full flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-transparent hover:border-blue-200 dark:hover:border-blue-800 group transition-all"
+                                    className={cn(
+                                        "w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group",
+                                        "border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-600",
+                                        "bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/10"
+                                    )}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <Folder className="text-blue-500" size={20} />
-                                        <div className="text-left">
-                                            <div className="font-medium text-gray-900 dark:text-white">{d.title}</div>
-                                            <div className="text-xs text-gray-500">{d.items.length} elementi</div>
-                                        </div>
+                                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400 shrink-0">
+                                        <Folder size={24} />
                                     </div>
-                                    {itemToAdd && (
-                                        <div className="opacity-0 group-hover:opacity-100 text-blue-600">
-                                            <Check size={18} />
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-gray-900 dark:text-white mb-0.5 truncate">{d.title}</h4>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            {d.items.length} {d.items.length === 1 ? 'elemento' : 'elementi'}
+                                        </p>
+                                    </div>
+                                    {itemToAdd ? (
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Check size={20} className="text-blue-600 dark:text-blue-400" />
                                         </div>
+                                    ) : (
+                                        <ChevronRight size={20} className="text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                                     )}
                                 </button>
                             ))

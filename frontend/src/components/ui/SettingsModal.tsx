@@ -1,5 +1,6 @@
 import { X, Monitor, Moon, Sun, Eye } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { cn } from '../../lib/utils';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -25,33 +26,53 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
                 
                 <div className="p-6 space-y-6">
-                    {/* Theme */}
+                    {/* Theme - iOS-style Segmented Control */}
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">Tema</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button 
+                        <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-xl grid grid-cols-2 gap-1">
+                            <button
                                 onClick={() => updateSettings({ theme: 'light' })}
-                                className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${settings.theme === 'light' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                className={cn(
+                                    "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                    settings.theme === 'light'
+                                        ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400"
+                                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                )}
                             >
-                                <Sun size={18} /> Chiaro
+                                <Sun size={16} /> Chiaro
                             </button>
-                            <button 
+                            <button
                                 onClick={() => updateSettings({ theme: 'dark' })}
-                                className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${settings.theme === 'dark' ? 'border-blue-500 bg-blue-900/20 text-blue-400' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                className={cn(
+                                    "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                    settings.theme === 'dark'
+                                        ? "bg-white dark:bg-gray-700 shadow-sm text-blue-600 dark:text-blue-400"
+                                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                )}
                             >
-                                <Moon size={18} /> Scuro
+                                <Moon size={16} /> Scuro
                             </button>
-                            <button 
+                            <button
                                 onClick={() => updateSettings({ theme: 'sepia' })}
-                                className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${settings.theme === 'sepia' ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                className={cn(
+                                    "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                    settings.theme === 'sepia'
+                                        ? "bg-white dark:bg-gray-700 shadow-sm text-amber-600 dark:text-amber-400"
+                                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                )}
                             >
-                                <Eye size={18} /> Seppia
+                                <Eye size={16} /> Seppia
                             </button>
-                             <button 
+                             <button
                                 onClick={() => updateSettings({ theme: 'high-contrast' })}
-                                className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${settings.theme === 'high-contrast' ? 'border-black bg-white text-black ring-2 ring-black' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                className={cn(
+                                    "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                    settings.theme === 'high-contrast'
+                                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
+                                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                                )}
                             >
-                                <Monitor size={18} /> Contrasto
+                                <Monitor size={16} /> Contrasto
                             </button>
                         </div>
                     </div>

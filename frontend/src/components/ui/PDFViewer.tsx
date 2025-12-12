@@ -14,26 +14,31 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative bg-gray-900 rounded-xl shadow-2xl w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700 shrink-0">
-          <h3 className="text-white font-medium flex items-center gap-2">
-            <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold">PDF</span>
-            Visualizzatore Documento
+      <div className="relative bg-gray-900 rounded-xl shadow-2xl w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-800">
+        <div className="flex items-center justify-between px-6 py-4 bg-gray-900 border-b border-gray-800 shrink-0">
+          <h3 className="text-white font-bold flex items-center gap-3">
+            <div className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              PDF
+            </div>
+            <span className="text-gray-300 font-medium">Visualizzatore Documento</span>
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {pdfUrl && (
-              <a 
-                href={pdfUrl} 
-                download 
-                className="p-2 hover:bg-gray-700 rounded-md text-gray-300 hover:text-white transition-colors"
+              <a
+                href={pdfUrl}
+                download
+                className="bg-gray-800 hover:bg-gray-700 text-white p-2.5 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium px-4"
                 title="Scarica PDF"
               >
                 <Download size={20} />
+                <span className="hidden sm:inline">Scarica</span>
               </a>
             )}
-            <button 
+            <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-700 rounded-md text-gray-300 hover:text-white transition-colors"
+              className="bg-white text-gray-900 hover:bg-gray-200 p-2.5 rounded-lg transition-colors font-medium"
+              title="Chiudi"
             >
               <X size={20} />
             </button>
