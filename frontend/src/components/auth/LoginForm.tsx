@@ -1,10 +1,10 @@
 /**
- * Login form component
+ * Login form component - Refactored with glassmorphism and micro-interactions
  */
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function LoginForm() {
@@ -12,6 +12,8 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   const { login, loading, error: authError } = useAuth();
   const navigate = useNavigate();
@@ -45,88 +47,108 @@ export function LoginForm() {
   const error = formError || authError;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 px-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center bg-[#F3F4F6] dark:bg-[#0F172A] relative overflow-hidden px-4">
+      {/* Background Decorative Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-[420px] w-full relative z-10 p-6">
         {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 text-white rounded-full mb-4">
-            <LogIn size={32} />
+        <div className="text-center mb-10 space-y-3">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 mb-2 transform transition-transform hover:scale-105 duration-300">
+            <LogIn size={28} strokeWidth={2.5} />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">VisuaLex</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Legal Research Platform
+          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+            Visua<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Lex</span>
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 font-medium">
+            Accedi alla tua piattaforma legale
           </p>
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
-            Sign In
-          </h2>
-
+        {/* Login Card with Glass Effect */}
+        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-gray-900/5 dark:ring-white/10 p-8 transition-all duration-300">
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-start gap-2">
-              <AlertCircle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+            <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+                Email
               </label>
-              <div className="relative">
-                <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div
+                className={cn(
+                  'relative group transition-all duration-300',
+                  isEmailFocused ? 'transform scale-[1.02]' : ''
+                )}
+              >
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail
+                    size={18}
+                    className={cn(
+                      'transition-colors',
+                      isEmailFocused ? 'text-blue-500' : 'text-gray-400'
+                    )}
+                  />
+                </div>
                 <input
-                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={cn(
-                    "w-full pl-10 pr-4 py-2 border rounded-md bg-white dark:bg-gray-900",
-                    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-                    "text-gray-900 dark:text-gray-100 placeholder-gray-400",
-                    error ? "border-red-300 dark:border-red-700" : "border-gray-300 dark:border-gray-600"
-                  )}
-                  placeholder="you@example.com"
-                  autoComplete="email"
+                  onFocus={() => setIsEmailFocused(true)}
+                  onBlur={() => setIsEmailFocused(false)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
+                  placeholder="name@company.com"
                   disabled={loading}
+                  autoComplete="email"
                 />
               </div>
             </div>
 
             {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
                 Password
               </label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div
+                className={cn(
+                  'relative group transition-all duration-300',
+                  isPasswordFocused ? 'transform scale-[1.02]' : ''
+                )}
+              >
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock
+                    size={18}
+                    className={cn(
+                      'transition-colors',
+                      isPasswordFocused ? 'text-blue-500' : 'text-gray-400'
+                    )}
+                  />
+                </div>
                 <input
-                  id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={cn(
-                    "w-full pl-10 pr-12 py-2 border rounded-md bg-white dark:bg-gray-900",
-                    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-                    "text-gray-900 dark:text-gray-100 placeholder-gray-400",
-                    error ? "border-red-300 dark:border-red-700" : "border-gray-300 dark:border-gray-600"
-                  )}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
+                  className="w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
                   placeholder="••••••••"
-                  autoComplete="current-password"
                   disabled={loading}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
@@ -135,38 +157,29 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className={cn(
-                "w-full py-2.5 px-4 rounded-md font-medium transition-colors",
-                "bg-blue-600 hover:bg-blue-700 text-white",
-                "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-                "flex items-center justify-center gap-2"
-              )}
+              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Signing in...</span>
-                </>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <LogIn size={18} />
-                  <span>Sign In</span>
+                  Sign In{' '}
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
 
           {/* Register Link */}
-          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{' '}
+          <p className="mt-8 text-center text-sm text-gray-500 bg-white/50 dark:bg-white/5 py-2 rounded-lg mx-auto w-fit px-4 border border-gray-100 dark:border-white/5">
+            Non hai un account?{' '}
             <Link
               to="/register"
-              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              className="text-blue-600 font-semibold hover:text-blue-500 transition-colors"
             >
-              Create Account
+              Registrati ora
             </Link>
-          </div>
+          </p>
         </div>
 
         {/* Footer */}
