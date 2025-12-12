@@ -10,7 +10,6 @@ interface LooseArticleCardProps {
   tabId: string;
   looseArticle: LooseArticle;
   onViewPdf: (urn: string) => void;
-  onCompareArticle: (article: ArticleData) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
 }
 
@@ -18,7 +17,6 @@ export function LooseArticleCard({
   tabId,
   looseArticle,
   onViewPdf,
-  onCompareArticle,
   onCrossReference
 }: LooseArticleCardProps) {
   const { article, sourceNorma } = looseArticle;
@@ -96,7 +94,6 @@ export function LooseArticleCard({
         <div className="p-4">
           <ArticleTabContent
             data={article}
-            onCompare={onCompareArticle}
             onCrossReferenceNavigate={onCrossReference}
           />
         </div>

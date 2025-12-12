@@ -1,17 +1,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
-import { ExternalLink, Paperclip, Calendar, Bookmark, FolderPlus, Copy, StickyNote, Highlighter, Share2, GitCompare, Download, X, Tag, SplitSquareHorizontal } from 'lucide-react';
+import { ExternalLink, Paperclip, Calendar, Bookmark, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, Tag, MoreHorizontal, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { Toast } from '../../ui/Toast';
-import { diffWords } from 'diff';
+import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { SafeHTML } from '../../../utils/sanitize';
 
 interface ArticleTabContentProps {
   data: ArticleData;
-  onCompare?: (article: ArticleData) => void;
   onCrossReferenceNavigate?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
 }
 
@@ -30,8 +29,8 @@ const HIGHLIGHT_STYLES: Record<string, string> = {
     blue: 'background-color:#DBEAFE;color:#1E3A8A;',
 };
 
-export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }: ArticleTabContentProps) {
-  const { article_text, norma_data, brocardi_info, url } = data;
+export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTabContentProps) {
+  const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
   const {
     addBookmark,
     removeBookmark,
@@ -44,7 +43,7 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
     highlights,
     addHighlight,
     removeHighlight,
-    comparisonArticle,
+    triggerSearch,
   } = useAppStore();
   
   const [showDossierModal, setShowDossierModal] = useState(false);
@@ -53,8 +52,10 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false);
   const [tagInput, setTagInput] = useState('');
   const [highlightColor, setHighlightColor] = useState<'yellow' | 'green' | 'red' | 'blue'>('yellow');
-  const [diffModalOpen, setDiffModalOpen] = useState(false);
-  const [diffHtml, setDiffHtml] = useState('');
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [showVersionInput, setShowVersionInput] = useState(false);
+  const [versionDate, setVersionDate] = useState('');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -167,6 +168,35 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
           
           await navigator.clipboard.writeText(textToCopy);
           showToast(selection ? 'Testo selezionato copiato con citazione' : 'Articolo copiato con citazione e note', 'success');
+      } catch (err) {
+          showToast('Errore durante la copia', 'error');
+      }
+  };
+
+  const handleAdvancedCopy = async (options: CopyOptions) => {
+      try {
+          let textToCopy = '';
+
+          if (options.includeText) {
+              const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
+              textToCopy += plainText;
+          }
+
+          if (options.includeCitation) {
+              const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`;
+              textToCopy += citation;
+          }
+
+          if (options.includeNotes && itemAnnotations.length > 0) {
+              textToCopy += `\n\nNote personali:\n${itemAnnotations.map((n, i) => `${i + 1}. ${n.text}`).join('\n')}`;
+          }
+
+          if (options.includeHighlights && articleHighlights.length > 0) {
+              textToCopy += `\n\nEvidenziazioni:\n${articleHighlights.map((h, i) => `${i + 1}. "${h.text}"`).join('\n')}`;
+          }
+
+          await navigator.clipboard.writeText(textToCopy);
+          showToast('Contenuto copiato negli appunti', 'success');
       } catch (err) {
           showToast('Errore durante la copia', 'error');
       }
@@ -304,36 +334,6 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
       selection?.removeAllRanges();
   };
 
-  const handleCompare = () => {
-      if (onCompare) {
-          onCompare(data);
-          showToast('Articolo inviato alla vista comparata', 'success');
-      }
-  };
-
-  const handleDiff = () => {
-      if (!comparisonArticle) {
-          showToast('Nessun articolo nella vista comparata', 'error');
-          return;
-      }
-      if (comparisonArticle.norma_data.numero_articolo === norma_data.numero_articolo) {
-          showToast('Seleziona un articolo diverso per il confronto', 'error');
-          return;
-      }
-      try {
-          const diff = diffWords(comparisonArticle.article_text || '', article_text || '');
-          const html = diff.map(part => {
-              const color = part.added ? '#16a34a' : part.removed ? '#dc2626' : '#374151';
-              const background = part.added ? '#dcfce7' : part.removed ? '#fee2e2' : 'transparent';
-              return `<span style="color:${color};background:${background}">${part.value}</span>`;
-          }).join('');
-          setDiffHtml(html);
-          setDiffModalOpen(true);
-      } catch (err) {
-          showToast('Errore durante il confronto', 'error');
-      }
-  };
-
   const formattedText = article_text?.replace(/\n/g, '<br />') || '';
 
   const processedContent = useMemo(() => {
@@ -386,12 +386,31 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
     <div className="animate-in fade-in duration-300 relative">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-dashed border-gray-200 dark:border-gray-700">
         <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400 items-center">
-           <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300 font-medium">
-             {norma_data.versione || 'Vigente'}
-           </span>
-           <span className="flex items-center gap-1">
-             <Calendar size={12} /> {norma_data.data_versione || 'N/A'}
-           </span>
+           {versionInfo?.isHistorical ? (
+             <>
+               <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded text-orange-700 dark:text-orange-400 font-medium flex items-center gap-1">
+                 <Clock size={11} />
+                 Versione storica
+               </span>
+               <span className="text-orange-600 dark:text-orange-400 font-medium">
+                 Richiesta: {versionInfo.requestedDate}
+               </span>
+               {versionInfo.effectiveDate && (
+                 <span className="flex items-center gap-1">
+                   <Calendar size={12} /> Vigente al: {versionInfo.effectiveDate}
+                 </span>
+               )}
+             </>
+           ) : (
+             <>
+               <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300 font-medium">
+                 {norma_data.versione || 'Vigente'}
+               </span>
+               <span className="flex items-center gap-1">
+                 <Calendar size={12} /> {norma_data.data_versione || 'N/A'}
+               </span>
+             </>
+           )}
            {norma_data.allegato && (
              <span className="flex items-center gap-1">
                <Paperclip size={12} /> {norma_data.allegato}
@@ -399,68 +418,25 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
            )}
         </div>
         <div className="flex flex-wrap gap-1">
-            <button 
+            {/* Primary buttons */}
+            <button
                 onClick={handleBookmark}
-                className={cn("p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", isBookmarkedItem ? "text-yellow-500 fill-yellow-500" : "text-gray-400")}
+                className={cn("p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", isBookmarkedItem ? "text-yellow-500" : "text-gray-400")}
                 title="Segnalibro"
             >
                 <Bookmark size={16} className={isBookmarkedItem ? "fill-current" : ""} />
             </button>
-            <button 
-                onClick={() => {
-                    if (!isBookmarkedItem) {
-                        showToast('Aggiungi prima un segnalibro per usare i tag', 'error');
-                        return;
-                    }
-                    setTagsEditorOpen(prev => !prev);
-                }}
-                disabled={!isBookmarkedItem}
-                className={cn(
-                    "p-1.5 rounded transition-colors",
-                    !isBookmarkedItem 
-                        ? "text-gray-300 dark:text-gray-600 cursor-not-allowed" 
-                        : tagsEditorOpen 
-                            ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20" 
-                            : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                )}
-                title={!isBookmarkedItem ? "Aggiungi un segnalibro per usare i tag" : "Gestisci Tag"}
-            >
-                <Tag size={16} />
-            </button>
-            <button 
-                onClick={() => setShowDossierModal(true)}
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-500 transition-colors"
-                title="Aggiungi a Dossier"
-            >
-                <FolderPlus size={16} />
-            </button>
-            <button 
-                onClick={handleCopy}
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-green-500 transition-colors"
-                title="Copia con Citazione"
-            >
-                <Copy size={16} />
-            </button>
-             <button 
+            <button
                 onClick={() => setShowNotes(!showNotes)}
-                className={cn("p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", showNotes || itemAnnotations.length > 0 ? "text-blue-500" : "text-gray-400")}
+                className={cn("p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative", showNotes || itemAnnotations.length > 0 ? "text-blue-500" : "text-gray-400")}
                 title="Note Personali"
             >
                 <StickyNote size={16} />
-            </button>
-            <button
-                onClick={handleShareLink}
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-indigo-500 transition-colors"
-                title="Condividi"
-            >
-                <Share2 size={16} />
-            </button>
-            <button
-                onClick={handleExportRtf}
-                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-emerald-500 transition-colors"
-                title="Esporta RTF"
-            >
-                <Download size={16} />
+                {itemAnnotations.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                        {itemAnnotations.length}
+                    </span>
+                )}
             </button>
             <div className="relative" data-highlight-picker>
                 <button
@@ -474,12 +450,17 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
                         setShowHighlightPicker(!showHighlightPicker);
                     }}
                     className={cn(
-                        "p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
+                        "p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative",
                         articleHighlights.length > 0 ? "text-purple-500" : "text-gray-400 hover:text-purple-500"
                     )}
-                    title="Evidenzia Testo Selezionato"
+                    title="Evidenzia Testo"
                 >
                     <Highlighter size={16} />
+                    {articleHighlights.length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                            {articleHighlights.length}
+                        </span>
+                    )}
                 </button>
                 {showHighlightPicker && (
                     <div className="absolute left-1/2 -translate-x-1/2 mt-2 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 flex gap-2 z-50 animate-in fade-in zoom-in-95 duration-200">
@@ -504,29 +485,97 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
                     </div>
                 )}
             </div>
-            {onCompare && (
+            <button
+                onClick={() => setShowCopyModal(true)}
+                className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-green-500 transition-colors"
+                title="Copia"
+            >
+                <Copy size={16} />
+            </button>
+
+            {/* More menu */}
+            <div className="relative">
                 <button
-                    onClick={handleCompare}
+                    onClick={() => setShowMoreMenu(!showMoreMenu)}
                     className={cn(
                         "p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
-                        comparisonArticle?.norma_data.numero_articolo === norma_data.numero_articolo 
-                            ? "text-blue-500 bg-blue-50 dark:bg-blue-900/20" 
-                            : "text-gray-400 hover:text-purple-500"
+                        showMoreMenu ? "text-blue-500 bg-gray-100 dark:bg-gray-800" : "text-gray-400"
                     )}
-                    title="Invia a Vista Comparata"
+                    title="Altre azioni"
                 >
-                    <SplitSquareHorizontal size={16} />
+                    <MoreHorizontal size={16} />
                 </button>
-            )}
-            {comparisonArticle && comparisonArticle.norma_data.numero_articolo !== norma_data.numero_articolo && (
-                <button
-                    onClick={handleDiff}
-                    className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-rose-500 transition-colors"
-                    title="Confronta Differenze"
-                >
-                    <GitCompare size={16} />
-                </button>
-            )}
+                {showMoreMenu && (
+                    <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
+                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 animate-in fade-in zoom-in-95 duration-200 py-1">
+                            <button
+                                onClick={() => {
+                                    if (!isBookmarkedItem) {
+                                        showToast('Aggiungi prima un segnalibro per usare i tag', 'error');
+                                        return;
+                                    }
+                                    setTagsEditorOpen(prev => !prev);
+                                    setShowMoreMenu(false);
+                                }}
+                                disabled={!isBookmarkedItem}
+                                className={cn(
+                                    "w-full px-3 py-2 text-sm text-left flex items-center gap-2 transition-colors",
+                                    !isBookmarkedItem
+                                        ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                )}
+                            >
+                                <Tag size={14} />
+                                Gestisci tag
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowDossierModal(true);
+                                    setShowMoreMenu(false);
+                                }}
+                                className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <FolderPlus size={14} />
+                                Aggiungi a dossier
+                            </button>
+                            <button
+                                onClick={() => {
+                                    handleShareLink();
+                                    setShowMoreMenu(false);
+                                }}
+                                className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <Share2 size={14} />
+                                Condividi link
+                            </button>
+                            <button
+                                onClick={() => {
+                                    handleExportRtf();
+                                    setShowMoreMenu(false);
+                                }}
+                                className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <Download size={14} />
+                                Esporta RTF
+                            </button>
+
+                            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+
+                            <button
+                                onClick={() => {
+                                    setShowVersionInput(true);
+                                    setShowMoreMenu(false);
+                                }}
+                                className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <Clock size={14} />
+                                Cerca versione...
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
       </div>
 
@@ -638,38 +687,90 @@ export function ArticleTabContent({ data, onCompare, onCrossReferenceNavigate }:
         />
       )}
 
-      <DossierModal 
-        isOpen={showDossierModal} 
-        onClose={() => setShowDossierModal(false)} 
+      <DossierModal
+        isOpen={showDossierModal}
+        onClose={() => setShowDossierModal(false)}
         itemToAdd={norma_data}
         itemType="norma"
       />
 
-      {diffModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setDiffModalOpen(false)} />
-            <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden border border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-gray-800">
-                    <h4 className="font-semibold text-gray-800 dark:text-gray-100">Diff Vista Comparata</h4>
-                    <button onClick={() => setDiffModalOpen(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <X size={16} />
-                    </button>
-                </div>
-                <SafeHTML
-                  html={diffHtml}
-                  className="p-4 overflow-y-auto prose prose-sm dark:prose-invert"
-                />
+      <CopyModal
+        isOpen={showCopyModal}
+        onClose={() => setShowCopyModal(false)}
+        onCopy={handleAdvancedCopy}
+        hasNotes={itemAnnotations.length > 0}
+        hasHighlights={articleHighlights.length > 0}
+      />
+
+      {showVersionInput && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowVersionInput(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-sm mx-4 p-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Cerca Versione</h3>
+              <button onClick={() => setShowVersionInput(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                <X size={18} className="text-gray-500" />
+              </button>
             </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              Inserisci una data per cercare la versione dell'articolo vigente a quella data.
+            </p>
+            <input
+              type="date"
+              value={versionDate}
+              onChange={(e) => setVersionDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowVersionInput(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                Annulla
+              </button>
+              <button
+                onClick={() => {
+                  if (versionDate) {
+                    // Trigger search with version date
+                    const searchParams: SearchParams = {
+                      act_type: norma_data.tipo_atto,
+                      act_number: norma_data.numero_atto || '',
+                      date: norma_data.data || '',
+                      article: norma_data.numero_articolo,
+                      version: 'vigente',
+                      version_date: versionDate,
+                      show_brocardi_info: true
+                    };
+                    console.log('🔎 Triggering version search with params:', searchParams);
+                    showToast(`Ricerca versione del ${versionDate}`, 'info');
+                    setShowVersionInput(false);
+                    setVersionDate('');
+                    triggerSearch(searchParams);
+                  } else {
+                    showToast('Seleziona una data', 'error');
+                  }
+                }}
+                disabled={!versionDate}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg flex items-center gap-2"
+              >
+                <Clock size={14} />
+                Cerca
+              </button>
+            </div>
+          </div>
         </div>
       )}
+
     </div>
   );
 }
 
-function parseInlineStyle(style: string) {
+function parseInlineStyle(style: string): React.CSSProperties {
     const entries = style.split(';').filter(Boolean).map(rule => {
         const [prop, value] = rule.split(':');
-        return [prop.trim(), value.trim()];
+        // Convert CSS property name to camelCase (e.g., background-color -> backgroundColor)
+        const camelProp = prop.trim().replace(/-([a-z])/g, (_, char) => char.toUpperCase());
+        return [camelProp, value.trim()];
     });
     return Object.fromEntries(entries);
 }

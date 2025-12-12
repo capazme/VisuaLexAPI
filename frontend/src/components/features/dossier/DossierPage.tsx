@@ -1,0 +1,1062 @@
+import { useState, useMemo } from 'react';
+import { Folder, FileText, Trash2, FolderPlus, ChevronRight, ArrowLeft, Download, Search, Tag, Star, Edit2, Eye, X, GripVertical, FileDown, Share2, Copy, Check, CheckSquare, Square, FolderInput, Circle, BookOpen, AlertCircle, CheckCircle2, FileJson, TreeDeciduous, Loader2 } from 'lucide-react';
+import { useAppStore } from '../../../store/useAppStore';
+import { DossierModal } from '../../ui/DossierModal';
+import { jsPDF } from 'jspdf';
+import { cn } from '../../../lib/utils';
+import type { Dossier, DossierItem } from '../../../types';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Status configuration
+const STATUS_CONFIG = {
+  unread: { label: 'Da leggere', icon: Circle, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700' },
+  reading: { label: 'In lettura', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+  important: { label: 'Importante', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
+  done: { label: 'Completato', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
+};
+
+// Sortable item component
+function SortableItem({
+  item,
+  isSelected,
+  onToggleSelect,
+  onView,
+  onRemove,
+  onStatusChange,
+  showCheckbox
+}: {
+  item: DossierItem;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onView: () => void;
+  onRemove: () => void;
+  onStatusChange: (status: string) => void;
+  showCheckbox: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const status = item.status || 'unread';
+  const StatusIcon = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.icon || Circle;
+  const statusConfig = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.unread;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "bg-white dark:bg-gray-800 p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors",
+        isSelected ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"
+      )}
+    >
+      <div className="flex items-center gap-3">
+        {showCheckbox && (
+          <button onClick={onToggleSelect} className="text-gray-400 hover:text-blue-500">
+            {isSelected ? <CheckSquare size={20} className="text-blue-500" /> : <Square size={20} />}
+          </button>
+        )}
+        <div {...attributes} {...listeners} className="text-gray-300 dark:text-gray-600 cursor-grab hover:text-gray-500">
+          <GripVertical size={20} />
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600">
+          <FileText size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          {item.type === 'norma' ? (
+            <>
+              <h4 className="font-medium text-gray-900 dark:text-white">
+                {item.data.tipo_atto} {item.data.numero_atto}
+              </h4>
+              <p className="text-sm text-gray-500">Art. {item.data.numero_articolo} • {item.data.data}</p>
+            </>
+          ) : (
+            <p className="text-gray-700 dark:text-gray-300 italic truncate">"{item.data}"</p>
+          )}
+          <div className="text-xs text-gray-400 mt-1">
+            Aggiunto il {new Date(item.addedAt).toLocaleDateString()}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {/* Status dropdown */}
+          <div className="relative group/status">
+            <button
+              className={cn("p-2 rounded-md transition-colors", statusConfig.color, statusConfig.bg)}
+              title={statusConfig.label}
+            >
+              <StatusIcon size={16} />
+            </button>
+            <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 hidden group-hover/status:block">
+              {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                <button
+                  key={key}
+                  onClick={() => onStatusChange(key)}
+                  className={cn(
+                    "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700",
+                    status === key && "bg-gray-100 dark:bg-gray-700"
+                  )}
+                >
+                  <config.icon size={14} className={config.color} />
+                  {config.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={onView}
+            className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+            title="Visualizza contenuto"
+          >
+            <Eye size={18} />
+          </button>
+          <button
+            onClick={onRemove}
+            className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-0 group-hover:opacity-100"
+            title="Rimuovi"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Article viewer modal component
+function ArticleViewerModal({
+  item,
+  isOpen,
+  onClose
+}: {
+  item: DossierItem | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  if (!isOpen || !item) return null;
+
+  const isNorma = item.type === 'norma';
+  const title = isNorma
+    ? `${item.data.tipo_atto} ${item.data.numero_atto || ''} - Art. ${item.data.numero_articolo}`
+    : 'Nota';
+  const content = isNorma ? item.data.article_text : item.data;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {content ? (
+            <div
+              className="prose prose-sm dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br />') }}
+            />
+          ) : (
+            <p className="text-gray-500 italic text-center py-8">Contenuto non disponibile</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Edit dossier modal
+function EditDossierModal({
+  dossier,
+  isOpen,
+  onClose,
+  onSave
+}: {
+  dossier: Dossier | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (title: string, description: string, tags: string[]) => void;
+}) {
+  const [title, setTitle] = useState(dossier?.title || '');
+  const [description, setDescription] = useState(dossier?.description || '');
+  const [tagsInput, setTagsInput] = useState((dossier?.tags || []).join(', '));
+
+  if (!isOpen || !dossier) return null;
+
+  const handleSave = () => {
+    const tags = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
+    onSave(title, description, tags);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
+        <div className="p-6">
+          <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-4">Modifica Dossier</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titolo</label>
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tag (separati da virgola)</label>
+              <input
+                value={tagsInput}
+                onChange={e => setTagsInput(e.target.value)}
+                placeholder="diritto civile, contratti, obbligazioni"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <button onClick={onClose} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+              Annulla
+            </button>
+            <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              Salva
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tree Navigator Modal for importing articles from a norm
+function TreeNavigatorModal({
+  isOpen,
+  onClose,
+  onImport
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onImport: (articles: { numero: string; urn?: string }[], normInfo: { tipo_atto: string; data: string; numero_atto: string }) => void;
+}) {
+  const [actType, setActType] = useState('codice civile');
+  const [actNumber, setActNumber] = useState('');
+  const [actDate, setActDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tree, setTree] = useState<Array<string | Record<string, string>>>([]);
+  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
+
+  if (!isOpen) return null;
+
+  const fetchTree = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // First get the norma data to get the URN
+      const normaRes = await fetch('/fetch_norma_data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          act_type: actType,
+          act_number: actNumber || undefined,
+          date: actDate || undefined,
+          article: '1' // dummy article to get URN
+        })
+      });
+      const normaData = await normaRes.json();
+
+      if (!normaData.urn) {
+        throw new Error('Impossibile generare URN per questa norma');
+      }
+
+      // Now fetch the tree
+      const treeRes = await fetch('/fetch_tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urn: normaData.urn,
+          link: true
+        })
+      });
+      const treeData = await treeRes.json();
+
+      if (treeData.error) {
+        throw new Error(treeData.error);
+      }
+
+      setTree(treeData.tree || []);
+      setSelectedArticles(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore nel recupero della struttura');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleArticle = (articleNum: string) => {
+    setSelectedArticles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(articleNum)) newSet.delete(articleNum);
+      else newSet.add(articleNum);
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    const allArticles = tree.map(item =>
+      typeof item === 'string' ? item : Object.keys(item)[0]
+    );
+    setSelectedArticles(new Set(allArticles));
+  };
+
+  const handleImport = () => {
+    const articles = Array.from(selectedArticles).map(num => {
+      const item = tree.find(t =>
+        typeof t === 'string' ? t === num : Object.keys(t)[0] === num
+      );
+      return {
+        numero: num,
+        urn: typeof item === 'object' ? Object.values(item)[0] : undefined
+      };
+    });
+    onImport(articles, { tipo_atto: actType, data: actDate, numero_atto: actNumber });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] border border-gray-200 dark:border-gray-800 flex flex-col">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+          <h3 className="font-semibold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+            <TreeDeciduous size={20} className="text-green-600" />
+            Importa articoli da norma
+          </h3>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo atto</label>
+              <select
+                value={actType}
+                onChange={e => setActType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              >
+                <option value="codice civile">Codice Civile</option>
+                <option value="codice penale">Codice Penale</option>
+                <option value="codice procedura civile">Codice Procedura Civile</option>
+                <option value="codice procedura penale">Codice Procedura Penale</option>
+                <option value="costituzione">Costituzione</option>
+                <option value="legge">Legge</option>
+                <option value="decreto legislativo">Decreto Legislativo</option>
+                <option value="decreto legge">Decreto Legge</option>
+                <option value="d.p.r.">D.P.R.</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Numero</label>
+              <input
+                value={actNumber}
+                onChange={e => setActNumber(e.target.value)}
+                placeholder="241"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
+              <input
+                type="date"
+                value={actDate}
+                onChange={e => setActDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={fetchTree}
+            disabled={loading}
+            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+            {loading ? 'Caricamento...' : 'Cerca articoli'}
+          </button>
+
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          {tree.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600 dark:text-gray-400">{tree.length} articoli trovati</span>
+                <button onClick={selectAll} className="text-sm text-blue-600 hover:underline">
+                  Seleziona tutti
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
+                {tree.map((item, idx) => {
+                  const articleNum = typeof item === 'string' ? item : Object.keys(item)[0];
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => toggleArticle(articleNum)}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      {selectedArticles.has(articleNum) ? (
+                        <CheckSquare size={16} className="text-blue-500" />
+                      ) : (
+                        <Square size={16} className="text-gray-400" />
+                      )}
+                      <span className="text-sm">Art. {articleNum}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+            Annulla
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={selectedArticles.size === 0}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          >
+            Importa {selectedArticles.size > 0 ? `(${selectedArticles.size})` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DossierPage() {
+  const { dossiers, deleteDossier, removeFromDossier, updateDossier, toggleDossierPin, reorderDossierItems, updateDossierItemStatus, moveToDossier } = useAppStore();
+  const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'date' | 'name' | 'items'>('date');
+  const [viewingItem, setViewingItem] = useState<DossierItem | null>(null);
+  const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [moveToModalOpen, setMoveToModalOpen] = useState(false);
+  const [treeNavigatorOpen, setTreeNavigatorOpen] = useState(false);
+
+  const selectedDossier = dossiers.find(d => d.id === selectedDossierId);
+  const { addToDossier } = useAppStore();
+
+  // Drag & drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id && selectedDossier) {
+      const oldIndex = selectedDossier.items.findIndex(item => item.id === active.id);
+      const newIndex = selectedDossier.items.findIndex(item => item.id === over.id);
+      reorderDossierItems(selectedDossier.id, oldIndex, newIndex);
+    }
+  };
+
+  // Bulk selection helpers
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) newSet.delete(itemId);
+      else newSet.add(itemId);
+      return newSet;
+    });
+  };
+
+  const selectAllItems = () => {
+    if (selectedDossier) {
+      setSelectedItems(new Set(selectedDossier.items.map(i => i.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedItems(new Set());
+
+  const deleteSelectedItems = () => {
+    if (selectedDossier && selectedItems.size > 0) {
+      selectedItems.forEach(itemId => removeFromDossier(selectedDossier.id, itemId));
+      clearSelection();
+    }
+  };
+
+  const handleMoveToDossier = (targetDossierId: string) => {
+    if (selectedDossier && selectedItems.size > 0) {
+      moveToDossier(selectedDossier.id, targetDossierId, Array.from(selectedItems));
+      clearSelection();
+      setMoveToModalOpen(false);
+    }
+  };
+
+  // JSON export/import
+  const exportDossierJSON = (dossier: Dossier) => {
+    const data = JSON.stringify(dossier, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${dossier.title.replace(/[^a-z0-9]/gi, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyShareLink = async (dossier: Dossier) => {
+    const data = btoa(JSON.stringify(dossier));
+    const shareUrl = `${window.location.origin}/dossier?import=${encodeURIComponent(data)}`;
+    await navigator.clipboard.writeText(shareUrl);
+    alert('Link copiato negli appunti!');
+  };
+
+  // Import articles from tree navigator
+  const handleTreeImport = (
+    articles: { numero: string; urn?: string }[],
+    normInfo: { tipo_atto: string; data: string; numero_atto: string }
+  ) => {
+    if (!selectedDossier) return;
+    articles.forEach(art => {
+      addToDossier(selectedDossier.id, {
+        tipo_atto: normInfo.tipo_atto,
+        data: normInfo.data,
+        numero_atto: normInfo.numero_atto,
+        numero_articolo: art.numero,
+        urn: art.urn
+      }, 'norma');
+    });
+  };
+
+  // Get all unique tags
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    dossiers.forEach(d => d.tags?.forEach(t => tags.add(t)));
+    return Array.from(tags).sort();
+  }, [dossiers]);
+
+  // Filter and sort dossiers
+  const filteredDossiers = useMemo(() => {
+    let result = [...dossiers];
+
+    // Filter by search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(d =>
+        d.title.toLowerCase().includes(query) ||
+        d.description?.toLowerCase().includes(query) ||
+        d.items.some(item => {
+          if (item.type === 'norma') {
+            return item.data.tipo_atto?.toLowerCase().includes(query) ||
+                   item.data.numero_articolo?.includes(query);
+          }
+          return item.data?.toLowerCase?.().includes(query);
+        })
+      );
+    }
+
+    // Filter by tag
+    if (selectedTag) {
+      result = result.filter(d => d.tags?.includes(selectedTag));
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      // Pinned first
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+
+      switch (sortBy) {
+        case 'name':
+          return a.title.localeCompare(b.title);
+        case 'items':
+          return b.items.length - a.items.length;
+        case 'date':
+        default:
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+
+    return result;
+  }, [dossiers, searchQuery, selectedTag, sortBy]);
+
+  const handleExportPdf = (dossierId: string) => {
+    const dossier = dossiers.find(d => d.id === dossierId);
+    if (!dossier) return;
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    let y = 50;
+
+    // Title
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(dossier.title, 40, y);
+    y += 30;
+
+    // Description
+    if (dossier.description) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'italic');
+      const descWrapped = doc.splitTextToSize(dossier.description, 500);
+      doc.text(descWrapped, 40, y);
+      y += descWrapped.length * 14 + 10;
+    }
+
+    // Tags
+    if (dossier.tags?.length) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Tag: ${dossier.tags.join(', ')}`, 40, y);
+      y += 20;
+    }
+
+    // Separator
+    doc.setDrawColor(200);
+    doc.line(40, y, 555, y);
+    y += 20;
+
+    // Items
+    doc.setFont('helvetica', 'normal');
+    dossier.items.forEach((item, idx) => {
+      if (y > 760) {
+        doc.addPage();
+        y = 50;
+      }
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      const itemTitle = item.type === 'norma'
+        ? `${idx + 1}. ${item.data.tipo_atto} ${item.data.numero_atto || ''} - Art. ${item.data.numero_articolo}`
+        : `${idx + 1}. Nota`;
+      doc.text(itemTitle, 40, y);
+      y += 18;
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const content = item.type === 'norma'
+        ? (item.data.article_text || '').replace(/<[^>]+>/g, '').substring(0, 2000)
+        : item.data;
+      const wrapped = doc.splitTextToSize(content, 500);
+      wrapped.slice(0, 50).forEach((line: string) => {
+        if (y > 760) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.text(line, 40, y);
+        y += 13;
+      });
+      y += 15;
+    });
+
+    doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+  };
+
+  const handleUpdateDossier = (title: string, description: string, tags: string[]) => {
+    if (editingDossier) {
+      updateDossier(editingDossier.id, { title, description, tags });
+    }
+  };
+
+  // Detail view
+  if (selectedDossier) {
+    return (
+      <div className="animate-in slide-in-from-right-10 duration-300">
+        <button
+          onClick={() => setSelectedDossierId(null)}
+          className="mb-4 flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+        >
+          <ArrowLeft size={16} /> Torna ai Dossier
+        </button>
+
+        <header className="mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
+          <div className="flex justify-between items-start">
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                  <Folder className="text-blue-500" size={28} />
+                  {selectedDossier.title}
+                </h2>
+                {selectedDossier.isPinned && (
+                  <Star size={18} className="text-yellow-500 fill-yellow-500" />
+                )}
+              </div>
+              {selectedDossier.description && (
+                <p className="text-gray-500 mt-1">{selectedDossier.description}</p>
+              )}
+              {selectedDossier.tags?.length > 0 && (
+                <div className="flex gap-2 mt-2">
+                  {selectedDossier.tags.map(tag => (
+                    <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="text-xs text-gray-400 mt-2">
+                Creato il {new Date(selectedDossier.createdAt).toLocaleDateString()} • {selectedDossier.items.length} elementi
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditingDossier(selectedDossier)}
+                className="text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-md transition-colors"
+                title="Modifica"
+              >
+                <Edit2 size={18} />
+              </button>
+              <button
+                onClick={() => toggleDossierPin(selectedDossier.id)}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  selectedDossier.isPinned
+                    ? "text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
+                    : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                )}
+                title={selectedDossier.isPinned ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti"}
+              >
+                <Star size={18} className={selectedDossier.isPinned ? "fill-current" : ""} />
+              </button>
+              <button
+                onClick={() => handleExportPdf(selectedDossier.id)}
+                className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-2 rounded-md transition-colors"
+                title="Esporta PDF"
+              >
+                <Download size={18} />
+              </button>
+              <button
+                onClick={() => exportDossierJSON(selectedDossier)}
+                className="text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded-md transition-colors"
+                title="Esporta JSON"
+              >
+                <FileJson size={18} />
+              </button>
+              <button
+                onClick={() => copyShareLink(selectedDossier)}
+                className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded-md transition-colors"
+                title="Copia link di condivisione"
+              >
+                <Share2 size={18} />
+              </button>
+              <button
+                onClick={() => setTreeNavigatorOpen(true)}
+                className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 p-2 rounded-md transition-colors"
+                title="Importa da norma"
+              >
+                <TreeDeciduous size={18} />
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Sei sicuro di voler eliminare questo dossier?')) {
+                    deleteDossier(selectedDossier.id);
+                    setSelectedDossierId(null);
+                  }
+                }}
+                className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-colors"
+                title="Elimina Dossier"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Bulk actions toolbar */}
+        {selectedDossier.items.length > 0 && (
+          <div className="mb-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowBulkActions(!showBulkActions)}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm transition-colors",
+                  showBulkActions
+                    ? "bg-blue-600 text-white"
+                    : "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
+                )}
+              >
+                {showBulkActions ? "Annulla selezione" : "Seleziona"}
+              </button>
+              {showBulkActions && (
+                <>
+                  <button
+                    onClick={selectAllItems}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Seleziona tutti
+                  </button>
+                  <span className="text-sm text-gray-500">
+                    {selectedItems.size} selezionati
+                  </span>
+                </>
+              )}
+            </div>
+            {showBulkActions && selectedItems.size > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMoveToModalOpen(true)}
+                  className="px-3 py-1.5 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center gap-1"
+                >
+                  <FolderInput size={14} />
+                  Sposta
+                </button>
+                <button
+                  onClick={deleteSelectedItems}
+                  className="px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1"
+                >
+                  <Trash2 size={14} />
+                  Elimina
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={selectedDossier.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {selectedDossier.items.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700">
+                  <p className="text-gray-500">Questo dossier è vuoto.</p>
+                  <p className="text-xs text-gray-400 mt-1">Aggiungi articoli dai risultati di ricerca.</p>
+                </div>
+              ) : (
+                selectedDossier.items.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    isSelected={selectedItems.has(item.id)}
+                    onToggleSelect={() => toggleItemSelection(item.id)}
+                    onView={() => setViewingItem(item)}
+                    onRemove={() => removeFromDossier(selectedDossier.id, item.id)}
+                    onStatusChange={(status) => updateDossierItemStatus(selectedDossier.id, item.id, status)}
+                    showCheckbox={showBulkActions}
+                  />
+                ))
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        {/* Move to dossier modal */}
+        {moveToModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMoveToModalOpen(false)} />
+            <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
+              <div className="p-6">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-4">Sposta in altro dossier</h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {dossiers.filter(d => d.id !== selectedDossier.id).map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => handleMoveToDossier(d.id)}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                    >
+                      <Folder size={16} className="text-blue-500" />
+                      {d.title}
+                    </button>
+                  ))}
+                  {dossiers.filter(d => d.id !== selectedDossier.id).length === 0 && (
+                    <p className="text-gray-500 text-sm text-center py-4">Nessun altro dossier disponibile</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setMoveToModalOpen(false)}
+                  className="mt-4 w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                >
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <ArticleViewerModal
+          item={viewingItem}
+          isOpen={!!viewingItem}
+          onClose={() => setViewingItem(null)}
+        />
+
+        <EditDossierModal
+          dossier={editingDossier}
+          isOpen={!!editingDossier}
+          onClose={() => setEditingDossier(null)}
+          onSave={handleUpdateDossier}
+        />
+
+        <TreeNavigatorModal
+          isOpen={treeNavigatorOpen}
+          onClose={() => setTreeNavigatorOpen(false)}
+          onImport={handleTreeImport}
+        />
+      </div>
+    );
+  }
+
+  // List view
+  return (
+    <div className="animate-in fade-in duration-300">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">I tuoi Dossier</h2>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+        >
+          <FolderPlus size={18} /> Nuovo Dossier
+        </button>
+      </div>
+
+      {/* Search and filters */}
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Cerca nei dossier..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as 'date' | 'name' | 'items')}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          >
+            <option value="date">Ordina per data</option>
+            <option value="name">Ordina per nome</option>
+            <option value="items">Ordina per elementi</option>
+          </select>
+        </div>
+
+        {/* Tags filter */}
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedTag(null)}
+              className={cn(
+                "px-3 py-1 rounded-full text-sm transition-colors",
+                !selectedTag
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+              )}
+            >
+              Tutti
+            </button>
+            {allTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm transition-colors flex items-center gap-1",
+                  selectedTag === tag
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                )}
+              >
+                <Tag size={12} />
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Dossier grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredDossiers.length === 0 ? (
+          <div className="col-span-full text-center py-20">
+            <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Folder size={40} className="text-gray-400" />
+            </div>
+            {searchQuery || selectedTag ? (
+              <>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Nessun risultato</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-2">Prova a modificare i filtri di ricerca.</p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Nessun dossier creato</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-2">Organizza le tue ricerche creando dei dossier tematici.</p>
+              </>
+            )}
+          </div>
+        ) : (
+          filteredDossiers.map(dossier => (
+            <div
+              key={dossier.id}
+              onClick={() => setSelectedDossierId(dossier.id)}
+              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative"
+            >
+              {dossier.isPinned && (
+                <Star size={16} className="absolute top-3 right-3 text-yellow-500 fill-yellow-500" />
+              )}
+              <div className="flex justify-between items-start mb-4">
+                <Folder className="text-blue-500 group-hover:scale-110 transition-transform" size={32} />
+                <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full">
+                  {dossier.items.length} elementi
+                </span>
+              </div>
+              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors">
+                {dossier.title}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em]">
+                {dossier.description || "Nessuna descrizione"}
+              </p>
+              {dossier.tags?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-3">
+                  {dossier.tags.slice(0, 3).map(tag => (
+                    <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">
+                      {tag}
+                    </span>
+                  ))}
+                  {dossier.tags.length > 3 && (
+                    <span className="text-xs text-gray-400">+{dossier.tags.length - 3}</span>
+                  )}
+                </div>
+              )}
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                <span className="text-xs text-gray-400">{new Date(dossier.createdAt).toLocaleDateString()}</span>
+                <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <DossierModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      <EditDossierModal
+        dossier={editingDossier}
+        isOpen={!!editingDossier}
+        onClose={() => setEditingDossier(null)}
+        onSave={handleUpdateDossier}
+      />
+    </div>
+  );
+}

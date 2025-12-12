@@ -22,9 +22,9 @@ export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { setComparisonArticle, addWorkspaceTab, addNormaToTab, workspaceTabs } = useAppStore();
+  const { addWorkspaceTab, addNormaToTab, workspaceTabs, searchTrigger, clearSearchTrigger } = useAppStore();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[] }>>({});
+  const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
@@ -33,7 +33,7 @@ export function SearchPanel() {
     isLoading: false
   });
 
-  const processResult = useCallback((result: ArticleData) => {
+  const processResult = useCallback((result: ArticleData, versionDate?: string) => {
       if (result.error) {
           console.error("Backend Error for item:", result.error);
           return;
@@ -44,6 +44,16 @@ export function SearchPanel() {
       if (!normaData) {
           console.error("Received result without norma_data", result);
           return;
+      }
+
+      // Mark as historical if version_date was provided
+      if (versionDate) {
+          console.log('📅 Processing with versionDate:', versionDate, 'norma data_versione:', normaData.data_versione);
+          result.versionInfo = {
+              isHistorical: true,
+              requestedDate: versionDate,
+              effectiveDate: normaData.data_versione || normaData.data
+          };
       }
 
       const norma: Norma = {
@@ -77,16 +87,17 @@ export function SearchPanel() {
 
           return {
               ...prev,
-              [key]: { norma, articles: newArticles }
+              [key]: { norma, articles: newArticles, versionDate }
           };
       });
   }, []);
 
-  const processResults = useCallback((items: ArticleData[]) => {
-      items.forEach(processResult);
+  const processResults = useCallback((items: ArticleData[], versionDate?: string) => {
+      items.forEach(item => processResult(item, versionDate));
   }, [processResult]);
 
   const handleSearch = useCallback(async (params: SearchParams) => {
+    console.log('🔍 SearchPanel handleSearch called with:', params);
     setIsLoading(true);
     setError(null);
     setResultsBuffer({}); // Clear buffer before new search
@@ -103,7 +114,7 @@ export function SearchPanel() {
 
         if (params.show_brocardi_info) {
             const data = await response.json();
-            processResults(data);
+            processResults(data, params.version_date);
         } else {
             if (!response.body) return;
             const reader = response.body.getReader();
@@ -121,7 +132,7 @@ export function SearchPanel() {
                     if (line.trim()) {
                         try {
                             const result = JSON.parse(line);
-                            processResult(result);
+                            processResult(result, params.version_date);
                         } catch (e) {
                             console.error("Error parsing line", line, e);
                         }
@@ -131,7 +142,7 @@ export function SearchPanel() {
             if (buffer.trim()) {
                  try {
                     const result = JSON.parse(buffer);
-                    processResult(result);
+                    processResult(result, params.version_date);
                 } catch (e) {}
             }
         }
@@ -148,24 +159,38 @@ export function SearchPanel() {
   // Process results buffer and create workspace tabs
   useEffect(() => {
     if (Object.keys(resultsBuffer).length > 0 && !isLoading) {
-      Object.entries(resultsBuffer).forEach(([_, group]) => {
-        // Check if there's an existing tab with this norma
-        const existingTab = workspaceTabs.find(tab =>
-          tab.content.some(item =>
-            item.type === 'norma' &&
-            item.norma.tipo_atto === group.norma.tipo_atto &&
-            item.norma.numero_atto === group.norma.numero_atto &&
-            item.norma.data === group.norma.data
-          )
-        );
+      console.log('📦 Processing results buffer:', resultsBuffer);
+      Object.entries(resultsBuffer).forEach(([key, group]) => {
+        // For historical versions, always create a new tab
+        const isHistorical = group.articles.some(a => a.versionInfo?.isHistorical);
+        console.log('🏷️ Processing group:', key, 'isHistorical:', isHistorical, 'versionDate:', group.versionDate);
 
-        if (existingTab) {
-          // Add articles to existing tab's norma
-          addNormaToTab(existingTab.id, group.norma, group.articles);
-        } else {
-          // Create new tab
-          const label = `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
+        if (isHistorical) {
+          // Create new tab with version date in label
+          const versionDate = group.versionDate ? ` - Ver. ${group.versionDate}` : ' - Storico';
+          const label = `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionDate}`;
+          console.log('➕ Creating historical tab with label:', label);
           addWorkspaceTab(label, group.norma, group.articles);
+        } else {
+          // Check if there's an existing tab with this norma (current version)
+          const existingTab = workspaceTabs.find(tab =>
+            tab.content.some(item =>
+              item.type === 'norma' &&
+              item.norma.tipo_atto === group.norma.tipo_atto &&
+              item.norma.numero_atto === group.norma.numero_atto &&
+              item.norma.data === group.norma.data &&
+              !item.articles?.some(a => a.versionInfo?.isHistorical) // Make sure it's not a historical tab
+            )
+          );
+
+          if (existingTab) {
+            // Add articles to existing tab's norma
+            addNormaToTab(existingTab.id, group.norma, group.articles);
+          } else {
+            // Create new tab
+            const label = `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
+            addWorkspaceTab(label, group.norma, group.articles);
+          }
         }
       });
 
@@ -191,9 +216,13 @@ export function SearchPanel() {
     }
   }, [searchParams, setSearchParams, handleSearch]);
 
-  const handleCompareArticle = useCallback((article: ArticleData) => {
-      setComparisonArticle(article);
-  }, [setComparisonArticle]);
+  // Listen for programmatic search triggers
+  useEffect(() => {
+    if (searchTrigger) {
+      handleSearch(searchTrigger);
+      clearSearchTrigger();
+    }
+  }, [searchTrigger, handleSearch, clearSearchTrigger]);
 
   const handleCrossReferenceNavigate = useCallback((articleNumber: string, normaData: ArticleData['norma_data']) => {
       const params: SearchParams = {
@@ -246,7 +275,6 @@ export function SearchPanel() {
       {/* Workspace Manager - renders all tabs */}
       <WorkspaceManager
         onViewPdf={handleViewPdf}
-        onCompareArticle={handleCompareArticle}
         onCrossReference={handleCrossReferenceNavigate}
       />
 

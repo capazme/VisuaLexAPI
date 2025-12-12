@@ -11,14 +11,12 @@ import type { ArticleData } from '../../../types';
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
   onViewPdf: (urn: string) => void;
-  onCompareArticle: (article: ArticleData) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
 }
 
 export function WorkspaceTabPanel({
   tab,
   onViewPdf,
-  onCompareArticle,
   onCrossReference
 }: WorkspaceTabPanelProps) {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -257,7 +255,6 @@ export function WorkspaceTabPanel({
                       tabId={tab.id}
                       normaBlock={item}
                       onViewPdf={onViewPdf}
-                      onCompareArticle={onCompareArticle}
                       onCrossReference={onCrossReference}
                       onExtractArticle={(articleId) => extractArticleFromNorma(tab.id, item.id, articleId)}
                       onRemoveArticle={(articleId) => removeArticleFromNorma(tab.id, item.id, articleId)}
@@ -270,7 +267,6 @@ export function WorkspaceTabPanel({
                       tabId={tab.id}
                       looseArticle={item}
                       onViewPdf={onViewPdf}
-                      onCompareArticle={onCompareArticle}
                       onCrossReference={onCrossReference}
                     />
                   );

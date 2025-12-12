@@ -10,7 +10,6 @@ interface NormaBlockComponentProps {
   tabId: string;
   normaBlock: NormaBlock;
   onViewPdf: (urn: string) => void;
-  onCompareArticle: (article: ArticleData) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
   onExtractArticle: (articleId: string) => void;
   onRemoveArticle: (articleId: string) => void;
@@ -20,7 +19,6 @@ export function NormaBlockComponent({
   tabId,
   normaBlock,
   onViewPdf,
-  onCompareArticle,
   onCrossReference,
   onExtractArticle,
   onRemoveArticle
@@ -164,7 +162,6 @@ export function NormaBlockComponent({
               <ArticleTabContent
                 key={activeArticle.norma_data.numero_articolo}
                 data={activeArticle}
-                onCompare={onCompareArticle}
                 onCrossReferenceNavigate={onCrossReference}
               />
             ) : (

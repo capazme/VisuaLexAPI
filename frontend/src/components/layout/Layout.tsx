@@ -49,9 +49,9 @@ export function Layout() {
             e.preventDefault();
             toggleSidebar();
         }
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'w') {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
             e.preventDefault();
-            navigate('/workspace');
+            navigate('/dossier');
         }
         if ((e.metaKey || e.ctrlKey) && e.key === ' ') {
             e.preventDefault();
@@ -64,7 +64,7 @@ export function Layout() {
 
   const pageTitles: Record<string, string> = {
     '/': 'Ricerca Normativa',
-    '/workspace': 'Workspace',
+    '/dossier': 'Dossier',
     '/history': 'Cronologia',
     '/bookmarks': 'Segnalibri',
   };

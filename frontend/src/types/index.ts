@@ -37,6 +37,11 @@ export interface ArticleData {
     brocardi_info?: BrocardiInfo | null;
     error?: string;
     queue_position?: number;
+    versionInfo?: {
+        isHistorical: boolean;
+        requestedDate?: string;
+        effectiveDate?: string;
+    };
 }
 
 export interface SearchParams {
@@ -84,6 +89,8 @@ export interface Dossier {
     description?: string;
     createdAt: string;
     items: DossierItem[];
+    tags?: string[];
+    isPinned?: boolean;
 }
 
 export interface DossierItem {
@@ -91,6 +98,7 @@ export interface DossierItem {
     type: 'norma' | 'note';
     data: any; // NormaVisitata or Note content
     addedAt: string;
+    status?: 'unread' | 'reading' | 'important' | 'done';
 }
 
 export interface Bookmark {

@@ -7,7 +7,6 @@ import type { ArticleData } from '../../../types';
 
 interface WorkspaceManagerProps {
   onViewPdf: (urn: string) => void;
-  onCompareArticle: (article: ArticleData) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
 }
 
@@ -19,7 +18,6 @@ interface DragData {
 
 export function WorkspaceManager({
   onViewPdf,
-  onCompareArticle,
   onCrossReference
 }: WorkspaceManagerProps) {
   const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs } = useAppStore();
@@ -85,7 +83,6 @@ export function WorkspaceManager({
           key={tab.id}
           tab={tab}
           onViewPdf={onViewPdf}
-          onCompareArticle={onCompareArticle}
           onCrossReference={onCrossReference}
         />
       ))}

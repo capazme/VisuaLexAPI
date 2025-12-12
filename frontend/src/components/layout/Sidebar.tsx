@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { BookOpen, Search, Layout, Clock, Bookmark, Moon, Sun, Settings } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Bookmark, Moon, Sun, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface SidebarProps {
@@ -35,16 +35,16 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
           <Search size={20} />
           Ricerca
         </NavLink>
-        <NavLink 
-          to="/workspace" 
+        <NavLink
+          to="/dossier"
           className={({ isActive }) => cn(
             "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
             isActive ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
           )}
           onClick={closeMobile}
         >
-          <Layout size={20} />
-          Workspace
+          <Folder size={20} />
+          Dossier
         </NavLink>
         <NavLink 
           to="/history" 

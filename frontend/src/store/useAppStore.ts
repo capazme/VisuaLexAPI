@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData } from '../types';
+import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams } from '../types';
 
 // Content types for WorkspaceTab
 interface NormaBlock {
@@ -46,13 +46,15 @@ interface AppState {
     dossiers: Dossier[];
     annotations: Annotation[];
     highlights: Highlight[];
-    comparisonArticle: ArticleData | null;
 
     // UI State
     sidebarVisible: boolean;
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
+
+    // Search State
+    searchTrigger: SearchParams | null;
 
     // Actions
     updateSettings: (settings: Partial<AppSettings>) => void;
@@ -88,8 +90,13 @@ interface AppState {
     
     createDossier: (title: string, description?: string) => void;
     deleteDossier: (id: string) => void;
+    updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
+    toggleDossierPin: (id: string) => void;
     addToDossier: (dossierId: string, item: any, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
+    reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
+    updateDossierItemStatus: (dossierId: string, itemId: string, status: string) => void;
+    moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     
     addAnnotation: (normaKey: string, articleId: string, text: string) => void;
     removeAnnotation: (id: string) => void;
@@ -98,8 +105,9 @@ interface AppState {
     removeHighlight: (id: string) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
 
-    setComparisonArticle: (article: ArticleData) => void;
-    clearComparisonArticle: () => void;
+    // Search Actions
+    triggerSearch: (params: SearchParams) => void;
+    clearSearchTrigger: () => void;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -128,7 +136,9 @@ const appStore = createStore<AppState>()(
             dossiers: [],
             annotations: [],
             highlights: [],
-            comparisonArticle: null,
+
+            // Search State
+            searchTrigger: null,
 
             // UI State
             sidebarVisible: true,
@@ -424,6 +434,22 @@ const appStore = createStore<AppState>()(
                 state.dossiers = state.dossiers.filter(d => d.id !== id);
             }),
 
+            updateDossier: (id, updates) => set((state) => {
+                const dossier = state.dossiers.find(d => d.id === id);
+                if (dossier) {
+                    if (updates.title !== undefined) dossier.title = updates.title;
+                    if (updates.description !== undefined) dossier.description = updates.description;
+                    if (updates.tags !== undefined) dossier.tags = updates.tags;
+                }
+            }),
+
+            toggleDossierPin: (id) => set((state) => {
+                const dossier = state.dossiers.find(d => d.id === id);
+                if (dossier) {
+                    dossier.isPinned = !dossier.isPinned;
+                }
+            }),
+
             addToDossier: (dossierId, itemData, type) => set((state) => {
                 const dossier = state.dossiers.find(d => d.id === dossierId);
                 if (dossier) {
@@ -440,6 +466,36 @@ const appStore = createStore<AppState>()(
                 const dossier = state.dossiers.find(d => d.id === dossierId);
                 if (dossier) {
                     dossier.items = dossier.items.filter(i => i.id !== itemId);
+                }
+            }),
+
+            reorderDossierItems: (dossierId, fromIndex, toIndex) => set((state) => {
+                const dossier = state.dossiers.find(d => d.id === dossierId);
+                if (dossier && fromIndex !== toIndex) {
+                    const items = [...dossier.items];
+                    const [removed] = items.splice(fromIndex, 1);
+                    items.splice(toIndex, 0, removed);
+                    dossier.items = items;
+                }
+            }),
+
+            updateDossierItemStatus: (dossierId, itemId, status) => set((state) => {
+                const dossier = state.dossiers.find(d => d.id === dossierId);
+                if (dossier) {
+                    const item = dossier.items.find(i => i.id === itemId);
+                    if (item) {
+                        item.status = status;
+                    }
+                }
+            }),
+
+            moveToDossier: (sourceDossierId, targetDossierId, itemIds) => set((state) => {
+                const source = state.dossiers.find(d => d.id === sourceDossierId);
+                const target = state.dossiers.find(d => d.id === targetDossierId);
+                if (source && target) {
+                    const itemsToMove = source.items.filter(i => itemIds.includes(i.id));
+                    source.items = source.items.filter(i => !itemIds.includes(i.id));
+                    target.items.push(...itemsToMove);
                 }
             }),
 
@@ -476,12 +532,13 @@ const appStore = createStore<AppState>()(
                 return get().highlights.filter(h => h.normaKey === normaKey && h.articleId === articleId);
             },
 
-            setComparisonArticle: (article) => set((state) => {
-                state.comparisonArticle = article;
+            // Search Actions
+            triggerSearch: (params) => set((state) => {
+                state.searchTrigger = params;
             }),
 
-            clearComparisonArticle: () => set((state) => {
-                state.comparisonArticle = null;
+            clearSearchTrigger: () => set((state) => {
+                state.searchTrigger = null;
             })
         })),
         {
