@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, ExternalLink, ChevronDown, FileText, Scale, MessageCircle, Gavel } from 'lucide-react';
 import type { BrocardiInfo as BrocardiInfoType } from '../../../types';
 import { cn } from '../../../lib/utils';
@@ -13,6 +14,7 @@ interface BrocardiSectionProps {
 
 function BrocardiSection({ title, content, icon, color }: BrocardiSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   if (!content || (Array.isArray(content) && content.length === 0)) return null;
 
@@ -23,11 +25,16 @@ function BrocardiSection({ title, content, icon, color }: BrocardiSectionProps) 
 
   if (Array.isArray(validContent) && validContent.length === 0) return null;
 
+  // Pagination for Massime
+  const displayContent = title === 'Massime' && Array.isArray(validContent) && !showAll
+    ? validContent.slice(0, 10)
+    : validContent;
+
   return (
-    <div className="border-b border-gray-200 dark:border-gray-800 last:border-b-0">
+    <div className="border-b border-gray-100 dark:border-gray-800">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left group"
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 dark:hover:bg-white/5"
       >
         <div className="flex items-center gap-3">
           <div className={cn("p-2 rounded-lg", color)}>
@@ -51,44 +58,64 @@ function BrocardiSection({ title, content, icon, color }: BrocardiSectionProps) 
         />
       </button>
 
-      {isOpen && (
-        <div className="px-6 pb-4">
-          {title === 'Massime' && Array.isArray(validContent) ? (
-            <div className="space-y-3">
-              {validContent.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <span className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 text-sm font-semibold text-blue-600 dark:text-blue-400">
-                    {idx + 1}
-                  </span>
-                  <SafeHTML
-                    html={item}
-                    className="prose prose-sm dark:prose-invert max-w-none flex-1 [&_*]:text-gray-700 dark:[&_*]:text-gray-300"
-                  />
-                </div>
-              ))}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="px-6 pb-6 pt-2">
+              {title === 'Massime' && Array.isArray(displayContent) ? (
+                <>
+                  <div className="space-y-3">
+                    {displayContent.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <span className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 text-sm font-semibold text-blue-600 dark:text-blue-400">
+                          {idx + 1}
+                        </span>
+                        <SafeHTML
+                          html={item}
+                          className="prose prose-sm dark:prose-invert max-w-none flex-1 [&_*]:text-gray-700 dark:[&_*]:text-gray-300"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {Array.isArray(validContent) && validContent.length > 10 && !showAll && (
+                    <button
+                      onClick={() => setShowAll(true)}
+                      className="mt-4 w-full py-2 px-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Mostra altre {validContent.length - 10} massime
+                    </button>
+                  )}
+                </>
+              ) : Array.isArray(validContent) ? (
+                <ul className="space-y-2">
+                  {validContent.map((item, idx) => (
+                    <li
+                      key={idx}
+                      className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <SafeHTML
+                  html={validContent as string}
+                  className="prose prose-sm dark:prose-invert max-w-none [&_*]:text-gray-700 dark:[&_*]:text-gray-300"
+                />
+              )}
             </div>
-          ) : Array.isArray(validContent) ? (
-            <ul className="space-y-2">
-              {validContent.map((item, idx) => (
-                <li
-                  key={idx}
-                  className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-700 dark:text-gray-300"
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <SafeHTML
-              html={validContent as string}
-              className="prose prose-sm dark:prose-invert max-w-none [&_*]:text-gray-700 dark:[&_*]:text-gray-300"
-            />
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

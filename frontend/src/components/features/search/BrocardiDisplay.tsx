@@ -73,31 +73,25 @@ export function BrocardiDisplay({ info }: { info: BrocardiInfoType }) {
   const [isMainOpen, setIsMainOpen] = useState(true);
 
   return (
-    <div className="mt-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="mt-8 border-l-4 border-blue-500 pl-6 py-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-r-xl">
       <button
         onClick={() => setIsMainOpen(!isMainOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 hover:from-blue-100 hover:to-blue-200 dark:hover:from-blue-900/30 dark:hover:to-blue-800/30 transition-colors border-b border-gray-200 dark:border-gray-700"
+        className="flex items-center gap-3 text-blue-800 dark:text-blue-300 font-bold uppercase tracking-wider text-xs mb-4 hover:opacity-80 transition-opacity"
       >
-        <h6 className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm uppercase tracking-wide">
-          <Lightbulb size={16} className="fill-current" /> Approfondimenti Giuridici
-        </h6>
-        <ChevronDown 
-          size={20} 
-          className={cn(
-            "text-blue-500 dark:text-blue-400 transition-transform duration-200",
-            isMainOpen ? "rotate-180" : ""
-          )} 
+        <Lightbulb size={16} />
+        Approfondimenti & Dottrina
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", isMainOpen && "rotate-180")}
         />
       </button>
-      
+
       {isMainOpen && (
-        <div className="p-4">
-          <div className="space-y-2">
-            <BrocardiSection title="Brocardi" content={info.Brocardi} />
-            <BrocardiSection title="Ratio" content={info.Ratio} />
-            <BrocardiSection title="Spiegazione" content={info.Spiegazione} />
-            <BrocardiSection title="Massime" content={info.Massime} />
-          </div>
+        <div className="space-y-2">
+          <BrocardiSection title="Brocardi" content={info.Brocardi} />
+          <BrocardiSection title="Ratio" content={info.Ratio} />
+          <BrocardiSection title="Spiegazione" content={info.Spiegazione} />
+          <BrocardiSection title="Massime" content={info.Massime} />
           {info.link && (
              <div className="mt-3 text-right">
                 <a href={info.link} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline flex items-center justify-end gap-1">

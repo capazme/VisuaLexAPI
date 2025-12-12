@@ -384,40 +384,26 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
 
   return (
     <div className="animate-in fade-in duration-300 relative">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-dashed border-gray-200 dark:border-gray-700">
-        <div className="flex gap-3 text-xs text-gray-500 dark:text-gray-400 items-center">
+      {/* Sticky Reading Toolbar */}
+      <div className="sticky top-0 z-10 flex items-center justify-between p-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b mb-4">
+        {/* Version Info */}
+        <div className="flex items-center gap-1 text-xs font-medium text-gray-500">
            {versionInfo?.isHistorical ? (
-             <>
-               <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded text-orange-700 dark:text-orange-400 font-medium flex items-center gap-1">
-                 <Clock size={11} />
-                 Versione storica
-               </span>
-               <span className="text-orange-600 dark:text-orange-400 font-medium">
-                 Richiesta: {versionInfo.requestedDate}
-               </span>
-               {versionInfo.effectiveDate && (
-                 <span className="flex items-center gap-1">
-                   <Calendar size={12} /> Vigente al: {versionInfo.effectiveDate}
-                 </span>
-               )}
-             </>
+             <span className={cn("px-2 py-1 rounded",
+               versionInfo.isHistorical ? "bg-orange-100 text-orange-700" : "bg-green-100 text-green-700")}>
+               {versionInfo.isHistorical ? "Storica" : "Vigente"}
+             </span>
            ) : (
-             <>
-               <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300 font-medium">
-                 {norma_data.versione || 'Vigente'}
-               </span>
-               <span className="flex items-center gap-1">
-                 <Calendar size={12} /> {norma_data.data_versione || 'N/A'}
-               </span>
-             </>
-           )}
-           {norma_data.allegato && (
-             <span className="flex items-center gap-1">
-               <Paperclip size={12} /> {norma_data.allegato}
+             <span className="px-2 py-1 rounded bg-green-100 text-green-700">
+               Vigente
              </span>
            )}
+           <span className="text-gray-400">|</span>
+           <span>Aggiornato al: {norma_data.data_versione || 'N/A'}</span>
         </div>
-        <div className="flex flex-wrap gap-1">
+
+        {/* Quick Actions */}
+        <div className="flex items-center gap-1">
             {/* Primary buttons */}
             <button
                 onClick={handleBookmark}
@@ -636,7 +622,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
       )}
 
 
-      <div className="prose prose-sm dark:prose-invert max-w-none mb-6 bg-white dark:bg-gray-900 p-4 rounded-md border border-gray-100 dark:border-gray-800 min-h-[100px]" ref={contentRef} id={`article-content-${itemKey}`}>
+      {/* Article Content with Prose Styling */}
+      <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed px-4" ref={contentRef} id={`article-content-${itemKey}`}>
         {processedContent ? (
             <SafeHTML html={processedContent} />
         ) : (
