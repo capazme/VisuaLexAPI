@@ -74,11 +74,9 @@ class NormattivaScraper(BaseScraper):
                 # SCENARIO 3: Allegato o Testo senza Formattazione AKN
                 return self._estrai_testo_allegato(corpo, link=get_link_dict)
             else:
-                log.warning("Unknown HTML formatting structure in document")
-                raise ParsingError(
-                    "Unknown HTML formatting structure in Normattiva document",
-                    html_snippet=atto
-                )
+                # SCENARIO 4: Fallback - estrai tutto il testo visibile
+                log.warning("Unknown HTML formatting structure, using fallback extraction")
+                return self._estrai_testo_fallback(corpo, link=get_link_dict)
         except ParsingError:
             # Re-raise ParsingError as-is
             raise
@@ -201,6 +199,33 @@ class NormattivaScraper(BaseScraper):
         except Exception as e:
             logger.error(f"Error in _estrai_testo_allegato: {e}", exc_info=True)
             return f"Error in _estrai_testo_allegato: {e}"
+
+    def _estrai_testo_fallback(self, corpo: Tag, link: bool = False) -> Union[str, Dict[str, Any]]:
+        """
+        Fallback extraction when no specific HTML pattern is recognized.
+        Extracts all visible text from the body, useful for abrogated articles
+        or articles with unusual structure.
+        """
+        try:
+            link_dict: Dict[str, str] = {}
+
+            # Extract all text content from corpo
+            final_text, link_dict = self.extract_text_recursive(corpo, link=link, link_dict=link_dict)
+
+            # Clean up the text
+            final_text = re.sub(r'\n{3,}', '\n\n', final_text).strip()
+            final_text = re.sub(r'[ \t]+', ' ', final_text)
+
+            # If no text found, indicate the article may be empty/abrogated
+            if not final_text.strip():
+                final_text = "[Articolo senza contenuto o abrogato]"
+
+            if link:
+                return {"testo": final_text, "link": link_dict}
+            return final_text
+        except Exception as e:
+            logger.error(f"Error in _estrai_testo_fallback: {e}", exc_info=True)
+            return f"Error in _estrai_testo_fallback: {e}"
 
     def parse_document(self, atto: str) -> BeautifulSoup:
         return BeautifulSoup(atto, 'html.parser')

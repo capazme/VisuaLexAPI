@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, ExternalLink, Plus, ArrowRight } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
@@ -8,6 +8,7 @@ import { TreeViewPanel } from './TreeViewPanel';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { ArticleMinimap } from '../workspace/ArticleMinimap';
 import { useAppStore } from '../../../store/useAppStore';
+import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
 
 interface NormaCardProps {
   norma: Norma;
@@ -52,10 +53,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   };
 
   const fetchTree = async () => {
-    if (!norma.urn) return;
+    if (!norma.urn || treeData) return; // Don't refetch if already loaded
     try {
         setTreeLoading(true);
-        setTreeError(null);
         const res = await fetch('/fetch_tree', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -65,14 +65,21 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         const payload = await res.json();
         setTreeData(payload.articles || payload);
     } catch (e: any) {
-        setTreeError(e.message);
+        console.error('Error fetching tree:', e);
     } finally {
         setTreeLoading(false);
     }
   };
 
+  // Auto-fetch tree structure when norma has URN
+  useEffect(() => {
+    if (norma.urn && !treeData && !treeLoading) {
+      fetchTree();
+    }
+  }, [norma.urn]);
+
   // Set first tab active when articles change if no tab is active
-  React.useEffect(() => {
+  useEffect(() => {
     if (articles.length > 0 && !activeTabId) {
         setActiveTabId(articles[0].norma_data.numero_articolo);
     } else if (articles.length > 0 && activeTabId && !articles.find(a => a.norma_data.numero_articolo === activeTabId)) {
@@ -80,21 +87,34 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         setActiveTabId(articles[0].norma_data.numero_articolo);
     }
   }, [articles, activeTabId]);
-  
+
   const activeArticle = articles.find(a => a.norma_data.numero_articolo === activeTabId);
 
-  const articleIds = articles.map(a => a.norma_data.numero_articolo);
-  const currentIndex = articleIds.findIndex(id => id === activeTabId);
+  // Loaded article IDs
+  const loadedArticleIds = articles.map(a => a.norma_data.numero_articolo);
 
-  const handlePrevArticle = () => {
-    if (currentIndex > 0) {
-      setActiveTabId(articleIds[currentIndex - 1]);
-    }
+  // All article IDs from structure (if available)
+  const allArticleIds = treeData ? extractArticleIdsFromTree(treeData) : undefined;
+
+  // Function to load a new article
+  const handleLoadArticle = (articleNumber: string) => {
+    triggerSearch({
+      act_type: norma.tipo_atto,
+      act_number: norma.numero_atto || '',
+      date: norma.data || '',
+      article: articleNumber,
+      version: 'vigente',
+      version_date: '',
+      show_brocardi_info: true
+    });
   };
 
-  const handleNextArticle = () => {
-    if (currentIndex < articleIds.length - 1) {
-      setActiveTabId(articleIds[currentIndex + 1]);
+  // Function to navigate to a loaded article or load it if not present
+  const handleArticleSelect = (articleNumber: string) => {
+    if (loadedArticleIds.includes(articleNumber)) {
+      setActiveTabId(articleNumber);
+    } else {
+      handleLoadArticle(articleNumber);
     }
   };
 
@@ -219,7 +239,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         treeData={treeData || []}
         urn={norma.urn || ''}
         title="Struttura Atto"
-        loadedArticles={articleIds}
+        loadedArticles={loadedArticleIds}
         onArticleSelect={(articleNumber) => {
           triggerSearch({
             act_type: norma.tipo_atto,
@@ -237,23 +257,25 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
       {/* Content */}
       {isOpen && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
-          {/* Navigation bar */}
-          {articles.length > 1 && (
+          {/* Navigation bar - show when structure available OR multiple articles loaded */}
+          {(allArticleIds && allArticleIds.length > 1) || articles.length > 1 ? (
             <div className="px-5 pt-3 flex items-center justify-between">
               <ArticleNavigation
-                currentIndex={currentIndex}
-                totalArticles={articles.length}
-                onPrev={handlePrevArticle}
-                onNext={handleNextArticle}
+                allArticleIds={allArticleIds}
+                loadedArticleIds={loadedArticleIds}
+                activeArticleId={activeTabId}
+                onNavigate={setActiveTabId}
+                onLoadArticle={handleLoadArticle}
               />
               <ArticleMinimap
-                articleIds={articleIds}
+                allArticleIds={allArticleIds}
+                loadedArticleIds={loadedArticleIds}
                 activeArticleId={activeTabId}
-                onArticleClick={setActiveTabId}
-                className="max-w-[250px]"
+                onArticleClick={handleArticleSelect}
+                className="max-w-[300px]"
               />
             </div>
-          )}
+          ) : null}
 
           {/* Modern Underline Tabs */}
           <div className="px-5 border-b border-gray-200 dark:border-gray-700 flex gap-0 overflow-x-auto no-scrollbar relative">

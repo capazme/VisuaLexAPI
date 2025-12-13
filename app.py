@@ -262,16 +262,16 @@ class NormaController:
                 act_number=data.get('act_number')
             )
             log.info("Completed date parsed", data_completa=data_completa)
-            data_completa_estesa = format_date_to_extended(data_completa)
-            log.info("Extended date formatted", data_completa_estesa=data_completa_estesa)
+            # Keep YYYY-MM-DD format for Norma validation
+            norma_date = data_completa
         else:
             log.info("Act type is not in allowed types", act_type=act_type)
-            data_completa_estesa = data.get('date')
-            log.info("Using provided date", data_completa_estesa=data_completa_estesa)
+            norma_date = data.get('date')
+            log.info("Using provided date", norma_date=norma_date)
 
         norma = Norma(
             tipo_atto=act_type,
-            data=data_completa_estesa if data_completa_estesa else None,
+            data=norma_date if norma_date else None,
             numero_atto=data.get('act_number')
         )
         log.info("Norma instance created", norma=norma)

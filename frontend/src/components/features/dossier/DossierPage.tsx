@@ -4,6 +4,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { DossierModal } from '../../ui/DossierModal';
 import { jsPDF } from 'jspdf';
 import { cn } from '../../../lib/utils';
+import { parseItalianDate } from '../../../utils/dateUtils';
 import type { Dossier, DossierItem } from '../../../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -270,7 +271,7 @@ function TreeNavigatorModal({
         body: JSON.stringify({
           act_type: actType,
           act_number: actNumber || undefined,
-          date: actDate || undefined,
+          date: actDate ? parseItalianDate(actDate) : undefined,
           article: '1' // dummy article to get URN
         })
       });
@@ -377,9 +378,10 @@ function TreeNavigatorModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
               <input
-                type="date"
+                type="text"
                 value={actDate}
                 onChange={e => setActDate(e.target.value)}
+                placeholder="aaaa o gg-mm-aaaa"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
             </div>

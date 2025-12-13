@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type NormaBlock } from '../../../store/useAppStore';
@@ -7,6 +7,7 @@ import { ArticleNavigation } from './ArticleNavigation';
 import { ArticleMinimap } from './ArticleMinimap';
 import { TreeViewPanel } from '../search/TreeViewPanel';
 import { cn } from '../../../lib/utils';
+import { extractArticleIdsFromTree, normalizeArticleId } from '../../../utils/treeUtils';
 import type { ArticleData } from '../../../types';
 
 interface NormaBlockComponentProps {
@@ -33,10 +34,11 @@ export function NormaBlockComponent({
   const [treeData, setTreeData] = useState<any[] | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
 
-  const { toggleNormaCollapse, triggerSearch } = useAppStore();
+  const { toggleNormaCollapse, triggerSearch, addNormaToTab } = useAppStore();
+  const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
 
   const fetchTree = async () => {
-    if (!normaBlock.norma.urn) return;
+    if (!normaBlock.norma.urn || treeData) return; // Don't refetch if already loaded
     try {
       setTreeLoading(true);
       const res = await fetch('/fetch_tree', {
@@ -53,6 +55,13 @@ export function NormaBlockComponent({
       setTreeLoading(false);
     }
   };
+
+  // Auto-fetch tree structure when norma has URN
+  useEffect(() => {
+    if (normaBlock.norma.urn && !treeData && !treeLoading) {
+      fetchTree();
+    }
+  }, [normaBlock.norma.urn]);
 
   // Make this norma draggable
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
@@ -85,18 +94,75 @@ export function NormaBlockComponent({
     a => a.norma_data.numero_articolo === activeArticleId
   );
 
-  const articleIds = normaBlock.articles.map(a => a.norma_data.numero_articolo);
-  const currentIndex = articleIds.findIndex(id => id === activeArticleId);
+  // Loaded article IDs
+  const loadedArticleIds = normaBlock.articles.map(a => a.norma_data.numero_articolo);
 
-  const handlePrevArticle = () => {
-    if (currentIndex > 0) {
-      setActiveArticleId(articleIds[currentIndex - 1]);
+  // Normalized set for faster lookups (handles "3 bis" vs "3-bis" differences)
+  const loadedArticleIdsNormalized = new Set(loadedArticleIds.map(normalizeArticleId));
+
+  // Helper to check if an article is loaded (handles format differences)
+  const isArticleLoaded = (articleId: string) => loadedArticleIdsNormalized.has(normalizeArticleId(articleId));
+
+  // All article IDs from structure (if available)
+  const allArticleIds = treeData ? extractArticleIdsFromTree(treeData) : undefined;
+
+  // Function to load a new article directly into this tab
+  const handleLoadArticle = async (articleNumber: string) => {
+    // Don't load if already loading or already loaded
+    if (loadingArticle) return;
+    if (isArticleLoaded(articleNumber)) {
+      // Find the actual ID in loadedArticleIds (might have different format)
+      const actualId = loadedArticleIds.find(id => normalizeArticleId(id) === normalizeArticleId(articleNumber));
+      setActiveArticleId(actualId || articleNumber);
+      return;
+    }
+
+    setLoadingArticle(articleNumber);
+
+    try {
+      const response = await fetch('/fetch_all_data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          act_type: normaBlock.norma.tipo_atto,
+          act_number: normaBlock.norma.numero_atto || '',
+          date: normaBlock.norma.data || '',
+          article: articleNumber,
+          version: 'vigente',
+          version_date: '',
+          show_brocardi_info: true
+        })
+      });
+
+      if (!response.ok) throw new Error('Errore nel caricamento');
+
+      const data = await response.json();
+      const articles = Array.isArray(data) ? data : [data];
+
+      // Filter out any errors
+      const validArticles = articles.filter((a: any) => !a.error && a.norma_data);
+
+      if (validArticles.length > 0) {
+        // Add to current tab's norma block
+        addNormaToTab(tabId, normaBlock.norma, validArticles);
+        // Set active to the newly loaded article
+        setActiveArticleId(articleNumber);
+      }
+    } catch (e) {
+      console.error('Error loading article:', e);
+    } finally {
+      setLoadingArticle(null);
     }
   };
 
-  const handleNextArticle = () => {
-    if (currentIndex < articleIds.length - 1) {
-      setActiveArticleId(articleIds[currentIndex + 1]);
+  // Function to navigate to a loaded article or load it if not present
+  const handleArticleSelect = (articleNumber: string) => {
+    if (isArticleLoaded(articleNumber)) {
+      // Find the actual ID in loadedArticleIds (might have different format)
+      const actualId = loadedArticleIds.find(id => normalizeArticleId(id) === normalizeArticleId(articleNumber));
+      setActiveArticleId(actualId || articleNumber);
+    } else {
+      handleLoadArticle(articleNumber);
     }
   };
 
@@ -189,17 +255,9 @@ export function NormaBlockComponent({
         treeData={treeData || []}
         urn={normaBlock.norma.urn || ''}
         title="Struttura Atto"
-        loadedArticles={articleIds}
+        loadedArticles={loadedArticleIds}
         onArticleSelect={(articleNumber) => {
-          triggerSearch({
-            act_type: normaBlock.norma.tipo_atto,
-            act_number: normaBlock.norma.numero_atto || '',
-            date: normaBlock.norma.data || '',
-            article: articleNumber,
-            version: 'vigente',
-            version_date: '',
-            show_brocardi_info: true
-          });
+          handleLoadArticle(articleNumber);
           setTreeVisible(false);
         }}
       />
@@ -207,19 +265,21 @@ export function NormaBlockComponent({
       {/* Articles */}
       {!normaBlock.isCollapsed && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
-          {/* Navigation bar */}
-          {normaBlock.articles.length > 1 && (
+          {/* Navigation bar - show when structure available OR multiple articles loaded */}
+          {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
             <div className="px-3 pt-2 flex items-center justify-between">
               <ArticleNavigation
-                currentIndex={currentIndex}
-                totalArticles={normaBlock.articles.length}
-                onPrev={handlePrevArticle}
-                onNext={handleNextArticle}
+                allArticleIds={allArticleIds}
+                loadedArticleIds={loadedArticleIds}
+                activeArticleId={activeArticleId}
+                onNavigate={setActiveArticleId}
+                onLoadArticle={handleLoadArticle}
               />
               <ArticleMinimap
-                articleIds={articleIds}
+                allArticleIds={allArticleIds}
+                loadedArticleIds={loadedArticleIds}
                 activeArticleId={activeArticleId}
-                onArticleClick={setActiveArticleId}
+                onArticleClick={handleArticleSelect}
                 className="max-w-[200px]"
               />
             </div>
@@ -235,41 +295,40 @@ export function NormaBlockComponent({
                 <div
                   key={id}
                   className={cn(
-                    "group flex items-center gap-2 px-3 py-2 rounded-t-lg text-xs font-medium border-t border-x border-b-0 cursor-pointer transition-all min-w-[100px] justify-between",
+                    "group flex items-center gap-1 px-2 py-1.5 rounded-t-lg text-xs font-medium cursor-pointer transition-all whitespace-nowrap",
                     isActive
-                      ? "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 relative -bottom-px z-10"
-                      : "bg-gray-100 dark:bg-gray-800/50 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700/50"
+                      ? "bg-white dark:bg-gray-800 border border-b-0 border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 relative -bottom-px z-10"
+                      : "bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700/50"
                   )}
                   onClick={() => setActiveArticleId(id)}
                 >
                   <span>Art. {id}</span>
-                  <div className={cn(
-                    "flex items-center gap-1 transition-opacity",
-                    isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  )}>
-                    {normaBlock.articles.length > 1 && (
+                  {isActive && (
+                    <div className="flex items-center gap-0.5 ml-1">
+                      {normaBlock.articles.length > 1 && (
+                        <button
+                          className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onExtractArticle(id);
+                          }}
+                          title="Estrai come articolo loose"
+                        >
+                          <ExternalLink size={10} />
+                        </button>
+                      )}
                       <button
-                        className="p-1 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                        className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onExtractArticle(id);
+                          onRemoveArticle(id);
                         }}
-                        title="Estrai come articolo loose"
+                        title="Chiudi articolo"
                       >
-                        <ExternalLink size={12} />
+                        <X size={10} />
                       </button>
-                    )}
-                    <button
-                      className="p-1 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveArticle(id);
-                      }}
-                      title="Chiudi articolo"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

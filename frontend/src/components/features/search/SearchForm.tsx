@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, RefreshCw, Eraser, Plus, Minus } from 'lucide-react';
 import type { SearchParams } from '../../../types';
+import { parseItalianDate } from '../../../utils/dateUtils';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -68,7 +69,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch(formData);
+    onSearch({
+      ...formData,
+      date: formData.date ? parseItalianDate(formData.date) : '',
+      version_date: formData.version_date ? parseItalianDate(formData.version_date) : ''
+    });
   };
 
   const handleReset = () => {

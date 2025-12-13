@@ -3,6 +3,7 @@ import { Command } from 'cmdk';
 import { Search, Book, FileText, Globe, X, Check } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { parseItalianDate } from '../../../utils/dateUtils';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -86,7 +87,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
       act_type: selectedAct,
       article,
       act_number: actNumber || undefined,
-      date: actDate || undefined,
+      date: actDate ? parseItalianDate(actDate) : undefined,
       version: 'vigente',
       version_date: '',
       show_brocardi_info: true
@@ -186,9 +187,10 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                       onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
                     />
                     <input
-                      type="date"
+                      type="text"
                       value={actDate}
                       onChange={(e) => setActDate(e.target.value)}
+                      placeholder="aaaa o gg-mm-aaaa"
                       className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
                       onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
                     />
