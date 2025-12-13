@@ -145,8 +145,9 @@ export function NormaBlockComponent({
       if (validArticles.length > 0) {
         // Add to current tab's norma block
         addNormaToTab(tabId, normaBlock.norma, validArticles);
-        // Set active to the newly loaded article
-        setActiveArticleId(articleNumber);
+        // Set active to the newly loaded article using the actual ID from response
+        const loadedArticleId = validArticles[0].norma_data?.numero_articolo;
+        setActiveArticleId(loadedArticleId || articleNumber);
       }
     } catch (e) {
       console.error('Error loading article:', e);
