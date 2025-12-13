@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FloatingSearchPanel } from './FloatingSearchPanel';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
 import { PDFViewer } from '../../ui/PDFViewer';
+import { NormeNavigator } from './NormeNavigator';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
 import { SearchX, Search, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
@@ -22,9 +23,38 @@ export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { addWorkspaceTab, addNormaToTab, workspaceTabs, searchTrigger, clearSearchTrigger } = useAppStore();
+  const { addWorkspaceTab, addNormaToTab, workspaceTabs, searchTrigger, clearSearchTrigger, bringTabToFront } = useAppStore();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
+
+  // Extract unique norme from workspace tabs for navigator
+  const normeForNavigator = useMemo(() => {
+    const normeMap = new Map();
+
+    workspaceTabs.forEach(tab => {
+      tab.content.forEach(item => {
+        if (item.type === 'norma') {
+          const key = `${item.norma.tipo_atto}-${item.norma.numero_atto || ''}-${item.norma.data || ''}`;
+          if (!normeMap.has(key)) {
+            normeMap.set(key, {
+              norma: item.norma,
+              articles: item.articles,
+              tabId: tab.id
+            });
+          }
+        }
+      });
+    });
+
+    return Array.from(normeMap.values());
+  }, [workspaceTabs]);
+
+  const handleNavigateToNorma = useCallback((index: number) => {
+    const normaData = normeForNavigator[index];
+    if (normaData?.tabId) {
+      bringTabToFront(normaData.tabId);
+    }
+  }, [normeForNavigator, bringTabToFront]);
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
@@ -271,6 +301,12 @@ export function SearchPanel() {
 
       {/* Floating Search Panel */}
       <FloatingSearchPanel onSearch={handleSearch} isLoading={isLoading} />
+
+      {/* Norme Navigator - Quick navigation between open norms */}
+      <NormeNavigator
+        norme={normeForNavigator}
+        onNavigateToNorma={handleNavigateToNorma}
+      />
 
       {/* Workspace Manager - renders all tabs */}
       <WorkspaceManager

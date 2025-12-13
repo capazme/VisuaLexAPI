@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Book, ChevronDown, X, GitBranch, ExternalLink } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Book, ChevronDown, X, GitBranch, ExternalLink, Plus, ArrowRight } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
+import { useAppStore } from '../../../store/useAppStore';
 
 interface NormaCardProps {
   norma: Norma;
@@ -25,6 +26,28 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeData, setTreeData] = useState<any[] | null>(null);
   const [treeError, setTreeError] = useState<string | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddValue, setQuickAddValue] = useState('');
+  const { triggerSearch } = useAppStore();
+
+  const handleQuickAddArticle = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickAddValue.trim()) return;
+
+    // Trigger search for the new article
+    triggerSearch({
+      act_type: norma.tipo_atto,
+      act_number: norma.numero_atto || '',
+      date: norma.data || '',
+      article: quickAddValue.trim(),
+      version: 'vigente',
+      version_date: '',
+      show_brocardi_info: true
+    });
+
+    setQuickAddValue('');
+    setQuickAddOpen(false);
+  };
 
   const fetchTree = async () => {
     if (!norma.urn) return;
@@ -91,8 +114,55 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           </div>
         </div>
         <div className="flex items-center gap-2">
+            {/* Quick Add Article */}
+            <AnimatePresence>
+              {quickAddOpen ? (
+                <motion.form
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 'auto', opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  onSubmit={handleQuickAddArticle}
+                  className="flex items-center gap-1 overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="text"
+                    value={quickAddValue}
+                    onChange={(e) => setQuickAddValue(e.target.value)}
+                    placeholder="es. 1, 2-5"
+                    autoFocus
+                    className="w-24 px-2 py-1 text-xs border border-blue-300 dark:border-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
+                  />
+                  <button
+                    type="submit"
+                    className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                    title="Aggiungi"
+                  >
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setQuickAddOpen(false); setQuickAddValue(''); }}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded-md transition-colors"
+                    title="Annulla"
+                  >
+                    <X size={14} />
+                  </button>
+                </motion.form>
+              ) : (
+                <button
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 rounded-md transition-colors flex items-center gap-1"
+                  onClick={(e) => { e.stopPropagation(); setQuickAddOpen(true); }}
+                  title="Aggiungi articolo"
+                >
+                  <Plus size={14} /> Articolo
+                </button>
+              )}
+            </AnimatePresence>
+
             {norma.urn && (
-                <button 
+                <button
                     className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-md transition-colors"
                     onClick={(e) => {
                         e.stopPropagation();
