@@ -5,6 +5,8 @@ import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
+import { ArticleNavigation } from '../workspace/ArticleNavigation';
+import { ArticleMinimap } from '../workspace/ArticleMinimap';
 import { useAppStore } from '../../../store/useAppStore';
 
 interface NormaCardProps {
@@ -80,6 +82,21 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   }, [articles, activeTabId]);
   
   const activeArticle = articles.find(a => a.norma_data.numero_articolo === activeTabId);
+
+  const articleIds = articles.map(a => a.norma_data.numero_articolo);
+  const currentIndex = articleIds.findIndex(id => id === activeTabId);
+
+  const handlePrevArticle = () => {
+    if (currentIndex > 0) {
+      setActiveTabId(articleIds[currentIndex - 1]);
+    }
+  };
+
+  const handleNextArticle = () => {
+    if (currentIndex < articleIds.length - 1) {
+      setActiveTabId(articleIds[currentIndex + 1]);
+    }
+  };
 
   if (articles.length === 0) return null;
 
@@ -202,21 +219,45 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         treeData={treeData || []}
         urn={norma.urn || ''}
         title="Struttura Atto"
+        loadedArticles={articleIds}
+        onArticleSelect={(articleNumber) => {
+          triggerSearch({
+            act_type: norma.tipo_atto,
+            act_number: norma.numero_atto || '',
+            date: norma.data || '',
+            article: articleNumber,
+            version: 'vigente',
+            version_date: '',
+            show_brocardi_info: true
+          });
+          setTreeVisible(false);
+        }}
       />
 
       {/* Content */}
       {isOpen && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
+          {/* Navigation bar */}
+          {articles.length > 1 && (
+            <div className="px-5 pt-3 flex items-center justify-between">
+              <ArticleNavigation
+                currentIndex={currentIndex}
+                totalArticles={articles.length}
+                onPrev={handlePrevArticle}
+                onNext={handleNextArticle}
+              />
+              <ArticleMinimap
+                articleIds={articleIds}
+                activeArticleId={activeTabId}
+                onArticleClick={setActiveTabId}
+                className="max-w-[250px]"
+              />
+            </div>
+          )}
+
           {/* Modern Underline Tabs */}
           <div className="px-5 border-b border-gray-200 dark:border-gray-700 flex gap-0 overflow-x-auto no-scrollbar relative">
-            {/* Position Indicator */}
-            {articles.length > 1 && (
-              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-                {articles.findIndex(a => a.norma_data.numero_articolo === activeTabId) + 1}/{articles.length}
-              </div>
-            )}
-
-            {articles.map((article, index) => {
+            {articles.map((article) => {
                 const id = article.norma_data.numero_articolo;
                 const isActive = id === activeTabId;
                 return (
@@ -226,8 +267,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                             "relative px-6 py-3 text-sm font-medium transition-all group flex items-center gap-2",
                             isActive
                               ? "text-blue-600 dark:text-blue-400"
-                              : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30",
-                            index === 0 && articles.length > 1 && "ml-16" // Space for position indicator
+                              : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30"
                         )}
                         onClick={() => setActiveTabId(id)}
                     >

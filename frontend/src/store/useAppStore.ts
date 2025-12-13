@@ -21,7 +21,21 @@ interface LooseArticle {
     sourceNorma: any;
 }
 
-type TabContent = NormaBlock | LooseArticle;
+interface CollectionArticle {
+    article: ArticleData;
+    sourceNorma: any;
+}
+
+interface ArticleCollection {
+    type: 'collection';
+    id: string;
+    label: string;
+    articles: CollectionArticle[];
+    isCollapsed: boolean;
+    color?: 'purple' | 'indigo';
+}
+
+type TabContent = NormaBlock | LooseArticle | ArticleCollection;
 
 // Renamed from FloatingPanel to WorkspaceTab
 interface WorkspaceTab {
@@ -82,6 +96,15 @@ interface AppState {
     extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
     moveLooseArticleBetweenTabs: (articleId: string, sourceTabId: string, targetTabId: string) => void;
     removeArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
+    mergeLooseArticleToNorma: (tabId: string, looseArticleId: string, targetNormaId: string) => boolean;
+
+    // Collection Actions
+    createCollection: (tabId: string, label?: string) => string;
+    renameCollection: (tabId: string, collectionId: string, newLabel: string) => void;
+    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: any) => void;
+    removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
+    toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
+    moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
     
     addBookmark: (norma: NormaVisitata, tags?: string[]) => void;
     updateBookmarkTags: (normaKey: string, tags: string[]) => void;
@@ -392,6 +415,182 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
+            mergeLooseArticleToNorma: (tabId, looseArticleId, targetNormaId) => {
+                let success = false;
+                set((state) => {
+                    const tab = state.workspaceTabs.find(t => t.id === tabId);
+                    if (!tab) return;
+
+                    // Find the loose article
+                    const looseIndex = tab.content.findIndex(
+                        c => c.type === 'loose-article' && c.id === looseArticleId
+                    );
+                    if (looseIndex === -1) return;
+
+                    const loose = tab.content[looseIndex] as LooseArticle;
+
+                    // Find the target norma block
+                    const targetNorma = tab.content.find(
+                        c => c.type === 'norma' && c.id === targetNormaId
+                    ) as NormaBlock | undefined;
+                    if (!targetNorma) return;
+
+                    // Verify compatibility: same source norma
+                    const isSameNorma =
+                        loose.sourceNorma.tipo_atto === targetNorma.norma.tipo_atto &&
+                        loose.sourceNorma.numero_atto === targetNorma.norma.numero_atto &&
+                        loose.sourceNorma.data === targetNorma.norma.data;
+
+                    if (!isSameNorma) return;
+
+                    // Check for duplicate article
+                    const articleNumber = loose.article.norma_data.numero_articolo;
+                    const isDuplicate = targetNorma.articles.some(
+                        a => a.norma_data.numero_articolo === articleNumber
+                    );
+
+                    if (isDuplicate) return;
+
+                    // Add article to norma block and sort
+                    targetNorma.articles.push(loose.article);
+                    targetNorma.articles.sort((a, b) => {
+                        const numA = parseInt(a.norma_data.numero_articolo) || 0;
+                        const numB = parseInt(b.norma_data.numero_articolo) || 0;
+                        return numA - numB;
+                    });
+
+                    // Remove loose article
+                    tab.content.splice(looseIndex, 1);
+                    success = true;
+                });
+                return success;
+            },
+
+            // Collection Actions
+            createCollection: (tabId, label) => {
+                let collectionId = '';
+                set((state) => {
+                    const tab = state.workspaceTabs.find(t => t.id === tabId);
+                    if (!tab) return;
+
+                    const newCollection: ArticleCollection = {
+                        type: 'collection',
+                        id: uuidv4(),
+                        label: label || 'Nuova Raccolta',
+                        articles: [],
+                        isCollapsed: false,
+                        color: 'purple'
+                    };
+
+                    tab.content.push(newCollection);
+                    collectionId = newCollection.id;
+                });
+                return collectionId;
+            },
+
+            renameCollection: (tabId, collectionId, newLabel) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+
+                const collection = tab.content.find(
+                    c => c.type === 'collection' && c.id === collectionId
+                ) as ArticleCollection | undefined;
+
+                if (collection) {
+                    collection.label = newLabel;
+                }
+            }),
+
+            addArticleToCollection: (tabId, collectionId, article, sourceNorma) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+
+                const collection = tab.content.find(
+                    c => c.type === 'collection' && c.id === collectionId
+                ) as ArticleCollection | undefined;
+
+                if (!collection) return;
+
+                // Check for duplicates
+                const articleKey = `${sourceNorma.tipo_atto}-${sourceNorma.numero_atto}-${article.norma_data.numero_articolo}`;
+                const exists = collection.articles.some(
+                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` === articleKey
+                );
+
+                if (!exists) {
+                    collection.articles.push({ article, sourceNorma });
+                }
+            }),
+
+            removeArticleFromCollection: (tabId, collectionId, articleKey) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+
+                const collection = tab.content.find(
+                    c => c.type === 'collection' && c.id === collectionId
+                ) as ArticleCollection | undefined;
+
+                if (!collection) return;
+
+                collection.articles = collection.articles.filter(
+                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` !== articleKey
+                );
+
+                // Remove empty collection
+                if (collection.articles.length === 0) {
+                    tab.content = tab.content.filter(c => c.id !== collectionId);
+                }
+            }),
+
+            toggleCollectionCollapse: (tabId, collectionId) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+
+                const collection = tab.content.find(
+                    c => c.type === 'collection' && c.id === collectionId
+                ) as ArticleCollection | undefined;
+
+                if (collection) {
+                    collection.isCollapsed = !collection.isCollapsed;
+                }
+            }),
+
+            moveLooseArticleToCollection: (tabId, looseArticleId, collectionId) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+
+                // Find and remove loose article
+                const looseIndex = tab.content.findIndex(
+                    c => c.type === 'loose-article' && c.id === looseArticleId
+                );
+                if (looseIndex === -1) return;
+
+                const loose = tab.content[looseIndex] as LooseArticle;
+
+                // Find target collection
+                const collection = tab.content.find(
+                    c => c.type === 'collection' && c.id === collectionId
+                ) as ArticleCollection | undefined;
+
+                if (!collection) return;
+
+                // Check for duplicates
+                const articleKey = `${loose.sourceNorma.tipo_atto}-${loose.sourceNorma.numero_atto}-${loose.article.norma_data.numero_articolo}`;
+                const exists = collection.articles.some(
+                    a => `${a.sourceNorma.tipo_atto}-${a.sourceNorma.numero_atto}-${a.article.norma_data.numero_articolo}` === articleKey
+                );
+
+                if (!exists) {
+                    collection.articles.push({
+                        article: loose.article,
+                        sourceNorma: loose.sourceNorma
+                    });
+                }
+
+                // Remove loose article
+                tab.content.splice(looseIndex, 1);
+            }),
+
             addBookmark: (norma, tags = []) => set((state) => {
                 const key = generateKey(norma);
                 if (!state.bookmarks.find(b => b.normaKey === key)) {
@@ -557,5 +756,5 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
 }
 
 // Export types
-export type { WorkspaceTab, NormaBlock, LooseArticle, TabContent, SearchPanelState };
+export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };
 

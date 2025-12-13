@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
 import { Rnd } from 'react-rnd';
-import { X, GripVertical, Edit2 } from 'lucide-react';
+import { X, Edit2, FolderPlus } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { NormaBlockComponent } from './NormaBlockComponent';
 import { LooseArticleCard } from './LooseArticleCard';
+import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 
@@ -29,9 +30,9 @@ export function WorkspaceTabPanel({
     toggleTabPin,
     toggleTabMinimize,
     setTabLabel,
-    workspaceTabs,
     extractArticleFromNorma,
-    removeArticleFromNorma
+    removeArticleFromNorma,
+    createCollection
   } = useAppStore();
 
   // Make this tab a drop zone
@@ -227,6 +228,13 @@ export function WorkspaceTabPanel({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => createCollection(tab.id)}
+              className="p-1.5 text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 rounded transition-colors"
+              title="Crea nuova raccolta"
+            >
+              <FolderPlus size={16} />
+            </button>
             {tab.isPinned && (
               <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full font-medium">
                 Pinned
@@ -254,6 +262,16 @@ export function WorkspaceTabPanel({
                       onCrossReference={onCrossReference}
                       onExtractArticle={(articleId) => extractArticleFromNorma(tab.id, item.id, articleId)}
                       onRemoveArticle={(articleId) => removeArticleFromNorma(tab.id, item.id, articleId)}
+                    />
+                  );
+                } else if (item.type === 'collection') {
+                  return (
+                    <ArticleCollectionComponent
+                      key={item.id}
+                      tabId={tab.id}
+                      collection={item}
+                      onViewPdf={onViewPdf}
+                      onCrossReference={onCrossReference}
                     />
                   );
                 } else {

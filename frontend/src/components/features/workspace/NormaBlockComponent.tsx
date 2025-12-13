@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical } from 'lucide-react';
-import { useDraggable } from '@dnd-kit/core';
+import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch } from 'lucide-react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type NormaBlock } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
+import { ArticleNavigation } from './ArticleNavigation';
+import { ArticleMinimap } from './ArticleMinimap';
+import { TreeViewPanel } from '../search/TreeViewPanel';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 
@@ -26,11 +29,33 @@ export function NormaBlockComponent({
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
     normaBlock.articles[0]?.norma_data?.numero_articolo || null
   );
+  const [treeVisible, setTreeVisible] = useState(false);
+  const [treeData, setTreeData] = useState<any[] | null>(null);
+  const [treeLoading, setTreeLoading] = useState(false);
 
-  const { toggleNormaCollapse } = useAppStore();
+  const { toggleNormaCollapse, triggerSearch } = useAppStore();
+
+  const fetchTree = async () => {
+    if (!normaBlock.norma.urn) return;
+    try {
+      setTreeLoading(true);
+      const res = await fetch('/fetch_tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urn: normaBlock.norma.urn, link: false, details: true })
+      });
+      if (!res.ok) throw new Error('Impossibile caricare la struttura');
+      const payload = await res.json();
+      setTreeData(payload.articles || payload);
+    } catch (e) {
+      console.error('Error fetching tree:', e);
+    } finally {
+      setTreeLoading(false);
+    }
+  };
 
   // Make this norma draggable
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `norma-${normaBlock.id}`,
     data: {
       type: 'norma',
@@ -39,16 +64,51 @@ export function NormaBlockComponent({
     },
   });
 
+  // Make this norma a drop target for loose articles
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `norma-drop-${normaBlock.id}`,
+    data: {
+      type: 'norma-drop-zone',
+      normaId: normaBlock.id,
+      tabId: tabId,
+      norma: normaBlock.norma, // For compatibility check
+    },
+  });
+
+  // Combine refs for both draggable and droppable
+  const setNodeRef = (node: HTMLDivElement | null) => {
+    setDragRef(node);
+    setDropRef(node);
+  };
+
   const activeArticle = normaBlock.articles.find(
     a => a.norma_data.numero_articolo === activeArticleId
   );
+
+  const articleIds = normaBlock.articles.map(a => a.norma_data.numero_articolo);
+  const currentIndex = articleIds.findIndex(id => id === activeArticleId);
+
+  const handlePrevArticle = () => {
+    if (currentIndex > 0) {
+      setActiveArticleId(articleIds[currentIndex - 1]);
+    }
+  };
+
+  const handleNextArticle = () => {
+    if (currentIndex < articleIds.length - 1) {
+      setActiveArticleId(articleIds[currentIndex + 1]);
+    }
+  };
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden transition-all shadow-sm hover:shadow-md",
-        isDragging && "opacity-50 scale-95"
+        "bg-white dark:bg-gray-800 rounded-xl border-2 overflow-hidden transition-all shadow-sm hover:shadow-md",
+        isDragging && "opacity-50 scale-95",
+        isOver
+          ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800 bg-blue-50/50 dark:bg-blue-900/20"
+          : "border-gray-200 dark:border-gray-700"
       )}
     >
       {/* Norma Header */}
@@ -90,22 +150,81 @@ export function NormaBlockComponent({
           </div>
         </div>
 
-        {normaBlock.norma.urn && !normaBlock.isCollapsed && (
-          <button
-            className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 rounded transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewPdf(normaBlock.norma.urn);
-            }}
-          >
-            PDF
-          </button>
+        {!normaBlock.isCollapsed && (
+          <div className="flex items-center gap-2">
+            {normaBlock.norma.urn && (
+              <button
+                className="px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded transition-colors flex items-center gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTreeVisible(!treeVisible);
+                  if (!treeData) {
+                    fetchTree();
+                  }
+                }}
+              >
+                <GitBranch size={12} />
+                {treeLoading ? 'Carico...' : 'Struttura'}
+              </button>
+            )}
+            {normaBlock.norma.urn && (
+              <button
+                className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 rounded transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewPdf(normaBlock.norma.urn);
+                }}
+              >
+                PDF
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Tree View Side Panel */}
+      <TreeViewPanel
+        isOpen={treeVisible}
+        onClose={() => setTreeVisible(false)}
+        treeData={treeData || []}
+        urn={normaBlock.norma.urn || ''}
+        title="Struttura Atto"
+        loadedArticles={articleIds}
+        onArticleSelect={(articleNumber) => {
+          triggerSearch({
+            act_type: normaBlock.norma.tipo_atto,
+            act_number: normaBlock.norma.numero_atto || '',
+            date: normaBlock.norma.data || '',
+            article: articleNumber,
+            version: 'vigente',
+            version_date: '',
+            show_brocardi_info: true
+          });
+          setTreeVisible(false);
+        }}
+      />
 
       {/* Articles */}
       {!normaBlock.isCollapsed && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
+          {/* Navigation bar */}
+          {normaBlock.articles.length > 1 && (
+            <div className="px-3 pt-2 flex items-center justify-between">
+              <ArticleNavigation
+                currentIndex={currentIndex}
+                totalArticles={normaBlock.articles.length}
+                onPrev={handlePrevArticle}
+                onNext={handleNextArticle}
+              />
+              <ArticleMinimap
+                articleIds={articleIds}
+                activeArticleId={activeArticleId}
+                onArticleClick={setActiveArticleId}
+                className="max-w-[200px]"
+              />
+            </div>
+          )}
+
           {/* Article tabs */}
           <div className="px-3 pt-3 border-b border-gray-200 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar">
             {normaBlock.articles.map((article) => {

@@ -29,6 +29,7 @@ export function LooseArticleCard({
       type: 'loose-article',
       itemId: looseArticle.id,
       sourceTabId: tabId,
+      sourceNorma: sourceNorma, // For compatibility check when dropping on NormaBlock
     },
   });
 
@@ -82,7 +83,7 @@ export function LooseArticleCard({
         {article.norma_data.url && !isCollapsed && (
           <button
             className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 rounded transition-colors"
-            onClick={() => onViewPdf(article.norma_data.url)}
+            onClick={() => onViewPdf(article.norma_data.url!)}
           >
             PDF
           </button>

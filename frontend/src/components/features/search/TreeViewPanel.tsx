@@ -1,5 +1,6 @@
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Check, Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 export interface TreeViewPanelProps {
@@ -8,11 +9,42 @@ export interface TreeViewPanelProps {
   treeData: any[];
   urn: string;
   title?: string;
+  onArticleSelect?: (articleNumber: string) => void;
+  loadedArticles?: string[];
 }
 
-export function TreeViewPanel({ isOpen, onClose, treeData, title = 'Struttura Atto' }: TreeViewPanelProps) {
+export function TreeViewPanel({
+  isOpen,
+  onClose,
+  treeData,
+  title = 'Struttura Atto',
+  onArticleSelect,
+  loadedArticles = []
+}: TreeViewPanelProps) {
+  // Check if a node is an article (has numero and no children)
+  const isArticleNode = (node: any): boolean => {
+    if (!node) return false;
+    const hasArticleNumber = node?.numero || (typeof node?.label === 'string' && node.label.match(/^Art\.\s*\d+/));
+    const hasNoChildren = !node?.children && !node?.items && !node?.articoli;
+    return hasArticleNumber && hasNoChildren;
+  };
+
+  // Extract article number from node
+  const getArticleNumber = (node: any): string | null => {
+    if (node?.numero) return node.numero;
+    if (typeof node?.label === 'string') {
+      const match = node.label.match(/Art\.\s*(\d+(?:\s*-?\s*\w+)?)/i);
+      if (match) return match[1].trim();
+    }
+    if (typeof node?.title === 'string') {
+      const match = node.title.match(/Art\.\s*(\d+(?:\s*-?\s*\w+)?)/i);
+      if (match) return match[1].trim();
+    }
+    return null;
+  };
+
   // Recursive function to render tree nodes with enhanced styling
-  const renderTreeNodes = (nodes: any, depth = 0): JSX.Element | null => {
+  const renderTreeNodes = (nodes: any, depth = 0): React.ReactElement | null => {
     if (!nodes) return null;
 
     const list = Array.isArray(nodes) ? nodes : Object.values(nodes);
@@ -25,20 +57,46 @@ export function TreeViewPanel({ isOpen, onClose, treeData, title = 'Struttura At
         {list.map((node: any, idx: number) => {
           const label = node?.title || node?.label || node?.name || node?.numero || (typeof node === 'string' ? node : `Nodo ${idx + 1}`);
           const children = node?.children || node?.items || node?.articoli;
+          const articleNum = getArticleNumber(node);
+          const isArticle = isArticleNode(node);
+          const isLoaded = articleNum ? loadedArticles.includes(articleNum) : false;
+          const isClickable = isArticle && onArticleSelect && !isLoaded;
 
           return (
             <li key={node?.id || idx}>
-              <div className="flex items-start gap-2 group">
+              <div
+                className={cn(
+                  "flex items-start gap-2 group",
+                  isClickable && "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded px-1 -mx-1 transition-colors",
+                  isLoaded && "opacity-60"
+                )}
+                onClick={() => {
+                  if (isClickable && articleNum) {
+                    onArticleSelect(articleNum);
+                  }
+                }}
+              >
                 <span className={cn(
                   "mt-1.5 rounded-full flex-shrink-0",
-                  depth === 0 ? "w-2 h-2 bg-blue-500" : "w-1.5 h-1.5 bg-gray-400 dark:bg-gray-600"
+                  depth === 0 ? "w-2 h-2 bg-blue-500" : "w-1.5 h-1.5 bg-gray-400 dark:bg-gray-600",
+                  isLoaded && "bg-green-500"
                 )} />
                 <span className={cn(
-                  "leading-relaxed",
-                  depth === 0 && "font-medium text-gray-900 dark:text-white"
+                  "leading-relaxed flex-1",
+                  depth === 0 && "font-medium text-gray-900 dark:text-white",
+                  isClickable && "text-blue-600 dark:text-blue-400"
                 )}>
                   {label}
                 </span>
+                {isArticle && (
+                  <span className="flex-shrink-0">
+                    {isLoaded ? (
+                      <Check size={14} className="text-green-500" />
+                    ) : onArticleSelect && (
+                      <Plus size={14} className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </span>
+                )}
               </div>
               {children && renderTreeNodes(children, depth + 1)}
             </li>

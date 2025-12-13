@@ -14,13 +14,21 @@ interface DragData {
   type: 'norma' | 'loose-article';
   itemId: string;
   sourceTabId: string;
+  sourceNorma?: any; // For loose articles
+}
+
+interface DropData {
+  type: 'norma-drop-zone';
+  normaId: string;
+  tabId: string;
+  norma: any;
 }
 
 export function WorkspaceManager({
   onViewPdf,
   onCrossReference
 }: WorkspaceManagerProps) {
-  const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs } = useAppStore();
+  const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs, mergeLooseArticleToNorma, moveLooseArticleToCollection } = useAppStore();
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
 
   // Configure sensors for drag detection
@@ -46,19 +54,47 @@ export function WorkspaceManager({
     }
 
     const dragData = active.data.current as DragData;
-    const targetTabId = over.id as string;
+    const overId = over.id as string;
 
-    // Don't do anything if dropped on same tab
-    if (dragData.sourceTabId === targetTabId) {
+    // Check if dropping on a NormaBlock (merge loose article)
+    if (overId.startsWith('norma-drop-') && dragData.type === 'loose-article') {
+      const dropData = over.data.current as DropData;
+
+      // Verify compatibility: same source norma
+      if (dragData.sourceNorma) {
+        const isSameNorma =
+          dragData.sourceNorma.tipo_atto === dropData.norma.tipo_atto &&
+          dragData.sourceNorma.numero_atto === dropData.norma.numero_atto &&
+          dragData.sourceNorma.data === dropData.norma.data;
+
+        if (isSameNorma) {
+          mergeLooseArticleToNorma(dropData.tabId, dragData.itemId, dropData.normaId);
+        }
+      }
+
       setActiveItem(null);
       return;
     }
 
-    // Move based on type
+    // Check if dropping on a Collection
+    if (overId.startsWith('collection-drop-') && dragData.type === 'loose-article') {
+      const dropData = over.data.current as { type: string; collectionId: string; tabId: string };
+      moveLooseArticleToCollection(dropData.tabId, dragData.itemId, dropData.collectionId);
+      setActiveItem(null);
+      return;
+    }
+
+    // Don't do anything if dropped on same tab (for tab-to-tab moves)
+    if (dragData.sourceTabId === overId) {
+      setActiveItem(null);
+      return;
+    }
+
+    // Move based on type (between tabs)
     if (dragData.type === 'norma') {
-      moveNormaBetweenTabs(dragData.itemId, dragData.sourceTabId, targetTabId);
+      moveNormaBetweenTabs(dragData.itemId, dragData.sourceTabId, overId);
     } else if (dragData.type === 'loose-article') {
-      moveLooseArticleBetweenTabs(dragData.itemId, dragData.sourceTabId, targetTabId);
+      moveLooseArticleBetweenTabs(dragData.itemId, dragData.sourceTabId, overId);
     }
 
     setActiveItem(null);
