@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Clock, Loader2, Search, ArrowRight } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { Clock, Loader2, Search, ArrowRight, Calendar } from 'lucide-react';
+import { cn } from '../../../lib/utils';
 
 export function HistoryView() {
     const [history, setHistory] = useState<any[]>([]);
@@ -28,6 +29,17 @@ export function HistoryView() {
         );
     });
 
+    // Group by date
+    const groupedByDate = useMemo(() => {
+        const groups: Record<string, any[]> = {};
+        filteredHistory.forEach(item => {
+            const date = item.timestamp ? new Date(item.timestamp).toLocaleDateString('it-IT') : 'Senza data';
+            if (!groups[date]) groups[date] = [];
+            groups[date].push(item);
+        });
+        return groups;
+    }, [filteredHistory]);
+
     return (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -48,7 +60,8 @@ export function HistoryView() {
                     </div>
                 </div>
                 
-                <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-[70vh] overflow-y-auto">
+                {/* Timeline with grouped dates */}
+                <div className="max-h-[70vh] overflow-y-auto p-6">
                     {loading ? (
                         <div className="p-8 text-center">
                             <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
@@ -58,26 +71,66 @@ export function HistoryView() {
                             {searchTerm ? "Nessun risultato trovato." : "Nessuna ricerca recente."}
                         </div>
                     ) : (
-                        filteredHistory.map((item, idx) => (
-                            <div key={idx} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors flex justify-between items-center group">
-                                <div>
-                                    <div className="flex items-baseline gap-2">
-                                        <p className="font-bold text-blue-600 dark:text-blue-400 text-lg capitalize">
-                                            {item.act_type}
-                                        </p>
-                                        {item.act_number && <span className="font-medium text-gray-700 dark:text-gray-300">n. {item.act_number}</span>}
+                        <div className="space-y-8">
+                            {Object.entries(groupedByDate).map(([date, items]) => (
+                                <div key={date} className="relative">
+                                    {/* Date label with timeline line */}
+                                    <div className="flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-gray-800 py-2 z-10">
+                                        <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
+                                            <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
+                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{date}</span>
+                                        </div>
+                                        <div className="flex-1 h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent" />
                                     </div>
-                                    <div className="text-sm text-gray-500 mt-1 flex gap-3">
-                                        <span className="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-xs font-medium">Art. {item.article}</span>
-                                        {item.date && <span>del {item.date}</span>}
+
+                                    {/* Timeline items */}
+                                    <div className="space-y-3 pl-6 border-l-2 border-blue-100 dark:border-blue-900 relative">
+                                        {items.map((item, idx) => (
+                                            <div key={idx} className="relative group">
+                                                {/* Timeline dot */}
+                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-gray-800 group-hover:scale-125 transition-transform" />
+
+                                                {/* Item card */}
+                                                <div className={cn(
+                                                    "bg-white dark:bg-gray-800 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                                                    "border-gray-200 dark:border-gray-700",
+                                                    "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
+                                                )}>
+                                                    <div className="flex justify-between items-start gap-4">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-baseline gap-2 mb-2">
+                                                                <p className="font-bold text-blue-600 dark:text-blue-400 text-lg capitalize">
+                                                                    {item.act_type}
+                                                                </p>
+                                                                {item.act_number && (
+                                                                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                                                                        n. {item.act_number}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+                                                                <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-lg text-xs font-medium">
+                                                                    Art. {item.article}
+                                                                </span>
+                                                                {item.date && (
+                                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                                        del {item.date}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <button className="opacity-0 group-hover:opacity-100 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-500 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40">
+                                                            <ArrowRight size={18} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                                
-                                <button className="opacity-0 group-hover:opacity-100 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full text-blue-500 transition-all">
-                                    <ArrowRight size={18} />
-                                </button>
-                            </div>
-                        ))
+                            ))}
+                        </div>
                     )}
                 </div>
             </div>
