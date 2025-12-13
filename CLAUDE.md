@@ -167,12 +167,41 @@ The application uses async web scraping with intelligent source routing:
 Uses Zustand for global state with the following stores:
 
 - **Search Results**: Active norm cards with article text, Brocardi info
-- **History**: Previously searched norms (persisted to localStorage)
-- **Bookmarks**: Saved articles for later reference
+- **History**: Previously searched norms (server-side, fetched from `/history`)
+- **Bookmarks**: Quick-access saved articles (localStorage)
+- **Dossiers**: Research collections with multiple articles (localStorage)
 - **Workspace**: Active tabs with content
 - **Settings**: User preferences (API endpoint, theme, etc.)
 
 The store is located in `frontend/src/store/useAppStore.ts` and uses Immer for immutable updates.
+
+### Bookmarks vs Dossiers - Conceptual Difference
+
+**Bookmarks** 📌 (Simple, Quick Access):
+- Purpose: Save individual articles for quick reference
+- Use case: Daily workflow, frequently accessed norms
+- Features:
+  - One-click save/access
+  - Tag filtering
+  - Instant norm retrieval (click → opens search)
+- Think: Browser bookmarks
+
+**Dossiers** 📁 (Advanced, Research Collections):
+- Purpose: Organize multiple articles into research projects
+- Use case: Complex legal research, study preparation, case analysis
+- Features:
+  - Multiple articles per dossier
+  - Drag & drop reordering
+  - Status tracking (unread, reading, important, done)
+  - PDF export, JSON export, sharing
+  - Bulk operations (move, delete)
+  - Import articles from norm tree
+  - Description and tags
+- Think: Research folders/projects
+
+**Both are essential** - Bookmarks for speed, Dossiers for organization.
+
+All three (History, Bookmarks, Dossiers) support instant norm retrieval via `triggerSearch()`.
 
 ## Important Implementation Notes
 
