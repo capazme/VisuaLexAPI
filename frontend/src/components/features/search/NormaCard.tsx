@@ -108,9 +108,14 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {norma.data ? `Data: ${norma.data}` : 'Estremi non disponibili'}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {norma.data ? `Data: ${norma.data}` : 'Estremi non disponibili'}
+              </p>
+              <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
+                {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'}
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -203,8 +208,15 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
       {isOpen && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
           {/* Modern Underline Tabs */}
-          <div className="px-5 border-b border-gray-200 dark:border-gray-700 flex gap-0 overflow-x-auto no-scrollbar">
-            {articles.map((article) => {
+          <div className="px-5 border-b border-gray-200 dark:border-gray-700 flex gap-0 overflow-x-auto no-scrollbar relative">
+            {/* Position Indicator */}
+            {articles.length > 1 && (
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                {articles.findIndex(a => a.norma_data.numero_articolo === activeTabId) + 1}/{articles.length}
+              </div>
+            )}
+
+            {articles.map((article, index) => {
                 const id = article.norma_data.numero_articolo;
                 const isActive = id === activeTabId;
                 return (
@@ -214,7 +226,8 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                             "relative px-6 py-3 text-sm font-medium transition-all group flex items-center gap-2",
                             isActive
                               ? "text-blue-600 dark:text-blue-400"
-                              : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                              : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30",
+                            index === 0 && articles.length > 1 && "ml-16" // Space for position indicator
                         )}
                         onClick={() => setActiveTabId(id)}
                     >
