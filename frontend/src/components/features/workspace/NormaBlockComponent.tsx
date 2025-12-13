@@ -47,12 +47,12 @@ export function NormaBlockComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-opacity",
-        isDragging && "opacity-50"
+        "bg-white dark:bg-gray-800 rounded-xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden transition-all shadow-sm hover:shadow-md",
+        isDragging && "opacity-50 scale-95"
       )}
     >
       {/* Norma Header */}
-      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 border-b border-blue-200 dark:border-blue-800">
         <div className="flex items-center gap-2">
           {/* Drag handle */}
           <div

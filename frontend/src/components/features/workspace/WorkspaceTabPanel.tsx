@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Rnd } from 'react-rnd';
-import { X, Minimize2, Pin, PinOff, GripVertical, Edit2 } from 'lucide-react';
+import { X, GripVertical, Edit2 } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { NormaBlockComponent } from './NormaBlockComponent';
@@ -145,10 +145,34 @@ export function WorkspaceTabPanel({
             : "border-gray-200 dark:border-gray-700"
         )}
       >
-        {/* Header */}
-        <div className="drag-handle cursor-move flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <GripVertical size={16} className="text-gray-400 shrink-0" />
+        {/* Header with macOS-style controls */}
+        <div className="drag-handle cursor-move flex items-center justify-between px-4 py-3 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* macOS traffic lights */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => removeTab(tab.id)}
+                className="w-3 h-3 bg-red-500 hover:bg-red-600 rounded-full transition-colors group/close"
+                title="Chiudi"
+              >
+                <X size={10} className="text-red-900 opacity-0 group-hover/close:opacity-100 transition-opacity mx-auto" />
+              </button>
+              <button
+                onClick={() => toggleTabMinimize(tab.id)}
+                className="w-3 h-3 bg-yellow-500 hover:bg-yellow-600 rounded-full transition-colors"
+                title="Minimizza"
+              />
+              <button
+                onClick={() => toggleTabPin(tab.id)}
+                className={cn(
+                  "w-3 h-3 rounded-full transition-colors",
+                  tab.isPinned ? "bg-blue-500 hover:bg-blue-600" : "bg-green-500 hover:bg-green-600"
+                )}
+                title={tab.isPinned ? "Rimuovi pin" : "Fissa"}
+              />
+            </div>
+
+            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
 
             {isEditingLabel ? (
               <input
@@ -202,40 +226,12 @@ export function WorkspaceTabPanel({
             )}
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {tab.isPinned && (
-              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded">
+              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full font-medium">
                 Pinned
               </span>
             )}
-
-            <button
-              onClick={() => toggleTabPin(tab.id)}
-              className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-              title={tab.isPinned ? "Rimuovi pin" : "Fissa in alto"}
-            >
-              {tab.isPinned ? (
-                <PinOff size={14} className="text-gray-600 dark:text-gray-400" />
-              ) : (
-                <Pin size={14} className="text-gray-600 dark:text-gray-400" />
-              )}
-            </button>
-
-            <button
-              onClick={() => toggleTabMinimize(tab.id)}
-              className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Minimizza"
-            >
-              <Minimize2 size={14} className="text-gray-600 dark:text-gray-400" />
-            </button>
-
-            <button
-              onClick={() => removeTab(tab.id)}
-              className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
-              title="Chiudi"
-            >
-              <X size={14} className="text-gray-600 dark:text-gray-400 hover:text-red-600" />
-            </button>
           </div>
         </div>
 

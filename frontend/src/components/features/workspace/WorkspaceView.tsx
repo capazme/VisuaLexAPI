@@ -151,26 +151,39 @@ export function WorkspaceView() {
               </div>
           ) : (
               dossiers.map(dossier => (
-                  <div 
+                  <div
                     key={dossier.id}
                     onClick={() => setSelectedDossierId(dossier.id)}
-                    className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group"
+                    className="group relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 transition-all hover:-translate-y-1 hover:shadow-xl cursor-pointer overflow-hidden"
                   >
-                      <div className="flex justify-between items-start mb-4">
-                          <Folder className="text-blue-500 group-hover:scale-110 transition-transform" size={32} />
-                          <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full">
-                              {dossier.items.length} elementi
-                          </span>
-                      </div>
-                      <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors">
-                          {dossier.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em]">
-                          {dossier.description || "Nessuna descrizione"}
-                      </p>
-                      <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                          <span className="text-xs text-gray-400">{new Date(dossier.createdAt).toLocaleDateString()}</span>
-                          <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                      {/* Decorative blob */}
+                      <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-blue-500/10 dark:bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/20 dark:group-hover:bg-blue-500/30 transition-colors" />
+
+                      <div className="relative z-10">
+                          <div className="flex justify-between items-start mb-4">
+                              <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-xl text-blue-600 dark:text-blue-400">
+                                  <Folder size={24} />
+                              </div>
+                              {dossier.isPinned && <span className="w-2 h-2 bg-yellow-400 rounded-full" />}
+                          </div>
+
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                              {dossier.title}
+                          </h3>
+
+                          <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em] mb-4">
+                              {dossier.description || "Nessuna descrizione"}
+                          </p>
+
+                          <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center gap-1.5">
+                                  <FileText size={16} />
+                                  <span>{dossier.items.length}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                  <span className="text-xs">{new Date(dossier.createdAt).toLocaleDateString()}</span>
+                              </div>
+                          </div>
                       </div>
                   </div>
               ))

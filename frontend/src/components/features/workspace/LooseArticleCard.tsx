@@ -36,12 +36,12 @@ export function LooseArticleCard({
     <div
       ref={setNodeRef}
       className={cn(
-        "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden transition-opacity",
-        isDragging && "opacity-50"
+        "bg-white dark:bg-gray-800 rounded-xl border-2 border-amber-200 dark:border-amber-800 overflow-hidden transition-all shadow-sm hover:shadow-md",
+        isDragging && "opacity-50 scale-95"
       )}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+      <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-amber-50 to-amber-50/50 dark:from-amber-900/20 dark:to-amber-900/10 border-b border-amber-200 dark:border-amber-800">
         {/* Drag handle */}
         <div
           {...attributes}
