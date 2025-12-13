@@ -1,10 +1,10 @@
 import asyncio
-import logging
 import random
 import time
 from typing import Dict, Optional
 
 import aiohttp
+import structlog
 
 from ..tools.config import (
     HTTP_BACKOFF_FACTOR,
@@ -15,8 +15,9 @@ from ..tools.config import (
     HTTP_MIN_INTERVAL,
     HTTP_TIMEOUT,
 )
+from ..tools.exceptions import DocumentNotFoundError, NetworkError
 
-logger = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 class HttpResult:
@@ -67,9 +68,17 @@ class ThrottledHttpClient:
                         headers = dict(response.headers)
                         status = response.status
                         self._log_response(source, url, status, headers)
+
+                        # Handle 404 explicitly - don't retry
+                        if status == 404:
+                            raise DocumentNotFoundError(
+                                f"Document not found at {url}",
+                                urn=url
+                            )
+
                         if status in self.RATE_LIMIT_STATUSES:
                             wait_time = self._retry_delay(attempt, headers)
-                            logger.warning(
+                            log.warning(
                                 "Rate limit signal detected",
                                 extra={
                                     "source": source,
@@ -86,7 +95,7 @@ class ThrottledHttpClient:
                         return HttpResult(text=text, status=status, headers=headers)
                 except aiohttp.ClientError as exc:
                     wait_time = self._retry_delay(attempt)
-                    logger.warning(
+                    log.warning(
                         "HTTP request failed; retrying",
                         extra={"source": source, "url": url, "attempt": attempt, "error": str(exc)},
                     )
@@ -94,13 +103,13 @@ class ThrottledHttpClient:
                     attempt += 1
                 except asyncio.TimeoutError:
                     wait_time = self._retry_delay(attempt)
-                    logger.warning(
+                    log.warning(
                         "HTTP request timeout; retrying",
                         extra={"source": source, "url": url, "attempt": attempt},
                     )
                     await asyncio.sleep(wait_time)
                     attempt += 1
-            raise RuntimeError(f"Exceeded retry budget for {url}")
+            raise NetworkError(f"Exceeded retry budget for {url} after {HTTP_MAX_RETRIES + 1} attempts")
 
     async def _respect_min_interval(self) -> None:
         async with self._request_lock:
@@ -123,7 +132,7 @@ class ThrottledHttpClient:
         return max(retry_after, base + jitter)
 
     def _log_response(self, source: str, url: str, status: int, headers: Dict[str, str]) -> None:
-        logger.debug(
+        log.debug(
             "HTTP response",
             extra={
                 "source": source,

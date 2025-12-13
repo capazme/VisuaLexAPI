@@ -1,36 +1,36 @@
-import logging
 import os
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
+import structlog
+
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
+from ..tools.exceptions import DocumentNotFoundError
+from ..tools.cache import PersistentCache
 
-# Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    handlers=[logging.FileHandler("eurlex_scraper.log"),
-                              logging.StreamHandler()])
+# Configure structured logger
+log = structlog.get_logger()
 
 class EurlexScraper(BaseScraper):
     def __init__(self):
         self.base_url = 'https://eur-lex.europa.eu/eli'
-        logging.info("EurlexScraper initialized")
+        self.cache = PersistentCache("eurlex")
+        log.info("EUR-Lex scraper initialized")
 
     def get_uri(self, act_type, year, num):
-        logging.debug(f"get_uri called with act_type={act_type}, year={year}, num={num}")
+        log.debug(f"get_uri called with act_type={act_type}, year={year}, num={num}")
 
         if act_type in EURLEX and EURLEX[act_type].startswith('https'):
             uri = EURLEX[act_type]
-            logging.info(f"Act type is a treaty. Using predefined URI: {uri}")
+            log.info(f"Act type is a treaty. Using predefined URI: {uri}")
         else:
             uri = f'{self.base_url}/{EURLEX[act_type]}/{year}/{num}/oj/ita'
-            logging.info(f"Constructed URI for regulation or directive: {uri}")
+            log.info(f"Constructed URI for regulation or directive: {uri}")
         
         return uri
 
-    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata=None, act_type=None, article=None, year=None, num=None, urn=None):
-        logging.info(f"Fetching EUR-Lex document with parameters {normavisitata.to_dict()}: act_type={act_type}, article={article}, year={year}, num={num}, urn={urn}")
+        log.info(f"Fetching EUR-Lex document with parameters {normavisitata.to_dict() if normavisitata else {}}: act_type={act_type}, article={article}, year={year}, num={num}, urn={urn}")
 
         if normavisitata:
             urn = normavisitata.urn
@@ -38,42 +38,56 @@ class EurlexScraper(BaseScraper):
             year = normavisitata.norma.data
             num = normavisitata.norma.numero_atto
             article = normavisitata.numero_articolo
-            logging.debug(f"Using normavisitata with act_type={act_type}, year={year}, num={num}, article={article}")
+            log.debug(f"Using normavisitata with act_type={act_type}, year={year}, num={num}, article={article}")
 
         if not urn:
             if act_type not in EURLEX:
-                logging.error(f"Invalid act_type '{act_type}' not found in EURLEX map")
-                raise ValueError("EUR-Lex element not found")
+                log.error(f"Invalid act_type '{act_type}' not found in EURLEX map")
+                raise DocumentNotFoundError(
+                    f"Act type '{act_type}' not found in EUR-Lex mapping",
+                    urn=f"eurlex:{act_type}"
+                )
             url = self.get_uri(act_type=act_type, year=year, num=num)
         else:
             url = urn
 
-        html_content = await self.request_document(url)
-        soup = self.parse_document(html_content)
+        # Check persistent cache first
+        cache_key = url
+        cached_html = await self.cache.get(cache_key)
+        if cached_html:
+            log.info("Cache hit", source="eurlex_persistent")
+            soup = self.parse_document(cached_html)
+        else:
+            html_content = await self.request_document(url)
+            await self.cache.set(cache_key, html_content)
+            soup = self.parse_document(html_content)
 
         if article:
-            logging.info(f"Extracting text for article {article}")
+            log.info(f"Extracting text for article {article}")
             return await self.extract_article_text(soup, article), url
         else:
-            logging.info("Returning full document text")
+            log.info("Returning full document text")
             return soup.get_text(), url
 
     async def extract_article_text(self, soup, article):
-        logging.info(f"Searching for article {article} in the document")
+        log.info(f"Searching for article {article} in the document")
         search_query = f"Articolo {article}"
         article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(search_query))
 
         if not article_section:
-            logging.warning(f"Article {article} not found in the document")
-            raise ValueError(f"Article {article} not found")
+            log.warning(f"Article {article} not found in the document")
+            raise DocumentNotFoundError(
+                f"Article {article} not found in EUR-Lex document",
+                urn=soup.find('link', rel='canonical')['href'] if soup.find('link', rel='canonical') else None
+            )
 
-        logging.debug("Article found, extracting text")
+        log.debug("Article found, extracting text")
         full_text = [article_section.get_text(strip=True)]
         element = article_section.find_next_sibling()
 
         while element:
             if element.name == 'p' and 'ti-art' in element.get('class', []):
-                logging.debug("Next article section found, stopping extraction")
+                log.debug("Next article section found, stopping extraction")
                 break
             if element.name in ['p', 'div']:
                 full_text.append(element.get_text(strip=True))
@@ -81,11 +95,11 @@ class EurlexScraper(BaseScraper):
                 full_text.extend(self.extract_table_text(element))
             element = element.find_next_sibling()
 
-        logging.info(f"Article {article} text extracted successfully")
+        log.info(f"Article {article} text extracted successfully")
         return "\n".join(full_text)
 
     def extract_table_text(self, table):
-        logging.debug("Extracting text from table")
+        log.debug("Extracting text from table")
         rows = table.find_all('tr')
         table_text = []
 
@@ -94,7 +108,7 @@ class EurlexScraper(BaseScraper):
             row_text = ' '.join(cell.get_text(strip=True) for cell in cells)
             table_text.append(row_text)
 
-        logging.debug("Table text extracted successfully")
+        log.debug("Table text extracted successfully")
         return table_text
 
 # Configure production logging differently

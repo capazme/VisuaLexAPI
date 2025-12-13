@@ -1,4 +1,4 @@
-import logging
+import structlog
 import re
 import os
 from typing import Optional, Tuple, Union, Dict, Any, List
@@ -14,17 +14,10 @@ from ..tools.text_op import normalize_act_type
 from ..tools.sys_op import BaseScraper
 from ..tools.cache import PersistentCache
 from .http_client import http_client
+from ..tools.exceptions import DocumentNotFoundError
 
-# Configurazione del logger di modulo
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-file_handler = logging.FileHandler("brocardi_scraper.log")
-file_handler.setFormatter(formatter)
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-logger.addHandler(stream_handler)
+# Configure structured logger
+log = structlog.get_logger()
 
 # Costante per il base URL
 BASE_URL: str = "https://brocardi.it"
@@ -32,31 +25,34 @@ BASE_URL: str = "https://brocardi.it"
 
 class BrocardiScraper(BaseScraper):
     def __init__(self) -> None:
-        logger.info("Initializing BrocardiScraper")
+        log.info("Initializing BrocardiScraper")
         self.knowledge: List[Dict[str, Any]] = [BROCARDI_CODICI]
         self.cache = PersistentCache("brocardi")
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def do_know(self, norma_visitata: NormaVisitata) -> Optional[Tuple[str, str]]:
-        logger.info(f"Checking if knowledge exists for norma: {norma_visitata}")
+        log.info(f"Checking if knowledge exists for norma: {norma_visitata}")
 
         norma_str: Optional[str] = self._build_norma_string(norma_visitata)
         if norma_str is None:
-            logger.error("Invalid norma format")
-            raise ValueError("Invalid norma format")
+            log.error("Invalid norma format")
+            raise DocumentNotFoundError(
+                "Invalid norma format for Brocardi lookup",
+                urn=str(norma_visitata)
+            )
 
         search_str = norma_str.lower()
         for txt, link in self.knowledge[0].items():
             if search_str in txt.lower():
-                logger.info(f"Knowledge found for norma: {norma_visitata}")
+                log.info(f"Knowledge found for norma: {norma_visitata}")
                 return txt, link
 
-        logger.warning(f"No knowledge found for norma: {norma_visitata}")
+        log.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def look_up(self, norma_visitata: NormaVisitata) -> Optional[str]:
-        logger.info(f"Looking up norma: {norma_visitata}")
+        log.info(f"Looking up norma: {norma_visitata}")
 
         norma_info = await self.do_know(norma_visitata)
         if not norma_info:
@@ -66,7 +62,7 @@ class BrocardiScraper(BaseScraper):
         # Recupera il contenuto della pagina principale
         soup = await self._fetch_soup(link, cache_suffix="main", source="brocardi_main")
         if soup is None:
-            logger.error(f"Failed to retrieve content for norma link: {link}")
+            log.error(f"Failed to retrieve content for norma link: {link}")
             return None
 
         numero_articolo: Optional[str] = (
@@ -76,20 +72,20 @@ class BrocardiScraper(BaseScraper):
         if numero_articolo:
             article_link = await self._find_article_link(soup, BASE_URL, numero_articolo)
             return article_link
-        logger.info("No article number provided")
+        log.info("No article number provided")
         return None
 
     async def _find_article_link(self, soup: BeautifulSoup, base_url: str, numero_articolo: str) -> Optional[str]:
         # Compila il pattern una sola volta
         pattern = re.compile(rf'href=["\']([^"\']*art{re.escape(numero_articolo)}\.html)["\']')
-        logger.info("Searching for target link in the main page content")
+        log.info("Searching for target link in the main page content")
 
         # Utilizza str(soup) invece di prettify per migliorare le performance
         matches = pattern.findall(str(soup))
         if matches:
             return requests.compat.urljoin(base_url, matches[0])
 
-        logger.info("No direct match found, searching in 'section-title' divs")
+        log.info("No direct match found, searching in 'section-title' divs")
         section_titles = soup.find_all('div', class_='section-title')
         for section in section_titles:
             for a_tag in section.find_all('a', href=True):
@@ -101,11 +97,11 @@ class BrocardiScraper(BaseScraper):
                 if sub_matches:
                     return requests.compat.urljoin(base_url, sub_matches[0])
 
-        logger.info("No matching article found")
+        log.info("No matching article found")
         return None
 
     async def get_info(self, norma_visitata: NormaVisitata) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
-        logger.info(f"Getting info for norma: {norma_visitata}")
+        log.info(f"Getting info for norma: {norma_visitata}")
 
         norma_link = await self.look_up(norma_visitata)
         if not norma_link:
@@ -113,7 +109,7 @@ class BrocardiScraper(BaseScraper):
 
         soup = await self._fetch_soup(norma_link, cache_suffix="article", source="brocardi_article")
         if soup is None:
-            logger.error(f"Failed to retrieve content for norma link: {norma_link}")
+            log.error(f"Failed to retrieve content for norma link: {norma_link}")
             return None, {}, None
 
         info: Dict[str, Any] = {}
@@ -126,13 +122,13 @@ class BrocardiScraper(BaseScraper):
         if position_tag:
             # Mantiene la logica originale di slicing
             return position_tag.get_text(strip=False).replace('\n', '').replace('  ', '')[17:]
-        logger.warning("Breadcrumb position not found")
+        log.warning("Breadcrumb position not found")
         return None
 
     def _extract_sections(self, soup: BeautifulSoup, info: Dict[str, Any]) -> None:
         corpo = soup.find('div', class_='panes-condensed panes-w-ads content-ext-guide content-mark', recursive=True)
         if not corpo:
-            logger.warning("Main content section not found")
+            log.warning("Main content section not found")
             return
 
         brocardi_sections = corpo.find_all('div', class_='brocardi-content')
@@ -175,13 +171,13 @@ class BrocardiScraper(BaseScraper):
         cache_key = f"{cache_suffix}:{url}"
         cached_html = await self.cache.get(cache_key)
         if cached_html:
-            logger.info(f"Serving cached Brocardi content for {url}")
+            log.info(f"Serving cached Brocardi content for {url}")
             return BeautifulSoup(cached_html, 'html.parser')
 
         try:
             result = await http_client.request("GET", url, source=source)
         except Exception as exc:
-            logger.error(f"Failed to retrieve content for {url}: {exc}")
+            log.error(f"Failed to retrieve content for {url}: {exc}")
             return None
 
         await self.cache.set(cache_key, result.text)

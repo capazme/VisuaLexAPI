@@ -1,13 +1,16 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
-import logging
+import re
+import structlog
 
 # Assuming these functions are defined elsewhere in your code
 from .urngenerator import generate_urn
 from .text_op import normalize_act_type
 from .treextractor import get_tree
 from .config import MAX_CACHE_SIZE
+
+log = structlog.get_logger()
 
 @dataclass
 class Norma:
@@ -18,16 +21,25 @@ class Norma:
     _tree: any = field(default=None, repr=False)
 
     def __post_init__(self):
-        logging.debug(f"Initializing Norma with tipo_atto: {self.tipo_atto}, data: {self.data}, numero_atto: {self.numero_atto}")
+        # Validazione tipo_atto
+        if not self.tipo_atto or not isinstance(self.tipo_atto, str):
+            raise ValueError("tipo_atto must be a non-empty string")
+
+        # Validazione data (formato YYYY-MM-DD se presente)
+        if self.data:
+            if not re.match(r'^\d{4}-\d{2}-\d{2}$', self.data):
+                raise ValueError(f"Invalid date format: {self.data} (expected YYYY-MM-DD)")
+
+        log.debug("Initializing Norma", tipo_atto=self.tipo_atto, data=self.data, numero_atto=self.numero_atto)
         self.tipo_atto_str = normalize_act_type(self.tipo_atto, search=True)
         self.tipo_atto_urn = normalize_act_type(self.tipo_atto)
-        logging.debug(f"Norma initialized: {self}")
+        log.debug("Norma initialized", norma=str(self))
 
     @property
      
     def url(self):
         if not self._url:
-            logging.debug("Generating URL for Norma.")
+            log.debug("Generating URL for Norma.")
             self._url = generate_urn(
                 act_type=self.tipo_atto_urn,
                 date=self.data,
@@ -40,7 +52,7 @@ class Norma:
      
     def tree(self):
         if not self._tree:
-            logging.debug("Fetching tree structure for Norma.")
+            log.debug("Fetching tree structure for Norma.")
             self._tree = get_tree(self.url)
         return self._tree
 
@@ -84,13 +96,13 @@ class NormaVisitata:
                 self.data_versione == other.data_versione and self.allegato == other.allegato)
 
     def __post_init__(self):
-        logging.debug(f"NormaVisitata initialized: {self}")
+        log.debug(f"NormaVisitata initialized: {self}")
 
     @property
      
     def urn(self):
         if not self._urn:
-            logging.debug("Generating URN for NormaVisitata.")
+            log.debug("Generating URN for NormaVisitata.")
             self._urn = generate_urn(
                 act_type=self.norma.tipo_atto_urn,
                 date=self.norma.data,
@@ -122,7 +134,7 @@ class NormaVisitata:
 
     @staticmethod
     def from_dict(data):
-        logging.debug(f"Creating NormaVisitata from dict: {data}")
+        log.debug(f"Creating NormaVisitata from dict: {data}")
         norma = Norma(
             tipo_atto=data['tipo_atto'],
             data=data.get('data'),
@@ -138,7 +150,7 @@ class NormaVisitata:
             allegato = data.get('allegato')
             #timestamp=data.get('timestamp')
         )
-        logging.debug(f"NormaVisitata created: {norma_visitata}")
+        log.debug(f"NormaVisitata created: {norma_visitata}")
         return norma_visitata
 
 codice_civile = Norma(tipo_atto='codice civile')

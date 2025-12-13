@@ -1,56 +1,52 @@
-import logging
 import re
 from typing import Tuple, Optional, Union, Dict, Any
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
+import structlog
 
 from ..tools.norma import NormaVisitata
 from ..tools.sys_op import BaseScraper
 from ..tools.cache import PersistentCache
+from ..tools.exceptions import DocumentNotFoundError, ParsingError
 
-# Configurazione del logger di modulo
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-file_handler = logging.FileHandler("norma.log")
-file_handler.setFormatter(formatter)
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-logger.addHandler(stream_handler)
+# Configure structured logger
+log = structlog.get_logger()
 
 
 class NormattivaScraper(BaseScraper):
     def __init__(self) -> None:
         self.base_url: str = "https://www.normattiva.it/"
-        logger.info("NormattivaScraper initialized")
+        log.info("Normattiva scraper initialized")
         self.cache = PersistentCache("normattiva")
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:
-        logger.info(f"Fetching Normattiva document for: {normavisitata}")
+        log.info("Fetching Normattiva document", norma=str(normavisitata))
         urn: str = normavisitata.urn
-        logger.info(f"Requesting URL: {urn}")
+        log.info("Requesting URL", urn=urn[:100])
 
         cache_key = urn
         html_content: str = await self.cache.get(cache_key)
         if html_content:
-            logger.info("Serving Normattiva document from persistent cache")
+            log.info("Cache hit", source="normattiva_persistent")
         else:
             html_content = await self.request_document(urn, source="normattiva")
             await self.cache.set(cache_key, html_content)
 
         if not html_content:
-            logger.error("Document not found or malformed")
-            raise ValueError("Document not found or malformed")
+            log.error("Document not found or malformed", urn=urn)
+            raise DocumentNotFoundError(
+                f"Document not found for {normavisitata}",
+                urn=urn
+            )
 
         if normavisitata.numero_articolo:
             document_text = await self.estrai_da_html(html_content)
             return document_text, urn
         else:
-            logger.info("Returning full document text")
+            log.info("Returning full document text")
             return html_content, urn
 
     async def estrai_da_html(
@@ -60,8 +56,11 @@ class NormattivaScraper(BaseScraper):
             soup: BeautifulSoup = self.parse_document(atto)
             corpo: Optional[Tag] = soup.find('div', class_='bodyTesto')
             if corpo is None:
-                logger.warning("Body of the document not found")
-                return "Body of the document not found"
+                log.warning("Missing expected div.bodyTesto in document")
+                raise ParsingError(
+                    "Missing expected div.bodyTesto in Normattiva response",
+                    html_snippet=atto
+                )
 
             if corpo.find(class_='art-comma-div-akn'):
                 # SCENARIO 1: Formattazione AKN Dettagliata
@@ -73,11 +72,17 @@ class NormattivaScraper(BaseScraper):
                 # SCENARIO 3: Allegato o Testo senza Formattazione AKN
                 return self._estrai_testo_allegato(corpo, link=get_link_dict)
             else:
-                logger.warning("Unknown formatting structure")
-                return "Unknown formatting structure"
+                log.warning("Unknown HTML formatting structure in document")
+                raise ParsingError(
+                    "Unknown HTML formatting structure in Normattiva document",
+                    html_snippet=atto
+                )
+        except ParsingError:
+            # Re-raise ParsingError as-is
+            raise
         except Exception as e:
-            logger.error(f"Generic error: {e}", exc_info=True)
-            return f"Generic error: {e}"
+            log.error("Failed to extract text from HTML", error=str(e), exc_info=True)
+            raise ParsingError(f"Failed to extract text from HTML: {e}", html_snippet=atto)
 
     def extract_text_recursive(
         self, element: Tag, link: bool = False, link_dict: Optional[Dict[str, str]] = None
