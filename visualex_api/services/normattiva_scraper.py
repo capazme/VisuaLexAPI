@@ -10,6 +10,7 @@ from ..tools.norma import NormaVisitata
 from ..tools.sys_op import BaseScraper
 from ..tools.cache import PersistentCache
 from ..tools.exceptions import DocumentNotFoundError, ParsingError
+from ..tools.selectors import NormattivaSelectors
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -18,6 +19,7 @@ log = structlog.get_logger()
 class NormattivaScraper(BaseScraper):
     def __init__(self) -> None:
         self.base_url: str = "https://www.normattiva.it/"
+        self.selectors = NormattivaSelectors()
         log.info("Normattiva scraper initialized")
         self.cache = PersistentCache("normattiva")
 
@@ -54,7 +56,7 @@ class NormattivaScraper(BaseScraper):
     ) -> Union[str, Dict[str, Any]]:
         try:
             soup: BeautifulSoup = self.parse_document(atto)
-            corpo: Optional[Tag] = soup.find('div', class_='bodyTesto')
+            corpo: Optional[Tag] = soup.find('div', class_=self.selectors.BODY_TESTO)
             if corpo is None:
                 log.warning("Missing expected div.bodyTesto in document")
                 raise ParsingError(
@@ -62,13 +64,13 @@ class NormattivaScraper(BaseScraper):
                     html_snippet=atto
                 )
 
-            if corpo.find(class_='art-comma-div-akn'):
+            if corpo.find(class_=self.selectors.AKN_COMMA_DIV):
                 # SCENARIO 1: Formattazione AKN Dettagliata
                 return self._estrai_testo_akn_dettagliato(corpo, link=get_link_dict)
-            elif corpo.find(class_='art-just-text-akn'):
+            elif corpo.find(class_=self.selectors.AKN_JUST_TEXT):
                 # SCENARIO 2: Formattazione Semplice con `akn-just-text`
                 return self._estrai_testo_akn_semplice(corpo, link=get_link_dict)
-            elif corpo.find(class_='attachment-just-text'):
+            elif corpo.find(class_=self.selectors.ATTACHMENT_TEXT):
                 # SCENARIO 3: Allegato o Testo senza Formattazione AKN
                 return self._estrai_testo_allegato(corpo, link=get_link_dict)
             else:
@@ -120,8 +122,8 @@ class NormattivaScraper(BaseScraper):
             link_dict: Dict[str, str] = {}
 
             # Estrazione del numero e del titolo dell'articolo
-            article_number_tag = corpo.find('h2', class_='article-num-akn')
-            article_title_tag = corpo.find('div', class_='article-heading-akn')
+            article_number_tag = corpo.find('h2', class_=self.selectors.AKN_ARTICLE_NUMBER)
+            article_title_tag = corpo.find('div', class_=self.selectors.AKN_ARTICLE_TITLE)
             article_number = article_number_tag.get_text(strip=True) if article_number_tag else "Articolo non trovato"
             article_title = article_title_tag.get_text(strip=True) if article_title_tag else ""
 
@@ -129,7 +131,7 @@ class NormattivaScraper(BaseScraper):
             final_text = f"{article_number}\n{article_title}\n\n"
 
             # Estrazione dei commi
-            commi = corpo.find_all('div', class_='art-comma-div-akn')
+            commi = corpo.find_all('div', class_=self.selectors.AKN_COMMA_DIV)
             for comma_div in commi:
                 comma_text, _ = self.extract_text_recursive(comma_div, link=link, link_dict=link_dict)
                 final_text += comma_text.strip() + '\n\n'
@@ -150,15 +152,15 @@ class NormattivaScraper(BaseScraper):
             link_dict: Dict[str, str] = {}
 
             # Estrazione del numero e del titolo dell'articolo
-            article_number_tag = corpo.find('h2', class_='article-num-akn')
-            article_title_tag = corpo.find('div', class_='article-heading-akn')
+            article_number_tag = corpo.find('h2', class_=self.selectors.AKN_ARTICLE_NUMBER)
+            article_title_tag = corpo.find('div', class_=self.selectors.AKN_ARTICLE_TITLE)
             article_number = article_number_tag.get_text(strip=True) if article_number_tag else ""
             article_title = article_title_tag.get_text(strip=True) if article_title_tag else ""
 
             final_text = f"{article_number}\n{article_title}\n\n"
 
             # Estrazione del contenuto del testo semplice
-            just_text = corpo.find('span', class_='art-just-text-akn')
+            just_text = corpo.find('span', class_=self.selectors.AKN_JUST_TEXT)
             if just_text:
                 content_text, _ = self.extract_text_recursive(just_text, link=link, link_dict=link_dict)
                 final_text += content_text.strip()
@@ -178,7 +180,7 @@ class NormattivaScraper(BaseScraper):
             link_dict: Dict[str, str] = {}
 
             # Estrazione del contenuto dell'allegato
-            attachment_text = corpo.find('span', class_='attachment-just-text')
+            attachment_text = corpo.find('span', class_=self.selectors.ATTACHMENT_TEXT)
             final_text = ""
             if attachment_text:
                 content_text, _ = self.extract_text_recursive(attachment_text, link=link, link_dict=link_dict)

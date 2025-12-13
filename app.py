@@ -240,6 +240,8 @@ class NormaController:
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
+        self.app.add_url_rule('/health', view_func=self.health, methods=['GET'])
+        self.app.add_url_rule('/health/detailed', view_func=self.health_detailed, methods=['GET'])
 
 
     async def home(self):
@@ -493,6 +495,76 @@ class NormaController:
         except Exception as e:
             log.error("Error in get_history", error=str(e))
             return jsonify({'error': str(e)}), 500
+
+    async def health(self):
+        """Basic health check - returns 200 if app is running."""
+        from datetime import datetime
+        return jsonify({
+            'status': 'ok',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+
+    async def health_detailed(self):
+        """Detailed health check - tests connectivity to external sources."""
+        from datetime import datetime
+        import time as time_module
+
+        results = {
+            'status': 'ok',
+            'timestamp': datetime.utcnow().isoformat(),
+            'services': {}
+        }
+
+        # Test Normattiva (fetch homepage with timeout)
+        try:
+            start = time_module.time()
+            await normattiva_scraper.request_document("https://www.normattiva.it", source="health_check")
+            latency = time_module.time() - start
+            results['services']['normattiva'] = {
+                'status': 'ok',
+                'latency_ms': round(latency * 1000, 2)
+            }
+        except Exception as e:
+            results['services']['normattiva'] = {
+                'status': 'error',
+                'error': str(e)
+            }
+            results['status'] = 'degraded'
+
+        # Test EUR-Lex (fetch homepage with timeout)
+        try:
+            start = time_module.time()
+            await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
+            latency = time_module.time() - start
+            results['services']['eurlex'] = {
+                'status': 'ok',
+                'latency_ms': round(latency * 1000, 2)
+            }
+        except Exception as e:
+            results['services']['eurlex'] = {
+                'status': 'error',
+                'error': str(e)
+            }
+            results['status'] = 'degraded'
+
+        # Test Brocardi (fetch homepage with timeout)
+        try:
+            start = time_module.time()
+            await brocardi_scraper.request_document("https://www.brocardi.it", source="health_check")
+            latency = time_module.time() - start
+            results['services']['brocardi'] = {
+                'status': 'ok',
+                'latency_ms': round(latency * 1000, 2)
+            }
+        except Exception as e:
+            results['services']['brocardi'] = {
+                'status': 'error',
+                'error': str(e)
+            }
+            results['status'] = 'degraded'
+
+        status_code = 200 if results['status'] == 'ok' else 503
+        return jsonify(results), status_code
 
     async def export_pdf(self):
         try:

@@ -7,6 +7,7 @@ from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError
 from ..tools.cache import PersistentCache
+from ..tools.selectors import EURLexSelectors
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -15,6 +16,7 @@ class EurlexScraper(BaseScraper):
     def __init__(self):
         self.base_url = 'https://eur-lex.europa.eu/eli'
         self.cache = PersistentCache("eurlex")
+        self.selectors = EURLexSelectors()
         log.info("EUR-Lex scraper initialized")
 
     def get_uri(self, act_type, year, num):

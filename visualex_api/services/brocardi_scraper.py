@@ -15,6 +15,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.cache import PersistentCache
 from .http_client import http_client
 from ..tools.exceptions import DocumentNotFoundError
+from ..tools.selectors import BrocardiSelectors
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -28,6 +29,7 @@ class BrocardiScraper(BaseScraper):
         log.info("Initializing BrocardiScraper")
         self.knowledge: List[Dict[str, Any]] = [BROCARDI_CODICI]
         self.cache = PersistentCache("brocardi")
+        self.selectors = BrocardiSelectors()
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def do_know(self, norma_visitata: NormaVisitata) -> Optional[Tuple[str, str]]:
