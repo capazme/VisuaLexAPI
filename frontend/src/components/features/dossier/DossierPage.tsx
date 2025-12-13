@@ -9,6 +9,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useNavigate } from 'react-router-dom';
 
 // Status configuration
 const STATUS_CONFIG = {
@@ -52,18 +53,19 @@ function SortableItem({
     <div
       ref={setNodeRef}
       style={style}
+      onClick={onView}
       className={cn(
-        "bg-white dark:bg-gray-800 p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors",
+        "bg-white dark:bg-gray-800 p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer",
         isSelected ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"
       )}
     >
       <div className="flex items-center gap-3">
         {showCheckbox && (
-          <button onClick={onToggleSelect} className="text-gray-400 hover:text-blue-500">
+          <button onClick={(e) => { e.stopPropagation(); onToggleSelect(); }} className="text-gray-400 hover:text-blue-500">
             {isSelected ? <CheckSquare size={20} className="text-blue-500" /> : <Square size={20} />}
           </button>
         )}
-        <div {...attributes} {...listeners} className="text-gray-300 dark:text-gray-600 cursor-grab hover:text-gray-500">
+        <div {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="text-gray-300 dark:text-gray-600 cursor-grab hover:text-gray-500">
           <GripVertical size={20} />
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600">
@@ -86,7 +88,7 @@ function SortableItem({
         </div>
         <div className="flex items-center gap-1">
           {/* Status dropdown */}
-          <div className="relative group/status">
+          <div className="relative group/status" onClick={(e) => e.stopPropagation()}>
             <button
               className={cn("p-2 rounded-md transition-colors", statusConfig.color, statusConfig.bg)}
               title={statusConfig.label}
@@ -97,7 +99,7 @@ function SortableItem({
               {Object.entries(STATUS_CONFIG).map(([key, config]) => (
                 <button
                   key={key}
-                  onClick={() => onStatusChange(key)}
+                  onClick={(e) => { e.stopPropagation(); onStatusChange(key); }}
                   className={cn(
                     "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700",
                     status === key && "bg-gray-100 dark:bg-gray-700"
@@ -110,14 +112,7 @@ function SortableItem({
             </div>
           </div>
           <button
-            onClick={onView}
-            className="text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded-md transition-colors opacity-0 group-hover:opacity-100"
-            title="Visualizza contenuto"
-          >
-            <Eye size={18} />
-          </button>
-          <button
-            onClick={onRemove}
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-0 group-hover:opacity-100"
             title="Rimuovi"
           >
@@ -454,7 +449,7 @@ function TreeNavigatorModal({
 }
 
 export function DossierPage() {
-  const { dossiers, deleteDossier, removeFromDossier, updateDossier, toggleDossierPin, reorderDossierItems, updateDossierItemStatus, moveToDossier } = useAppStore();
+  const { dossiers, deleteDossier, removeFromDossier, updateDossier, toggleDossierPin, reorderDossierItems, updateDossierItemStatus, moveToDossier, triggerSearch } = useAppStore();
   const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -466,9 +461,26 @@ export function DossierPage() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [moveToModalOpen, setMoveToModalOpen] = useState(false);
   const [treeNavigatorOpen, setTreeNavigatorOpen] = useState(false);
+  const navigate = useNavigate();
 
   const selectedDossier = dossiers.find(d => d.id === selectedDossierId);
   const { addToDossier } = useAppStore();
+
+  const handleDossierItemClick = (item: DossierItem) => {
+    if (item.type === 'norma') {
+      // Navigate to search page and trigger search
+      navigate('/');
+      triggerSearch({
+        act_type: item.data.tipo_atto,
+        act_number: item.data.numero_atto || '',
+        date: item.data.data || '',
+        article: item.data.numero_articolo?.toString() || '',
+        version: 'vigente',
+        version_date: '',
+        show_brocardi_info: true
+      });
+    }
+  };
 
   // Drag & drop sensors
   const sensors = useSensors(
@@ -851,7 +863,7 @@ export function DossierPage() {
                     item={item}
                     isSelected={selectedItems.has(item.id)}
                     onToggleSelect={() => toggleItemSelection(item.id)}
-                    onView={() => setViewingItem(item)}
+                    onView={() => handleDossierItemClick(item)}
                     onRemove={() => removeFromDossier(selectedDossier.id, item.id)}
                     onStatusChange={(status) => updateDossierItemStatus(selectedDossier.id, item.id, status)}
                     showCheckbox={showBulkActions}

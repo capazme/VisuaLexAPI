@@ -2,10 +2,26 @@ import { useState } from 'react';
 import { Bookmark, Trash2, Tag, Filter, X } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export function BookmarksView() {
-  const { bookmarks, removeBookmark } = useAppStore();
+  const { bookmarks, removeBookmark, triggerSearch } = useAppStore();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const handleBookmarkClick = (bookmark: any) => {
+    // Navigate to search page and trigger search
+    navigate('/');
+    triggerSearch({
+      act_type: bookmark.normaData.tipo_atto,
+      act_number: bookmark.normaData.numero_atto || '',
+      date: bookmark.normaData.data || '',
+      article: bookmark.normaData.numero_articolo?.toString() || '',
+      version: bookmark.normaData.versione || 'vigente',
+      version_date: bookmark.normaData.data_versione || '',
+      show_brocardi_info: true
+    });
+  };
 
   // Extract all unique tags
   const allTags = Array.from(new Set(bookmarks.flatMap(b => b.tags || [])));
@@ -74,11 +90,15 @@ export function BookmarksView() {
               </div>
           ) : (
               filteredBookmarks.map(bookmark => (
-                  <div key={bookmark.id} className={cn(
-                      "group relative bg-white dark:bg-gray-800 rounded-2xl border-2 p-6 transition-all cursor-pointer overflow-hidden",
-                      "border-gray-200 dark:border-gray-700",
-                      "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl hover:-translate-y-1"
-                  )}>
+                  <div
+                      key={bookmark.id}
+                      onClick={() => handleBookmarkClick(bookmark)}
+                      className={cn(
+                          "group relative bg-white dark:bg-gray-800 rounded-2xl border-2 p-6 transition-all cursor-pointer overflow-hidden",
+                          "border-gray-200 dark:border-gray-700",
+                          "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl hover:-translate-y-1"
+                      )}
+                  >
                       {/* Decorative blob */}
                       <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-blue-500/10 dark:bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/20 dark:group-hover:bg-blue-500/30 transition-colors" />
 

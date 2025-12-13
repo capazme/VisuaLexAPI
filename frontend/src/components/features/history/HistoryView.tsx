@@ -1,11 +1,29 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Clock, Loader2, Search, ArrowRight, Calendar } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { useAppStore } from '../../../store/useAppStore';
+import { useNavigate } from 'react-router-dom';
 
 export function HistoryView() {
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const { triggerSearch } = useAppStore();
+    const navigate = useNavigate();
+
+    const handleItemClick = (item: any) => {
+        // Navigate to search page and trigger search
+        navigate('/');
+        triggerSearch({
+            act_type: item.act_type,
+            act_number: item.act_number || '',
+            date: item.date || '',
+            article: item.article?.toString() || '',
+            version: 'vigente',
+            version_date: '',
+            show_brocardi_info: true
+        });
+    };
 
     useEffect(() => {
         fetch('/history')
@@ -91,11 +109,14 @@ export function HistoryView() {
                                                 <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-gray-800 group-hover:scale-125 transition-transform" />
 
                                                 {/* Item card */}
-                                                <div className={cn(
-                                                    "bg-white dark:bg-gray-800 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                                                    "border-gray-200 dark:border-gray-700",
-                                                    "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
-                                                )}>
+                                                <div
+                                                    onClick={() => handleItemClick(item)}
+                                                    className={cn(
+                                                        "bg-white dark:bg-gray-800 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                                                        "border-gray-200 dark:border-gray-700",
+                                                        "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
+                                                    )}
+                                                >
                                                     <div className="flex justify-between items-start gap-4">
                                                         <div className="flex-1">
                                                             <div className="flex items-baseline gap-2 mb-2">
@@ -120,9 +141,9 @@ export function HistoryView() {
                                                             </div>
                                                         </div>
 
-                                                        <button className="opacity-0 group-hover:opacity-100 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-500 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/40">
+                                                        <div className="opacity-0 group-hover:opacity-100 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-500 transition-all pointer-events-none">
                                                             <ArrowRight size={18} />
-                                                        </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
