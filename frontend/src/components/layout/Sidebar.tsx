@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Bookmark, Moon, Sun, Settings } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Bookmark, Moon, Sun, Settings, Sparkles, Star } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAppStore } from '../../store/useAppStore';
 
 interface SidebarProps {
   theme: string;
@@ -143,6 +144,18 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
 }
 
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings }: SidebarProps) {
+  const location = useLocation();
+  const { openCommandPalette, quickNorms } = useAppStore();
+  const isOnSearchPage = location.pathname === '/';
+
+  const handleSearchClick = () => {
+    closeMobile();
+    // If already on search page, open CommandPalette
+    if (isOnSearchPage) {
+      openCommandPalette();
+    }
+  };
+
   return (
     <aside
       className={cn(
@@ -172,9 +185,22 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         </motion.div>
       </div>
 
+      {/* Quick Search Button */}
+      <div className="flex flex-col items-center pt-4 pb-2 border-b border-white/10 dark:border-white/5">
+        <ActionButton
+          icon={Sparkles}
+          label="Ricerca Veloce ⌘K"
+          onClick={openCommandPalette}
+          isActive={false}
+        />
+        {quickNorms.length > 0 && (
+          <div className="mt-1 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
+        )}
+      </div>
+
       {/* Navigation */}
       <nav className="flex-1 flex flex-col items-center py-4 gap-2">
-        <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
+        <NavItem to="/" icon={Search} label="Ricerca" onClick={handleSearchClick} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
         <NavItem to="/bookmarks" icon={Bookmark} label="Segnalibri" onClick={closeMobile} />

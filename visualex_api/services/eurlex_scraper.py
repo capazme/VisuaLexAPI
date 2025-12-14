@@ -22,6 +22,10 @@ class EurlexScraper(BaseScraper):
     def get_uri(self, act_type, year, num):
         log.debug(f"get_uri called with act_type={act_type}, year={year}, num={num}")
 
+        # EUR-Lex only needs the year, not full date (YYYY-MM-DD → YYYY)
+        if year and '-' in str(year):
+            year = str(year).split('-')[0]
+
         if act_type in EURLEX and EURLEX[act_type].startswith('https'):
             uri = EURLEX[act_type]
             log.info(f"Act type is a treaty. Using predefined URI: {uri}")
@@ -72,12 +76,52 @@ class EurlexScraper(BaseScraper):
             return soup.get_text(), url
 
     async def extract_article_text(self, soup, article):
+        import re
         log.info(f"Searching for article {article} in the document")
-        search_query = f"Articolo {article}"
-        article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(search_query))
+
+        # Multiple patterns to find article header (EUR-Lex structure may vary)
+        search_patterns = [
+            f"Articolo {article}",
+            f"Article {article}",
+            f"Art. {article}",
+        ]
+
+        article_section = None
+
+        # Strategy 1: Look for <p class="ti-art"> (original selector)
+        for pattern in search_patterns:
+            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(pattern))
+            if article_section:
+                log.debug(f"Found article with ti-art class using pattern: {pattern}")
+                break
+
+        # Strategy 2: Look for any element with class containing 'art' or 'title'
+        if not article_section:
+            for pattern in search_patterns:
+                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and tag.get_text(strip=True).startswith(pattern))
+                if article_section:
+                    log.debug(f"Found article with art/title class using pattern: {pattern}")
+                    break
+
+        # Strategy 3: Look for any element whose text matches article pattern exactly
+        if not article_section:
+            article_regex = re.compile(rf'^Articolo\s+{re.escape(str(article))}\b', re.IGNORECASE)
+            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and article_regex.match(tag.get_text(strip=True)))
+            if article_section:
+                log.debug("Found article using regex text match")
+
+        # Strategy 4: Search in eli-subdivision divs (common EUR-Lex structure)
+        if not article_section:
+            subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
+            for subdiv in subdivisions:
+                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(s.strip().startswith(p) for p in search_patterns))
+                if title_elem:
+                    article_section = subdiv
+                    log.debug("Found article in eli-subdivision")
+                    break
 
         if not article_section:
-            log.warning(f"Article {article} not found in the document")
+            log.warning(f"Article {article} not found in the document after all strategies")
             raise DocumentNotFoundError(
                 f"Article {article} not found in EUR-Lex document",
                 urn=soup.find('link', rel='canonical')['href'] if soup.find('link', rel='canonical') else None
@@ -87,12 +131,22 @@ class EurlexScraper(BaseScraper):
         full_text = [article_section.get_text(strip=True)]
         element = article_section.find_next_sibling()
 
+        # Detect end of article by finding next article
+        next_article_pattern = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+
         while element:
+            # Check if we've reached the next article
             if element.name == 'p' and 'ti-art' in element.get('class', []):
-                log.debug("Next article section found, stopping extraction")
+                log.debug("Next article section found (ti-art class), stopping extraction")
                 break
-            if element.name in ['p', 'div']:
-                full_text.append(element.get_text(strip=True))
+            elem_text = element.get_text(strip=True) if element.name else ''
+            if next_article_pattern.match(elem_text):
+                log.debug("Next article section found (text pattern), stopping extraction")
+                break
+            if element.name in ['p', 'div', 'span']:
+                text = element.get_text(strip=True)
+                if text:
+                    full_text.append(text)
             elif element.name == 'table':
                 full_text.extend(self.extract_table_text(element))
             element = element.find_next_sibling()

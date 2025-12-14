@@ -10,27 +10,58 @@ interface SearchFormProps {
 }
 
 const ACT_TYPES = [
+  // Fonti Primarie
   { label: 'Costituzione', value: 'costituzione', group: 'Fonti Primarie' },
   { label: 'Legge', value: 'legge', group: 'Fonti Primarie' },
   { label: 'Decreto Legge', value: 'decreto legge', group: 'Fonti Primarie' },
   { label: 'Decreto Legislativo', value: 'decreto legislativo', group: 'Fonti Primarie' },
-  { label: 'Codice Civile', value: 'codice civile', group: 'Codici' },
-  { label: 'Codice Penale', value: 'codice penale', group: 'Codici' },
-  { label: 'Codice Proc. Civile', value: 'codice di procedura civile', group: 'Codici' },
-  { label: 'Codice Proc. Penale', value: 'codice di procedura penale', group: 'Codici' },
-  { label: 'Regolamento UE', value: 'Regolamento UE', group: 'Unione Europea' },
-  { label: 'Direttiva UE', value: 'Direttiva UE', group: 'Unione Europea' },
+  { label: 'D.P.R.', value: 'decreto del presidente della repubblica', group: 'Fonti Primarie' },
+  { label: 'Regio Decreto', value: 'regio decreto', group: 'Fonti Primarie' },
+
+  // Codici Fondamentali
+  { label: 'Codice Civile', value: 'codice civile', group: 'Codici Fondamentali' },
+  { label: 'Codice Penale', value: 'codice penale', group: 'Codici Fondamentali' },
+  { label: 'Codice Proc. Civile', value: 'codice di procedura civile', group: 'Codici Fondamentali' },
+  { label: 'Codice Proc. Penale', value: 'codice di procedura penale', group: 'Codici Fondamentali' },
+  { label: 'Preleggi', value: 'preleggi', group: 'Codici Fondamentali' },
+  { label: 'Disp. Att. Cod. Civile', value: 'disposizioni per l\'attuazione del Codice civile e disposizioni transitorie', group: 'Codici Fondamentali' },
+  { label: 'Disp. Att. Cod. Proc. Civile', value: 'disposizioni per l\'attuazione del Codice di procedura civile e disposizioni transitorie', group: 'Codici Fondamentali' },
+
+  // Codici Settoriali
+  { label: 'Codice della Strada', value: 'codice della strada', group: 'Codici Settoriali' },
+  { label: 'Codice della Navigazione', value: 'codice della navigazione', group: 'Codici Settoriali' },
+  { label: 'Codice del Consumo', value: 'codice del consumo', group: 'Codici Settoriali' },
+  { label: 'Codice della Privacy', value: 'codice in materia di protezione dei dati personali', group: 'Codici Settoriali' },
+  { label: 'Codice Ambiente', value: 'norme in materia ambientale', group: 'Codici Settoriali' },
+  { label: 'Codice Contratti Pubblici', value: 'codice dei contratti pubblici', group: 'Codici Settoriali' },
+  { label: 'Codice Beni Culturali', value: 'codice dei beni culturali e del paesaggio', group: 'Codici Settoriali' },
+  { label: 'Codice Assicurazioni', value: 'codice delle assicurazioni private', group: 'Codici Settoriali' },
+  { label: 'Codice Processo Tributario', value: 'codice del processo tributario', group: 'Codici Settoriali' },
+  { label: 'Codice Processo Amm.vo', value: 'codice del processo amministrativo', group: 'Codici Settoriali' },
+  { label: 'Codice Amm. Digitale', value: 'codice dell\'amministrazione digitale', group: 'Codici Settoriali' },
+  { label: 'Codice Proprietà Industriale', value: 'codice della proprietà industriale', group: 'Codici Settoriali' },
+  { label: 'Codice Comunicazioni', value: 'codice delle comunicazioni elettroniche', group: 'Codici Settoriali' },
+  { label: 'Codice Pari Opportunità', value: 'codice delle pari opportunità', group: 'Codici Settoriali' },
+  { label: 'Codice Ord. Militare', value: 'codice dell\'ordinamento militare', group: 'Codici Settoriali' },
+  { label: 'Codice del Turismo', value: 'codice del turismo', group: 'Codici Settoriali' },
+  { label: 'Codice Antimafia', value: 'codice antimafia', group: 'Codici Settoriali' },
+  { label: 'Codice Giustizia Contabile', value: 'codice di giustizia contabile', group: 'Codici Settoriali' },
+  { label: 'Codice Terzo Settore', value: 'codice del Terzo settore', group: 'Codici Settoriali' },
+  { label: 'Codice Protezione Civile', value: 'codice della protezione civile', group: 'Codici Settoriali' },
+  { label: 'Codice Crisi Impresa', value: 'codice della crisi d\'impresa e dell\'insolvenza', group: 'Codici Settoriali' },
+  { label: 'Codice Nautica Diporto', value: 'codice della nautica da diporto', group: 'Codici Settoriali' },
+
+  // Unione Europea
   { label: 'TUE', value: 'TUE', group: 'Unione Europea' },
   { label: 'TFUE', value: 'TFUE', group: 'Unione Europea' },
   { label: 'CDFUE', value: 'CDFUE', group: 'Unione Europea' },
-  { label: 'Codice Navigazione', value: 'codice della navigazione', group: 'Altri' },
-  { label: 'Codice Strada', value: 'codice della strada', group: 'Altri' },
-  { label: 'Codice Proc. Amm.', value: 'codice del processo amministrativo', group: 'Altri' },
-  { label: 'Codice Crisi Impresa', value: "codice della crisi d'impresa e dell'insolvenza", group: 'Altri' },
+  { label: 'Regolamento UE', value: 'Regolamento UE', group: 'Unione Europea' },
+  { label: 'Direttiva UE', value: 'Direttiva UE', group: 'Unione Europea' },
 ];
 
 const ACT_TYPES_REQUIRING_DETAILS = [
   'legge', 'decreto legge', 'decreto legislativo',
+  'decreto del presidente della repubblica', 'regio decreto',
   'Regolamento UE', 'Direttiva UE'
 ];
 

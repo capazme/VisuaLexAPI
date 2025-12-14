@@ -108,3 +108,14 @@ export interface Bookmark {
     addedAt: string;
     tags: string[];
 }
+
+// QuickNorm - Favorite norms for quick access
+export interface QuickNorm {
+    id: string;
+    label: string; // User-defined label (e.g., "Art. 2043 CC - Risarcimento")
+    searchParams: SearchParams;
+    sourceUrl?: string; // Optional Normattiva URL if imported from link
+    createdAt: string;
+    usageCount: number; // Track usage for sorting
+    lastUsedAt?: string;
+}

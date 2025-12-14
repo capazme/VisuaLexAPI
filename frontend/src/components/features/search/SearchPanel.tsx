@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { FloatingSearchPanel } from './FloatingSearchPanel';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
+import { QuickNormsManager } from './QuickNormsManager';
 import { PDFViewer } from '../../ui/PDFViewer';
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
-import { SearchX, Search, X } from 'lucide-react';
+import { SearchX, Search, X, Star, Plus, Sparkles } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
+import { cn } from '../../../lib/utils';
 
 // Helper to generate keys (replicates original JS logic)
 const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -23,8 +25,13 @@ export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { addWorkspaceTab, addNormaToTab, workspaceTabs, searchTrigger, clearSearchTrigger } = useAppStore();
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const {
+    addWorkspaceTab, addNormaToTab, workspaceTabs,
+    searchTrigger, clearSearchTrigger,
+    quickNorms, useQuickNorm, triggerSearch,
+    commandPaletteOpen, openCommandPalette, closeCommandPalette
+  } = useAppStore();
+  const [quickNormsManagerOpen, setQuickNormsManagerOpen] = useState(false);
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
 
   // PDF State
@@ -266,7 +273,7 @@ export function SearchPanel() {
     <>
       <CommandPalette
         isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
+        onClose={closeCommandPalette}
         onSearch={handleSearch}
       />
 
@@ -282,13 +289,20 @@ export function SearchPanel() {
       {/* Workspace Navigator - dock at bottom showing all tabs */}
       <WorkspaceNavigator />
 
+      {/* QuickNorms Manager Modal */}
+      <QuickNormsManager
+        isOpen={quickNormsManagerOpen}
+        onClose={() => setQuickNormsManagerOpen(false)}
+        onSearch={handleSearch}
+      />
+
       {/* Main Content Area - Empty state when no tabs */}
       {!hasTabs && !isLoading && (
         <div className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700">
           {/* Interactive Search Icon */}
           <div
             className="relative group cursor-pointer"
-            onClick={() => setCommandPaletteOpen(true)}
+            onClick={openCommandPalette}
             title="Apri ricerca (Cmd+K)"
           >
             {/* Blur Background */}
@@ -314,6 +328,83 @@ export function SearchPanel() {
             Prova con <span className="text-blue-600 font-medium">"Art 2043 cc"</span> o{' '}
             <span className="text-blue-600 font-medium">"responsabilità oggettiva"</span>.
           </p>
+
+          {/* QuickNorms Section */}
+          <div className="mt-10 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+                <Star size={16} className="text-amber-500" />
+                <span>Ricerche Frequenti</span>
+              </div>
+              <button
+                onClick={() => setQuickNormsManagerOpen(true)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium",
+                  "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
+                  "text-gray-600 dark:text-gray-300 transition-colors"
+                )}
+              >
+                <Plus size={14} />
+                Gestisci
+              </button>
+            </div>
+
+            {quickNorms.length === 0 ? (
+              <div
+                onClick={() => setQuickNormsManagerOpen(true)}
+                className={cn(
+                  "flex flex-col items-center justify-center py-8 px-4 rounded-2xl cursor-pointer",
+                  "border-2 border-dashed border-gray-200 dark:border-gray-700",
+                  "hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/10",
+                  "transition-all duration-200"
+                )}
+              >
+                <Sparkles size={24} className="text-gray-400 dark:text-gray-500 mb-2" />
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                  Aggiungi le norme che consulti più spesso<br />
+                  <span className="text-xs text-gray-400">Clicca per iniziare</span>
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 justify-center">
+                {quickNorms.slice(0, 6).map((qn) => (
+                  <button
+                    key={qn.id}
+                    onClick={() => {
+                      useQuickNorm(qn.id);
+                      triggerSearch(qn.searchParams);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-xl",
+                      "bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg",
+                      "border border-gray-200 dark:border-gray-700",
+                      "hover:bg-white dark:hover:bg-gray-800 hover:shadow-md hover:scale-[1.02]",
+                      "text-sm font-medium text-gray-700 dark:text-gray-200",
+                      "transition-all duration-200"
+                    )}
+                  >
+                    <Star size={14} className="text-amber-500 shrink-0" />
+                    <span className="truncate max-w-[150px]">{qn.label}</span>
+                  </button>
+                ))}
+                {quickNorms.length > 6 && (
+                  <button
+                    onClick={() => setQuickNormsManagerOpen(true)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-xl",
+                      "bg-gray-100 dark:bg-gray-800",
+                      "border border-gray-200 dark:border-gray-700",
+                      "hover:bg-gray-200 dark:hover:bg-gray-700",
+                      "text-sm font-medium text-gray-600 dark:text-gray-400",
+                      "transition-all duration-200"
+                    )}
+                  >
+                    +{quickNorms.length - 6} altre
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -19,17 +19,17 @@ const ITALIAN_MONTHS: Record<string, string> = {
 };
 
 /**
- * Parses various date formats and returns YYYY-MM-DD or just YYYY.
+ * Parses various date formats and returns YYYY-MM-DD.
  *
  * Supported formats:
- * - "1990" → "1990" (year only, API will handle)
+ * - "1990" → "1990-01-01" (year only, expanded to full date)
  * - "2024-08-07" → "2024-08-07" (already correct)
  * - "07-08-1990" or "07/08/1990" → "1990-08-07" (DD-MM-YYYY to YYYY-MM-DD)
  * - "7 agosto 1990" → "1990-08-07" (Italian text date)
  * - "7-8-1990" → "1990-08-07" (D-M-YYYY)
  *
  * @param input - The date string in any supported format
- * @returns The date in YYYY-MM-DD format, or just YYYY, or empty string if invalid
+ * @returns The date in YYYY-MM-DD format, or empty string if invalid
  */
 export function parseItalianDate(input: string): string {
   if (!input) return '';
@@ -41,9 +41,9 @@ export function parseItalianDate(input: string): string {
     return trimmed;
   }
 
-  // Year only (4 digits)
+  // Year only (4 digits) - expand to full date (Jan 1st)
   if (/^\d{4}$/.test(trimmed)) {
-    return trimmed;
+    return `${trimmed}-01-01`;
   }
 
   // DD-MM-YYYY or DD/MM/YYYY format (with 1 or 2 digit day/month)

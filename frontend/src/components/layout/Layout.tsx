@@ -8,7 +8,7 @@ import { SettingsModal } from '../ui/SettingsModal';
 import { cn } from '../../lib/utils';
 
 export function Layout() {
-  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel } = useAppStore();
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigate = useNavigate();
@@ -46,7 +46,7 @@ export function Layout() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        toggleSearchPanel();
+        openCommandPalette(); // Open CommandPalette with Cmd+K
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
@@ -60,10 +60,14 @@ export function Layout() {
         e.preventDefault();
         updateSettings({ focusMode: !settings.focusMode });
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        toggleSearchPanel(); // Toggle floating search panel with Cmd+Shift+S
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel]);
+  }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette]);
 
   return (
     <div className="min-h-screen flex bg-theme-bg text-theme-text transition-colors duration-300">

@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams } from '../types';
+import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm } from '../types';
 
 // Content types for WorkspaceTab
 interface NormaBlock {
@@ -62,9 +62,11 @@ interface AppState {
     dossiers: Dossier[];
     annotations: Annotation[];
     highlights: Highlight[];
+    quickNorms: QuickNorm[];
 
     // UI State
     sidebarVisible: boolean;
+    commandPaletteOpen: boolean;
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
@@ -78,6 +80,8 @@ interface AppState {
     // UI Actions
     toggleSidebar: () => void;
     setSidebarVisible: (visible: boolean) => void;
+    openCommandPalette: () => void;
+    closeCommandPalette: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
     bringSearchPanelToFront: () => void;  // Bring search panel to front
@@ -136,6 +140,13 @@ interface AppState {
     // Search Actions
     triggerSearch: (params: SearchParams) => void;
     clearSearchTrigger: () => void;
+
+    // QuickNorm Actions
+    addQuickNorm: (label: string, searchParams: SearchParams, sourceUrl?: string) => void;
+    removeQuickNorm: (id: string) => void;
+    updateQuickNormLabel: (id: string, label: string) => void;
+    useQuickNorm: (id: string) => QuickNorm | undefined;
+    getQuickNormsSorted: () => QuickNorm[];
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -164,12 +175,14 @@ const appStore = createStore<AppState>()(
             dossiers: [],
             annotations: [],
             highlights: [],
+            quickNorms: [],
 
             // Search State
             searchTrigger: null,
 
             // UI State
             sidebarVisible: true,
+            commandPaletteOpen: false,
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
@@ -189,6 +202,14 @@ const appStore = createStore<AppState>()(
 
             setSidebarVisible: (visible) => set((state) => {
                 state.sidebarVisible = visible;
+            }),
+
+            openCommandPalette: () => set((state) => {
+                state.commandPaletteOpen = true;
+            }),
+
+            closeCommandPalette: () => set((state) => {
+                state.commandPaletteOpen = false;
             }),
 
             toggleSearchPanel: () => set((state) => {
@@ -768,7 +789,72 @@ const appStore = createStore<AppState>()(
 
             clearSearchTrigger: () => set((state) => {
                 state.searchTrigger = null;
-            })
+            }),
+
+            // QuickNorm Actions
+            addQuickNorm: (label, searchParams, sourceUrl) => set((state) => {
+                // Check for duplicates based on search params
+                const isDuplicate = state.quickNorms.some(
+                    qn => qn.searchParams.act_type === searchParams.act_type &&
+                          qn.searchParams.article === searchParams.article &&
+                          qn.searchParams.act_number === searchParams.act_number &&
+                          qn.searchParams.date === searchParams.date
+                );
+
+                if (!isDuplicate) {
+                    state.quickNorms.push({
+                        id: uuidv4(),
+                        label,
+                        searchParams,
+                        sourceUrl,
+                        createdAt: new Date().toISOString(),
+                        usageCount: 0,
+                        lastUsedAt: undefined
+                    });
+                }
+            }),
+
+            removeQuickNorm: (id) => set((state) => {
+                state.quickNorms = state.quickNorms.filter(qn => qn.id !== id);
+            }),
+
+            updateQuickNormLabel: (id, label) => set((state) => {
+                const qn = state.quickNorms.find(q => q.id === id);
+                if (qn) {
+                    qn.label = label;
+                }
+            }),
+
+            useQuickNorm: (id) => {
+                const state = get();
+                const qn = state.quickNorms.find(q => q.id === id);
+                if (qn) {
+                    // Update usage stats
+                    set((state) => {
+                        const quickNorm = state.quickNorms.find(q => q.id === id);
+                        if (quickNorm) {
+                            quickNorm.usageCount += 1;
+                            quickNorm.lastUsedAt = new Date().toISOString();
+                        }
+                    });
+                    return qn;
+                }
+                return undefined;
+            },
+
+            getQuickNormsSorted: () => {
+                const state = get();
+                // Sort by usage count (descending), then by last used (most recent first)
+                return [...state.quickNorms].sort((a, b) => {
+                    if (b.usageCount !== a.usageCount) {
+                        return b.usageCount - a.usageCount;
+                    }
+                    if (a.lastUsedAt && b.lastUsedAt) {
+                        return new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime();
+                    }
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                });
+            }
         })),
         {
             name: 'visualex-storage',

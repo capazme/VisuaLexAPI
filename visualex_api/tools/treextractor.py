@@ -49,7 +49,7 @@ async def get_tree(normurn, link=False, details=False):
     if "normattiva" in normurn:
         return await _parse_normattiva_tree(soup, normurn, link, details)
     elif "eur-lex" in normurn:
-        return await _parse_eurlex_tree(soup)
+        return await _parse_eurlex_tree(soup, normurn, link, details)
 
     logging.warning(f"Unrecognized norm URN format: {normurn}")
     return "Unrecognized norm URN format", 0
@@ -182,42 +182,196 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     return new_urn
 
 
-async def _parse_eurlex_tree(soup, normurn):
-    """Parsa la struttura dell'albero degli articoli per Eur-Lex."""
+async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
+    """
+    Parsa la struttura dell'albero degli articoli per Eur-Lex.
+
+    Args:
+        soup: BeautifulSoup object del documento
+        normurn (str): URL base del documento EUR-Lex
+        link (bool): Se includere i link agli articoli
+        details (bool): Se includere i titoli di Capi/Sezioni/Titoli
+
+    Returns:
+        tuple: Lista di articoli estratti e conteggio
+    """
     logging.info("Parsing Eur-Lex structure")
-    result, seen = [], set()
+    result = []
+    seen_articles = set()
+    count_articles = 0
 
-    for a_tag in soup.find_all('a'):
-        if 'Articolo' in a_tag.text:
-            article_number = _extract_eurlex_article(a_tag, seen)
-            if article_number:
-                result.append(article_number)
+    # Estrai anno e numero dall'URL per generare link ELI
+    eli_info = _extract_eli_info(normurn)
 
-    count = len(result)
-    logging.info(f"Extracted {count} unique articles from Eur-Lex")
-    return result, count
+    # Pattern per identificare strutture gerarchiche
+    title_pattern = re.compile(r'^(TITOLO|TITLE)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
+    chapter_pattern = re.compile(r'^(CAPO|CHAPTER)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
+    section_pattern = re.compile(r'^(SEZIONE|SECTION)\s+(\d+|\w+)', re.IGNORECASE)
+    article_pattern = re.compile(r'^(Articolo|Article)\s+(\d+)', re.IGNORECASE)
+
+    # Strategia 1: Cerca nel TOC (table of contents) se presente
+    toc = soup.find('div', class_='eli-toc') or soup.find('div', id='toc')
+    if toc:
+        logging.info("Found TOC, parsing from table of contents")
+        for item in toc.find_all(['a', 'li', 'p']):
+            text = item.get_text(strip=True)
+
+            # Estrai titoli/capi/sezioni se details=True
+            if details:
+                if title_pattern.match(text) or chapter_pattern.match(text) or section_pattern.match(text):
+                    result.append(text)
+                    continue
+
+            # Estrai articoli
+            article_match = article_pattern.match(text)
+            if article_match:
+                article_num = article_match.group(2)
+                if article_num not in seen_articles:
+                    seen_articles.add(article_num)
+                    article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
+                    result.append(article_data)
+                    count_articles += 1
+
+    # Strategia 2: Cerca direttamente nel documento se TOC non presente o vuoto
+    if count_articles == 0:
+        logging.info("TOC not found or empty, searching in document body")
+
+        # Cerca elementi con classe ti-art (titoli articoli) o pattern simili
+        article_elements = soup.find_all(['p', 'div', 'span'], class_=lambda c: c and ('ti-art' in c or 'art' in c.lower()))
+
+        if not article_elements:
+            # Fallback: cerca qualsiasi elemento con testo "Articolo X"
+            article_elements = soup.find_all(string=article_pattern)
+
+        for elem in article_elements:
+            text = elem.get_text(strip=True) if hasattr(elem, 'get_text') else str(elem)
+            article_match = article_pattern.match(text)
+            if article_match:
+                article_num = article_match.group(2)
+                if article_num not in seen_articles:
+                    seen_articles.add(article_num)
+                    article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
+                    result.append(article_data)
+                    count_articles += 1
+
+    # Strategia 3: Fallback sui link <a> (metodo originale)
+    if count_articles == 0:
+        logging.info("Falling back to anchor tag search")
+        for a_tag in soup.find_all('a'):
+            text = a_tag.get_text(strip=True)
+            article_match = article_pattern.match(text)
+            if article_match:
+                article_num = article_match.group(2)
+                if article_num not in seen_articles:
+                    seen_articles.add(article_num)
+                    article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
+                    result.append(article_data)
+                    count_articles += 1
+
+    # Ordina per numero articolo
+    result = _sort_eurlex_results(result, link)
+
+    logging.info(f"Extracted {count_articles} unique articles from Eur-Lex")
+    return result, count_articles
 
 
-def _extract_eurlex_article(a_tag, seen):
-    """Estrae i dettagli di un articolo da Eur-Lex."""
-    match = re.search(r'Articolo\s+(\d+\s*\w*)', a_tag.get_text(strip=True))
-    if match:
-        article_number = match.group(1).strip()
-        if article_number not in seen:
-            seen.add(article_number)
-            return article_number
-    return None
+def _extract_eli_info(normurn):
+    """
+    Estrae informazioni ELI dall'URL per generare link agli articoli.
+
+    Args:
+        normurn (str): URL EUR-Lex
+
+    Returns:
+        dict: Dizionario con tipo, anno, numero dell'atto
+    """
+    eli_info = {'type': None, 'year': None, 'num': None, 'base_url': normurn}
+
+    # Pattern ELI: /eli/reg/2016/679/oj o /eli/dir/2019/790/oj
+    eli_match = re.search(r'/eli/(reg|dir)/(\d{4})/(\d+)', normurn)
+    if eli_match:
+        eli_info['type'] = eli_match.group(1)
+        eli_info['year'] = eli_match.group(2)
+        eli_info['num'] = eli_match.group(3)
+        return eli_info
+
+    # Pattern CELEX: CELEX:32016R0679 o CELEX:32019L0790
+    celex_match = re.search(r'CELEX:3(\d{4})([RL])(\d+)', normurn)
+    if celex_match:
+        eli_info['year'] = celex_match.group(1)
+        eli_info['type'] = 'reg' if celex_match.group(2) == 'R' else 'dir'
+        eli_info['num'] = str(int(celex_match.group(3)))  # Rimuovi zeri iniziali
+        return eli_info
+
+    return eli_info
+
+
+def _format_eurlex_article(article_num, normurn, eli_info, link):
+    """
+    Formatta i dati dell'articolo con o senza link.
+
+    Args:
+        article_num (str): Numero dell'articolo
+        normurn (str): URL base
+        eli_info (dict): Info ELI estratte
+        link (bool): Se includere il link
+
+    Returns:
+        str or dict: Numero articolo o dizionario {numero: url}
+    """
+    if not link:
+        return article_num
+
+    # Genera URL ELI per l'articolo specifico
+    if eli_info['type'] and eli_info['year'] and eli_info['num']:
+        article_url = f"https://eur-lex.europa.eu/eli/{eli_info['type']}/{eli_info['year']}/{eli_info['num']}/art_{article_num}/oj"
+    else:
+        # Fallback: usa URL base con ancora
+        article_url = f"{normurn}#art_{article_num}"
+
+    return {article_num: article_url}
+
+
+def _sort_eurlex_results(results, link):
+    """
+    Ordina i risultati per numero articolo.
+
+    Args:
+        results (list): Lista di articoli
+        link (bool): Se i risultati contengono link
+
+    Returns:
+        list: Lista ordinata
+    """
+    def get_sort_key(item):
+        if isinstance(item, dict):
+            key = list(item.keys())[0]
+        else:
+            key = item
+        # Estrai numero per ordinamento
+        match = re.match(r'(\d+)', str(key))
+        return int(match.group(1)) if match else 0
+
+    try:
+        return sorted(results, key=get_sort_key)
+    except Exception:
+        return results
 
 # Funzione principale per test
 async def main():
+    # Test Normattiva
     normurn = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:2010-12-13;220'
     result, count = await get_tree(normurn, link=True, details=True)
-    print(f"Found {count} articles.")
-    print(result)
+    print(f"Normattiva - Found {count} articles.")
+    print(result[:5] if result else "No results")
 
-async def main():
-    normurn = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:2010-12-13;220'
-    result, count = await get_tree(normurn, link=True, details=True)
-    print(f"Found {count} articles.")
-    print(result)
+    # Test EUR-Lex (GDPR)
+    eurlex_url = 'https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita'
+    result, count = await get_tree(eurlex_url, link=True, details=False)
+    print(f"EUR-Lex - Found {count} articles.")
+    print(result[:5] if result else "No results")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
