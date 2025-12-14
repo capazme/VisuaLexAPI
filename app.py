@@ -3,7 +3,7 @@ import os
 import logging
 import sys
 import json
-from collections import defaultdict, deque
+from collections import defaultdict
 from time import time
 
 from quart import Quart, request, jsonify, render_template, send_file, Response, g
@@ -11,12 +11,12 @@ from quart_cors import cors
 import structlog
 
 from visualex_api.tools.config import (
-    HISTORY_LIMIT,
     RATE_LIMIT,
     RATE_LIMIT_WINDOW,
     FETCH_QUEUE_WORKERS,
     FETCH_QUEUE_DELAY,
 )
+from visualex_api.tools.history_manager import history_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
@@ -62,9 +62,15 @@ def count_tokens(data):
     else:
         return 0
 
-# Storage per il rate limiting e la history
+# Storage per il rate limiting
 request_counts = defaultdict(lambda: {'count': 0, 'time': time()})
-history = deque(maxlen=HISTORY_LIMIT)
+
+
+def add_to_history(data: dict):
+    """Aggiunge ricerca alla history con persistenza."""
+    if history_manager.add(data):
+        log.debug("Added to history", data=data)
+
 
 # Inizializzazione degli scraper e del driver manager
 brocardi_scraper = BrocardiScraper()
@@ -164,6 +170,7 @@ class NormaController:
         """
         data = await request.get_json()
         log.info("Received data for stream_article_text", data=data)
+        add_to_history(data)
         normavisitate = await self.create_norma_visitata_from_data(data)
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
         
@@ -239,6 +246,8 @@ class NormaController:
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
+        self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
+        self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
         self.app.add_url_rule('/health', view_func=self.health, methods=['GET'])
         self.app.add_url_rule('/health/detailed', view_func=self.health_detailed, methods=['GET'])
@@ -320,6 +329,7 @@ class NormaController:
         try:
             data = await request.get_json()
             log.info("Received data for fetch_article_text", data=data)
+            add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
             log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
@@ -433,6 +443,7 @@ class NormaController:
         try:
             data = await request.get_json()
             log.info("Received data for fetch_all_data", data=data)
+            add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
 
@@ -491,9 +502,29 @@ class NormaController:
 
     async def get_history(self):
         try:
-            return jsonify({'history': list(history)})
+            return jsonify({'history': history_manager.get_all()})
         except Exception as e:
             log.error("Error in get_history", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def clear_history(self):
+        """Svuota tutta la history."""
+        try:
+            history_manager.clear()
+            return jsonify({'success': True, 'message': 'History cleared'})
+        except Exception as e:
+            log.error("Error in clear_history", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def delete_history_item(self, timestamp):
+        """Elimina un singolo item dalla history."""
+        try:
+            success = history_manager.remove(timestamp)
+            if success:
+                return jsonify({'success': True})
+            return jsonify({'error': 'Item not found'}), 404
+        except Exception as e:
+            log.error("Error in delete_history_item", error=str(e))
             return jsonify({'error': str(e)}), 500
 
     async def health(self):

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FloatingSearchPanel } from './FloatingSearchPanel';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
 import { QuickNormsManager } from './QuickNormsManager';
@@ -276,9 +275,6 @@ export function SearchPanel() {
         onClose={closeCommandPalette}
         onSearch={handleSearch}
       />
-
-      {/* Floating Search Panel */}
-      <FloatingSearchPanel onSearch={handleSearch} isLoading={isLoading} />
 
       {/* Workspace Manager - renders all tabs */}
       <WorkspaceManager

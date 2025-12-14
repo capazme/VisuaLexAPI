@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { SelectionPopup } from './SelectionPopup';
-import { ExternalLink, Bookmark, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, Tag, MoreHorizontal, Clock } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, MoreHorizontal, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
@@ -34,25 +34,19 @@ const HIGHLIGHT_STYLES: Record<string, string> = {
 export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
     const {
-        addBookmark,
-        removeBookmark,
-        isBookmarked,
         annotations,
         addAnnotation,
         removeAnnotation,
-        bookmarks,
-        updateBookmarkTags,
         highlights,
         addHighlight,
         removeHighlight,
         triggerSearch,
+        addQuickNorm,
     } = useAppStore();
 
     const [showDossierModal, setShowDossierModal] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
     const [noteText, setNoteText] = useState('');
-    const [tagsEditorOpen, setTagsEditorOpen] = useState(false);
-    const [tagInput, setTagInput] = useState('');
     const [highlightColor] = useState<'yellow' | 'green' | 'red' | 'blue'>('yellow');
     const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
@@ -74,15 +68,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
     };
 
     const itemKey = generateKey();
-    const isBookmarkedItem = isBookmarked(itemKey);
-    const bookmarkRecord = bookmarks.find(b => b.normaKey === itemKey);
-    const currentTags = bookmarkRecord?.tags || [];
     const itemAnnotations = annotations.filter(a => a.normaKey === itemKey && a.articleId === norma_data.numero_articolo);
     const articleHighlights = highlights.filter(h => h.normaKey === itemKey && h.articleId === norma_data.numero_articolo);
-
-    useEffect(() => {
-        setTagInput(currentTags.join(', '));
-    }, [bookmarkRecord?.id, currentTags.join(',')]);
 
     useEffect(() => {
         if (!toastMessage) return;
@@ -131,26 +118,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
         setToastMessage({ text, type });
     };
 
-    const handleBookmark = () => {
-        if (isBookmarkedItem) {
-            removeBookmark(itemKey);
-            showToast('Segnalibro rimosso', 'info');
-        } else {
-            addBookmark(norma_data);
-            setTagsEditorOpen(true);
-            showToast('Segnalibro aggiunto', 'success');
-        }
-    };
-
-    const handleTagSave = () => {
-        if (!isBookmarkedItem) {
-            showToast('Aggiungi prima un segnalibro', 'error');
-            return;
-        }
-        const tags = tagInput.split(',').map(t => t.trim()).filter(Boolean);
-        updateBookmarkTags(itemKey, tags);
-        setTagsEditorOpen(false);
-        showToast(tags.length > 0 ? `${tags.length} tag salvati` : 'Tag rimossi', 'success');
+    const handleAddToQuickNorms = () => {
+        const label = `Art. ${norma_data.numero_articolo} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+        addQuickNorm(label, {
+            act_type: norma_data.tipo_atto,
+            act_number: norma_data.numero_atto || '',
+            date: norma_data.data || '',
+            article: norma_data.numero_articolo,
+            version: 'vigente',
+            show_brocardi_info: true,
+        });
+        showToast('Aggiunto alle norme rapide', 'success');
     };
 
     const handleAdvancedCopy = async (options: CopyOptions) => {
@@ -368,11 +346,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                 <div className="flex items-center gap-1">
                     {/* Primary buttons */}
                     <button
-                        onClick={handleBookmark}
-                        className={cn("p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors", isBookmarkedItem ? "text-yellow-500" : "text-gray-400")}
-                        title="Segnalibro"
+                        onClick={handleAddToQuickNorms}
+                        className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-amber-500"
+                        title="Aggiungi a norme rapide"
                     >
-                        <Bookmark size={16} className={isBookmarkedItem ? "fill-current" : ""} />
+                        <Zap size={16} />
                     </button>
                     <button
                         onClick={() => setShowNotes(!showNotes)}
@@ -459,26 +437,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 animate-in fade-in zoom-in-95 duration-200 py-1">
                                     <button
                                         onClick={() => {
-                                            if (!isBookmarkedItem) {
-                                                showToast('Aggiungi prima un segnalibro per usare i tag', 'error');
-                                                return;
-                                            }
-                                            setTagsEditorOpen(prev => !prev);
-                                            setShowMoreMenu(false);
-                                        }}
-                                        disabled={!isBookmarkedItem}
-                                        className={cn(
-                                            "w-full px-3 py-2 text-sm text-left flex items-center gap-2 transition-colors",
-                                            !isBookmarkedItem
-                                                ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
-                                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        )}
-                                    >
-                                        <Tag size={14} />
-                                        Gestisci tag
-                                    </button>
-                                    <button
-                                        onClick={() => {
                                             setShowDossierModal(true);
                                             setShowMoreMenu(false);
                                         }}
@@ -526,22 +484,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                     </div>
                 </div>
             </div>
-
-            {tagsEditorOpen && (
-                <div className="mb-4 bg-gray-50 dark:bg-gray-800/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase">Tag Segnalibro</label>
-                    <input
-                        value={tagInput}
-                        onChange={(e) => setTagInput(e.target.value)}
-                        placeholder="Es. #procedura, #esame"
-                        className="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 px-3 py-2 text-sm"
-                    />
-                    <div className="flex gap-2 justify-end">
-                        <button onClick={() => setTagsEditorOpen(false)} className="text-sm px-3 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700">Annulla</button>
-                        <button onClick={handleTagSave} className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700">Salva</button>
-                    </div>
-                </div>
-            )}
 
             {(showNotes || itemAnnotations.length > 0) && (
                 <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30 rounded-lg p-4">

@@ -1,12 +1,14 @@
 import os
 from pathlib import Path
 
+BASE_PATH = Path(__file__).resolve().parents[2]
+
 MAX_CACHE_SIZE = 10000
 HISTORY_LIMIT = 50
+HISTORY_FILE = BASE_PATH / "data" / "history.json"
 RATE_LIMIT = 1000  # Limit to 100 requests per minute
 RATE_LIMIT_WINDOW = 600  # Window size in seconds
 
-BASE_PATH = Path(__file__).resolve().parents[2]
 PERSISTENT_CACHE_DIR = BASE_PATH / "download" / "cache"
 PERSISTENT_CACHE_TTL = int(os.getenv("PERSISTENT_CACHE_TTL", 86400))
 
