@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion, useMotionValue, useSpring, useDragControls } from 'framer-motion';
+import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { Search, Minimize2, Plus } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
@@ -11,15 +11,15 @@ interface FloatingSearchPanelProps {
   isLoading: boolean;
 }
 
-// Spring physics config for smooth, natural motion
-const SPRING_CONFIG = { damping: 30, stiffness: 300, mass: 0.8 };
+
 
 export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanelProps) {
   const {
     searchPanelState,
     toggleSearchPanel,
     setSearchPanelPosition,
-    addWorkspaceTab
+    addWorkspaceTab,
+    bringSearchPanelToFront
   } = useAppStore();
 
   const [showTooltip, setShowTooltip] = useState(false);
@@ -28,13 +28,9 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
   // Drag controls for handle-based dragging
   const dragControls = useDragControls();
 
-  // Motion values for smooth physics-based dragging
+  // Motion values for position (no spring - direct values)
   const x = useMotionValue(searchPanelState.position.x);
   const y = useMotionValue(searchPanelState.position.y);
-
-  // Apply spring physics to the motion values
-  const springX = useSpring(x, SPRING_CONFIG);
-  const springY = useSpring(y, SPRING_CONFIG);
 
   // Sync position from store when it changes externally
   useEffect(() => {
@@ -58,6 +54,7 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
 
   const handleDragStart = () => {
     setIsDragging(true);
+    bringSearchPanelToFront();  // Bring to front when starting to drag
   };
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -95,21 +92,19 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
     return (
       <motion.div
         drag
-        dragMomentum={true}
-        dragElastic={0.1}
-        dragTransition={{ bounceStiffness: 300, bounceDamping: 20 }}
+        dragMomentum={false}
+        dragElastic={0}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        style={{ x: springX, y: springY }}
-        className="fixed z-[9999] cursor-grab active:cursor-grabbing"
-        whileDrag={{ scale: 1.05 }}
-        whileHover={{ scale: 1.02 }}
+        onPointerDown={() => bringSearchPanelToFront()}
+        style={{ x, y, zIndex: searchPanelState.zIndex }}
+        className="fixed cursor-grab active:cursor-grabbing"
       >
         <div className="relative">
           <button
             onClick={handleSingleClick}
             onDoubleClick={toggleSearchPanel}
-            className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+            className="w-14 h-14 bg-blue-500/90 hover:bg-blue-600/95 backdrop-blur-2xl text-white rounded-2xl shadow-glass-lg flex items-center justify-center transition-all duration-200 border border-white/20"
             title="Doppio click per aprire - Trascinabile"
           >
             <Search size={24} />
@@ -138,30 +133,36 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
       drag
       dragControls={dragControls}
       dragListener={false}
-      dragMomentum={true}
-      dragElastic={0.05}
-      dragTransition={{ bounceStiffness: 400, bounceDamping: 25 }}
+      dragMomentum={false}
+      dragElastic={0}
+      dragConstraints={{ left: 0, right: window.innerWidth - 384, top: 0, bottom: window.innerHeight - 400 }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      style={{ x: springX, y: springY }}
-      className="fixed z-[9999]"
+      onPointerDown={() => bringSearchPanelToFront()}
+      style={{ x, y, zIndex: searchPanelState.zIndex }}
+      className="fixed"
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96 max-h-[80vh] overflow-hidden flex flex-col">
-        {/* Header with drag handle */}
+      <div className="bg-white/75 dark:bg-gray-900/75 backdrop-blur-2xl rounded-2xl shadow-glass-lg border border-white/20 dark:border-white/10 w-96 max-h-[80vh] overflow-hidden flex flex-col">
+        {/* Header with drag handle - DRAG FROM HERE */}
         <div
           onPointerDown={(e) => {
-            // Only start drag if not clicking a button
-            const target = e.target as HTMLElement;
-            if (target.closest('button')) return;
+            e.preventDefault();
             dragControls.start(e);
           }}
-          className="h-12 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing bg-gradient-to-b from-gray-50/50 to-transparent dark:from-gray-900/50 border-b border-gray-200 dark:border-gray-700 select-none touch-none"
+          className="h-14 flex items-center justify-between px-4 cursor-grab active:cursor-grabbing bg-gradient-to-b from-gray-100/80 to-gray-50/50 dark:from-gray-800/80 dark:to-gray-900/50 border-b border-gray-200/50 dark:border-gray-700/50 select-none touch-none"
         >
-          {/* Grip Dots Indicator */}
-          <div className="flex gap-1.5 opacity-30 hover:opacity-100 transition-opacity pointer-events-none">
-            <div className="w-1 h-1 bg-gray-600 dark:bg-gray-400 rounded-full" />
-            <div className="w-1 h-1 bg-gray-600 dark:bg-gray-400 rounded-full" />
-            <div className="w-1 h-1 bg-gray-600 dark:bg-gray-400 rounded-full" />
+          {/* Grip Handle - More Visible */}
+          <div className="flex flex-col gap-1 opacity-40 hover:opacity-100 transition-opacity pointer-events-none">
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full" />
+            </div>
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full" />
+              <div className="w-1.5 h-1.5 bg-gray-500 dark:bg-gray-400 rounded-full" />
+            </div>
           </div>
 
           {/* Title */}
@@ -170,6 +171,7 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
           <div className="flex items-center gap-1">
             <button
               onClick={handleNewTab}
+              onPointerDown={(e) => e.stopPropagation()}
               className="px-2 py-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors flex items-center gap-1"
               title="Crea nuova tab vuota"
             >
@@ -178,6 +180,7 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
             </button>
             <button
               onClick={toggleSearchPanel}
+              onPointerDown={(e) => e.stopPropagation()}
               className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
               title="Minimizza (Cmd+K)"
             >

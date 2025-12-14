@@ -14,9 +14,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={onClose} />
+            <div className="relative bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl rounded-2xl shadow-glass-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20 dark:border-white/10">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-white/5">
                     <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         Impostazioni
                     </h3>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, useMotionValue, useSpring, useDragControls } from 'framer-motion';
+import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
@@ -10,8 +10,7 @@ import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 
-// Spring physics config for smooth, natural motion
-const SPRING_CONFIG = { damping: 25, stiffness: 250, mass: 0.8 };
+
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -133,9 +132,9 @@ export function WorkspaceTabPanel({
   const width = useMotionValue(tab.size.width);
   const height = useMotionValue(tab.size.height);
 
-  // Apply spring physics
-  const springX = useSpring(x, SPRING_CONFIG);
-  const springY = useSpring(y, SPRING_CONFIG);
+  // Motion values for position (no spring - direct values)
+  const springX = x;  // Renamed for compatibility but no spring
+  const springY = y;  // Renamed for compatibility but no spring
 
   // Sync with store when tab position/size changes externally
   const [isDragging, setIsDragging] = useState(false);
@@ -268,9 +267,8 @@ export function WorkspaceTabPanel({
       drag
       dragControls={dragControls}
       dragListener={false}
-      dragMomentum={true}
-      dragElastic={0.05}
-      dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+      dragMomentum={false}
+      dragElastic={0}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       style={{
@@ -290,13 +288,16 @@ export function WorkspaceTabPanel({
       <div
         ref={setNodeRef}
         className={cn(
-          "h-full flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-2xl border overflow-hidden",
+          // Liquid Glass container
+          "h-full flex flex-col rounded-2xl shadow-glass-lg overflow-hidden",
+          "bg-white/75 dark:bg-gray-900/75 backdrop-blur-2xl",
+          "border",
           isOver
-            ? "border-blue-500 border-2 bg-blue-50 dark:bg-blue-950"
-            : "border-gray-200 dark:border-gray-700"
+            ? "border-blue-500 border-2 bg-blue-50/80 dark:bg-blue-950/80"
+            : "border-white/20 dark:border-white/10"
         )}
       >
-        {/* Header with macOS-style controls - draggable */}
+        {/* Header with macOS-style controls - Liquid Glass */}
         <div
           onPointerDown={(e) => {
             // Only start drag if not clicking a button or interactive element
@@ -304,7 +305,7 @@ export function WorkspaceTabPanel({
             if (target.closest('button') || target.closest('input')) return;
             dragControls.start(e);
           }}
-          className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 select-none touch-none">
+          className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-white/30 dark:bg-white/5 border-b border-white/10 dark:border-white/5 select-none touch-none">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* macOS traffic lights */}
             <div className="flex items-center gap-1.5 shrink-0">

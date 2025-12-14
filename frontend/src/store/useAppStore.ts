@@ -53,6 +53,7 @@ interface WorkspaceTab {
 interface SearchPanelState {
     isCollapsed: boolean;
     position: { x: number; y: number };
+    zIndex: number;  // Dynamic z-index for stacking order
 }
 
 interface AppState {
@@ -79,6 +80,7 @@ interface AppState {
     setSidebarVisible: (visible: boolean) => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
+    bringSearchPanelToFront: () => void;  // Bring search panel to front
 
     // Workspace Tab Actions
     addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[]) => string;
@@ -108,12 +110,12 @@ interface AppState {
     removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
     toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
     moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
-    
+
     addBookmark: (norma: NormaVisitata, tags?: string[]) => void;
     updateBookmarkTags: (normaKey: string, tags: string[]) => void;
     removeBookmark: (normaKey: string) => void;
     isBookmarked: (normaKey: string) => boolean;
-    
+
     createDossier: (title: string, description?: string) => void;
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
@@ -123,10 +125,10 @@ interface AppState {
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: string) => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
-    
+
     addAnnotation: (normaKey: string, articleId: string, text: string) => void;
     removeAnnotation: (id: string) => void;
-    
+
     addHighlight: (normaKey: string, articleId: string, text: string, range: string, color: Highlight['color']) => void;
     removeHighlight: (id: string) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
@@ -170,7 +172,8 @@ const appStore = createStore<AppState>()(
             sidebarVisible: true,
             searchPanelState: {
                 isCollapsed: false,
-                position: { x: window.innerWidth - 420, y: 20 }
+                position: { x: window.innerWidth - 420, y: 20 },
+                zIndex: 1000  // Start high so it's above tabs
             },
             workspaceTabs: [],
             highestZIndex: 100,
@@ -194,6 +197,10 @@ const appStore = createStore<AppState>()(
 
             setSearchPanelPosition: (position) => set((state) => {
                 state.searchPanelState.position = position;
+            }),
+
+            bringSearchPanelToFront: () => set((state) => {
+                state.searchPanelState.zIndex = ++state.highestZIndex;
             }),
 
             // Workspace Tab Actions - Complete refactor
@@ -243,9 +250,9 @@ const appStore = createStore<AppState>()(
 
                 const existingNorma = tab.content.find(
                     c => c.type === 'norma' &&
-                    c.norma.tipo_atto === norma.tipo_atto &&
-                    c.norma.numero_atto === norma.numero_atto &&
-                    c.norma.data === norma.data
+                        c.norma.tipo_atto === norma.tipo_atto &&
+                        c.norma.numero_atto === norma.numero_atto &&
+                        c.norma.data === norma.data
                 ) as NormaBlock | undefined;
 
                 if (existingNorma) {
@@ -736,14 +743,14 @@ const appStore = createStore<AppState>()(
             }),
 
             addHighlight: (normaKey, articleId, text, range, color) => set((state) => {
-                 state.highlights.push({
-                     id: uuidv4(),
-                     normaKey,
-                     articleId,
-                     text,
-                     rangeSerialized: range,
-                     color
-                 });
+                state.highlights.push({
+                    id: uuidv4(),
+                    normaKey,
+                    articleId,
+                    text,
+                    rangeSerialized: range,
+                    color
+                });
             }),
 
             removeHighlight: (id) => set((state) => {

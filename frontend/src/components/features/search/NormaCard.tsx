@@ -55,19 +55,19 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   const fetchTree = async () => {
     if (!norma.urn || treeData) return; // Don't refetch if already loaded
     try {
-        setTreeLoading(true);
-        const res = await fetch('/fetch_tree', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urn: norma.urn, link: false, details: true })
-        });
-        if (!res.ok) throw new Error('Impossibile caricare la struttura');
-        const payload = await res.json();
-        setTreeData(payload.articles || payload);
+      setTreeLoading(true);
+      const res = await fetch('/fetch_tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urn: norma.urn, link: false, details: true })
+      });
+      if (!res.ok) throw new Error('Impossibile caricare la struttura');
+      const payload = await res.json();
+      setTreeData(payload.articles || payload);
     } catch (e: any) {
-        console.error('Error fetching tree:', e);
+      console.error('Error fetching tree:', e);
     } finally {
-        setTreeLoading(false);
+      setTreeLoading(false);
     }
   };
 
@@ -81,10 +81,10 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   // Set first tab active when articles change if no tab is active
   useEffect(() => {
     if (articles.length > 0 && !activeTabId) {
-        setActiveTabId(articles[0].norma_data.numero_articolo);
+      setActiveTabId(articles[0].norma_data.numero_articolo);
     } else if (articles.length > 0 && activeTabId && !articles.find(a => a.norma_data.numero_articolo === activeTabId)) {
-        // If active tab was closed, switch to first available
-        setActiveTabId(articles[0].norma_data.numero_articolo);
+      // If active tab was closed, switch to first available
+      setActiveTabId(articles[0].norma_data.numero_articolo);
     }
   }, [articles, activeTabId]);
 
@@ -122,12 +122,24 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
 
   return (
     <div className={cn(
-      "bg-white dark:bg-gray-800 rounded-xl shadow-sm border overflow-hidden mb-6 transition-all duration-200 hover:shadow-md",
-      isNew ? "border-blue-500 ring-2 ring-blue-500/20" : "border-gray-200 dark:border-gray-700"
+      "rounded-xl overflow-hidden mb-6",
+      "bg-white dark:bg-gray-800",
+      "border shadow-md",
+      "transition-all duration-200",
+      "hover:shadow-lg",
+      isNew
+        ? "border-blue-500 ring-2 ring-blue-500/20"
+        : "border-gray-200 dark:border-gray-700"
     )}>
       {/* Header */}
-      <div 
-        className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between cursor-pointer bg-white dark:bg-gray-800"
+      <div
+        className={cn(
+          "p-4 flex items-center justify-between cursor-pointer",
+          "border-b border-gray-200 dark:border-gray-700",
+          "bg-gray-50 dark:bg-gray-750",
+          "hover:bg-gray-100 dark:hover:bg-gray-700",
+          "transition-colors duration-200"
+        )}
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex items-center gap-3">
@@ -156,79 +168,79 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           </div>
         </div>
         <div className="flex items-center gap-2">
-            {/* Quick Add Article */}
-            <AnimatePresence>
-              {quickAddOpen ? (
-                <motion.form
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 'auto', opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  onSubmit={handleQuickAddArticle}
-                  className="flex items-center gap-1 overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="text"
-                    value={quickAddValue}
-                    onChange={(e) => setQuickAddValue(e.target.value)}
-                    placeholder="es. 1, 2-5"
-                    autoFocus
-                    className="w-24 px-2 py-1 text-xs border border-blue-300 dark:border-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
-                  />
-                  <button
-                    type="submit"
-                    className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                    title="Aggiungi"
-                  >
-                    <ArrowRight size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setQuickAddOpen(false); setQuickAddValue(''); }}
-                    className="p-1 text-gray-400 hover:text-gray-600 rounded-md transition-colors"
-                    title="Annulla"
-                  >
-                    <X size={14} />
-                  </button>
-                </motion.form>
-              ) : (
+          {/* Quick Add Article */}
+          <AnimatePresence>
+            {quickAddOpen ? (
+              <motion.form
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 'auto', opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onSubmit={handleQuickAddArticle}
+                className="flex items-center gap-1 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="text"
+                  value={quickAddValue}
+                  onChange={(e) => setQuickAddValue(e.target.value)}
+                  placeholder="es. 1, 2-5"
+                  autoFocus
+                  className="w-24 px-2 py-1 text-xs border border-blue-300 dark:border-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
+                />
                 <button
-                  className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 rounded-md transition-colors flex items-center gap-1"
-                  onClick={(e) => { e.stopPropagation(); setQuickAddOpen(true); }}
-                  title="Aggiungi articolo"
+                  type="submit"
+                  className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                  title="Aggiungi"
                 >
-                  <Plus size={14} /> Articolo
+                  <ArrowRight size={14} />
                 </button>
-              )}
-            </AnimatePresence>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setQuickAddOpen(false); setQuickAddValue(''); }}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded-md transition-colors"
+                  title="Annulla"
+                >
+                  <X size={14} />
+                </button>
+              </motion.form>
+            ) : (
+              <button
+                className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 rounded-md transition-colors flex items-center gap-1"
+                onClick={(e) => { e.stopPropagation(); setQuickAddOpen(true); }}
+                title="Aggiungi articolo"
+              >
+                <Plus size={14} /> Articolo
+              </button>
+            )}
+          </AnimatePresence>
 
-            {norma.urn && (
-                <button
-                    className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-md transition-colors"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onViewPdf(norma.urn!);
-                    }}
-                >
-                    PDF
-                </button>
-            )}
-            {norma.urn && (
-                <button
-                    className="px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded-md transition-colors"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setTreeVisible(!treeVisible);
-                        if (!treeData) {
-                            fetchTree();
-                        }
-                    }}
-                >
-                    <span className="flex items-center gap-1"><GitBranch size={14} /> Struttura</span>
-                </button>
-            )}
-            <ChevronDown className={cn("text-gray-400 transition-transform duration-200", isOpen ? "rotate-180" : "")} size={20} />
+          {norma.urn && (
+            <button
+              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-md transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewPdf(norma.urn!);
+              }}
+            >
+              PDF
+            </button>
+          )}
+          {norma.urn && (
+            <button
+              className="px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded-md transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setTreeVisible(!treeVisible);
+                if (!treeData) {
+                  fetchTree();
+                }
+              }}
+            >
+              <span className="flex items-center gap-1"><GitBranch size={14} /> Struttura</span>
+            </button>
+          )}
+          <ChevronDown className={cn("text-gray-400 transition-transform duration-200", isOpen ? "rotate-180" : "")} size={20} />
         </div>
       </div>
 
@@ -280,73 +292,73 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           {/* Modern Underline Tabs */}
           <div className="px-5 border-b border-gray-200 dark:border-gray-700 flex gap-0 overflow-x-auto no-scrollbar relative">
             {articles.map((article) => {
-                const id = article.norma_data.numero_articolo;
-                const isActive = id === activeTabId;
-                return (
+              const id = article.norma_data.numero_articolo;
+              const isActive = id === activeTabId;
+              return (
+                <button
+                  key={id}
+                  className={cn(
+                    "relative px-6 py-3 text-sm font-medium transition-all group flex items-center gap-2",
+                    isActive
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                  )}
+                  onClick={() => setActiveTabId(id)}
+                >
+                  <span>Art. {id}</span>
+
+                  {/* Animated underline */}
+                  {isActive && (
+                    <motion.span
+                      layoutId="activeTab"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
+                      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                    />
+                  )}
+
+                  {/* Actions (visible on hover) */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {onPopOut && articles.length > 1 && (
+                      <button
+                        className="p-0.5 hover:text-blue-500 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPopOut(id);
+                        }}
+                        title="Estrai in nuova finestra"
+                      >
+                        <ExternalLink size={12} />
+                      </button>
+                    )}
                     <button
-                        key={id}
-                        className={cn(
-                            "relative px-6 py-3 text-sm font-medium transition-all group flex items-center gap-2",
-                            isActive
-                              ? "text-blue-600 dark:text-blue-400"
-                              : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30"
-                        )}
-                        onClick={() => setActiveTabId(id)}
+                      className="p-0.5 hover:text-red-500 rounded"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseArticle(id);
+                      }}
+                      title="Chiudi articolo"
                     >
-                        <span>Art. {id}</span>
-
-                        {/* Animated underline */}
-                        {isActive && (
-                          <motion.span
-                            layoutId="activeTab"
-                            className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
-                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                          />
-                        )}
-
-                        {/* Actions (visible on hover) */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {onPopOut && articles.length > 1 && (
-                                <button
-                                    className="p-0.5 hover:text-blue-500 rounded"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onPopOut(id);
-                                    }}
-                                    title="Estrai in nuova finestra"
-                                >
-                                    <ExternalLink size={12} />
-                                </button>
-                            )}
-                            <button
-                                className="p-0.5 hover:text-red-500 rounded"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCloseArticle(id);
-                                }}
-                                title="Chiudi articolo"
-                            >
-                                <X size={12} />
-                            </button>
-                        </div>
+                      <X size={12} />
                     </button>
-                );
+                  </div>
+                </button>
+              );
             })}
           </div>
 
           {/* Tab Pane */}
           <div className="p-6 bg-white dark:bg-gray-800 min-h-[300px]">
             {activeArticle ? (
-                <ArticleTabContent 
-                    key={activeArticle.norma_data.numero_articolo} 
-                    data={activeArticle} 
-                    onCompare={onCompareArticle}
-                    onCrossReferenceNavigate={onCrossReference}
-                />
+              <ArticleTabContent
+                key={activeArticle.norma_data.numero_articolo}
+                data={activeArticle}
+                onCompare={onCompareArticle}
+                onCrossReferenceNavigate={onCrossReference}
+              />
             ) : (
-                <div className="text-center py-10 text-gray-400">
-                    Nessun articolo selezionato
-                </div>
+              <div className="text-center py-10 text-gray-400">
+                Nessun articolo selezionato
+              </div>
             )}
           </div>
         </div>

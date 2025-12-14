@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
-import { Menu, Maximize2, Minimize2, Settings as SettingsIcon } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { SettingsModal } from '../ui/SettingsModal';
 import { cn } from '../../lib/utils';
@@ -11,21 +11,22 @@ export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const location = useLocation();
   const navigate = useNavigate();
 
   // Apply Theme & Typography Effects
   useEffect(() => {
     const root = document.documentElement;
-    
-    // Theme
+
+    // Set theme - CSS variables handle colors via data-theme attribute
     root.setAttribute('data-theme', settings.theme);
-    if (settings.theme === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
-    
-    // Classes for Sepia/HighContrast handling in CSS would be needed, or just rely on data-theme
-    
+
+    // Toggle .dark class for Tailwind dark: utilities (backward compatibility)
+    if (settings.theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+
     // Font Size
     root.setAttribute('data-font-size', settings.fontSize);
     // Remove previous font classes
@@ -40,66 +41,63 @@ export function Layout() {
     updateSettings({ theme: newTheme });
   };
 
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            toggleSearchPanel();
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
-            e.preventDefault();
-            toggleSidebar();
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
-            e.preventDefault();
-            navigate('/dossier');
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key === ' ') {
-            e.preventDefault();
-            updateSettings({ focusMode: !settings.focusMode });
-        }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        toggleSearchPanel();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        navigate('/dossier');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === ' ') {
+        e.preventDefault();
+        updateSettings({ focusMode: !settings.focusMode });
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel]);
 
-  const pageTitles: Record<string, string> = {
-    '/': 'Ricerca Normativa',
-    '/dossier': 'Dossier',
-    '/history': 'Cronologia',
-    '/bookmarks': 'Segnalibri',
-  };
-
   return (
-    <div className={cn(
-        "min-h-screen flex transition-colors duration-300",
-        settings.theme === 'sepia' ? 'bg-[#f4ecd8] text-[#5b4636]' : 
-        settings.theme === 'high-contrast' ? 'bg-white text-black' : 
-        "bg-gray-50 dark:bg-gray-950"
-    )}>
+    <div className="min-h-screen flex bg-theme-bg text-theme-text transition-colors duration-300">
       {/* Mobile Overlay */}
       {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Desktop Sidebar - Slide animation */}
-      <div className={cn(
-        "hidden lg:block transition-all duration-300 ease-in-out",
-        sidebarVisible ? "w-64" : "w-0"
-      )}>
+      {/* Desktop Sidebar - Slide animation with new w-16 width */}
+      <motion.div
+        initial={false}
+        animate={{
+          width: sidebarVisible && !settings.focusMode ? 64 : 0,
+          opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
+        }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="hidden lg:block overflow-hidden"
+      >
         {sidebarVisible && !settings.focusMode && (
           <Sidebar
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={true}
-            closeMobile={() => {}}
+            closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
           />
         )}
-      </div>
+      </motion.div>
 
       {/* Mobile Sidebar */}
       {!settings.focusMode && (
@@ -115,76 +113,49 @@ export function Layout() {
       )}
 
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
-        {/* Animated Header with Framer Motion */}
-        <motion.header
-          initial={false}
-          animate={{
-            y: settings.focusMode ? -100 : 0,
-            opacity: settings.focusMode ? 0 : 1,
-          }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between z-20 absolute w-full top-0 left-0"
-        >
-          <div className="flex items-center gap-3">
-            {/* Mobile toggle */}
-            <button
-              className="lg:hidden p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              <Menu size={24} className="text-gray-600 dark:text-gray-300" />
-            </button>
-
-            {/* Desktop toggle */}
-            <button
-              className="hidden lg:block p-2 -ml-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-              onClick={toggleSidebar}
-              title="Toggle Sidebar (Cmd+B)"
-            >
-              <Menu size={20} className="text-gray-600 dark:text-gray-300" />
-            </button>
-
-            <h1 className="text-lg font-medium text-gray-700 dark:text-gray-200">
-              {pageTitles[location.pathname] || 'VisuaLex'}
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md text-gray-600 dark:text-gray-300"
-              title="Impostazioni"
-            >
-              <SettingsIcon size={20} />
-            </button>
-          </div>
-        </motion.header>
-
         {/* Floating Focus Toggle - Always Visible */}
         <motion.button
-          whileHover={{ scale: 1.1 }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           className={cn(
-            'absolute top-4 right-4 z-50 p-3 rounded-full shadow-lg backdrop-blur-sm transition-colors',
+            'fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
+            // Liquid Glass effect
+            'backdrop-blur-2xl shadow-glass',
             settings.focusMode
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-white/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800'
+              ? 'bg-blue-500/90 text-white hover:bg-blue-600/90'
+              : 'bg-white/70 dark:bg-gray-800/70 text-gray-600 dark:text-gray-300 hover:bg-white/90 dark:hover:bg-gray-800/90 border border-white/20 dark:border-white/10'
           )}
           title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
         >
-          {settings.focusMode ? <Minimize2 size={24} /> : <Maximize2 size={24} />}
+          {settings.focusMode ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
         </motion.button>
 
-        {/* Content Area with Padding Adjustment */}
-        <motion.div
-          animate={{ paddingTop: settings.focusMode ? 0 : 80 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="flex-1 overflow-y-auto w-full h-full"
-        >
-          <div className={cn('max-w-7xl mx-auto p-6 md:p-8', settings.focusMode && 'max-w-4xl py-12')}>
+        {/* Mobile Menu Button - Only visible on mobile */}
+        {!settings.focusMode && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl backdrop-blur-2xl shadow-glass bg-white/70 dark:bg-gray-800/70 text-gray-600 dark:text-gray-300 border border-white/20 dark:border-white/10"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </motion.button>
+        )}
+
+        {/* Content Area - Full height, no navbar padding needed */}
+        <div className="flex-1 overflow-y-auto w-full h-full">
+          <div className={cn(
+            'max-w-7xl mx-auto p-6 md:p-8',
+            settings.focusMode && 'max-w-4xl py-12'
+          )}>
             <Outlet />
           </div>
-        </motion.div>
+        </div>
       </main>
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />

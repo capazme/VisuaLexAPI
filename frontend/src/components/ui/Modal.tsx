@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -65,7 +65,7 @@ export function Modal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/40 backdrop-blur-md z-50"
           />
 
           {/* Modal */}
@@ -78,8 +78,15 @@ export function Modal({
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 'w-full pointer-events-auto',
-                'bg-white dark:bg-gray-900 rounded-2xl shadow-2xl',
-                'border border-gray-200 dark:border-gray-800',
+                // Elevated glass effect with inner highlight
+                'bg-white/85 dark:bg-gray-900/85',
+                'backdrop-blur-3xl',
+                'rounded-2xl',
+                'shadow-[0_25px_50px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.1)]',
+                'border border-white/25 dark:border-white/15',
+                // Inner highlight
+                '[box-shadow:0_25px_50px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.4)]',
+                'dark:[box-shadow:0_25px_50px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)]',
                 'max-h-[90vh] flex flex-col',
                 sizeStyles[size],
                 className
@@ -87,7 +94,12 @@ export function Modal({
             >
               {/* Header */}
               {(title || showCloseButton) && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
+                <div className={cn(
+                  "flex items-center justify-between px-6 py-4 shrink-0",
+                  "border-b border-white/15 dark:border-white/10",
+                  "bg-white/30 dark:bg-white/5",
+                  "rounded-t-2xl"
+                )}>
                   {title && (
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                       {title}
@@ -96,7 +108,14 @@ export function Modal({
                   {showCloseButton && (
                     <button
                       onClick={onClose}
-                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors ml-auto"
+                      className={cn(
+                        "p-2 rounded-xl ml-auto",
+                        "hover:bg-gray-100/80 dark:hover:bg-gray-800/80",
+                        "text-gray-500 dark:text-gray-400",
+                        "hover:text-gray-700 dark:hover:text-gray-200",
+                        "transition-all duration-200 ease-smooth-out",
+                        "active:scale-95"
+                      )}
                     >
                       <X size={20} />
                     </button>

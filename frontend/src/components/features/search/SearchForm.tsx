@@ -30,8 +30,8 @@ const ACT_TYPES = [
 ];
 
 const ACT_TYPES_REQUIRING_DETAILS = [
-    'legge', 'decreto legge', 'decreto legislativo', 
-    'Regolamento UE', 'Direttiva UE'
+  'legge', 'decreto legge', 'decreto legislativo',
+  'Regolamento UE', 'Direttiva UE'
 ];
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
@@ -295,8 +295,8 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   }, {} as Record<string, typeof ACT_TYPES>);
 
   return (
-    <div className="card bg-white dark:bg-gray-800 shadow-sm rounded-lg border border-gray-200 dark:border-gray-700 sticky top-6">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 sticky top-6">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-t-xl">
         <h5 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <Search size={18} />
           Parametri
@@ -306,10 +306,10 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="search-act-type" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tipo atto</label>
-            <select 
-              id="search-act-type" 
-              name="act_type" 
-              value={formData.act_type} 
+            <select
+              id="search-act-type"
+              name="act_type"
+              value={formData.act_type}
               onChange={handleChange}
               className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border"
               required
@@ -328,11 +328,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label htmlFor="act_number" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Numero</label>
-              <input 
-                type="text" 
-                id="act_number" 
-                name="act_number" 
-                value={formData.act_number} 
+              <input
+                type="text"
+                id="act_number"
+                name="act_number"
+                value={formData.act_number}
                 onChange={handleChange}
                 disabled={!isDetailsRequired}
                 placeholder="n."
@@ -341,11 +341,11 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </div>
             <div>
               <label htmlFor="date" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Data</label>
-              <input 
-                type="text" 
-                id="date" 
-                name="date" 
-                value={formData.date} 
+              <input
+                type="text"
+                id="date"
+                name="date"
+                value={formData.date}
                 onChange={handleChange}
                 disabled={!isDetailsRequired}
                 placeholder="aaaa"
@@ -404,46 +404,46 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Versione</label>
             <div className="flex gap-4 mb-2">
               <div className="flex items-center">
-                <input 
-                  type="radio" 
-                  id="vigente" 
-                  name="version" 
-                  value="vigente" 
-                  checked={formData.version === 'vigente'} 
+                <input
+                  type="radio"
+                  id="vigente"
+                  name="version"
+                  value="vigente"
+                  checked={formData.version === 'vigente'}
                   onChange={handleChange}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                 />
                 <label htmlFor="vigente" className="ml-2 text-sm text-gray-700 dark:text-gray-300">Vigente</label>
               </div>
               <div className="flex items-center">
-                <input 
-                  type="radio" 
-                  id="originale" 
-                  name="version" 
-                  value="originale" 
-                  checked={formData.version === 'originale'} 
+                <input
+                  type="radio"
+                  id="originale"
+                  name="version"
+                  value="originale"
+                  checked={formData.version === 'originale'}
                   onChange={handleChange}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                 />
                 <label htmlFor="originale" className="ml-2 text-sm text-gray-700 dark:text-gray-300">Originale</label>
               </div>
             </div>
-            <input 
-              type="date" 
-              name="version_date" 
+            <input
+              type="date"
+              name="version_date"
               value={formData.version_date}
               onChange={handleChange}
-              disabled={true} 
+              disabled={true}
               className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm p-2 border disabled:opacity-50"
             />
           </div>
 
           <div className="flex items-center">
-            <input 
-              type="checkbox" 
-              id="show_brocardi_info" 
-              name="show_brocardi_info" 
-              checked={formData.show_brocardi_info} 
+            <input
+              type="checkbox"
+              id="show_brocardi_info"
+              name="show_brocardi_info"
+              checked={formData.show_brocardi_info}
               onChange={handleChange}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
@@ -453,8 +453,8 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
 
           <div className="space-y-2 pt-2">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-md font-medium shadow-sm transition-colors disabled:opacity-70"
             >

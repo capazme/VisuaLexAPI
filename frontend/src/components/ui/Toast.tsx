@@ -36,11 +36,12 @@ export function Toast({
     warning: <AlertCircle size={20} className="text-yellow-600 dark:text-yellow-400" />,
   };
 
+  // Liquid Glass toast styles
   const styles = {
-    success: 'bg-green-50/90 dark:bg-green-900/40 border-green-200 dark:border-green-800 text-green-900 dark:text-green-100',
-    error: 'bg-red-50/90 dark:bg-red-900/40 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100',
-    info: 'bg-blue-50/90 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100',
-    warning: 'bg-yellow-50/90 dark:bg-yellow-900/40 border-yellow-200 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100',
+    success: 'bg-green-500/10 dark:bg-green-500/20 border-green-500/30 text-green-900 dark:text-green-100',
+    error: 'bg-red-500/10 dark:bg-red-500/20 border-red-500/30 text-red-900 dark:text-red-100',
+    info: 'bg-blue-500/10 dark:bg-blue-500/20 border-blue-500/30 text-blue-900 dark:text-blue-100',
+    warning: 'bg-yellow-500/10 dark:bg-yellow-500/20 border-yellow-500/30 text-yellow-900 dark:text-yellow-100',
   };
 
   const positionStyles = position === 'top'
@@ -56,7 +57,7 @@ export function Toast({
           exit={{ opacity: 0, y: position === 'top' ? -20 : 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className={cn(
-            'fixed z-[200] flex items-center gap-4 px-5 py-4 rounded-xl shadow-2xl border backdrop-blur-md max-w-[90vw] md:max-w-md',
+            'fixed z-[200] flex items-center gap-4 px-5 py-4 rounded-2xl shadow-glass-lg border backdrop-blur-2xl max-w-[90vw] md:max-w-md',
             positionStyles,
             styles[type]
           )}
