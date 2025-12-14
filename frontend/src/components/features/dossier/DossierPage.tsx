@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Folder, FileText, Trash2, FolderPlus, ChevronRight, ArrowLeft, Download, Search, Tag, Star, Edit2, Eye, X, GripVertical, FileDown, Share2, Copy, Check, CheckSquare, Square, FolderInput, Circle, BookOpen, AlertCircle, CheckCircle2, FileJson, TreeDeciduous, Loader2 } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Folder, FileText, Trash2, FolderPlus, ChevronRight, ArrowLeft, Download, Search, Tag, Star, Edit2, Eye, X, GripVertical, FileDown, Share2, Copy, Check, CheckSquare, Square, FolderInput, Circle, BookOpen, AlertCircle, CheckCircle2, FileJson, TreeDeciduous, Loader2, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { DossierModal } from '../../ui/DossierModal';
 import { jsPDF } from 'jspdf';
@@ -10,7 +10,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // Status configuration
 const STATUS_CONFIG = {
@@ -240,6 +240,90 @@ function EditDossierModal({
   );
 }
 
+// Import Dossier Modal
+function ImportDossierModal({
+  dossier,
+  isOpen,
+  onClose,
+  onConfirm
+}: {
+  dossier: Dossier | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!isOpen || !dossier) return null;
+
+  const stats = {
+    total: dossier.items.length,
+    norme: dossier.items.filter(i => i.type === 'norma').length,
+    note: dossier.items.filter(i => i.type === 'note').length
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+            <FolderInput className="text-blue-600" size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Importa Dossier</h2>
+            <p className="text-sm text-gray-500">Qualcuno ha condiviso un dossier con te</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4">
+          <h3 className="font-medium text-gray-900 dark:text-white text-lg mb-2">{dossier.title}</h3>
+          {dossier.description && (
+            <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">{dossier.description}</p>
+          )}
+          <div className="flex flex-wrap gap-2 text-sm">
+            <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+              {stats.total} elementi
+            </span>
+            {stats.norme > 0 && (
+              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+                {stats.norme} articoli
+              </span>
+            )}
+            {stats.note > 0 && (
+              <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded">
+                {stats.note} note
+              </span>
+            )}
+          </div>
+          {dossier.tags && dossier.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-3">
+              {dossier.tags.map(tag => (
+                <span key={tag} className="px-2 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs text-gray-600 dark:text-gray-300">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <FolderInput size={18} />
+            Importa
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Tree Navigator Modal for importing articles from a norm
 function TreeNavigatorModal({
   isOpen,
@@ -451,7 +535,7 @@ function TreeNavigatorModal({
 }
 
 export function DossierPage() {
-  const { dossiers, deleteDossier, removeFromDossier, updateDossier, toggleDossierPin, reorderDossierItems, updateDossierItemStatus, moveToDossier, triggerSearch } = useAppStore();
+  const { dossiers, deleteDossier, removeFromDossier, updateDossier, toggleDossierPin, reorderDossierItems, updateDossierItemStatus, moveToDossier, triggerSearch, importDossier } = useAppStore();
   const [selectedDossierId, setSelectedDossierId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -463,7 +547,35 @@ export function DossierPage() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [moveToModalOpen, setMoveToModalOpen] = useState(false);
   const [treeNavigatorOpen, setTreeNavigatorOpen] = useState(false);
+  const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Handle import from share link
+  useEffect(() => {
+    const importData = searchParams.get('import');
+    if (importData) {
+      try {
+        const decoded = atob(decodeURIComponent(importData));
+        const dossier = JSON.parse(decoded) as Dossier;
+        setImportingDossier(dossier);
+        // Clear the URL parameter
+        setSearchParams({}, { replace: true });
+      } catch (e) {
+        console.error('Failed to parse import data:', e);
+        alert('Link di importazione non valido');
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, setSearchParams]);
+
+  const handleConfirmImport = () => {
+    if (importingDossier) {
+      const newId = importDossier(importingDossier);
+      setImportingDossier(null);
+      setSelectedDossierId(newId);
+    }
+  };
 
   const selectedDossier = dossiers.find(d => d.id === selectedDossierId);
   const { addToDossier } = useAppStore();
@@ -482,6 +594,40 @@ export function DossierPage() {
         show_brocardi_info: true
       });
     }
+  };
+
+  // Open all dossier items on dashboard (grouped by norm)
+  const handleOpenAllOnDashboard = () => {
+    if (!selectedDossier) return;
+
+    // Filter only norma items
+    const normaItems = selectedDossier.items.filter(i => i.type === 'norma');
+    if (normaItems.length === 0) return;
+
+    // Group by norm (tipo_atto + numero_atto + data)
+    const groups = new Map<string, typeof normaItems>();
+    normaItems.forEach(item => {
+      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(item);
+    });
+
+    // Take the first group and create a search with all articles
+    const firstGroup = groups.values().next().value;
+    if (!firstGroup || firstGroup.length === 0) return;
+
+    const articles = firstGroup.map((i: DossierItem) => i.data.numero_articolo).join(',');
+
+    navigate('/');
+    triggerSearch({
+      act_type: firstGroup[0].data.tipo_atto,
+      act_number: firstGroup[0].data.numero_atto || '',
+      date: firstGroup[0].data.data || '',
+      article: articles,
+      version: 'vigente',
+      version_date: '',
+      show_brocardi_info: true
+    });
   };
 
   // Drag & drop sensors
@@ -723,7 +869,7 @@ export function DossierPage() {
               {selectedDossier.description && (
                 <p className="text-gray-500 mt-1">{selectedDossier.description}</p>
               )}
-              {selectedDossier.tags?.length > 0 && (
+              {selectedDossier.tags && selectedDossier.tags.length > 0 && (
                 <div className="flex gap-2 mt-2">
                   {selectedDossier.tags.map(tag => (
                     <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
@@ -735,6 +881,27 @@ export function DossierPage() {
               <div className="text-xs text-gray-400 mt-2">
                 Creato il {new Date(selectedDossier.createdAt).toLocaleDateString()} • {selectedDossier.items.length} elementi
               </div>
+              {/* Statistics bar */}
+              {selectedDossier.items.length > 0 && (
+                <div className="flex gap-3 mt-3 text-xs">
+                  <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                    <Circle size={12} className="text-gray-400" />
+                    {selectedDossier.items.filter(i => !i.status || i.status === 'unread').length} da leggere
+                  </span>
+                  <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-300">
+                    <BookOpen size={12} />
+                    {selectedDossier.items.filter(i => i.status === 'reading').length} in lettura
+                  </span>
+                  <span className="flex items-center gap-1 px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded text-orange-600 dark:text-orange-300">
+                    <AlertCircle size={12} />
+                    {selectedDossier.items.filter(i => i.status === 'important').length} importanti
+                  </span>
+                  <span className="flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded text-green-600 dark:text-green-300">
+                    <CheckCircle2 size={12} />
+                    {selectedDossier.items.filter(i => i.status === 'done').length} completati
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -783,6 +950,14 @@ export function DossierPage() {
                 title="Importa da norma"
               >
                 <TreeDeciduous size={18} />
+              </button>
+              <button
+                onClick={handleOpenAllOnDashboard}
+                className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 p-2 rounded-md transition-colors"
+                title="Apri tutti su Dashboard"
+                disabled={selectedDossier.items.filter(i => i.type === 'norma').length === 0}
+              >
+                <ExternalLink size={18} />
               </button>
               <button
                 onClick={() => {
@@ -927,6 +1102,13 @@ export function DossierPage() {
           onClose={() => setTreeNavigatorOpen(false)}
           onImport={handleTreeImport}
         />
+
+        <ImportDossierModal
+          dossier={importingDossier}
+          isOpen={!!importingDossier}
+          onClose={() => setImportingDossier(null)}
+          onConfirm={handleConfirmImport}
+        />
       </div>
     );
   }
@@ -1042,7 +1224,7 @@ export function DossierPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em]">
                 {dossier.description || "Nessuna descrizione"}
               </p>
-              {dossier.tags?.length > 0 && (
+              {dossier.tags && dossier.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-3">
                   {dossier.tags.slice(0, 3).map(tag => (
                     <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">
@@ -1070,6 +1252,13 @@ export function DossierPage() {
         isOpen={!!editingDossier}
         onClose={() => setEditingDossier(null)}
         onSave={handleUpdateDossier}
+      />
+
+      <ImportDossierModal
+        dossier={importingDossier}
+        isOpen={!!importingDossier}
+        onClose={() => setImportingDossier(null)}
+        onConfirm={handleConfirmImport}
       />
     </div>
   );

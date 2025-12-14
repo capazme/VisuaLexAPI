@@ -17,6 +17,7 @@ from visualex_api.tools.config import (
     FETCH_QUEUE_DELAY,
 )
 from visualex_api.tools.history_manager import history_manager
+from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
@@ -248,6 +249,17 @@ class NormaController:
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
+        # Dossier endpoints
+        self.app.add_url_rule('/dossiers', view_func=self.get_dossiers, methods=['GET'])
+        self.app.add_url_rule('/dossiers', view_func=self.create_dossier, methods=['POST'])
+        self.app.add_url_rule('/dossiers/sync', view_func=self.sync_dossiers, methods=['PUT'])
+        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.get_dossier, methods=['GET'])
+        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.update_dossier, methods=['PUT'])
+        self.app.add_url_rule('/dossiers/<dossier_id>', view_func=self.delete_dossier, methods=['DELETE'])
+        self.app.add_url_rule('/dossiers/<dossier_id>/items', view_func=self.add_dossier_item, methods=['POST'])
+        self.app.add_url_rule('/dossiers/<dossier_id>/items/<item_id>', view_func=self.remove_dossier_item, methods=['DELETE'])
+        self.app.add_url_rule('/dossiers/<dossier_id>/items/<item_id>/status', view_func=self.update_item_status, methods=['PUT'])
+        self.app.add_url_rule('/dossiers/import', view_func=self.import_dossier, methods=['POST'])
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
         self.app.add_url_rule('/health', view_func=self.health, methods=['GET'])
         self.app.add_url_rule('/health/detailed', view_func=self.health_detailed, methods=['GET'])
@@ -526,6 +538,123 @@ class NormaController:
         except Exception as e:
             log.error("Error in delete_history_item", error=str(e))
             return jsonify({'error': str(e)}), 500
+
+    # ==================== Dossier Endpoints ====================
+
+    async def get_dossiers(self):
+        """Restituisce tutti i dossier."""
+        try:
+            return jsonify({'dossiers': dossier_manager.get_all()})
+        except Exception as e:
+            log.error("Error in get_dossiers", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def get_dossier(self, dossier_id):
+        """Restituisce un dossier specifico."""
+        try:
+            dossier = dossier_manager.get_by_id(dossier_id)
+            if dossier:
+                return jsonify(dossier)
+            return jsonify({'error': 'Dossier not found'}), 404
+        except Exception as e:
+            log.error("Error in get_dossier", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def create_dossier(self):
+        """Crea un nuovo dossier."""
+        try:
+            data = await request.get_json()
+            title = data.get('title', 'Nuovo Dossier')
+            description = data.get('description', '')
+            dossier = dossier_manager.create(title, description)
+            return jsonify(dossier), 201
+        except Exception as e:
+            log.error("Error in create_dossier", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def update_dossier(self, dossier_id):
+        """Aggiorna un dossier."""
+        try:
+            data = await request.get_json()
+            dossier = dossier_manager.update(dossier_id, data)
+            if dossier:
+                return jsonify(dossier)
+            return jsonify({'error': 'Dossier not found'}), 404
+        except Exception as e:
+            log.error("Error in update_dossier", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def delete_dossier(self, dossier_id):
+        """Elimina un dossier."""
+        try:
+            success = dossier_manager.delete(dossier_id)
+            if success:
+                return jsonify({'success': True})
+            return jsonify({'error': 'Dossier not found'}), 404
+        except Exception as e:
+            log.error("Error in delete_dossier", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def add_dossier_item(self, dossier_id):
+        """Aggiunge un item a un dossier."""
+        try:
+            data = await request.get_json()
+            item_data = data.get('data')
+            item_type = data.get('type', 'norma')
+            item = dossier_manager.add_item(dossier_id, item_data, item_type)
+            if item:
+                return jsonify(item), 201
+            return jsonify({'error': 'Dossier not found'}), 404
+        except Exception as e:
+            log.error("Error in add_dossier_item", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def remove_dossier_item(self, dossier_id, item_id):
+        """Rimuove un item da un dossier."""
+        try:
+            success = dossier_manager.remove_item(dossier_id, item_id)
+            if success:
+                return jsonify({'success': True})
+            return jsonify({'error': 'Item not found'}), 404
+        except Exception as e:
+            log.error("Error in remove_dossier_item", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def update_item_status(self, dossier_id, item_id):
+        """Aggiorna lo status di un item."""
+        try:
+            data = await request.get_json()
+            status = data.get('status', 'unread')
+            success = dossier_manager.update_item_status(dossier_id, item_id, status)
+            if success:
+                return jsonify({'success': True})
+            return jsonify({'error': 'Item not found'}), 404
+        except Exception as e:
+            log.error("Error in update_item_status", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def import_dossier(self):
+        """Importa un dossier (da share link)."""
+        try:
+            data = await request.get_json()
+            dossier = dossier_manager.import_dossier(data)
+            return jsonify(dossier), 201
+        except Exception as e:
+            log.error("Error in import_dossier", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    async def sync_dossiers(self):
+        """Sincronizza tutti i dossier (sovrascrive dal frontend)."""
+        try:
+            data = await request.get_json()
+            dossiers = data.get('dossiers', [])
+            dossier_manager.sync_all(dossiers)
+            return jsonify({'success': True, 'count': len(dossiers)})
+        except Exception as e:
+            log.error("Error in sync_dossiers", error=str(e))
+            return jsonify({'error': str(e)}), 500
+
+    # ==================== Health Endpoints ====================
 
     async def health(self):
         """Basic health check - returns 200 if app is running."""

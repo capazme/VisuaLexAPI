@@ -6,6 +6,8 @@ BASE_PATH = Path(__file__).resolve().parents[2]
 MAX_CACHE_SIZE = 10000
 HISTORY_LIMIT = 50
 HISTORY_FILE = BASE_PATH / "data" / "history.json"
+DOSSIER_FILE = BASE_PATH / "data" / "dossiers.json"
+DOSSIER_LIMIT = 100  # Max number of dossiers
 RATE_LIMIT = 1000  # Limit to 100 requests per minute
 RATE_LIMIT_WINDOW = 600  # Window size in seconds
 

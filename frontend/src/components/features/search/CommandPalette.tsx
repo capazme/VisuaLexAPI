@@ -196,7 +196,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   const selectedActLabel = ACT_TYPES.find(act => act.value === selectedAct)?.label;
 
   return (
-    <div className="fixed inset-0 z-50 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[9999] animate-in fade-in duration-200">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm"

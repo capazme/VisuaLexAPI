@@ -129,6 +129,7 @@ interface AppState {
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: string) => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
+    importDossier: (dossier: Dossier) => string; // returns new dossier ID
 
     addAnnotation: (normaKey: string, articleId: string, text: string) => void;
     removeAnnotation: (id: string) => void;
@@ -748,6 +749,22 @@ const appStore = createStore<AppState>()(
                     target.items.push(...itemsToMove);
                 }
             }),
+
+            importDossier: (dossier) => {
+                const newId = uuidv4();
+                set((state) => {
+                    state.dossiers.push({
+                        ...dossier,
+                        id: newId,
+                        createdAt: new Date().toISOString(),
+                        items: dossier.items.map(item => ({
+                            ...item,
+                            id: uuidv4() // Generate new IDs to avoid conflicts
+                        }))
+                    });
+                });
+                return newId;
+            },
 
             addAnnotation: (normaKey, articleId, text) => set((state) => {
                 state.annotations.push({
