@@ -3,7 +3,10 @@ import aiohttp
 from bs4 import BeautifulSoup
 import logging
 import re
-from aiocache import cached
+from aiocache import cached, Cache
+from aiocache.serializers import JsonSerializer
+
+from .cache import PersistentCache
 
 # Configurazione del logging
 logging.basicConfig(level=logging.INFO,
@@ -11,7 +14,10 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
-@cached(ttl=3600)
+# Persistent cache for tree structures (survives restarts)
+_tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours
+
+@cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer())
 async def get_tree(normurn, link=False, details=False):
     """
     Recupera l'albero degli articoli da un URN normativo e ne estrae le informazioni.
@@ -28,6 +34,15 @@ async def get_tree(normurn, link=False, details=False):
     if not normurn or not isinstance(normurn, str):
         logging.error("Invalid URN provided")
         return "Invalid URN provided", 0
+
+    # Build cache key including options
+    cache_key = f"{normurn}|link={link}|details={details}"
+    
+    # Check persistent cache first (survives server restarts)
+    cached_result = await _tree_cache.get(cache_key)
+    if cached_result:
+        logging.info(f"Persistent cache hit for tree: {normurn[:50]}")
+        return cached_result.get("result", []), cached_result.get("count", 0)
 
     try:
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
@@ -47,12 +62,19 @@ async def get_tree(normurn, link=False, details=False):
     soup = BeautifulSoup(text, 'html.parser')
 
     if "normattiva" in normurn:
-        return await _parse_normattiva_tree(soup, normurn, link, details)
+        result, count = await _parse_normattiva_tree(soup, normurn, link, details)
     elif "eur-lex" in normurn:
-        return await _parse_eurlex_tree(soup, normurn, link, details)
-
-    logging.warning(f"Unrecognized norm URN format: {normurn}")
-    return "Unrecognized norm URN format", 0
+        result, count = await _parse_eurlex_tree(soup, normurn, link, details)
+    else:
+        logging.warning(f"Unrecognized norm URN format: {normurn}")
+        return "Unrecognized norm URN format", 0
+    
+    # Store in persistent cache for future restarts
+    if count > 0:
+        await _tree_cache.set(cache_key, {"result": result, "count": count})
+        logging.info(f"Stored tree in persistent cache: {normurn[:50]}, {count} articles")
+    
+    return result, count
 
 
 async def _parse_normattiva_tree(soup, normurn, link, details):

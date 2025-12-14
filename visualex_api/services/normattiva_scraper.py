@@ -8,7 +8,7 @@ import structlog
 
 from ..tools.norma import NormaVisitata
 from ..tools.sys_op import BaseScraper
-from ..tools.cache import PersistentCache
+from ..tools.cache_manager import get_cache_manager
 from ..tools.exceptions import DocumentNotFoundError, ParsingError
 from ..tools.selectors import NormattivaSelectors
 
@@ -21,7 +21,7 @@ class NormattivaScraper(BaseScraper):
         self.base_url: str = "https://www.normattiva.it/"
         self.selectors = NormattivaSelectors()
         log.info("Normattiva scraper initialized")
-        self.cache = PersistentCache("normattiva")
+        self.cache = get_cache_manager().get_persistent("normattiva")
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def get_document(self, normavisitata: NormaVisitata) -> Tuple[str, str]:

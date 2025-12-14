@@ -12,7 +12,7 @@ from ..tools.map import BROCARDI_CODICI
 from ..tools.norma import NormaVisitata
 from ..tools.text_op import normalize_act_type
 from ..tools.sys_op import BaseScraper
-from ..tools.cache import PersistentCache
+from ..tools.cache_manager import get_cache_manager
 from .http_client import http_client
 from ..tools.exceptions import DocumentNotFoundError
 from ..tools.selectors import BrocardiSelectors
@@ -28,7 +28,7 @@ class BrocardiScraper(BaseScraper):
     def __init__(self) -> None:
         log.info("Initializing BrocardiScraper")
         self.knowledge: List[Dict[str, Any]] = [BROCARDI_CODICI]
-        self.cache = PersistentCache("brocardi")
+        self.cache = get_cache_manager().get_persistent("brocardi")
         self.selectors = BrocardiSelectors()
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())

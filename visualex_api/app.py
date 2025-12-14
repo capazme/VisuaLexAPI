@@ -29,6 +29,8 @@ from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
+from visualex_api.tools.cache_warmup import warmup_cache_background
+from visualex_api.tools.cache_manager import get_cache_manager
 import os
 from visualex_api.tools.exceptions import ExtractionError
 # Configure logging
@@ -69,6 +71,9 @@ class NormaController:
         # Define routes
         self._setup_routes()
         
+        # Set up startup tasks (cache warmup)
+        self._setup_startup_tasks()
+        
         logger.info("NormaController initialized")
     
     def _init_services(self):
@@ -93,6 +98,14 @@ class NormaController:
         # Global error handler
         self.app.errorhandler(Exception)(self.handle_error)
         logger.info("Middleware setup complete")
+    
+    def _setup_startup_tasks(self):
+        """Set up tasks to run at application startup."""
+        @self.app.before_serving
+        async def on_startup():
+            """Run warmup tasks when server starts."""
+            logger.info("Starting cache warmup in background")
+            asyncio.create_task(warmup_cache_background())
     
     def _setup_routes(self):
         """Set up all routes for the application."""
@@ -348,10 +361,12 @@ class NormaController:
         Returns:
             JSON response with service status
         """
+        cache_stats = get_cache_manager().get_stats()
         return jsonify({
             'status': 'ok',
             'timestamp': time.time(),
-            'version': settings.get('version', '1.0.0')
+            'version': settings.get('version', '1.0.0'),
+            'cache': cache_stats
         })
     
     async def swagger_ui(self):

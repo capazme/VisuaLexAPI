@@ -1,58 +1,9 @@
 [
   {
-    "act_type": "costituzione",
-    "act_number": "",
+    "act_type": "Regolamento UE",
+    "act_number": "679",
     "article": "1",
-    "date": "",
-    "timestamp": "2025-12-14T17:55:06.222497Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "1",
-    "date": "",
-    "timestamp": "2025-12-14T17:56:47.773745Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "2",
-    "date": "",
-    "timestamp": "2025-12-14T17:57:37.717392Z"
-  },
-  {
-    "act_type": "codice penale",
-    "act_number": "",
-    "article": "1",
-    "date": "",
-    "timestamp": "2025-12-14T17:58:29.179436Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "2",
-    "date": "",
-    "timestamp": "2025-12-14T17:59:09.183423Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "3",
-    "date": "",
-    "timestamp": "2025-12-14T17:59:09.988389Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "4",
-    "date": "",
-    "timestamp": "2025-12-14T17:59:12.012014Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "1",
-    "date": "",
-    "timestamp": "2025-12-14T18:01:05.157626Z"
+    "date": "2016-01-01",
+    "timestamp": "2025-12-14T18:31:56.511358Z"
   }
 ]

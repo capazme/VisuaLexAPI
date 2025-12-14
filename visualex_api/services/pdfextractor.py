@@ -13,6 +13,17 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
+
+class PDFExtractor:
+    """Wrapper class for PDF extraction functionality."""
+    
+    def __init__(self):
+        logging.info("PDFExtractor initialized")
+    
+    def extract_pdf(self, driver, urn, timeout=30):
+        """Wrapper method for the extract_pdf function."""
+        return extract_pdf(driver, urn, timeout)
+
  
 def extract_pdf(driver, urn, timeout=30):
     """
