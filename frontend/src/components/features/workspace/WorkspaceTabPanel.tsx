@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { Rnd } from 'react-rnd';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, useMotionValue, useSpring, useDragControls } from 'framer-motion';
+import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useAppStore, appStore, type WorkspaceTab } from '../../../store/useAppStore';
@@ -8,6 +9,9 @@ import { LooseArticleCard } from './LooseArticleCard';
 import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
+
+// Spring physics config for smooth, natural motion
+const SPRING_CONFIG = { damping: 25, stiffness: 250, mass: 0.8 };
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -120,120 +124,193 @@ export function WorkspaceTabPanel({
     id: tab.id,
   });
 
-  // Track velocity for inertia
-  const lastPositions = useRef<Array<{ x: number; y: number; time: number }>>([]);
+  // Drag controls for handle-based dragging
+  const dragControls = useDragControls();
 
-  const handleDrag = (_e: any, data: { x: number; y: number }) => {
-    const now = Date.now();
-    lastPositions.current.push({ x: data.x, y: data.y, time: now });
-    // Keep only last 5 positions
-    if (lastPositions.current.length > 5) {
-      lastPositions.current.shift();
+  // Motion values for physics-based dragging
+  const x = useMotionValue(tab.position.x);
+  const y = useMotionValue(tab.position.y);
+  const width = useMotionValue(tab.size.width);
+  const height = useMotionValue(tab.size.height);
+
+  // Apply spring physics
+  const springX = useSpring(x, SPRING_CONFIG);
+  const springY = useSpring(y, SPRING_CONFIG);
+
+  // Sync with store when tab position/size changes externally
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number; direction: string } | null>(null);
+
+  useEffect(() => {
+    if (!isDragging) {
+      x.set(tab.position.x);
+      y.set(tab.position.y);
     }
-  };
+  }, [tab.position.x, tab.position.y, isDragging, x, y]);
 
-  // Apply inertia on drag stop
-  const handleDragStop = (_e: any, data: { x: number; y: number }) => {
-    const positions = lastPositions.current;
+  useEffect(() => {
+    if (!isResizing) {
+      width.set(tab.size.width);
+      height.set(tab.size.height);
+    }
+  }, [tab.size.width, tab.size.height, isResizing, width, height]);
 
-    if (positions.length >= 2) {
-      const last = positions[positions.length - 1];
-      const prev = positions[0];
-      const dt = (last.time - prev.time) / 1000; // seconds
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+    bringTabToFront(tab.id);
+  }, [bringTabToFront, tab.id]);
 
-      if (dt > 0 && dt < 0.3) { // Apply inertia for quick movements
-        const vx = (last.x - prev.x) / dt;
-        const vy = (last.y - prev.y) / dt;
+  const handleDragEnd = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    setIsDragging(false);
 
-        // Apply momentum (higher = more slide)
-        const friction = 0.25;
-        const finalX = Math.round(data.x + vx * friction);
-        const finalY = Math.round(data.y + vy * friction);
+    const currentX = x.get();
+    const currentY = y.get();
 
-        // Clamp to window bounds
-        const maxX = window.innerWidth - tab.size.width;
-        const maxY = window.innerHeight - tab.size.height;
+    // Apply momentum
+    const momentumX = info.velocity.x * 0.15;
+    const momentumY = info.velocity.y * 0.15;
 
-        updateTab(tab.id, {
-          position: {
-            x: Math.max(0, Math.min(finalX, maxX)),
-            y: Math.max(0, Math.min(finalY, maxY))
-          }
-        });
-      } else {
-        updateTab(tab.id, { position: { x: data.x, y: data.y } });
-      }
-    } else {
-      updateTab(tab.id, { position: { x: data.x, y: data.y } });
+    // Clamp to window bounds
+    const currentWidth = tab.isMinimized ? 300 : width.get();
+    const currentHeight = tab.isMinimized ? 44 : height.get();
+    const maxX = window.innerWidth - currentWidth;
+    const maxY = window.innerHeight - currentHeight;
+
+    const finalX = Math.max(0, Math.min(maxX, currentX + momentumX));
+    const finalY = Math.max(0, Math.min(maxY, currentY + momentumY));
+
+    // Animate to final position
+    x.set(finalX);
+    y.set(finalY);
+
+    // Save to store
+    updateTab(tab.id, { position: { x: finalX, y: finalY } });
+  }, [tab.id, tab.isMinimized, updateTab, x, y, width, height]);
+
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    bringTabToFront(tab.id);
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: width.get(),
+      startH: height.get(),
+      direction
+    };
+  }, [bringTabToFront, tab.id, width, height]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing || !resizeRef.current) return;
+
+    const { startX, startY, startW, startH, direction } = resizeRef.current;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    let newW = startW;
+    let newH = startH;
+    let newX = x.get();
+    let newY = y.get();
+
+    if (direction.includes('right')) newW = Math.max(200, startW + dx);
+    if (direction.includes('bottom')) newH = Math.max(100, startH + dy);
+    if (direction.includes('left')) {
+      const deltaW = Math.min(dx, startW - 200);
+      newW = startW - deltaW;
+      newX = tab.position.x + deltaW;
+    }
+    if (direction.includes('top')) {
+      const deltaH = Math.min(dy, startH - 100);
+      newH = startH - deltaH;
+      newY = tab.position.y + deltaH;
     }
 
-    // Clear positions
-    lastPositions.current = [];
-  };
+    width.set(newW);
+    height.set(newH);
+    if (direction.includes('left')) x.set(newX);
+    if (direction.includes('top')) y.set(newY);
+  }, [isResizing, x, y, width, height, tab.position.x, tab.position.y]);
 
-  const handleResizeStop = (
-    _e: any,
-    _direction: any,
-    ref: HTMLElement,
-    _delta: any,
-    position: { x: number; y: number }
-  ) => {
+  const handleResizeEnd = useCallback(() => {
+    if (!isResizing) return;
+    setIsResizing(false);
+
     updateTab(tab.id, {
-      size: {
-        width: parseInt(ref.style.width),
-        height: parseInt(ref.style.height)
-      },
-      position
+      size: { width: width.get(), height: height.get() },
+      position: { x: x.get(), y: y.get() }
     });
-  };
+    resizeRef.current = null;
+  }, [isResizing, tab.id, updateTab, width, height, x, y]);
+
+  // Global mouse listeners for resize
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleResizeMove);
+        window.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
 
   const handleMouseDown = () => {
     bringTabToFront(tab.id);
   };
 
+  const currentSize = tab.isMinimized ? { width: 300, height: 44 } : { width: width.get(), height: height.get() };
+
   return (
-    <Rnd
-      position={tab.position}
-      size={tab.isMinimized ? { width: 300, height: 44 } : tab.size}
-      onDrag={handleDrag}
-      onDragStop={handleDragStop}
-      onResizeStop={handleResizeStop}
-      dragHandleClassName="drag-handle"
-      minWidth={200}
-      minHeight={44}
-      style={{ zIndex: tab.zIndex }}
-      onMouseDown={handleMouseDown}
-      className={cn(
-        tab.isPinned && "ring-2 ring-blue-500"
-      )}
-      enableResizing={tab.isMinimized ? false : {
-        top: true,
-        right: true,
-        bottom: true,
-        left: true,
-        topRight: true,
-        bottomRight: true,
-        bottomLeft: true,
-        topLeft: true
+    <motion.div
+      drag
+      dragControls={dragControls}
+      dragListener={false}
+      dragMomentum={true}
+      dragElastic={0.05}
+      dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      style={{
+        x: springX,
+        y: springY,
+        width: tab.isMinimized ? 300 : width,
+        height: tab.isMinimized ? 44 : height,
+        zIndex: tab.zIndex
       }}
+      className={cn(
+        "fixed",
+        tab.isPinned && "ring-2 ring-blue-500",
+        isDragging && "cursor-grabbing"
+      )}
+      onMouseDown={handleMouseDown}
     >
       <div
         ref={setNodeRef}
-        onMouseDown={handleMouseDown}
         className={cn(
-          "h-full flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-2xl border overflow-hidden transition-shadow hover:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]",
+          "h-full flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-2xl border overflow-hidden",
           isOver
             ? "border-blue-500 border-2 bg-blue-50 dark:bg-blue-950"
             : "border-gray-200 dark:border-gray-700"
         )}
       >
-        {/* Header with macOS-style controls */}
-        <div className="drag-handle cursor-move flex items-center justify-between px-4 py-3 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
+        {/* Header with macOS-style controls - draggable */}
+        <div
+          onPointerDown={(e) => {
+            // Only start drag if not clicking a button or interactive element
+            const target = e.target as HTMLElement;
+            if (target.closest('button') || target.closest('input')) return;
+            dragControls.start(e);
+          }}
+          className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 select-none touch-none">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* macOS traffic lights */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => removeTab(tab.id)}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="w-3 h-3 bg-red-500 hover:bg-red-600 rounded-full transition-colors group/close"
                 title="Chiudi"
               >
@@ -241,11 +318,13 @@ export function WorkspaceTabPanel({
               </button>
               <button
                 onClick={() => toggleTabMinimize(tab.id)}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="w-3 h-3 bg-yellow-500 hover:bg-yellow-600 rounded-full transition-colors"
                 title="Minimizza"
               />
               <button
                 onClick={() => toggleTabPin(tab.id)}
+                onPointerDown={(e) => e.stopPropagation()}
                 className={cn(
                   "w-3 h-3 rounded-full transition-colors",
                   tab.isPinned ? "bg-blue-500 hover:bg-blue-600" : "bg-green-500 hover:bg-green-600"
@@ -299,6 +378,7 @@ export function WorkspaceTabPanel({
                     setLabelInput(tab.label);
                     setIsEditingLabel(true);
                   }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
                   title="Modifica nome"
                 >
@@ -310,7 +390,7 @@ export function WorkspaceTabPanel({
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Add to Dossier button with dropdown */}
-            <div className="relative" ref={dossierMenuRef}>
+            <div className="relative" ref={dossierMenuRef} onPointerDown={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setShowDossierMenu(!showDossierMenu)}
                 className={cn(
@@ -450,7 +530,23 @@ export function WorkspaceTabPanel({
             )}
           </div>
         )}
+
+        {/* Resize handles - only show when not minimized */}
+        {!tab.isMinimized && (
+          <>
+            {/* Edges */}
+            <div onMouseDown={(e) => handleResizeStart(e, 'right')} className="absolute right-0 top-2 bottom-2 w-1 cursor-ew-resize hover:bg-blue-400/50 transition-colors" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'bottom')} className="absolute bottom-0 left-2 right-2 h-1 cursor-ns-resize hover:bg-blue-400/50 transition-colors" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'left')} className="absolute left-0 top-2 bottom-2 w-1 cursor-ew-resize hover:bg-blue-400/50 transition-colors" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'top')} className="absolute top-0 left-2 right-2 h-1 cursor-ns-resize hover:bg-blue-400/50 transition-colors" />
+            {/* Corners */}
+            <div onMouseDown={(e) => handleResizeStart(e, 'top-left')} className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'top-right')} className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-left')} className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-right')} className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize" />
+          </>
+        )}
       </div>
-    </Rnd>
+    </motion.div>
   );
 }
