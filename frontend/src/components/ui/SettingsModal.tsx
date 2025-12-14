@@ -124,10 +124,9 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">Aiuto</label>
                             <button
                                 onClick={() => {
-                                    onRestartTour();
                                     onClose();
-                                    // Reload page to restart the tour
-                                    window.location.reload();
+                                    // Small delay to let modal close animation complete
+                                    setTimeout(() => onRestartTour(), 200);
                                 }}
                                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-sm font-medium"
                             >

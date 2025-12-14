@@ -925,7 +925,7 @@ export function DossierPage() {
               </button>
               <button
                 onClick={() => handleExportPdf(selectedDossier.id)}
-                className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-2 rounded-md transition-colors"
+                className="dossier-export text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-2 rounded-md transition-colors"
                 title="Esporta PDF"
               >
                 <Download size={18} />
@@ -1120,7 +1120,7 @@ export function DossierPage() {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">I tuoi Dossier</h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+          className="dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
         >
           <FolderPlus size={18} /> Nuovo Dossier
         </button>
@@ -1207,7 +1207,7 @@ export function DossierPage() {
             <div
               key={dossier.id}
               onClick={() => setSelectedDossierId(dossier.id)}
-              className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative"
+              className="dossier-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative"
             >
               {dossier.isPinned && (
                 <Star size={16} className="absolute top-3 right-3 text-yellow-500 fill-yellow-500" />

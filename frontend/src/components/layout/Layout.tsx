@@ -15,7 +15,7 @@ export function Layout() {
   const navigate = useNavigate();
 
   // Onboarding Tour
-  const { startTour, hasSeenTour, resetTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  const { startTour, hasSeenTour, resetAndStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
 
   // Auto-start tour on first visit
   useEffect(() => {
@@ -178,7 +178,7 @@ export function Layout() {
         </div>
       </main>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetTour} />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetAndStartTour} />
     </div>
   );
 }

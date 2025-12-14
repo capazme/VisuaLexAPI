@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { X, Plus, Link, FileText, Star, Trash2, ExternalLink } from 'lucide-react';
+import { X, Plus, Link, FileText, Star, Trash2, ExternalLink, Pencil, Check } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { parseNormattivaUrl, generateLabelFromParams, validateSearchParams } from '../../../utils/normattivaParser';
 import type { SearchParams, QuickNorm } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { ACT_TYPES, getActTypesByGroup } from '../../../constants/actTypes';
 
 interface QuickNormsManagerProps {
   isOpen: boolean;
@@ -14,30 +15,8 @@ interface QuickNormsManagerProps {
 
 type InputMode = 'url' | 'manual';
 
-const ACT_TYPES = [
-  // Codici Fondamentali
-  { label: 'Codice Civile', value: 'codice civile' },
-  { label: 'Codice Penale', value: 'codice penale' },
-  { label: 'Codice Proc. Civile', value: 'codice di procedura civile' },
-  { label: 'Codice Proc. Penale', value: 'codice di procedura penale' },
-  { label: 'Preleggi', value: 'preleggi' },
-  // Fonti Primarie
-  { label: 'Costituzione', value: 'costituzione' },
-  { label: 'Legge', value: 'legge' },
-  { label: 'Decreto Legislativo', value: 'decreto legislativo' },
-  { label: 'Decreto Legge', value: 'decreto legge' },
-  { label: 'D.P.R.', value: 'decreto del presidente della repubblica' },
-  // Codici Settoriali (più usati)
-  { label: 'Codice della Strada', value: 'codice della strada' },
-  { label: 'Codice del Consumo', value: 'codice del consumo' },
-  { label: 'Codice della Privacy', value: 'codice in materia di protezione dei dati personali' },
-  { label: 'Codice Ambiente', value: 'norme in materia ambientale' },
-  { label: 'Codice Contratti Pubblici', value: 'codice dei contratti pubblici' },
-  { label: 'Codice Processo Amm.vo', value: 'codice del processo amministrativo' },
-];
-
 export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
-  const { quickNorms, addQuickNorm, removeQuickNorm, useQuickNorm, triggerSearch } = useAppStore();
+  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, useQuickNorm, triggerSearch } = useAppStore();
 
   const [inputMode, setInputMode] = useState<InputMode>('manual');
   const [urlInput, setUrlInput] = useState('');
@@ -49,6 +28,10 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
   const [actDate, setActDate] = useState('');
   const [article, setArticle] = useState('1');
   const [customLabel, setCustomLabel] = useState('');
+
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState('');
 
   const resetForm = useCallback(() => {
     setUrlInput('');
@@ -111,6 +94,24 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
     triggerSearch(qn.searchParams);
     onClose();
   }, [useQuickNorm, triggerSearch, onClose]);
+
+  const handleStartEdit = useCallback((qn: QuickNorm) => {
+    setEditingId(qn.id);
+    setEditLabel(qn.label);
+  }, []);
+
+  const handleSaveEdit = useCallback(() => {
+    if (editingId && editLabel.trim()) {
+      updateQuickNormLabel(editingId, editLabel.trim());
+    }
+    setEditingId(null);
+    setEditLabel('');
+  }, [editingId, editLabel, updateQuickNormLabel]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditLabel('');
+  }, []);
 
   if (!isOpen) return null;
 
@@ -241,8 +242,12 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                       onChange={(e) => setActType(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     >
-                      {ACT_TYPES.map(at => (
-                        <option key={at.value} value={at.value}>{at.label}</option>
+                      {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
+                        <optgroup key={group} label={group}>
+                          {acts.map(at => (
+                            <option key={at.value} value={at.value}>{at.label}</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </div>
@@ -331,43 +336,87 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                     key={qn.id}
                     className="group flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
-                    <button
-                      onClick={() => handleUseQuickNorm(qn)}
-                      className="flex-1 flex items-center gap-3 text-left"
-                    >
-                      <Star className="w-4 h-4 text-amber-500 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-white truncate">
-                          {qn.label}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {qn.searchParams.act_type}
-                          {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
-                          {qn.usageCount > 0 && ` · Usato ${qn.usageCount}x`}
-                        </p>
-                      </div>
-                    </button>
-
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {qn.sourceUrl && (
-                        <a
-                          href={qn.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500"
-                          title="Apri su Normattiva"
+                    {editingId === qn.id ? (
+                      // Edit mode
+                      <>
+                        <Star className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveEdit();
+                              if (e.key === 'Escape') handleCancelEdit();
+                            }}
+                            className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            autoFocus
+                          />
+                          <button
+                            onClick={handleSaveEdit}
+                            className="p-2 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg text-green-600"
+                            title="Salva"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500"
+                            title="Annulla"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      // View mode
+                      <>
+                        <button
+                          onClick={() => handleUseQuickNorm(qn)}
+                          className="flex-1 flex items-center gap-3 text-left"
                         >
-                          <ExternalLink size={16} />
-                        </a>
-                      )}
-                      <button
-                        onClick={() => removeQuickNorm(qn.id)}
-                        className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-gray-500 hover:text-red-600"
-                        title="Rimuovi"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                          <Star className="w-4 h-4 text-amber-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                              {qn.label}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {qn.searchParams.act_type}
+                              {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
+                              {qn.usageCount > 0 && ` · Usato ${qn.usageCount}x`}
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleStartEdit(qn)}
+                            className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg text-gray-500 hover:text-blue-600"
+                            title="Rinomina"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          {qn.sourceUrl && (
+                            <a
+                              href={qn.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500"
+                              title="Apri su Normattiva"
+                            >
+                              <ExternalLink size={16} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => removeQuickNorm(qn.id)}
+                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-gray-500 hover:text-red-600"
+                            title="Rimuovi"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

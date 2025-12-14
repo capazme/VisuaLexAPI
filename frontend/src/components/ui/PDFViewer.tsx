@@ -11,7 +11,7 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       
       <div className="relative bg-gray-900 rounded-xl shadow-2xl w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-800">

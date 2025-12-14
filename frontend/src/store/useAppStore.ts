@@ -67,6 +67,7 @@ interface AppState {
     // UI State
     sidebarVisible: boolean;
     commandPaletteOpen: boolean;
+    quickNormsManagerOpen: boolean;
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
@@ -82,6 +83,8 @@ interface AppState {
     setSidebarVisible: (visible: boolean) => void;
     openCommandPalette: () => void;
     closeCommandPalette: () => void;
+    openQuickNormsManager: () => void;
+    closeQuickNormsManager: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
     bringSearchPanelToFront: () => void;  // Bring search panel to front
@@ -184,6 +187,7 @@ const appStore = createStore<AppState>()(
             // UI State
             sidebarVisible: true,
             commandPaletteOpen: false,
+            quickNormsManagerOpen: false,
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
@@ -211,6 +215,14 @@ const appStore = createStore<AppState>()(
 
             closeCommandPalette: () => set((state) => {
                 state.commandPaletteOpen = false;
+            }),
+
+            openQuickNormsManager: () => set((state) => {
+                state.quickNormsManagerOpen = true;
+            }),
+
+            closeQuickNormsManager: () => set((state) => {
+                state.quickNormsManagerOpen = false;
             }),
 
             toggleSearchPanel: () => set((state) => {

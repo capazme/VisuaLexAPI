@@ -401,7 +401,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 </span>
               )}
             </div>
-            <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+            <div className="article-navigation flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
               <button
                 type="button"
                 onClick={handleDecrementArticle}

@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, Book, FileText, Globe, X, Check, Star, Zap, Lightbulb } from 'lucide-react';
+import { Search, X, Check, Star, Zap, Lightbulb, Settings2 } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 import { useTour } from '../../../hooks/useTour';
+import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -14,66 +15,10 @@ interface CommandPaletteProps {
   onSearch: (params: SearchParams) => void;
 }
 
-const ACT_TYPES = [
-  // Fonti Primarie
-  { label: 'Costituzione', value: 'costituzione', group: 'Fonti Primarie', icon: FileText },
-  { label: 'Legge', value: 'legge', group: 'Fonti Primarie', icon: FileText },
-  { label: 'Decreto Legge', value: 'decreto legge', group: 'Fonti Primarie', icon: FileText },
-  { label: 'Decreto Legislativo', value: 'decreto legislativo', group: 'Fonti Primarie', icon: FileText },
-  { label: 'D.P.R.', value: 'decreto del presidente della repubblica', group: 'Fonti Primarie', icon: FileText },
-  { label: 'Regio Decreto', value: 'regio decreto', group: 'Fonti Primarie', icon: FileText },
-
-  // Codici Fondamentali
-  { label: 'Codice Civile', value: 'codice civile', group: 'Codici Fondamentali', icon: Book },
-  { label: 'Codice Penale', value: 'codice penale', group: 'Codici Fondamentali', icon: Book },
-  { label: 'Codice Proc. Civile', value: 'codice di procedura civile', group: 'Codici Fondamentali', icon: Book },
-  { label: 'Codice Proc. Penale', value: 'codice di procedura penale', group: 'Codici Fondamentali', icon: Book },
-  { label: 'Preleggi', value: 'preleggi', group: 'Codici Fondamentali', icon: Book },
-  { label: 'Disp. Att. Cod. Civile', value: 'disposizioni per l\'attuazione del Codice civile e disposizioni transitorie', group: 'Codici Fondamentali', icon: Book },
-  { label: 'Disp. Att. Cod. Proc. Civile', value: 'disposizioni per l\'attuazione del Codice di procedura civile e disposizioni transitorie', group: 'Codici Fondamentali', icon: Book },
-
-  // Codici Settoriali
-  { label: 'Codice della Strada', value: 'codice della strada', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice della Navigazione', value: 'codice della navigazione', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice del Consumo', value: 'codice del consumo', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice della Privacy', value: 'codice in materia di protezione dei dati personali', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Ambiente', value: 'norme in materia ambientale', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Contratti Pubblici', value: 'codice dei contratti pubblici', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Beni Culturali', value: 'codice dei beni culturali e del paesaggio', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Assicurazioni', value: 'codice delle assicurazioni private', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Processo Tributario', value: 'codice del processo tributario', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Processo Amm.vo', value: 'codice del processo amministrativo', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Amm. Digitale', value: 'codice dell\'amministrazione digitale', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Proprietà Industriale', value: 'codice della proprietà industriale', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Comunicazioni', value: 'codice delle comunicazioni elettroniche', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Pari Opportunità', value: 'codice delle pari opportunità', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Ord. Militare', value: 'codice dell\'ordinamento militare', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice del Turismo', value: 'codice del turismo', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Antimafia', value: 'codice antimafia', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Giustizia Contabile', value: 'codice di giustizia contabile', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Terzo Settore', value: 'codice del Terzo settore', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Protezione Civile', value: 'codice della protezione civile', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Crisi Impresa', value: 'codice della crisi d\'impresa e dell\'insolvenza', group: 'Codici Settoriali', icon: Book },
-  { label: 'Codice Nautica Diporto', value: 'codice della nautica da diporto', group: 'Codici Settoriali', icon: Book },
-
-  // Unione Europea
-  { label: 'TUE', value: 'TUE', group: 'Unione Europea', icon: Globe },
-  { label: 'TFUE', value: 'TFUE', group: 'Unione Europea', icon: Globe },
-  { label: 'CDFUE', value: 'CDFUE', group: 'Unione Europea', icon: Globe },
-  { label: 'Regolamento UE', value: 'Regolamento UE', group: 'Unione Europea', icon: Globe },
-  { label: 'Direttiva UE', value: 'Direttiva UE', group: 'Unione Europea', icon: Globe },
-];
-
-const ACT_TYPES_REQUIRING_DETAILS = [
-  'legge', 'decreto legge', 'decreto legislativo',
-  'decreto del presidente della repubblica', 'regio decreto',
-  'Regolamento UE', 'Direttiva UE'
-];
-
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
 
 export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProps) {
-  const { quickNorms, useQuickNorm, settings } = useAppStore();
+  const { quickNorms, useQuickNorm, settings, openQuickNormsManager } = useAppStore();
   const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
@@ -144,6 +89,12 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
       onClose();
     }
   }, [useQuickNorm, onSearch, onClose]);
+
+  const handleOpenQuickNormsManager = useCallback(() => {
+    onClose();
+    // Small delay to let the palette close before opening manager
+    setTimeout(() => openQuickNormsManager(), 100);
+  }, [onClose, openQuickNormsManager]);
 
   // Handle smart citation search
   const handleCitationSearch = useCallback(() => {
@@ -360,43 +311,53 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
               </Command.Empty>
 
               {/* QuickNorms - Favorite norms for quick access */}
-              {quickNorms.length > 0 && (
-                <Command.Group heading="Preferiti" className="px-2 py-2">
-                  <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-2 px-2 flex items-center gap-1.5">
-                    <Star size={12} fill="currentColor" />
-                    Preferiti
+              <Command.Group heading="Preferiti" className="px-2 py-2">
+                <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-2 px-2 flex items-center gap-1.5">
+                  <Star size={12} fill="currentColor" />
+                  Preferiti
+                </div>
+                {/* Manage QuickNorms - Always visible */}
+                <Command.Item
+                  value="gestisci preferiti manage favorites"
+                  onSelect={handleOpenQuickNormsManager}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                    "aria-selected:bg-blue-50 dark:aria-selected:bg-blue-900/20",
+                    "aria-selected:text-blue-600 dark:aria-selected:text-blue-400"
+                  )}
+                >
+                  <Settings2 size={16} className="text-gray-400" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium">Gestisci Preferiti</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                      Aggiungi, modifica o rimuovi ricerche frequenti
+                    </span>
                   </div>
-                  {quickNorms.slice(0, 5).map((qn) => (
-                    <Command.Item
-                      key={qn.id}
-                      value={`preferito ${qn.label}`}
-                      onSelect={() => handleSelectQuickNorm(qn.id)}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
-                        "aria-selected:bg-amber-50 dark:aria-selected:bg-amber-900/20",
-                        "aria-selected:text-amber-700 dark:aria-selected:text-amber-400"
-                      )}
-                    >
-                      <Star size={16} className="text-amber-500" fill="currentColor" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium truncate block">{qn.label}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
-                          {qn.searchParams.act_type}
-                          {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
-                        </span>
-                      </div>
-                    </Command.Item>
-                  ))}
-                </Command.Group>
-              )}
+                </Command.Item>
+                {quickNorms.slice(0, 5).map((qn) => (
+                  <Command.Item
+                    key={qn.id}
+                    value={`preferito ${qn.label}`}
+                    onSelect={() => handleSelectQuickNorm(qn.id)}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                      "aria-selected:bg-amber-50 dark:aria-selected:bg-amber-900/20",
+                      "aria-selected:text-amber-700 dark:aria-selected:text-amber-400"
+                    )}
+                  >
+                    <Star size={16} className="text-amber-500" fill="currentColor" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate block">{qn.label}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
+                        {qn.searchParams.act_type}
+                        {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
+                      </span>
+                    </div>
+                  </Command.Item>
+                ))}
+              </Command.Group>
 
-              {Object.entries(
-                ACT_TYPES.reduce((acc, act) => {
-                  if (!acc[act.group]) acc[act.group] = [];
-                  acc[act.group].push(act);
-                  return acc;
-                }, {} as Record<string, typeof ACT_TYPES>)
-              ).map(([group, acts]) => (
+              {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
                 <Command.Group key={group} heading={group} className="px-2 py-2">
                   <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 px-2">
                     {group}

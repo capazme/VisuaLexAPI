@@ -28,9 +28,9 @@ export function SearchPanel() {
     addWorkspaceTab, addNormaToTab, workspaceTabs,
     searchTrigger, clearSearchTrigger,
     quickNorms, useQuickNorm, triggerSearch,
-    commandPaletteOpen, openCommandPalette, closeCommandPalette
+    commandPaletteOpen, openCommandPalette, closeCommandPalette,
+    quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
   } = useAppStore();
-  const [quickNormsManagerOpen, setQuickNormsManagerOpen] = useState(false);
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
 
   // PDF State
@@ -288,7 +288,7 @@ export function SearchPanel() {
       {/* QuickNorms Manager Modal */}
       <QuickNormsManager
         isOpen={quickNormsManagerOpen}
-        onClose={() => setQuickNormsManagerOpen(false)}
+        onClose={closeQuickNormsManager}
         onSearch={handleSearch}
       />
 
@@ -332,7 +332,7 @@ export function SearchPanel() {
                 <span>Ricerche Frequenti</span>
               </div>
               <button
-                onClick={() => setQuickNormsManagerOpen(true)}
+                onClick={openQuickNormsManager}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium",
                   "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
@@ -346,7 +346,7 @@ export function SearchPanel() {
 
             {quickNorms.length === 0 ? (
               <div
-                onClick={() => setQuickNormsManagerOpen(true)}
+                onClick={openQuickNormsManager}
                 className={cn(
                   "flex flex-col items-center justify-center py-8 px-4 rounded-2xl cursor-pointer",
                   "border-2 border-dashed border-gray-200 dark:border-gray-700",
@@ -384,7 +384,7 @@ export function SearchPanel() {
                 ))}
                 {quickNorms.length > 6 && (
                   <button
-                    onClick={() => setQuickNormsManagerOpen(true)}
+                    onClick={openQuickNormsManager}
                     className={cn(
                       "flex items-center gap-2 px-4 py-2.5 rounded-xl",
                       "bg-gray-100 dark:bg-gray-800",
