@@ -1,13 +1,14 @@
-import { X, Monitor, Moon, Sun, Eye } from 'lucide-react';
+import { X, Monitor, Moon, Sun, Eye, HelpCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../lib/utils';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onRestartTour?: () => void;
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalProps) {
     const { settings, updateSettings } = useAppStore();
 
     if (!isOpen) return null;
@@ -24,7 +25,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <X size={18} />
                     </button>
                 </div>
-                
+
                 <div className="p-6 space-y-6">
                     {/* Theme - iOS-style Segmented Control */}
                     <div>
@@ -63,7 +64,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             >
                                 <Eye size={16} /> Seppia
                             </button>
-                             <button
+                            <button
                                 onClick={() => updateSettings({ theme: 'high-contrast' })}
                                 className={cn(
                                     "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
@@ -100,15 +101,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-2 rounded-lg">
                                 <span className="text-sm text-gray-600 dark:text-gray-400 px-2">Font</span>
                                 <div className="flex gap-1">
-                                    <button 
+                                    <button
                                         onClick={() => updateSettings({ fontFamily: 'sans' })}
                                         className={`px-3 py-1.5 rounded text-xs font-sans border ${settings.fontFamily === 'sans' ? 'border-blue-500 bg-white dark:bg-gray-700 text-blue-600' : 'border-transparent hover:bg-gray-200'}`}
                                     >Sans</button>
-                                    <button 
+                                    <button
                                         onClick={() => updateSettings({ fontFamily: 'serif' })}
                                         className={`px-3 py-1.5 rounded text-xs font-serif border ${settings.fontFamily === 'serif' ? 'border-blue-500 bg-white dark:bg-gray-700 text-blue-600' : 'border-transparent hover:bg-gray-200'}`}
                                     >Serif</button>
-                                    <button 
+                                    <button
                                         onClick={() => updateSettings({ fontFamily: 'mono' })}
                                         className={`px-3 py-1.5 rounded text-xs font-mono border ${settings.fontFamily === 'mono' ? 'border-blue-500 bg-white dark:bg-gray-700 text-blue-600' : 'border-transparent hover:bg-gray-200'}`}
                                     >Mono</button>
@@ -116,6 +117,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             </div>
                         </div>
                     </div>
+
+                    {/* Restart Tour */}
+                    {onRestartTour && (
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">Aiuto</label>
+                            <button
+                                onClick={() => {
+                                    onRestartTour();
+                                    onClose();
+                                    // Reload page to restart the tour
+                                    window.location.reload();
+                                }}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-sm font-medium"
+                            >
+                                <HelpCircle size={16} />
+                                Ricomincia il Tour Guidato
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -18,17 +18,19 @@ interface NavItemProps {
   icon: React.ElementType;
   label: string;
   onClick?: () => void;
+  id?: string;
 }
 
 // Spring config for smooth animations
 const SPRING_CONFIG = { type: 'spring', stiffness: 400, damping: 30 };
 
-function NavItem({ to, icon: Icon, label, onClick }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   return (
     <NavLink
       to={to}
+      id={id}
       className={({ isActive }) => cn(
         "relative flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200",
         "hover:bg-white/40 dark:hover:bg-white/10",
@@ -184,21 +186,23 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
 
       {/* Quick Search Button */}
       <div className="flex flex-col items-center pt-4 pb-2 border-b border-white/10 dark:border-white/5">
-        <ActionButton
-          icon={Sparkles}
-          label="Ricerca Veloce ⌘K"
-          onClick={handleSparklesClick}
-          isActive={false}
-        />
+        <div id="tour-quick-search">
+          <ActionButton
+            icon={Sparkles}
+            label="Ricerca Veloce ⌘K"
+            onClick={handleSparklesClick}
+            isActive={false}
+          />
+        </div>
         {quickNorms.length > 0 && (
           <div className="mt-1 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col items-center py-4 gap-2">
+      <nav id="tour-sidebar" className="flex-1 flex flex-col items-center py-4 gap-2">
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
-        <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} />
+        <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 

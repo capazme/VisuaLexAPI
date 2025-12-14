@@ -294,7 +294,7 @@ export function SearchPanel() {
 
       {/* Main Content Area - Empty state when no tabs */}
       {!hasTabs && !isLoading && (
-        <div className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700">
+        <div id="tour-main-content" className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700">
           {/* Interactive Search Icon */}
           <div
             className="relative group cursor-pointer"
@@ -325,7 +325,7 @@ export function SearchPanel() {
           </p>
 
           {/* QuickNorms Section */}
-          <div className="mt-10 w-full max-w-lg">
+          <div id="tour-quicknorms" className="mt-10 w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
                 <Star size={16} className="text-amber-500" />

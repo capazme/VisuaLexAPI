@@ -9,6 +9,7 @@ import { StudyMode } from './StudyMode';
 import { cn } from '../../../lib/utils';
 import { extractArticleIdsFromTree, normalizeArticleId } from '../../../utils/treeUtils';
 import type { ArticleData } from '../../../types';
+import { useTour } from '../../../hooks/useTour';
 
 interface NormaBlockComponentProps {
   tabId: string;
@@ -37,8 +38,14 @@ export function NormaBlockComponent({
   const [treeLoading, setTreeLoading] = useState(false);
   const [studyModeOpen, setStudyModeOpen] = useState(false);
 
-  const { toggleNormaCollapse, triggerSearch, addNormaToTab } = useAppStore();
+  const { toggleNormaCollapse, triggerSearch, addNormaToTab, settings } = useAppStore();
   const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
+
+  // Trigger NormaBlock tour on first render
+  const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  useEffect(() => {
+    tryStartTour('normaBlock');
+  }, [tryStartTour]);
 
   const fetchTree = async () => {
     if (!normaBlock.norma.urn || treeData) return; // Don't refetch if already loaded
@@ -182,7 +189,7 @@ export function NormaBlockComponent({
       )}
     >
       {/* Norma Header */}
-      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 border-b border-blue-200 dark:border-blue-800">
+      <div className="norma-block-header flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 border-b border-blue-200 dark:border-blue-800">
         <div className="flex items-center gap-2">
           {/* Drag handle */}
           <div
@@ -214,25 +221,25 @@ export function NormaBlockComponent({
             className="flex items-center gap-2 cursor-pointer flex-1"
             onClick={() => toggleNormaCollapse(tabId, normaBlock.id)}
           >
-          {normaBlock.isCollapsed ? (
-            <ChevronRight size={16} className="text-gray-500" />
-          ) : (
-            <ChevronDown size={16} className="text-gray-500" />
-          )}
+            {normaBlock.isCollapsed ? (
+              <ChevronRight size={16} className="text-gray-500" />
+            ) : (
+              <ChevronDown size={16} className="text-gray-500" />
+            )}
 
-          <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-            <Book size={16} className="text-blue-600 dark:text-blue-400" />
-          </div>
+            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+              <Book size={16} className="text-blue-600 dark:text-blue-400" />
+            </div>
 
-          <div>
-            <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
-              {normaBlock.norma.tipo_atto}
-              {normaBlock.norma.numero_atto && ` n. ${normaBlock.norma.numero_atto}`}
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {normaBlock.norma.data || 'Estremi non disponibili'} · {normaBlock.articles.length} articoli
-            </p>
-          </div>
+            <div>
+              <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
+                {normaBlock.norma.tipo_atto}
+                {normaBlock.norma.numero_atto && ` n. ${normaBlock.norma.numero_atto}`}
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {normaBlock.norma.data || 'Estremi non disponibili'} · {normaBlock.articles.length} articoli
+              </p>
+            </div>
           </div>
         </div>
 
@@ -240,7 +247,7 @@ export function NormaBlockComponent({
           <div className="flex items-center gap-2">
             {/* Study Mode Button */}
             <button
-              className="px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors flex items-center gap-1"
+              className="norma-study-mode-btn px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors flex items-center gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setStudyModeOpen(true);
@@ -252,7 +259,7 @@ export function NormaBlockComponent({
             </button>
             {normaBlock.norma.urn && (
               <button
-                className="px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded transition-colors flex items-center gap-1"
+                className="norma-structure-btn px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded transition-colors flex items-center gap-1"
                 onClick={(e) => {
                   e.stopPropagation();
                   setTreeVisible(!treeVisible);
@@ -311,7 +318,7 @@ export function NormaBlockComponent({
           )}
 
           {/* Article tabs */}
-          <div className="px-3 pt-3 border-b border-gray-200 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="norma-article-tabs px-3 pt-3 border-b border-gray-200 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar">
             {normaBlock.articles.map((article) => {
               const id = article.norma_data.numero_articolo;
               const isActive = id === activeArticleId;

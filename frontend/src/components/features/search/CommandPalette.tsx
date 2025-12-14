@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, Book, FileText, Globe, X, Check, Star, Zap } from 'lucide-react';
+import { Search, Book, FileText, Globe, X, Check, Star, Zap, Lightbulb } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
+import { useTour } from '../../../hooks/useTour';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -72,13 +73,22 @@ const ACT_TYPES_REQUIRING_DETAILS = [
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
 
 export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProps) {
-  const { quickNorms, useQuickNorm } = useAppStore();
+  const { quickNorms, useQuickNorm, settings } = useAppStore();
+  const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
   const [article, setArticle] = useState('1');
   const [actNumber, setActNumber] = useState('');
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
+  const [includeBrocardi, setIncludeBrocardi] = useState(true);
+
+  // Trigger Command Palette tour on first open
+  useEffect(() => {
+    if (isOpen) {
+      tryStartTour('commandPalette');
+    }
+  }, [isOpen, tryStartTour]);
 
   // Smart citation parsing
   const parsedCitation = useMemo<ParsedCitation | null>(() => {
@@ -147,7 +157,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
         date: params.date ? parseItalianDate(params.date) : '',
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: true
+        show_brocardi_info: includeBrocardi
       });
       onClose();
     } else if (parsedCitation.act_type) {
@@ -168,7 +178,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, onClose]);
+  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi]);
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -180,11 +190,11 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
       date: actDate ? parseItalianDate(actDate) : '',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: true
+      show_brocardi_info: includeBrocardi
     });
 
     onClose();
-  }, [selectedAct, article, actNumber, actDate, onSearch, onClose]);
+  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, includeBrocardi]);
 
   const handleSubmitDetails = useCallback(() => {
     if (!selectedAct || !actNumber || !actDate) return;
@@ -344,7 +354,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
 
           {/* Content */}
           {step === 'select_act' && (
-            <Command.List className="max-h-[400px] overflow-y-auto p-2">
+            <Command.List id="command-palette-results" className="max-h-[400px] overflow-y-auto p-2">
               <Command.Empty className="px-4 py-8 text-center text-gray-500 text-sm">
                 Nessun risultato trovato.
               </Command.Empty>
@@ -438,8 +448,28 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
             </div>
           )}
 
-          {/* Footer hint */}
+          {/* Footer with options and hints */}
           <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+            {/* Brocardi Toggle */}
+            <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={includeBrocardi}
+                    onChange={(e) => setIncludeBrocardi(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </div>
+                <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <Lightbulb size={14} className={includeBrocardi ? "text-blue-500" : "text-gray-400"} />
+                  Includi Brocardi
+                </span>
+              </label>
+              <span className="text-xs text-gray-400">spiegazioni, ratio, massime</span>
+            </div>
+            {/* Keyboard hints */}
             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <div className="flex items-center gap-4">
                 <span><kbd className="px-2 py-1 bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-700">↑↓</kbd> naviga</span>

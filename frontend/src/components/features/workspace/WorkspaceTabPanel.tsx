@@ -9,6 +9,7 @@ import { LooseArticleCard } from './LooseArticleCard';
 import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
+import { useTour } from '../../../hooks/useTour';
 
 
 
@@ -43,8 +44,15 @@ export function WorkspaceTabPanel({
     createCollection,
     dossiers,
     addToDossier,
-    createDossier
+    createDossier,
+    settings
   } = useAppStore();
+
+  // Trigger workspace tab tour on first tab render
+  const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+  useEffect(() => {
+    tryStartTour('workspaceTab');
+  }, [tryStartTour]);
 
   // Close dossier menu when clicking outside
   useEffect(() => {
@@ -289,7 +297,7 @@ export function WorkspaceTabPanel({
         ref={setNodeRef}
         className={cn(
           // Liquid Glass container
-          "h-full flex flex-col rounded-2xl shadow-glass-lg overflow-hidden",
+          "workspace-tab-panel h-full flex flex-col rounded-2xl shadow-glass-lg overflow-hidden",
           "bg-white/75 dark:bg-gray-900/75 backdrop-blur-2xl",
           "border",
           isOver

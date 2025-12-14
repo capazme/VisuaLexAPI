@@ -6,12 +6,27 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { SettingsModal } from '../ui/SettingsModal';
 import { cn } from '../../lib/utils';
+import { useTour } from '../../hooks/useTour';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Onboarding Tour
+  const { startTour, hasSeenTour, resetTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
+
+  // Auto-start tour on first visit
+  useEffect(() => {
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      if (!hasSeenTour('main')) {
+        startTour('main');
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [hasSeenTour, startTour]);
 
   // Apply Theme & Typography Effects
   useEffect(() => {
@@ -122,6 +137,7 @@ export function Layout() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
+          id="tour-focus-toggle"
           className={cn(
             'fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
             // Liquid Glass effect
@@ -162,7 +178,7 @@ export function Layout() {
         </div>
       </main>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetTour} />
     </div>
   );
 }

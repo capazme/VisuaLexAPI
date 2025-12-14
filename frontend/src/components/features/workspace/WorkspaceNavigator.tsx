@@ -85,10 +85,13 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
   };
 
   return (
-    <div className={cn(
-      "fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999]",
-      className
-    )}>
+    <div
+      id="tour-workspace-dock"
+      className={cn(
+        "fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999]",
+        className
+      )}
+    >
       {/* Collapsed toggle button */}
       {!isExpanded && (
         <button
