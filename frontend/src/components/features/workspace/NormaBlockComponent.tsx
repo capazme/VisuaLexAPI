@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch } from 'lucide-react';
+import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type NormaBlock } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { ArticleNavigation } from './ArticleNavigation';
-import { ArticleMinimap } from './ArticleMinimap';
 import { TreeViewPanel } from '../search/TreeViewPanel';
+import { StudyMode } from './StudyMode';
 import { cn } from '../../../lib/utils';
 import { extractArticleIdsFromTree, normalizeArticleId } from '../../../utils/treeUtils';
 import type { ArticleData } from '../../../types';
@@ -17,6 +17,7 @@ interface NormaBlockComponentProps {
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
   onExtractArticle: (articleId: string) => void;
   onRemoveArticle: (articleId: string) => void;
+  onRemoveNorma?: () => void;
 }
 
 export function NormaBlockComponent({
@@ -25,7 +26,8 @@ export function NormaBlockComponent({
   onViewPdf,
   onCrossReference,
   onExtractArticle,
-  onRemoveArticle
+  onRemoveArticle,
+  onRemoveNorma
 }: NormaBlockComponentProps) {
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
     normaBlock.articles[0]?.norma_data?.numero_articolo || null
@@ -33,6 +35,7 @@ export function NormaBlockComponent({
   const [treeVisible, setTreeVisible] = useState(false);
   const [treeData, setTreeData] = useState<any[] | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
+  const [studyModeOpen, setStudyModeOpen] = useState(false);
 
   const { toggleNormaCollapse, triggerSearch, addNormaToTab } = useAppStore();
   const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
@@ -191,6 +194,22 @@ export function NormaBlockComponent({
             <GripVertical size={16} className="text-gray-400" />
           </div>
 
+          {/* Delete button with confirmation */}
+          {onRemoveNorma && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm('Eliminare questa norma e tutti i suoi articoli?')) {
+                  onRemoveNorma();
+                }
+              }}
+              className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+              title="Elimina norma"
+            >
+              <Trash2 size={14} className="text-red-500" />
+            </button>
+          )}
+
           <div
             className="flex items-center gap-2 cursor-pointer flex-1"
             onClick={() => toggleNormaCollapse(tabId, normaBlock.id)}
@@ -219,6 +238,18 @@ export function NormaBlockComponent({
 
         {!normaBlock.isCollapsed && (
           <div className="flex items-center gap-2">
+            {/* Study Mode Button */}
+            <button
+              className="px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setStudyModeOpen(true);
+              }}
+              title="Modalità studio"
+            >
+              <BookOpen size={12} />
+              Studio
+            </button>
             {normaBlock.norma.urn && (
               <button
                 className="px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded transition-colors flex items-center gap-1"
@@ -268,20 +299,13 @@ export function NormaBlockComponent({
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
           {/* Navigation bar - show when structure available OR multiple articles loaded */}
           {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
-            <div className="px-3 pt-2 flex items-center justify-between">
+            <div className="px-3 pt-2 flex items-center justify-end">
               <ArticleNavigation
                 allArticleIds={allArticleIds}
                 loadedArticleIds={loadedArticleIds}
                 activeArticleId={activeArticleId}
                 onNavigate={setActiveArticleId}
                 onLoadArticle={handleLoadArticle}
-              />
-              <ArticleMinimap
-                allArticleIds={allArticleIds}
-                loadedArticleIds={loadedArticleIds}
-                activeArticleId={activeArticleId}
-                onArticleClick={handleArticleSelect}
-                className="max-w-[200px]"
               />
             </div>
           )}
@@ -306,18 +330,16 @@ export function NormaBlockComponent({
                   <span>Art. {id}</span>
                   {isActive && (
                     <div className="flex items-center gap-0.5 ml-1">
-                      {normaBlock.articles.length > 1 && (
-                        <button
-                          className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onExtractArticle(id);
-                          }}
-                          title="Estrai come articolo loose"
-                        >
-                          <ExternalLink size={10} />
-                        </button>
-                      )}
+                      <button
+                        className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onExtractArticle(id);
+                        }}
+                        title="Estrai come articolo loose"
+                      >
+                        <ExternalLink size={10} />
+                      </button>
                       <button
                         className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
                         onClick={(e) => {
@@ -351,6 +373,19 @@ export function NormaBlockComponent({
           </div>
         </div>
       )}
+
+      {/* Study Mode Overlay */}
+      <StudyMode
+        isOpen={studyModeOpen}
+        onClose={() => setStudyModeOpen(false)}
+        article={activeArticle || normaBlock.articles[0]}
+        articles={normaBlock.articles}
+        onNavigate={(articleId) => setActiveArticleId(articleId)}
+        onCrossReferenceNavigate={onCrossReference}
+        normaLabel={`${normaBlock.norma.tipo_atto}${normaBlock.norma.numero_atto ? ` n. ${normaBlock.norma.numero_atto}` : ''}`}
+        allArticleIds={allArticleIds}
+        onLoadArticle={handleLoadArticle}
+      />
     </div>
   );
 }

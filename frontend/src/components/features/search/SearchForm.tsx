@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Search, RefreshCw, Eraser, Plus, Minus } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, RefreshCw, Eraser, Plus, Minus, Loader2 } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { parseItalianDate } from '../../../utils/dateUtils';
+import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -44,10 +45,146 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     show_brocardi_info: false
   });
 
+  // State for real article navigation
+  const [articleList, setArticleList] = useState<string[]>([]);
+  const [isLoadingArticles, setIsLoadingArticles] = useState(false);
+  const [lastFetchedNorma, setLastFetchedNorma] = useState<string>('');
+
+  // Generate a key for the current norma to detect changes
+  const getNormaKey = useCallback(() => {
+    return `${formData.act_type}|${formData.act_number}|${formData.date}`;
+  }, [formData.act_type, formData.act_number, formData.date]);
+
+  // Fetch article tree when norma details change
+  useEffect(() => {
+    const fetchArticleTree = async () => {
+      const normaKey = getNormaKey();
+
+      console.log('🔍 [SearchForm] Checking if should fetch articles...', {
+        act_type: formData.act_type,
+        act_number: formData.act_number,
+        date: formData.date,
+        normaKey,
+        lastFetchedNorma,
+        isSameNorma: normaKey === lastFetchedNorma
+      });
+
+      // Don't refetch if same norma or no act_type
+      if (!formData.act_type) {
+        console.log('❌ [SearchForm] No act_type, skipping fetch');
+        return;
+      }
+
+      if (normaKey === lastFetchedNorma) {
+        console.log('⏭️ [SearchForm] Same norma, skipping fetch');
+        return;
+      }
+
+      // For acts requiring details, wait until we have at least number or date
+      const needsDetails = ACT_TYPES_REQUIRING_DETAILS.includes(formData.act_type);
+      console.log('📋 [SearchForm] Needs details?', { needsDetails, act_type: formData.act_type });
+
+      if (needsDetails && !formData.act_number && !formData.date) {
+        console.log('⏳ [SearchForm] Needs details but missing number/date, clearing list');
+        setArticleList([]);
+        return;
+      }
+
+      console.log('🚀 [SearchForm] Starting fetch for articles...');
+      setIsLoadingArticles(true);
+
+      try {
+        // First get the URN
+        const requestBody = {
+          act_type: formData.act_type,
+          act_number: formData.act_number || undefined,
+          date: formData.date ? parseItalianDate(formData.date) : undefined,
+          article: '1'
+        };
+        console.log('📤 [SearchForm] Fetching norma data with:', requestBody);
+
+        const normaRes = await fetch('/fetch_norma_data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log('📥 [SearchForm] Norma response status:', normaRes.status);
+
+        if (!normaRes.ok) {
+          const errorText = await normaRes.text();
+          console.error('❌ [SearchForm] Norma fetch failed:', errorText);
+          throw new Error('Errore fetch norma');
+        }
+
+        const normaData = await normaRes.json();
+        console.log('📥 [SearchForm] Norma data received:', normaData);
+
+        // Extract URN from the response - it's inside norma_data array
+        const urnToUse = normaData.norma_data?.[0]?.urn || normaData.norma_data?.[0]?.url;
+        console.log('🔗 [SearchForm] Extracted URN:', urnToUse);
+
+        if (!urnToUse) {
+          console.log('❌ [SearchForm] No URN in response, clearing list');
+          setArticleList([]);
+          return;
+        }
+
+        // Then fetch the tree
+        console.log('🌳 [SearchForm] Fetching tree for URN:', urnToUse);
+        const treeRes = await fetch('/fetch_tree', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urn: urnToUse, link: false, details: false })
+        });
+
+        console.log('📥 [SearchForm] Tree response status:', treeRes.status);
+
+        if (!treeRes.ok) {
+          const errorText = await treeRes.text();
+          console.error('❌ [SearchForm] Tree fetch failed:', errorText);
+          throw new Error('Errore fetch tree');
+        }
+
+        const treeResponse = await treeRes.json();
+        console.log('🌳 [SearchForm] Tree response received:', {
+          hasArticles: !!treeResponse.articles,
+          count: treeResponse.count,
+          articlesType: typeof treeResponse.articles,
+          isArray: Array.isArray(treeResponse.articles),
+          sample: Array.isArray(treeResponse.articles) ? treeResponse.articles.slice(0, 5) : treeResponse
+        });
+
+        // Extract article IDs from tree - API returns { articles: [...], count: N }
+        const treeData = treeResponse.articles || treeResponse;
+        const articles = extractArticleIdsFromTree(treeData);
+        console.log('📚 [SearchForm] Extracted articles:', {
+          count: articles.length,
+          first10: articles.slice(0, 10),
+          last5: articles.slice(-5)
+        });
+
+        setArticleList(articles);
+        setLastFetchedNorma(normaKey);
+
+        console.log(`✅ [SearchForm] Successfully loaded ${articles.length} articles for navigation`);
+      } catch (e) {
+        console.error('💥 [SearchForm] Error fetching article tree:', e);
+        setArticleList([]);
+      } finally {
+        setIsLoadingArticles(false);
+      }
+    };
+
+    // Debounce the fetch
+    const timeout = setTimeout(fetchArticleTree, 500);
+    return () => clearTimeout(timeout);
+  }, [formData.act_type, formData.act_number, formData.date, getNormaKey, lastFetchedNorma]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -55,17 +192,77 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   };
 
   const handleIncrementArticle = () => {
-    setFormData(prev => ({ ...prev, article: (parseInt(prev.article) + 1).toString() }));
+    console.log('➕ [SearchForm] Increment clicked', {
+      currentArticle: formData.article,
+      articleListLength: articleList.length,
+      articleListSample: articleList.slice(0, 5)
+    });
+
+    if (articleList.length > 0) {
+      // Use real article list
+      const currentIndex = articleList.findIndex(a => a === formData.article);
+      console.log('➕ [SearchForm] Current index in list:', currentIndex);
+
+      if (currentIndex === -1) {
+        // Current article not in list, go to first
+        console.log('➕ [SearchForm] Article not in list, going to first:', articleList[0]);
+        setFormData(prev => ({ ...prev, article: articleList[0] }));
+      } else if (currentIndex < articleList.length - 1) {
+        // Go to next article
+        const nextArticle = articleList[currentIndex + 1];
+        console.log('➕ [SearchForm] Going to next article:', nextArticle);
+        setFormData(prev => ({ ...prev, article: nextArticle }));
+      } else {
+        console.log('➕ [SearchForm] Already at end of list');
+      }
+    } else {
+      // Fallback to numeric increment
+      const newArticle = (parseInt(formData.article) + 1).toString();
+      console.log('➕ [SearchForm] Fallback numeric increment:', newArticle);
+      setFormData(prev => ({ ...prev, article: newArticle }));
+    }
   };
 
   const handleDecrementArticle = () => {
-    setFormData(prev => {
-      const val = parseInt(prev.article);
-      return { ...prev, article: val > 1 ? (val - 1).toString() : '1' };
+    console.log('➖ [SearchForm] Decrement clicked', {
+      currentArticle: formData.article,
+      articleListLength: articleList.length
     });
+
+    if (articleList.length > 0) {
+      // Use real article list
+      const currentIndex = articleList.findIndex(a => a === formData.article);
+      console.log('➖ [SearchForm] Current index in list:', currentIndex);
+
+      if (currentIndex === -1) {
+        // Current article not in list, go to first
+        console.log('➖ [SearchForm] Article not in list, going to first:', articleList[0]);
+        setFormData(prev => ({ ...prev, article: articleList[0] }));
+      } else if (currentIndex > 0) {
+        // Go to previous article
+        const prevArticle = articleList[currentIndex - 1];
+        console.log('➖ [SearchForm] Going to previous article:', prevArticle);
+        setFormData(prev => ({ ...prev, article: prevArticle }));
+      } else {
+        console.log('➖ [SearchForm] Already at start of list');
+      }
+    } else {
+      // Fallback to numeric decrement
+      setFormData(prev => {
+        const val = parseInt(prev.article);
+        const newArticle = val > 1 ? (val - 1).toString() : '1';
+        console.log('➖ [SearchForm] Fallback numeric decrement:', newArticle);
+        return { ...prev, article: newArticle };
+      });
+    }
   };
 
   const isDetailsRequired = ACT_TYPES_REQUIRING_DETAILS.includes(formData.act_type);
+
+  // Calculate position in article list for display
+  const articlePosition = articleList.length > 0
+    ? articleList.findIndex(a => a === formData.article) + 1
+    : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +283,8 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       version_date: '',
       show_brocardi_info: false
     });
+    setArticleList([]);
+    setLastFetchedNorma('');
   };
 
   // Group options
@@ -157,13 +356,27 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
           {/* Modern Article Number Input */}
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-gray-400 uppercase">Articolo</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-400 uppercase">Articolo</label>
+              {isLoadingArticles && (
+                <span className="flex items-center gap-1 text-xs text-blue-500">
+                  <Loader2 size={12} className="animate-spin" />
+                  Carico...
+                </span>
+              )}
+              {!isLoadingArticles && articleList.length > 0 && (
+                <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                  {articlePosition > 0 ? `${articlePosition}/${articleList.length}` : `${articleList.length} articoli`}
+                </span>
+              )}
+            </div>
             <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
               <button
                 type="button"
                 onClick={handleDecrementArticle}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400"
-                title="Decrementa articolo"
+                disabled={articleList.length > 0 && articlePosition <= 1}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={articleList.length > 0 ? "Articolo precedente" : "Decrementa articolo"}
               >
                 <Minus size={16} />
               </button>
@@ -178,8 +391,9 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               <button
                 type="button"
                 onClick={handleIncrementArticle}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400"
-                title="Incrementa articolo"
+                disabled={articleList.length > 0 && articlePosition >= articleList.length}
+                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={articleList.length > 0 ? "Articolo successivo" : "Incrementa articolo"}
               >
                 <Plus size={16} />
               </button>

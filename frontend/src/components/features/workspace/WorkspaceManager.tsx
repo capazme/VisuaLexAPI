@@ -104,8 +104,10 @@ export function WorkspaceManager({
     setActiveItem(null);
   };
 
-  // Sort tabs by zIndex to ensure proper stacking order
-  const sortedTabs = [...workspaceTabs].sort((a, b) => a.zIndex - b.zIndex);
+  // Sort tabs by zIndex to ensure proper stacking order, filter out hidden tabs
+  const sortedTabs = [...workspaceTabs]
+    .filter(tab => !tab.isHidden)
+    .sort((a, b) => a.zIndex - b.zIndex);
 
   return (
     <DndContext

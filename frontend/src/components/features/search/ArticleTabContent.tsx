@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
-import { ExternalLink, Paperclip, Calendar, Bookmark, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, Tag, MoreHorizontal, Clock } from 'lucide-react';
+import { SelectionPopup } from './SelectionPopup';
+import { ExternalLink, Bookmark, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, Tag, MoreHorizontal, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
+import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
 import { SafeHTML } from '../../../utils/sanitize';
 
 interface ArticleTabContentProps {
@@ -51,9 +53,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
   const [noteText, setNoteText] = useState('');
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false);
   const [tagInput, setTagInput] = useState('');
-  const [highlightColor, setHighlightColor] = useState<'yellow' | 'green' | 'red' | 'blue'>('yellow');
+  const [highlightColor] = useState<'yellow' | 'green' | 'red' | 'blue'>('yellow');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
+  const [showAdvancedExport, setShowAdvancedExport] = useState(false);
   const [showVersionInput, setShowVersionInput] = useState(false);
   const [versionDate, setVersionDate] = useState('');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -150,29 +153,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
       showToast(tags.length > 0 ? `${tags.length} tag salvati` : 'Tag rimossi', 'success');
   };
 
-  const handleCopy = async () => {
-      try {
-          const selection = window.getSelection()?.toString();
-          const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-          
-          let textToCopy = selection || plainText;
-          
-          // Add citation
-          const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`;
-          textToCopy += citation;
-          
-          // Add notes if any
-          if (itemAnnotations.length > 0) {
-              textToCopy += `\n\nNote personali:\n${itemAnnotations.map((n, i) => `${i + 1}. ${n.text}`).join('\n')}`;
-          }
-          
-          await navigator.clipboard.writeText(textToCopy);
-          showToast(selection ? 'Testo selezionato copiato con citazione' : 'Articolo copiato con citazione e note', 'success');
-      } catch (err) {
-          showToast('Errore durante la copia', 'error');
-      }
-  };
-
   const handleAdvancedCopy = async (options: CopyOptions) => {
       try {
           let textToCopy = '';
@@ -232,69 +212,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
       }
   };
 
-  const handleExportRtf = () => {
-      try {
-          const escapeRtf = (text: string) => text.replace(/\\/g, '\\\\').replace(/{/g, '\\{').replace(/}/g, '\\}');
-          const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, '\\par ');
-          
-          const header = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Arial;}{\\f1 Times New Roman;}}`;
-          
-          // Title
-          const title = `\\f0\\fs28\\b ${escapeRtf(norma_data.tipo_atto)}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}\\b0\\par\\par`;
-          
-          // Article text
-          const body = `\\f1\\fs22 ${escapeRtf(plainText)}\\par\\par`;
-          
-          // Citation
-          const citation = `\\f0\\fs18\\i Tratto da: ${escapeRtf(norma_data.tipo_atto)}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${escapeRtf(norma_data.data)}` : ''}, Art. ${escapeRtf(norma_data.numero_articolo)}\\i0\\par\\par`;
-          
-          // Notes section
-          let notesSection = '';
-          if (itemAnnotations.length > 0) {
-              notesSection = `\\f0\\fs20\\b Note Personali:\\b0\\par\\par`;
-              itemAnnotations.forEach((note, idx) => {
-                  notesSection += `\\f1\\fs18 ${idx + 1}. ${escapeRtf(note.text)}\\par`;
-              });
-              notesSection += '\\par';
-          }
-          
-          // Highlights section
-          let highlightsSection = '';
-          if (articleHighlights.length > 0) {
-              highlightsSection = `\\f0\\fs20\\b Evidenziazioni:\\b0\\par\\par`;
-              articleHighlights.forEach((h, idx) => {
-                  highlightsSection += `\\f1\\fs18 ${idx + 1}. ${escapeRtf(h.text)}\\par`;
-              });
-              highlightsSection += '\\par';
-          }
-          
-          const rtf = `${header}${title}${body}${citation}${notesSection}${highlightsSection}}`;
-          const blob = new Blob([rtf], { type: 'application/rtf' });
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          const fileName = `VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.rtf`;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(link.href);
-          showToast('File RTF scaricato con successo', 'success');
-      } catch (err) {
-          console.error('RTF Export Error:', err);
-          showToast('Errore durante l\'esportazione RTF', 'error');
-      }
-  };
-
   const handleHighlightAdd = (color?: 'yellow' | 'green' | 'red' | 'blue') => {
       const selection = window.getSelection();
       const selectedText = selection?.toString().trim();
-      
+
       if (!selectedText) {
           // Try to use saved selection
           if (highlightSelectionRef.current) {
               const saved = highlightSelectionRef.current;
               // Check if already highlighted
-              const alreadyHighlighted = articleHighlights.some(h => 
+              const alreadyHighlighted = articleHighlights.some(h =>
                   h.text.toLowerCase() === saved.text.toLowerCase()
               );
               if (alreadyHighlighted) {
@@ -314,7 +241,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
       }
 
       // Check if already highlighted
-      const alreadyHighlighted = articleHighlights.some(h => 
+      const alreadyHighlighted = articleHighlights.some(h =>
           h.text.toLowerCase() === selectedText.toLowerCase()
       );
       if (alreadyHighlighted) {
@@ -329,9 +256,40 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
       showToast(`Testo evidenziato in ${finalColor}`, 'success');
       setShowHighlightPicker(false);
       highlightSelectionRef.current = null;
-      
+
       // Clear selection
       selection?.removeAllRanges();
+  };
+
+  // Handler for SelectionPopup highlight action
+  const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue') => {
+      const alreadyHighlighted = articleHighlights.some(h =>
+          h.text.toLowerCase() === text.toLowerCase()
+      );
+      if (alreadyHighlighted) {
+          showToast('Questo testo è già evidenziato', 'info');
+          return;
+      }
+      addHighlight(itemKey, norma_data.numero_articolo, text, '', color);
+      showToast(`Testo evidenziato in ${color}`, 'success');
+  };
+
+  // Handler for SelectionPopup note action
+  const handlePopupAddNote = (text: string) => {
+      setNoteText(text);
+      setShowNotes(true);
+      showToast('Testo aggiunto alla nota', 'info');
+  };
+
+  // Handler for SelectionPopup copy action
+  const handlePopupCopy = async (text: string) => {
+      try {
+          const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`;
+          await navigator.clipboard.writeText(text + citation);
+          showToast('Testo copiato con citazione', 'success');
+      } catch (err) {
+          showToast('Errore durante la copia', 'error');
+      }
   };
 
   const formattedText = article_text?.replace(/\n/g, '<br />') || '';
@@ -398,8 +356,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                Vigente
              </span>
            )}
-           <span className="text-gray-400">|</span>
-           <span>Aggiornato al: {norma_data.data_versione || 'N/A'}</span>
+           {norma_data.data_versione && (
+             <>
+               <span className="text-gray-400">|</span>
+               <span>Aggiornato al: {norma_data.data_versione}</span>
+             </>
+           )}
         </div>
 
         {/* Quick Actions */}
@@ -537,13 +499,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                             </button>
                             <button
                                 onClick={() => {
-                                    handleExportRtf();
+                                    setShowAdvancedExport(true);
                                     setShowMoreMenu(false);
                                 }}
                                 className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             >
                                 <Download size={14} />
-                                Esporta RTF
+                                Esporta...
                             </button>
 
                             <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
@@ -623,12 +585,20 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
 
 
       {/* Article Content with Prose Styling */}
-      <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed px-4" ref={contentRef} id={`article-content-${itemKey}`}>
-        {processedContent ? (
-            <SafeHTML html={processedContent} />
-        ) : (
-            <div className="text-gray-400 italic text-center py-4">Caricamento testo...</div>
-        )}
+      <div className="relative" ref={contentRef}>
+        <SelectionPopup
+          containerRef={contentRef}
+          onHighlight={handlePopupHighlight}
+          onAddNote={handlePopupAddNote}
+          onCopy={handlePopupCopy}
+        />
+        <div className="prose prose-lg dark:prose-invert max-w-none font-serif leading-relaxed px-4" id={`article-content-${itemKey}`}>
+          {processedContent ? (
+              <SafeHTML html={processedContent} />
+          ) : (
+              <div className="text-gray-400 italic text-center py-4">Caricamento testo...</div>
+          )}
+        </div>
       </div>
 
       {articleHighlights.length > 0 && (
@@ -687,6 +657,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
         onCopy={handleAdvancedCopy}
         hasNotes={itemAnnotations.length > 0}
         hasHighlights={articleHighlights.length > 0}
+      />
+
+      <AdvancedExportModal
+        isOpen={showAdvancedExport}
+        onClose={() => setShowAdvancedExport(false)}
+        articleData={data}
+        annotations={itemAnnotations}
+        highlights={articleHighlights}
       />
 
       {showVersionInput && (

@@ -46,6 +46,7 @@ interface WorkspaceTab {
     zIndex: number;
     isPinned: boolean;
     isMinimized: boolean;
+    isHidden: boolean;
     content: TabContent[]; // Mixed norme and loose articles
 }
 
@@ -88,6 +89,7 @@ interface AppState {
     bringTabToFront: (id: string) => void;
     toggleTabPin: (id: string) => void;
     toggleTabMinimize: (id: string) => void;
+    toggleTabVisibility: (id: string) => void;
     toggleNormaCollapse: (tabId: string, normaId: string) => void;
     setTabLabel: (id: string, label: string) => void;
 
@@ -96,6 +98,7 @@ interface AppState {
     extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
     moveLooseArticleBetweenTabs: (articleId: string, sourceTabId: string, targetTabId: string) => void;
     removeArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
+    removeContentFromTab: (tabId: string, contentId: string) => void;
     mergeLooseArticleToNorma: (tabId: string, looseArticleId: string, targetNormaId: string) => boolean;
 
     // Collection Actions
@@ -208,6 +211,7 @@ const appStore = createStore<AppState>()(
                         zIndex: ++state.highestZIndex,
                         isPinned: false,
                         isMinimized: false,
+                        isHidden: false,
                         content: []
                     };
 
@@ -326,6 +330,13 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
+            toggleTabVisibility: (id) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === id);
+                if (tab) {
+                    tab.isHidden = !tab.isHidden;
+                }
+            }),
+
             toggleNormaCollapse: (tabId, normaId) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
@@ -410,6 +421,18 @@ const appStore = createStore<AppState>()(
                     tab.content = tab.content.filter(c => c.id !== normaId);
                 }
 
+                if (tab.content.length === 0) {
+                    state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
+                }
+            }),
+
+            removeContentFromTab: (tabId, contentId) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+
+                tab.content = tab.content.filter(c => c.id !== contentId);
+
+                // Remove tab if empty
                 if (tab.content.length === 0) {
                     state.workspaceTabs = state.workspaceTabs.filter(t => t.id !== tabId);
                 }
@@ -754,6 +777,9 @@ export function useAppStore<T>(selector?: (state: AppState) => T) {
     }
     return useStore(appStore);
 }
+
+// Export store for direct access (e.g., appStore.getState())
+export { appStore };
 
 // Export types
 export type { WorkspaceTab, NormaBlock, LooseArticle, ArticleCollection, CollectionArticle, TabContent, SearchPanelState };

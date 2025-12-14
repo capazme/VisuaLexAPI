@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Rnd } from 'react-rnd';
 import { Search, X, Pin, PinOff, Minimize2, Plus, GripHorizontal } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
@@ -18,12 +19,27 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
     addWorkspaceTab
   } = useAppStore();
 
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Hide tooltip after 2 seconds
+  useEffect(() => {
+    if (showTooltip) {
+      const timer = setTimeout(() => setShowTooltip(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showTooltip]);
+
   const handleNewTab = () => {
     addWorkspaceTab('Nuova Tab');
   };
 
   const handleDragStop = (_e: any, data: { x: number; y: number }) => {
     setSearchPanelPosition({ x: data.x, y: data.y });
+  };
+
+  const handleSingleClick = () => {
+    setShowTooltip(true);
   };
 
   // Collapsed state: draggable FAB button
@@ -34,15 +50,26 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
         onDragStop={handleDragStop}
         enableResizing={false}
         bounds="window"
-        className="z-50"
+        className="z-[9999]"
       >
-        <button
-          onDoubleClick={toggleSearchPanel}
-          className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95"
-          title="Doppio click per aprire - Trascinabile"
-        >
-          <Search size={24} />
-        </button>
+        <div className="relative">
+          <button
+            onClick={handleSingleClick}
+            onDoubleClick={toggleSearchPanel}
+            className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95"
+            title="Doppio click per aprire - Trascinabile"
+          >
+            <Search size={24} />
+          </button>
+
+          {/* Tooltip on single click */}
+          {showTooltip && (
+            <div className="absolute left-1/2 -translate-x-1/2 -top-12 whitespace-nowrap bg-gray-900 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-200">
+              Doppio click per aprire
+              <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
+            </div>
+          )}
+        </div>
       </Rnd>
     );
   }
@@ -55,9 +82,14 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
       enableResizing={false}
       dragHandleClassName="drag-handle"
       bounds="window"
-      className="z-50"
+      className={cn("transition-all", isFocused ? "z-[9999]" : "z-50")}
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96 max-h-[80vh] overflow-hidden flex flex-col">
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 w-96 max-h-[80vh] overflow-hidden flex flex-col"
+        onMouseDown={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        tabIndex={-1}
+      >
         {/* Header with drag handle and grip dots */}
         <div className="drag-handle h-12 flex items-center justify-between px-4 cursor-move bg-gradient-to-b from-gray-50/50 to-transparent dark:from-gray-900/50 border-b border-gray-200 dark:border-gray-700">
           {/* Grip Dots Indicator */}

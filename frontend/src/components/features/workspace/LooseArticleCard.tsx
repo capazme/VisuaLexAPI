@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, GripVertical, ChevronRight, ChevronDown } from 'lucide-react';
+import { FileText, GripVertical, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import type { LooseArticle } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
@@ -11,13 +11,15 @@ interface LooseArticleCardProps {
   looseArticle: LooseArticle;
   onViewPdf: (urn: string) => void;
   onCrossReference: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
+  onRemove?: () => void;
 }
 
 export function LooseArticleCard({
   tabId,
   looseArticle,
   onViewPdf,
-  onCrossReference
+  onCrossReference,
+  onRemove
 }: LooseArticleCardProps) {
   const { article, sourceNorma } = looseArticle;
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -52,6 +54,22 @@ export function LooseArticleCard({
         >
           <GripVertical size={16} className="text-amber-500" />
         </div>
+
+        {/* Delete button with confirmation */}
+        {onRemove && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm('Eliminare questo articolo?')) {
+                onRemove();
+              }
+            }}
+            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+            title="Elimina articolo"
+          >
+            <Trash2 size={14} className="text-red-500" />
+          </button>
+        )}
 
         {/* Collapse toggle */}
         <div

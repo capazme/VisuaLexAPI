@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
@@ -19,6 +20,7 @@ interface ArticleNavigationProps {
 /**
  * Navigation arrows with position counter for article navigation.
  * Supports navigation through full structure, loading articles on demand.
+ * Double-click on the counter to manually enter an article number.
  */
 export function ArticleNavigation({
   allArticleIds,
@@ -28,6 +30,18 @@ export function ArticleNavigation({
   onLoadArticle,
   className
 }: ArticleNavigationProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
   // Use structure if available, otherwise loaded articles
   const navigationIds = allArticleIds && allArticleIds.length > 0
     ? allArticleIds
@@ -76,6 +90,47 @@ export function ArticleNavigation({
   // Show structure info
   const hasStructure = allArticleIds && allArticleIds.length > loadedArticleIds.length;
 
+  // Handle double-click to edit
+  const handleDoubleClick = () => {
+    setInputValue(activeArticleId || '');
+    setIsEditing(true);
+  };
+
+  // Handle input submission
+  const handleInputSubmit = () => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) {
+      setIsEditing(false);
+      return;
+    }
+
+    // Find the article in navigation list (normalized comparison)
+    const normalizedInput = normalizeArticleId(trimmed);
+    const matchingId = navigationIds.find(id => normalizeArticleId(id) === normalizedInput);
+
+    if (matchingId) {
+      // Found in list - navigate or load
+      if (isLoaded(matchingId)) {
+        onNavigate(matchingId);
+      } else if (onLoadArticle) {
+        onLoadArticle(matchingId);
+      }
+    } else if (onLoadArticle) {
+      // Not in list but try to load anyway (user might know better)
+      onLoadArticle(trimmed);
+    }
+
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleInputSubmit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+    }
+  };
+
   return (
     <div className={cn("flex items-center gap-1", className)}>
       <button
@@ -97,14 +152,31 @@ export function ArticleNavigation({
         )}
       </button>
 
-      <span className={cn(
-        "text-xs font-medium min-w-[50px] text-center tabular-nums",
-        hasStructure
-          ? "text-blue-600 dark:text-blue-400"
-          : "text-gray-500 dark:text-gray-400"
-      )}>
-        {currentIndex + 1}/{navigationIds.length}
-      </span>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={handleInputSubmit}
+          onKeyDown={handleKeyDown}
+          className="w-16 text-xs font-medium text-center bg-white dark:bg-gray-700 border border-blue-500 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Art."
+        />
+      ) : (
+        <span
+          onDoubleClick={handleDoubleClick}
+          className={cn(
+            "text-xs font-medium min-w-[50px] text-center tabular-nums cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 px-1 py-0.5 rounded transition-colors",
+            hasStructure
+              ? "text-blue-600 dark:text-blue-400"
+              : "text-gray-500 dark:text-gray-400"
+          )}
+          title="Doppio click per inserire articolo"
+        >
+          {currentIndex + 1}/{navigationIds.length}
+        </span>
+      )}
 
       <button
         onClick={handleNext}
