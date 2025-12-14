@@ -135,7 +135,6 @@ export function FloatingSearchPanel({ onSearch, isLoading }: FloatingSearchPanel
       dragListener={false}
       dragMomentum={false}
       dragElastic={0}
-      dragConstraints={{ left: 0, right: window.innerWidth - 384, top: 0, bottom: window.innerHeight - 400 }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onPointerDown={() => bringSearchPanelToFront()}
