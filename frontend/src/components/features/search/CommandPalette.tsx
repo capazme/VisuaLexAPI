@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, Book, FileText, Globe, X, Check, Star } from 'lucide-react';
+import { Search, Book, FileText, Globe, X, Check, Star, Zap } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
+import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -79,6 +80,15 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
 
+  // Smart citation parsing
+  const parsedCitation = useMemo<ParsedCitation | null>(() => {
+    if (!inputValue || inputValue.length < 3) return null;
+    return parseLegalCitation(inputValue);
+  }, [inputValue]);
+
+  const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
+  const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
+
   // Reset on close
   useEffect(() => {
     if (!isOpen) {
@@ -124,6 +134,41 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
       onClose();
     }
   }, [useQuickNorm, onSearch, onClose]);
+
+  // Handle smart citation search
+  const handleCitationSearch = useCallback(() => {
+    if (!parsedCitation) return;
+
+    if (citationReady) {
+      // Citation is complete - search immediately
+      const params = toSearchParams(parsedCitation);
+      onSearch({
+        ...params,
+        date: params.date ? parseItalianDate(params.date) : '',
+        version: 'vigente',
+        version_date: '',
+        show_brocardi_info: true
+      });
+      onClose();
+    } else if (parsedCitation.act_type) {
+      // Partial citation - pre-fill fields and move to next step
+      setSelectedAct(parsedCitation.act_type);
+      if (parsedCitation.article) setArticle(parsedCitation.article);
+      if (parsedCitation.act_number) setActNumber(parsedCitation.act_number);
+      if (parsedCitation.date) setActDate(parsedCitation.date);
+      setInputValue('');
+
+      if (ACT_TYPES_REQUIRING_DETAILS.includes(parsedCitation.act_type)) {
+        if (parsedCitation.act_number && parsedCitation.date) {
+          setStep('input_article');
+        } else {
+          setStep('input_details');
+        }
+      } else {
+        setStep('input_article');
+      }
+    }
+  }, [parsedCitation, citationReady, onSearch, onClose]);
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -206,14 +251,41 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                   <Command.Input
                     value={inputValue}
                     onValueChange={setInputValue}
-                    placeholder="Cerca 'Art 2043 Codice Civile' o seleziona..."
+                    placeholder="Incolla citazione (es. 'art 2043 cc') o seleziona..."
                     className="w-full bg-transparent text-gray-900 dark:text-white placeholder-gray-400 outline-none text-base"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && parsedCitation) {
+                        e.preventDefault();
+                        handleCitationSearch();
+                      }
+                    }}
                   />
-                  <div className="mt-1 flex gap-2">
-                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-gray-50 dark:bg-gray-800 px-1.5 text-[10px] font-medium text-gray-500">
-                      <span className="text-xs">⌘</span>K
-                    </kbd>
-                  </div>
+                  {/* Citation preview */}
+                  {parsedCitation && citationPreview && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Zap size={14} className={cn(
+                        citationReady ? "text-green-500" : "text-amber-500"
+                      )} />
+                      <span className={cn(
+                        "text-sm font-medium",
+                        citationReady ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
+                      )}>
+                        {citationPreview}
+                      </span>
+                      {citationReady ? (
+                        <span className="text-xs text-green-500">↵ per cercare</span>
+                      ) : (
+                        <span className="text-xs text-amber-500">↵ per completare</span>
+                      )}
+                    </div>
+                  )}
+                  {!parsedCitation && (
+                    <div className="mt-1 flex gap-2">
+                      <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-gray-50 dark:bg-gray-800 px-1.5 text-[10px] font-medium text-gray-500">
+                        <span className="text-xs">⌘</span>K
+                      </kbd>
+                    </div>
+                  )}
                 </div>
               )}
               {step === 'input_details' && (

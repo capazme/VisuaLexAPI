@@ -14,11 +14,11 @@ import { cn } from '../../../lib/utils';
 // Helper to generate keys (replicates original JS logic)
 const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
 const generateNormaKey = (norma: Norma) => {
-    if (!norma) return '';
-    const parts = [norma.tipo_atto];
-    if (norma.numero_atto?.trim()) parts.push(norma.numero_atto);
-    if (norma.data?.trim()) parts.push(norma.data);
-    return parts.map(part => sanitize(part || '')).join('--');
+  if (!norma) return '';
+  const parts = [norma.tipo_atto];
+  if (norma.numero_atto?.trim()) parts.push(norma.numero_atto);
+  if (norma.data?.trim()) parts.push(norma.data);
+  return parts.map(part => sanitize(part || '')).join('--');
 };
 
 export function SearchPanel() {
@@ -42,66 +42,66 @@ export function SearchPanel() {
   });
 
   const processResult = useCallback((result: ArticleData, versionDate?: string) => {
-      if (result.error) {
-          console.error("Backend Error for item:", result.error);
-          return;
-      }
+    if (result.error) {
+      console.error("Backend Error for item:", result.error);
+      return;
+    }
 
-      const normaData = result.norma_data;
+    const normaData = result.norma_data;
 
-      if (!normaData) {
-          console.error("Received result without norma_data", result);
-          return;
-      }
+    if (!normaData) {
+      console.error("Received result without norma_data", result);
+      return;
+    }
 
-      // Mark as historical if version_date was provided
-      if (versionDate) {
-          console.log('📅 Processing with versionDate:', versionDate, 'norma data_versione:', normaData.data_versione);
-          result.versionInfo = {
-              isHistorical: true,
-              requestedDate: versionDate,
-              effectiveDate: normaData.data_versione || normaData.data
-          };
-      }
-
-      const norma: Norma = {
-          tipo_atto: normaData.tipo_atto,
-          data: normaData.data,
-          numero_atto: normaData.numero_atto,
-          urn: normaData.url
+    // Mark as historical if version_date was provided
+    if (versionDate) {
+      console.log('📅 Processing with versionDate:', versionDate, 'norma data_versione:', normaData.data_versione);
+      result.versionInfo = {
+        isHistorical: true,
+        requestedDate: versionDate,
+        effectiveDate: normaData.data_versione || normaData.data
       };
+    }
 
-      const key = generateNormaKey(norma);
-      if (!key) return;
+    const norma: Norma = {
+      tipo_atto: normaData.tipo_atto,
+      data: normaData.data,
+      numero_atto: normaData.numero_atto,
+      urn: normaData.url
+    };
 
-      // Buffer results temporarily during streaming
-      setResultsBuffer(prev => {
-          const existing = prev[key];
-          const newArticles = existing ? [...existing.articles] : [];
+    const key = generateNormaKey(norma);
+    if (!key) return;
 
-          const isNewArticle = !newArticles.find(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
+    // Buffer results temporarily during streaming
+    setResultsBuffer(prev => {
+      const existing = prev[key];
+      const newArticles = existing ? [...existing.articles] : [];
 
-          if (isNewArticle) {
-             newArticles.push(result);
-             newArticles.sort((a, b) => {
-                 const numA = parseInt(a.norma_data.numero_articolo) || 0;
-                 const numB = parseInt(b.norma_data.numero_articolo) || 0;
-                 return numA - numB;
-             });
-          } else {
-             const idx = newArticles.findIndex(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
-             newArticles[idx] = result;
-          }
+      const isNewArticle = !newArticles.find(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
 
-          return {
-              ...prev,
-              [key]: { norma, articles: newArticles, versionDate }
-          };
-      });
+      if (isNewArticle) {
+        newArticles.push(result);
+        newArticles.sort((a, b) => {
+          const numA = parseInt(a.norma_data.numero_articolo) || 0;
+          const numB = parseInt(b.norma_data.numero_articolo) || 0;
+          return numA - numB;
+        });
+      } else {
+        const idx = newArticles.findIndex(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
+        newArticles[idx] = result;
+      }
+
+      return {
+        ...prev,
+        [key]: { norma, articles: newArticles, versionDate }
+      };
+    });
   }, []);
 
   const processResults = useCallback((items: ArticleData[], versionDate?: string) => {
-      items.forEach(item => processResult(item, versionDate));
+    items.forEach(item => processResult(item, versionDate));
   }, [processResult]);
 
   const handleSearch = useCallback(async (params: SearchParams) => {
@@ -111,56 +111,56 @@ export function SearchPanel() {
     setResultsBuffer({}); // Clear buffer before new search
 
     try {
-        const endpoint = params.show_brocardi_info ? '/fetch_all_data' : '/stream_article_text';
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-        });
+      const endpoint = params.show_brocardi_info ? '/fetch_all_data' : '/stream_article_text';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      });
 
-        if (!response.ok) throw new Error('Errore nella richiesta');
+      if (!response.ok) throw new Error('Errore nella richiesta');
 
-        if (params.show_brocardi_info) {
-            const data = await response.json();
-            processResults(data, params.version_date);
-        } else {
-            if (!response.body) return;
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+      if (params.show_brocardi_info) {
+        const data = await response.json();
+        processResults(data, params.version_date);
+      } else {
+        if (!response.body) return;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-                for (const line of lines) {
-                    if (line.trim()) {
-                        try {
-                            const result = JSON.parse(line);
-                            processResult(result, params.version_date);
-                        } catch (e) {
-                            console.error("Error parsing line", line, e);
-                        }
-                    }
-                }
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const result = JSON.parse(line);
+                processResult(result, params.version_date);
+              } catch (e) {
+                console.error("Error parsing line", line, e);
+              }
             }
-            if (buffer.trim()) {
-                 try {
-                    const result = JSON.parse(buffer);
-                    processResult(result, params.version_date);
-                } catch (e) {}
-            }
+          }
         }
+        if (buffer.trim()) {
+          try {
+            const result = JSON.parse(buffer);
+            processResult(result, params.version_date);
+          } catch (e) { }
+        }
+      }
 
-        // Results buffer will be processed by useEffect below
+      // Results buffer will be processed by useEffect below
 
     } catch (err: any) {
-        setError(err.message || "Si è verificato un errore.");
+      setError(err.message || "Si è verificato un errore.");
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [processResults, processResult]);
 
@@ -210,17 +210,17 @@ export function SearchPanel() {
   useEffect(() => {
     const shareValue = searchParams.get('share');
     if (shareValue) {
-        try {
-            const decoded = JSON.parse(atob(shareValue));
-            if (decoded) {
-                handleSearch(decoded);
-            }
-        } catch (e) {
-            console.error('Invalid share link', e);
+      try {
+        const decoded = JSON.parse(atob(shareValue));
+        if (decoded) {
+          handleSearch(decoded);
         }
-        const next = new URLSearchParams(searchParams);
-        next.delete('share');
-        setSearchParams(next, { replace: true });
+      } catch (e) {
+        console.error('Invalid share link', e);
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete('share');
+      setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams, handleSearch]);
 
@@ -233,38 +233,38 @@ export function SearchPanel() {
   }, [searchTrigger, handleSearch, clearSearchTrigger]);
 
   const handleCrossReferenceNavigate = useCallback((articleNumber: string, normaData: ArticleData['norma_data']) => {
-      const params: SearchParams = {
-          act_type: normaData.tipo_atto,
-          act_number: normaData.numero_atto || '',
-          date: normaData.data || '',
-          article: articleNumber,
-          version: (normaData.versione as 'vigente' | 'originale') || 'vigente',
-          version_date: normaData.data_versione || '',
-          show_brocardi_info: true
-      };
-      handleSearch(params);
+    const params: SearchParams = {
+      act_type: normaData.tipo_atto,
+      act_number: normaData.numero_atto || '',
+      date: normaData.data || '',
+      article: articleNumber,
+      version: (normaData.versione as 'vigente' | 'originale') || 'vigente',
+      version_date: normaData.data_versione || '',
+      show_brocardi_info: true
+    };
+    handleSearch(params);
   }, [handleSearch]);
 
 
   const handleViewPdf = async (urn: string) => {
-      setPdfState({ isOpen: true, url: null, isLoading: true });
-      try {
-          const response = await fetch('/export_pdf', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ urn })
-          });
-          
-          if (!response.ok) throw new Error('Errore generazione PDF');
-          
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          setPdfState({ isOpen: true, url, isLoading: false });
-      } catch (e) {
-          console.error(e);
-          setPdfState({ isOpen: false, url: null, isLoading: false });
-          setError("Impossibile caricare il PDF.");
-      }
+    setPdfState({ isOpen: true, url: null, isLoading: true });
+    try {
+      const response = await fetch('/export_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urn })
+      });
+
+      if (!response.ok) throw new Error('Errore generazione PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      setPdfState({ isOpen: true, url, isLoading: false });
+    } catch (e) {
+      console.error(e);
+      setPdfState({ isOpen: false, url: null, isLoading: false });
+      setError("Impossibile caricare il PDF.");
+    }
   };
 
   const hasTabs = workspaceTabs.length > 0;
@@ -324,9 +324,8 @@ export function SearchPanel() {
             Ricerca Intelligente
           </h3>
           <p className="text-gray-500 dark:text-gray-400 max-w-sm text-center leading-relaxed">
-            Cerca norme, articoli o concetti giuridici. <br/>
-            Prova con <span className="text-blue-600 font-medium">"Art 2043 cc"</span> o{' '}
-            <span className="text-blue-600 font-medium">"responsabilità oggettiva"</span>.
+            Cerca norme, articoli o concetti giuridici. <br />
+            Prova con <span className="text-blue-600 font-medium">"Art 2043 cc"</span>
           </p>
 
           {/* QuickNorms Section */}
@@ -459,7 +458,7 @@ export function SearchPanel() {
       {/* PDF Viewer Modal */}
       <PDFViewer
         isOpen={pdfState.isOpen}
-        onClose={() => setPdfState(s => ({...s, isOpen: false}))}
+        onClose={() => setPdfState(s => ({ ...s, isOpen: false }))}
         pdfUrl={pdfState.url}
         isLoading={pdfState.isLoading}
       />
