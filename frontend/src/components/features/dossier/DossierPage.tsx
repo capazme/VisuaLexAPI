@@ -13,7 +13,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // Status configuration
-const STATUS_CONFIG = {
+type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
+
+const STATUS_CONFIG: Record<DossierItemStatus, { label: string; icon: any; color: string; bg: string }> = {
   unread: { label: 'Da leggere', icon: Circle, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700' },
   reading: { label: 'In lettura', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
   important: { label: 'Importante', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
@@ -35,7 +37,7 @@ function SortableItem({
   onToggleSelect: () => void;
   onView: () => void;
   onRemove: () => void;
-  onStatusChange: (status: string) => void;
+  onStatusChange: (status: 'unread' | 'reading' | 'important' | 'done') => void;
   showCheckbox: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
@@ -97,7 +99,7 @@ function SortableItem({
               <StatusIcon size={16} />
             </button>
             <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 hidden group-hover/status:block">
-              {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+              {(Object.entries(STATUS_CONFIG) as [DossierItemStatus, typeof STATUS_CONFIG[DossierItemStatus]][]).map(([key, config]) => (
                 <button
                   key={key}
                   onClick={(e) => { e.stopPropagation(); onStatusChange(key); }}

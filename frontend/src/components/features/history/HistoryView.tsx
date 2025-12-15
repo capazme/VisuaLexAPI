@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, X, Zap, FolderPlus, MoreVertical, Check, Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { useAppStore } from '../../../store/useAppStore';
+import { useAppStore, appStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 
@@ -119,7 +119,7 @@ export function HistoryView() {
             createDossier(title);
             // Il dossier appena creato sarà l'ultimo
             setTimeout(() => {
-                const newDossier = useAppStore.getState().dossiers.slice(-1)[0];
+                const newDossier = appStore.getState().dossiers.slice(-1)[0];
                 if (newDossier) {
                     addToDossier(newDossier.id, norma, 'norma');
                     showFeedback(`Creato "${title}" e aggiunta norma`);

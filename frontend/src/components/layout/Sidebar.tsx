@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
+import { useAuth } from '../../hooks/useAuth';
 
 interface SidebarProps {
   theme: string;
@@ -22,7 +23,7 @@ interface NavItemProps {
 }
 
 // Spring config for smooth animations
-const SPRING_CONFIG = { type: 'spring', stiffness: 400, damping: 30 };
+const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
 function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -148,6 +149,8 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings }: SidebarProps) {
   const navigate = useNavigate();
   const { openCommandPalette, quickNorms } = useAppStore();
+  const { user, isAdmin, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleSparklesClick = () => {
     // Navigate to search page first, then open command palette
@@ -219,6 +222,86 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
           label={theme === 'dark' ? 'Tema Chiaro' : 'Tema Scuro'}
           onClick={toggleTheme}
         />
+      </div>
+
+      {/* User Menu */}
+      <div className="relative flex flex-col items-center py-4 border-t border-white/10 dark:border-white/5">
+        <button
+          onClick={() => setShowUserMenu(!showUserMenu)}
+          className={cn(
+            "relative flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200",
+            "hover:bg-white/40 dark:hover:bg-white/10",
+            showUserMenu && "bg-blue-500/15"
+          )}
+        >
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={SPRING_CONFIG}
+            className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold",
+              isAdmin
+                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+            )}
+          >
+            {user?.username?.charAt(0).toUpperCase() || 'U'}
+          </motion.div>
+        </button>
+
+        {/* User Dropdown Menu */}
+        <AnimatePresence>
+          {showUserMenu && (
+            <motion.div
+              initial={{ opacity: 0, x: -8, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -8, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-full bottom-0 ml-3 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50"
+            >
+              {/* User Info */}
+              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+                <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                  {user?.username}
+                </p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
+                    <Shield size={10} />
+                    Admin
+                  </span>
+                )}
+              </div>
+
+              {/* Menu Items */}
+              <div className="py-1">
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      navigate('/admin');
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Shield size={16} />
+                    Pannello Admin
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    logout();
+                    navigate('/login');
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  <LogOut size={16} />
+                  Esci
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </aside>
   );

@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as authService from '../services/authService';
 import type { UserResponse } from '../types/api';
+import { appStore } from '../store/useAppStore';
 
 interface AuthState {
   user: UserResponse | null;
@@ -38,6 +39,12 @@ export function useAuth() {
           error: null,
           isAuthenticated: true,
         });
+
+        // Fetch user data from API if not already loaded
+        const store = appStore.getState();
+        if (!store.isDataLoaded && !store.isLoadingData) {
+          store.fetchUserData();
+        }
       } catch (error: any) {
         setState({
           user: null,
@@ -58,7 +65,7 @@ export function useAuth() {
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
-      const user = await authService.register({ email, username, password });
+      await authService.register({ email, username, password });
 
       // Auto-login after registration
       await authService.login({ email, password });
@@ -99,6 +106,9 @@ export function useAuth() {
         isAuthenticated: true,
       });
 
+      // Fetch user data from API after successful login
+      appStore.getState().fetchUserData();
+
       return user;
     } catch (error: any) {
       setState((prev) => ({
@@ -115,6 +125,8 @@ export function useAuth() {
    */
   const logout = useCallback(() => {
     authService.logout();
+    // Clear user data from store
+    appStore.getState().clearUserData();
     setState({
       user: null,
       loading: false,
@@ -164,6 +176,7 @@ export function useAuth() {
 
   return {
     ...state,
+    isAdmin: state.user?.is_admin ?? false,
     register,
     login,
     logout,

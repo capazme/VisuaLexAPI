@@ -132,4 +132,6 @@ export const del = async <T = any>(url: string): Promise<T> => {
   return response.data;
 };
 
+// Export as both named and default for flexibility
+export { apiClient };
 export default apiClient;

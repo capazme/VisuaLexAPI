@@ -29,8 +29,39 @@ export interface UserResponse {
   username: string;
   is_active: boolean;
   is_verified: boolean;
+  is_admin: boolean;
   created_at: string;
   updated_at?: string;
+}
+
+// Admin user management types
+export interface AdminUserCreate {
+  email: string;
+  username: string;
+  password: string;
+  isAdmin?: boolean;
+  isActive?: boolean;
+}
+
+export interface AdminUserUpdate {
+  email?: string;
+  username?: string;
+  isAdmin?: boolean;
+  isActive?: boolean;
+  isVerified?: boolean;
+}
+
+export interface AdminUserResponse extends UserResponse {
+  stats?: {
+    bookmarks: number;
+    dossiers: number;
+    annotations: number;
+    highlights: number;
+  };
+}
+
+export interface AdminResetPassword {
+  newPassword: string;
 }
 
 export interface ChangePasswordRequest {

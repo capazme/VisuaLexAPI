@@ -69,6 +69,7 @@ export const register = async (req: Request, res: Response) => {
       username: user.username,
       is_active: user.isActive,
       is_verified: user.isVerified,
+      is_admin: user.isAdmin,
       created_at: user.createdAt,
     },
   });
@@ -112,6 +113,7 @@ export const login = async (req: Request, res: Response) => {
       username: user.username,
       is_active: user.isActive,
       is_verified: user.isVerified,
+      is_admin: user.isAdmin,
       created_at: user.createdAt,
     },
   });
@@ -159,6 +161,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     username: req.user.username,
     is_active: req.user.isActive,
     is_verified: req.user.isVerified,
+    is_admin: req.user.isAdmin,
     created_at: req.user.createdAt,
   });
 };

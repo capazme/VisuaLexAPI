@@ -4,23 +4,26 @@ import { verifyToken, verifyTokenType } from '../utils/jwt';
 
 const prisma = new PrismaClient();
 
-export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ detail: 'Missing or invalid authorization header' });
+      res.status(401).json({ detail: 'Missing or invalid authorization header' });
+      return;
     }
 
     const token = authHeader.substring(7);
     const payload = verifyToken(token);
 
     if (!payload) {
-      return res.status(401).json({ detail: 'Invalid or expired token' });
+      res.status(401).json({ detail: 'Invalid or expired token' });
+      return;
     }
 
     if (!verifyTokenType(payload, 'access')) {
-      return res.status(401).json({ detail: 'Invalid token type' });
+      res.status(401).json({ detail: 'Invalid token type' });
+      return;
     }
 
     const user = await prisma.user.findUnique({
@@ -28,12 +31,13 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     });
 
     if (!user || !user.isActive) {
-      return res.status(401).json({ detail: 'User not found or inactive' });
+      res.status(401).json({ detail: 'User not found or inactive' });
+      return;
     }
 
     req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ detail: 'Authentication failed' });
+    res.status(401).json({ detail: 'Authentication failed' });
   }
 };

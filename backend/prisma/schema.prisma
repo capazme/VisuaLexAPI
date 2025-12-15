@@ -19,6 +19,7 @@ model User {
   password  String
   isActive  Boolean  @default(true) @map("is_active")
   isVerified Boolean @default(false) @map("is_verified")
+  isAdmin   Boolean  @default(false) @map("is_admin")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

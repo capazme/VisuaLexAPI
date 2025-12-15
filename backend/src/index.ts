@@ -4,10 +4,12 @@ import 'express-async-errors';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth';
+import adminRoutes from './routes/admin';
 import folderRoutes from './routes/folders';
 import bookmarkRoutes from './routes/bookmarks';
 import highlightRoutes from './routes/highlights';
 import annotationRoutes from './routes/annotations';
+import dossierRoutes from './routes/dossiers';
 
 const app = express();
 
@@ -31,10 +33,12 @@ app.get('/api/health', (req, res) => {
 
 // Routes
 app.use('/api', authRoutes);
+app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);
 app.use('/api', bookmarkRoutes);
 app.use('/api', highlightRoutes);
 app.use('/api', annotationRoutes);
+app.use('/api', dossierRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -58,6 +62,7 @@ app.listen(config.port, () => {
 ║  API Endpoints:                                           ║
 ║  - Health: http://localhost:${config.port}/api/health            ║
 ║  - Auth: http://localhost:${config.port}/api/auth/*              ║
+║  - Admin: http://localhost:${config.port}/api/admin/*            ║
 ║  - Folders: http://localhost:${config.port}/api/folders/*        ║
 ║  - Bookmarks: http://localhost:${config.port}/api/bookmarks/*    ║
 ║  - Highlights: http://localhost:${config.port}/api/highlights/*  ║

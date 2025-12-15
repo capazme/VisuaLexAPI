@@ -5,6 +5,13 @@ import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, Environment, EnvironmentCategory } from '../types';
 
+// Services for API sync
+import { bookmarkService } from '../services/bookmarkService';
+import { dossierService, type DossierApi } from '../services/dossierService';
+// Note: annotationService and highlightService will be used when per-article sync is implemented
+// import { annotationService } from '../services/annotationService';
+// import { highlightService } from '../services/highlightService';
+
 // Content types for WorkspaceTab
 interface NormaBlock {
     type: 'norma';
@@ -65,6 +72,11 @@ interface AppState {
     quickNorms: QuickNorm[];
     environments: Environment[];
 
+    // Data Loading State (for API sync)
+    isLoadingData: boolean;
+    dataError: string | null;
+    isDataLoaded: boolean;
+
     // UI State
     sidebarVisible: boolean;
     commandPaletteOpen: boolean;
@@ -78,6 +90,10 @@ interface AppState {
 
     // Actions
     updateSettings: (settings: Partial<AppSettings>) => void;
+
+    // Data Sync Actions (API)
+    fetchUserData: () => Promise<void>;
+    clearUserData: () => void;
 
     // UI Actions
     toggleSidebar: () => void;
@@ -131,7 +147,7 @@ interface AppState {
     addToDossier: (dossierId: string, item: any, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
-    updateDossierItemStatus: (dossierId: string, itemId: string, status: string) => void;
+    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'reading' | 'important' | 'done') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     importDossier: (dossier: Dossier) => string; // returns new dossier ID
 
@@ -192,6 +208,11 @@ const appStore = createStore<AppState>()(
             quickNorms: [],
             environments: [],
 
+            // Data Loading State
+            isLoadingData: false,
+            dataError: null,
+            isDataLoaded: false,
+
             // Search State
             searchTrigger: null,
 
@@ -209,6 +230,72 @@ const appStore = createStore<AppState>()(
 
             updateSettings: (newSettings) => set((state) => {
                 state.settings = { ...state.settings, ...newSettings };
+            }),
+
+            // Data Sync Actions
+            fetchUserData: async () => {
+                set((state) => {
+                    state.isLoadingData = true;
+                    state.dataError = null;
+                });
+
+                try {
+                    // Fetch all user data in parallel
+                    const [bookmarksRes, dossiersRes] = await Promise.all([
+                        bookmarkService.getAll().catch(() => []),
+                        dossierService.getAll().catch(() => []),
+                        // Note: annotations and highlights are fetched per-article, not all at once
+                    ]);
+
+                    // Transform API bookmarks to local format
+                    const bookmarks: Bookmark[] = bookmarksRes.map((b: any) => ({
+                        id: b.id,
+                        normaKey: b.normaKey,
+                        normaData: b.normaData,
+                        addedAt: b.createdAt,
+                        tags: b.tags || [],
+                    }));
+
+                    // Transform API dossiers to local format
+                    const dossiers: Dossier[] = dossiersRes.map((d: DossierApi) => ({
+                        id: d.id,
+                        title: d.name,
+                        description: d.description || undefined,
+                        createdAt: d.created_at,
+                        items: d.items.map(item => ({
+                            id: item.id,
+                            type: item.item_type === 'norm' ? 'norma' : 'note',
+                            data: item.content,
+                            addedAt: item.created_at,
+                        })),
+                        tags: [],
+                        isPinned: false,
+                    }));
+
+                    set((state) => {
+                        state.bookmarks = bookmarks;
+                        state.dossiers = dossiers;
+                        state.isLoadingData = false;
+                        state.isDataLoaded = true;
+                    });
+                } catch (error: any) {
+                    console.error('Failed to fetch user data:', error);
+                    set((state) => {
+                        state.isLoadingData = false;
+                        state.dataError = error.message || 'Failed to load user data';
+                    });
+                }
+            },
+
+            clearUserData: () => set((state) => {
+                state.bookmarks = [];
+                state.dossiers = [];
+                state.annotations = [];
+                state.highlights = [];
+                state.quickNorms = [];
+                state.environments = [];
+                state.isDataLoaded = false;
+                state.dataError = null;
             }),
 
             // UI Actions
@@ -666,56 +753,161 @@ const appStore = createStore<AppState>()(
                 tab.content.splice(looseIndex, 1);
             }),
 
-            addBookmark: (norma, tags = []) => set((state) => {
+            addBookmark: (norma, tags = []) => {
                 const key = generateKey(norma);
-                if (!state.bookmarks.find(b => b.normaKey === key)) {
-                    state.bookmarks.push({
-                        id: uuidv4(),
-                        normaKey: key,
-                        normaData: norma,
-                        addedAt: new Date().toISOString(),
-                        tags
+                const tempId = uuidv4();
+
+                // Optimistic update
+                set((state) => {
+                    if (!state.bookmarks.find(b => b.normaKey === key)) {
+                        state.bookmarks.push({
+                            id: tempId,
+                            normaKey: key,
+                            normaData: norma,
+                            addedAt: new Date().toISOString(),
+                            tags
+                        });
+                    }
+                });
+
+                // API call in background
+                bookmarkService.create({
+                    norma_key: key,
+                    norma_data: norma,
+                    tags,
+                }).then(created => {
+                    // Update with server ID
+                    set((state) => {
+                        const bookmark = state.bookmarks.find(b => b.id === tempId);
+                        if (bookmark) {
+                            bookmark.id = created.id;
+                        }
                     });
-                }
-            }),
+                }).catch(err => {
+                    console.error('Failed to create bookmark:', err);
+                    // Rollback on error
+                    set((state) => {
+                        state.bookmarks = state.bookmarks.filter(b => b.id !== tempId);
+                    });
+                });
+            },
 
-            updateBookmarkTags: (key, tags) => set((state) => {
+            updateBookmarkTags: (key, tags) => {
+                const state = get();
                 const bookmark = state.bookmarks.find(b => b.normaKey === key);
-                if (bookmark) {
-                    bookmark.tags = tags;
-                }
-            }),
+                if (!bookmark) return;
 
-            removeBookmark: (key) => set((state) => {
-                state.bookmarks = state.bookmarks.filter(b => b.normaKey !== key);
-            }),
+                // Optimistic update
+                set((state) => {
+                    const b = state.bookmarks.find(b => b.normaKey === key);
+                    if (b) b.tags = tags;
+                });
+
+                // API call
+                bookmarkService.update(bookmark.id, { tags }).catch(err => {
+                    console.error('Failed to update bookmark tags:', err);
+                });
+            },
+
+            removeBookmark: (key) => {
+                const state = get();
+                const bookmark = state.bookmarks.find(b => b.normaKey === key);
+                if (!bookmark) return;
+
+                // Optimistic update
+                set((state) => {
+                    state.bookmarks = state.bookmarks.filter(b => b.normaKey !== key);
+                });
+
+                // API call
+                bookmarkService.delete(bookmark.id).catch(err => {
+                    console.error('Failed to delete bookmark:', err);
+                    // Rollback - re-add the bookmark
+                    set((state) => {
+                        state.bookmarks.push(bookmark);
+                    });
+                });
+            },
 
             isBookmarked: (key) => {
                 return !!get().bookmarks.find(b => b.normaKey === key);
             },
 
-            createDossier: (title, description) => set((state) => {
-                state.dossiers.push({
-                    id: uuidv4(),
-                    title,
-                    description,
-                    createdAt: new Date().toISOString(),
-                    items: []
+            createDossier: (title, description) => {
+                const tempId = uuidv4();
+
+                // Optimistic update
+                set((state) => {
+                    state.dossiers.push({
+                        id: tempId,
+                        title,
+                        description,
+                        createdAt: new Date().toISOString(),
+                        items: []
+                    });
                 });
-            }),
 
-            deleteDossier: (id) => set((state) => {
-                state.dossiers = state.dossiers.filter(d => d.id !== id);
-            }),
+                // API call
+                dossierService.create({
+                    name: title,
+                    description,
+                }).then(created => {
+                    // Update with server ID
+                    set((state) => {
+                        const dossier = state.dossiers.find(d => d.id === tempId);
+                        if (dossier) {
+                            dossier.id = created.id;
+                        }
+                    });
+                }).catch(err => {
+                    console.error('Failed to create dossier:', err);
+                    // Rollback
+                    set((state) => {
+                        state.dossiers = state.dossiers.filter(d => d.id !== tempId);
+                    });
+                });
+            },
 
-            updateDossier: (id, updates) => set((state) => {
+            deleteDossier: (id) => {
+                const state = get();
                 const dossier = state.dossiers.find(d => d.id === id);
-                if (dossier) {
-                    if (updates.title !== undefined) dossier.title = updates.title;
-                    if (updates.description !== undefined) dossier.description = updates.description;
-                    if (updates.tags !== undefined) dossier.tags = updates.tags;
-                }
-            }),
+
+                // Optimistic update
+                set((state) => {
+                    state.dossiers = state.dossiers.filter(d => d.id !== id);
+                });
+
+                // API call
+                dossierService.delete(id).catch(err => {
+                    console.error('Failed to delete dossier:', err);
+                    // Rollback
+                    if (dossier) {
+                        set((state) => {
+                            state.dossiers.push(dossier);
+                        });
+                    }
+                });
+            },
+
+            updateDossier: (id, updates) => {
+                // Optimistic update
+                set((state) => {
+                    const dossier = state.dossiers.find(d => d.id === id);
+                    if (dossier) {
+                        if (updates.title !== undefined) dossier.title = updates.title;
+                        if (updates.description !== undefined) dossier.description = updates.description;
+                        if (updates.tags !== undefined) dossier.tags = updates.tags;
+                    }
+                });
+
+                // API call
+                dossierService.update(id, {
+                    name: updates.title,
+                    description: updates.description,
+                }).catch(err => {
+                    console.error('Failed to update dossier:', err);
+                });
+            },
 
             toggleDossierPin: (id) => set((state) => {
                 const dossier = state.dossiers.find(d => d.id === id);
@@ -724,34 +916,102 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
-            addToDossier: (dossierId, itemData, type) => set((state) => {
-                const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (dossier) {
-                    dossier.items.push({
-                        id: uuidv4(),
-                        type,
-                        data: itemData,
-                        addedAt: new Date().toISOString()
+            addToDossier: (dossierId, itemData, type) => {
+                const tempId = uuidv4();
+
+                // Optimistic update
+                set((state) => {
+                    const dossier = state.dossiers.find(d => d.id === dossierId);
+                    if (dossier) {
+                        dossier.items.push({
+                            id: tempId,
+                            type,
+                            data: itemData,
+                            addedAt: new Date().toISOString()
+                        });
+                    }
+                });
+
+                // API call
+                dossierService.addItem(dossierId, {
+                    itemType: type === 'norma' ? 'norm' : 'note',
+                    title: itemData.tipo_atto || 'Nota',
+                    content: itemData,
+                }).then(created => {
+                    // Update with server ID
+                    set((state) => {
+                        const dossier = state.dossiers.find(d => d.id === dossierId);
+                        const item = dossier?.items.find(i => i.id === tempId);
+                        if (item) {
+                            item.id = created.id;
+                        }
                     });
-                }
-            }),
+                }).catch(err => {
+                    console.error('Failed to add item to dossier:', err);
+                    // Rollback
+                    set((state) => {
+                        const dossier = state.dossiers.find(d => d.id === dossierId);
+                        if (dossier) {
+                            dossier.items = dossier.items.filter(i => i.id !== tempId);
+                        }
+                    });
+                });
+            },
 
-            removeFromDossier: (dossierId, itemId) => set((state) => {
+            removeFromDossier: (dossierId, itemId) => {
+                const state = get();
                 const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (dossier) {
-                    dossier.items = dossier.items.filter(i => i.id !== itemId);
-                }
-            }),
+                const item = dossier?.items.find(i => i.id === itemId);
 
-            reorderDossierItems: (dossierId, fromIndex, toIndex) => set((state) => {
+                // Optimistic update
+                set((state) => {
+                    const d = state.dossiers.find(d => d.id === dossierId);
+                    if (d) {
+                        d.items = d.items.filter(i => i.id !== itemId);
+                    }
+                });
+
+                // API call
+                dossierService.deleteItem(dossierId, itemId).catch(err => {
+                    console.error('Failed to remove item from dossier:', err);
+                    // Rollback
+                    if (item) {
+                        set((state) => {
+                            const d = state.dossiers.find(d => d.id === dossierId);
+                            if (d) {
+                                d.items.push(item);
+                            }
+                        });
+                    }
+                });
+            },
+
+            reorderDossierItems: (dossierId, fromIndex, toIndex) => {
+                const state = get();
                 const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (dossier && fromIndex !== toIndex) {
-                    const items = [...dossier.items];
-                    const [removed] = items.splice(fromIndex, 1);
-                    items.splice(toIndex, 0, removed);
-                    dossier.items = items;
-                }
-            }),
+                if (!dossier || fromIndex === toIndex) return;
+
+                // Optimistic update
+                set((state) => {
+                    const d = state.dossiers.find(d => d.id === dossierId);
+                    if (d) {
+                        const items = [...d.items];
+                        const [removed] = items.splice(fromIndex, 1);
+                        items.splice(toIndex, 0, removed);
+                        d.items = items;
+                    }
+                });
+
+                // API call - send new order
+                const newOrder = [...dossier.items];
+                const [removed] = newOrder.splice(fromIndex, 1);
+                newOrder.splice(toIndex, 0, removed);
+                const itemIds = newOrder.map(i => i.id);
+
+                dossierService.reorderItems(dossierId, itemIds).catch(err => {
+                    console.error('Failed to reorder dossier items:', err);
+                });
+            },
 
             updateDossierItemStatus: (dossierId, itemId, status) => set((state) => {
                 const dossier = state.dossiers.find(d => d.id === dossierId);
@@ -1029,6 +1289,16 @@ const appStore = createStore<AppState>()(
         })),
         {
             name: 'visualex-storage',
+            // Only persist UI state and settings, NOT user data (bookmarks, dossiers, etc.)
+            // User data is fetched from API and should not be persisted locally
+            partialize: (state) => ({
+                settings: state.settings,
+                searchPanelState: state.searchPanelState,
+                workspaceTabs: state.workspaceTabs,
+                highestZIndex: state.highestZIndex,
+                // Note: We intentionally exclude bookmarks, dossiers, annotations, highlights,
+                // quickNorms, environments - these are synced from the server
+            }),
         }
     )
 );
