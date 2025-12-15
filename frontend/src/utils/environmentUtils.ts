@@ -1,0 +1,196 @@
+import type { Environment, EnvironmentExport, EnvironmentCategory } from '../types';
+
+// Current export format version
+export const ENVIRONMENT_EXPORT_VERSION = 1;
+
+// Category configuration
+export const ENVIRONMENT_CATEGORIES: Record<EnvironmentCategory, { label: string; icon: string; color: string }> = {
+  compliance: { label: 'Compliance', icon: '🔒', color: '#8B5CF6' },
+  civil: { label: 'Diritto Civile', icon: '⚖️', color: '#3B82F6' },
+  penal: { label: 'Diritto Penale', icon: '⚔️', color: '#EF4444' },
+  administrative: { label: 'Diritto Amministrativo', icon: '🏛️', color: '#F59E0B' },
+  eu: { label: 'Diritto UE', icon: '🇪🇺', color: '#10B981' },
+  other: { label: 'Altro', icon: '📁', color: '#6B7280' },
+};
+
+/**
+ * Export an environment to a downloadable JSON file
+ */
+export function exportEnvironmentToFile(env: Environment): void {
+  const exportData: EnvironmentExport = {
+    version: ENVIRONMENT_EXPORT_VERSION,
+    type: 'environment',
+    exportedAt: new Date().toISOString(),
+    data: env,
+  };
+
+  const json = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ambiente-${sanitizeFilename(env.name)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Create a shareable link for an environment (base64 encoded)
+ * Returns null if the environment is too large
+ */
+export function createEnvironmentShareLink(env: Environment): string | null {
+  const exportData: EnvironmentExport = {
+    version: ENVIRONMENT_EXPORT_VERSION,
+    type: 'environment',
+    exportedAt: new Date().toISOString(),
+    data: env,
+  };
+
+  const json = JSON.stringify(exportData);
+  const encoded = btoa(unescape(encodeURIComponent(json)));
+
+  // URL length limit (roughly 2KB for base64)
+  if (encoded.length > 2000) {
+    return null; // Too large for URL sharing
+  }
+
+  return `${window.location.origin}/environments?import=${encodeURIComponent(encoded)}`;
+}
+
+/**
+ * Parse an environment from a JSON file
+ */
+export async function parseEnvironmentFromFile(file: File): Promise<{ success: true; data: Environment } | { success: false; error: string }> {
+  try {
+    const text = await file.text();
+    return parseEnvironmentFromJSON(text);
+  } catch (e) {
+    return { success: false, error: 'Impossibile leggere il file' };
+  }
+}
+
+/**
+ * Parse an environment from a JSON string
+ */
+export function parseEnvironmentFromJSON(json: string): { success: true; data: Environment } | { success: false; error: string } {
+  try {
+    const parsed = JSON.parse(json);
+
+    // Check if it's wrapped in export format
+    if (parsed.type === 'environment' && parsed.data) {
+      if (parsed.version > ENVIRONMENT_EXPORT_VERSION) {
+        return { success: false, error: 'Formato più recente non supportato. Aggiorna l\'applicazione.' };
+      }
+      return validateEnvironment(parsed.data);
+    }
+
+    // Direct environment object
+    return validateEnvironment(parsed);
+  } catch (e) {
+    return { success: false, error: 'JSON non valido' };
+  }
+}
+
+/**
+ * Parse an environment from a base64 encoded string (from URL)
+ */
+export function parseEnvironmentFromBase64(encoded: string): { success: true; data: Environment } | { success: false; error: string } {
+  try {
+    const decoded = decodeURIComponent(escape(atob(encoded)));
+    return parseEnvironmentFromJSON(decoded);
+  } catch (e) {
+    return { success: false, error: 'Link non valido' };
+  }
+}
+
+/**
+ * Validate an environment object has required fields
+ */
+function validateEnvironment(obj: any): { success: true; data: Environment } | { success: false; error: string } {
+  if (!obj || typeof obj !== 'object') {
+    return { success: false, error: 'Dati ambiente non validi' };
+  }
+
+  if (!obj.name || typeof obj.name !== 'string') {
+    return { success: false, error: 'Nome ambiente mancante' };
+  }
+
+  if (!Array.isArray(obj.dossiers)) {
+    return { success: false, error: 'Dossiers mancanti o non validi' };
+  }
+
+  if (!Array.isArray(obj.quickNorms)) {
+    return { success: false, error: 'QuickNorms mancanti o non validi' };
+  }
+
+  // Ensure arrays exist (allow empty)
+  const validated: Environment = {
+    id: obj.id || '',
+    name: obj.name,
+    description: obj.description,
+    author: obj.author,
+    version: obj.version,
+    createdAt: obj.createdAt || new Date().toISOString(),
+    updatedAt: obj.updatedAt,
+    dossiers: obj.dossiers || [],
+    quickNorms: obj.quickNorms || [],
+    annotations: obj.annotations || [],
+    highlights: obj.highlights || [],
+    tags: obj.tags || [],
+    category: obj.category,
+    color: obj.color,
+  };
+
+  return { success: true, data: validated };
+}
+
+/**
+ * Sanitize a string for use in filenames
+ */
+function sanitizeFilename(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 50);
+}
+
+/**
+ * Get stats for an environment
+ */
+export function getEnvironmentStats(env: Environment): {
+  dossiers: number;
+  quickNorms: number;
+  annotations: number;
+  highlights: number;
+  articles: number;
+} {
+  const articles = env.dossiers.reduce((acc, d) => acc + d.items.filter(i => i.type === 'norma').length, 0);
+
+  return {
+    dossiers: env.dossiers.length,
+    quickNorms: env.quickNorms.length,
+    annotations: env.annotations.length,
+    highlights: env.highlights.length,
+    articles,
+  };
+}
+
+/**
+ * Check if an environment is small enough for link sharing
+ */
+export function canShareAsLink(env: Environment): boolean {
+  const exportData: EnvironmentExport = {
+    version: ENVIRONMENT_EXPORT_VERSION,
+    type: 'environment',
+    exportedAt: new Date().toISOString(),
+    data: env,
+  };
+
+  const json = JSON.stringify(exportData);
+  const encoded = btoa(unescape(encodeURIComponent(json)));
+  return encoded.length <= 2000;
+}

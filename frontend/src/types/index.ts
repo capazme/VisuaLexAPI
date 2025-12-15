@@ -119,3 +119,35 @@ export interface QuickNorm {
     usageCount: number; // Track usage for sorting
     lastUsedAt?: string;
 }
+
+// Environment - Bundled configuration for sharing
+export type EnvironmentCategory = 'compliance' | 'civil' | 'penal' | 'administrative' | 'eu' | 'other';
+
+export interface Environment {
+    id: string;
+    name: string;
+    description?: string;
+    author?: string;
+    version?: string;
+    createdAt: string;
+    updatedAt?: string;
+
+    // Content (snapshots)
+    dossiers: Dossier[];
+    quickNorms: QuickNorm[];
+    annotations: Annotation[];
+    highlights: Highlight[];
+
+    // Metadata
+    tags?: string[];
+    category?: EnvironmentCategory;
+    color?: string; // Hex color for UI distinction
+}
+
+// Export format for environments (versioned for compatibility)
+export interface EnvironmentExport {
+    version: number;
+    type: 'environment';
+    exportedAt: string;
+    data: Environment;
+}

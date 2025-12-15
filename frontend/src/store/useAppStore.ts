@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm } from '../types';
+import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, Environment, EnvironmentCategory } from '../types';
 
 // Content types for WorkspaceTab
 interface NormaBlock {
@@ -63,6 +63,7 @@ interface AppState {
     annotations: Annotation[];
     highlights: Highlight[];
     quickNorms: QuickNorm[];
+    environments: Environment[];
 
     // UI State
     sidebarVisible: boolean;
@@ -151,6 +152,15 @@ interface AppState {
     updateQuickNormLabel: (id: string, label: string) => void;
     useQuickNorm: (id: string) => QuickNorm | undefined;
     getQuickNormsSorted: () => QuickNorm[];
+
+    // Environment Actions
+    createEnvironment: (name: string, options?: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => string;
+    updateEnvironment: (id: string, updates: Partial<Omit<Environment, 'id' | 'createdAt'>>) => void;
+    deleteEnvironment: (id: string) => void;
+    importEnvironment: (env: Environment) => string;
+    applyEnvironment: (id: string, mode: 'replace' | 'merge') => void;
+    refreshEnvironmentFromCurrent: (id: string) => void;
+    getCurrentStateAsEnvironment: (name: string) => Environment;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -180,6 +190,7 @@ const appStore = createStore<AppState>()(
             annotations: [],
             highlights: [],
             quickNorms: [],
+            environments: [],
 
             // Search State
             searchTrigger: null,
@@ -883,6 +894,137 @@ const appStore = createStore<AppState>()(
                     }
                     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
                 });
+            },
+
+            // Environment Actions
+            createEnvironment: (name, options = {}) => {
+                const envId = uuidv4();
+                const state = get();
+
+                set((draft) => {
+                    const newEnv: Environment = {
+                        id: envId,
+                        name,
+                        description: options.description,
+                        category: options.category,
+                        createdAt: new Date().toISOString(),
+                        // If fromCurrent, snapshot current state
+                        dossiers: options.fromCurrent ? JSON.parse(JSON.stringify(state.dossiers)) : [],
+                        quickNorms: options.fromCurrent ? JSON.parse(JSON.stringify(state.quickNorms)) : [],
+                        annotations: options.fromCurrent ? JSON.parse(JSON.stringify(state.annotations)) : [],
+                        highlights: options.fromCurrent ? JSON.parse(JSON.stringify(state.highlights)) : [],
+                        tags: [],
+                    };
+                    draft.environments.push(newEnv);
+                });
+                return envId;
+            },
+
+            updateEnvironment: (id, updates) => set((state) => {
+                const env = state.environments.find(e => e.id === id);
+                if (env) {
+                    Object.assign(env, updates, { updatedAt: new Date().toISOString() });
+                }
+            }),
+
+            deleteEnvironment: (id) => set((state) => {
+                state.environments = state.environments.filter(e => e.id !== id);
+            }),
+
+            importEnvironment: (env) => {
+                const newId = uuidv4();
+                set((state) => {
+                    // Deep clone and regenerate IDs to avoid conflicts
+                    const imported: Environment = {
+                        ...JSON.parse(JSON.stringify(env)),
+                        id: newId,
+                        createdAt: new Date().toISOString(),
+                        dossiers: env.dossiers.map(d => ({ ...d, id: uuidv4(), items: d.items.map(i => ({ ...i, id: uuidv4() })) })),
+                        quickNorms: env.quickNorms.map(q => ({ ...q, id: uuidv4() })),
+                        annotations: env.annotations.map(a => ({ ...a, id: uuidv4() })),
+                        highlights: env.highlights.map(h => ({ ...h, id: uuidv4() })),
+                    };
+                    state.environments.push(imported);
+                });
+                return newId;
+            },
+
+            applyEnvironment: (id, mode) => set((state) => {
+                const env = state.environments.find(e => e.id === id);
+                if (!env) return;
+
+                // Deep clone environment content
+                const clonedDossiers = JSON.parse(JSON.stringify(env.dossiers)).map((d: Dossier) => ({
+                    ...d,
+                    id: uuidv4(),
+                    items: d.items.map((i: any) => ({ ...i, id: uuidv4() }))
+                }));
+                const clonedQuickNorms = JSON.parse(JSON.stringify(env.quickNorms)).map((q: QuickNorm) => ({
+                    ...q,
+                    id: uuidv4(),
+                    usageCount: 0,
+                    lastUsedAt: undefined
+                }));
+                const clonedAnnotations = JSON.parse(JSON.stringify(env.annotations)).map((a: Annotation) => ({
+                    ...a,
+                    id: uuidv4()
+                }));
+                const clonedHighlights = JSON.parse(JSON.stringify(env.highlights)).map((h: Highlight) => ({
+                    ...h,
+                    id: uuidv4()
+                }));
+
+                if (mode === 'replace') {
+                    state.dossiers = clonedDossiers;
+                    state.quickNorms = clonedQuickNorms;
+                    state.annotations = clonedAnnotations;
+                    state.highlights = clonedHighlights;
+                } else {
+                    // Merge mode: add new items, skip duplicates by title/label
+                    const existingDossierTitles = new Set(state.dossiers.map(d => d.title.toLowerCase()));
+                    const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
+
+                    clonedDossiers.forEach((d: Dossier) => {
+                        if (!existingDossierTitles.has(d.title.toLowerCase())) {
+                            state.dossiers.push(d);
+                        }
+                    });
+
+                    clonedQuickNorms.forEach((q: QuickNorm) => {
+                        if (!existingQuickNormLabels.has(q.label.toLowerCase())) {
+                            state.quickNorms.push(q);
+                        }
+                    });
+
+                    // For annotations and highlights, we add all (hard to detect duplicates)
+                    state.annotations.push(...clonedAnnotations);
+                    state.highlights.push(...clonedHighlights);
+                }
+            }),
+
+            refreshEnvironmentFromCurrent: (id) => set((state) => {
+                const env = state.environments.find(e => e.id === id);
+                if (env) {
+                    env.dossiers = JSON.parse(JSON.stringify(state.dossiers));
+                    env.quickNorms = JSON.parse(JSON.stringify(state.quickNorms));
+                    env.annotations = JSON.parse(JSON.stringify(state.annotations));
+                    env.highlights = JSON.parse(JSON.stringify(state.highlights));
+                    env.updatedAt = new Date().toISOString();
+                }
+            }),
+
+            getCurrentStateAsEnvironment: (name) => {
+                const state = get();
+                return {
+                    id: uuidv4(),
+                    name,
+                    createdAt: new Date().toISOString(),
+                    dossiers: JSON.parse(JSON.stringify(state.dossiers)),
+                    quickNorms: JSON.parse(JSON.stringify(state.quickNorms)),
+                    annotations: JSON.parse(JSON.stringify(state.annotations)),
+                    highlights: JSON.parse(JSON.stringify(state.highlights)),
+                    tags: [],
+                };
             }
         })),
         {

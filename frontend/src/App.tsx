@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
+import { EnvironmentPage } from './components/features/environments/EnvironmentPage';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route index element={<SearchPage />} />
           <Route path="dossier" element={<DossierPage />} />
           <Route path="history" element={<HistoryView />} />
+          <Route path="environments" element={<EnvironmentPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
