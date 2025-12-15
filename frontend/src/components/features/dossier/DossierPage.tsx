@@ -626,7 +626,8 @@ export function DossierPage() {
       article: articles,
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: true
+      show_brocardi_info: true,
+      tabLabel: selectedDossier.title // Pass dossier name as tab label
     });
   };
 

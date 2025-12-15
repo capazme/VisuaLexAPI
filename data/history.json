@@ -82,5 +82,110 @@
     "article": "1",
     "date": "2016-01-01",
     "timestamp": "2025-12-14T23:37:21.722420Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "2016/679",
+    "article": "15,16,17,18,20,21,22",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-15T09:15:41.235807Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "2016/679",
+    "article": "5",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-15T09:20:52.165760Z"
+  },
+  {
+    "act_type": "decreto legislativo",
+    "act_number": "206",
+    "article": "20,21,22,23,24,25,26",
+    "date": "2005-09-06",
+    "timestamp": "2025-12-15T09:21:11.546751Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "2016/679",
+    "article": "15,16,17,18,20,21,22",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-15T09:21:40.938441Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "15,16,17,18,20,21,22",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-15T09:24:00.620458Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "633",
+    "article": "16",
+    "date": "1941-01-01",
+    "timestamp": "2025-12-15T12:54:15.780955Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "633",
+    "article": "4",
+    "date": "1941-01-01",
+    "timestamp": "2025-12-15T12:54:27.878683Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "633",
+    "article": "65",
+    "date": "1941-01-01",
+    "timestamp": "2025-12-15T13:01:21.158897Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "633",
+    "article": "66",
+    "date": "1941-01-01",
+    "timestamp": "2025-12-15T13:01:23.385713Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "633",
+    "article": "70",
+    "date": "1941-01-01",
+    "timestamp": "2025-12-15T13:01:26.290312Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "1689",
+    "article": "5",
+    "date": "2024-07-12",
+    "timestamp": "2025-12-15T13:09:28.035347Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "15,16,17,18,20,21,22",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-15T13:41:13.998162Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "124",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-15T14:20:38.272899Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "1689",
+    "article": "5",
+    "date": "2024-07-12",
+    "timestamp": "2025-12-15T15:28:30.551511Z"
+  },
+  {
+    "act_type": "codice di procedura civile",
+    "act_number": "",
+    "article": "323,324,325,327,339,342,360",
+    "date": "",
+    "timestamp": "2025-12-15T17:18:07.337478Z"
   }
 ]

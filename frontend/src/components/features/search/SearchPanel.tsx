@@ -32,6 +32,7 @@ export function SearchPanel() {
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
   } = useAppStore();
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
+  const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
@@ -167,7 +168,11 @@ export function SearchPanel() {
   useEffect(() => {
     if (Object.keys(resultsBuffer).length > 0 && !isLoading) {
       console.log('📦 Processing results buffer:', resultsBuffer);
-      Object.entries(resultsBuffer).forEach(([key, group]) => {
+
+      // Use custom label if provided (e.g., from dossier), otherwise generate default
+      const useCustomLabel = customTabLabel && Object.keys(resultsBuffer).length > 0;
+
+      Object.entries(resultsBuffer).forEach(([key, group], index) => {
         // For historical versions, always create a new tab
         const isHistorical = group.articles.some(a => a.versionInfo?.isHistorical);
         console.log('🏷️ Processing group:', key, 'isHistorical:', isHistorical, 'versionDate:', group.versionDate);
@@ -175,12 +180,15 @@ export function SearchPanel() {
         if (isHistorical) {
           // Create new tab with version date in label
           const versionDate = group.versionDate ? ` - Ver. ${group.versionDate}` : ' - Storico';
-          const label = `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionDate}`;
+          const label = useCustomLabel && index === 0
+            ? customTabLabel
+            : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionDate}`;
           console.log('➕ Creating historical tab with label:', label);
           addWorkspaceTab(label, group.norma, group.articles);
         } else {
           // Check if there's an existing tab with this norma (current version)
-          const existingTab = workspaceTabs.find(tab =>
+          // Skip this check if we have a custom label (always create new tab for dossiers)
+          const existingTab = useCustomLabel ? null : workspaceTabs.find(tab =>
             tab.content.some(item =>
               item.type === 'norma' &&
               item.norma.tipo_atto === group.norma.tipo_atto &&
@@ -194,17 +202,20 @@ export function SearchPanel() {
             // Add articles to existing tab's norma
             addNormaToTab(existingTab.id, group.norma, group.articles);
           } else {
-            // Create new tab
-            const label = `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
+            // Create new tab - use custom label for first group only
+            const label = useCustomLabel && index === 0
+              ? customTabLabel
+              : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
             addWorkspaceTab(label, group.norma, group.articles);
           }
         }
       });
 
-      // Clear buffer after processing
+      // Clear buffer and custom label after processing
       setResultsBuffer({});
+      setCustomTabLabel(null);
     }
-  }, [resultsBuffer, isLoading, addWorkspaceTab, addNormaToTab, workspaceTabs]);
+  }, [resultsBuffer, isLoading, addWorkspaceTab, addNormaToTab, workspaceTabs, customTabLabel]);
 
   useEffect(() => {
     const shareValue = searchParams.get('share');
@@ -226,6 +237,10 @@ export function SearchPanel() {
   // Listen for programmatic search triggers
   useEffect(() => {
     if (searchTrigger) {
+      // Capture custom tab label before search
+      if (searchTrigger.tabLabel) {
+        setCustomTabLabel(searchTrigger.tabLabel);
+      }
       handleSearch(searchTrigger);
       clearSearchTrigger();
     }

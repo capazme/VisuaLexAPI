@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, Plus, Search, Download, Link2, Trash2, Play, RefreshCw,
   FileJson, Upload, X, Check, AlertTriangle, FolderOpen, Star,
-  FileText, Pencil, MoreHorizontal
+  FileText, Pencil, MoreHorizontal, Sparkles
 } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
-import { cn } from '../../../lib/utils';
 import type { Environment, EnvironmentCategory } from '../../../types';
 import {
   ENVIRONMENT_CATEGORIES,
@@ -18,6 +16,7 @@ import {
   getEnvironmentStats,
   canShareAsLink,
 } from '../../../utils/environmentUtils';
+import { exampleEnvironments } from '../../../data/exampleEnvironments';
 
 export function EnvironmentPage() {
   const {
@@ -108,12 +107,37 @@ export function EnvironmentPage() {
     setDeleteConfirmId(null);
   };
 
+  const handleLoadExamples = () => {
+    let imported = 0;
+    exampleEnvironments.forEach((env) => {
+      // Check if an environment with same name already exists
+      const exists = environments.some(e => e.name === env.name);
+      if (!exists) {
+        importEnvironment(env);
+        imported++;
+      }
+    });
+    if (imported > 0) {
+      alert(`${imported} ambienti di esempio caricati con successo!`);
+    } else {
+      alert('Tutti gli ambienti di esempio sono già presenti.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">I tuoi Ambienti</h2>
         <div className="flex gap-2">
+          <button
+            onClick={handleLoadExamples}
+            className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            title="Carica ambienti di esempio (GDPR, DORA, AI Act, Consumatori)"
+          >
+            <Sparkles size={18} />
+            <span className="hidden sm:inline">Esempi</span>
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
@@ -179,14 +203,28 @@ export function EnvironmentPage() {
             ) : (
               <>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Nessun ambiente</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">Crea il tuo primo ambiente per salvare dossier e ricerche frequenti.</p>
-                <button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 transition-colors"
-                >
-                  <Plus size={18} />
-                  Crea Ambiente
-                </button>
+                <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-md">
+                  Gli ambienti ti permettono di salvare e condividere configurazioni di dossier, ricerche frequenti e annotazioni.
+                </p>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handleLoadExamples}
+                    className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Sparkles size={18} />
+                    Carica Esempi
+                  </button>
+                  <button
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Plus size={18} />
+                    Crea Ambiente
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">
+                  Gli esempi includono: GDPR, DORA, AI Act, Diritto dei Consumatori
+                </p>
               </>
             )}
           </div>
@@ -677,23 +715,25 @@ function ApplyEnvironmentModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6"
-      >
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-          Applica "{environment.name}"
-        </h2>
-        <p className="text-gray-500 dark:text-gray-400 mb-6">
-          Come vuoi applicare questo ambiente?
-        </p>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Applica "{environment.name}"
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <X size={20} />
+          </button>
+        </div>
 
-        <div className="space-y-3">
+        <div className="p-6 space-y-3">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Come vuoi applicare questo ambiente?
+          </p>
+
           <button
             onClick={() => onApply(environment, 'merge')}
-            className="w-full p-4 text-left bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-xl transition-colors"
+            className="w-full p-4 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
@@ -710,7 +750,7 @@ function ApplyEnvironmentModal({
 
           <button
             onClick={() => onApply(environment, 'replace')}
-            className="w-full p-4 text-left bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-xl transition-colors"
+            className="w-full p-4 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
@@ -725,14 +765,7 @@ function ApplyEnvironmentModal({
             </div>
           </button>
         </div>
-
-        <button
-          onClick={onClose}
-          className="w-full mt-4 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-        >
-          Annulla
-        </button>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -746,35 +779,31 @@ function DeleteConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center"
-      >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 text-center">
         <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-6 h-6 text-red-600" />
         </div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Elimina Ambiente?</h2>
-        <p className="text-gray-500 dark:text-gray-400 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Elimina Ambiente?</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           Questa azione non può essere annullata.
         </p>
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl transition-colors"
+            className="flex-1 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             Annulla
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors"
+            className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
           >
             Elimina
           </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

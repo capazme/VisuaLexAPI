@@ -52,6 +52,7 @@ export interface SearchParams {
     version: 'vigente' | 'originale';
     version_date?: string;
     show_brocardi_info: boolean;
+    tabLabel?: string; // Optional custom label for the workspace tab
 }
 
 // --- New Utility Features Types ---
