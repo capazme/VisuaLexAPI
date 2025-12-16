@@ -1,11 +1,15 @@
 import os
+import asyncio
+import time
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 import structlog
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
-from ..tools.exceptions import DocumentNotFoundError
+from ..tools.exceptions import DocumentNotFoundError, NetworkError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
 
@@ -18,6 +22,41 @@ class EurlexScraper(BaseScraper):
         self.cache = get_cache_manager().get_persistent("eurlex")
         self.selectors = EURLexSelectors()
         log.info("EUR-Lex scraper initialized")
+
+    def _fetch_with_selenium(self, url: str) -> str:
+        """Fetch URL using Selenium to bypass CloudFront WAF protection."""
+        options = Options()
+        options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--window-size=1920x1080')
+        options.add_argument('--disable-dev-shm-usage')
+
+        driver = webdriver.Chrome(options=options)
+        try:
+            driver.get(url)
+            # Wait for JavaScript to execute and bypass WAF challenge
+            time.sleep(2)
+            html = driver.page_source
+            return html
+        finally:
+            driver.quit()
+
+    async def request_document(self, url, *, source: str = "eurlex"):
+        """Override base request_document to use Selenium for WAF bypass."""
+        log.info(f"Consulting EUR-Lex with Selenium - URL: {url}")
+        try:
+            # Run sync Selenium in thread pool to not block event loop
+            html = await asyncio.to_thread(self._fetch_with_selenium, url)
+            if not html or len(html) < 1000:
+                raise DocumentNotFoundError(f"Document not found or empty at {url}", urn=url)
+            log.debug("EUR-Lex document fetched successfully with Selenium")
+            return html
+        except DocumentNotFoundError:
+            raise
+        except Exception as e:
+            log.error(f"Error during EUR-Lex consultation: {e}")
+            raise NetworkError(f"Failed to fetch EUR-Lex document: {e}")
 
     def get_uri(self, act_type, year, num):
         log.debug(f"get_uri called with act_type={act_type}, year={year}, num={num}")
