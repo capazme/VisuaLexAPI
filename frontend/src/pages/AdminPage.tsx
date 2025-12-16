@@ -2,6 +2,7 @@
  * Admin page for user management
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
 import type { AdminUserResponse } from '../types/api';
@@ -22,6 +23,7 @@ import {
 import { cn } from '../lib/utils';
 
 export function AdminPage() {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [users, setUsers] = useState<AdminUserResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +129,7 @@ export function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
@@ -139,20 +141,20 @@ export function AdminPage() {
                 <p className="text-xs text-gray-500">Gestione utenti VisuaLex</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 relative z-50">
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {user?.email}
               </span>
-              <a
-                href="/"
-                className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              <button
+                onClick={() => navigate('/')}
+                className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors pointer-events-auto"
                 title="Torna all'app"
               >
                 <Home size={20} />
-              </a>
+              </button>
               <button
                 onClick={logout}
-                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors pointer-events-auto"
                 title="Logout"
               >
                 <LogOut size={20} />
@@ -163,7 +165,7 @@ export function AdminPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 isolate">
         {/* Actions Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">

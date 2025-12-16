@@ -1,5 +1,7 @@
-import { X, Monitor, Moon, Sun, Eye, HelpCircle } from 'lucide-react';
+import { X, Monitor, Moon, Sun, Eye, HelpCircle, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
+import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
 interface SettingsModalProps {
@@ -9,6 +11,8 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalProps) {
+    const navigate = useNavigate();
+    const { isAdmin } = useAuth();
     const { settings, updateSettings } = useAppStore();
 
     if (!isOpen) return null;
@@ -132,6 +136,23 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             >
                                 <HelpCircle size={16} />
                                 Ricomincia il Tour Guidato
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Admin Panel - only for admins */}
+                    {isAdmin && (
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">Amministrazione</label>
+                            <button
+                                onClick={() => {
+                                    onClose();
+                                    navigate('/admin');
+                                }}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium"
+                            >
+                                <Shield size={16} />
+                                Pannello Admin
                             </button>
                         </div>
                     )}
