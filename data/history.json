@@ -187,5 +187,33 @@
     "article": "323,324,325,327,339,342,360",
     "date": "",
     "timestamp": "2025-12-15T17:18:07.337478Z"
+  },
+  {
+    "act_type": "codice penale",
+    "act_number": "",
+    "article": "110,111,112,114,116,117,119",
+    "date": "",
+    "timestamp": "2025-12-15T20:45:39.964377Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "241",
+    "article": "3",
+    "date": "1990-01-01",
+    "timestamp": "2025-12-15T20:46:21.215923Z"
+  },
+  {
+    "act_type": "decreto legislativo",
+    "act_number": "165",
+    "article": "35",
+    "date": "2001-01-01",
+    "timestamp": "2025-12-16T17:44:39.504037Z"
+  },
+  {
+    "act_type": "codice civile",
+    "act_number": "",
+    "article": "1",
+    "date": "",
+    "timestamp": "2025-12-16T17:59:10.596209Z"
   }
 ]

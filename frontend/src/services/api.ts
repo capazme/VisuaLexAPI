@@ -84,10 +84,11 @@ apiClient.interceptors.response.use(
     }
 
     // For other errors, reject with formatted error
+    const responseData = error.response?.data as { detail?: string } | undefined;
     return Promise.reject({
       status: error.response?.status,
-      message: error.response?.data?.detail || error.message || 'An error occurred',
-      data: error.response?.data,
+      message: responseData?.detail || error.message || 'An error occurred',
+      data: responseData,
     });
   }
 );

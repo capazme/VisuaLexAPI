@@ -22,13 +22,13 @@ interface NormaCardProps {
   isNew?: boolean;
 }
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle, onCrossReference, onPopOut, isNew }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle: _onCompareArticle, onCrossReference, onPopOut, isNew }: NormaCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [treeVisible, setTreeVisible] = useState(false);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeData, setTreeData] = useState<any[] | null>(null);
-  const [treeError, setTreeError] = useState<string | null>(null);
+  const [_treeError, _setTreeError] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddValue, setQuickAddValue] = useState('');
   const { triggerSearch } = useAppStore();
@@ -352,7 +352,6 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
               <ArticleTabContent
                 key={activeArticle.norma_data.numero_articolo}
                 data={activeArticle}
-                onCompare={onCompareArticle}
                 onCrossReferenceNavigate={onCrossReference}
               />
             ) : (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ExternalLink, ChevronDown, FileText, Scale, MessageCircle, Gavel } from 'lucide-react';
+import { Lightbulb, ExternalLink, ChevronDown, FileText, MessageCircle, Gavel } from 'lucide-react';
 import type { BrocardiInfo as BrocardiInfoType } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';

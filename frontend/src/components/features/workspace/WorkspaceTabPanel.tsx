@@ -41,7 +41,6 @@ export function WorkspaceTabPanel({
     extractArticleFromNorma,
     removeArticleFromNorma,
     removeContentFromTab,
-    createCollection,
     dossiers,
     addToDossier,
     createDossier,
@@ -267,8 +266,6 @@ export function WorkspaceTabPanel({
   const handleMouseDown = () => {
     bringTabToFront(tab.id);
   };
-
-  const currentSize = tab.isMinimized ? { width: 300, height: 44 } : { width: width.get(), height: height.get() };
 
   return (
     <motion.div

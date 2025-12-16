@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Folder, FileText, Trash2, FolderPlus, ChevronRight, ArrowLeft, Download } from 'lucide-react';
+import { Folder, FileText, Trash2, FolderPlus, ArrowLeft, Download } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { DossierModal } from '../../ui/DossierModal';
 import { jsPDF } from 'jspdf';

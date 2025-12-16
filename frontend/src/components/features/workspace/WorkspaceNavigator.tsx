@@ -46,7 +46,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
   // Get content summary for a tab
   const getTabSummary = (tab: WorkspaceTab) => {
     const normaCount = tab.content.filter(c => c.type === 'norma').length;
-    const looseCount = tab.content.filter(c => c.type === 'loose').length;
+    const looseCount = tab.content.filter(c => c.type === 'loose-article').length;
     const collectionCount = tab.content.filter(c => c.type === 'collection').length;
 
     const parts: string[] = [];
@@ -63,7 +63,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     return (
       <div className="flex gap-0.5">
         {types.has('norma') && <FileText size={10} className="text-blue-500" />}
-        {types.has('loose') && <File size={10} className="text-orange-500" />}
+        {types.has('loose-article') && <File size={10} className="text-orange-500" />}
         {types.has('collection') && <Folder size={10} className="text-purple-500" />}
       </div>
     );
@@ -75,7 +75,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     tab.content.forEach(item => {
       if (item.type === 'norma') {
         count += item.articles.length;
-      } else if (item.type === 'loose') {
+      } else if (item.type === 'loose-article') {
         count += 1;
       } else if (item.type === 'collection') {
         count += item.articles.length;

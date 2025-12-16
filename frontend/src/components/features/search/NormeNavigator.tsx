@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Book, ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { Compass, Book, ChevronRight, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { Norma, ArticleData } from '../../../types';
 

@@ -5,7 +5,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { parseNormattivaUrl, generateLabelFromParams, validateSearchParams } from '../../../utils/normattivaParser';
 import type { SearchParams, QuickNorm } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { ACT_TYPES, getActTypesByGroup } from '../../../constants/actTypes';
+import { getActTypesByGroup } from '../../../constants/actTypes';
 
 interface QuickNormsManagerProps {
   isOpen: boolean;

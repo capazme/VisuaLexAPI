@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, X, Zap, FolderPlus, MoreVertical, Check, Plus } from 'lucide-react';
+import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { useAppStore, appStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';

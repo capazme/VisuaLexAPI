@@ -29,7 +29,7 @@ export interface WorkspaceTab {
     content: TabContent[];
 }
 
-export function createWorkspaceTabActions(set: any, get: any) {
+export function createWorkspaceTabActions(set: any, _get: any) {
     return {
         addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[]) => {
             let tabId = '';

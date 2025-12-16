@@ -48,8 +48,8 @@ export function StudyMode({
   onNavigate,
   onCrossReferenceNavigate,
   normaLabel,
-  allArticleIds,
-  onLoadArticle
+  allArticleIds: _allArticleIds,
+  onLoadArticle: _onLoadArticle
 }: StudyModeProps) {
   // Typography state
   const [fontSize, setFontSize] = useState(18);
@@ -357,7 +357,7 @@ export function StudyMode({
           <StudyModeBrocardiPopover
             visible={showBrocardi}
             onClose={() => setShowBrocardi(false)}
-            brocardiInfo={article.brocardi_info}
+            brocardiInfo={article.brocardi_info ?? undefined}
             theme={theme}
           />
         </div>

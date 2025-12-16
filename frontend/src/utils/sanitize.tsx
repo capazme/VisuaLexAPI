@@ -1,14 +1,13 @@
 /**
  * HTML sanitization utilities using DOMPurify to prevent XSS attacks
  */
-import React from 'react';
-import DOMPurify from 'dompurify';
+import DOMPurify, { type Config } from 'dompurify';
 
 /**
  * Default DOMPurify configuration
  * Allows safe HTML tags and attributes while removing scripts and dangerous elements
  */
-const DEFAULT_CONFIG: DOMPurify.Config = {
+const DEFAULT_CONFIG: Config = {
   ALLOWED_TAGS: [
     // Text formatting
     'p', 'br', 'span', 'div', 'b', 'i', 'u', 'strong', 'em', 'mark',
@@ -43,7 +42,7 @@ const DEFAULT_CONFIG: DOMPurify.Config = {
  * Strict configuration for untrusted content (e.g., user input)
  * Removes all HTML except basic text formatting
  */
-const STRICT_CONFIG: DOMPurify.Config = {
+const STRICT_CONFIG: Config = {
   ALLOWED_TAGS: ['p', 'br', 'b', 'i', 'u', 'strong', 'em'],
   ALLOWED_ATTR: [],
   ALLOW_DATA_ATTR: false,
@@ -56,12 +55,12 @@ const STRICT_CONFIG: DOMPurify.Config = {
  * @param config - Optional DOMPurify configuration (defaults to DEFAULT_CONFIG)
  * @returns Sanitized HTML string safe for rendering
  */
-export function sanitizeHTML(dirty: string, config?: DOMPurify.Config): string {
+export function sanitizeHTML(dirty: string, config?: Config): string {
   if (!dirty) return '';
 
-  const finalConfig = config || DEFAULT_CONFIG;
+  const finalConfig = { ...config || DEFAULT_CONFIG, RETURN_TRUSTED_TYPE: false } as const;
 
-  return DOMPurify.sanitize(dirty, finalConfig);
+  return DOMPurify.sanitize(dirty, finalConfig) as string;
 }
 
 /**
@@ -74,7 +73,7 @@ export function sanitizeHTML(dirty: string, config?: DOMPurify.Config): string {
 export function sanitizeHTMLStrict(dirty: string): string {
   if (!dirty) return '';
 
-  return DOMPurify.sanitize(dirty, STRICT_CONFIG);
+  return DOMPurify.sanitize(dirty, { ...STRICT_CONFIG, RETURN_TRUSTED_TYPE: false }) as string;
 }
 
 /**
@@ -113,14 +112,14 @@ interface SafeHTMLProps {
   html: string;
   strict?: boolean;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
+  as?: 'div' | 'span' | 'p' | 'article' | 'section';
 }
 
-export function SafeHTML({ html, strict = false, className, as: Component = 'div' }: SafeHTMLProps) {
+export function SafeHTML({ html, strict = false, className, as: Tag = 'div' }: SafeHTMLProps) {
   const sanitized = strict ? sanitizeHTMLStrict(html) : sanitizeHTML(html);
 
   return (
-    <Component
+    <Tag
       className={className}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />

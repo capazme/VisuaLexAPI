@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import type { ArticleData, BrocardiInfo } from '../../types';
+import type { ArticleData } from '../../types';
 
 interface ExportSection {
   id: string;

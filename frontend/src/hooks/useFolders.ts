@@ -131,7 +131,7 @@ export function useFolders() {
 
       try {
         const moved = await folderService.moveFolder(folderId, {
-          parent_id: parentId || null,
+          parent_id: parentId,
           position,
         });
 
@@ -214,7 +214,7 @@ export function useFolders() {
       try {
         await folderService.bulkMoveFolders({
           folder_ids: folderIds,
-          target_parent_id: targetParentId || null,
+          target_parent_id: targetParentId,
         });
 
         // Reload tree to reflect changes

@@ -96,18 +96,6 @@ export function ArticleCollectionComponent({
     }
   };
 
-  const handlePrevArticle = () => {
-    if (activeArticleIndex > 0) {
-      setActiveArticleIndex(activeArticleIndex - 1);
-    }
-  };
-
-  const handleNextArticle = () => {
-    if (activeArticleIndex < collection.articles.length - 1) {
-      setActiveArticleIndex(activeArticleIndex + 1);
-    }
-  };
-
   return (
     <div
       ref={setNodeRef}
@@ -197,13 +185,12 @@ export function ArticleCollectionComponent({
           {collection.articles.length > 1 && (
             <div className="px-3 pt-2 flex items-center justify-between">
               <ArticleNavigation
-                currentIndex={activeArticleIndex}
-                totalArticles={collection.articles.length}
-                onPrev={handlePrevArticle}
-                onNext={handleNextArticle}
+                loadedArticleIds={collection.articles.map((_, i) => i.toString())}
+                activeArticleId={activeArticleIndex.toString()}
+                onNavigate={(id) => setActiveArticleIndex(parseInt(id))}
               />
               <ArticleMinimap
-                articleIds={collection.articles.map((_, i) => i.toString())}
+                loadedArticleIds={collection.articles.map((_, i) => i.toString())}
                 activeArticleId={activeArticleIndex.toString()}
                 onArticleClick={(id) => setActiveArticleIndex(parseInt(id))}
                 className="max-w-[200px]"

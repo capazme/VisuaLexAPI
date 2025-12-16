@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Folder, FileText, Trash2, FolderPlus, ChevronRight, ArrowLeft, Download, Search, Tag, Star, Edit2, Eye, X, GripVertical, FileDown, Share2, Copy, Check, CheckSquare, Square, FolderInput, Circle, BookOpen, AlertCircle, CheckCircle2, FileJson, TreeDeciduous, Loader2, ExternalLink } from 'lucide-react';
+import { Folder, FileText, Trash2, FolderPlus, ChevronRight, ArrowLeft, Download, Search, Tag, Star, Edit2, X, GripVertical, Share2, CheckSquare, Square, FolderInput, Circle, BookOpen, AlertCircle, CheckCircle2, FileJson, TreeDeciduous, Loader2, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { DossierModal } from '../../ui/DossierModal';
 import { jsPDF } from 'jspdf';

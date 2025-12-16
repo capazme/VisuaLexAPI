@@ -8,19 +8,23 @@ afterEach(() => {
 })
 
 // Mock localStorage
-const localStorageMock = {
+const localStorageMock: Storage = {
+  length: 0,
   getItem: (key: string) => {
-    return window.localStorage[key] || null
+    return (window.localStorage as Record<string, string>)[key] || null
   },
   setItem: (key: string, value: string) => {
-    window.localStorage[key] = value
+    (window.localStorage as Record<string, string>)[key] = value
   },
   removeItem: (key: string) => {
-    delete window.localStorage[key]
+    delete (window.localStorage as Record<string, string>)[key]
   },
   clear: () => {
-    window.localStorage = {}
+    Object.keys(window.localStorage).forEach(key => delete (window.localStorage as Record<string, string>)[key])
+  },
+  key: (index: number) => {
+    return Object.keys(window.localStorage)[index] || null
   }
 }
 
-global.localStorage = localStorageMock as any
+global.localStorage = localStorageMock

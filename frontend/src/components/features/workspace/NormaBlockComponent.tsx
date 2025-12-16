@@ -38,7 +38,7 @@ export function NormaBlockComponent({
   const [treeLoading, setTreeLoading] = useState(false);
   const [studyModeOpen, setStudyModeOpen] = useState(false);
 
-  const { toggleNormaCollapse, triggerSearch, addNormaToTab, settings } = useAppStore();
+  const { toggleNormaCollapse, addNormaToTab, settings } = useAppStore();
   const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
 
   // Trigger NormaBlock tour on first render
@@ -163,17 +163,6 @@ export function NormaBlockComponent({
       console.error('Error loading article:', e);
     } finally {
       setLoadingArticle(null);
-    }
-  };
-
-  // Function to navigate to a loaded article or load it if not present
-  const handleArticleSelect = (articleNumber: string) => {
-    if (isArticleLoaded(articleNumber)) {
-      // Find the actual ID in loadedArticleIds (might have different format)
-      const actualId = loadedArticleIds.find(id => normalizeArticleId(id) === normalizeArticleId(articleNumber));
-      setActiveArticleId(actualId || articleNumber);
-    } else {
-      handleLoadArticle(articleNumber);
     }
   };
 
