@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus } from 'lucide-react';
@@ -148,6 +148,32 @@ export function WorkspaceTabPanel({
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startX: number; startY: number; startW: number; startH: number; direction: string } | null>(null);
 
+  // Track window size for drag constraints
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Very permissive drag constraints - allow tabs to use all available space
+  // Only keep a tiny handle (50px) visible to allow grabbing back
+  const tabWidth = tab.isMinimized ? 300 : tab.size.width;
+  const minVisible = 50;
+
+  const dragConstraints = useMemo(() => ({
+    left: -(tabWidth - minVisible),          // Can go mostly off left
+    top: 0,                                   // Keep header accessible from top
+    right: windowSize.width - minVisible,    // Can go mostly off right
+    bottom: windowSize.height - minVisible   // Can go mostly off bottom
+  }), [windowSize.width, windowSize.height, tabWidth]);
+
   useEffect(() => {
     if (!isDragging) {
       x.set(tab.position.x);
@@ -173,18 +199,13 @@ export function WorkspaceTabPanel({
     const currentX = x.get();
     const currentY = y.get();
 
-    // Apply momentum
-    const momentumX = info.velocity.x * 0.15;
-    const momentumY = info.velocity.y * 0.15;
+    // Apply momentum (reduced for smoother feel)
+    const momentumX = info.velocity.x * 0.1;
+    const momentumY = info.velocity.y * 0.1;
 
-    // Clamp to window bounds
-    const currentWidth = tab.isMinimized ? 300 : width.get();
-    const currentHeight = tab.isMinimized ? 44 : height.get();
-    const maxX = window.innerWidth - currentWidth;
-    const maxY = window.innerHeight - currentHeight;
-
-    const finalX = Math.max(0, Math.min(maxX, currentX + momentumX));
-    const finalY = Math.max(0, Math.min(maxY, currentY + momentumY));
+    // Use dragConstraints limits
+    const finalX = Math.max(dragConstraints.left, Math.min(dragConstraints.right, currentX + momentumX));
+    const finalY = Math.max(dragConstraints.top, Math.min(dragConstraints.bottom, currentY + momentumY));
 
     // Animate to final position
     x.set(finalX);
@@ -192,7 +213,7 @@ export function WorkspaceTabPanel({
 
     // Save to store
     updateTab(tab.id, { position: { x: finalX, y: finalY } });
-  }, [tab.id, tab.isMinimized, updateTab, x, y, width, height]);
+  }, [tab.id, updateTab, x, y, dragConstraints]);
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent, direction: string) => {
@@ -273,7 +294,8 @@ export function WorkspaceTabPanel({
       dragControls={dragControls}
       dragListener={false}
       dragMomentum={false}
-      dragElastic={0}
+      dragElastic={0.1}
+      dragConstraints={dragConstraints}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       style={{

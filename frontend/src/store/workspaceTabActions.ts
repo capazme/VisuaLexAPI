@@ -37,11 +37,19 @@ export function createWorkspaceTabActions(set: any, _get: any) {
                 const tabCount = state.workspaceTabs.length;
                 const cascade = (tabCount % 5) * 40;
 
+                // Calculate center-ish position for new tabs
+                const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+                const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+                const tabWidth = 600;
+                const tabHeight = 500;
+                const baseX = Math.max(50, (viewportWidth - tabWidth) / 3);
+                const baseY = Math.max(50, (viewportHeight - tabHeight) / 4);
+
                 const newTab: WorkspaceTab = {
                     id: uuidv4(),
                     label,
-                    position: { x: 100 + cascade, y: 100 + cascade },
-                    size: { width: 800, height: 650 },
+                    position: { x: baseX + cascade, y: baseY + cascade },
+                    size: { width: tabWidth, height: tabHeight },
                     zIndex: ++state.highestZIndex,
                     isPinned: false,
                     isMinimized: false,
