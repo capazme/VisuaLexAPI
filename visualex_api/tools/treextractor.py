@@ -259,6 +259,7 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     logging.info("Parsing Eur-Lex structure")
     result = []
     seen_articles = set()
+    seen_sections = set()
     count_articles = 0
 
     # Estrai anno e numero dall'URL per generare link ELI
@@ -270,20 +271,64 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     section_pattern = re.compile(r'^(SEZIONE|SECTION)\s+(\d+|\w+)', re.IGNORECASE)
     article_pattern = re.compile(r'^(Articolo|Article)\s+(\d+)', re.IGNORECASE)
 
-    # Strategia 1: Cerca nel TOC (table of contents) se presente
-    toc = soup.find('div', class_='eli-toc') or soup.find('div', id='toc')
-    if toc:
-        logging.info("Found TOC, parsing from table of contents")
-        for item in toc.find_all(['a', 'li', 'p']):
-            text = item.get_text(strip=True)
+    # Strategia principale: cerca elementi ti-section (sezioni) e ti-art (articoli) in ordine di documento
+    # Questo preserva l'ordine gerarchico: CAPO -> Sezione -> Articolo
 
-            # Estrai titoli/capi/sezioni se details=True
+    # Trova tutti gli elementi strutturali in ordine
+    structure_elements = soup.find_all(['p', 'div', 'span'], class_=lambda c: c and any(x in str(c).lower() for x in ['ti-section', 'ti-art']))
+
+    if structure_elements:
+        logging.info(f"Found {len(structure_elements)} structure elements (ti-section/ti-art)")
+
+        for elem in structure_elements:
+            text = elem.get_text(strip=True)
+            class_str = ' '.join(elem.get('class', []))
+
+            # Verifica se è un header di sezione (CAPO, Sezione, TITOLO)
+            if 'ti-section' in class_str.lower():
+                # Estrai solo il titolo della sezione (CAPO I, Sezione 1, etc.)
+                section_match = (title_pattern.match(text) or
+                               chapter_pattern.match(text) or
+                               section_pattern.match(text))
+                if section_match and details:
+                    section_title = section_match.group(0)
+                    if section_title not in seen_sections:
+                        seen_sections.add(section_title)
+                        result.append(section_title)
+                        logging.debug(f"Found section: {section_title}")
+
+            # Verifica se è un articolo
+            elif 'ti-art' in class_str.lower():
+                article_match = article_pattern.match(text)
+                if article_match:
+                    article_num = article_match.group(2)
+                    if article_num not in seen_articles:
+                        seen_articles.add(article_num)
+                        article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
+                        result.append(article_data)
+                        count_articles += 1
+
+    # Fallback: cerca nel documento con pattern matching se non trovato nulla
+    if count_articles == 0:
+        logging.info("ti-section/ti-art not found, falling back to pattern search")
+
+        # Cerca tutti gli elementi che potrebbero contenere articoli o sezioni
+        for elem in soup.find_all(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']):
+            text = elem.get_text(strip=True)
+
+            # Check for sections first (when details=True)
             if details:
-                if title_pattern.match(text) or chapter_pattern.match(text) or section_pattern.match(text):
-                    result.append(text)
+                section_match = (title_pattern.match(text) or
+                               chapter_pattern.match(text) or
+                               section_pattern.match(text))
+                if section_match:
+                    section_title = section_match.group(0)
+                    if section_title not in seen_sections:
+                        seen_sections.add(section_title)
+                        result.append(section_title)
                     continue
 
-            # Estrai articoli
+            # Check for articles
             article_match = article_pattern.match(text)
             if article_match:
                 article_num = article_match.group(2)
@@ -293,46 +338,7 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
                     result.append(article_data)
                     count_articles += 1
 
-    # Strategia 2: Cerca direttamente nel documento se TOC non presente o vuoto
-    if count_articles == 0:
-        logging.info("TOC not found or empty, searching in document body")
-
-        # Cerca elementi con classe ti-art (titoli articoli) o pattern simili
-        article_elements = soup.find_all(['p', 'div', 'span'], class_=lambda c: c and ('ti-art' in c or 'art' in c.lower()))
-
-        if not article_elements:
-            # Fallback: cerca qualsiasi elemento con testo "Articolo X"
-            article_elements = soup.find_all(string=article_pattern)
-
-        for elem in article_elements:
-            text = elem.get_text(strip=True) if hasattr(elem, 'get_text') else str(elem)
-            article_match = article_pattern.match(text)
-            if article_match:
-                article_num = article_match.group(2)
-                if article_num not in seen_articles:
-                    seen_articles.add(article_num)
-                    article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
-                    result.append(article_data)
-                    count_articles += 1
-
-    # Strategia 3: Fallback sui link <a> (metodo originale)
-    if count_articles == 0:
-        logging.info("Falling back to anchor tag search")
-        for a_tag in soup.find_all('a'):
-            text = a_tag.get_text(strip=True)
-            article_match = article_pattern.match(text)
-            if article_match:
-                article_num = article_match.group(2)
-                if article_num not in seen_articles:
-                    seen_articles.add(article_num)
-                    article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
-                    result.append(article_data)
-                    count_articles += 1
-
-    # Ordina per numero articolo
-    result = _sort_eurlex_results(result, link)
-
-    logging.info(f"Extracted {count_articles} unique articles from Eur-Lex")
+    logging.info(f"Extracted {count_articles} unique articles and {len(seen_sections)} sections from Eur-Lex")
     return result, count_articles
 
 
