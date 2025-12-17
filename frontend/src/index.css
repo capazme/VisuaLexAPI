@@ -297,6 +297,45 @@ body {
 }
 
 /* ========================================
+   MOBILE RESPONSIVE TYPOGRAPHY
+   ======================================== */
+
+/* Mobile-first typography adjustments */
+@media (max-width: 640px) {
+  /* Slightly smaller legal prose on mobile for better fit */
+  .legal-prose {
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  /* Larger touch targets for cross-references on mobile */
+  .cross-reference {
+    padding: 4px 10px;
+    font-size: 13px;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Larger touch targets for dictionary terms on mobile */
+  .dictionary-term {
+    padding: 2px 0;
+  }
+
+  /* Better tooltip positioning on mobile */
+  .dictionary-term::after {
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    min-width: 180px;
+    max-width: 260px;
+  }
+
+  .dictionary-term:hover::after {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ========================================
    BUTTON GLASS STYLES
    ======================================== */
 

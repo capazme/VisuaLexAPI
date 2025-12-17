@@ -1,8 +1,23 @@
-import { X, Monitor, Moon, Sun, Eye, HelpCircle, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Monitor, Moon, Sun, Eye, HelpCircle, Shield, Info, GitBranch, GitCommit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
+
+interface VersionInfo {
+    version: string;
+    git: {
+        branch: string;
+        commit: {
+            hash: string;
+            hash_full: string;
+            message: string;
+            date: string;
+            author: string;
+        };
+    };
+}
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -14,8 +29,35 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     const navigate = useNavigate();
     const { isAdmin } = useAuth();
     const { settings, updateSettings } = useAppStore();
+    const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+    const [showInfo, setShowInfo] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && !versionInfo) {
+            fetch('/version')
+                .then(res => res.json())
+                .then(data => setVersionInfo(data))
+                .catch(() => setVersionInfo(null));
+        }
+    }, [isOpen, versionInfo]);
 
     if (!isOpen) return null;
+
+    const formatDate = (dateStr: string) => {
+        if (!dateStr || dateStr === 'unknown') return 'N/D';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('it-IT', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch {
+            return dateStr;
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -30,7 +72,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                     {/* Theme - iOS-style Segmented Control */}
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">Tema</label>
@@ -156,9 +198,61 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             </button>
                         </div>
                     )}
+
+                    {/* Version Info */}
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-3 block">Informazioni</label>
+                        <button
+                            onClick={() => setShowInfo(!showInfo)}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                        >
+                            <Info size={16} />
+                            {showInfo ? 'Nascondi dettagli' : 'Mostra versione'}
+                        </button>
+
+                        {showInfo && versionInfo && (
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500">Versione</span>
+                                    <span className="font-mono font-medium text-gray-900 dark:text-white">
+                                        v{versionInfo.version}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 flex items-center gap-1">
+                                        <GitBranch size={12} /> Branch
+                                    </span>
+                                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                                        {versionInfo.git.branch}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 flex items-center gap-1">
+                                        <GitCommit size={12} /> Commit
+                                    </span>
+                                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                                        {versionInfo.git.commit.hash}
+                                    </span>
+                                </div>
+                                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <p className="text-gray-600 dark:text-gray-400 truncate" title={versionInfo.git.commit.message}>
+                                        {versionInfo.git.commit.message}
+                                    </p>
+                                    <p className="text-gray-400 dark:text-gray-500 mt-1">
+                                        {versionInfo.git.commit.author} · {formatDate(versionInfo.git.commit.date)}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {showInfo && !versionInfo && (
+                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs text-gray-500 text-center">
+                                Caricamento...
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
-

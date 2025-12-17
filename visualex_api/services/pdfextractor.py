@@ -1,109 +1,105 @@
 import os
-import time
-import logging
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from functools import lru_cache
-from ..tools.config import MAX_CACHE_SIZE
+import asyncio
+import structlog
+from playwright.async_api import async_playwright, Page, Download
 
-# Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(levelname)s %(message)s',
-                    handlers=[logging.FileHandler("norma.log"),
-                              logging.StreamHandler()])
+log = structlog.get_logger()
 
 
 class PDFExtractor:
-    """Wrapper class for PDF extraction functionality."""
-    
+    """Async PDF extraction using Playwright."""
+
     def __init__(self):
-        logging.info("PDFExtractor initialized")
-    
-    def extract_pdf(self, driver, urn, timeout=30):
-        """Wrapper method for the extract_pdf function."""
-        return extract_pdf(driver, urn, timeout)
+        log.info("PDFExtractor initialized with Playwright")
 
- 
-def extract_pdf(driver, urn, timeout=30):
-    """
-    Extracts a PDF from a given URN using Selenium WebDriver.
+    async def extract_pdf(self, urn: str, timeout: int = 30000) -> str:
+        """
+        Extracts a PDF from a given URN using Playwright.
 
-    Arguments:
-    driver -- Selenium WebDriver instance
-    urn -- URN of the legal document
-    timeout -- Maximum time to wait for operations (default: 30 seconds)
+        Arguments:
+        urn -- URN of the legal document (Normattiva URL)
+        timeout -- Maximum time to wait for operations in ms (default: 30000)
 
-    Returns:
-    str -- Path to the downloaded PDF file
-    """
-    logging.info(f"Extracting PDF for URN: {urn} with timeout: {timeout}")
-    
-    download_dir = os.path.join(os.getcwd(), "download")
-    
-    if not os.path.exists(download_dir):
-        os.makedirs(download_dir)
-        logging.info(f"Created download directory: {download_dir}")
+        Returns:
+        str -- Path to the downloaded PDF file
+        """
+        log.info(f"Extracting PDF for URN: {urn} with timeout: {timeout}ms")
 
-    try:
-        driver.get(urn)
-        logging.info(f"Accessed URN: {urn}")
-        
-        # Selectors for the export button and the PDF download button
-        export_button_selector = "#mySidebarRight > div > div:nth-child(2) > div > div > ul > li:nth-child(2) > a"
-        export_pdf_selector = "downloadPdf"
-        
-        # Click the export button
-        WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, export_button_selector))
-        ).click()
-        logging.info("Clicked on export button")
-        
-        # Switch to the new window that opens
-        driver.switch_to.window(driver.window_handles[-1])
-        logging.info("Switched to the export window")
-        
-        # Click the download PDF button
-        WebDriverWait(driver, timeout).until(
-            EC.element_to_be_clickable((By.NAME, export_pdf_selector))
-        ).click()
-        logging.info("Clicked on download PDF button")
-        
-        # Wait for the download to complete
-        pdf_file_path = _wait_for_pdf_download(download_dir, timeout)
-        logging.info(f"PDF downloaded successfully: {pdf_file_path}")
-        return pdf_file_path
-    except Exception as e:
-        logging.error(f"Error extracting PDF: {e}", exc_info=True)
-        raise
-    finally:
-        logging.info("Closing the driver")
-        driver.quit()
+        download_dir = os.path.join(os.getcwd(), "download")
+        if not os.path.exists(download_dir):
+            os.makedirs(download_dir)
+            log.info(f"Created download directory: {download_dir}")
 
-def _wait_for_pdf_download(download_dir, timeout):
-    """
-    Waits for the PDF download to complete.
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-dev-shm-usage']
+            )
+            try:
+                context = await browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    accept_downloads=True
+                )
+                page = await context.new_page()
 
-    Arguments:
-    download_dir -- Directory where PDFs are downloaded
-    timeout -- Maximum time to wait for the download to complete
+                # Navigate to the URN
+                await page.goto(urn, wait_until='networkidle', timeout=timeout)
+                log.info(f"Accessed URN: {urn}")
 
-    Returns:
-    str -- Path to the downloaded PDF file
+                # Selectors for the export button and the PDF download button
+                export_button_selector = "#mySidebarRight > div > div:nth-child(2) > div > div > ul > li:nth-child(2) > a"
+                export_pdf_selector = "input[name='downloadPdf']"
 
-    Raises:
-    TimeoutError -- If the PDF is not downloaded within the timeout period
-    """
-    start_time = time.time()
-    initial_files = set(os.listdir(download_dir))
+                # Click the export button
+                await page.wait_for_selector(export_button_selector, timeout=timeout)
+                await page.click(export_button_selector)
+                log.info("Clicked on export button")
 
-    while True:
-        current_files = set(os.listdir(download_dir))
-        new_files = current_files - initial_files
-        if new_files:
-            pdf_file_path = os.path.join(download_dir, new_files.pop())
-            if pdf_file_path.endswith(".pdf"):
+                # Wait for new page/popup to open
+                async with context.expect_page() as new_page_info:
+                    pass  # The click above should trigger the popup
+
+                new_page = await new_page_info.value
+                await new_page.wait_for_load_state('networkidle')
+                log.info("Switched to the export window")
+
+                # Setup download handler before clicking
+                async with new_page.expect_download(timeout=timeout) as download_info:
+                    # Click the download PDF button
+                    await new_page.wait_for_selector(export_pdf_selector, timeout=timeout)
+                    await new_page.click(export_pdf_selector)
+                    log.info("Clicked on download PDF button")
+
+                download: Download = await download_info.value
+
+                # Save the download to our directory
+                pdf_filename = download.suggested_filename or f"document_{urn.split('/')[-1]}.pdf"
+                pdf_file_path = os.path.join(download_dir, pdf_filename)
+                await download.save_as(pdf_file_path)
+
+                log.info(f"PDF downloaded successfully: {pdf_file_path}")
+                await context.close()
                 return pdf_file_path
-        if time.time() - start_time > timeout:
-            raise TimeoutError("Download PDF timed out")
-        time.sleep(1)
+
+            except Exception as e:
+                log.error(f"Error extracting PDF: {e}", exc_info=True)
+                raise
+            finally:
+                await browser.close()
+                log.info("Browser closed")
+
+
+# Legacy function for backward compatibility
+async def extract_pdf(urn: str, timeout: int = 30000) -> str:
+    """
+    Async function to extract PDF using Playwright.
+
+    Arguments:
+    urn -- URN of the legal document
+    timeout -- Maximum time to wait for operations in ms (default: 30000)
+
+    Returns:
+    str -- Path to the downloaded PDF file
+    """
+    extractor = PDFExtractor()
+    return await extractor.extract_pdf(urn, timeout)

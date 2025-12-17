@@ -1,11 +1,7 @@
 import os
-import asyncio
-import time
-from aiocache import cached, Cache
-from aiocache.serializers import JsonSerializer
+import re
 import structlog
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from playwright.async_api import async_playwright
 
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
@@ -16,41 +12,42 @@ from ..tools.selectors import EURLexSelectors
 # Configure structured logger
 log = structlog.get_logger()
 
+
 class EurlexScraper(BaseScraper):
     def __init__(self):
         self.base_url = 'https://eur-lex.europa.eu/eli'
         self.cache = get_cache_manager().get_persistent("eurlex")
         self.selectors = EURLexSelectors()
-        log.info("EUR-Lex scraper initialized")
+        log.info("EUR-Lex scraper initialized with Playwright")
 
-    def _fetch_with_selenium(self, url: str) -> str:
-        """Fetch URL using Selenium to bypass CloudFront WAF protection."""
-        options = Options()
-        options.add_argument('--headless')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--window-size=1920x1080')
-        options.add_argument('--disable-dev-shm-usage')
-
-        driver = webdriver.Chrome(options=options)
-        try:
-            driver.get(url)
-            # Wait for JavaScript to execute and bypass WAF challenge
-            time.sleep(2)
-            html = driver.page_source
-            return html
-        finally:
-            driver.quit()
+    async def _fetch_with_playwright(self, url: str) -> str:
+        """Fetch URL using Playwright to bypass CloudFront WAF protection."""
+        log.info(f"Consulting EUR-Lex with Playwright - URL: {url}")
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-dev-shm-usage']
+            )
+            try:
+                context = await browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
+                page = await context.new_page()
+                await page.goto(url, wait_until='networkidle', timeout=30000)
+                html = await page.content()
+                await context.close()
+                return html
+            finally:
+                await browser.close()
 
     async def request_document(self, url, *, source: str = "eurlex"):
-        """Override base request_document to use Selenium for WAF bypass."""
-        log.info(f"Consulting EUR-Lex with Selenium - URL: {url}")
+        """Override base request_document to use Playwright for WAF bypass."""
         try:
-            # Run sync Selenium in thread pool to not block event loop
-            html = await asyncio.to_thread(self._fetch_with_selenium, url)
+            html = await self._fetch_with_playwright(url)
             if not html or len(html) < 1000:
                 raise DocumentNotFoundError(f"Document not found or empty at {url}", urn=url)
-            log.debug("EUR-Lex document fetched successfully with Selenium")
+            log.debug("EUR-Lex document fetched successfully with Playwright")
             return html
         except DocumentNotFoundError:
             raise
@@ -71,7 +68,7 @@ class EurlexScraper(BaseScraper):
         else:
             uri = f'{self.base_url}/{EURLEX[act_type]}/{year}/{num}/oj/ita'
             log.info(f"Constructed URI for regulation or directive: {uri}")
-        
+
         return uri
 
     async def get_document(self, normavisitata=None, act_type=None, article=None, year=None, num=None, urn=None):
@@ -115,7 +112,6 @@ class EurlexScraper(BaseScraper):
             return soup.get_text(), url
 
     async def extract_article_text(self, soup, article):
-        import re
         log.info(f"Searching for article {article} in the document")
 
         # Multiple patterns to find article header (EUR-Lex structure may vary)
@@ -205,11 +201,3 @@ class EurlexScraper(BaseScraper):
 
         log.debug("Table text extracted successfully")
         return table_text
-
-# Configure production logging differently
-if __name__ == "__main__":
-    if os.getenv('ENV') == 'production':
-        logging.getLogger().setLevel(logging.WARNING)
-        for handler in logging.getLogger().handlers:
-            if isinstance(handler, logging.StreamHandler):
-                handler.setLevel(logging.ERROR)

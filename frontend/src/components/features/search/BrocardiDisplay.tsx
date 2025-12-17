@@ -25,7 +25,7 @@ function BrocardiSection({ title, content }: BrocardiSectionProps) {
     <div className="card border border-gray-200 dark:border-gray-700 shadow-sm rounded-md mb-3 overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
       >
         <strong className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
           <Lightbulb size={14} className="text-blue-600" />
@@ -70,7 +70,10 @@ function BrocardiSection({ title, content }: BrocardiSectionProps) {
 }
 
 export function BrocardiDisplay({ info }: { info: BrocardiInfoType }) {
-  const [isMainOpen, setIsMainOpen] = useState(true);
+  // Default collapsed on mobile (<768px), expanded on desktop
+  const [isMainOpen, setIsMainOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true
+  );
 
   return (
     <div className="brocardi-display mt-8 border-l-4 border-blue-500 pl-6 py-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-r-xl">

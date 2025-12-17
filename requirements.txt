@@ -3,7 +3,6 @@ requests
 quart
 quart_cors
 structlog
-selenium
-chromium
+playwright
 aiocache
 aiohttp

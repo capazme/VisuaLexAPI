@@ -132,14 +132,14 @@ export function Layout() {
       )}
 
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
-        {/* Floating Focus Toggle - Always Visible */}
+        {/* Floating Focus Toggle - Desktop only (study feature) */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
+            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
             // Liquid Glass effect
             'backdrop-blur-2xl shadow-glass',
             settings.focusMode

@@ -23,7 +23,6 @@ from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf
-from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
@@ -73,11 +72,10 @@ def add_to_history(data: dict):
         log.debug("Added to history", data=data)
 
 
-# Inizializzazione degli scraper e del driver manager
+# Inizializzazione degli scraper
 brocardi_scraper = BrocardiScraper()
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
-driver_manager = WebDriverManager()
 
 
 class RateLimitedTaskQueue:
@@ -263,6 +261,7 @@ class NormaController:
         self.app.add_url_rule('/export_pdf', view_func=self.export_pdf, methods=['POST'])
         self.app.add_url_rule('/health', view_func=self.health, methods=['GET'])
         self.app.add_url_rule('/health/detailed', view_func=self.health_detailed, methods=['GET'])
+        self.app.add_url_rule('/version', view_func=self.get_version, methods=['GET'])
 
 
     async def home(self):
@@ -726,6 +725,44 @@ class NormaController:
         status_code = 200 if results['status'] == 'ok' else 503
         return jsonify(results), status_code
 
+    async def get_version(self):
+        """Returns version info and latest git commit details."""
+        import subprocess
+
+        def run_git_command(args: list[str]) -> str:
+            try:
+                result = subprocess.run(
+                    ['git'] + args,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                return result.stdout.strip() if result.returncode == 0 else ''
+            except Exception:
+                return ''
+
+        # Get git info in thread pool to not block
+        commit_hash = await asyncio.to_thread(run_git_command, ['rev-parse', '--short', 'HEAD'])
+        commit_hash_full = await asyncio.to_thread(run_git_command, ['rev-parse', 'HEAD'])
+        commit_message = await asyncio.to_thread(run_git_command, ['log', '-1', '--format=%s'])
+        commit_date = await asyncio.to_thread(run_git_command, ['log', '-1', '--format=%ci'])
+        commit_author = await asyncio.to_thread(run_git_command, ['log', '-1', '--format=%an'])
+        branch = await asyncio.to_thread(run_git_command, ['rev-parse', '--abbrev-ref', 'HEAD'])
+
+        return jsonify({
+            'version': '1.0.0',
+            'git': {
+                'branch': branch or 'unknown',
+                'commit': {
+                    'hash': commit_hash or 'unknown',
+                    'hash_full': commit_hash_full or 'unknown',
+                    'message': commit_message or 'unknown',
+                    'date': commit_date or 'unknown',
+                    'author': commit_author or 'unknown'
+                }
+            }
+        })
+
     async def export_pdf(self):
         try:
             data = await request.get_json()
@@ -736,6 +773,7 @@ class NormaController:
             log.info("Received data for export_pdf", data=data)
             pdf_path = urn_to_filename(urn)
 
+            # Check if PDF already exists in cache
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)
             if file_exists:
                 file_size = await asyncio.to_thread(os.path.getsize, pdf_path)
@@ -751,18 +789,16 @@ class NormaController:
                     log.info(f"File PDF presente ma vuoto: {pdf_path}. Rimuovo e rigenero.")
                     await asyncio.to_thread(os.remove, pdf_path)
 
-            driver = await asyncio.to_thread(driver_manager.setup_driver)
-            try:
-                extracted_pdf_path = await asyncio.to_thread(extract_pdf, driver, urn)
-                log.info(f"PDF estratto: {extracted_pdf_path}")
-            finally:
-                await asyncio.to_thread(driver_manager.close_drivers)
+            # Extract PDF using Playwright (async)
+            extracted_pdf_path = await extract_pdf(urn)
+            log.info(f"PDF estratto: {extracted_pdf_path}")
 
             exists_extracted = await asyncio.to_thread(os.path.exists, extracted_pdf_path)
             size_extracted = await asyncio.to_thread(os.path.getsize, extracted_pdf_path) if exists_extracted else 0
             if not exists_extracted or size_extracted == 0:
                 raise Exception("Il PDF estratto risulta vuoto o non esistente.")
 
+            # Copy to cache location if different
             if extracted_pdf_path != pdf_path:
                 def copy_file(src, dst):
                     with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:

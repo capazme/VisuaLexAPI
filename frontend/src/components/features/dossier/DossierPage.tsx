@@ -58,45 +58,46 @@ function SortableItem({
       style={style}
       onClick={onView}
       className={cn(
-        "bg-white dark:bg-gray-800 p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer",
+        "bg-white dark:bg-gray-800 p-3 md:p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer",
         isSelected ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"
       )}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         {showCheckbox && (
-          <button onClick={(e) => { e.stopPropagation(); onToggleSelect(); }} className="text-gray-400 hover:text-blue-500">
+          <button onClick={(e) => { e.stopPropagation(); onToggleSelect(); }} className="text-gray-400 hover:text-blue-500 p-2 -m-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 md:p-0 md:m-0 flex items-center justify-center">
             {isSelected ? <CheckSquare size={20} className="text-blue-500" /> : <Square size={20} />}
           </button>
         )}
-        <div {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="text-gray-300 dark:text-gray-600 cursor-grab hover:text-gray-500">
+        {/* Hide drag handle on mobile - simplified UX */}
+        <div {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="hidden md:block text-gray-300 dark:text-gray-600 cursor-grab hover:text-gray-500">
           <GripVertical size={20} />
         </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600">
-          <FileText size={20} />
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600 flex-shrink-0">
+          <FileText size={18} />
         </div>
         <div className="flex-1 min-w-0">
           {item.type === 'norma' ? (
             <>
-              <h4 className="font-medium text-gray-900 dark:text-white">
+              <h4 className="font-medium text-sm md:text-base text-gray-900 dark:text-white truncate">
                 {item.data.tipo_atto} {item.data.numero_atto}
               </h4>
-              <p className="text-sm text-gray-500">Art. {item.data.numero_articolo} • {item.data.data}</p>
+              <p className="text-xs md:text-sm text-gray-500 truncate">Art. {item.data.numero_articolo} • {item.data.data}</p>
             </>
           ) : (
-            <p className="text-gray-700 dark:text-gray-300 italic truncate">"{item.data}"</p>
+            <p className="text-sm md:text-base text-gray-700 dark:text-gray-300 italic truncate">"{item.data}"</p>
           )}
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-gray-400 mt-1 hidden md:block">
             Aggiunto il {new Date(item.addedAt).toLocaleDateString()}
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {/* Status dropdown */}
           <div className="relative group/status" onClick={(e) => e.stopPropagation()}>
             <button
-              className={cn("p-2 rounded-md transition-colors", statusConfig.color, statusConfig.bg)}
+              className={cn("p-2 md:p-2 rounded-md transition-colors min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center", statusConfig.color, statusConfig.bg)}
               title={statusConfig.label}
             >
-              <StatusIcon size={16} />
+              <StatusIcon size={18} />
             </button>
             <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 hidden group-hover/status:block">
               {(Object.entries(STATUS_CONFIG) as [DossierItemStatus, typeof STATUS_CONFIG[DossierItemStatus]][]).map(([key, config]) => (
@@ -104,11 +105,11 @@ function SortableItem({
                   key={key}
                   onClick={(e) => { e.stopPropagation(); onStatusChange(key); }}
                   className={cn(
-                    "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700",
+                    "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 min-h-[44px]",
                     status === key && "bg-gray-100 dark:bg-gray-700"
                   )}
                 >
-                  <config.icon size={14} className={config.color} />
+                  <config.icon size={16} className={config.color} />
                   {config.label}
                 </button>
               ))}
@@ -116,7 +117,7 @@ function SortableItem({
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-0 group-hover:opacity-100"
+            className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
             title="Rimuovi"
           >
             <Trash2 size={18} />
@@ -850,63 +851,119 @@ export function DossierPage() {
   if (selectedDossier) {
     return (
       <div className="animate-in slide-in-from-right-10 duration-300">
+        {/* Mobile back button - prominent */}
         <button
           onClick={() => setSelectedDossierId(null)}
-          className="mb-4 flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+          className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors w-full"
+        >
+          <ArrowLeft size={20} /> Torna ai Dossier
+        </button>
+
+        {/* Desktop back button - subtle */}
+        <button
+          onClick={() => setSelectedDossierId(null)}
+          className="hidden md:flex mb-4 items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
         >
           <ArrowLeft size={16} /> Torna ai Dossier
         </button>
 
         <header className="mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <Folder className="text-blue-500" size={28} />
-                  {selectedDossier.title}
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 md:gap-3">
+                  <Folder className="text-blue-500" size={24} />
+                  <span className="truncate">{selectedDossier.title}</span>
                 </h2>
                 {selectedDossier.isPinned && (
-                  <Star size={18} className="text-yellow-500 fill-yellow-500" />
+                  <Star size={16} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
                 )}
               </div>
               {selectedDossier.description && (
-                <p className="text-gray-500 mt-1">{selectedDossier.description}</p>
+                <p className="text-sm md:text-base text-gray-500 mt-1 line-clamp-2 md:line-clamp-none">{selectedDossier.description}</p>
               )}
               {selectedDossier.tags && selectedDossier.tags.length > 0 && (
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   {selectedDossier.tags.map(tag => (
-                    <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                    <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
                       {tag}
                     </span>
                   ))}
                 </div>
               )}
-              <div className="text-xs text-gray-400 mt-2">
+              <div className="text-xs md:text-sm text-gray-400 mt-2">
                 Creato il {new Date(selectedDossier.createdAt).toLocaleDateString()} • {selectedDossier.items.length} elementi
               </div>
-              {/* Statistics bar */}
+              {/* Statistics bar - scrollable on mobile */}
               {selectedDossier.items.length > 0 && (
-                <div className="flex gap-3 mt-3 text-xs">
-                  <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
-                    <Circle size={12} className="text-gray-400" />
+                <div className="flex gap-2 md:gap-3 mt-3 text-xs overflow-x-auto pb-2 md:pb-0 -mx-1 px-1">
+                  <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                    <Circle size={12} className="text-gray-400 flex-shrink-0" />
                     {selectedDossier.items.filter(i => !i.status || i.status === 'unread').length} da leggere
                   </span>
-                  <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-300">
-                    <BookOpen size={12} />
+                  <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-300 whitespace-nowrap">
+                    <BookOpen size={12} className="flex-shrink-0" />
                     {selectedDossier.items.filter(i => i.status === 'reading').length} in lettura
                   </span>
-                  <span className="flex items-center gap-1 px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded text-orange-600 dark:text-orange-300">
-                    <AlertCircle size={12} />
+                  <span className="flex items-center gap-1 px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded text-orange-600 dark:text-orange-300 whitespace-nowrap">
+                    <AlertCircle size={12} className="flex-shrink-0" />
                     {selectedDossier.items.filter(i => i.status === 'important').length} importanti
                   </span>
-                  <span className="flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded text-green-600 dark:text-green-300">
-                    <CheckCircle2 size={12} />
+                  <span className="flex items-center gap-1 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded text-green-600 dark:text-green-300 whitespace-nowrap">
+                    <CheckCircle2 size={12} className="flex-shrink-0" />
                     {selectedDossier.items.filter(i => i.status === 'done').length} completati
                   </span>
                 </div>
               )}
             </div>
-            <div className="flex gap-2">
+
+            {/* Mobile toolbar - simplified with larger touch targets (44px min) */}
+            <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+              <button
+                onClick={() => setEditingDossier(selectedDossier)}
+                className="flex-shrink-0 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 p-3 rounded-lg transition-colors"
+                title="Modifica"
+              >
+                <Edit2 size={20} />
+              </button>
+              <button
+                onClick={() => handleExportPdf(selectedDossier.id)}
+                className="flex-shrink-0 dossier-export text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-3 rounded-lg transition-colors"
+                title="Esporta PDF"
+              >
+                <Download size={20} />
+              </button>
+              <button
+                onClick={() => copyShareLink(selectedDossier)}
+                className="flex-shrink-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-3 rounded-lg transition-colors"
+                title="Condividi"
+              >
+                <Share2 size={20} />
+              </button>
+              <button
+                onClick={handleOpenAllOnDashboard}
+                className="flex-shrink-0 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 p-3 rounded-lg transition-colors disabled:opacity-50"
+                title="Apri su Dashboard"
+                disabled={selectedDossier.items.filter(i => i.type === 'norma').length === 0}
+              >
+                <ExternalLink size={20} />
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Sei sicuro di voler eliminare questo dossier?')) {
+                    deleteDossier(selectedDossier.id);
+                    setSelectedDossierId(null);
+                  }
+                }}
+                className="flex-shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-3 rounded-lg transition-colors"
+                title="Elimina"
+              >
+                <Trash2 size={20} />
+              </button>
+            </div>
+
+            {/* Desktop toolbar - full functionality */}
+            <div className="hidden md:flex gap-2">
               <button
                 onClick={() => setEditingDossier(selectedDossier)}
                 className="text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-md transition-colors"
@@ -980,12 +1037,12 @@ export function DossierPage() {
 
         {/* Bulk actions toolbar */}
         {selectedDossier.items.length > 0 && (
-          <div className="mb-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-3">
+          <div className="mb-4 flex flex-col md:flex-row items-stretch md:items-center gap-3 md:justify-between bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setShowBulkActions(!showBulkActions)}
                 className={cn(
-                  "px-3 py-1.5 rounded-md text-sm transition-colors",
+                  "px-4 py-2 md:px-3 md:py-1.5 rounded-md text-sm transition-colors min-h-[44px] md:min-h-0",
                   showBulkActions
                     ? "bg-blue-600 text-white"
                     : "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
@@ -997,7 +1054,7 @@ export function DossierPage() {
                 <>
                   <button
                     onClick={selectAllItems}
-                    className="text-sm text-blue-600 hover:underline"
+                    className="text-sm text-blue-600 hover:underline min-h-[44px] md:min-h-0 px-2"
                   >
                     Seleziona tutti
                   </button>
@@ -1011,17 +1068,17 @@ export function DossierPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setMoveToModalOpen(true)}
-                  className="px-3 py-1.5 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center gap-1"
+                  className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0"
                 >
-                  <FolderInput size={14} />
-                  Sposta
+                  <FolderInput size={16} />
+                  <span className="md:inline">Sposta</span>
                 </button>
                 <button
                   onClick={deleteSelectedItems}
-                  className="px-3 py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center gap-1"
+                  className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0"
                 >
-                  <Trash2 size={14} />
-                  Elimina
+                  <Trash2 size={16} />
+                  <span className="md:inline">Elimina</span>
                 </button>
               </div>
             )}
@@ -1119,19 +1176,19 @@ export function DossierPage() {
   // List view
   return (
     <div className="animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">I tuoi Dossier</h2>
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">I tuoi Dossier</h2>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+          className="dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] md:min-h-0"
         >
-          <FolderPlus size={18} /> Nuovo Dossier
+          <FolderPlus size={20} /> Nuovo Dossier
         </button>
       </div>
 
       {/* Search and filters */}
       <div className="mb-6 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -1139,13 +1196,13 @@ export function DossierPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Cerca nei dossier..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="w-full pl-10 pr-4 py-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] md:min-h-0"
             />
           </div>
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'date' | 'name' | 'items')}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            className="px-4 py-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] md:min-h-0"
           >
             <option value="date">Ordina per data</option>
             <option value="name">Ordina per nome</option>
@@ -1153,13 +1210,13 @@ export function DossierPage() {
           </select>
         </div>
 
-        {/* Tags filter */}
+        {/* Tags filter - scrollable on mobile */}
         {allTags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <button
               onClick={() => setSelectedTag(null)}
               className={cn(
-                "px-3 py-1 rounded-full text-sm transition-colors",
+                "px-4 py-2 md:px-3 md:py-1 rounded-full text-sm transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 flex items-center",
                 !selectedTag
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -1172,13 +1229,13 @@ export function DossierPage() {
                 key={tag}
                 onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
                 className={cn(
-                  "px-3 py-1 rounded-full text-sm transition-colors flex items-center gap-1",
+                  "px-4 py-2 md:px-3 md:py-1 rounded-full text-sm transition-colors flex items-center gap-1 whitespace-nowrap min-h-[44px] md:min-h-0",
                   selectedTag === tag
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
                 )}
               >
-                <Tag size={12} />
+                <Tag size={14} />
                 {tag}
               </button>
             ))}
@@ -1186,22 +1243,22 @@ export function DossierPage() {
         )}
       </div>
 
-      {/* Dossier grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Dossier grid - full width cards on mobile */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredDossiers.length === 0 ? (
-          <div className="col-span-full text-center py-20">
-            <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Folder size={40} className="text-gray-400" />
+          <div className="col-span-full text-center py-12 md:py-20">
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Folder size={32} className="text-gray-400 md:w-10 md:h-10" />
             </div>
             {searchQuery || selectedTag ? (
               <>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Nessun risultato</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">Prova a modificare i filtri di ricerca.</p>
+                <h3 className="text-base md:text-lg font-medium text-gray-900 dark:text-white">Nessun risultato</h3>
+                <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2">Prova a modificare i filtri di ricerca.</p>
               </>
             ) : (
               <>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Nessun dossier creato</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">Organizza le tue ricerche creando dei dossier tematici.</p>
+                <h3 className="text-base md:text-lg font-medium text-gray-900 dark:text-white">Nessun dossier creato</h3>
+                <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2">Organizza le tue ricerche creando dei dossier tematici.</p>
               </>
             )}
           </div>
@@ -1210,27 +1267,27 @@ export function DossierPage() {
             <div
               key={dossier.id}
               onClick={() => setSelectedDossierId(dossier.id)}
-              className="dossier-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative"
+              className="dossier-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative active:scale-[0.98]"
             >
               {dossier.isPinned && (
-                <Star size={16} className="absolute top-3 right-3 text-yellow-500 fill-yellow-500" />
+                <Star size={14} className="absolute top-3 right-3 text-yellow-500 fill-yellow-500" />
               )}
-              <div className="flex justify-between items-start mb-4">
-                <Folder className="text-blue-500 group-hover:scale-110 transition-transform" size={32} />
-                <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full">
+              <div className="flex justify-between items-start mb-3 md:mb-4">
+                <Folder className="text-blue-500 group-hover:scale-110 transition-transform flex-shrink-0" size={28} />
+                <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
                   {dossier.items.length} elementi
                 </span>
               </div>
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors">
+              <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
                 {dossier.title}
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em]">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em]">
                 {dossier.description || "Nessuna descrizione"}
               </p>
               {dossier.tags && dossier.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-3">
+                <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
                   {dossier.tags.slice(0, 3).map(tag => (
-                    <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">
+                    <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded truncate max-w-[100px]">
                       {tag}
                     </span>
                   ))}
@@ -1239,9 +1296,9 @@ export function DossierPage() {
                   )}
                 </div>
               )}
-              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
+              <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
                 <span className="text-xs text-gray-400">{new Date(dossier.createdAt).toLocaleDateString()}</span>
-                <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
               </div>
             </div>
           ))

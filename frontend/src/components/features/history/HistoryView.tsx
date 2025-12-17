@@ -203,11 +203,41 @@ export function HistoryView() {
     return (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+                {/* Mobile Header */}
+                <div className="md:hidden p-3 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                        <h2 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Clock size={18} /> Cronologia
+                        </h2>
+                        {history.length > 0 && (
+                            <button
+                                onClick={handleClearHistory}
+                                disabled={clearing}
+                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 min-h-[44px] min-w-[44px]"
+                                title="Svuota cronologia"
+                            >
+                                {clearing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            </button>
+                        )}
+                    </div>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Cerca..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900 transition-all min-h-[44px]"
+                        />
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    </div>
+                </div>
+
+                {/* Desktop Header */}
+                <div className="hidden md:flex p-4 border-b border-gray-200 dark:border-gray-700 flex-col sm:flex-row justify-between items-center gap-4">
                     <h2 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <Clock size={20} /> Cronologia Ricerche
                     </h2>
-                    
+
                     <div className="flex items-center gap-2">
                         <div className="relative w-full sm:w-64">
                             <input
@@ -233,7 +263,8 @@ export function HistoryView() {
                 </div>
                 
                 {/* Timeline with grouped dates */}
-                <div className="max-h-[70vh] overflow-y-auto p-6">
+                {/* Mobile: simplified padding */}
+                <div className="max-h-[70vh] overflow-y-auto p-3 md:p-6">
                     {loading ? (
                         <div className="p-8 text-center">
                             <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
@@ -243,11 +274,21 @@ export function HistoryView() {
                             {searchTerm ? "Nessun risultato trovato." : "Nessuna ricerca recente."}
                         </div>
                     ) : (
-                        <div className="space-y-8">
+                        <div className="space-y-6 md:space-y-8">
                             {Object.entries(groupedByDate).map(([date, items]) => (
                                 <div key={date} className="relative">
                                     {/* Date label with timeline line */}
-                                    <div className="flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-gray-800 py-2 z-10">
+                                    {/* Mobile: smaller, simpler date label */}
+                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-0 bg-white dark:bg-gray-800 py-1 z-10">
+                                        <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
+                                            <Calendar size={12} className="text-blue-600 dark:text-blue-400" />
+                                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{date}</span>
+                                        </div>
+                                        <div className="flex-1 h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent" />
+                                    </div>
+
+                                    {/* Desktop: full date label */}
+                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-gray-800 py-2 z-10">
                                         <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
                                             <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{date}</span>
@@ -256,7 +297,44 @@ export function HistoryView() {
                                     </div>
 
                                     {/* Timeline items */}
-                                    <div className="space-y-3 pl-6 border-l-2 border-blue-100 dark:border-blue-900 relative">
+                                    {/* Mobile: simpler timeline */}
+                                    <div className="md:hidden space-y-2">
+                                        {items.map((item, idx) => (
+                                            <div key={idx} className="relative">
+                                                {/* Mobile Item card - compact, tap-friendly */}
+                                                <div
+                                                    onClick={() => handleItemClick(item)}
+                                                    className={cn(
+                                                        "bg-white dark:bg-gray-800 p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
+                                                        "border-gray-200 dark:border-gray-700",
+                                                        "active:scale-[0.98] active:border-blue-400"
+                                                    )}
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5 mb-1">
+                                                                <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-bold">
+                                                                    Art. {item.article}
+                                                                </span>
+                                                                {item.act_number && (
+                                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                        n. {item.act_number}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white capitalize truncate">
+                                                                {item.act_type}
+                                                            </p>
+                                                        </div>
+                                                        <ArrowRight size={18} className="text-blue-500 flex-shrink-0 mt-1" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Desktop: full timeline with dots */}
+                                    <div className="hidden md:block space-y-3 pl-6 border-l-2 border-blue-100 dark:border-blue-900 relative">
                                         {items.map((item, idx) => (
                                             <div key={idx} className="relative group">
                                                 {/* Timeline dot */}
@@ -407,7 +485,7 @@ export function HistoryView() {
             {/* Feedback toast */}
             {feedback && (
                 <div className={cn(
-                    "fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-2 z-50",
+                    "fixed bottom-4 right-4 md:right-4 left-4 md:left-auto px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-in slide-in-from-bottom-2 z-50",
                     feedback.type === 'success'
                         ? "bg-green-500 text-white"
                         : "bg-red-500 text-white"

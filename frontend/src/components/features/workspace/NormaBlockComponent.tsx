@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type NormaBlock } from '../../../store/useAppStore';
@@ -234,9 +235,9 @@ export function NormaBlockComponent({
 
         {!normaBlock.isCollapsed && (
           <div className="flex items-center gap-2">
-            {/* Study Mode Button */}
+            {/* Study Mode Button - Desktop only (study features) */}
             <button
-              className="norma-study-mode-btn px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors flex items-center gap-1"
+              className="hidden md:flex norma-study-mode-btn px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors items-center gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setStudyModeOpen(true);
@@ -293,9 +294,9 @@ export function NormaBlockComponent({
       {/* Articles */}
       {!normaBlock.isCollapsed && (
         <div className="bg-gray-50/50 dark:bg-gray-900/50">
-          {/* Navigation bar - show when structure available OR multiple articles loaded */}
+          {/* Navigation bar - Desktop only: show when structure available OR multiple articles loaded */}
           {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
-            <div className="px-3 pt-2 flex items-center justify-end">
+            <div className="hidden md:flex px-3 pt-2 items-center justify-end">
               <ArticleNavigation
                 allArticleIds={allArticleIds}
                 loadedArticleIds={loadedArticleIds}
@@ -306,8 +307,33 @@ export function NormaBlockComponent({
             </div>
           )}
 
-          {/* Article tabs */}
-          <div className="norma-article-tabs px-3 pt-3 border-b border-gray-200 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar">
+          {/* Mobile: Scrollable list of ALL articles */}
+          <div className="md:hidden bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+            {normaBlock.articles.map((article) => (
+              <div key={article.norma_data.numero_articolo} className="p-4">
+                {/* Article header with close button */}
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-bold text-gray-900 dark:text-white">
+                    Art. {article.norma_data.numero_articolo}
+                  </h4>
+                  <button
+                    onClick={() => onRemoveArticle(article.norma_data.numero_articolo)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                    title="Chiudi articolo"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <ArticleTabContent
+                  data={article}
+                  onCrossReferenceNavigate={onCrossReference}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Article tabs */}
+          <div className="norma-article-tabs hidden md:flex px-3 pt-3 border-b border-gray-200 dark:border-gray-700 gap-2 overflow-x-auto no-scrollbar">
             {normaBlock.articles.map((article) => {
               const id = article.norma_data.numero_articolo;
               const isActive = id === activeArticleId;
@@ -353,15 +379,26 @@ export function NormaBlockComponent({
             })}
           </div>
 
-          {/* Active article content */}
-          <div className="p-4 bg-white dark:bg-gray-800 min-h-[200px]">
-            {activeArticle ? (
-              <ArticleTabContent
-                key={activeArticle.norma_data.numero_articolo}
-                data={activeArticle}
-                onCrossReferenceNavigate={onCrossReference}
-              />
-            ) : (
+          {/* Desktop: Active article content with tab navigation */}
+          <div className="hidden md:block bg-white dark:bg-gray-800 min-h-[200px] overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              {activeArticle && (
+                <motion.div
+                  key={activeArticle.norma_data.numero_articolo}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-4"
+                >
+                  <ArticleTabContent
+                    data={activeArticle}
+                    onCrossReferenceNavigate={onCrossReference}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {!activeArticle && (
               <div className="flex items-center justify-center h-40 text-gray-400">
                 <p className="text-sm">Nessun articolo selezionato</p>
               </div>

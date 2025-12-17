@@ -1,10 +1,7 @@
 import os
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 import structlog
 from bs4 import BeautifulSoup
-import requests
-from aiocache import Cache
+from playwright.async_api import async_playwright, Browser, BrowserContext
 
 from visualex_api.services.http_client import http_client
 from visualex_api.tools.exceptions import NetworkError, ParsingError
@@ -12,60 +9,70 @@ from visualex_api.tools.exceptions import NetworkError, ParsingError
 log = structlog.get_logger()
 
 
-class WebDriverManager:
+class PlaywrightManager:
+    """Manages Playwright browser instances for web scraping and PDF downloads."""
+
     def __init__(self):
-        self.drivers = []
-        log.info("WebDriverManager initialized")
+        self._playwright = None
+        self._browser: Browser | None = None
+        log.info("PlaywrightManager initialized")
 
-    def setup_driver(self, download_dir=None):
-        """
-        Creates a new WebDriver instance configured for handling downloads.
+    async def get_browser(self) -> Browser:
+        """Get or create a browser instance."""
+        if self._browser is None or not self._browser.is_connected():
+            self._playwright = await async_playwright().start()
+            self._browser = await self._playwright.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-dev-shm-usage']
+            )
+            log.info("Playwright browser launched")
+        return self._browser
 
-        Arguments:
-        download_dir -- Directory to save downloads (default is 'download' folder in the current directory)
+    async def new_context(self, download_dir: str | None = None) -> BrowserContext:
+        """Create a new browser context with optional download directory."""
+        browser = await self.get_browser()
 
-        Returns:
-        WebDriver -- A configured WebDriver instance
-        """
-        if download_dir is None:
-            download_dir = os.path.join(os.getcwd(), "download")
-        log.info(f"Setting up WebDriver with download directory: {download_dir}")
-
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920x1080")
-
-        prefs = {
-            "download.default_directory": download_dir,
-            "download.prompt_for_download": False,
-            "download.directory_upgrade": True,
-            "plugins.always_open_pdf_externally": True
+        context_options = {
+            'viewport': {'width': 1920, 'height': 1080},
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-        chrome_options.add_experimental_option("prefs", prefs)
-        
-        try:
-            new_driver = webdriver.Chrome(options=chrome_options)
-            self.drivers.append(new_driver)
-            log.info("WebDriver initialized successfully")
-            return new_driver
-        except Exception as e:
-            log.error(f"Failed to initialize WebDriver: {e}")
-            raise
 
-    def close_drivers(self):
-        """
-        Closes all open WebDriver instances and clears the driver list.
-        """
-        log.info("Closing all WebDriver instances")
-        for driver in self.drivers:
-            try:
-                driver.quit()
-                log.info("WebDriver closed successfully")
-            except Exception as e:
-                log.warning(f"Failed to quit WebDriver: {e}")
-        self.drivers.clear()
-        log.info("All WebDriver instances closed and cleared")
+        if download_dir:
+            if not os.path.exists(download_dir):
+                os.makedirs(download_dir)
+            context_options['accept_downloads'] = True
+
+        context = await browser.new_context(**context_options)
+        log.debug("New browser context created")
+        return context
+
+    async def close(self):
+        """Close the browser and playwright instance."""
+        if self._browser:
+            await self._browser.close()
+            self._browser = None
+            log.info("Browser closed")
+        if self._playwright:
+            await self._playwright.stop()
+            self._playwright = None
+            log.info("Playwright stopped")
+
+
+# Global instance for reuse
+_playwright_manager: PlaywrightManager | None = None
+
+
+def get_playwright_manager() -> PlaywrightManager:
+    """Get the global PlaywrightManager instance."""
+    global _playwright_manager
+    if _playwright_manager is None:
+        _playwright_manager = PlaywrightManager()
+    return _playwright_manager
+
+
+# Legacy alias for backward compatibility
+WebDriverManager = PlaywrightManager
+
 
 class BaseScraper:
     async def request_document(self, url, *, source: str = "base_scraper"):
@@ -85,9 +92,3 @@ class BaseScraper:
         except Exception as e:
             log.error(f"Failed to parse HTML: {e}")
             raise ParsingError(f"Failed to parse HTML content: {e}", html_snippet=html_content)
-
-    
-# Usage example:
-# driver_manager = WebDriverManager()
-# driver = driver_manager.setup_driver()
-# driver_manager.close_drivers()

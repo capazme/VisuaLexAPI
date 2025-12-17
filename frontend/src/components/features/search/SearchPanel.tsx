@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { PanInfo } from 'framer-motion';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
 import { QuickNormsManager } from './QuickNormsManager';
 import { PDFViewer } from '../../ui/PDFViewer';
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
+import { NormaCard } from './NormaCard';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
-import { SearchX, Search, X, Star, Plus, Sparkles } from 'lucide-react';
+import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
@@ -25,7 +28,7 @@ export function SearchPanel() {
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const {
-    addWorkspaceTab, addNormaToTab, workspaceTabs,
+    addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma,
     searchTrigger, clearSearchTrigger,
     quickNorms, useQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
@@ -33,6 +36,16 @@ export function SearchPanel() {
   } = useAppStore();
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
   const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
+
+  // Mobile: active tab index for swipe navigation
+  const [mobileActiveTabIndex, setMobileActiveTabIndex] = useState(0);
+
+  // Keep mobile tab index in bounds when tabs change
+  useEffect(() => {
+    if (mobileActiveTabIndex >= workspaceTabs.length && workspaceTabs.length > 0) {
+      setMobileActiveTabIndex(workspaceTabs.length - 1);
+    }
+  }, [workspaceTabs.length, mobileActiveTabIndex]);
 
   // PDF State
   const [pdfState, setPdfState] = useState<{ isOpen: boolean; url: string | null; isLoading: boolean }>({
@@ -292,13 +305,121 @@ export function SearchPanel() {
       />
 
       {/* Workspace Manager - renders all tabs */}
-      <WorkspaceManager
-        onViewPdf={handleViewPdf}
-        onCrossReference={handleCrossReferenceNavigate}
-      />
+      {/* Desktop: Workspace floating panels - hidden on mobile */}
+      <div className="hidden md:block">
+        <WorkspaceManager
+          onViewPdf={handleViewPdf}
+          onCrossReference={handleCrossReferenceNavigate}
+        />
+      </div>
 
-      {/* Workspace Navigator - dock at bottom showing all tabs */}
-      <WorkspaceNavigator />
+      {/* Desktop: Workspace Navigator dock - hidden on mobile */}
+      <div className="hidden md:block">
+        <WorkspaceNavigator />
+      </div>
+
+      {/* Mobile: Swipeable tabs navigation */}
+      {hasTabs && (
+        <div className="md:hidden w-full h-full flex flex-col overflow-hidden">
+          {/* Tab header with navigation */}
+          <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+            <div className="flex items-center justify-between">
+              {/* Prev button */}
+              <button
+                onClick={() => setMobileActiveTabIndex(Math.max(0, mobileActiveTabIndex - 1))}
+                disabled={mobileActiveTabIndex === 0}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  mobileActiveTabIndex === 0
+                    ? "text-gray-300 dark:text-gray-600"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+              >
+                <ChevronLeft size={20} />
+              </button>
+
+              {/* Tab label and indicator */}
+              <div className="flex-1 text-center">
+                <p className="font-semibold text-gray-900 dark:text-white text-sm truncate px-2">
+                  {workspaceTabs[mobileActiveTabIndex]?.label || 'Risultati'}
+                </p>
+                {/* Dots indicator */}
+                <div className="flex justify-center gap-1.5 mt-2">
+                  {workspaceTabs.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setMobileActiveTabIndex(idx)}
+                      className={cn(
+                        "h-1.5 rounded-full transition-all",
+                        idx === mobileActiveTabIndex
+                          ? "w-4 bg-blue-500"
+                          : "w-1.5 bg-gray-300 dark:bg-gray-600"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Next button */}
+              <button
+                onClick={() => setMobileActiveTabIndex(Math.min(workspaceTabs.length - 1, mobileActiveTabIndex + 1))}
+                disabled={mobileActiveTabIndex === workspaceTabs.length - 1}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  mobileActiveTabIndex === workspaceTabs.length - 1
+                    ? "text-gray-300 dark:text-gray-600"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Swipeable content area */}
+          <div className="flex-1 overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              {workspaceTabs[mobileActiveTabIndex] && (
+                <motion.div
+                  key={workspaceTabs[mobileActiveTabIndex].id}
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.2 }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={(_e: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+                    const threshold = 50;
+                    if (info.offset.x > threshold && mobileActiveTabIndex > 0) {
+                      setMobileActiveTabIndex(mobileActiveTabIndex - 1);
+                    } else if (info.offset.x < -threshold && mobileActiveTabIndex < workspaceTabs.length - 1) {
+                      setMobileActiveTabIndex(mobileActiveTabIndex + 1);
+                    }
+                  }}
+                  className="h-full overflow-y-auto p-4 space-y-4"
+                >
+                  {workspaceTabs[mobileActiveTabIndex].content
+                    .filter((item): item is typeof item & { type: 'norma' } => item.type === 'norma')
+                    .map((normaBlock) => (
+                      <NormaCard
+                        key={normaBlock.id}
+                        norma={normaBlock.norma}
+                        articles={normaBlock.articles || []}
+                        onCloseArticle={(articleId) => {
+                          removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
+                        }}
+                        onPinArticle={() => {}}
+                        onViewPdf={handleViewPdf}
+                        onCrossReference={handleCrossReferenceNavigate}
+                      />
+                    ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       {/* QuickNorms Manager Modal */}
       <QuickNormsManager
@@ -320,8 +441,8 @@ export function SearchPanel() {
             <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl group-hover:bg-blue-500/30 transition-all duration-500" />
 
             {/* Icon Container */}
-            <div className="relative w-32 h-32 bg-white dark:bg-gray-800 rounded-3xl shadow-2xl flex items-center justify-center border border-gray-100 dark:border-gray-700 group-hover:scale-105 transition-transform duration-300">
-              <Search size={48} className="text-blue-500 stroke-[1.5]" />
+            <div className="relative w-24 h-24 sm:w-32 sm:h-32 bg-white dark:bg-gray-800 rounded-3xl shadow-2xl flex items-center justify-center border border-gray-100 dark:border-gray-700 group-hover:scale-105 transition-transform duration-300">
+              <Search size={48} className="text-blue-500 stroke-[1.5] w-10 h-10 sm:w-12 sm:h-12" />
             </div>
 
             {/* Keyboard Shortcut Badge */}

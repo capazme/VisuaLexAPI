@@ -33,8 +33,10 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
       to={to}
       id={id}
       className={({ isActive }) => cn(
-        "relative flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200",
+        "relative flex items-center justify-center rounded-xl transition-all duration-200",
         "hover:bg-white/40 dark:hover:bg-white/10",
+        // Mobile: larger touch target (min 44px)
+        "w-12 h-12 md:w-11 md:h-11",
         isActive && "bg-blue-500/15 dark:bg-blue-500/20"
       )}
       onClick={onClick}
@@ -68,7 +70,7 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
             />
           )}
 
-          {/* Tooltip */}
+          {/* Tooltip - hidden on mobile (touch devices don't need hover tooltips) */}
           <AnimatePresence>
             {showTooltip && (
               <motion.div
@@ -76,7 +78,7 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
+                className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
               >
                 {label}
                 {/* Arrow */}
@@ -106,8 +108,10 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       className={cn(
-        "relative flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200",
+        "relative flex items-center justify-center rounded-xl transition-all duration-200",
         "hover:bg-white/40 dark:hover:bg-white/10",
+        // Mobile: larger touch target (min 44px)
+        "w-12 h-12 md:w-11 md:h-11",
         isActive && "bg-blue-500/15"
       )}
     >
@@ -127,7 +131,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
         />
       </motion.div>
 
-      {/* Tooltip */}
+      {/* Tooltip - hidden on mobile (touch devices don't need hover tooltips) */}
       <AnimatePresence>
         {showTooltip && (
           <motion.div
@@ -135,7 +139,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
+            className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
           >
             {label}
             <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 dark:bg-gray-100 rotate-45" />
@@ -161,8 +165,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
   return (
     <aside
       className={cn(
-        // Base layout
-        "fixed inset-y-0 left-0 z-50 w-16 flex flex-col",
+        // Base layout - wider on mobile for better touch targets
+        "fixed inset-y-0 left-0 z-50 flex flex-col",
+        "w-20 md:w-16",
         // Glass effect using CSS variables
         "backdrop-blur-2xl",
         "shadow-glass",
@@ -202,16 +207,16 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         )}
       </div>
 
-      {/* Navigation */}
-      <nav id="tour-sidebar" className="flex-1 flex flex-col items-center py-4 gap-2">
+      {/* Navigation - more spacing on mobile for easier tapping */}
+      <nav id="tour-sidebar" className="flex-1 flex flex-col items-center py-4 gap-3 md:gap-2">
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 
-      {/* System Actions */}
-      <div className="flex flex-col items-center py-4 gap-2 border-t border-white/10 dark:border-white/5">
+      {/* System Actions - more spacing on mobile */}
+      <div className="flex flex-col items-center py-4 gap-3 md:gap-2 border-t border-white/10 dark:border-white/5">
         <ActionButton
           icon={Settings}
           label="Impostazioni"
@@ -229,8 +234,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         <button
           onClick={() => setShowUserMenu(!showUserMenu)}
           className={cn(
-            "relative flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200",
+            "relative flex items-center justify-center rounded-xl transition-all duration-200",
             "hover:bg-white/40 dark:hover:bg-white/10",
+            // Mobile: larger touch target
+            "w-12 h-12 md:w-11 md:h-11",
             showUserMenu && "bg-blue-500/15"
           )}
         >
@@ -239,7 +246,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
             whileTap={{ scale: 0.95 }}
             transition={SPRING_CONFIG}
             className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold",
+              "rounded-lg flex items-center justify-center text-sm font-semibold",
+              // Mobile: larger avatar
+              "w-9 h-9 md:w-8 md:h-8",
               isAdmin
                 ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
                 : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
@@ -252,15 +261,27 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         {/* User Dropdown Menu */}
         <AnimatePresence>
           {showUserMenu && (
-            <motion.div
-              initial={{ opacity: 0, x: -8, scale: 0.95 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: -8, scale: 0.95 }}
-              transition={{ duration: 0.15 }}
-              className="absolute left-full bottom-0 ml-3 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50"
-            >
+            <>
+              {/* Mobile backdrop to close menu */}
+              <div
+                className="fixed inset-0 z-40 lg:hidden"
+                onClick={() => setShowUserMenu(false)}
+              />
+              <motion.div
+                initial={{ opacity: 0, x: -8, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -8, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className={cn(
+                  "absolute bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50",
+                  // Mobile: wider menu, position above the button
+                  "w-56 bottom-full mb-2 left-1/2 -translate-x-1/2",
+                  // Desktop: standard width, position to the right
+                  "md:w-48 lg:bottom-0 lg:mb-0 lg:left-full lg:ml-3 lg:translate-x-0"
+                )}
+              >
               {/* User Info */}
-              <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700">
+              <div className="px-4 py-3 md:py-2 border-b border-gray-100 dark:border-gray-700">
                 <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
                   {user?.username}
                 </p>
@@ -273,7 +294,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
                 )}
               </div>
 
-              {/* Menu Items */}
+              {/* Menu Items - larger touch targets on mobile */}
               <div className="py-1">
                 {isAdmin && (
                   <button
@@ -281,7 +302,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
                       setShowUserMenu(false);
                       navigate('/admin');
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
                     <Shield size={16} />
                     Pannello Admin
@@ -293,13 +314,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
                     logout();
                     navigate('/login');
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <LogOut size={16} />
                   Esci
                 </button>
               </div>
             </motion.div>
+            </>
           )}
         </AnimatePresence>
       </div>
