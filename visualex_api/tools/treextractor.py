@@ -5,6 +5,7 @@ import logging
 import re
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
+from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
 
@@ -16,6 +17,32 @@ logging.basicConfig(level=logging.INFO,
 
 # Persistent cache for tree structures (survives restarts)
 _tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours
+
+
+async def _fetch_with_playwright(url: str) -> str:
+    """
+    Fetch URL using Playwright to bypass CloudFront WAF protection.
+    Used for EUR-Lex which blocks simple HTTP requests.
+    """
+    logging.info(f"Fetching with Playwright (WAF bypass): {url[:80]}...")
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-dev-shm-usage']
+        )
+        try:
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
+            page = await context.new_page()
+            await page.goto(url, wait_until='networkidle', timeout=45000)
+            html = await page.content()
+            await context.close()
+            return html
+        finally:
+            await browser.close()
+
 
 @cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer())
 async def get_tree(normurn, link=False, details=False):
@@ -44,11 +71,19 @@ async def get_tree(normurn, link=False, details=False):
         logging.info(f"Persistent cache hit for tree: {normurn[:50]}")
         return cached_result.get("result", []), cached_result.get("count", 0)
 
+    # Use different fetch methods based on source
+    is_eurlex = "eur-lex" in normurn
+
     try:
-        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
-            async with session.get(normurn, timeout=30) as response:
-                response.raise_for_status()
-                text = await response.text()
+        if is_eurlex:
+            # EUR-Lex requires Playwright to bypass WAF
+            text = await _fetch_with_playwright(normurn)
+        else:
+            # Normattiva and others use simple HTTP
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+                async with session.get(normurn, timeout=30) as response:
+                    response.raise_for_status()
+                    text = await response.text()
     except aiohttp.ClientError as e:
         logging.error(f"HTTP error while fetching page: {e}", exc_info=True)
         return f"Failed to retrieve the page: {e}", 0
@@ -59,11 +94,15 @@ async def get_tree(normurn, link=False, details=False):
         logging.error(f"Unexpected error: {e}", exc_info=True)
         return f"Unexpected error: {e}", 0
 
+    if not text or len(text) < 500:
+        logging.error(f"Empty or too short response from {normurn[:50]}")
+        return "Empty response from server", 0
+
     soup = BeautifulSoup(text, 'html.parser')
 
     if "normattiva" in normurn:
         result, count = await _parse_normattiva_tree(soup, normurn, link, details)
-    elif "eur-lex" in normurn:
+    elif is_eurlex:
         result, count = await _parse_eurlex_tree(soup, normurn, link, details)
     else:
         logging.warning(f"Unrecognized norm URN format: {normurn}")

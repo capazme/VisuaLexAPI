@@ -1,61 +1,5 @@
 [
   {
-    "act_type": "legge",
-    "act_number": "241",
-    "article": "14",
-    "date": "1990-01-01",
-    "timestamp": "2025-12-14T18:42:02.163572Z"
-  },
-  {
-    "act_type": "legge",
-    "act_number": "241",
-    "article": "10",
-    "date": "1990-01-01",
-    "timestamp": "2025-12-14T18:42:15.642878Z"
-  },
-  {
-    "act_type": "legge",
-    "act_number": "241",
-    "article": "10 bis",
-    "date": "1990-01-01",
-    "timestamp": "2025-12-14T18:42:18.146660Z"
-  },
-  {
-    "act_type": "legge",
-    "act_number": "241",
-    "article": "10",
-    "date": "1990-01-01",
-    "timestamp": "2025-12-14T18:42:51.130838Z"
-  },
-  {
-    "act_type": "codice di procedura penale",
-    "act_number": "",
-    "article": "503",
-    "date": "",
-    "timestamp": "2025-12-14T18:43:13.837216Z"
-  },
-  {
-    "act_type": "legge",
-    "act_number": "241",
-    "article": "10,10-bis,12,13,14",
-    "date": "1990-01-01",
-    "timestamp": "2025-12-14T18:48:09.096738Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "1",
-    "date": "",
-    "timestamp": "2025-12-14T23:15:55.288179Z"
-  },
-  {
-    "act_type": "legge",
-    "act_number": "633",
-    "article": "1",
-    "date": "1941",
-    "timestamp": "2025-12-14T23:16:53.197923Z"
-  },
-  {
     "act_type": "Regolamento UE",
     "act_number": "679",
     "article": "1",
@@ -348,5 +292,61 @@
     "article": "1",
     "date": "",
     "timestamp": "2025-12-17T10:29:49.498830Z"
+  },
+  {
+    "act_type": "legge",
+    "act_number": "241",
+    "article": "4",
+    "date": "1990-01-01",
+    "timestamp": "2025-12-17T13:52:12.803235Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "5",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:33.033679Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "6",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:35.024269Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "7",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:35.994482Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "8",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:36.880394Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "9",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:37.732362Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "10",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:38.447728Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "11",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-17T13:55:39.057511Z"
   }
 ]
