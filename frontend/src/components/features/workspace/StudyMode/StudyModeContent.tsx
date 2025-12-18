@@ -1,5 +1,4 @@
 import { useRef, useMemo, useEffect, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowUpRight, StickyNote } from 'lucide-react';
 import { SelectionPopup } from '../../search/SelectionPopup';
@@ -54,7 +53,6 @@ export function StudyModeContent({
   const contentRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [activeFootnote, setActiveFootnote] = useState<Footnote | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
 
   const { article_text, norma_data } = article;
   const styles = THEME_CONTENT_STYLES[theme];
@@ -122,10 +120,7 @@ export function StudyModeContent({
   const toggleFootnotesPanel = useCallback(() => {
     if (activeFootnote) {
       setActiveFootnote(null);
-      setTooltipPosition(null);
     } else if (footnotes?.length) {
-      // Position near the floating button (bottom-right)
-      setTooltipPosition({ top: 0, left: 0 }); // Will be positioned via CSS
       setActiveFootnote(footnotes[0]); // Just to trigger the panel
     }
   }, [activeFootnote, footnotes]);
@@ -137,7 +132,6 @@ export function StudyModeContent({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setActiveFootnote(null);
-        setTooltipPosition(null);
       }
     };
 
