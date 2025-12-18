@@ -235,9 +235,9 @@ export function NormaBlockComponent({
 
         {!normaBlock.isCollapsed && (
           <div className="flex items-center gap-2">
-            {/* Study Mode Button - Desktop only (study features) */}
+            {/* Study Mode Button - Visible on all screen sizes */}
             <button
-              className="hidden md:flex norma-study-mode-btn px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors items-center gap-1"
+              className="flex norma-study-mode-btn px-1.5 sm:px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors items-center gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setStudyModeOpen(true);
@@ -245,7 +245,7 @@ export function NormaBlockComponent({
               title="Modalità studio"
             >
               <BookOpen size={12} />
-              Studio
+              <span className="hidden sm:inline">Studio</span>
             </button>
             {normaBlock.norma.urn && (
               <button
@@ -327,6 +327,7 @@ export function NormaBlockComponent({
                 <ArticleTabContent
                   data={article}
                   onCrossReferenceNavigate={onCrossReference}
+                  onOpenStudyMode={() => setStudyModeOpen(true)}
                 />
               </div>
             ))}
@@ -394,6 +395,7 @@ export function NormaBlockComponent({
                   <ArticleTabContent
                     data={activeArticle}
                     onCrossReferenceNavigate={onCrossReference}
+                    onOpenStudyMode={() => setStudyModeOpen(true)}
                   />
                 </motion.div>
               )}

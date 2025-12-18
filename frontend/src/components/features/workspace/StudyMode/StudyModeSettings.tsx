@@ -70,7 +70,11 @@ export function StudyModeSettings({
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed top-16 right-6 z-40 w-72 rounded-xl shadow-2xl border",
+              "fixed z-40 rounded-xl shadow-2xl border",
+              // Mobile: nearly full width, centered horizontally
+              "left-4 right-4 top-16 w-auto",
+              // Desktop: fixed width and position
+              "sm:left-auto sm:right-6 sm:w-72",
               styles.bg,
               styles.border
             )}

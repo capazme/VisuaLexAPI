@@ -85,23 +85,23 @@ export function StudyModeHeader({
             styles.border
           )}
         >
-          <div className="flex items-center justify-between px-4 py-2">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-2 gap-1 sm:gap-2">
             {/* Left: Close, Drag handle & Title */}
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
               <button
                 onClick={onClose}
-                className={cn("p-1.5 rounded-lg transition-colors", styles.button)}
+                className={cn("p-1 sm:p-1.5 rounded-lg transition-colors", styles.button)}
                 title="Chiudi (ESC)"
               >
                 <X size={18} />
               </button>
 
-              {/* Drag handle - only when not fullscreen */}
+              {/* Drag handle - only when not fullscreen and on larger screens */}
               {!isFullscreen && onDragStart && (
                 <div
                   onMouseDown={onDragStart}
                   className={cn(
-                    "p-1.5 rounded-lg transition-colors cursor-grab",
+                    "hidden sm:block p-1.5 rounded-lg transition-colors cursor-grab",
                     isDragging ? "cursor-grabbing bg-gray-200 dark:bg-gray-700" : styles.button
                   )}
                   title="Trascina finestra"
@@ -110,10 +110,10 @@ export function StudyModeHeader({
                 </div>
               )}
 
-              <div className="min-w-0 ml-2">
-                <h1 className="font-medium text-sm truncate">{normaLabel}</h1>
+              <div className="min-w-0 ml-1 sm:ml-2">
+                <h1 className="font-medium text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">{normaLabel}</h1>
                 <p className={cn(
-                  "text-xs truncate",
+                  "text-xs truncate hidden sm:block",
                   theme === 'dark' ? 'text-gray-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-gray-500'
                 )}>
                   Art. {article.norma_data.numero_articolo}
@@ -122,52 +122,52 @@ export function StudyModeHeader({
             </div>
 
             {/* Center: Navigation */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-0.5 sm:gap-2">
               <button
                 onClick={() => onNavigate('prev')}
                 disabled={!hasPrev}
                 className={cn(
-                  "p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+                  "p-1.5 sm:p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
                   styles.button
                 )}
                 title="Precedente (←)"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
               </button>
 
               <span className={cn(
-                "text-sm font-medium min-w-[60px] text-center tabular-nums",
+                "text-xs sm:text-sm font-medium min-w-[40px] sm:min-w-[60px] text-center tabular-nums",
                 theme === 'dark' ? 'text-gray-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-gray-500'
               )}>
-                {currentIndex + 1} / {totalArticles}
+                {currentIndex + 1}/{totalArticles}
               </span>
 
               <button
                 onClick={() => onNavigate('next')}
                 disabled={!hasNext}
                 className={cn(
-                  "p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+                  "p-1.5 sm:p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
                   styles.button
                 )}
                 title="Successivo (→)"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={18} className="sm:w-5 sm:h-5" />
               </button>
             </div>
 
             {/* Right: Panels, Theme, Settings, Bookmark, Fullscreen */}
-            <div className="flex items-center gap-1 flex-1 justify-end">
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-1 justify-end">
               {/* Panel Toggles */}
               {onToggleTools && (
                 <button
                   onClick={onToggleTools}
                   className={cn(
-                    "p-1.5 rounded-lg transition-colors",
+                    "p-1 sm:p-1.5 rounded-lg transition-colors",
                     showToolsPanel ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : styles.button
                   )}
                   title="Note e highlights (T)"
                 >
-                  <StickyNote size={16} />
+                  <StickyNote size={14} className="sm:w-4 sm:h-4" />
                 </button>
               )}
 
@@ -175,20 +175,20 @@ export function StudyModeHeader({
                 <button
                   onClick={onToggleBrocardi}
                   className={cn(
-                    "p-1.5 rounded-lg transition-colors",
+                    "p-1 sm:p-1.5 rounded-lg transition-colors",
                     showBrocardi ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/30' : styles.button
                   )}
                   title="Approfondimenti (B)"
                 >
-                  <Lightbulb size={16} />
+                  <Lightbulb size={14} className="sm:w-4 sm:h-4" />
                 </button>
               )}
 
-              <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+              <div className="hidden sm:block w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
 
-              {/* Quick Theme Toggle */}
+              {/* Quick Theme Toggle - hidden on mobile, use settings instead */}
               <div className={cn(
-                "flex items-center rounded-lg p-0.5",
+                "hidden sm:flex items-center rounded-lg p-0.5",
                 theme === 'dark' ? 'bg-gray-800' : theme === 'sepia' ? 'bg-[#e4d4b8]' : 'bg-gray-100'
               )}>
                 <button
@@ -225,31 +225,31 @@ export function StudyModeHeader({
 
               <button
                 onClick={onToggleSettings}
-                className={cn("p-1.5 rounded-lg transition-colors", styles.button)}
+                className={cn("p-1 sm:p-1.5 rounded-lg transition-colors", styles.button)}
                 title="Impostazioni (S)"
               >
-                <Settings size={16} />
+                <Settings size={14} className="sm:w-4 sm:h-4" />
               </button>
 
               <button
                 onClick={onBookmark}
                 className={cn(
-                  "p-1.5 rounded-lg transition-colors",
+                  "p-1 sm:p-1.5 rounded-lg transition-colors",
                   isBookmarked ? 'text-yellow-500' : styles.button
                 )}
                 title="Segnalibro (⌘B)"
               >
-                <Bookmark size={16} className={isBookmarked ? 'fill-current' : ''} />
+                <Bookmark size={14} className={cn("sm:w-4 sm:h-4", isBookmarked ? 'fill-current' : '')} />
               </button>
 
               {/* Fullscreen Toggle */}
               {onToggleFullscreen && (
                 <button
                   onClick={onToggleFullscreen}
-                  className={cn("p-1.5 rounded-lg transition-colors", styles.button)}
+                  className={cn("p-1 sm:p-1.5 rounded-lg transition-colors", styles.button)}
                   title={isFullscreen ? "Riduci (F)" : "Espandi (F)"}
                 >
-                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                  {isFullscreen ? <Minimize2 size={14} className="sm:w-4 sm:h-4" /> : <Maximize2 size={14} className="sm:w-4 sm:h-4" />}
                 </button>
               )}
             </div>

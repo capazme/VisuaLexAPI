@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, Lightbulb, ChevronDown } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
-import type { BrocardiInfo } from '../../../../types';
+import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPopoverProps {
@@ -49,7 +49,7 @@ const THEME_STYLES: Record<StudyModeTheme, {
 
 interface SectionProps {
   title: string;
-  content: string | string[] | null;
+  content: string | string[] | (string | MassimaStructured)[] | null;
   theme: StudyModeTheme;
   defaultOpen?: boolean;
 }
@@ -60,11 +60,21 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
 
   if (!content || (Array.isArray(content) && content.length === 0)) return null;
 
-  const validContent = Array.isArray(content)
-    ? content.filter(item => item && item.replace(/<[^>]*>/g, '').trim().length > 0)
-    : content;
+  // Handle Massime specially - convert to string array
+  let validContent: string | string[];
+  if (Array.isArray(content)) {
+    validContent = content
+      .map(item => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'massima' in item) return item.massima;
+        return '';
+      })
+      .filter(item => item && item.replace(/<[^>]*>/g, '').trim().length > 0);
 
-  if (Array.isArray(validContent) && validContent.length === 0) return null;
+    if (validContent.length === 0) return null;
+  } else {
+    validContent = content;
+  }
 
   return (
     <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
@@ -101,7 +111,7 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
               {title === 'Massime' && Array.isArray(validContent) ? (
                 <div className="space-y-2">
                   {validContent.map((item, idx) => (
-                    <div key={idx} className="flex gap-2 text-xs">
+                    <div key={`popover-massima-${idx}`} className="flex gap-2 text-xs">
                       <span className={cn(
                         "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs",
                         styles.section,
@@ -119,7 +129,7 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
               ) : Array.isArray(validContent) ? (
                 <ul className="space-y-1 text-xs">
                   {validContent.map((item, idx) => (
-                    <li key={idx}>{item}</li>
+                    <li key={`popover-item-${idx}`}>{item}</li>
                   ))}
                 </ul>
               ) : (
@@ -128,6 +138,66 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
                   className="prose prose-sm max-w-none text-xs leading-relaxed"
                 />
               )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+interface FootnotesSectionProps {
+  footnotes: Footnote[];
+  theme: StudyModeTheme;
+}
+
+function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const styles = THEME_STYLES[theme];
+
+  if (!footnotes || footnotes.length === 0) return null;
+
+  return (
+    <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-2 transition-colors text-left",
+          styles.section,
+          styles.sectionHover
+        )}
+      >
+        <span className={cn("text-xs font-medium", styles.muted)}>
+          Note al Dispositivo
+          <span className="ml-1 opacity-60">({footnotes.length})</span>
+        </span>
+        <ChevronDown
+          size={12}
+          className={cn("transition-transform", styles.muted, isOpen && "rotate-180")}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className={cn("p-3 text-sm max-h-48 overflow-y-auto space-y-2", styles.text)}>
+              {footnotes.map((footnote) => (
+                <div key={`popover-footnote-${footnote.numero}`} className="flex gap-2 text-xs">
+                  <span className={cn(
+                    "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold",
+                    "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                  )}>
+                    {footnote.numero}
+                  </span>
+                  <p className="flex-1 leading-relaxed">{footnote.testo}</p>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
@@ -148,19 +218,25 @@ export function StudyModeBrocardiPopover({
     brocardiInfo.Brocardi ||
     brocardiInfo.Ratio ||
     brocardiInfo.Spiegazione ||
-    (brocardiInfo.Massime && brocardiInfo.Massime.length > 0)
+    (brocardiInfo.Massime && brocardiInfo.Massime.length > 0) ||
+    (brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0)
   );
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.15 }}
           className={cn(
-            "absolute right-4 top-4 w-80 max-h-[70vh] flex flex-col rounded-lg shadow-xl border z-20",
+            // Base styles
+            "absolute flex flex-col rounded-lg shadow-xl border z-20",
+            // Mobile: nearly full width, centered
+            "left-4 right-4 top-auto bottom-4 max-h-[70vh]",
+            // Desktop: fixed position and width
+            "sm:left-auto sm:right-4 sm:top-4 sm:bottom-auto sm:w-80",
             styles.bg,
             styles.border
           )}
@@ -191,6 +267,9 @@ export function StudyModeBrocardiPopover({
                 <BrocardiSection title="Ratio" content={brocardiInfo.Ratio} theme={theme} />
                 <BrocardiSection title="Spiegazione" content={brocardiInfo.Spiegazione} theme={theme} />
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
+                {brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0 && (
+                  <FootnotesSection footnotes={brocardiInfo.Footnotes} theme={theme} />
+                )}
 
                 {brocardiInfo.link && (
                   <a

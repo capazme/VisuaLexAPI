@@ -7,6 +7,7 @@ import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { ArticleMinimap } from '../workspace/ArticleMinimap';
+import { StudyMode } from '../workspace/StudyMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
 
@@ -36,6 +37,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
     const first = articles[0]?.norma_data?.numero_articolo;
     return first ? new Set([first]) : new Set();
   });
+  // Study Mode state
+  const [studyModeOpen, setStudyModeOpen] = useState(false);
+  const [studyModeArticle, setStudyModeArticle] = useState<ArticleData | null>(null);
   const { triggerSearch } = useAppStore();
 
   const toggleArticleExpanded = (articleId: string) => {
@@ -48,6 +52,11 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
       }
       return next;
     });
+  };
+
+  const openStudyMode = (article: ArticleData) => {
+    setStudyModeArticle(article);
+    setStudyModeOpen(true);
   };
 
   const handleQuickAddArticle = (e: React.FormEvent) => {
@@ -494,6 +503,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                           <ArticleTabContent
                             data={article}
                             onCrossReferenceNavigate={onCrossReference}
+                            onOpenStudyMode={() => openStudyMode(article)}
                           />
                         </div>
                       </motion.div>
@@ -527,6 +537,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                   <ArticleTabContent
                     data={activeArticle}
                     onCrossReferenceNavigate={onCrossReference}
+                    onOpenStudyMode={() => openStudyMode(activeArticle)}
                   />
                 </motion.div>
               )}
@@ -539,6 +550,20 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           </div>
         </div>
       )}
+
+      {/* Study Mode */}
+      <AnimatePresence>
+        {studyModeOpen && studyModeArticle && (
+          <StudyMode
+            article={studyModeArticle}
+            onClose={() => {
+              setStudyModeOpen(false);
+              setStudyModeArticle(null);
+            }}
+            onCrossReferenceNavigate={onCrossReference}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

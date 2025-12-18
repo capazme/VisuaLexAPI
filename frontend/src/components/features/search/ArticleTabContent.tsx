@@ -14,6 +14,7 @@ import { SafeHTML } from '../../../utils/sanitize';
 interface ArticleTabContentProps {
     data: ArticleData;
     onCrossReferenceNavigate?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
+    onOpenStudyMode?: () => void;
 }
 
 const DICTIONARY_TERMS: Record<string, string> = {
@@ -31,7 +32,7 @@ const HIGHLIGHT_STYLES: Record<string, string> = {
     blue: 'background-color:#DBEAFE;color:#1E3A8A;',
 };
 
-export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTabContentProps) {
+export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
     const {
         annotations,
@@ -55,7 +56,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
     const [versionDate, setVersionDate] = useState('');
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [showHighlightPicker, setShowHighlightPicker] = useState(false);
-    const [mobileStudyMode, setMobileStudyMode] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
     const highlightSelectionRef = useRef<{ start: number; end: number; text: string } | null>(null);
 
@@ -368,23 +368,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                     >
                         <Copy size={20} />
                     </button>
-                    {/* Mobile Study Mode toggle */}
+                    {/* Study Mode button - sempre visibile */}
                     <button
-                        onClick={() => setMobileStudyMode(!mobileStudyMode)}
-                        className={cn(
-                            "p-2.5 rounded transition-colors relative",
-                            mobileStudyMode
-                                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
-                                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400"
-                        )}
+                        onClick={onOpenStudyMode}
+                        className="p-2.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-purple-500 transition-colors"
                         title="Modalità studio"
                     >
                         <BookOpen size={20} />
-                        {(itemAnnotations.length > 0 || articleHighlights.length > 0) && (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 text-white text-[10px] rounded-full flex items-center justify-center">
-                                {itemAnnotations.length + articleHighlights.length}
-                            </span>
-                        )}
                     </button>
                     {url && (
                         <a
@@ -542,88 +532,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
                 </div>
             </div>
 
-            {/* Mobile Study Mode Panel */}
-            {mobileStudyMode && (
-                <div className="md:hidden mb-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800/30 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <h6 className="text-xs font-bold text-purple-700 dark:text-purple-400 uppercase flex items-center gap-2">
-                            <BookOpen size={14} /> Modalità Studio
-                        </h6>
-                        <button
-                            onClick={() => setMobileStudyMode(false)}
-                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        >
-                            <X size={16} />
-                        </button>
-                    </div>
-
-                    {/* Highlight controls */}
-                    <div className="mb-4">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Evidenzia testo selezionato:</p>
-                        <div className="flex gap-2">
-                            {(['yellow', 'green', 'red', 'blue'] as const).map(color => (
-                                <button
-                                    key={color}
-                                    onClick={() => handleHighlightAdd(color)}
-                                    className={cn(
-                                        "w-10 h-10 rounded-full border-2 transition-all active:scale-95",
-                                        color === 'yellow' && 'bg-yellow-200 border-yellow-400',
-                                        color === 'green' && 'bg-green-200 border-green-400',
-                                        color === 'red' && 'bg-red-200 border-red-400',
-                                        color === 'blue' && 'bg-blue-200 border-blue-400'
-                                    )}
-                                    title={`Evidenzia in ${color}`}
-                                />
-                            ))}
-                        </div>
-                        {articleHighlights.length > 0 && (
-                            <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                                {articleHighlights.length} evidenziazion{articleHighlights.length === 1 ? 'e' : 'i'}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Notes section */}
-                    <div className="border-t border-purple-200 dark:border-purple-800/30 pt-3">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
-                            <StickyNote size={12} /> Note ({itemAnnotations.length})
-                        </p>
-
-                        {itemAnnotations.length > 0 && (
-                            <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                                {itemAnnotations.map(note => (
-                                    <div key={note.id} className="bg-white dark:bg-gray-800 p-2 rounded shadow-sm text-sm relative">
-                                        <p className="text-gray-700 dark:text-gray-300 text-xs line-clamp-2">{note.text}</p>
-                                        <button
-                                            onClick={() => removeAnnotation(note.id)}
-                                            className="absolute top-1 right-1 p-1 text-gray-400 hover:text-red-500"
-                                        >
-                                            <X size={12} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <div className="flex gap-2">
-                            <textarea
-                                value={noteText}
-                                onChange={e => setNoteText(e.target.value)}
-                                placeholder="Aggiungi nota..."
-                                className="flex-1 text-sm rounded-md border-purple-300 dark:border-purple-800 bg-white dark:bg-gray-900 p-2 focus:ring-purple-500 focus:border-purple-500 min-h-[50px]"
-                            />
-                            <button
-                                onClick={handleAddNote}
-                                className="self-end bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-md text-sm font-medium"
-                            >
-                                +
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Desktop only: Notes panel (study feature) */}
+            {/* Notes panel (study feature) */}
             {(showNotes || itemAnnotations.length > 0) && (
                 <div className="hidden md:block mb-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30 rounded-lg p-4">
                     <h6 className="text-xs font-bold text-yellow-700 dark:text-yellow-500 uppercase mb-2 flex items-center gap-2">
@@ -700,7 +609,31 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate }: ArticleTab
             )}
 
             {brocardi_info && (
-                <BrocardiDisplay info={brocardi_info} />
+                <BrocardiDisplay
+                    info={brocardi_info}
+                    currentNorma={{
+                        tipo_atto: norma_data.tipo_atto,
+                        data: norma_data.data,
+                        numero_atto: norma_data.numero_atto
+                    }}
+                    onArticleClick={(articleNumber, tipoAtto) => {
+                        // Se è la stessa norma e onCrossReferenceNavigate è disponibile, usalo
+                        if (tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase() && onCrossReferenceNavigate) {
+                            onCrossReferenceNavigate(articleNumber, norma_data);
+                        } else {
+                            // Altrimenti apri nuova tab
+                            const isSameActType = tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase();
+                            triggerSearch({
+                                act_type: tipoAtto,
+                                act_number: isSameActType && norma_data.numero_atto ? norma_data.numero_atto : '',
+                                date: isSameActType && norma_data.data ? norma_data.data : '',
+                                article: articleNumber,
+                                version: 'vigente',
+                                show_brocardi_info: true,
+                            });
+                        }
+                    }}
+                />
             )}
 
             {url && (

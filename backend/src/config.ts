@@ -13,7 +13,7 @@ export const config = {
   },
 
   cors: {
-    origins: (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+    origins: (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3001')
       .split(',')
       .map(origin => origin.trim()),
   },

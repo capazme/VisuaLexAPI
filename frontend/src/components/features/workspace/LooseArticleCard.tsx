@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { FileText, GripVertical, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { useDraggable } from '@dnd-kit/core';
 import type { LooseArticle } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
+import { StudyMode } from './StudyMode';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 
@@ -23,6 +25,7 @@ export function LooseArticleCard({
 }: LooseArticleCardProps) {
   const { article, sourceNorma } = looseArticle;
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [studyModeOpen, setStudyModeOpen] = useState(false);
 
   // Make this loose article draggable
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -114,9 +117,21 @@ export function LooseArticleCard({
           <ArticleTabContent
             data={article}
             onCrossReferenceNavigate={onCrossReference}
+            onOpenStudyMode={() => setStudyModeOpen(true)}
           />
         </div>
       )}
+
+      {/* Study Mode */}
+      <AnimatePresence>
+        {studyModeOpen && (
+          <StudyMode
+            article={article}
+            onClose={() => setStudyModeOpen(false)}
+            onCrossReferenceNavigate={onCrossReference}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

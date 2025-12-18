@@ -3,7 +3,7 @@ import { Pin, PinOff, ExternalLink, Lightbulb, ChevronDown } from 'lucide-react'
 import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
-import type { BrocardiInfo } from '../../../../types';
+import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPanelProps {
@@ -52,7 +52,7 @@ const THEME_PANEL_STYLES: Record<StudyModeTheme, {
 
 interface SectionProps {
   title: string;
-  content: string | string[] | null;
+  content: string | string[] | (string | MassimaStructured)[] | null;
   theme: StudyModeTheme;
 }
 
@@ -62,11 +62,21 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
 
   if (!content || (Array.isArray(content) && content.length === 0)) return null;
 
-  const validContent = Array.isArray(content)
-    ? content.filter(item => item && item.replace(/<[^>]*>/g, '').trim().length > 0)
-    : content;
+  // Handle Massime specially - convert to string array
+  let validContent: string | string[];
+  if (Array.isArray(content)) {
+    validContent = content
+      .map(item => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'massima' in item) return item.massima;
+        return '';
+      })
+      .filter(item => item && item.replace(/<[^>]*>/g, '').trim().length > 0);
 
-  if (Array.isArray(validContent) && validContent.length === 0) return null;
+    if (validContent.length === 0) return null;
+  } else {
+    validContent = content;
+  }
 
   return (
     <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
@@ -104,7 +114,7 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
               {title === 'Massime' && Array.isArray(validContent) ? (
                 <div className="space-y-3">
                   {validContent.map((item, idx) => (
-                    <div key={idx} className="flex gap-3">
+                    <div key={`study-massima-${idx}`} className="flex gap-3">
                       <span className={cn(
                         "shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium",
                         styles.section,
@@ -122,7 +132,7 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
               ) : Array.isArray(validContent) ? (
                 <ul className="space-y-2">
                   {validContent.map((item, idx) => (
-                    <li key={idx}>{item}</li>
+                    <li key={`study-item-${idx}`}>{item}</li>
                   ))}
                 </ul>
               ) : (
@@ -131,6 +141,67 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
                   className="prose prose-sm max-w-none"
                 />
               )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+interface FootnotesSectionProps {
+  footnotes: Footnote[];
+  theme: StudyModeTheme;
+}
+
+function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
+  const [isOpen, setIsOpen] = useState(true);
+  const styles = THEME_PANEL_STYLES[theme];
+
+  if (!footnotes || footnotes.length === 0) return null;
+
+  return (
+    <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          "w-full flex items-center justify-between px-4 py-2 transition-colors text-left",
+          styles.section,
+          styles.sectionHover
+        )}
+      >
+        <span className={cn("text-xs font-bold uppercase flex items-center gap-2", styles.muted)}>
+          <Lightbulb size={14} className="text-amber-500" />
+          Note al Dispositivo
+          <span className="text-xs font-normal">({footnotes.length})</span>
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", styles.muted, isOpen && "rotate-180")}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className={cn("p-4 text-sm space-y-3", styles.text)}>
+              {footnotes.map((footnote) => (
+                <div key={`study-footnote-${footnote.numero}`} className="flex gap-3">
+                  <span className={cn(
+                    "shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold",
+                    "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                  )}>
+                    {footnote.numero}
+                  </span>
+                  <p className="flex-1 leading-relaxed">{footnote.testo}</p>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
@@ -154,21 +225,27 @@ export function StudyModeBrocardiPanel({
     brocardiInfo.Brocardi ||
     brocardiInfo.Ratio ||
     brocardiInfo.Spiegazione ||
-    (brocardiInfo.Massime && brocardiInfo.Massime.length > 0)
+    (brocardiInfo.Massime && brocardiInfo.Massime.length > 0) ||
+    (brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0)
   );
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.aside
-          initial={{ x: '100%', opacity: 0.8 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: '100%', opacity: 0.8 }}
+          initial={{ y: '100%', opacity: 0.8 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0.8 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           className={cn(
-            "absolute right-0 top-0 bottom-0 w-96 z-10 flex flex-col border-l shadow-xl",
+            // Base styles
+            "absolute z-10 flex flex-col shadow-xl",
+            // Mobile: bottom sheet style
+            "inset-x-0 bottom-0 top-auto h-[60vh] rounded-t-xl border-t",
+            // Desktop: side panel style
+            "sm:right-0 sm:top-0 sm:bottom-0 sm:left-auto sm:h-auto sm:w-96 sm:rounded-none sm:border-t-0 sm:border-l",
             styles.bg,
             styles.border
           )}
@@ -200,6 +277,9 @@ export function StudyModeBrocardiPanel({
                 <BrocardiSection title="Ratio" content={brocardiInfo.Ratio} theme={theme} />
                 <BrocardiSection title="Spiegazione" content={brocardiInfo.Spiegazione} theme={theme} />
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
+                {brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0 && (
+                  <FootnotesSection footnotes={brocardiInfo.Footnotes} theme={theme} />
+                )}
 
                 {brocardiInfo.link && (
                   <a

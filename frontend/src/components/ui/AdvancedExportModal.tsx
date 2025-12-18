@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import type { ArticleData } from '../../types';
+import type { ArticleData, MassimaStructured } from '../../types';
 
 interface ExportSection {
   id: string;
@@ -45,13 +45,22 @@ export function AdvancedExportModal({
   const massimeList = useMemo(() => {
     if (!brocardi_info?.Massime || !Array.isArray(brocardi_info.Massime)) return [];
     return brocardi_info.Massime
-      .filter(m => m && m.replace(/<[^>]*>/g, '').trim().length > 0)
-      .map((m, idx) => ({
-        id: `massima-${idx}`,
-        text: m.replace(/<[^>]*>/g, '').trim(),
-        html: m,
-        selected: false
-      }));
+      .filter(m => {
+        if (!m) return false;
+        // Handle both string and structured formats
+        const text = typeof m === 'string' ? m : (m as MassimaStructured).massima;
+        return text && text.replace(/<[^>]*>/g, '').trim().length > 0;
+      })
+      .map((m, idx) => {
+        // Extract text from either string or structured format
+        const text = typeof m === 'string' ? m : (m as MassimaStructured).massima;
+        return {
+          id: `massima-${idx}`,
+          text: text.replace(/<[^>]*>/g, '').trim(),
+          html: text,
+          selected: false
+        };
+      });
   }, [brocardi_info?.Massime]);
 
   const [selectedMassime, setSelectedMassime] = useState<Set<string>>(new Set());

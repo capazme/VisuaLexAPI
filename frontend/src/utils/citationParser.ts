@@ -427,3 +427,90 @@ export function toSearchParams(parsed: ParsedCitation): {
     article: parsed.article || '',
   };
 }
+
+/**
+ * Riferimento ad articolo estratto da un testo (es. nota a piè di pagina)
+ */
+export interface ArticleRef {
+  numero: string;
+  tipoAtto: string;
+  confidence: number;
+}
+
+/**
+ * Pattern per estrarre riferimenti ad articoli dal testo.
+ * Supporta formati come:
+ * - "art. 2043"
+ * - "articolo 123"
+ * - "artt. 1-5"
+ * - "art. 2043 c.c."
+ * - "art. 123-bis"
+ */
+const ARTICLE_REF_PATTERN = /\b(?:art(?:icol[oi])?t?\.?\s*)(\d+(?:\s*-\s*\d+)?(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)\s*(?:e\s+(?:ss\.?|seg(?:uenti)?\.?)|(?:c\.?\s*c\.?|c\.?\s*p\.?|c\.?\s*p\.?\s*c\.?|c\.?\s*p\.?\s*p\.?|cost\.?|costituzione))?/gi;
+
+/**
+ * Pattern per rilevare il tipo di atto dopo il numero articolo
+ */
+const ACT_TYPE_SUFFIX_MAP: Record<string, string> = {
+  'c.c.': 'codice civile',
+  'c.c': 'codice civile',
+  'cc': 'codice civile',
+  'c.p.': 'codice penale',
+  'c.p': 'codice penale',
+  'cp': 'codice penale',
+  'c.p.c.': 'codice di procedura civile',
+  'c.p.c': 'codice di procedura civile',
+  'cpc': 'codice di procedura civile',
+  'c.p.p.': 'codice di procedura penale',
+  'c.p.p': 'codice di procedura penale',
+  'cpp': 'codice di procedura penale',
+  'cost.': 'costituzione',
+  'cost': 'costituzione',
+  'costituzione': 'costituzione',
+};
+
+/**
+ * Estrae riferimenti ad articoli da un testo (es. nota a piè di pagina).
+ * Utilizzato per creare link cliccabili verso altri articoli citati.
+ *
+ * @param text - Il testo da analizzare
+ * @param defaultActType - Tipo di atto di default se non specificato (es. "codice civile")
+ * @returns Array di riferimenti trovati con numero articolo e tipo atto
+ */
+export function extractArticleRefs(text: string, defaultActType = 'codice civile'): ArticleRef[] {
+  if (!text || typeof text !== 'string') return [];
+
+  const refs: ArticleRef[] = [];
+  const seenArticles = new Set<string>();
+
+  let match;
+  while ((match = ARTICLE_REF_PATTERN.exec(text)) !== null) {
+    const fullMatch = match[0].toLowerCase();
+    const articleNum = match[1].replace(/\s+/g, '').trim();
+
+    // Evita duplicati
+    if (seenArticles.has(articleNum)) continue;
+    seenArticles.add(articleNum);
+
+    // Determina il tipo di atto
+    let tipoAtto = defaultActType;
+    let confidence = 0.5;
+
+    // Cerca suffisso tipo atto nel match
+    for (const [suffix, actType] of Object.entries(ACT_TYPE_SUFFIX_MAP)) {
+      if (fullMatch.includes(suffix)) {
+        tipoAtto = actType;
+        confidence = 0.9;
+        break;
+      }
+    }
+
+    refs.push({
+      numero: articleNum,
+      tipoAtto,
+      confidence,
+    });
+  }
+
+  return refs;
+}

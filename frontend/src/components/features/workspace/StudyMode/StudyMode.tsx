@@ -12,13 +12,17 @@ import { cn } from '../../../../lib/utils';
 import type { ArticleData, NormaVisitata } from '../../../../types';
 
 export interface StudyModeProps {
-  isOpen: boolean;
+  /** When true (default), the component is visible */
+  isOpen?: boolean;
   onClose: () => void;
   article: ArticleData;
-  articles: ArticleData[];
-  onNavigate: (articleId: string) => void;
+  /** Array of articles for navigation. If not provided, single-article mode is used */
+  articles?: ArticleData[];
+  /** Callback when navigating between articles. Only needed if articles array is provided */
+  onNavigate?: (articleId: string) => void;
   onCrossReferenceNavigate?: (articleNumber: string, normaData: NormaVisitata) => void;
-  normaLabel: string;
+  /** Label for the norma. If not provided, generated from article data */
+  normaLabel?: string;
   allArticleIds?: string[];
   onLoadArticle?: (id: string) => void;
 }
@@ -41,23 +45,34 @@ const THEME_STYLES: Record<StudyModeTheme, { bg: string; text: string }> = {
 };
 
 export function StudyMode({
-  isOpen,
+  isOpen = true,
   onClose,
   article,
-  articles,
+  articles: articlesProp,
   onNavigate,
   onCrossReferenceNavigate,
-  normaLabel,
+  normaLabel: normaLabelProp,
   allArticleIds: _allArticleIds,
   onLoadArticle: _onLoadArticle
 }: StudyModeProps) {
+  // Handle single article mode: create single-element array if not provided
+  const articles = articlesProp ?? [article];
+
+  // Generate norma label if not provided
+  const normaLabel = normaLabelProp ?? `${article.norma_data.tipo_atto}${article.norma_data.numero_atto ? ` ${article.norma_data.numero_atto}` : ''}`;
+
   // Typography state
   const [fontSize, setFontSize] = useState(18);
   const [lineHeight, setLineHeight] = useState(1.8);
   const [theme, setTheme] = useState<StudyModeTheme>('light');
 
-  // Window state
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  // Window state - detect mobile for initial fullscreen
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640
+  );
+  const [isFullscreen, setIsFullscreen] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 640
+  );
   const [position, setPosition] = useState({ x: 80, y: 60 });
   const [size, setSize] = useState({ width: 900, height: 700 });
   const [isDragging, setIsDragging] = useState(false);
@@ -91,6 +106,9 @@ export function StudyMode({
   );
 
   const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    // Skip navigation if no callback provided or single article
+    if (!onNavigate || articles.length <= 1) return;
+
     if (direction === 'prev' && currentIndex > 0) {
       onNavigate(articles[currentIndex - 1].norma_data.numero_articolo);
     } else if (direction === 'next' && currentIndex < articles.length - 1) {
@@ -111,8 +129,10 @@ export function StudyMode({
   }, []);
 
   const handleToggleFullscreen = useCallback(() => {
+    // Don't allow exiting fullscreen on mobile
+    if (isMobile) return;
     setIsFullscreen(prev => !prev);
-  }, []);
+  }, [isMobile]);
 
   // Drag handlers
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -226,6 +246,21 @@ export function StudyMode({
     onToggleFullscreen: handleToggleFullscreen
   }, { enabled: isOpen });
 
+  // Detect mobile and handle resize
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 640;
+      setIsMobile(mobile);
+      // Force fullscreen on mobile
+      if (mobile && !isFullscreen) {
+        setIsFullscreen(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isFullscreen]);
+
   // Prevent body scroll when open
   useEffect(() => {
     if (isOpen) {
@@ -284,7 +319,7 @@ export function StudyMode({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        style={windowStyle}
+        style={isFullscreen ? undefined : windowStyle}
         className={cn(
           "fixed z-[9999] flex flex-col shadow-2xl overflow-hidden",
           isFullscreen && "inset-0",
@@ -349,6 +384,7 @@ export function StudyMode({
             theme={theme}
             highlights={articleHighlights}
             normaKey={normaKey}
+            footnotes={article.brocardi_info?.Footnotes ?? []}
             onAddHighlight={addHighlight}
             onCrossReferenceNavigate={onCrossReferenceNavigate}
           />
@@ -362,19 +398,24 @@ export function StudyMode({
           />
         </div>
 
-        {/* Footer - always visible with shortcuts */}
+        {/* Footer - shortcuts on desktop, simplified on mobile */}
         <div className={cn(
-          "flex items-center justify-between px-4 py-2 border-t text-xs",
+          "flex items-center justify-center sm:justify-between px-2 sm:px-4 py-2 border-t text-xs",
           theme === 'dark' ? 'bg-gray-800/50 border-gray-700 text-gray-400'
             : theme === 'sepia' ? 'bg-[#efe5d1] border-[#d4c4a8] text-[#8b7355]'
             : 'bg-gray-50 border-gray-200 text-gray-500'
         )}>
-          <div className="flex items-center gap-4">
+          {/* Mobile: simplified message */}
+          <div className="sm:hidden text-center">
+            Swipe o usa i pulsanti per navigare
+          </div>
+          {/* Desktop: full keyboard shortcuts */}
+          <div className="hidden sm:flex items-center gap-4">
             <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">ESC</kbd> Chiudi</span>
             <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">←→</kbd> Naviga</span>
             <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">F</kbd> Fullscreen</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="hidden sm:flex items-center gap-4">
             <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">T</kbd> Note</span>
             <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">B</kbd> Brocardi</span>
             <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">S</kbd> Settings</span>

@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Folder, ChevronDown, ChevronRight, X, GripVertical, Pencil, Check } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type ArticleCollection } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { ArticleNavigation } from './ArticleNavigation';
 import { ArticleMinimap } from './ArticleMinimap';
+import { StudyMode } from './StudyMode';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 
@@ -25,7 +27,16 @@ export function ArticleCollectionComponent({
   const [editedLabel, setEditedLabel] = useState(collection.label);
   const labelInputRef = useRef<HTMLInputElement>(null);
 
+  // Study Mode state
+  const [studyModeOpen, setStudyModeOpen] = useState(false);
+  const [studyModeArticle, setStudyModeArticle] = useState<ArticleData | null>(null);
+
   const { toggleCollectionCollapse, renameCollection, removeArticleFromCollection } = useAppStore();
+
+  const openStudyMode = (article: ArticleData) => {
+    setStudyModeArticle(article);
+    setStudyModeOpen(true);
+  };
 
   // Focus input when editing starts
   useEffect(() => {
@@ -246,6 +257,7 @@ export function ArticleCollectionComponent({
                 key={getArticleKey(activeArticle)}
                 data={activeArticle.article}
                 onCrossReferenceNavigate={onCrossReference}
+                onOpenStudyMode={() => openStudyMode(activeArticle.article)}
               />
             ) : (
               <div className="flex items-center justify-center h-40 text-gray-400">
@@ -255,6 +267,20 @@ export function ArticleCollectionComponent({
           </div>
         </div>
       )}
+
+      {/* Study Mode */}
+      <AnimatePresence>
+        {studyModeOpen && studyModeArticle && (
+          <StudyMode
+            article={studyModeArticle}
+            onClose={() => {
+              setStudyModeOpen(false);
+              setStudyModeArticle(null);
+            }}
+            onCrossReferenceNavigate={onCrossReference}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Empty state */}
       {!collection.isCollapsed && collection.articles.length === 0 && (

@@ -115,14 +115,19 @@ export function StudyModeToolsPanel({
     <AnimatePresence>
       {visible && (
         <motion.aside
-          initial={{ x: '-100%', opacity: 0.8 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: '-100%', opacity: 0.8 }}
+          initial={{ y: '100%', opacity: 0.8 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0.8 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           className={cn(
-            "absolute left-0 top-0 bottom-0 w-80 z-10 flex flex-col border-r shadow-xl",
+            // Base styles
+            "absolute z-10 flex flex-col shadow-xl",
+            // Mobile: bottom sheet style
+            "inset-x-0 bottom-0 top-auto h-[60vh] rounded-t-xl border-t",
+            // Desktop: side panel style
+            "sm:left-0 sm:top-0 sm:bottom-0 sm:right-auto sm:h-auto sm:w-80 sm:rounded-none sm:border-t-0 sm:border-r",
             styles.bg,
             styles.border
           )}

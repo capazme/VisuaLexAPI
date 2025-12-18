@@ -21,13 +21,84 @@ export interface NormaVisitata {
     urn?: string; // The specific URN for this article/version
 }
 
+// Structured massima from jurisprudence
+export interface MassimaStructured {
+    autorita: string | null;  // "Cass. civ.", "Corte cost.", etc.
+    numero: string | null;    // "123"
+    anno: string | null;      // "2021"
+    massima: string;          // Cleaned text content
+}
+
+// Article cited in relazioni
+export interface ArticoloCitato {
+    numero: string;
+    titolo: string;
+    url: string;
+}
+
+// Historical relazione (Guardasigilli)
+export interface RelazioneContent {
+    tipo: string;             // "libro_obbligazioni" | "codice_civile"
+    titolo: string;
+    numero_paragrafo: string | null;
+    testo: string;
+    articoli_citati: ArticoloCitato[];
+}
+
+// Relazione for Constitution
+export interface RelazioneCostituzione {
+    titolo: string;
+    autore: string;
+    anno: number;
+    testo: string;
+}
+
+// Footnote (nota a piè di pagina)
+export interface Footnote {
+    numero: number;
+    testo: string;
+    tipo: 'nota' | 'riferimento' | 'footnote';
+}
+
+// Related Article (articolo precedente/successivo)
+export interface RelatedArticle {
+    numero: string;
+    url: string;
+    titolo?: string;
+}
+
+export interface RelatedArticles {
+    previous?: RelatedArticle;
+    next?: RelatedArticle;
+}
+
+// Cross Reference (riferimento incrociato)
+export interface CrossReference {
+    articolo: string;
+    tipo_atto?: string;
+    url: string;
+    sezione: 'brocardi' | 'ratio' | 'spiegazione' | 'massime';
+    testo?: string;
+}
+
 export interface BrocardiInfo {
     position: string | null;
     link: string | null;
     Brocardi: string[] | null;
     Ratio: string | null;
     Spiegazione: string | null;
-    Massime: string[] | null;
+    // Massime: supports both legacy string[] and new structured format
+    Massime: (string | MassimaStructured)[] | null;
+    // Historical relations (Guardasigilli)
+    Relazioni?: RelazioneContent[] | null;
+    // Constitution relation (Meuccio Ruini)
+    RelazioneCostituzione?: RelazioneCostituzione | null;
+    // Footnotes (note a piè di pagina)
+    Footnotes?: Footnote[] | null;
+    // Related Articles (articoli correlati)
+    RelatedArticles?: RelatedArticles | null;
+    // Cross References (riferimenti incrociati)
+    CrossReferences?: CrossReference[] | null;
 }
 
 export interface ArticleData {

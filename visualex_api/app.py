@@ -56,7 +56,7 @@ class NormaController:
         self.app = Quart(__name__)
         
         # Configure CORS
-        allowed_origins = settings.get_list("allowed_origins", ["http://localhost:3000"])
+        allowed_origins = settings.get_list("allowed_origins", ["http://localhost:3001"])
         self.app = cors(self.app, allow_origin=allowed_origins)
         
         # Secret key for sessions
@@ -527,7 +527,12 @@ class NormaController:
                             'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
                             'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
                             'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
-                            'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None
+                            'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
+                            'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
+                            'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
+                            'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
+                            'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
+                            'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
                         }
                     }
                 except Exception as exc:

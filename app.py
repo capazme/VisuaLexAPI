@@ -137,7 +137,7 @@ class RateLimitedTaskQueue:
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
-        self.app = cors(self.app, allow_origin="http://localhost:3000")
+        self.app = cors(self.app, allow_origin="http://localhost:3001")
         self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
         
         # Middleware per registrare il tempo di inizio della richiesta
@@ -431,7 +431,12 @@ class NormaController:
                             'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
                             'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
                             'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
-                            'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None
+                            'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
+                            'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
+                            'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
+                            'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
+                            'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
+                            'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
                         }
                     }
                 except Exception as exc:
@@ -476,7 +481,12 @@ class NormaController:
                                 'Brocardi': b_info[1].get('Brocardi') if b_info[1] and 'Brocardi' in b_info[1] else None,
                                 'Ratio': b_info[1].get('Ratio') if b_info[1] and 'Ratio' in b_info[1] else None,
                                 'Spiegazione': b_info[1].get('Spiegazione') if b_info[1] and 'Spiegazione' in b_info[1] else None,
-                                'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None
+                                'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None,
+                                'Relazioni': b_info[1].get('Relazioni') if b_info[1] and 'Relazioni' in b_info[1] else None,
+                                'RelazioneCostituzione': b_info[1].get('RelazioneCostituzione') if b_info[1] and 'RelazioneCostituzione' in b_info[1] else None,
+                                'Footnotes': b_info[1].get('Footnotes') if b_info[1] and 'Footnotes' in b_info[1] else None,
+                                'RelatedArticles': b_info[1].get('RelatedArticles') if b_info[1] and 'RelatedArticles' in b_info[1] else None,
+                                'CrossReferences': b_info[1].get('CrossReferences') if b_info[1] and 'CrossReferences' in b_info[1] else None
                             }
                         except Exception as exc:
                             log.error("Error fetching Brocardi info", error=str(exc))
