@@ -7,3 +7,6 @@ download
 .vscode/*
 .DS_Store
 history*
+dist/*
+.claude
+data

@@ -27,6 +27,7 @@ export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
     addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma,
     searchTrigger, clearSearchTrigger,
@@ -94,6 +95,9 @@ export function SearchPanel() {
     if (isStreaming) {
       const isHistorical = result.versionInfo?.isHistorical;
 
+      // Update loading progress
+      setLoadingProgress(prev => prev ? { ...prev, loaded: prev.loaded + 1 } : { loaded: 1 });
+
       // Check if we're streaming to the same norma as before
       const isSameNorma = streamingTabRef.current && streamingTabRef.current.normaKey === key;
 
@@ -144,6 +148,30 @@ export function SearchPanel() {
     setError(null);
     setResultsBuffer({}); // Clear buffer before new search
     streamingTabRef.current = null; // Reset streaming tab tracker
+
+    // Calculate expected number of articles for progress tracking
+    const calculateExpectedArticles = (article: string): number => {
+      if (!article) return 0;
+
+      // Handle ranges (e.g., "1-10")
+      const rangeMatch = article.match(/^(\d+)-(\d+)$/);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1]);
+        const end = parseInt(rangeMatch[2]);
+        return Math.abs(end - start) + 1;
+      }
+
+      // Handle comma-separated (e.g., "1,2,3")
+      if (article.includes(',')) {
+        return article.split(',').filter(a => a.trim()).length;
+      }
+
+      // Single article
+      return 1;
+    };
+
+    const expectedTotal = calculateExpectedArticles(params.article || '');
+    setLoadingProgress({ loaded: 0, total: expectedTotal });
 
     try {
       // Always use streaming endpoint (now supports Brocardi too!)
@@ -197,6 +225,7 @@ export function SearchPanel() {
       setError(err.message || "Si è verificato un errore.");
     } finally {
       setIsLoading(false);
+      setLoadingProgress(null); // Clear progress when done
     }
   }, [processResult]);
 
@@ -589,6 +618,45 @@ export function SearchPanel() {
           </div>
         </div>
       )}
+
+      {/* Loading progress indicator */}
+      <AnimatePresence>
+        {loadingProgress && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
+          >
+            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-2xl flex items-start gap-4 ring-4 ring-primary-500/5">
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
+                <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+              </div>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
+                  Caricamento articoli...
+                </h4>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {loadingProgress.total
+                    ? `${loadingProgress.loaded} di ${loadingProgress.total} articoli caricati`
+                    : `${loadingProgress.loaded} articoli caricati`}
+                </p>
+                {/* Progress bar */}
+                {loadingProgress.total && (
+                  <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Error display */}
       <AnimatePresence>
