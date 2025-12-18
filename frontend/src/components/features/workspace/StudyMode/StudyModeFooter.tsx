@@ -11,20 +11,20 @@ interface StudyModeFooterProps {
 const THEME_FOOTER_STYLES: Record<StudyModeTheme, { bg: string; border: string; kbd: string; text: string }> = {
   light: {
     bg: 'bg-white/95 backdrop-blur-sm',
-    border: 'border-gray-200',
-    kbd: 'bg-gray-100 text-gray-600',
-    text: 'text-gray-500'
+    border: 'border-slate-200',
+    kbd: 'bg-slate-100 text-slate-600 border border-slate-200 shadow-sm',
+    text: 'text-slate-500'
   },
   dark: {
-    bg: 'bg-gray-900/95 backdrop-blur-sm',
-    border: 'border-gray-700',
-    kbd: 'bg-gray-800 text-gray-300',
-    text: 'text-gray-400'
+    bg: 'bg-slate-900/95 backdrop-blur-sm',
+    border: 'border-slate-700',
+    kbd: 'bg-slate-800 text-slate-300 border border-slate-700',
+    text: 'text-slate-400'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]/95 backdrop-blur-sm',
     border: 'border-[#d4c4a8]',
-    kbd: 'bg-[#e4d4b8] text-[#5c4b37]',
+    kbd: 'bg-[#e4d4b8] text-[#5c4b37] border border-[#d4c4a8]',
     text: 'text-[#8b7355]'
   }
 };
@@ -48,9 +48,9 @@ export function StudyModeFooter({ visible, theme }: StudyModeFooterProps) {
         >
           <div className="flex items-center justify-center gap-6 px-4 py-2">
             {STUDY_MODE_SHORTCUTS.map(({ key, label }) => (
-              <span key={key} className={cn("text-xs flex items-center gap-1.5", styles.text)}>
+              <span key={key} className={cn("text-xs flex items-center gap-1.5 font-medium", styles.text)}>
                 <kbd className={cn(
-                  "px-1.5 py-0.5 rounded font-mono text-xs",
+                  "px-1.5 py-0.5 rounded font-mono text-[10px]",
                   styles.kbd
                 )}>
                   {key}

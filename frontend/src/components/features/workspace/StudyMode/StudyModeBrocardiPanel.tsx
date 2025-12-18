@@ -26,19 +26,19 @@ const THEME_PANEL_STYLES: Record<StudyModeTheme, {
 }> = {
   light: {
     bg: 'bg-white',
-    border: 'border-gray-200',
-    section: 'bg-gray-50',
-    sectionHover: 'hover:bg-gray-100',
-    text: 'text-gray-900',
-    muted: 'text-gray-500'
+    border: 'border-slate-200',
+    section: 'bg-slate-50',
+    sectionHover: 'hover:bg-slate-100',
+    text: 'text-slate-900',
+    muted: 'text-slate-500'
   },
   dark: {
-    bg: 'bg-gray-800',
-    border: 'border-gray-700',
-    section: 'bg-gray-700',
-    sectionHover: 'hover:bg-gray-600',
-    text: 'text-gray-100',
-    muted: 'text-gray-400'
+    bg: 'bg-slate-900',
+    border: 'border-slate-700',
+    section: 'bg-slate-800',
+    sectionHover: 'hover:bg-slate-700',
+    text: 'text-slate-100',
+    muted: 'text-slate-400'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]',
@@ -79,7 +79,7 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
   }
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
+    <div className={cn("rounded-lg border overflow-hidden transition-colors", styles.border)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -88,16 +88,16 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
           styles.sectionHover
         )}
       >
-        <span className={cn("text-xs font-bold uppercase flex items-center gap-2", styles.muted)}>
-          <Lightbulb size={14} className="text-blue-500" />
+        <span className={cn("text-xs font-bold uppercase tracking-wide flex items-center gap-2", styles.muted)}>
+          <Lightbulb size={14} className="text-amber-500" />
           {title}
           {Array.isArray(validContent) && (
-            <span className="text-xs font-normal">({validContent.length})</span>
+            <span className="text-xs font-normal opacity-70">({validContent.length})</span>
           )}
         </span>
         <ChevronDown
           size={14}
-          className={cn("transition-transform", styles.muted, isOpen && "rotate-180")}
+          className={cn("transition-transform opacity-60", styles.muted, isOpen && "rotate-180")}
         />
       </button>
 
@@ -110,27 +110,28 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className={cn("p-4 text-sm", styles.text)}>
+            <div className={cn("p-4 text-sm custom-scrollbar", styles.text)}>
               {title === 'Massime' && Array.isArray(validContent) ? (
                 <div className="space-y-3">
                   {validContent.map((item, idx) => (
-                    <div key={`study-massima-${idx}`} className="flex gap-3">
+                    <div key={`study-massima-${idx}`} className="flex gap-3 group">
                       <span className={cn(
-                        "shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium",
+                        "shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium transition-colors",
                         styles.section,
-                        styles.muted
+                        styles.muted,
+                        "group-hover:bg-opacity-80"
                       )}>
                         {idx + 1}
                       </span>
                       <SafeHTML
                         html={item}
-                        className="prose prose-sm max-w-none"
+                        className="prose prose-sm max-w-none leading-relaxed"
                       />
                     </div>
                   ))}
                 </div>
               ) : Array.isArray(validContent) ? (
-                <ul className="space-y-2">
+                <ul className="space-y-2 list-disc list-outside pl-4">
                   {validContent.map((item, idx) => (
                     <li key={`study-item-${idx}`}>{item}</li>
                   ))}
@@ -138,7 +139,7 @@ function BrocardiSection({ title, content, theme }: SectionProps) {
               ) : (
                 <SafeHTML
                   html={validContent as string}
-                  className="prose prose-sm max-w-none"
+                  className="prose prose-sm max-w-none leading-relaxed"
                 />
               )}
             </div>
@@ -161,7 +162,7 @@ function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
   if (!footnotes || footnotes.length === 0) return null;
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
+    <div className={cn("rounded-lg border overflow-hidden transition-colors", styles.border)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -170,14 +171,14 @@ function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
           styles.sectionHover
         )}
       >
-        <span className={cn("text-xs font-bold uppercase flex items-center gap-2", styles.muted)}>
+        <span className={cn("text-xs font-bold uppercase tracking-wide flex items-center gap-2", styles.muted)}>
           <Lightbulb size={14} className="text-amber-500" />
           Note al Dispositivo
-          <span className="text-xs font-normal">({footnotes.length})</span>
+          <span className="text-xs font-normal opacity-70">({footnotes.length})</span>
         </span>
         <ChevronDown
           size={14}
-          className={cn("transition-transform", styles.muted, isOpen && "rotate-180")}
+          className={cn("transition-transform opacity-60", styles.muted, isOpen && "rotate-180")}
         />
       </button>
 
@@ -190,7 +191,7 @@ function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className={cn("p-4 text-sm space-y-3", styles.text)}>
+            <div className={cn("p-4 text-sm space-y-3 custom-scrollbar", styles.text)}>
               {footnotes.map((footnote) => (
                 <div key={`study-footnote-${footnote.numero}`} className="flex gap-3">
                   <span className={cn(
@@ -233,9 +234,9 @@ export function StudyModeBrocardiPanel({
     <AnimatePresence>
       {visible && (
         <motion.aside
-          initial={{ y: '100%', opacity: 0.8 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0.8 }}
+          initial={{ x: '100%', opacity: 0.8 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: '100%', opacity: 0.8 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
@@ -252,16 +253,16 @@ export function StudyModeBrocardiPanel({
         >
           {/* Header */}
           <div className={cn("flex items-center justify-between px-4 py-3 border-b", styles.border)}>
-            <h3 className={cn("font-semibold flex items-center gap-2", styles.text)}>
-              <Lightbulb size={18} className="text-blue-500" />
+            <h3 className={cn("font-semibold flex items-center gap-2 text-sm uppercase tracking-wide", styles.text)}>
+              <Lightbulb size={18} className="text-amber-500" />
               Approfondimenti
             </h3>
             <button
               onClick={onTogglePin}
               className={cn(
-                "p-1.5 rounded-lg transition-colors",
-                isPinned ? 'text-blue-500' : styles.muted,
-                'hover:bg-gray-100 dark:hover:bg-gray-700'
+                "p-1.5 rounded-md transition-colors",
+                isPinned ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/30' : styles.muted,
+                'hover:bg-slate-100 dark:hover:bg-slate-700'
               )}
               title={isPinned ? 'Sblocca pannello' : 'Blocca pannello'}
             >
@@ -270,7 +271,7 @@ export function StudyModeBrocardiPanel({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             {hasContent ? (
               <>
                 <BrocardiSection title="Brocardi" content={brocardiInfo.Brocardi} theme={theme} />
@@ -286,7 +287,7 @@ export function StudyModeBrocardiPanel({
                     href={brocardiInfo.link}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center justify-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline py-2"
+                    className="flex items-center justify-center gap-2 text-sm text-primary-600 hover:text-primary-700 hover:underline py-3 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
                   >
                     <ExternalLink size={14} />
                     Vedi fonte su Brocardi.it
@@ -294,9 +295,9 @@ export function StudyModeBrocardiPanel({
                 )}
               </>
             ) : (
-              <div className={cn("text-center py-8", styles.muted)}>
-                <Lightbulb size={32} className="mx-auto mb-3 opacity-50" />
-                <p className="text-sm">Nessun approfondimento disponibile per questo articolo.</p>
+              <div className={cn("text-center py-8 flex flex-col items-center gap-2", styles.muted)}>
+                <Lightbulb size={32} className="opacity-30" />
+                <p className="text-xs opacity-70">Nessun approfondimento disponibile per questo articolo.</p>
               </div>
             )}
           </div>

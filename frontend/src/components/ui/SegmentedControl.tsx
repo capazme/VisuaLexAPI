@@ -18,7 +18,7 @@ export interface SegmentedControlProps {
 export function SegmentedControl({ options, value, onChange, className }: SegmentedControlProps) {
   return (
     <div className={cn(
-      'bg-gray-100 dark:bg-gray-800 p-1 rounded-xl flex gap-1',
+      'bg-slate-100 dark:bg-slate-900 p-1 rounded-xl flex gap-1',
       className
     )}>
       {options.map((option) => {
@@ -29,17 +29,17 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
             key={option.value}
             onClick={() => onChange(option.value)}
             className={cn(
-              'flex-1 relative flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all',
+              'flex-1 relative flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary-500',
               isActive
-                ? 'text-blue-600 dark:text-blue-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ? 'text-slate-900 dark:text-slate-100'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             )}
           >
             {/* Animated background pill */}
             {isActive && (
               <motion.div
                 layoutId="active-pill"
-                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-lg shadow-sm"
+                className="absolute inset-0 bg-white dark:bg-slate-700 rounded-lg shadow-sm border border-slate-200/50 dark:border-slate-600"
                 transition={{ type: 'spring', damping: 20, stiffness: 300 }}
               />
             )}

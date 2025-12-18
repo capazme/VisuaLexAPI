@@ -17,17 +17,17 @@ interface StudyModeSettingsProps {
 const THEME_SETTINGS_STYLES: Record<StudyModeTheme, { bg: string; border: string; text: string; muted: string; button: string }> = {
   light: {
     bg: 'bg-white',
-    border: 'border-gray-200',
-    text: 'text-gray-900',
-    muted: 'text-gray-500',
-    button: 'hover:bg-gray-100'
+    border: 'border-slate-200',
+    text: 'text-slate-900',
+    muted: 'text-slate-500',
+    button: 'hover:bg-slate-100'
   },
   dark: {
-    bg: 'bg-gray-800',
-    border: 'border-gray-700',
-    text: 'text-gray-100',
-    muted: 'text-gray-400',
-    button: 'hover:bg-gray-700'
+    bg: 'bg-slate-900',
+    border: 'border-slate-700',
+    text: 'text-slate-100',
+    muted: 'text-slate-400',
+    button: 'hover:bg-slate-800'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]',
@@ -70,7 +70,7 @@ export function StudyModeSettings({
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed z-40 rounded-xl shadow-2xl border",
+              "fixed z-40 rounded-xl shadow-2xl border overflow-hidden",
               // Mobile: nearly full width, centered horizontally
               "left-4 right-4 top-16 w-auto",
               // Desktop: fixed width and position
@@ -78,150 +78,159 @@ export function StudyModeSettings({
               styles.bg,
               styles.border
             )}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className={cn("flex items-center justify-between px-4 py-3 border-b", styles.border)}>
-              <h3 className={cn("font-semibold", styles.text)}>Impostazioni</h3>
+              <h3 className={cn("font-semibold text-sm uppercase tracking-wide", styles.text)}>Impostazioni</h3>
               <button
                 onClick={onClose}
-                className={cn("p-1 rounded-lg transition-colors", styles.button, styles.muted)}
+                className={cn("p-1 rounded-md transition-colors", styles.button, styles.muted)}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-4 space-y-5">
+            <div className="p-4 space-y-6">
               {/* Theme Selection */}
               <div>
-                <label className={cn("text-xs font-semibold uppercase mb-2 block", styles.muted)}>
+                <label className={cn("text-[10px] font-bold uppercase tracking-wider mb-3 block opacity-70", styles.muted)}>
                   Tema
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => onThemeChange('light')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
                       theme === 'light'
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-yellow-500 bg-yellow-50 shadow-sm'
                         : cn('border-transparent', styles.button)
                     )}
                   >
                     <Sun size={20} className={theme === 'light' ? 'text-yellow-500' : styles.muted} />
-                    <span className={cn("text-xs font-medium", styles.text)}>Chiaro</span>
+                    <span className={cn("text-xs font-medium", theme === 'light' ? 'text-yellow-700' : styles.muted)}>Chiaro</span>
                   </button>
                   <button
                     onClick={() => onThemeChange('sepia')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
                       theme === 'sepia'
-                        ? 'border-amber-500 bg-amber-50'
+                        ? 'border-amber-500 bg-amber-50 shadow-sm'
                         : cn('border-transparent', styles.button)
                     )}
                   >
                     <BookOpen size={20} className={theme === 'sepia' ? 'text-amber-600' : styles.muted} />
-                    <span className={cn("text-xs font-medium", styles.text)}>Seppia</span>
+                    <span className={cn("text-xs font-medium", theme === 'sepia' ? 'text-amber-800' : styles.muted)}>Seppia</span>
                   </button>
                   <button
                     onClick={() => onThemeChange('dark')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-1 p-3 rounded-lg border-2 transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
                       theme === 'dark'
-                        ? 'border-blue-500 bg-blue-900/30'
+                        ? 'border-blue-500 bg-slate-800 shadow-sm'
                         : cn('border-transparent', styles.button)
                     )}
                   >
                     <Moon size={20} className={theme === 'dark' ? 'text-blue-400' : styles.muted} />
-                    <span className={cn("text-xs font-medium", styles.text)}>Scuro</span>
+                    <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-blue-200' : styles.muted)}>Scuro</span>
                   </button>
                 </div>
               </div>
 
               {/* Font Size */}
               <div>
-                <label className={cn("text-xs font-semibold uppercase mb-2 block", styles.muted)}>
-                  Dimensione testo
-                </label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
+                    Dimensione testo
+                  </label>
+                  <span className={cn("text-xs font-mono font-medium opacity-70", styles.text)}>
+                    {fontSize}px
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => onFontSizeChange(Math.max(14, fontSize - 2))}
                     disabled={fontSize <= 14}
                     className={cn(
-                      "p-2 rounded-lg transition-colors disabled:opacity-30",
-                      styles.button
+                      "p-1.5 rounded-md transition-colors disabled:opacity-30",
+                      styles.button,
+                      styles.text
                     )}
                   >
                     <Minus size={16} />
                   </button>
-                  <div className="flex-1 text-center">
-                    <span className={cn("text-lg font-mono font-medium", styles.text)}>
-                      {fontSize}px
-                    </span>
+                  <div className="flex-1 px-1">
+                    <input
+                      type="range"
+                      min={14}
+                      max={32}
+                      step={2}
+                      value={fontSize}
+                      onChange={(e) => onFontSizeChange(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary-500 dark:bg-slate-700"
+                    />
                   </div>
                   <button
                     onClick={() => onFontSizeChange(Math.min(32, fontSize + 2))}
                     disabled={fontSize >= 32}
                     className={cn(
-                      "p-2 rounded-lg transition-colors disabled:opacity-30",
-                      styles.button
+                      "p-1.5 rounded-md transition-colors disabled:opacity-30",
+                      styles.button,
+                      styles.text
                     )}
                   >
                     <Plus size={16} />
                   </button>
                 </div>
-                {/* Slider */}
-                <input
-                  type="range"
-                  min={14}
-                  max={32}
-                  step={2}
-                  value={fontSize}
-                  onChange={(e) => onFontSizeChange(parseInt(e.target.value))}
-                  className="w-full mt-2 accent-blue-500"
-                />
               </div>
 
               {/* Line Height */}
               <div>
-                <label className={cn("text-xs font-semibold uppercase mb-2 block", styles.muted)}>
-                  Interlinea
-                </label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
+                    Interlinea
+                  </label>
+                  <span className={cn("text-xs font-mono font-medium opacity-70", styles.text)}>
+                    {lineHeight.toFixed(1)}
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => onLineHeightChange(Math.max(1.4, lineHeight - 0.2))}
                     disabled={lineHeight <= 1.4}
                     className={cn(
-                      "p-2 rounded-lg transition-colors disabled:opacity-30",
-                      styles.button
+                      "p-1.5 rounded-md transition-colors disabled:opacity-30",
+                      styles.button,
+                      styles.text
                     )}
                   >
                     <Minus size={16} />
                   </button>
-                  <div className="flex-1 text-center">
-                    <span className={cn("text-lg font-mono font-medium", styles.text)}>
-                      {lineHeight.toFixed(1)}
-                    </span>
+                  <div className="flex-1 px-1">
+                    <input
+                      type="range"
+                      min={1.4}
+                      max={2.4}
+                      step={0.2}
+                      value={lineHeight}
+                      onChange={(e) => onLineHeightChange(parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary-500 dark:bg-slate-700"
+                    />
                   </div>
                   <button
                     onClick={() => onLineHeightChange(Math.min(2.4, lineHeight + 0.2))}
                     disabled={lineHeight >= 2.4}
                     className={cn(
-                      "p-2 rounded-lg transition-colors disabled:opacity-30",
-                      styles.button
+                      "p-1.5 rounded-md transition-colors disabled:opacity-30",
+                      styles.button,
+                      styles.text
                     )}
                   >
                     <Plus size={16} />
                   </button>
                 </div>
-                {/* Slider */}
-                <input
-                  type="range"
-                  min={1.4}
-                  max={2.4}
-                  step={0.2}
-                  value={lineHeight}
-                  onChange={(e) => onLineHeightChange(parseFloat(e.target.value))}
-                  className="w-full mt-2 accent-blue-500"
-                />
               </div>
             </div>
           </motion.div>

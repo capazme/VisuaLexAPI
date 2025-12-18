@@ -2,40 +2,45 @@ import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'glass' | 'elevated' | 'glass-elevated';
+  variant?: 'default' | 'glass' | 'elevated' | 'glass-elevated' | 'outline';
   hover?: boolean;
   children: ReactNode;
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ variant = 'default', hover = false, children, className, ...props }, ref) => {
-    const baseStyles = 'rounded-2xl transition-all duration-300 ease-smooth-out';
+    const baseStyles = 'rounded-xl transition-all duration-200 ease-smooth-out';
 
     const variantStyles = {
-      default: 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm',
+      default: cn(
+        'bg-white dark:bg-slate-900',
+        'border border-slate-200 dark:border-slate-800',
+        'shadow-sm'
+      ),
+      outline: cn(
+        'bg-transparent',
+        'border border-slate-200 dark:border-slate-800'
+      ),
       glass: cn(
-        'bg-white/70 dark:bg-gray-900/70',
-        'backdrop-blur-2xl',
+        'bg-white/70 dark:bg-slate-900/70',
+        'backdrop-blur-xl',
         'border border-white/20 dark:border-white/10',
-        'shadow-glass-card',
-        '[box-shadow:var(--glass-shadow),var(--inner-highlight)]'
+        'shadow-sm'
       ),
       elevated: cn(
-        'bg-white/80 dark:bg-gray-800/80',
-        'backdrop-blur-xl',
-        'shadow-elevated border border-white/15 dark:border-white/10'
+        'bg-white dark:bg-slate-800',
+        'shadow-lg border border-transparent dark:border-slate-700'
       ),
       'glass-elevated': cn(
-        'bg-white/85 dark:bg-gray-900/85',
-        'backdrop-blur-3xl',
-        'border border-white/25 dark:border-white/15',
-        'shadow-glass-elevated',
-        '[box-shadow:0_8px_40px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.08),var(--inner-highlight-strong)]'
+        'bg-white/80 dark:bg-slate-900/80',
+        'backdrop-blur-2xl',
+        'border border-white/20 dark:border-white/10',
+        'shadow-md'
       ),
     };
 
     const hoverStyles = hover
-      ? 'hover:shadow-glass-lg dark:hover:shadow-xl hover:-translate-y-0.5 hover:scale-[1.01] cursor-pointer active:scale-[0.99] active:translate-y-0'
+      ? 'hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 hover:-translate-y-0.5 cursor-pointer'
       : '';
 
     return (

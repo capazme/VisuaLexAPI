@@ -34,10 +34,10 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
       id={id}
       className={({ isActive }) => cn(
         "relative flex items-center justify-center rounded-xl transition-all duration-200",
-        "hover:bg-white/40 dark:hover:bg-white/10",
+        "hover:bg-slate-100 dark:hover:bg-slate-800",
         // Mobile: larger touch target (min 44px)
         "w-12 h-12 md:w-11 md:h-11",
-        isActive && "bg-blue-500/15 dark:bg-blue-500/20"
+        isActive && "bg-primary-50 dark:bg-primary-900/10"
       )}
       onClick={onClick}
       onMouseEnter={() => setShowTooltip(true)}
@@ -55,8 +55,8 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
               className={cn(
                 "transition-colors duration-200",
                 isActive
-                  ? "text-blue-600 dark:text-blue-400 stroke-[2.5px]"
-                  : "text-gray-600 dark:text-gray-400 stroke-[2px]"
+                  ? "text-primary-600 dark:text-primary-400 stroke-[2.5px]"
+                  : "text-slate-500 dark:text-slate-400 stroke-[2px]"
               )}
             />
           </motion.div>
@@ -65,12 +65,12 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
           {isActive && (
             <motion.span
               layoutId="activeIndicator"
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-500 rounded-r-full"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-600 rounded-r-full"
               transition={SPRING_CONFIG}
             />
           )}
 
-          {/* Tooltip - hidden on mobile (touch devices don't need hover tooltips) */}
+          {/* Tooltip - hidden on mobile */}
           <AnimatePresence>
             {showTooltip && (
               <motion.div
@@ -78,11 +78,11 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
+                className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
               >
                 {label}
                 {/* Arrow */}
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 dark:bg-gray-100 rotate-45" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -109,10 +109,10 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
       onMouseLeave={() => setShowTooltip(false)}
       className={cn(
         "relative flex items-center justify-center rounded-xl transition-all duration-200",
-        "hover:bg-white/40 dark:hover:bg-white/10",
-        // Mobile: larger touch target (min 44px)
+        "hover:bg-slate-100 dark:hover:bg-slate-800",
+        // Mobile: larger touch target
         "w-12 h-12 md:w-11 md:h-11",
-        isActive && "bg-blue-500/15"
+        isActive && "bg-primary-50 dark:bg-primary-900/10"
       )}
     >
       <motion.div
@@ -125,13 +125,13 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
           className={cn(
             "transition-colors duration-200",
             isActive
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-gray-500 dark:text-gray-400"
+              ? "text-primary-600 dark:text-primary-400"
+              : "text-slate-500 dark:text-slate-400"
           )}
         />
       </motion.div>
 
-      {/* Tooltip - hidden on mobile (touch devices don't need hover tooltips) */}
+      {/* Tooltip */}
       <AnimatePresence>
         {showTooltip && (
           <motion.div
@@ -139,10 +139,10 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
+            className="hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50"
           >
             {label}
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 dark:bg-gray-100 rotate-45" />
+            <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-slate-900 dark:bg-slate-100 rotate-45" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -165,35 +165,31 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
   return (
     <aside
       className={cn(
-        // Base layout - wider on mobile for better touch targets
+        // Base layout
         "fixed inset-y-0 left-0 z-50 flex flex-col",
         "w-20 md:w-16",
-        // Glass effect using CSS variables
-        "backdrop-blur-2xl",
-        "shadow-glass",
+        // Clean Slate/Glass effect
+        "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl",
+        "border-r border-slate-200 dark:border-slate-800",
         // Mobile slide
-        "transform transition-transform duration-300 ease-out",
+        "transform transition-transform duration-300 ease-smooth-out",
         "lg:translate-x-0 lg:static",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
-      style={{
-        backgroundColor: 'var(--sidebar-bg)',
-        borderRight: '1px solid var(--glass-border)',
-      }}
     >
       {/* Logo */}
-      <div className="flex items-center justify-center h-16 border-b border-white/10 dark:border-white/5">
+      <div className="flex items-center justify-center h-16 border-b border-slate-100 dark:border-slate-800/50">
         <motion.div
           whileHover={{ scale: 1.1, rotate: 5 }}
           whileTap={{ scale: 0.95 }}
           transition={SPRING_CONFIG}
         >
-          <BookOpen className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+          <BookOpen className="w-7 h-7 text-primary-600 dark:text-primary-400" />
         </motion.div>
       </div>
 
       {/* Quick Search Button */}
-      <div className="flex flex-col items-center pt-4 pb-2 border-b border-white/10 dark:border-white/5">
+      <div className="flex flex-col items-center pt-4 pb-2 border-b border-slate-100 dark:border-slate-800/50">
         <div id="tour-quick-search">
           <ActionButton
             icon={Sparkles}
@@ -207,7 +203,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         )}
       </div>
 
-      {/* Navigation - more spacing on mobile for easier tapping */}
+      {/* Navigation */}
       <nav id="tour-sidebar" className="flex-1 flex flex-col items-center py-4 gap-3 md:gap-2">
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
@@ -215,8 +211,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 
-      {/* System Actions - more spacing on mobile */}
-      <div className="flex flex-col items-center py-4 gap-3 md:gap-2 border-t border-white/10 dark:border-white/5">
+      {/* System Actions */}
+      <div className="flex flex-col items-center py-4 gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50">
         <ActionButton
           icon={Settings}
           label="Impostazioni"
@@ -230,15 +226,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
       </div>
 
       {/* User Menu */}
-      <div className="relative flex flex-col items-center py-4 border-t border-white/10 dark:border-white/5">
+      <div className="relative flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
         <button
           onClick={() => setShowUserMenu(!showUserMenu)}
           className={cn(
             "relative flex items-center justify-center rounded-xl transition-all duration-200",
-            "hover:bg-white/40 dark:hover:bg-white/10",
-            // Mobile: larger touch target
+            "hover:bg-slate-100 dark:hover:bg-slate-800",
             "w-12 h-12 md:w-11 md:h-11",
-            showUserMenu && "bg-blue-500/15"
+            showUserMenu && "bg-primary-50 dark:bg-primary-900/10"
           )}
         >
           <motion.div
@@ -247,11 +242,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
             transition={SPRING_CONFIG}
             className={cn(
               "rounded-lg flex items-center justify-center text-sm font-semibold",
-              // Mobile: larger avatar
               "w-9 h-9 md:w-8 md:h-8",
               isAdmin
                 ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
-                : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                : "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
             )}
           >
             {user?.username?.charAt(0).toUpperCase() || 'U'}
@@ -262,7 +256,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         <AnimatePresence>
           {showUserMenu && (
             <>
-              {/* Mobile backdrop to close menu */}
+              {/* Mobile backdrop */}
               <div
                 className="fixed inset-0 z-40 lg:hidden"
                 onClick={() => setShowUserMenu(false)}
@@ -273,54 +267,52 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
                 exit={{ opacity: 0, x: -8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
                 className={cn(
-                  "absolute bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50",
-                  // Mobile: wider menu, position above the button
+                  "absolute bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-50",
                   "w-56 bottom-full mb-2 left-1/2 -translate-x-1/2",
-                  // Desktop: standard width, position to the right
                   "md:w-48 lg:bottom-0 lg:mb-0 lg:left-full lg:ml-3 lg:translate-x-0"
                 )}
               >
-              {/* User Info */}
-              <div className="px-4 py-3 md:py-2 border-b border-gray-100 dark:border-gray-700">
-                <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                  {user?.username}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                {isAdmin && (
-                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
-                    <Shield size={10} />
-                    Admin
-                  </span>
-                )}
-              </div>
+                {/* User Info */}
+                <div className="px-4 py-3 md:py-2 border-b border-slate-100 dark:border-slate-700">
+                  <p className="font-medium text-slate-900 dark:text-white text-sm truncate">
+                    {user?.username}
+                  </p>
+                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                  {isAdmin && (
+                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
+                      <Shield size={10} />
+                      Admin
+                    </span>
+                  )}
+                </div>
 
-              {/* Menu Items - larger touch targets on mobile */}
-              <div className="py-1">
-                {isAdmin && (
+                {/* Menu Items */}
+                <div className="py-1">
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        navigate('/admin');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <Shield size={16} />
+                      Pannello Admin
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       setShowUserMenu(false);
-                      navigate('/admin');
+                      logout();
+                      navigate('/login');
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
-                    <Shield size={16} />
-                    Pannello Admin
+                    <LogOut size={16} />
+                    Esci
                   </button>
-                )}
-                <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    logout();
-                    navigate('/login');
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                >
-                  <LogOut size={16} />
-                  Esci
-                </button>
-              </div>
-            </motion.div>
+                </div>
+              </motion.div>
             </>
           )}
         </AnimatePresence>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, Settings2 } from 'lucide-react';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
@@ -8,6 +8,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 import { useTour } from '../../../hooks/useTour';
 import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -47,7 +48,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   // Reset on close
   useEffect(() => {
     if (!isOpen) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setStep('select_act');
         setSelectedAct('');
         setArticle('1');
@@ -55,6 +56,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
         setActDate('');
         setInputValue('');
       }, 200);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -96,12 +98,10 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
     setTimeout(() => openQuickNormsManager(), 100);
   }, [onClose, openQuickNormsManager]);
 
-  // Handle smart citation search
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
 
     if (citationReady) {
-      // Citation is complete - search immediately
       const params = toSearchParams(parsedCitation);
       onSearch({
         ...params,
@@ -112,7 +112,6 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
       });
       onClose();
     } else if (parsedCitation.act_type) {
-      // Partial citation - pre-fill fields and move to next step
       setSelectedAct(parsedCitation.act_type);
       if (parsedCitation.article) setArticle(parsedCitation.article);
       if (parsedCitation.act_number) setActNumber(parsedCitation.act_number);
@@ -157,63 +156,89 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   const selectedActLabel = ACT_TYPES.find(act => act.value === selectedAct)?.label;
 
   return (
-    <div className="fixed inset-0 z-[9999] animate-in fade-in duration-200">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+    <div className="fixed inset-0 z-[9999] p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar">
+      {/* Premium Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-slate-950/40 backdrop-blur-md"
         onClick={onClose}
       />
 
-      {/* Command Palette */}
-      <div className="fixed left-1/2 top-[20vh] -translate-x-1/2 w-full max-w-2xl">
+      {/* Command Palette - Glass Overlay */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: -20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="relative mx-auto w-full max-w-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-glass border border-white dark:border-slate-800 overflow-hidden"
+      >
         <Command
-          className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden"
-          label="Command Menu"
+          id="command-menu-root"
+          className="flex flex-col h-full"
+          label="Menu di Ricerca"
         >
-          {/* Header */}
-          <div className="border-b border-gray-200 dark:border-gray-800">
-            {/* Step Indicators */}
-            <div className="flex items-center gap-2 px-4 pt-3 pb-2">
-              <div className={cn(
-                "flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
-                step === 'select_act' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
-                  selectedAct ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
-                    "bg-gray-100 dark:bg-gray-800 text-gray-500"
-              )}>
-                {selectedAct ? <Check size={14} /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-current" />}
+          {/* Header with Glass-style search area */}
+          <div className="border-b border-slate-200 dark:border-slate-800">
+            {/* Navigation / Step Breadcrumbs */}
+            <div className="flex items-center gap-2 px-6 pt-5 pb-3">
+              <div
+                onClick={() => setStep('select_act')}
+                className={cn(
+                  "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                  step === 'select_act'
+                    ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
+                    : selectedAct
+                      ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                )}
+              >
+                {selectedAct && step !== 'select_act' ? <Check size={12} strokeWidth={3} /> : <Book size={12} strokeWidth={3} />}
                 <span>Atto</span>
               </div>
+
               {ACT_TYPES_REQUIRING_DETAILS.includes(selectedAct) && (
-                <div className={cn(
-                  "flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
-                  step === 'input_details' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
-                    (actNumber && actDate) ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
-                      "bg-gray-100 dark:bg-gray-800 text-gray-500"
-                )}>
-                  {(actNumber && actDate) ? <Check size={14} /> : <span className="w-3.5 h-3.5 rounded-full border-2 border-current" />}
+                <div
+                  onClick={() => selectedAct && setStep('input_details')}
+                  className={cn(
+                    "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                    step === 'input_details'
+                      ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
+                      : (actNumber && actDate)
+                        ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                  )}
+                >
+                  {(actNumber && actDate) && step !== 'input_details' ? <Check size={12} strokeWidth={3} /> : <Zap size={12} strokeWidth={3} />}
                   <span>Dettagli</span>
                 </div>
               )}
+
               <div className={cn(
-                "flex items-center gap-2 px-2 py-1 rounded-lg text-xs font-medium transition-colors",
-                step === 'input_article' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
-                  "bg-gray-100 dark:bg-gray-800 text-gray-500"
+                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                step === 'input_article'
+                  ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-400"
               )}>
-                <span className="w-3.5 h-3.5 rounded-full border-2 border-current" />
+                <Star size={12} strokeWidth={3} />
                 <span>Articolo</span>
               </div>
             </div>
 
-            {/* Input Area */}
-            <div className="flex items-center gap-3 px-4 pb-3">
-              <Search className="text-gray-400" size={20} />
+            {/* Main Interactive Input Area */}
+            <div className="flex items-center gap-4 px-6 pb-6">
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                <Search size={24} strokeWidth={1.5} />
+              </div>
+
               {step === 'select_act' && (
                 <div className="flex-1">
                   <Command.Input
                     value={inputValue}
                     onValueChange={setInputValue}
-                    placeholder="Incolla citazione (es. 'art 2043 cc') o seleziona..."
-                    className="w-full bg-transparent text-gray-900 dark:text-white placeholder-gray-400 outline-none text-base"
+                    placeholder="Es. 'art 2043 cc' o seleziona Atto..."
+                    className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 outline-none text-xl font-bold tracking-tight"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && parsedCitation) {
                         e.preventDefault();
@@ -221,226 +246,257 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                       }
                     }}
                   />
-                  {/* Citation preview */}
-                  {parsedCitation && citationPreview && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <Zap size={14} className={cn(
-                        citationReady ? "text-green-500" : "text-amber-500"
-                      )} />
-                      <span className={cn(
-                        "text-sm font-medium",
-                        citationReady ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
-                      )}>
-                        {citationPreview}
-                      </span>
-                      {citationReady ? (
-                        <span className="text-xs text-green-500">↵ per cercare</span>
-                      ) : (
-                        <span className="text-xs text-amber-500">↵ per completare</span>
-                      )}
-                    </div>
-                  )}
-                  {!parsedCitation && (
-                    <div className="mt-1 flex gap-2">
-                      <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-gray-50 dark:bg-gray-800 px-1.5 text-[10px] font-medium text-gray-500">
-                        <span className="text-xs">⌘</span>K
-                      </kbd>
-                    </div>
-                  )}
-                </div>
-              )}
-              {step === 'input_details' && (
-                <div className="flex-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedActLabel}</span>
-                  </p>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      placeholder="Numero (es. 241)"
-                      value={actNumber}
-                      onChange={(e) => setActNumber(e.target.value)}
-                      className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
-                      autoFocus
-                      onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
-                    />
-                    <input
-                      type="text"
-                      value={actDate}
-                      onChange={(e) => setActDate(e.target.value)}
-                      placeholder="aaaa o gg-mm-aaaa"
-                      className="flex-1 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
-                      onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
-                    />
-                  </div>
-                </div>
-              )}
-              {step === 'input_article' && (
-                <div className="flex-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    <span className="font-semibold text-gray-900 dark:text-white">{selectedActLabel}</span>
-                    {actNumber && actDate && (
-                      <span className="ml-2 text-xs text-gray-500">n. {actNumber} del {actDate}</span>
+                  <AnimatePresence>
+                    {parsedCitation && citationPreview && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-2 flex items-center gap-2.5"
+                      >
+                        <div className={cn(
+                          "w-5 h-5 rounded-md flex items-center justify-center",
+                          citationReady ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                        )}>
+                          <Zap size={10} fill="currentColor" strokeWidth={3} />
+                        </div>
+                        <span className={cn(
+                          "text-xs font-bold uppercase tracking-wider",
+                          citationReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                        )}>
+                          {citationPreview}
+                        </span>
+                        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          {citationReady ? "Enter Ricerca" : "Enter Completa"}
+                        </span>
+                      </motion.div>
                     )}
-                  </p>
+                  </AnimatePresence>
+                </div>
+              )}
+
+              {step === 'input_details' && (
+                <div className="flex-1 flex gap-3">
                   <input
                     type="text"
-                    placeholder="Numero articolo (es. 1414) o range (es. 1414-1415)"
-                    value={article}
-                    onChange={(e) => setArticle(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 outline-none focus:border-blue-500"
+                    placeholder="N. Atto (es. 241)"
+                    value={actNumber}
+                    onChange={(e) => setActNumber(e.target.value)}
+                    className="flex-[1.5] bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3 rounded-2xl text-base font-bold border border-slate-200 dark:border-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 placeholder:text-slate-400"
                     autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
+                  />
+                  <input
+                    type="text"
+                    value={actDate}
+                    onChange={(e) => setActDate(e.target.value)}
+                    placeholder="Anno/Data"
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3 rounded-2xl text-base font-bold border border-slate-200 dark:border-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 placeholder:text-slate-400"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
                   />
                 </div>
               )}
+
+              {step === 'input_article' && (
+                <div className="flex-1 flex gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="N. Articolo (es. 12)"
+                      value={article}
+                      onChange={(e) => setArticle(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3 rounded-2xl text-base font-bold border border-slate-200 dark:border-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 placeholder:text-slate-400"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
+                    />
+                    {actNumber && actDate && (
+                      <span className="absolute -top-6 left-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {selectedActLabel} n. {actNumber} del {actDate}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleSubmitArticle}
+                    className="aspect-square w-12 h-12 bg-primary-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/20 active:scale-90 transition-all"
+                  >
+                    <ArrowRight size={20} strokeWidth={3} />
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2 sm:hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
               >
-                <X size={18} className="text-gray-400" />
+                <X size={20} />
               </button>
             </div>
           </div>
 
-          {/* Content */}
-          {step === 'select_act' && (
-            <Command.List id="command-palette-results" className="max-h-[400px] overflow-y-auto p-2">
-              <Command.Empty className="px-4 py-8 text-center text-gray-500 text-sm">
-                Nessun risultato trovato.
-              </Command.Empty>
-
-              {/* QuickNorms - Favorite norms for quick access */}
-              <Command.Group heading="Preferiti" className="px-2 py-2">
-                <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-2 px-2 flex items-center gap-1.5">
-                  <Star size={12} fill="currentColor" />
-                  Preferiti
-                </div>
-                {/* Manage QuickNorms - Always visible */}
-                <Command.Item
-                  value="gestisci preferiti manage favorites"
-                  onSelect={handleOpenQuickNormsManager}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
-                    "aria-selected:bg-blue-50 dark:aria-selected:bg-blue-900/20",
-                    "aria-selected:text-blue-600 dark:aria-selected:text-blue-400"
-                  )}
-                >
-                  <Settings2 size={16} className="text-gray-400" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium">Gestisci Preferiti</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 block">
-                      Aggiungi, modifica o rimuovi ricerche frequenti
-                    </span>
+          {/* Results List / Content */}
+          <div className="flex-1 overflow-y-auto max-h-[60vh] custom-scrollbar bg-slate-50/30 dark:bg-slate-950/20">
+            {step === 'select_act' && (
+              <Command.List id="command-palette-results" className="p-3">
+                <Command.Empty className="px-6 py-12 text-center text-slate-400">
+                  <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                    <X size={24} />
                   </div>
-                </Command.Item>
-                {quickNorms.slice(0, 5).map((qn) => (
-                  <Command.Item
-                    key={qn.id}
-                    value={`preferito ${qn.label}`}
-                    onSelect={() => handleSelectQuickNorm(qn.id)}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
-                      "aria-selected:bg-amber-50 dark:aria-selected:bg-amber-900/20",
-                      "aria-selected:text-amber-700 dark:aria-selected:text-amber-400"
-                    )}
-                  >
-                    <Star size={16} className="text-amber-500" fill="currentColor" />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium truncate block">{qn.label}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 truncate block">
-                        {qn.searchParams.act_type}
-                        {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
-                      </span>
+                  <p className="font-bold">Nessun risultato trovato</p>
+                  <p className="text-xs font-medium opacity-60 mt-1">Prova a cambiare i criteri di ricerca</p>
+                </Command.Empty>
+
+                {/* QuickNorms Section */}
+                <Command.Group className="mb-4">
+                  <div className="flex items-center justify-between px-3 mb-3">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                      <Star size={12} fill="currentColor" strokeWidth={3} />
+                      Preferiti
                     </div>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-
-              {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
-                <Command.Group key={group} heading={group} className="px-2 py-2">
-                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 px-2">
-                    {group}
+                    <button
+                      onClick={handleOpenQuickNormsManager}
+                      className="p-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      Gestisci
+                    </button>
                   </div>
-                  {acts.map((act) => {
-                    const Icon = act.icon;
-                    return (
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {quickNorms.slice(0, 6).map((qn) => (
                       <Command.Item
-                        key={act.value}
-                        value={act.value}
-                        onSelect={() => handleSelectAct(act.value)}
+                        key={qn.id}
+                        value={`preferito ${qn.label}`}
+                        onSelect={() => handleSelectQuickNorm(qn.id)}
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
-                          "aria-selected:bg-blue-50 dark:aria-selected:bg-blue-900/20",
-                          "aria-selected:text-blue-600 dark:aria-selected:text-blue-400"
+                          "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                          "bg-white dark:bg-slate-900 border border-transparent",
+                          "aria-selected:bg-primary-50 dark:aria-selected:bg-primary-900/10 aria-selected:border-primary-200/50 dark:aria-selected:border-primary-800/30"
                         )}
                       >
-                        <Icon size={16} className="text-gray-400" />
-                        <span className="text-sm">{act.label}</span>
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center group-aria-selected:scale-110 transition-transform">
+                          <Star size={18} fill="currentColor" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{qn.label}</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">{qn.searchParams.act_type}</span>
+                        </div>
                       </Command.Item>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </Command.Group>
-              ))}
-            </Command.List>
-          )}
 
-          {step === 'input_details' && (
-            <div className="p-4">
-              <button
-                onClick={handleSubmitDetails}
-                disabled={!actNumber || !actDate}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
-              >
-                Continua
-              </button>
-            </div>
-          )}
-
-          {step === 'input_article' && (
-            <div className="p-4">
-              <button
-                onClick={handleSubmitArticle}
-                disabled={!article}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:cursor-not-allowed"
-              >
-                Cerca Articolo
-              </button>
-            </div>
-          )}
-
-          {/* Footer with options and hints */}
-          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-            {/* Brocardi Toggle */}
-            <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-2 pb-2 border-b border-gray-200 dark:border-gray-700">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={includeBrocardi}
-                    onChange={(e) => setIncludeBrocardi(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                {/* Unified Act Types Section */}
+                <div className="space-y-4">
+                  {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
+                    <Command.Group key={group} className="space-y-1">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">
+                        {group}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1 pb-1">
+                        {acts.map((act) => {
+                          const Icon = act.icon;
+                          const isSelected = selectedAct === act.value;
+                          return (
+                            <Command.Item
+                              key={act.value}
+                              value={act.value}
+                              onSelect={() => handleSelectAct(act.value)}
+                              className={cn(
+                                "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                                "bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/50",
+                                "aria-selected:bg-primary-500 aria-selected:border-primary-600 aria-selected:shadow-lg aria-selected:shadow-primary-500/20",
+                                isSelected && !step.includes('select_act') && "border-emerald-500 ring-2 ring-emerald-500/5"
+                              )}
+                            >
+                              <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                                "bg-slate-50 dark:bg-slate-800 group-aria-selected:bg-primary-600 text-slate-400 group-aria-selected:text-white"
+                              )}>
+                                <Icon size={20} />
+                              </div>
+                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-aria-selected:text-white">{act.label}</span>
+                            </Command.Item>
+                          );
+                        })}
+                      </div>
+                    </Command.Group>
+                  ))}
                 </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                  <Lightbulb size={14} className={includeBrocardi ? "text-blue-500" : "text-gray-400"} />
-                  Includi Brocardi
-                </span>
-              </label>
-              <span className="text-xs text-gray-400">spiegazioni, ratio, massime</span>
-            </div>
-            {/* Keyboard hints */}
-            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-              <div className="flex items-center gap-4">
-                <span><kbd className="px-2 py-1 bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-700">↑↓</kbd> naviga</span>
-                <span><kbd className="px-2 py-1 bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-700">↵</kbd> seleziona</span>
+              </Command.List>
+            )}
+
+            {(step === 'input_details' || step === 'input_article') && (
+              <div className="p-8">
+                <div className="w-20 h-20 rounded-3xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 mx-auto mb-6">
+                  <Zap size={40} strokeWidth={1} />
+                </div>
+                <div className="text-center mb-8">
+                  <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Inserisci {step === 'input_details' ? 'i Dettagli' : 'Articolo'}</h4>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+                    Stai consultando: <span className="text-primary-600 dark:text-primary-400 font-bold">{selectedActLabel}</span>
+                  </p>
+                </div>
+
+                <button
+                  onClick={step === 'input_details' ? handleSubmitDetails : handleSubmitArticle}
+                  disabled={step === 'input_details' ? (!actNumber || !actDate) : !article}
+                  className="w-full flex items-center justify-center gap-3 h-14 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-primary-500/20 disabled:shadow-none active:scale-[0.98]"
+                >
+                  <span>Continua</span>
+                  <ArrowRight size={20} strokeWidth={3} />
+                </button>
               </div>
-              <span><kbd className="px-2 py-1 bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-700">esc</kbd> chiudi</span>
+            )}
+          </div>
+
+          {/* Premium Footer */}
+          <div className="px-6 py-5 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
+            {/* Quick Settings - Brocardi Toggle */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "p-2 rounded-xl border transition-all",
+                  includeBrocardi
+                    ? "bg-purple-500 text-white border-purple-600 shadow-md shadow-purple-500/20"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"
+                )}>
+                  <Lightbulb size={16} fill={includeBrocardi ? "currentColor" : "none"} />
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Includi Corredo Brocardi</span>
+                  <span className="text-[10px] font-bold text-slate-400">Ratio legis, spiegazioni e massime correlate</span>
+                </div>
+              </div>
+
+              <div
+                onClick={() => setIncludeBrocardi(!includeBrocardi)}
+                className={cn(
+                  "w-12 h-6 rounded-full relative transition-colors p-1 cursor-pointer",
+                  includeBrocardi ? "bg-purple-500" : "bg-slate-200 dark:bg-slate-700"
+                )}
+              >
+                <motion.div
+                  className="w-4 h-4 rounded-full bg-white shadow-sm"
+                  animate={{ x: includeBrocardi ? 24 : 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                />
+              </div>
+            </div>
+
+            {/* Hint Badges */}
+            <div className="flex flex-wrap gap-2 justify-center pt-2">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+                <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">↑↓</span> Naviga
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+                <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">↵</span> Seleziona
+              </div>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+                <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">ESC</span> Chiudi
+              </div>
             </div>
           </div>
         </Command>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -320,40 +320,40 @@ export function SearchPanel() {
 
       {/* Mobile: Swipeable tabs navigation */}
       {hasTabs && (
-        <div className="md:hidden w-full h-full flex flex-col overflow-hidden">
-          {/* Tab header with navigation */}
-          <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div className="md:hidden w-full h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
+          {/* Tab header with navigation - Glass aesthetic */}
+          <div className="flex-shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-4">
             <div className="flex items-center justify-between">
               {/* Prev button */}
               <button
                 onClick={() => setMobileActiveTabIndex(Math.max(0, mobileActiveTabIndex - 1))}
                 disabled={mobileActiveTabIndex === 0}
                 className={cn(
-                  "p-2 rounded-lg transition-colors",
+                  "p-2.5 rounded-xl transition-all shadow-sm active:scale-95",
                   mobileActiveTabIndex === 0
-                    ? "text-gray-300 dark:text-gray-600"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    ? "text-slate-300 dark:text-slate-700 bg-slate-50 dark:bg-slate-900"
+                    : "text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
                 )}
               >
                 <ChevronLeft size={20} />
               </button>
 
               {/* Tab label and indicator */}
-              <div className="flex-1 text-center">
-                <p className="font-semibold text-gray-900 dark:text-white text-sm truncate px-2">
+              <div className="flex-1 text-center min-w-0 px-4">
+                <p className="font-bold text-slate-900 dark:text-white text-base truncate">
                   {workspaceTabs[mobileActiveTabIndex]?.label || 'Risultati'}
                 </p>
                 {/* Dots indicator */}
-                <div className="flex justify-center gap-1.5 mt-2">
+                <div className="flex justify-center gap-1.5 mt-2.5">
                   {workspaceTabs.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => setMobileActiveTabIndex(idx)}
                       className={cn(
-                        "h-1.5 rounded-full transition-all",
+                        "h-1.5 rounded-full transition-all duration-300",
                         idx === mobileActiveTabIndex
-                          ? "w-4 bg-blue-500"
-                          : "w-1.5 bg-gray-300 dark:bg-gray-600"
+                          ? "w-6 bg-primary-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                          : "w-1.5 bg-slate-300 dark:bg-slate-700"
                       )}
                     />
                   ))}
@@ -365,10 +365,10 @@ export function SearchPanel() {
                 onClick={() => setMobileActiveTabIndex(Math.min(workspaceTabs.length - 1, mobileActiveTabIndex + 1))}
                 disabled={mobileActiveTabIndex === workspaceTabs.length - 1}
                 className={cn(
-                  "p-2 rounded-lg transition-colors",
+                  "p-2.5 rounded-xl transition-all shadow-sm active:scale-95",
                   mobileActiveTabIndex === workspaceTabs.length - 1
-                    ? "text-gray-300 dark:text-gray-600"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    ? "text-slate-300 dark:text-slate-700 bg-slate-50 dark:bg-slate-900"
+                    : "text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
                 )}
               >
                 <ChevronRight size={20} />
@@ -385,7 +385,7 @@ export function SearchPanel() {
                   initial={{ opacity: 0, x: 50 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.3, ease: "circOut" }}
                   drag="x"
                   dragConstraints={{ left: 0, right: 0 }}
                   dragElastic={0.2}
@@ -397,7 +397,7 @@ export function SearchPanel() {
                       setMobileActiveTabIndex(mobileActiveTabIndex + 1);
                     }
                   }}
-                  className="h-full overflow-y-auto p-4 space-y-4"
+                  className="h-full overflow-y-auto p-4 space-y-4 custom-scrollbar"
                 >
                   {workspaceTabs[mobileActiveTabIndex].content
                     .filter((item): item is typeof item & { type: 'norma' } => item.type === 'norma')
@@ -409,7 +409,7 @@ export function SearchPanel() {
                         onCloseArticle={(articleId) => {
                           removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
                         }}
-                        onPinArticle={() => {}}
+                        onPinArticle={() => { }}
                         onViewPdf={handleViewPdf}
                         onCrossReference={handleCrossReferenceNavigate}
                       />
@@ -430,49 +430,52 @@ export function SearchPanel() {
 
       {/* Main Content Area - Empty state when no tabs */}
       {!hasTabs && !isLoading && (
-        <div id="tour-main-content" className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700">
+        <div id="tour-main-content" className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 bg-slate-50 dark:bg-slate-950">
           {/* Interactive Search Icon */}
           <div
-            className="relative group cursor-pointer"
+            className="relative group cursor-pointer active:scale-95 transition-transform"
             onClick={openCommandPalette}
             title="Apri ricerca (Cmd+K)"
           >
             {/* Blur Background */}
-            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl group-hover:bg-blue-500/30 transition-all duration-500" />
+            <div className="absolute inset-0 bg-primary-500/20 rounded-[2.5rem] blur-2xl group-hover:bg-primary-500/30 transition-all duration-700 animate-pulse" />
 
-            {/* Icon Container */}
-            <div className="relative w-24 h-24 sm:w-32 sm:h-32 bg-white dark:bg-gray-800 rounded-3xl shadow-2xl flex items-center justify-center border border-gray-100 dark:border-gray-700 group-hover:scale-105 transition-transform duration-300">
-              <Search size={48} className="text-blue-500 stroke-[1.5] w-10 h-10 sm:w-12 sm:h-12" />
-            </div>
+            {/* Icon Container - Glass Card */}
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2.5rem] shadow-glass-lg flex items-center justify-center border border-white dark:border-slate-800 transition-all duration-500 group-hover:shadow-primary-500/10 group-hover:-translate-y-2">
+              <Search size={64} className="text-primary-500 stroke-[1.2] w-14 h-14 sm:w-16 sm:h-16 group-hover:scale-110 transition-transform duration-500" />
 
-            {/* Keyboard Shortcut Badge */}
-            <div className="absolute -bottom-3 -right-3 bg-gray-900 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg border-2 border-white dark:border-gray-800">
-              ⌘K
+              {/* Keyboard Shortcut Badge */}
+              <div className="absolute -bottom-2 -right-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg border-4 border-slate-50 dark:border-slate-950 uppercase tracking-widest">
+                ⌘ K
+              </div>
             </div>
           </div>
 
           {/* Title and Description */}
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mt-10 mb-3">
-            Ricerca Intelligente
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-sm text-center leading-relaxed">
-            Cerca norme, articoli o concetti giuridici. <br />
-            Prova con <span className="text-blue-600 font-medium">"Art 2043 cc"</span>
-          </p>
+          <div className="text-center mt-12 mb-10 max-w-md">
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+              Ricerca Intelligente
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400 text-lg leading-relaxed font-medium">
+              Esplora l'intero ecosistema normativo con query naturali. Prova <span className="text-primary-600 dark:text-primary-400 font-bold">"Art 2043 cc"</span>
+            </p>
+          </div>
 
           {/* QuickNorms Section */}
-          <div id="tour-quicknorms" className="mt-10 w-full max-w-lg">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                <Star size={16} className="text-amber-500" />
+          <div id="tour-quicknorms" className="w-full max-w-2xl px-4">
+            <div className="flex items-center justify-between mb-6 px-2">
+              <div className="flex items-center gap-2.5 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
+                  <Star size={14} fill="currentColor" />
+                </div>
                 <span>Ricerche Frequenti</span>
               </div>
               <button
                 onClick={openQuickNormsManager}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium",
-                  "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700",
-                  "text-gray-600 dark:text-gray-300 transition-colors"
+                  "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider",
+                  "bg-slate-200/50 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700",
+                  "text-slate-600 dark:text-slate-300 transition-all shadow-sm active:scale-95 border border-slate-300 dark:border-slate-700"
                 )}
               >
                 <Plus size={14} />
@@ -484,20 +487,22 @@ export function SearchPanel() {
               <div
                 onClick={openQuickNormsManager}
                 className={cn(
-                  "flex flex-col items-center justify-center py-8 px-4 rounded-2xl cursor-pointer",
-                  "border-2 border-dashed border-gray-200 dark:border-gray-700",
-                  "hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/10",
-                  "transition-all duration-200"
+                  "group flex flex-col items-center justify-center py-12 px-8 rounded-3xl cursor-pointer",
+                  "border-2 border-dashed border-slate-200 dark:border-slate-800",
+                  "hover:border-primary-400/50 dark:hover:border-primary-500/50 hover:bg-primary-50/30 dark:hover:bg-primary-900/10",
+                  "transition-all duration-300"
                 )}
               >
-                <Sparkles size={24} className="text-gray-400 dark:text-gray-500 mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                  Aggiungi le norme che consulti più spesso<br />
-                  <span className="text-xs text-gray-400">Clicca per iniziare</span>
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Sparkles size={28} className="text-slate-400 dark:text-slate-500 group-hover:text-primary-500 transition-colors" />
+                </div>
+                <p className="text-base text-slate-500 dark:text-slate-400 text-center font-bold">
+                  Velocizza il tuo workflow<br />
+                  <span className="text-xs font-medium text-slate-400 mt-1 block">Aggiungi norme consultate frequentemente</span>
                 </p>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2 justify-center">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {quickNorms.slice(0, 6).map((qn) => (
                   <button
                     key={qn.id}
@@ -506,33 +511,25 @@ export function SearchPanel() {
                       triggerSearch(qn.searchParams);
                     }}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-xl",
-                      "bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg",
-                      "border border-gray-200 dark:border-gray-700",
-                      "hover:bg-white dark:hover:bg-gray-800 hover:shadow-md hover:scale-[1.02]",
-                      "text-sm font-medium text-gray-700 dark:text-gray-200",
-                      "transition-all duration-200"
+                      "group flex flex-col gap-2 p-4 rounded-2xl text-left",
+                      "bg-white dark:bg-slate-900",
+                      "border border-slate-200 dark:border-slate-800",
+                      "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-xl hover:shadow-primary-500/5 hover:-translate-y-1",
+                      "transition-all duration-300"
                     )}
                   >
-                    <Star size={14} className="text-amber-500 shrink-0" />
-                    <span className="truncate max-w-[150px]">{qn.label}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-500">
+                        <Star size={12} fill="currentColor" />
+                      </div>
+                      <ChevronRight size={14} className="text-slate-300 group-hover:text-primary-500 transition-colors" />
+                    </div>
+                    <div>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{qn.label}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">{qn.searchParams.act_type}</span>
+                    </div>
                   </button>
                 ))}
-                {quickNorms.length > 6 && (
-                  <button
-                    onClick={openQuickNormsManager}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-xl",
-                      "bg-gray-100 dark:bg-gray-800",
-                      "border border-gray-200 dark:border-gray-700",
-                      "hover:bg-gray-200 dark:hover:bg-gray-700",
-                      "text-sm font-medium text-gray-600 dark:text-gray-400",
-                      "transition-all duration-200"
-                    )}
-                  >
-                    +{quickNorms.length - 6} altre
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -541,51 +538,62 @@ export function SearchPanel() {
 
       {/* Loading Skeleton - Shows while search is in progress */}
       {isLoading && !hasTabs && (
-        <div className="w-full max-w-4xl mx-auto p-8 space-y-6 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-            {/* Skeleton Header */}
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 space-y-3">
-              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-3/4" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-1/2" />
-            </div>
-
-            {/* Skeleton Content */}
-            <div className="p-6 space-y-4">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-full" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-5/6" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-4/6" />
-            </div>
+        <div className="w-full max-w-4xl mx-auto p-12 space-y-8 animate-pulse">
+          <div className="space-y-4">
+            <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-2xl w-1/3" />
+            <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/2" />
           </div>
 
-          {/* Additional Skeleton Cards */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-            <div className="p-6 space-y-4">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-full" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-shimmer w-3/4" />
-            </div>
+          <div className="grid grid-cols-1 gap-6">
+            {[1, 2].map(i => (
+              <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div className="p-8 space-y-6">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-12 h-12 bg-slate-200 dark:bg-slate-800 rounded-2xl" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-md w-1/4" />
+                      <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded-md w-1/6" />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-3 bg-slate-100 dark:bg-slate-800/50 rounded-md w-full" />
+                    <div className="h-3 bg-slate-100 dark:bg-slate-800/50 rounded-md w-full" />
+                    <div className="h-3 bg-slate-100 dark:bg-slate-800/50 rounded-md w-2/3" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* Error display */}
-      {error && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md shadow-lg max-w-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <SearchX className="h-5 w-5 text-red-400" />
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
+          >
+            <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-2xl shadow-2xl flex items-start gap-4 ring-4 ring-red-500/5">
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500">
+                <SearchX size={20} />
+              </div>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Errore di Ricerca</h4>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto pl-3"
-            >
-              <X size={16} className="text-red-400 hover:text-red-600" />
-            </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* PDF Viewer Modal */}
       <PDFViewer

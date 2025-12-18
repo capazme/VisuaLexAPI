@@ -30,13 +30,13 @@ interface StudyModeHeaderProps {
 const THEME_HEADER_STYLES: Record<StudyModeTheme, { bg: string; border: string; button: string }> = {
   light: {
     bg: 'bg-white/95 backdrop-blur-sm',
-    border: 'border-gray-200',
-    button: 'hover:bg-gray-100 text-gray-600'
+    border: 'border-slate-200',
+    button: 'hover:bg-slate-100 text-slate-600'
   },
   dark: {
-    bg: 'bg-gray-900/95 backdrop-blur-sm',
-    border: 'border-gray-700',
-    button: 'hover:bg-gray-800 text-gray-400'
+    bg: 'bg-slate-900/95 backdrop-blur-sm',
+    border: 'border-slate-700',
+    button: 'hover:bg-slate-800 text-slate-400'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]/95 backdrop-blur-sm',
@@ -85,12 +85,12 @@ export function StudyModeHeader({
             styles.border
           )}
         >
-          <div className="flex items-center justify-between px-2 sm:px-4 py-2 gap-1 sm:gap-2">
+          <div className="flex items-center justify-between px-2 sm:px-4 py-2.5 gap-1 sm:gap-2">
             {/* Left: Close, Drag handle & Title */}
             <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
               <button
                 onClick={onClose}
-                className={cn("p-1 sm:p-1.5 rounded-lg transition-colors", styles.button)}
+                className={cn("p-1.5 sm:p-2 rounded-md transition-colors", styles.button)}
                 title="Chiudi (ESC)"
               >
                 <X size={18} />
@@ -101,8 +101,8 @@ export function StudyModeHeader({
                 <div
                   onMouseDown={onDragStart}
                   className={cn(
-                    "hidden sm:block p-1.5 rounded-lg transition-colors cursor-grab",
-                    isDragging ? "cursor-grabbing bg-gray-200 dark:bg-gray-700" : styles.button
+                    "hidden sm:block p-2 rounded-md transition-colors cursor-grab",
+                    isDragging ? "cursor-grabbing bg-slate-200 dark:bg-slate-700" : styles.button
                   )}
                   title="Trascina finestra"
                 >
@@ -111,10 +111,10 @@ export function StudyModeHeader({
               )}
 
               <div className="min-w-0 ml-1 sm:ml-2">
-                <h1 className="font-medium text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none">{normaLabel}</h1>
+                <h1 className="font-semibold text-xs sm:text-sm truncate max-w-[100px] sm:max-w-none tracking-tight">{normaLabel}</h1>
                 <p className={cn(
-                  "text-xs truncate hidden sm:block",
-                  theme === 'dark' ? 'text-gray-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-gray-500'
+                  "text-xs truncate hidden sm:block font-medium",
+                  theme === 'dark' ? 'text-slate-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-slate-500'
                 )}>
                   Art. {article.norma_data.numero_articolo}
                 </p>
@@ -122,12 +122,12 @@ export function StudyModeHeader({
             </div>
 
             {/* Center: Navigation */}
-            <div className="flex items-center gap-0.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => onNavigate('prev')}
                 disabled={!hasPrev}
                 className={cn(
-                  "p-1.5 sm:p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+                  "p-1.5 sm:p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
                   styles.button
                 )}
                 title="Precedente (←)"
@@ -137,16 +137,18 @@ export function StudyModeHeader({
 
               <span className={cn(
                 "text-xs sm:text-sm font-medium min-w-[40px] sm:min-w-[60px] text-center tabular-nums",
-                theme === 'dark' ? 'text-gray-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-gray-500'
+                theme === 'dark' ? 'text-slate-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-slate-500'
               )}>
-                {currentIndex + 1}/{totalArticles}
+                {currentIndex + 1}
+                <span className="opacity-50 mx-1">/</span>
+                {totalArticles}
               </span>
 
               <button
                 onClick={() => onNavigate('next')}
                 disabled={!hasNext}
                 className={cn(
-                  "p-1.5 sm:p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
+                  "p-1.5 sm:p-2 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed",
                   styles.button
                 )}
                 title="Successivo (→)"
@@ -162,8 +164,8 @@ export function StudyModeHeader({
                 <button
                   onClick={onToggleTools}
                   className={cn(
-                    "p-1 sm:p-1.5 rounded-lg transition-colors",
-                    showToolsPanel ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/30' : styles.button
+                    "p-1.5 sm:p-2 rounded-md transition-colors",
+                    showToolsPanel ? 'text-primary-600 bg-primary-50 dark:bg-primary-900/30 dark:text-primary-400' : styles.button
                   )}
                   title="Note e highlights (T)"
                 >
@@ -175,8 +177,8 @@ export function StudyModeHeader({
                 <button
                   onClick={onToggleBrocardi}
                   className={cn(
-                    "p-1 sm:p-1.5 rounded-lg transition-colors",
-                    showBrocardi ? 'text-amber-500 bg-amber-50 dark:bg-amber-900/30' : styles.button
+                    "p-1.5 sm:p-2 rounded-md transition-colors",
+                    showBrocardi ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400' : styles.button
                   )}
                   title="Approfondimenti (B)"
                 >
@@ -184,18 +186,18 @@ export function StudyModeHeader({
                 </button>
               )}
 
-              <div className="hidden sm:block w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+              <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
               {/* Quick Theme Toggle - hidden on mobile, use settings instead */}
               <div className={cn(
-                "hidden sm:flex items-center rounded-lg p-0.5",
-                theme === 'dark' ? 'bg-gray-800' : theme === 'sepia' ? 'bg-[#e4d4b8]' : 'bg-gray-100'
+                "hidden sm:flex items-center rounded-lg p-0.5 border",
+                theme === 'dark' ? 'bg-slate-800 border-slate-700' : theme === 'sepia' ? 'bg-[#e4d4b8] border-[#d4c4a8]' : 'bg-slate-100 border-slate-200'
               )}>
                 <button
                   onClick={() => onThemeChange('light')}
                   className={cn(
-                    "p-1 rounded transition-colors",
-                    theme === 'light' ? 'bg-white shadow text-yellow-500' : 'text-gray-400'
+                    "p-1 rounded-md transition-all",
+                    theme === 'light' ? 'bg-white shadow-sm text-yellow-500' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema chiaro (1)"
                 >
@@ -204,8 +206,8 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('sepia')}
                   className={cn(
-                    "p-1 rounded transition-colors",
-                    theme === 'sepia' ? 'bg-white shadow text-amber-600' : 'text-gray-400'
+                    "p-1 rounded-md transition-all",
+                    theme === 'sepia' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema seppia (2)"
                 >
@@ -214,8 +216,8 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('dark')}
                   className={cn(
-                    "p-1 rounded transition-colors",
-                    theme === 'dark' ? 'bg-gray-700 shadow text-blue-400' : 'text-gray-400'
+                    "p-1 rounded-md transition-all",
+                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-blue-400' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema scuro (3)"
                 >
@@ -225,7 +227,7 @@ export function StudyModeHeader({
 
               <button
                 onClick={onToggleSettings}
-                className={cn("p-1 sm:p-1.5 rounded-lg transition-colors", styles.button)}
+                className={cn("p-1.5 sm:p-2 rounded-md transition-colors", styles.button)}
                 title="Impostazioni (S)"
               >
                 <Settings size={14} className="sm:w-4 sm:h-4" />
@@ -234,8 +236,8 @@ export function StudyModeHeader({
               <button
                 onClick={onBookmark}
                 className={cn(
-                  "p-1 sm:p-1.5 rounded-lg transition-colors",
-                  isBookmarked ? 'text-yellow-500' : styles.button
+                  "p-1.5 sm:p-2 rounded-md transition-colors",
+                  isBookmarked ? 'text-amber-500 fill-amber-500' : styles.button
                 )}
                 title="Segnalibro (⌘B)"
               >
@@ -246,7 +248,7 @@ export function StudyModeHeader({
               {onToggleFullscreen && (
                 <button
                   onClick={onToggleFullscreen}
-                  className={cn("p-1 sm:p-1.5 rounded-lg transition-colors", styles.button)}
+                  className={cn("p-1.5 sm:p-2 rounded-md transition-colors", styles.button)}
                   title={isFullscreen ? "Riduci (F)" : "Espandi (F)"}
                 >
                   {isFullscreen ? <Minimize2 size={14} className="sm:w-4 sm:h-4" /> : <Maximize2 size={14} className="sm:w-4 sm:h-4" />}

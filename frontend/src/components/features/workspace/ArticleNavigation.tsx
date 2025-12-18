@@ -137,18 +137,18 @@ export function ArticleNavigation({
         onClick={handlePrev}
         disabled={isFirst}
         className={cn(
-          "p-1 rounded transition-colors relative",
+          "p-1 rounded-md transition-colors relative",
           isFirst
-            ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+            ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : prevWillLoad
-              ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-              : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300"
+              ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
+              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
         title={prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
       >
         <ChevronLeft size={16} />
         {prevWillLoad && (
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
         )}
       </button>
 
@@ -160,21 +160,23 @@ export function ArticleNavigation({
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleInputSubmit}
           onKeyDown={handleKeyDown}
-          className="w-16 text-xs font-medium text-center bg-white dark:bg-gray-700 border border-blue-500 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-16 text-xs font-medium text-center bg-white dark:bg-slate-800 border border-primary-500 rounded-md px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
           placeholder="Art."
         />
       ) : (
         <span
           onDoubleClick={handleDoubleClick}
           className={cn(
-            "text-xs font-medium min-w-[50px] text-center tabular-nums cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 px-1 py-0.5 rounded transition-colors",
+            "text-xs font-medium min-w-[50px] text-center tabular-nums cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-1 rounded-md transition-colors select-none",
             hasStructure
-              ? "text-blue-600 dark:text-blue-400"
-              : "text-gray-500 dark:text-gray-400"
+              ? "text-primary-600 dark:text-primary-400 font-semibold"
+              : "text-slate-500 dark:text-slate-400"
           )}
           title="Doppio click per inserire articolo"
         >
-          {currentIndex + 1}/{navigationIds.length}
+          {currentIndex + 1}
+          <span className="text-slate-300 dark:text-slate-600 mx-1">/</span>
+          {navigationIds.length}
         </span>
       )}
 
@@ -182,18 +184,18 @@ export function ArticleNavigation({
         onClick={handleNext}
         disabled={isLast}
         className={cn(
-          "p-1 rounded transition-colors relative",
+          "p-1 rounded-md transition-colors relative",
           isLast
-            ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+            ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : nextWillLoad
-              ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30"
-              : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300"
+              ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
+              : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
         title={nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
       >
         <ChevronRight size={16} />
         {nextWillLoad && (
-          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
         )}
       </button>
     </div>

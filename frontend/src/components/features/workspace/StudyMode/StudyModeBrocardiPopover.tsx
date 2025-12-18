@@ -23,19 +23,19 @@ const THEME_STYLES: Record<StudyModeTheme, {
 }> = {
   light: {
     bg: 'bg-white',
-    border: 'border-gray-200',
-    section: 'bg-gray-50',
-    sectionHover: 'hover:bg-gray-100',
-    text: 'text-gray-900',
-    muted: 'text-gray-500'
+    border: 'border-slate-200',
+    section: 'bg-slate-50',
+    sectionHover: 'hover:bg-slate-100',
+    text: 'text-slate-900',
+    muted: 'text-slate-500'
   },
   dark: {
-    bg: 'bg-gray-800',
-    border: 'border-gray-700',
-    section: 'bg-gray-700',
-    sectionHover: 'hover:bg-gray-600',
-    text: 'text-gray-100',
-    muted: 'text-gray-400'
+    bg: 'bg-slate-900',
+    border: 'border-slate-700',
+    section: 'bg-slate-800',
+    sectionHover: 'hover:bg-slate-700',
+    text: 'text-slate-100',
+    muted: 'text-slate-400'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]',
@@ -77,7 +77,7 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
   }
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
+    <div className={cn("rounded-lg border overflow-hidden transition-colors", styles.border)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -86,15 +86,15 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
           styles.sectionHover
         )}
       >
-        <span className={cn("text-xs font-medium", styles.muted)}>
+        <span className={cn("text-xs font-semibold uppercase tracking-wide", styles.muted)}>
           {title}
           {Array.isArray(validContent) && (
-            <span className="ml-1 opacity-60">({validContent.length})</span>
+            <span className="ml-1 opacity-60 font-normal">({validContent.length})</span>
           )}
         </span>
         <ChevronDown
-          size={12}
-          className={cn("transition-transform", styles.muted, isOpen && "rotate-180")}
+          size={14}
+          className={cn("transition-transform opacity-60", styles.muted, isOpen && "rotate-180")}
         />
       </button>
 
@@ -107,15 +107,14 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
             transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className={cn("p-3 text-sm max-h-48 overflow-y-auto", styles.text)}>
+            <div className={cn("p-3 text-sm max-h-48 overflow-y-auto custom-scrollbar", styles.text)}>
               {title === 'Massime' && Array.isArray(validContent) ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {validContent.map((item, idx) => (
-                    <div key={`popover-massima-${idx}`} className="flex gap-2 text-xs">
+                    <div key={`popover-massima-${idx}`} className="flex gap-2 text-xs group">
                       <span className={cn(
-                        "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs",
-                        styles.section,
-                        styles.muted
+                        "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold mt-0.5 transition-colors",
+                        theme === 'dark' ? "bg-slate-700 text-slate-300" : theme === 'sepia' ? "bg-[#d4c4a8] text-[#5c4b37]" : "bg-slate-100 text-slate-500 group-hover:bg-slate-200"
                       )}>
                         {idx + 1}
                       </span>
@@ -127,7 +126,7 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
                   ))}
                 </div>
               ) : Array.isArray(validContent) ? (
-                <ul className="space-y-1 text-xs">
+                <ul className="space-y-1.5 text-xs list-disc list-outside pl-4">
                   {validContent.map((item, idx) => (
                     <li key={`popover-item-${idx}`}>{item}</li>
                   ))}
@@ -158,7 +157,7 @@ function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
   if (!footnotes || footnotes.length === 0) return null;
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", styles.border)}>
+    <div className={cn("rounded-lg border overflow-hidden transition-colors", styles.border)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -167,13 +166,13 @@ function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
           styles.sectionHover
         )}
       >
-        <span className={cn("text-xs font-medium", styles.muted)}>
-          Note al Dispositivo
-          <span className="ml-1 opacity-60">({footnotes.length})</span>
+        <span className={cn("text-xs font-semibold uppercase tracking-wide", styles.muted)}>
+          Note
+          <span className="ml-1 opacity-60 font-normal">({footnotes.length})</span>
         </span>
         <ChevronDown
-          size={12}
-          className={cn("transition-transform", styles.muted, isOpen && "rotate-180")}
+          size={14}
+          className={cn("transition-transform opacity-60", styles.muted, isOpen && "rotate-180")}
         />
       </button>
 
@@ -186,11 +185,11 @@ function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
             transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className={cn("p-3 text-sm max-h-48 overflow-y-auto space-y-2", styles.text)}>
+            <div className={cn("p-3 text-sm max-h-48 overflow-y-auto space-y-3 custom-scrollbar", styles.text)}>
               {footnotes.map((footnote) => (
                 <div key={`popover-footnote-${footnote.numero}`} className="flex gap-2 text-xs">
                   <span className={cn(
-                    "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold",
+                    "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold mt-0.5",
                     "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
                   )}>
                     {footnote.numero}
@@ -232,35 +231,35 @@ export function StudyModeBrocardiPopover({
           transition={{ duration: 0.15 }}
           className={cn(
             // Base styles
-            "absolute flex flex-col rounded-lg shadow-xl border z-20",
+            "absolute flex flex-col rounded-xl shadow-2xl border z-20 overflow-hidden",
             // Mobile: nearly full width, centered
             "left-4 right-4 top-auto bottom-4 max-h-[70vh]",
             // Desktop: fixed position and width
-            "sm:left-auto sm:right-4 sm:top-4 sm:bottom-auto sm:w-80",
+            "sm:left-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-80 sm:max-h-[calc(100vh-100px)]",
             styles.bg,
             styles.border
           )}
         >
           {/* Header */}
-          <div className={cn("flex items-center justify-between px-3 py-2 border-b", styles.border)}>
-            <h3 className={cn("text-sm font-medium flex items-center gap-2", styles.text)}>
+          <div className={cn("flex items-center justify-between px-3 py-2.5 border-b shrink-0", styles.border)}>
+            <h3 className={cn("text-xs font-bold uppercase tracking-wide flex items-center gap-2", styles.text)}>
               <Lightbulb size={14} className="text-amber-500" />
               Approfondimenti
             </h3>
             <button
               onClick={onClose}
               className={cn(
-                "p-1 rounded transition-colors",
+                "p-1 rounded-md transition-colors",
                 styles.muted,
-                'hover:bg-gray-100 dark:hover:bg-gray-700'
+                'hover:bg-slate-100 dark:hover:bg-slate-700'
               )}
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
             {hasContent ? (
               <>
                 <BrocardiSection title="Brocardi" content={brocardiInfo.Brocardi} theme={theme} defaultOpen />
@@ -276,7 +275,7 @@ export function StudyModeBrocardiPopover({
                     href={brocardiInfo.link}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center justify-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 hover:underline py-2"
+                    className="flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 hover:underline py-3 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
                   >
                     <ExternalLink size={12} />
                     Fonte Brocardi.it
@@ -284,9 +283,9 @@ export function StudyModeBrocardiPopover({
                 )}
               </>
             ) : (
-              <div className={cn("text-center py-6", styles.muted)}>
-                <Lightbulb size={24} className="mx-auto mb-2 opacity-50" />
-                <p className="text-xs">Nessun approfondimento disponibile.</p>
+              <div className={cn("text-center py-8 flex flex-col items-center gap-2", styles.muted)}>
+                <Lightbulb size={24} className="opacity-30" />
+                <p className="text-xs opacity-70">Nessun approfondimento disponibile.</p>
               </div>
             )}
           </div>

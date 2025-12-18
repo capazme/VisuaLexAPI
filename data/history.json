@@ -2,34 +2,6 @@
   {
     "act_type": "codice civile",
     "act_number": "",
-    "article": "1174",
-    "date": "",
-    "timestamp": "2025-12-17T18:49:26.576720Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "1175",
-    "date": "",
-    "timestamp": "2025-12-17T18:51:25.809643Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "1176",
-    "date": "",
-    "timestamp": "2025-12-17T18:51:27.851211Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "1177",
-    "date": "",
-    "timestamp": "2025-12-17T18:51:29.016719Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
     "article": "1178",
     "date": "",
     "timestamp": "2025-12-17T18:51:31.295865Z"
@@ -348,5 +320,33 @@
     "article": "1",
     "date": "",
     "timestamp": "2025-12-18T08:32:40.619870Z"
+  },
+  {
+    "act_type": "codice civile",
+    "act_number": "",
+    "article": "1175",
+    "date": "",
+    "timestamp": "2025-12-18T11:31:56.270951Z"
+  },
+  {
+    "act_type": "codice civile",
+    "act_number": "",
+    "article": "1176",
+    "date": "",
+    "timestamp": "2025-12-18T11:32:10.737901Z"
+  },
+  {
+    "act_type": "regolamento ue",
+    "act_number": "679",
+    "article": "15,16,17,18,20,21,22",
+    "date": "2016-04-27",
+    "timestamp": "2025-12-18T11:36:09.583218Z"
+  },
+  {
+    "act_type": "codice di procedura civile",
+    "act_number": "",
+    "article": "12",
+    "date": "",
+    "timestamp": "2025-12-18T12:54:20.885432Z"
   }
 ]

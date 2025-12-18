@@ -29,7 +29,7 @@ const HIGHLIGHT_STYLES: Record<string, string> = {
 
 const THEME_CONTENT_STYLES: Record<StudyModeTheme, { prose: string }> = {
   light: {
-    prose: 'prose-gray'
+    prose: 'prose-slate'
   },
   dark: {
     prose: 'prose-invert'
@@ -90,7 +90,7 @@ export function StudyModeContent({
 
     // Apply cross-references
     html = html.replace(/art\.?\s+(\d+)/gi, (_match, p1) => {
-      return `<button type="button" class="cross-reference text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" data-article="${p1}">art. ${p1}</button>`;
+      return `<button type="button" class="cross-reference text-primary-600 dark:text-primary-400 hover:underline cursor-pointer font-medium" data-article="${p1}">art. ${p1}</button>`;
     });
 
     return html;
@@ -162,11 +162,11 @@ export function StudyModeContent({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto relative">
+    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
       {/* Progress Bar */}
-      <div className="sticky top-0 left-0 right-0 h-1 bg-transparent z-10">
+      <div className="sticky top-0 left-0 right-0 h-1 bg-transparent z-10 pointer-events-none">
         <motion.div
-          className="h-full bg-blue-500/50"
+          className="h-full bg-primary-500/50 backdrop-blur-sm"
           initial={{ width: '0%' }}
           animate={{ width: `${scrollProgress}%` }}
           transition={{ duration: 0.1 }}
@@ -186,7 +186,7 @@ export function StudyModeContent({
           >
             <h2 className={cn(
               "text-xl sm:text-2xl font-serif font-bold mb-4 sm:mb-8 pb-3 sm:pb-4 border-b",
-              theme === 'dark' ? 'border-gray-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-gray-200'
+              theme === 'dark' ? 'border-gray-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-slate-200'
             )}>
               Articolo {norma_data.numero_articolo}
             </h2>
@@ -202,7 +202,7 @@ export function StudyModeContent({
             {/* Article Text */}
             <div
               className={cn(
-                "prose max-w-none font-serif",
+                "prose max-w-none font-serif leading-relaxed",
                 styles.prose
               )}
               style={{
@@ -213,7 +213,8 @@ export function StudyModeContent({
               {processedContent ? (
                 <SafeHTML html={processedContent} />
               ) : (
-                <div className="text-center py-8 opacity-50">
+                <div className="text-center py-8 opacity-50 flex flex-col items-center gap-2">
+                  <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
                   Caricamento testo...
                 </div>
               )}
@@ -233,27 +234,27 @@ export function StudyModeContent({
             onClick={toggleFootnotesPanel}
             className={cn(
               // Base styles
-              "absolute z-20 flex items-center gap-1.5 sm:gap-2 rounded-full shadow-lg transition-colors",
+              "absolute z-20 flex items-center gap-1.5 sm:gap-2 rounded-full shadow-lg transition-colors border",
               // Responsive positioning - closer to edge on mobile
               "bottom-4 right-4 sm:bottom-6 sm:right-6",
               // Responsive padding
-              "px-2.5 py-1.5 sm:px-3 sm:py-2",
+              "px-3 py-1.5 sm:px-4 sm:py-2",
               // Active/inactive states with theme support
               activeFootnote
                 ? theme === 'dark'
-                  ? "bg-amber-600 text-white"
-                  : "bg-amber-500 text-white"
+                  ? "bg-slate-700 border-slate-600 text-white shadow-slate-900/50"
+                  : "bg-slate-800 border-slate-700 text-white shadow-slate-200"
                 : theme === 'dark'
-                ? "bg-gray-700 text-amber-400 hover:bg-gray-600 active:bg-gray-600"
-                : theme === 'sepia'
-                ? "bg-[#d4c4a8] text-[#5c4b37] hover:bg-[#c4b498] active:bg-[#c4b498]"
-                : "bg-white text-amber-600 hover:bg-gray-50 active:bg-gray-100 border border-gray-200"
+                  ? "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 active:bg-slate-600"
+                  : theme === 'sepia'
+                    ? "bg-[#f4ecd8] text-[#5c4b37] border-[#d4c4a8] hover:bg-[#e4d4b8] active:bg-[#e4d4b8]"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 active:bg-slate-100"
             )}
             title={`${footnotes.length} note disponibili`}
             aria-label={`${footnotes.length} note disponibili`}
           >
-            <StickyNote size={16} className="sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm font-medium">{footnotes.length}</span>
+            <StickyNote size={16} className="sm:w-4 sm:h-4 text-primary-500" />
+            <span className="text-xs sm:text-sm font-semibold">{footnotes.length}</span>
           </motion.button>
 
           {/* Footnotes Panel - responsive layout */}
@@ -266,7 +267,7 @@ export function StudyModeContent({
                 transition={{ duration: 0.2 }}
                 className={cn(
                   // Base styles
-                  "absolute z-20 flex flex-col rounded-lg shadow-xl border overflow-hidden",
+                  "absolute z-20 flex flex-col rounded-xl shadow-2xl border overflow-hidden",
                   // Responsive width - nearly full width on mobile, fixed on desktop
                   "left-4 right-4 sm:left-auto sm:right-6 sm:w-80",
                   // Responsive positioning - bottom sheet style on mobile
@@ -275,37 +276,37 @@ export function StudyModeContent({
                   "max-h-[50vh] sm:max-h-[60vh]",
                   // Theme colors
                   theme === 'dark'
-                    ? "bg-gray-800 border-gray-700"
+                    ? "bg-slate-800 border-slate-700"
                     : theme === 'sepia'
-                    ? "bg-[#f4ecd8] border-[#d4c4a8]"
-                    : "bg-white border-gray-200"
+                      ? "bg-[#f4ecd8] border-[#d4c4a8]"
+                      : "bg-white border-slate-200"
                 )}
               >
                 {/* Header */}
                 <div className={cn(
                   "flex items-center justify-between px-4 py-3 border-b shrink-0",
                   theme === 'dark'
-                    ? "bg-gray-700/50 border-gray-700"
+                    ? "bg-slate-800 border-slate-700"
                     : theme === 'sepia'
-                    ? "bg-[#efe5d1] border-[#d4c4a8]"
-                    : "bg-gray-50 border-gray-100"
+                      ? "bg-[#efe5d1] border-[#d4c4a8]"
+                      : "bg-slate-50 border-slate-100"
                 )}>
                   <span className={cn(
                     "text-sm font-semibold flex items-center gap-2",
-                    theme === 'dark' ? "text-gray-200" : theme === 'sepia' ? "text-[#5c4b37]" : "text-gray-700"
+                    theme === 'dark' ? "text-slate-200" : theme === 'sepia' ? "text-[#5c4b37]" : "text-slate-700"
                   )}>
-                    <StickyNote size={16} className="text-amber-500" />
+                    <StickyNote size={16} className="text-primary-500" />
                     Note al Dispositivo
                   </span>
                   <button
                     onClick={toggleFootnotesPanel}
                     className={cn(
-                      "p-1 rounded transition-colors",
+                      "p-1 rounded-md transition-colors",
                       theme === 'dark'
-                        ? "text-gray-400 hover:text-gray-300 hover:bg-gray-600"
+                        ? "text-slate-400 hover:text-slate-300 hover:bg-slate-700"
                         : theme === 'sepia'
-                        ? "text-[#8b7355] hover:text-[#5c4b37] hover:bg-[#e4d4b8]"
-                        : "text-gray-400 hover:text-gray-600 hover:bg-gray-200"
+                          ? "text-[#8b7355] hover:text-[#5c4b37] hover:bg-[#e4d4b8]"
+                          : "text-slate-400 hover:text-slate-600 hover:bg-slate-200"
                     )}
                     aria-label="Chiudi note"
                   >
@@ -314,7 +315,7 @@ export function StudyModeContent({
                 </div>
 
                 {/* Notes List */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                   {footnotes.map((fn, idx) => {
                     const articleRefs = extractArticleRefs(fn.testo, norma_data.tipo_atto);
                     return (
@@ -323,24 +324,24 @@ export function StudyModeContent({
                         className={cn(
                           "px-4 py-3 border-b last:border-b-0",
                           theme === 'dark'
-                            ? "border-gray-700"
+                            ? "border-slate-700 hover:bg-slate-700/30"
                             : theme === 'sepia'
-                            ? "border-[#d4c4a8]"
-                            : "border-gray-100"
+                              ? "border-[#d4c4a8] hover:bg-[#e4d4b8]/30"
+                              : "border-slate-100 hover:bg-slate-50"
                         )}
                       >
                         {/* Note number badge */}
                         <div className="flex items-start gap-3">
                           <span className={cn(
-                            "shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold",
-                            "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                            "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold mt-0.5",
+                            "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300"
                           )}>
                             {fn.numero}
                           </span>
                           <div className="flex-1 min-w-0">
                             <p className={cn(
                               "text-sm leading-relaxed",
-                              theme === 'dark' ? "text-gray-300" : theme === 'sepia' ? "text-[#5c4b37]" : "text-gray-700"
+                              theme === 'dark' ? "text-slate-300" : theme === 'sepia' ? "text-[#5c4b37]" : "text-slate-700"
                             )}>
                               {fn.testo}
                             </p>
@@ -357,12 +358,12 @@ export function StudyModeContent({
                                       }
                                     }}
                                     className={cn(
-                                      "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded transition-colors cursor-pointer",
+                                      "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded transition-colors cursor-pointer border",
                                       theme === 'dark'
-                                        ? "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
+                                        ? "bg-primary-900/20 text-primary-300 border-primary-900/30 hover:bg-primary-900/40"
                                         : theme === 'sepia'
-                                        ? "bg-amber-100/70 text-amber-800 hover:bg-amber-200"
-                                        : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                          ? "bg-amber-100/70 text-amber-800 border-amber-200 hover:bg-amber-200"
+                                          : "bg-primary-50 text-primary-700 border-primary-100 hover:bg-primary-100"
                                     )}
                                     title={`Vai a Art. ${ref.numero}`}
                                   >

@@ -32,11 +32,11 @@ export type StudyModeTheme = 'light' | 'dark' | 'sepia';
 const THEME_STYLES: Record<StudyModeTheme, { bg: string; text: string }> = {
   light: {
     bg: 'bg-white',
-    text: 'text-gray-900'
+    text: 'text-slate-900'
   },
   dark: {
-    bg: 'bg-gray-900',
-    text: 'text-gray-100'
+    bg: 'bg-slate-900',
+    text: 'text-slate-100'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]',
@@ -295,11 +295,11 @@ export function StudyMode({
   const windowStyle = isFullscreen
     ? {}
     : {
-        left: position.x,
-        top: position.y,
-        width: size.width,
-        height: size.height,
-      };
+      left: position.x,
+      top: position.y,
+      width: size.width,
+      height: size.height,
+    };
 
   // Render via Portal to escape tab stacking context
   return createPortal(
@@ -309,7 +309,7 @@ export function StudyMode({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9998] bg-black/50"
+        className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -323,11 +323,11 @@ export function StudyMode({
         className={cn(
           "fixed z-[9999] flex flex-col shadow-2xl overflow-hidden",
           isFullscreen && "inset-0",
-          !isFullscreen && "rounded-xl border",
+          !isFullscreen && "rounded-2xl border",
           isDragging && "cursor-grabbing select-none",
           themeStyle.bg,
           themeStyle.text,
-          !isFullscreen && (theme === 'dark' ? 'border-gray-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-gray-200')
+          !isFullscreen && (theme === 'dark' ? 'border-slate-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-slate-200')
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -362,8 +362,8 @@ export function StudyMode({
             visible={showToolsPanel}
             isPinned={showToolsPanel}
             onTogglePin={handleToggleTools}
-            onMouseEnter={() => {}}
-            onMouseLeave={() => {}}
+            onMouseEnter={() => { }}
+            onMouseLeave={() => { }}
             annotations={articleAnnotations}
             highlights={articleHighlights}
             normaKey={normaKey}
@@ -400,10 +400,10 @@ export function StudyMode({
 
         {/* Footer - shortcuts on desktop, simplified on mobile */}
         <div className={cn(
-          "flex items-center justify-center sm:justify-between px-2 sm:px-4 py-2 border-t text-xs",
-          theme === 'dark' ? 'bg-gray-800/50 border-gray-700 text-gray-400'
+          "flex items-center justify-center sm:justify-between px-2 sm:px-4 py-2 border-t text-xs transition-colors",
+          theme === 'dark' ? 'bg-slate-800/50 border-slate-700 text-slate-400'
             : theme === 'sepia' ? 'bg-[#efe5d1] border-[#d4c4a8] text-[#8b7355]'
-            : 'bg-gray-50 border-gray-200 text-gray-500'
+              : 'bg-slate-50 border-slate-200 text-slate-500'
         )}>
           {/* Mobile: simplified message */}
           <div className="sm:hidden text-center">
@@ -411,14 +411,14 @@ export function StudyMode({
           </div>
           {/* Desktop: full keyboard shortcuts */}
           <div className="hidden sm:flex items-center gap-4">
-            <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">ESC</kbd> Chiudi</span>
-            <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">←→</kbd> Naviga</span>
-            <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">F</kbd> Fullscreen</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>ESC</kbd> Chiudi</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>←→</kbd> Naviga</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>F</kbd> Fullscreen</span>
           </div>
           <div className="hidden sm:flex items-center gap-4">
-            <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">T</kbd> Note</span>
-            <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">B</kbd> Brocardi</span>
-            <span><kbd className="px-1 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-xs">S</kbd> Settings</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>T</kbd> Note</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>B</kbd> Brocardi</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>S</kbd> Settings</span>
           </div>
         </div>
 
@@ -428,7 +428,7 @@ export function StudyMode({
             onMouseDown={handleResizeStart}
             className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
             style={{
-              background: 'linear-gradient(135deg, transparent 50%, rgba(128,128,128,0.3) 50%)'
+              background: 'linear-gradient(135deg, transparent 50%, rgba(148,163,184,0.3) 50%)'
             }}
           />
         )}

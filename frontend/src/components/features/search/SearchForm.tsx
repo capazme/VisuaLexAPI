@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, RefreshCw, Eraser, Plus, Minus, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import type { SearchParams } from '../../../types';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
+import { cn } from '../../../lib/utils';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -91,37 +93,22 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     const fetchArticleTree = async () => {
       const normaKey = getNormaKey();
 
-      console.log('🔍 [SearchForm] Checking if should fetch articles...', {
-        act_type: formData.act_type,
-        act_number: formData.act_number,
-        date: formData.date,
-        normaKey,
-        lastFetchedNorma,
-        isSameNorma: normaKey === lastFetchedNorma
-      });
-
-      // Don't refetch if same norma or no act_type
       if (!formData.act_type) {
-        console.log('❌ [SearchForm] No act_type, skipping fetch');
         return;
       }
 
       if (normaKey === lastFetchedNorma) {
-        console.log('⏭️ [SearchForm] Same norma, skipping fetch');
         return;
       }
 
       // For acts requiring details, wait until we have at least number or date
       const needsDetails = ACT_TYPES_REQUIRING_DETAILS.includes(formData.act_type);
-      console.log('📋 [SearchForm] Needs details?', { needsDetails, act_type: formData.act_type });
 
       if (needsDetails && !formData.act_number && !formData.date) {
-        console.log('⏳ [SearchForm] Needs details but missing number/date, clearing list');
         setArticleList([]);
         return;
       }
 
-      console.log('🚀 [SearchForm] Starting fetch for articles...');
       setIsLoadingArticles(true);
 
       try {
@@ -132,7 +119,6 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           date: formData.date ? parseItalianDate(formData.date) : undefined,
           article: '1'
         };
-        console.log('📤 [SearchForm] Fetching norma data with:', requestBody);
 
         const normaRes = await fetch('/fetch_norma_data', {
           method: 'POST',
@@ -140,67 +126,37 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           body: JSON.stringify(requestBody)
         });
 
-        console.log('📥 [SearchForm] Norma response status:', normaRes.status);
-
         if (!normaRes.ok) {
-          const errorText = await normaRes.text();
-          console.error('❌ [SearchForm] Norma fetch failed:', errorText);
           throw new Error('Errore fetch norma');
         }
 
         const normaData = await normaRes.json();
-        console.log('📥 [SearchForm] Norma data received:', normaData);
-
-        // Extract URN from the response - it's inside norma_data array
         const urnToUse = normaData.norma_data?.[0]?.urn || normaData.norma_data?.[0]?.url;
-        console.log('🔗 [SearchForm] Extracted URN:', urnToUse);
 
         if (!urnToUse) {
-          console.log('❌ [SearchForm] No URN in response, clearing list');
           setArticleList([]);
           return;
         }
 
         // Then fetch the tree
-        console.log('🌳 [SearchForm] Fetching tree for URN:', urnToUse);
         const treeRes = await fetch('/fetch_tree', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ urn: urnToUse, link: false, details: false })
         });
 
-        console.log('📥 [SearchForm] Tree response status:', treeRes.status);
-
         if (!treeRes.ok) {
-          const errorText = await treeRes.text();
-          console.error('❌ [SearchForm] Tree fetch failed:', errorText);
           throw new Error('Errore fetch tree');
         }
 
         const treeResponse = await treeRes.json();
-        console.log('🌳 [SearchForm] Tree response received:', {
-          hasArticles: !!treeResponse.articles,
-          count: treeResponse.count,
-          articlesType: typeof treeResponse.articles,
-          isArray: Array.isArray(treeResponse.articles),
-          sample: Array.isArray(treeResponse.articles) ? treeResponse.articles.slice(0, 5) : treeResponse
-        });
-
-        // Extract article IDs from tree - API returns { articles: [...], count: N }
         const treeData = treeResponse.articles || treeResponse;
         const articles = extractArticleIdsFromTree(treeData);
-        console.log('📚 [SearchForm] Extracted articles:', {
-          count: articles.length,
-          first10: articles.slice(0, 10),
-          last5: articles.slice(-5)
-        });
 
         setArticleList(articles);
         setLastFetchedNorma(normaKey);
-
-        console.log(`✅ [SearchForm] Successfully loaded ${articles.length} articles for navigation`);
       } catch (e) {
-        console.error('💥 [SearchForm] Error fetching article tree:', e);
+        console.error('Error fetching article tree:', e);
         setArticleList([]);
       } finally {
         setIsLoadingArticles(false);
@@ -223,66 +179,31 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   };
 
   const handleIncrementArticle = () => {
-    console.log('➕ [SearchForm] Increment clicked', {
-      currentArticle: formData.article,
-      articleListLength: articleList.length,
-      articleListSample: articleList.slice(0, 5)
-    });
-
     if (articleList.length > 0) {
-      // Use real article list
       const currentIndex = articleList.findIndex(a => a === formData.article);
-      console.log('➕ [SearchForm] Current index in list:', currentIndex);
-
       if (currentIndex === -1) {
-        // Current article not in list, go to first
-        console.log('➕ [SearchForm] Article not in list, going to first:', articleList[0]);
         setFormData(prev => ({ ...prev, article: articleList[0] }));
       } else if (currentIndex < articleList.length - 1) {
-        // Go to next article
-        const nextArticle = articleList[currentIndex + 1];
-        console.log('➕ [SearchForm] Going to next article:', nextArticle);
-        setFormData(prev => ({ ...prev, article: nextArticle }));
-      } else {
-        console.log('➕ [SearchForm] Already at end of list');
+        setFormData(prev => ({ ...prev, article: articleList[currentIndex + 1] }));
       }
     } else {
-      // Fallback to numeric increment
       const newArticle = (parseInt(formData.article) + 1).toString();
-      console.log('➕ [SearchForm] Fallback numeric increment:', newArticle);
       setFormData(prev => ({ ...prev, article: newArticle }));
     }
   };
 
   const handleDecrementArticle = () => {
-    console.log('➖ [SearchForm] Decrement clicked', {
-      currentArticle: formData.article,
-      articleListLength: articleList.length
-    });
-
     if (articleList.length > 0) {
-      // Use real article list
       const currentIndex = articleList.findIndex(a => a === formData.article);
-      console.log('➖ [SearchForm] Current index in list:', currentIndex);
-
       if (currentIndex === -1) {
-        // Current article not in list, go to first
-        console.log('➖ [SearchForm] Article not in list, going to first:', articleList[0]);
         setFormData(prev => ({ ...prev, article: articleList[0] }));
       } else if (currentIndex > 0) {
-        // Go to previous article
-        const prevArticle = articleList[currentIndex - 1];
-        console.log('➖ [SearchForm] Going to previous article:', prevArticle);
-        setFormData(prev => ({ ...prev, article: prevArticle }));
-      } else {
-        console.log('➖ [SearchForm] Already at start of list');
+        setFormData(prev => ({ ...prev, article: articleList[currentIndex - 1] }));
       }
     } else {
-      // Fallback to numeric decrement
       setFormData(prev => {
         const val = parseInt(prev.article);
         const newArticle = val > 1 ? (val - 1).toString() : '1';
-        console.log('➖ [SearchForm] Fallback numeric decrement:', newArticle);
         return { ...prev, article: newArticle };
       });
     }
@@ -320,45 +241,57 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   // Group options
   const groupedOptions = ACT_TYPES.reduce((acc, option) => {
-    if (!acc[option.group]) acc[option.group] = [];
-    acc[option.group].push(option);
+    const group = option.group || 'Altro';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(option);
     return acc;
   }, {} as Record<string, typeof ACT_TYPES>);
 
   return (
-    <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl border border-gray-200 dark:border-gray-700 sticky top-6">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-t-xl">
-        <h5 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Search size={18} />
-          Parametri
+    <div className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl border border-slate-200 dark:border-slate-800 sticky top-6 overflow-hidden">
+      {/* Header Container with premium gradient/glass look */}
+      <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+        <h5 className="font-bold text-slate-900 dark:text-white flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400">
+            <Search size={20} />
+          </div>
+          <span className="text-lg tracking-tight">Parametri di Estrazione</span>
         </h5>
       </div>
-      <div className="p-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="search-act-type" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tipo atto</label>
+
+      <div className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Act Type Selection */}
+          <div className="space-y-2">
+            <label htmlFor="search-act-type" className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Fonte Normativa</label>
             <select
               id="search-act-type"
               name="act_type"
               value={formData.act_type}
               onChange={handleChange}
-              className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border"
+              className={cn(
+                "w-full text-sm rounded-xl px-4 py-3 appearance-none cursor-pointer border shadow-sm transition-all",
+                "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
+                "border-slate-200 dark:border-slate-700",
+                "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none"
+              )}
               required
             >
-              <option value="">Seleziona...</option>
+              <option value="">Seleziona Atto...</option>
               {Object.entries(groupedOptions).map(([group, options]) => (
-                <optgroup label={group} key={group}>
+                <optgroup label={group} key={group} className="font-bold text-slate-400 bg-white dark:bg-slate-900">
                   {options.map(opt => (
-                    <option value={opt.value} key={opt.value}>{opt.label}</option>
+                    <option value={opt.value} key={opt.value} className="text-slate-900 dark:text-white font-medium">{opt.label}</option>
                   ))}
                 </optgroup>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label htmlFor="act_number" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Numero</label>
+          {/* Act Number & Date */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="act_number" className="block text-xs font-bold text-slate-400 uppercase tracking-widest text-center sm:text-left">Numero Atto</label>
               <input
                 type="text"
                 id="act_number"
@@ -367,11 +300,16 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 onChange={handleChange}
                 disabled={!isDetailsRequired}
                 placeholder="n."
-                className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 p-2 border"
+                className={cn(
+                  "w-full text-sm rounded-xl px-4 py-3 border shadow-sm transition-all",
+                  "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
+                  "border-slate-200 dark:border-slate-700 disabled:opacity-30 disabled:bg-slate-50 dark:disabled:bg-slate-900",
+                  "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none placeholder:text-slate-400"
+                )}
               />
             </div>
-            <div>
-              <label htmlFor="date" className="block text-xs font-semibold text-gray-500 uppercase mb-1">Data</label>
+            <div className="space-y-2">
+              <label htmlFor="date" className="block text-xs font-bold text-slate-400 uppercase tracking-widest text-center sm:text-left">Anno/Data</label>
               <input
                 type="text"
                 id="date"
@@ -380,127 +318,180 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 onChange={handleChange}
                 disabled={!isDetailsRequired}
                 placeholder="aaaa"
-                className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50 p-2 border"
+                className={cn(
+                  "w-full text-sm rounded-xl px-4 py-3 border shadow-sm transition-all",
+                  "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
+                  "border-slate-200 dark:border-slate-700 disabled:opacity-30 disabled:bg-slate-50 dark:disabled:bg-slate-900",
+                  "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none placeholder:text-slate-400"
+                )}
               />
             </div>
           </div>
 
-          {/* Modern Article Number Input */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-gray-400 uppercase">Articolo</label>
-              {isLoadingArticles && (
-                <span className="flex items-center gap-1 text-xs text-blue-500">
+          {/* Premium Article Navigator */}
+          <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Articolo</label>
+              {isLoadingArticles ? (
+                <div className="flex items-center gap-2 text-[10px] font-bold text-primary-500 uppercase">
                   <Loader2 size={12} className="animate-spin" />
-                  Carico...
-                </span>
-              )}
-              {!isLoadingArticles && articleList.length > 0 && (
-                <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                  {articlePosition > 0 ? `${articlePosition}/${articleList.length}` : `${articleList.length} articoli`}
-                </span>
-              )}
+                  Indicizzazione...
+                </div>
+              ) : articleList.length > 0 ? (
+                <div className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                  {articlePosition > 0 ? `${articlePosition} di ${articleList.length}` : `${articleList.length} totali`}
+                </div>
+              ) : null}
             </div>
-            <div className="article-navigation flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+
+            <div className="flex items-center bg-white dark:bg-slate-800 rounded-xl p-1.5 shadow-sm border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
                 onClick={handleDecrementArticle}
                 disabled={articleList.length > 0 && articlePosition <= 1}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                title={articleList.length > 0 ? "Articolo precedente" : "Decrementa articolo"}
+                className="w-12 h-12 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-90 transition-all text-slate-500 dark:text-slate-400 disabled:opacity-20 disabled:cursor-not-allowed"
               >
-                <Minus size={16} />
+                <Minus size={18} />
               </button>
+
               <input
                 type="text"
                 id="article"
                 name="article"
                 value={formData.article}
                 onChange={handleChange}
-                className="flex-1 bg-transparent text-center font-mono text-xl font-bold border-none focus:ring-0 text-gray-900 dark:text-white outline-none"
+                className="flex-1 bg-transparent text-center font-bold text-2xl tracking-tighter border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
               />
+
               <button
                 type="button"
                 onClick={handleIncrementArticle}
                 disabled={articleList.length > 0 && articlePosition >= articleList.length}
-                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white dark:hover:bg-gray-700 shadow-sm transition-all text-gray-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                title={articleList.length > 0 ? "Articolo successivo" : "Incrementa articolo"}
+                className="w-12 h-12 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-90 transition-all text-slate-500 dark:text-slate-400 disabled:opacity-20 disabled:cursor-not-allowed"
               >
-                <Plus size={16} />
+                <Plus size={18} />
               </button>
             </div>
+
+            {articleList.length > 0 && (
+              <div className="w-full h-1 bg-slate-200 dark:bg-slate-800 rounded-full mt-1 overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(articlePosition / articleList.length) * 100}%` }}
+                />
+              </div>
+            )}
           </div>
 
-          <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-md">
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Versione</label>
-            <div className="flex gap-4 mb-2">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="vigente"
-                  name="version"
-                  value="vigente"
-                  checked={formData.version === 'vigente'}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <label htmlFor="vigente" className="ml-2 text-sm text-gray-700 dark:text-gray-300">Vigente</label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="originale"
-                  name="version"
-                  value="originale"
-                  checked={formData.version === 'originale'}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <label htmlFor="originale" className="ml-2 text-sm text-gray-700 dark:text-gray-300">Originale</label>
-              </div>
+          {/* Version Selection Card */}
+          <div className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Linea Temporale</label>
+              <div className="p-1 px-2 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-[10px] font-bold">ALPHA VERSION</div>
             </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData(p => ({ ...p, version: 'vigente' }))}
+                className={cn(
+                  "flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all border",
+                  formData.version === 'vigente'
+                    ? "bg-white dark:bg-slate-800 border-primary-500 text-primary-600 dark:text-primary-400 shadow-md ring-4 ring-primary-500/5"
+                    : "bg-transparent border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                )}
+              >
+                Vigente
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(p => ({ ...p, version: 'originale' }))}
+                className={cn(
+                  "flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all border",
+                  formData.version === 'originale'
+                    ? "bg-white dark:bg-slate-800 border-primary-500 text-primary-600 dark:text-primary-400 shadow-md ring-4 ring-primary-500/5"
+                    : "bg-transparent border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                )}
+              >
+                Originale
+              </button>
+            </div>
+
             <input
               type="date"
               name="version_date"
               value={formData.version_date}
               onChange={handleChange}
               disabled={true}
-              className="w-full text-sm rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm p-2 border disabled:opacity-50"
+              className="w-full text-xs font-bold rounded-xl border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-500 shadow-sm p-3 border disabled:cursor-not-allowed opacity-50"
             />
           </div>
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="show_brocardi_info"
-              name="show_brocardi_info"
-              checked={formData.show_brocardi_info}
-              onChange={handleChange}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="show_brocardi_info" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Includi Brocardi & Ratio
-            </label>
+          {/* Brocardi Toggle - Modern look */}
+          <div className="group flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-900/20 rounded-2xl cursor-pointer hover:border-purple-300 dark:hover:border-purple-800 transition-colors shadow-sm" onClick={() => setFormData(p => ({ ...p, show_brocardi_info: !p.show_brocardi_info }))}>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                formData.show_brocardi_info
+                  ? "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
+                  : "bg-slate-100 dark:bg-slate-900 text-slate-400"
+              )}>
+                <RefreshCw size={18} className={formData.show_brocardi_info ? "animate-spin-slow" : ""} />
+              </div>
+              <div>
+                <span className="block text-sm font-bold text-slate-900 dark:text-white">Brocardi & Ratio</span>
+                <span className="text-[10px] font-medium text-slate-400">Analisi dottrinale inclusa</span>
+              </div>
+            </div>
+            <div className={cn(
+              "w-12 h-6 rounded-full relative transition-colors p-1",
+              formData.show_brocardi_info ? "bg-purple-500" : "bg-slate-200 dark:bg-slate-700"
+            )}>
+              <motion.div
+                className="w-4 h-4 rounded-full bg-white shadow-sm"
+                animate={{ x: formData.show_brocardi_info ? 24 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2 pt-2">
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-4">
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-md font-medium shadow-sm transition-colors disabled:opacity-70"
+              className={cn(
+                "group w-full h-14 flex items-center justify-center gap-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]",
+                "bg-primary-600 hover:bg-primary-700 text-white shadow-primary-500/20",
+                "disabled:opacity-70 disabled:cursor-wait"
+              )}
             >
               {isLoading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="relative w-6 h-6">
+                  <div className="absolute inset-0 border-3 border-white/20 rounded-full" />
+                  <div className="absolute inset-0 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
               ) : (
-                <Search size={18} />
+                <>
+                  <Search size={18} className="group-hover:scale-110 transition-transform" />
+                  Estrai Contenuto
+                </>
               )}
-              Estrai
             </button>
-            <div className="flex gap-2">
-              <button type="button" onClick={handleReset} className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 py-1.5 px-3 rounded-md text-sm transition-colors">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex items-center justify-center gap-2 h-11 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95"
+              >
                 <RefreshCw size={14} /> Reset
               </button>
-              <button type="button" onClick={handleReset} className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 py-1.5 px-3 rounded-md text-sm transition-colors">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex items-center justify-center gap-2 h-11 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95"
+              >
                 <Eraser size={14} /> Pulisci
               </button>
             </div>

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
-import { X, Edit2, FolderPlus, Check, Plus } from 'lucide-react';
+import { X, Edit2, FolderPlus, Check, Plus, FileText } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useAppStore, appStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { NormaBlockComponent } from './NormaBlockComponent';
@@ -10,8 +10,6 @@ import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
-
-
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -140,8 +138,8 @@ export function WorkspaceTabPanel({
   const height = useMotionValue(tab.size.height);
 
   // Motion values for position (no spring - direct values)
-  const springX = x;  // Renamed for compatibility but no spring
-  const springY = y;  // Renamed for compatibility but no spring
+  const springX = x;
+  const springY = y;
 
   // Sync with store when tab position/size changes externally
   const [isDragging, setIsDragging] = useState(false);
@@ -162,16 +160,15 @@ export function WorkspaceTabPanel({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Very permissive drag constraints - allow tabs to use all available space
-  // Only keep a tiny handle (50px) visible to allow grabbing back
+  // Very permissive drag constraints
   const tabWidth = tab.isMinimized ? 300 : tab.size.width;
   const minVisible = 50;
 
   const dragConstraints = useMemo(() => ({
-    left: -(tabWidth - minVisible),          // Can go mostly off left
-    top: 0,                                   // Keep header accessible from top
-    right: windowSize.width - minVisible,    // Can go mostly off right
-    bottom: windowSize.height - minVisible   // Can go mostly off bottom
+    left: -(tabWidth - minVisible),
+    top: 0,
+    right: windowSize.width - minVisible,
+    bottom: windowSize.height - minVisible
   }), [windowSize.width, windowSize.height, tabWidth]);
 
   useEffect(() => {
@@ -199,7 +196,7 @@ export function WorkspaceTabPanel({
     const currentX = x.get();
     const currentY = y.get();
 
-    // Apply momentum (reduced for smoother feel)
+    // Apply momentum
     const momentumX = info.velocity.x * 0.1;
     const momentumY = info.velocity.y * 0.1;
 
@@ -207,11 +204,9 @@ export function WorkspaceTabPanel({
     const finalX = Math.max(dragConstraints.left, Math.min(dragConstraints.right, currentX + momentumX));
     const finalY = Math.max(dragConstraints.top, Math.min(dragConstraints.bottom, currentY + momentumY));
 
-    // Animate to final position
     x.set(finalX);
     y.set(finalY);
 
-    // Save to store
     updateTab(tab.id, { position: { x: finalX, y: finalY } });
   }, [tab.id, updateTab, x, y, dragConstraints]);
 
@@ -307,7 +302,7 @@ export function WorkspaceTabPanel({
       }}
       className={cn(
         "fixed",
-        tab.isPinned && "ring-2 ring-blue-500",
+        tab.isPinned && "ring-2 ring-primary-500 rounded-2xl",
         isDragging && "cursor-grabbing"
       )}
       onMouseDown={handleMouseDown}
@@ -315,39 +310,39 @@ export function WorkspaceTabPanel({
       <div
         ref={setNodeRef}
         className={cn(
-          // Liquid Glass container
-          "workspace-tab-panel h-full flex flex-col rounded-2xl shadow-glass-lg overflow-hidden",
-          "bg-white/75 dark:bg-gray-900/75 backdrop-blur-2xl",
-          "border",
+          // Liquid Glass container - Slate 800-900 based
+          "workspace-tab-panel h-full flex flex-col rounded-2xl shadow-glass overflow-hidden",
+          "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl",
+          "border transition-colors",
           isOver
-            ? "border-blue-500 border-2 bg-blue-50/80 dark:bg-blue-950/80"
-            : "border-white/20 dark:border-white/10"
+            ? "border-primary-500 border-2 bg-primary-50/80 dark:bg-primary-950/80"
+            : "border-slate-200/60 dark:border-slate-800"
         )}
       >
-        {/* Header with macOS-style controls - Liquid Glass */}
+        {/* Header with macOS-style controls */}
         <div
           onPointerDown={(e) => {
-            // Only start drag if not clicking a button or interactive element
             const target = e.target as HTMLElement;
             if (target.closest('button') || target.closest('input')) return;
             dragControls.start(e);
           }}
-          className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-white/30 dark:bg-white/5 border-b border-white/10 dark:border-white/5 select-none touch-none">
+          className="cursor-grab active:cursor-grabbing flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200/60 dark:border-slate-800 select-none touch-none"
+        >
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {/* macOS traffic lights */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => removeTab(tab.id)}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="w-3 h-3 bg-red-500 hover:bg-red-600 rounded-full transition-colors group/close"
+                className="w-3 h-3 bg-red-400 hover:bg-red-500 rounded-full transition-colors group/close flex items-center justify-center"
                 title="Chiudi"
               >
-                <X size={10} className="text-red-900 opacity-0 group-hover/close:opacity-100 transition-opacity mx-auto" />
+                <X size={8} className="text-red-900 opacity-0 group-hover/close:opacity-100 transition-opacity" />
               </button>
               <button
                 onClick={() => toggleTabMinimize(tab.id)}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="w-3 h-3 bg-yellow-500 hover:bg-yellow-600 rounded-full transition-colors"
+                className="w-3 h-3 bg-amber-400 hover:bg-amber-500 rounded-full transition-colors"
                 title="Minimizza"
               />
               <button
@@ -355,13 +350,13 @@ export function WorkspaceTabPanel({
                 onPointerDown={(e) => e.stopPropagation()}
                 className={cn(
                   "w-3 h-3 rounded-full transition-colors",
-                  tab.isPinned ? "bg-blue-500 hover:bg-blue-600" : "bg-green-500 hover:bg-green-600"
+                  tab.isPinned ? "bg-primary-500 hover:bg-primary-600" : "bg-emerald-400 hover:bg-emerald-500"
                 )}
                 title={tab.isPinned ? "Rimuovi pin" : "Fissa"}
               />
             </div>
 
-            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
 
             {isEditingLabel ? (
               <input
@@ -387,7 +382,7 @@ export function WorkspaceTabPanel({
                   }
                 }}
                 autoFocus
-                className="flex-1 px-2 py-1 text-sm font-semibold bg-white dark:bg-gray-800 border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="flex-1 px-2 py-0.5 text-sm font-semibold bg-white dark:bg-slate-800 border border-primary-500 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 text-slate-900 dark:text-white"
                 placeholder="Nome tab"
               />
             ) : (
@@ -398,7 +393,7 @@ export function WorkspaceTabPanel({
                   setIsEditingLabel(true);
                 }}
               >
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">
                   {tab.label}
                 </h3>
                 <button
@@ -407,10 +402,10 @@ export function WorkspaceTabPanel({
                     setIsEditingLabel(true);
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-opacity"
                   title="Modifica nome"
                 >
-                  <Edit2 size={12} className="text-gray-500" />
+                  <Edit2 size={12} className="text-slate-500" />
                 </button>
               </div>
             )}
@@ -422,10 +417,10 @@ export function WorkspaceTabPanel({
               <button
                 onClick={() => setShowDossierMenu(!showDossierMenu)}
                 className={cn(
-                  "p-1.5 rounded transition-colors",
+                  "p-1.5 rounded-lg transition-colors border border-transparent",
                   showDossierMenu
-                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
-                    : "text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30"
+                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                    : "text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:hover:border-purple-800/50"
                 )}
                 title="Aggiungi a dossier"
               >
@@ -434,16 +429,16 @@ export function WorkspaceTabPanel({
 
               {/* Dossier dropdown menu */}
               {showDossierMenu && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Aggiungi a Dossier
                     </span>
                   </div>
 
-                  <div className="max-h-48 overflow-y-auto">
+                  <div className="max-h-48 overflow-y-auto custom-scrollbar">
                     {dossiers.length === 0 && !isCreatingDossier ? (
-                      <div className="px-3 py-4 text-center text-sm text-gray-500">
+                      <div className="px-3 py-4 text-center text-sm text-slate-500">
                         Nessun dossier disponibile
                       </div>
                     ) : (
@@ -451,18 +446,18 @@ export function WorkspaceTabPanel({
                         <button
                           key={dossier.id}
                           onClick={() => handleAddToDossier(dossier.id)}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 flex items-center gap-2 transition-colors"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-purple-50 dark:hover:bg-purple-900/30 flex items-center gap-2 transition-colors border-b border-transparent hover:border-purple-100 dark:hover:border-purple-900/20"
                         >
                           <FolderPlus size={14} className="text-purple-500 shrink-0" />
-                          <span className="truncate text-gray-700 dark:text-gray-300">{dossier.title}</span>
-                          <span className="text-xs text-gray-400 ml-auto">{dossier.items.length}</span>
+                          <span className="truncate text-slate-700 dark:text-slate-300 flex-1">{dossier.title}</span>
+                          <span className="text-xs text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-full">{dossier.items.length}</span>
                         </button>
                       ))
                     )}
                   </div>
 
                   {/* Create new dossier */}
-                  <div className="border-t border-gray-200 dark:border-gray-700">
+                  <div className="border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
                     {isCreatingDossier ? (
                       <div className="p-2 flex gap-2">
                         <input
@@ -477,13 +472,13 @@ export function WorkspaceTabPanel({
                             }
                           }}
                           placeholder="Nome dossier..."
-                          className="flex-1 text-sm px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          className="flex-1 text-sm px-2 py-1.5 border border-primary-300 dark:border-primary-700 rounded-lg bg-white dark:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
                           autoFocus
                         />
                         <button
                           onClick={handleCreateAndAdd}
                           disabled={!newDossierName.trim()}
-                          className="p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/30 rounded disabled:opacity-50"
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg disabled:opacity-50 transition-colors"
                         >
                           <Check size={16} />
                         </button>
@@ -503,7 +498,7 @@ export function WorkspaceTabPanel({
             </div>
 
             {tab.isPinned && (
-              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full font-medium">
+              <span className="text-[10px] px-2 py-0.5 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-300 rounded-full font-bold uppercase tracking-wider border border-primary-100 dark:border-primary-800">
                 Pinned
               </span>
             )}
@@ -514,8 +509,12 @@ export function WorkspaceTabPanel({
         {!tab.isMinimized && (
           <div className="flex-1 overflow-auto p-4 space-y-4">
             {tab.content.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                <p className="text-sm">Tab vuota - trascina qui norme o articoli</p>
+              <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800/50 rounded-full flex items-center justify-center mb-3">
+                  <FileText size={24} className="opacity-50" />
+                </div>
+                <p className="text-sm font-medium">Tab vuota</p>
+                <p className="text-xs text-slate-500 mt-1">Trascina qui norme o articoli</p>
               </div>
             ) : (
               tab.content.map((item) => {
@@ -559,19 +558,18 @@ export function WorkspaceTabPanel({
           </div>
         )}
 
-        {/* Resize handles - only show when not minimized */}
+        {/* Resize handles */}
         {!tab.isMinimized && (
           <>
-            {/* Edges */}
-            <div onMouseDown={(e) => handleResizeStart(e, 'right')} className="absolute right-0 top-2 bottom-2 w-1 cursor-ew-resize hover:bg-blue-400/50 transition-colors" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'bottom')} className="absolute bottom-0 left-2 right-2 h-1 cursor-ns-resize hover:bg-blue-400/50 transition-colors" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'left')} className="absolute left-0 top-2 bottom-2 w-1 cursor-ew-resize hover:bg-blue-400/50 transition-colors" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'top')} className="absolute top-0 left-2 right-2 h-1 cursor-ns-resize hover:bg-blue-400/50 transition-colors" />
-            {/* Corners */}
-            <div onMouseDown={(e) => handleResizeStart(e, 'top-left')} className="absolute top-0 left-0 w-3 h-3 cursor-nwse-resize" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'top-right')} className="absolute top-0 right-0 w-3 h-3 cursor-nesw-resize" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-left')} className="absolute bottom-0 left-0 w-3 h-3 cursor-nesw-resize" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-right')} className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'right')} className="absolute right-0 top-2 bottom-2 w-1.5 cursor-ew-resize hover:bg-primary-400/30 transition-colors z-10" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'bottom')} className="absolute bottom-0 left-2 right-2 h-1.5 cursor-ns-resize hover:bg-primary-400/30 transition-colors z-10" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'left')} className="absolute left-0 top-2 bottom-2 w-1.5 cursor-ew-resize hover:bg-primary-400/30 transition-colors z-10" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'top')} className="absolute top-0 left-2 right-2 h-1.5 cursor-ns-resize hover:bg-primary-400/30 transition-colors z-10" />
+
+            <div onMouseDown={(e) => handleResizeStart(e, 'top-left')} className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-20" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'top-right')} className="absolute top-0 right-0 w-4 h-4 cursor-nesw-resize z-20" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-left')} className="absolute bottom-0 left-0 w-4 h-4 cursor-nesw-resize z-20" />
+            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-right')} className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-20" />
           </>
         )}
       </div>

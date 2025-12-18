@@ -34,10 +34,10 @@ export function Tooltip({
   };
 
   const placementStyles = {
-    top: 'bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2',
+    top: 'bottom-full left-1/2 -translate-x-1/2 mb-1.5',
+    bottom: 'top-full left-1/2 -translate-x-1/2 mt-1.5',
+    left: 'right-full top-1/2 -translate-y-1/2 mr-1.5',
+    right: 'left-full top-1/2 -translate-y-1/2 ml-1.5',
   };
 
   const arrowStyles = {
@@ -69,7 +69,7 @@ export function Tooltip({
           >
             <div
               className={cn(
-                'bg-gray-900 dark:bg-gray-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap',
+                'bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 rounded-md shadow-md whitespace-nowrap',
                 className
               )}
             >
@@ -78,7 +78,7 @@ export function Tooltip({
               {/* Arrow */}
               <div
                 className={cn(
-                  'absolute w-0 h-0 border-4 border-gray-900 dark:border-gray-700',
+                  'absolute w-0 h-0 border-[3px] border-slate-900',
                   arrowStyles[placement]
                 )}
               />

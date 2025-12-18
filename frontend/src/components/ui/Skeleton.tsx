@@ -10,7 +10,7 @@ export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
 
 export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
   ({ variant = 'rectangular', width, height, className, style, ...props }, ref) => {
-    const baseStyles = 'animate-shimmer bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 dark:from-gray-800 dark:via-gray-700 dark:to-gray-800';
+    const baseStyles = 'animate-shimmer bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800';
 
     const variantStyles = {
       text: 'h-4 rounded',

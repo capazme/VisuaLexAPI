@@ -28,30 +28,31 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     const inputVariants = {
       default: cn(
-        'bg-gray-50 dark:bg-gray-800/50',
-        'border-gray-200 dark:border-gray-700',
-        error && 'border-red-300 dark:border-red-700'
+        'bg-slate-50 dark:bg-slate-900/50',
+        'border-slate-200 dark:border-slate-700',
+        error && 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
       ),
       glass: cn(
-        'bg-white/50 dark:bg-white/[0.08]',
+        'bg-white/50 dark:bg-slate-900/20',
         'backdrop-blur-sm',
-        'border-gray-200/50 dark:border-white/10',
+        'border-white/20 dark:border-white/10',
+        'hover:bg-white/60 dark:hover:bg-slate-900/30',
         error && 'border-red-300/70 dark:border-red-500/50'
       ),
     };
 
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 w-full">
         {label && (
-          <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+          <label className="block text-xs font-semibold tracking-wide text-slate-500 dark:text-slate-400 ml-1 mb-1">
             {label}
           </label>
         )}
 
         <div
           className={cn(
-            'relative group transition-all duration-300 ease-smooth-out',
-            isFocused && 'transform scale-[1.01]'
+            'relative group transition-all duration-200 ease-smooth-out',
+            isFocused && 'transform scale-[1.005]'
           )}
         >
           {icon && (
@@ -59,7 +60,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               <div
                 className={cn(
                   'transition-colors duration-200',
-                  isFocused ? 'text-blue-500' : 'text-gray-400'
+                  isFocused ? 'text-primary-500' : 'text-slate-400 dark:text-slate-500'
                 )}
               >
                 {icon}
@@ -70,13 +71,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             className={cn(
-              'w-full py-3 border rounded-xl',
+              'w-full py-2.5 border rounded-lg',
               'transition-all duration-200 ease-smooth-out outline-none',
-              'text-gray-900 dark:text-gray-100',
-              'placeholder:text-gray-400/70',
+              'text-slate-900 dark:text-slate-100',
+              'placeholder:text-slate-400 dark:placeholder:text-slate-500',
+              'text-sm font-medium',
               // Focus states
-              'focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500',
-              'focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]',
+              'focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
               inputVariants[variant],
               icon ? 'pl-10 pr-4' : 'px-4',
               className
@@ -91,7 +92,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <p
             className={cn(
               'text-xs ml-1',
-              error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
+              error ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400'
             )}
           >
             {error || helperText}

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Book, ChevronDown, X, GitBranch, ExternalLink, Plus, ArrowRight } from 'lucide-react';
+import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { ArticleTabContent } from './ArticleTabContent';
@@ -23,7 +23,7 @@ interface NormaCardProps {
   isNew?: boolean;
 }
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle: _onCompareArticle, onCrossReference, onPopOut, isNew }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle: _onCompareArticle, onCrossReference, isNew }: NormaCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [treeVisible, setTreeVisible] = useState(false);
@@ -32,11 +32,13 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   const [_treeError, _setTreeError] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddValue, setQuickAddValue] = useState('');
+
   // Mobile: track which articles are expanded (by default first one is expanded)
   const [expandedArticles, setExpandedArticles] = useState<Set<string>>(() => {
     const first = articles[0]?.norma_data?.numero_articolo;
     return first ? new Set([first]) : new Set();
   });
+
   // Study Mode state
   const [studyModeOpen, setStudyModeOpen] = useState(false);
   const [studyModeArticle, setStudyModeArticle] = useState<ArticleData | null>(null);
@@ -150,130 +152,125 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   return (
     <div className={cn(
       "rounded-xl overflow-hidden mb-6",
-      "bg-white dark:bg-gray-800",
-      "border shadow-md",
-      "transition-all duration-200",
-      "hover:shadow-lg",
+      "bg-white dark:bg-slate-900",
+      "border shadow-lg",
+      "transition-all duration-300",
+      "hover:shadow-xl",
       isNew
-        ? "border-blue-500 ring-2 ring-blue-500/20"
-        : "border-gray-200 dark:border-gray-700"
+        ? "border-primary-500 ring-4 ring-primary-500/10"
+        : "border-slate-200 dark:border-slate-800"
     )}>
-      {/* Mobile Header - Simplified for quick lookup */}
+      {/* Mobile Header */}
       <div
         className={cn(
           "md:hidden",
           "p-4 cursor-pointer",
-          "border-b border-gray-200 dark:border-gray-700",
-          "bg-gray-50 dark:bg-gray-800/50",
-          "hover:bg-gray-100 dark:hover:bg-gray-700",
+          "border-b border-slate-200 dark:border-slate-800",
+          "bg-slate-50 dark:bg-slate-900/50",
+          "hover:bg-slate-100 dark:hover:bg-slate-800",
           "transition-colors duration-200"
         )}
         onClick={() => setIsOpen(!isOpen)}
       >
-        {/* Top row: Icon and title */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 flex-shrink-0 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400">
             <Book size={20} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-bold text-gray-900 dark:text-white text-base leading-tight">
+              <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight">
                 {norma.tipo_atto} {norma.numero_atto}
               </h3>
               {isNew && (
-                <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase bg-blue-500 text-white rounded-full animate-pulse">
+                <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase bg-primary-600 text-white rounded-full shadow-sm">
                   Nuovo
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
               {norma.data ? `Data: ${norma.data}` : 'Estremi non disponibili'}
             </p>
-            <span className="inline-block text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
-              {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'}
+            <span className="inline-block text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
+              {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'} caricati
             </span>
           </div>
         </div>
 
-        {/* Bottom row: Action buttons with proper touch targets */}
         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
           {norma.urn && (
             <button
-              className="flex-1 p-3 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+              className="flex-1 h-9 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 dark:text-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onViewPdf(norma.urn!);
               }}
-              title="Esporta PDF"
             >
+              <ExternalLink size={14} className="text-primary-500" />
               PDF
             </button>
           )}
           {norma.urn && (
             <button
-              className="flex-1 p-3 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+              className="flex-1 h-9 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 dark:text-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm flex items-center justify-center gap-1.5"
               onClick={(e) => {
                 e.stopPropagation();
                 setTreeVisible(!treeVisible);
-                if (!treeData) {
-                  fetchTree();
-                }
+                if (!treeData) fetchTree();
               }}
-              title="Visualizza struttura"
             >
-              <GitBranch size={14} />
-              <span>Struttura</span>
+              <GitBranch size={14} className="text-emerald-500" />
+              Struttura
             </button>
           )}
           <button
-            className="p-3 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             onClick={() => setIsOpen(!isOpen)}
-            title={isOpen ? "Chiudi" : "Apri"}
           >
-            <ChevronDown className={cn("transition-transform duration-200", isOpen ? "rotate-180" : "")} size={20} />
+            <ChevronDown className={cn("transition-transform duration-300", isOpen ? "rotate-180" : "")} size={20} />
           </button>
         </div>
       </div>
 
-      {/* Desktop Header - Full experience */}
+      {/* Desktop Header */}
       <div
         className={cn(
           "hidden md:flex",
-          "p-4 items-center justify-between cursor-pointer",
-          "border-b border-gray-200 dark:border-gray-700",
-          "bg-gray-50 dark:bg-gray-800/50",
-          "hover:bg-gray-100 dark:hover:bg-gray-700",
+          "p-5 items-center justify-between cursor-pointer",
+          "border-b border-slate-200 dark:border-slate-800",
+          "bg-slate-50 dark:bg-slate-900/50",
+          "hover:bg-slate-100 dark:hover:bg-slate-900/80",
           "transition-colors duration-200"
         )}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-            <Book size={20} />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 shadow-sm border border-primary-200/50 dark:border-primary-800/50">
+            <Book size={24} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-slate-900 dark:text-white text-xl leading-tight">
                 {norma.tipo_atto} {norma.numero_atto}
               </h3>
               {isNew && (
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-blue-500 text-white rounded-full animate-pulse">
-                  Nuovo
+                <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-primary-600 text-white rounded-full shadow-sm tracking-wider">
+                  Nuovo Risultato
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {norma.data ? `Data: ${norma.data}` : 'Estremi non disponibili'}
+            <div className="flex items-center gap-3 mt-1.5">
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                {norma.data ? `Edizione del ${norma.data}` : 'Data non disponibile'}
               </p>
-              <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
+              <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+              <span className="text-xs bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
                 {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'}
               </span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Quick Add Article - Desktop only */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Quick Add Article */}
           <AnimatePresence>
             {quickAddOpen ? (
               <motion.form
@@ -282,72 +279,68 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 onSubmit={handleQuickAddArticle}
-                className="flex items-center gap-1 overflow-hidden"
+                className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-primary-200 dark:border-primary-800 p-1.5 rounded-xl shadow-sm"
                 onClick={(e) => e.stopPropagation()}
               >
                 <input
                   type="text"
                   value={quickAddValue}
                   onChange={(e) => setQuickAddValue(e.target.value)}
-                  placeholder="es. 1, 2-5"
+                  placeholder="Es. 1, 12..."
                   autoFocus
-                  className="w-24 px-2 py-1 text-xs border border-blue-300 dark:border-blue-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
+                  className="w-24 px-2 py-1 text-sm bg-transparent border-none focus:outline-none focus:ring-0 dark:text-white"
                 />
                 <button
                   type="submit"
-                  className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                  title="Aggiungi"
+                  className="p-1.5 text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
                 >
                   <ArrowRight size={14} />
                 </button>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setQuickAddOpen(false); setQuickAddValue(''); }}
-                  className="p-1 text-gray-400 hover:text-gray-600 rounded-md transition-colors"
-                  title="Annulla"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors"
                 >
                   <X size={14} />
                 </button>
               </motion.form>
             ) : (
               <button
-                className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 rounded-md transition-colors flex items-center gap-1"
+                className="h-10 px-4 text-xs font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 dark:text-primary-400 dark:bg-primary-900/30 dark:hover:bg-primary-900/50 rounded-xl transition-all flex items-center gap-2 border border-primary-100/50 dark:border-primary-800/50"
                 onClick={(e) => { e.stopPropagation(); setQuickAddOpen(true); }}
-                title="Aggiungi articolo"
               >
-                <Plus size={14} /> <span>Articolo</span>
+                <Plus size={16} /> <span>Aggiungi Articolo</span>
               </button>
             )}
           </AnimatePresence>
 
           {norma.urn && (
             <button
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-md transition-colors"
+              className="h-10 px-4 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-xl transition-all border border-red-100/50 dark:border-red-800/20"
               onClick={(e) => {
                 e.stopPropagation();
                 onViewPdf(norma.urn!);
               }}
-              title="Esporta PDF"
             >
               PDF
             </button>
           )}
           {norma.urn && (
             <button
-              className="px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded-md transition-colors"
+              className="h-10 px-4 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 dark:text-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 rounded-xl transition-all flex items-center gap-2 shadow-sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setTreeVisible(!treeVisible);
-                if (!treeData) {
-                  fetchTree();
-                }
+                if (!treeData) fetchTree();
               }}
-              title="Visualizza struttura"
             >
-              <span className="flex items-center gap-1"><GitBranch size={14} /> <span>Struttura</span></span>
+              <GitBranch size={16} className="text-emerald-500" />
+              <span>Struttura</span>
             </button>
           )}
-          <ChevronDown className={cn("text-gray-400 transition-transform duration-200", isOpen ? "rotate-180" : "")} size={20} />
+          <div className="w-10 h-10 flex items-center justify-center text-slate-400 dark:text-slate-500">
+            <ChevronDown className={cn("transition-transform duration-300", isOpen ? "rotate-180" : "")} size={20} />
+          </div>
         </div>
       </div>
 
@@ -357,7 +350,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         onClose={() => setTreeVisible(false)}
         treeData={treeData || []}
         urn={norma.urn || ''}
-        title="Struttura Atto"
+        title="Struttura dell'Atto"
         loadedArticles={loadedArticleIds}
         onArticleSelect={(articleNumber) => {
           triggerSearch({
@@ -375,10 +368,10 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
 
       {/* Content */}
       {isOpen && (
-        <div className="bg-gray-50/50 dark:bg-gray-900/50">
-          {/* Navigation bar - Desktop only (hidden on mobile since we show full list) */}
+        <div className="bg-slate-50/50 dark:bg-slate-900/30">
+          {/* Internal Navigation bar */}
           {(allArticleIds && allArticleIds.length > 1) || articles.length > 1 ? (
-            <div className="hidden md:flex px-5 pt-3 items-center justify-between">
+            <div className="hidden md:flex px-6 py-4 items-center justify-between border-b border-slate-200/50 dark:border-slate-800/50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
               <ArticleNavigation
                 allArticleIds={allArticleIds}
                 loadedArticleIds={loadedArticleIds}
@@ -387,17 +380,16 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                 onLoadArticle={handleLoadArticle}
               />
               <ArticleMinimap
-                allArticleIds={allArticleIds}
                 loadedArticleIds={loadedArticleIds}
                 activeArticleId={activeTabId}
                 onArticleClick={handleArticleSelect}
-                className="max-w-[300px]"
+                className="max-w-[400px]"
               />
             </div>
           ) : null}
 
-          {/* Desktop Underline Tabs - Hidden on Mobile (< 768px) */}
-          <div className="hidden md:flex px-5 border-b border-gray-200 dark:border-gray-700 gap-0 overflow-x-auto no-scrollbar relative">
+          {/* Desktop Article Tabs */}
+          <div className="hidden md:flex px-6 border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto no-scrollbar relative bg-white dark:bg-slate-900">
             {articles.map((article) => {
               const id = article.norma_data.numero_articolo;
               const isActive = id === activeTabId;
@@ -405,47 +397,35 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                 <div
                   key={id}
                   className={cn(
-                    "relative px-6 py-3 text-sm font-medium transition-all group flex items-center gap-2 flex-shrink-0 cursor-pointer",
+                    "relative px-6 py-4 text-sm font-bold transition-all group flex items-center gap-3 flex-shrink-0 cursor-pointer overflow-hidden",
                     isActive
-                      ? "text-blue-600 dark:text-blue-400"
-                      : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                      ? "text-primary-600 dark:text-primary-400"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   )}
                   onClick={() => setActiveTabId(id)}
                 >
-                  <span>Art. {id}</span>
+                  <span className="relative z-10 uppercase tracking-wide text-xs">Art. {id}</span>
 
-                  {/* Animated underline */}
+                  {/* Active Indicator */}
                   {isActive && (
                     <motion.span
-                      layoutId="activeTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"
+                      layoutId="activeNormaTab"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 shadow-[0_-4px_10px_rgba(59,130,246,0.3)]"
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                     />
                   )}
 
-                  {/* Actions (visible on hover) */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {onPopOut && articles.length > 1 && (
-                      <button
-                        className="p-0.5 hover:text-blue-500 rounded"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPopOut(id);
-                        }}
-                        title="Estrai in nuova finestra"
-                      >
-                        <ExternalLink size={12} />
-                      </button>
-                    )}
+                  {/* Tab Actions */}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity relative z-10">
                     <button
-                      className="p-0.5 hover:text-red-500 rounded"
+                      className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         onCloseArticle(id);
                       }}
-                      title="Chiudi articolo"
+                      title="Chiudi sessione"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </div>
                 </div>
@@ -453,53 +433,64 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
             })}
           </div>
 
-          {/* Mobile: Collapsible list of articles */}
-          <div className="md:hidden bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+          {/* Mobile: Expandable List */}
+          <div className="md:hidden bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
             {articles.map((article) => {
               const articleId = article.norma_data.numero_articolo;
               const isExpanded = expandedArticles.has(articleId);
               return (
                 <div key={articleId} className="overflow-hidden">
-                  {/* Collapsible header - always visible */}
                   <div
                     onClick={() => toggleArticleExpanded(articleId)}
-                    className="w-full p-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                    className={cn(
+                      "w-full p-4 flex items-center justify-between transition-colors cursor-pointer",
+                      isExpanded ? "bg-primary-50/30 dark:bg-primary-900/10" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    )}
                   >
                     <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center transition-colors font-bold text-xs",
+                        isExpanded ? "bg-primary-600 text-white shadow-md shadow-primary-500/20" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                      )}>
+                        {articleId}
+                      </div>
+                      <h4 className={cn(
+                        "font-bold text-base transition-colors",
+                        isExpanded ? "text-slate-900 dark:text-white" : "text-slate-600 dark:text-slate-400"
+                      )}>
+                        Dispositivo Articolo
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCloseArticle(articleId);
+                        }}
+                        className="p-2 text-slate-400 hover:text-red-500 rounded-lg"
+                      >
+                        <X size={16} />
+                      </button>
                       <ChevronDown
                         size={18}
                         className={cn(
-                          "text-gray-400 transition-transform duration-200",
+                          "text-slate-400 transition-transform duration-300",
                           isExpanded ? "rotate-180" : ""
                         )}
                       />
-                      <h4 className="font-bold text-gray-900 dark:text-white text-base">
-                        Art. {articleId}
-                      </h4>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onCloseArticle(articleId);
-                      }}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      title="Chiudi articolo"
-                    >
-                      <X size={16} />
-                    </button>
                   </div>
 
-                  {/* Collapsible content */}
                   <AnimatePresence initial={false}>
                     {isExpanded && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        className="overflow-hidden border-t border-slate-100 dark:border-slate-800"
                       >
-                        <div className="p-4 pt-2">
+                        <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50">
                           <ArticleTabContent
                             data={article}
                             onCrossReferenceNavigate={onCrossReference}
@@ -512,27 +503,22 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                 </div>
               );
             })}
-            {articles.length === 0 && (
-              <div className="text-center py-10 text-gray-400">
-                Nessun articolo caricato
-              </div>
-            )}
           </div>
 
-          {/* Desktop: Tab Pane with single article */}
+          {/* Desktop Content Area */}
           <div
             ref={contentRef}
-            className="hidden md:block bg-white dark:bg-gray-800 min-h-[300px] overflow-hidden"
+            className="hidden md:block bg-white dark:bg-slate-900 min-h-[400px] overflow-hidden"
           >
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
                 <motion.div
                   key={activeArticle.norma_data.numero_articolo}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="p-6"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="p-8"
                 >
                   <ArticleTabContent
                     data={activeArticle}
@@ -543,15 +529,16 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
               )}
             </AnimatePresence>
             {!activeArticle && (
-              <div className="text-center py-10 text-gray-400">
-                Nessun articolo selezionato
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Book size={48} className="opacity-20 mb-4" />
+                <p className="text-sm font-medium">Seleziona un articolo per visualizzarne il contenuto</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Study Mode */}
+      {/* Study Mode Portal */}
       <AnimatePresence>
         {studyModeOpen && studyModeArticle && (
           <StudyMode

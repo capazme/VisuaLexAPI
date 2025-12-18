@@ -2,7 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   icon?: ReactNode;
   loading?: boolean;
@@ -14,60 +14,62 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = cn(
       'inline-flex items-center justify-center gap-2 font-medium',
       'transition-all duration-200 ease-smooth-out',
-      'focus:outline-none focus:ring-2 focus:ring-offset-2',
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50',
       'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
       'active:scale-[0.98]'
     );
 
     const variantStyles = {
       primary: cn(
-        'bg-gradient-to-b from-blue-500 to-blue-600',
-        'hover:from-blue-400 hover:to-blue-500',
+        'bg-primary-600 hover:bg-primary-700 active:bg-primary-800',
         'text-white',
-        'shadow-[0_4px_14px_rgba(37,99,235,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]',
-        'hover:shadow-[0_6px_20px_rgba(37,99,235,0.5),inset_0_1px_0_rgba(255,255,255,0.25)]',
-        'hover:-translate-y-0.5',
-        'focus:ring-blue-500'
+        'shadow-md hover:shadow-lg hover:shadow-primary/20',
+        'border border-transparent',
+        'hover:-translate-y-0.5'
       ),
       secondary: cn(
-        'bg-white/80 dark:bg-gray-800/80',
-        'hover:bg-white dark:hover:bg-gray-700',
-        'text-gray-900 dark:text-gray-100',
-        'border border-gray-200/80 dark:border-gray-600/80',
-        'shadow-sm hover:shadow-md',
-        'focus:ring-gray-500'
+        'bg-white dark:bg-slate-800',
+        'text-slate-700 dark:text-slate-200',
+        'border border-slate-200 dark:border-slate-700',
+        'hover:bg-slate-50 dark:hover:bg-slate-700',
+        'hover:text-slate-900 dark:hover:text-white',
+        'shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600'
+      ),
+      outline: cn(
+        'bg-transparent',
+        'text-slate-600 dark:text-slate-300',
+        'border border-slate-200 dark:border-slate-700',
+        'hover:bg-slate-50 dark:hover:bg-slate-800',
+        'hover:text-slate-900 dark:hover:text-white',
+        'hover:border-slate-300 dark:hover:border-slate-600'
       ),
       ghost: cn(
-        'hover:bg-gray-100/80 dark:hover:bg-gray-800/80',
-        'text-gray-700 dark:text-gray-300',
-        'focus:ring-gray-500'
+        'bg-transparent',
+        'text-slate-600 dark:text-slate-400',
+        'hover:bg-slate-100 dark:hover:bg-slate-800',
+        'hover:text-slate-900 dark:hover:text-slate-100'
       ),
       danger: cn(
-        'bg-gradient-to-b from-red-500 to-red-600',
-        'hover:from-red-400 hover:to-red-500',
+        'bg-red-600 hover:bg-red-700',
         'text-white',
-        'shadow-[0_4px_14px_rgba(239,68,68,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]',
-        'hover:shadow-[0_6px_20px_rgba(239,68,68,0.5)]',
-        'hover:-translate-y-0.5',
-        'focus:ring-red-500'
+        'shadow-sm hover:shadow-md hover:shadow-red-500/20',
+        'hover:-translate-y-0.5'
       ),
       glass: cn(
-        'bg-white/60 dark:bg-gray-800/60',
-        'backdrop-blur-xl',
-        'hover:bg-white/80 dark:hover:bg-gray-700/80',
-        'text-gray-700 dark:text-gray-200',
-        'border border-white/30 dark:border-white/10',
-        'shadow-[0_2px_8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.25)]',
-        'hover:shadow-[0_4px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.3)]',
-        'hover:-translate-y-0.5',
-        'focus:ring-blue-500/50'
+        'bg-white/60 dark:bg-slate-800/60',
+        'backdrop-blur-md',
+        'border border-white/20 dark:border-white/5',
+        'text-slate-700 dark:text-slate-200',
+        'hover:bg-white/80 dark:hover:bg-slate-700/80',
+        'shadow-sm hover:shadow-md',
+        'hover:-translate-y-0.5'
       ),
     };
 
     const sizeStyles = {
-      sm: 'px-3 py-1.5 text-sm rounded-lg',
-      md: 'px-4 py-2.5 text-sm rounded-xl',
-      lg: 'px-6 py-3.5 text-base rounded-xl',
+      sm: 'px-3 py-1.5 text-xs rounded-lg',
+      md: 'px-4 py-2 text-sm rounded-lg',
+      lg: 'px-6 py-3 text-base rounded-lg',
     };
 
     return (

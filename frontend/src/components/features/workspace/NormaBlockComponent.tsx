@@ -171,24 +171,24 @@ export function NormaBlockComponent({
     <div
       ref={setNodeRef}
       className={cn(
-        "bg-white dark:bg-gray-800 rounded-xl border-2 overflow-hidden transition-all shadow-sm hover:shadow-md",
+        "bg-white dark:bg-slate-800 rounded-xl border overflow-hidden transition-all shadow-sm hover:shadow-md",
         isDragging && "opacity-50 scale-95",
         isOver
-          ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800 bg-blue-50/50 dark:bg-blue-900/20"
-          : "border-gray-200 dark:border-gray-700"
+          ? "border-primary-500 ring-2 ring-primary-200 dark:ring-primary-900 bg-primary-50/50 dark:bg-primary-900/20"
+          : "border-slate-200 dark:border-slate-700"
       )}
     >
       {/* Norma Header */}
-      <div className="norma-block-header flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 border-b border-blue-200 dark:border-blue-800">
-        <div className="flex items-center gap-2">
+      <div className="norma-block-header flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-primary-50 to-white dark:from-primary-950/40 dark:to-slate-900/40 border-b border-primary-100 dark:border-primary-900/50">
+        <div className="flex items-center gap-2 min-w-0">
           {/* Drag handle */}
           <div
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
             title="Trascina norma"
           >
-            <GripVertical size={16} className="text-gray-400" />
+            <GripVertical size={16} className="text-slate-400" />
           </div>
 
           {/* Delete button with confirmation */}
@@ -203,30 +203,30 @@ export function NormaBlockComponent({
               className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
               title="Elimina norma"
             >
-              <Trash2 size={14} className="text-red-500" />
+              <Trash2 size={14} className="text-red-500 opacity-70 hover:opacity-100" />
             </button>
           )}
 
           <div
-            className="flex items-center gap-2 cursor-pointer flex-1"
+            className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
             onClick={() => toggleNormaCollapse(tabId, normaBlock.id)}
           >
             {normaBlock.isCollapsed ? (
-              <ChevronRight size={16} className="text-gray-500" />
+              <ChevronRight size={16} className="text-primary-400 shrink-0" />
             ) : (
-              <ChevronDown size={16} className="text-gray-500" />
+              <ChevronDown size={16} className="text-primary-400 shrink-0" />
             )}
 
-            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-              <Book size={16} className="text-blue-600 dark:text-blue-400" />
+            <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-primary-200 dark:border-primary-800/50 flex items-center justify-center shadow-sm shrink-0">
+              <Book size={16} className="text-primary-600 dark:text-primary-400" />
             </div>
 
-            <div>
-              <h4 className="font-semibold text-sm text-gray-900 dark:text-white">
+            <div className="min-w-0">
+              <h4 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
                 {normaBlock.norma.tipo_atto}
                 {normaBlock.norma.numero_atto && ` n. ${normaBlock.norma.numero_atto}`}
               </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {normaBlock.norma.data || 'Estremi non disponibili'} · {normaBlock.articles.length} articoli
               </p>
             </div>
@@ -234,10 +234,10 @@ export function NormaBlockComponent({
         </div>
 
         {!normaBlock.isCollapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-4 shrink-0">
             {/* Study Mode Button - Visible on all screen sizes */}
             <button
-              className="flex norma-study-mode-btn px-1.5 sm:px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 dark:text-purple-400 dark:bg-purple-900/20 rounded transition-colors items-center gap-1"
+              className="flex norma-study-mode-btn px-2 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 dark:text-purple-400 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/30 rounded-lg transition-colors items-center gap-1.5"
               onClick={(e) => {
                 e.stopPropagation();
                 setStudyModeOpen(true);
@@ -249,7 +249,7 @@ export function NormaBlockComponent({
             </button>
             {normaBlock.norma.urn && (
               <button
-                className="norma-structure-btn px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 rounded transition-colors flex items-center gap-1"
+                className="norma-structure-btn px-2 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-lg transition-colors flex items-center gap-1.5"
                 onClick={(e) => {
                   e.stopPropagation();
                   setTreeVisible(!treeVisible);
@@ -259,12 +259,12 @@ export function NormaBlockComponent({
                 }}
               >
                 <GitBranch size={12} />
-                {treeLoading ? 'Carico...' : 'Struttura'}
+                <span className="hidden sm:inline">{treeLoading ? 'Carico...' : 'Struttura'}</span>
               </button>
             )}
             {normaBlock.norma.urn && (
               <button
-                className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 rounded transition-colors"
+                className="px-2 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 dark:text-slate-300 dark:bg-slate-700 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-slate-600 rounded-lg transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
                   onViewPdf(normaBlock.norma.urn);
@@ -293,7 +293,7 @@ export function NormaBlockComponent({
 
       {/* Articles */}
       {!normaBlock.isCollapsed && (
-        <div className="bg-gray-50/50 dark:bg-gray-900/50">
+        <div className="bg-slate-50/50 dark:bg-slate-900/50">
           {/* Navigation bar - Desktop only: show when structure available OR multiple articles loaded */}
           {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
             <div className="hidden md:flex px-3 pt-2 items-center justify-end">
@@ -308,17 +308,17 @@ export function NormaBlockComponent({
           )}
 
           {/* Mobile: Scrollable list of ALL articles */}
-          <div className="md:hidden bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="md:hidden bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
             {normaBlock.articles.map((article) => (
               <div key={article.norma_data.numero_articolo} className="p-4">
                 {/* Article header with close button */}
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-gray-900 dark:text-white">
+                  <h4 className="font-bold text-slate-900 dark:text-white">
                     Art. {article.norma_data.numero_articolo}
                   </h4>
                   <button
                     onClick={() => onRemoveArticle(article.norma_data.numero_articolo)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
                     title="Chiudi articolo"
                   >
                     <X size={16} />
@@ -334,7 +334,7 @@ export function NormaBlockComponent({
           </div>
 
           {/* Desktop Article tabs */}
-          <div className="norma-article-tabs hidden md:flex px-3 pt-3 border-b border-gray-200 dark:border-gray-700 gap-2 overflow-x-auto no-scrollbar">
+          <div className="norma-article-tabs hidden md:flex px-3 pt-3 border-b border-slate-200 dark:border-slate-700 gap-2 overflow-x-auto custom-scrollbar">
             {normaBlock.articles.map((article) => {
               const id = article.norma_data.numero_articolo;
               const isActive = id === activeArticleId;
@@ -343,10 +343,10 @@ export function NormaBlockComponent({
                 <div
                   key={id}
                   className={cn(
-                    "group flex items-center gap-1 px-2 py-1.5 rounded-t-lg text-xs font-medium cursor-pointer transition-all whitespace-nowrap",
+                    "group flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap border-t border-x",
                     isActive
-                      ? "bg-white dark:bg-gray-800 border border-b-0 border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 relative -bottom-px z-10"
-                      : "bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700/50"
+                      ? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 border-b-0 text-primary-600 dark:text-primary-400 relative -bottom-px z-10"
+                      : "bg-slate-100 dark:bg-slate-800/50 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50"
                   )}
                   onClick={() => setActiveArticleId(id)}
                 >
@@ -354,7 +354,7 @@ export function NormaBlockComponent({
                   {isActive && (
                     <div className="flex items-center gap-0.5 ml-1">
                       <button
-                        className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                        className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           onExtractArticle(id);
@@ -364,7 +364,7 @@ export function NormaBlockComponent({
                         <ExternalLink size={10} />
                       </button>
                       <button
-                        className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                        className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           onRemoveArticle(id);
@@ -381,16 +381,16 @@ export function NormaBlockComponent({
           </div>
 
           {/* Desktop: Active article content with tab navigation */}
-          <div className="hidden md:block bg-white dark:bg-gray-800 min-h-[200px] overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden">
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
                 <motion.div
                   key={activeArticle.norma_data.numero_articolo}
-                  initial={{ opacity: 0, x: 20 }}
+                  initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="p-4"
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="p-5"
                 >
                   <ArticleTabContent
                     data={activeArticle}
@@ -401,7 +401,7 @@ export function NormaBlockComponent({
               )}
             </AnimatePresence>
             {!activeArticle && (
-              <div className="flex items-center justify-center h-40 text-gray-400">
+              <div className="flex items-center justify-center h-40 text-slate-400">
                 <p className="text-sm">Nessun articolo selezionato</p>
               </div>
             )}

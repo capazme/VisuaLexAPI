@@ -30,18 +30,17 @@ export function Toast({
   }, [isVisible, duration, onClose]);
 
   const icons = {
-    success: <CheckCircle2 size={20} className="text-green-600 dark:text-green-400" />,
-    error: <XCircle size={20} className="text-red-600 dark:text-red-400" />,
-    info: <Info size={20} className="text-blue-600 dark:text-blue-400" />,
-    warning: <AlertCircle size={20} className="text-yellow-600 dark:text-yellow-400" />,
+    success: <CheckCircle2 size={18} className="text-emerald-500" />,
+    error: <XCircle size={18} className="text-red-500" />,
+    info: <Info size={18} className="text-blue-500" />,
+    warning: <AlertCircle size={18} className="text-amber-500" />,
   };
 
-  // Liquid Glass toast styles
   const styles = {
-    success: 'bg-green-500/10 dark:bg-green-500/20 border-green-500/30 text-green-900 dark:text-green-100',
-    error: 'bg-red-500/10 dark:bg-red-500/20 border-red-500/30 text-red-900 dark:text-red-100',
-    info: 'bg-blue-500/10 dark:bg-blue-500/20 border-blue-500/30 text-blue-900 dark:text-blue-100',
-    warning: 'bg-yellow-500/10 dark:bg-yellow-500/20 border-yellow-500/30 text-yellow-900 dark:text-yellow-100',
+    success: 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-900/30 text-slate-800 dark:text-slate-100 shadow-lg shadow-emerald-500/5',
+    error: 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-900/30 text-slate-800 dark:text-slate-100 shadow-lg shadow-red-500/5',
+    info: 'bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-900/30 text-slate-800 dark:text-slate-100 shadow-lg shadow-blue-500/5',
+    warning: 'bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-900/30 text-slate-800 dark:text-slate-100 shadow-lg shadow-amber-500/5',
   };
 
   const positionStyles = position === 'top'
@@ -57,17 +56,17 @@ export function Toast({
           exit={{ opacity: 0, y: position === 'top' ? -20 : 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className={cn(
-            'fixed z-[200] flex items-center gap-4 px-5 py-4 rounded-2xl shadow-glass-lg border backdrop-blur-2xl max-w-[90vw] md:max-w-md',
+            'fixed z-[200] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-sm',
             positionStyles,
             styles[type]
           )}
           role="alert"
         >
           <div className="shrink-0">{icons[type]}</div>
-          <p className="flex-1 font-medium text-sm">{message}</p>
+          <p className="flex-1 font-medium text-sm leading-tight">{message}</p>
           <button
             onClick={onClose}
-            className="shrink-0 hover:opacity-70 transition-opacity p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+            className="shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800 p-1 rounded-md transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
             aria-label="Chiudi notifica"
           >
             <X size={16} />

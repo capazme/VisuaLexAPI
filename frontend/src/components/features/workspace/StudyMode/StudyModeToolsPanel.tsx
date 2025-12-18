@@ -27,7 +27,7 @@ type Tab = 'notes' | 'highlights';
 
 const HIGHLIGHT_COLORS: Record<string, { bg: string; text: string }> = {
   yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-  green: { bg: 'bg-green-100', text: 'text-green-800' },
+  green: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   red: { bg: 'bg-red-100', text: 'text-red-800' },
   blue: { bg: 'bg-blue-100', text: 'text-blue-800' },
 };
@@ -44,23 +44,23 @@ const THEME_PANEL_STYLES: Record<StudyModeTheme, {
 }> = {
   light: {
     bg: 'bg-white',
-    border: 'border-gray-200',
-    tab: 'text-gray-500 hover:text-gray-700',
-    tabActive: 'text-blue-600 border-blue-600',
-    input: 'bg-gray-50 border-gray-200 focus:border-blue-500',
-    card: 'bg-gray-50 hover:bg-gray-100',
-    text: 'text-gray-900',
-    muted: 'text-gray-500'
+    border: 'border-slate-200',
+    tab: 'text-slate-500 hover:text-slate-700',
+    tabActive: 'text-primary-600 border-primary-600',
+    input: 'bg-slate-50 border-slate-200 focus:border-primary-500',
+    card: 'bg-slate-50 hover:bg-slate-100',
+    text: 'text-slate-900',
+    muted: 'text-slate-500'
   },
   dark: {
-    bg: 'bg-gray-800',
-    border: 'border-gray-700',
-    tab: 'text-gray-400 hover:text-gray-200',
-    tabActive: 'text-blue-400 border-blue-400',
-    input: 'bg-gray-900 border-gray-700 focus:border-blue-500',
-    card: 'bg-gray-700 hover:bg-gray-600',
-    text: 'text-gray-100',
-    muted: 'text-gray-400'
+    bg: 'bg-slate-900',
+    border: 'border-slate-700',
+    tab: 'text-slate-400 hover:text-slate-200',
+    tabActive: 'text-primary-400 border-primary-400',
+    input: 'bg-slate-800 border-slate-700 focus:border-primary-500',
+    card: 'bg-slate-800 hover:bg-slate-700',
+    text: 'text-slate-100',
+    muted: 'text-slate-400'
   },
   sepia: {
     bg: 'bg-[#f4ecd8]',
@@ -115,9 +115,9 @@ export function StudyModeToolsPanel({
     <AnimatePresence>
       {visible && (
         <motion.aside
-          initial={{ y: '100%', opacity: 0.8 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0.8 }}
+          initial={{ x: '-100%', opacity: 0.8 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: '-100%', opacity: 0.8 }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
@@ -134,13 +134,13 @@ export function StudyModeToolsPanel({
         >
           {/* Header */}
           <div className={cn("flex items-center justify-between px-4 py-3 border-b", styles.border)}>
-            <h3 className={cn("font-semibold", styles.text)}>Strumenti</h3>
+            <h3 className={cn("font-semibold text-sm uppercase tracking-wide", styles.text)}>Strumenti</h3>
             <button
               onClick={onTogglePin}
               className={cn(
-                "p-1.5 rounded-lg transition-colors",
-                isPinned ? 'text-blue-500' : styles.muted,
-                'hover:bg-gray-100 dark:hover:bg-gray-700'
+                "p-1.5 rounded-md transition-colors",
+                isPinned ? 'text-primary-500 bg-primary-50 dark:bg-primary-900/30' : styles.muted,
+                'hover:bg-slate-100 dark:hover:bg-slate-700'
               )}
               title={isPinned ? 'Sblocca pannello' : 'Blocca pannello'}
             >
@@ -153,14 +153,14 @@ export function StudyModeToolsPanel({
             <button
               onClick={() => setActiveTab('notes')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 activeTab === 'notes' ? styles.tabActive : cn(styles.tab, 'border-transparent')
               )}
             >
               <StickyNote size={16} />
               Note
               {annotations.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300 rounded-full">
                   {annotations.length}
                 </span>
               )}
@@ -168,14 +168,14 @@ export function StudyModeToolsPanel({
             <button
               onClick={() => setActiveTab('highlights')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 activeTab === 'highlights' ? styles.tabActive : cn(styles.tab, 'border-transparent')
               )}
             >
               <Highlighter size={16} />
               Evidenziazioni
               {highlights.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-full">
                   {highlights.length}
                 </span>
               )}
@@ -183,26 +183,29 @@ export function StudyModeToolsPanel({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
             {activeTab === 'notes' ? (
               <div className="space-y-3">
                 {annotations.length === 0 ? (
-                  <p className={cn("text-sm text-center py-4", styles.muted)}>
-                    Nessuna nota per questo articolo.
-                    <br />
-                    <span className="text-xs">Seleziona del testo o usa il campo sotto.</span>
-                  </p>
+                  <div className={cn("text-sm text-center py-8 flex flex-col items-center gap-2", styles.muted)}>
+                    <StickyNote size={24} className="opacity-30" />
+                    <div>
+                      Nessuna nota per questo articolo.
+                      <br />
+                      <span className="text-xs opacity-70">Seleziona del testo o usa il campo sotto.</span>
+                    </div>
+                  </div>
                 ) : (
                   annotations.map(note => (
                     <div
                       key={note.id}
-                      className={cn("group relative p-3 rounded-lg transition-colors", styles.card)}
+                      className={cn("group relative p-3 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700", styles.card)}
                     >
-                      <p className={cn("text-sm whitespace-pre-wrap pr-6", styles.text)}>
+                      <p className={cn("text-sm whitespace-pre-wrap pr-6 leading-relaxed", styles.text)}>
                         {note.text}
                       </p>
-                      <p className={cn("text-xs mt-2", styles.muted)}>
-                        {new Date(note.createdAt).toLocaleDateString()}
+                      <p className={cn("text-[10px] mt-2 font-medium opacity-60", styles.muted)}>
+                        {new Date(note.createdAt).toLocaleString()}
                       </p>
                       <button
                         onClick={() => onRemoveAnnotation(note.id)}
@@ -217,27 +220,32 @@ export function StudyModeToolsPanel({
             ) : (
               <div className="space-y-3">
                 {highlights.length === 0 ? (
-                  <p className={cn("text-sm text-center py-4", styles.muted)}>
-                    Nessuna evidenziazione.
-                    <br />
-                    <span className="text-xs">Seleziona del testo per evidenziarlo.</span>
-                  </p>
+                  <div className={cn("text-sm text-center py-8 flex flex-col items-center gap-2", styles.muted)}>
+                    <Highlighter size={24} className="opacity-30" />
+                    <div>
+                      Nessuna evidenziazione.
+                      <br />
+                      <span className="text-xs opacity-70">Seleziona del testo per evidenziarlo.</span>
+                    </div>
+                  </div>
                 ) : (
                   highlights.map(h => {
                     const colorStyle = HIGHLIGHT_COLORS[h.color] || HIGHLIGHT_COLORS.yellow;
                     return (
                       <div
                         key={h.id}
-                        className={cn("group relative p-3 rounded-lg transition-colors", styles.card)}
+                        className={cn("group relative p-3 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700", styles.card)}
                       >
                         <div className={cn(
-                          "inline-block px-2 py-1 rounded text-sm mb-2",
+                          "inline-block px-2 py-1 rounded text-xs font-medium mb-1.5",
                           colorStyle.bg,
                           colorStyle.text
                         )}>
-                          {h.text.substring(0, 100)}
-                          {h.text.length > 100 && '...'}
+                          {h.color.charAt(0).toUpperCase() + h.color.slice(1)}
                         </div>
+                        <p className={cn("text-sm line-clamp-3 leading-relaxed", styles.text)}>
+                          "{h.text}"
+                        </p>
                         <button
                           onClick={() => onRemoveHighlight(h.id)}
                           className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
@@ -267,7 +275,7 @@ export function StudyModeToolsPanel({
                   }}
                   placeholder="Scrivi una nota..."
                   className={cn(
-                    "flex-1 text-sm rounded-lg border px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500",
+                    "flex-1 text-sm rounded-lg border px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-shadow",
                     styles.input,
                     styles.text
                   )}
@@ -276,12 +284,12 @@ export function StudyModeToolsPanel({
                 <button
                   onClick={handleAddNote}
                   disabled={!noteText.trim()}
-                  className="self-end p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="self-end p-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
                   <Send size={16} />
                 </button>
               </div>
-              <p className={cn("text-xs mt-1", styles.muted)}>
+              <p className={cn("text-[10px] mt-1.5 text-right opacity-70", styles.muted)}>
                 Premi ⌘+Enter per salvare
               </p>
             </div>
