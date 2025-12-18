@@ -24,7 +24,7 @@ from visualex_api.tools.exceptions import (
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
-from visualex_api.services.pdfextractor import PDFExtractor
+from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool
 from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
@@ -106,6 +106,12 @@ class NormaController:
             """Run warmup tasks when server starts."""
             logger.info("Starting cache warmup in background")
             asyncio.create_task(warmup_cache_background())
+
+        @self.app.after_serving
+        async def on_shutdown():
+            """Cleanup tasks when server shuts down."""
+            logger.info("Shutting down - cleaning up browser pool")
+            await cleanup_browser_pool()
     
     def _setup_routes(self):
         """Set up all routes for the application."""
@@ -456,16 +462,18 @@ class NormaController:
     async def stream_article_text(self):
         """
         Stream article text results as they become available.
-        
+        Now supports Brocardi info in parallel streaming!
+
         Returns:
-            Streaming response with article text
+            Streaming response with article text and optional Brocardi info
         """
         try:
             data = await request.get_json()
             logger.info("Received data for stream_article_text", extra={"data": data})
-            
+
             normavisitate = await self.create_norma_visitata_from_data(data)
-            
+            show_brocardi = data.get('show_brocardi_info', False)
+
             async def result_generator():
                 """Generator function for streaming results."""
                 for nv in normavisitate:
@@ -476,22 +484,58 @@ class NormaController:
                         continue
 
                     try:
-                        article_text, url = await scraper.get_document(nv)
-                        result = {
-                            'article_text': article_text,
-                            'norma_data': nv.to_dict(),
-                            'url': url
-                        }
+                        # Fetch article text and Brocardi info in parallel if requested
+                        tasks = [scraper.get_document(nv)]
+                        if show_brocardi and isinstance(scraper, NormattivaScraper):
+                            tasks.append(self.brocardi_scraper.get_info(nv))
+
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                        # Process article text
+                        if isinstance(results[0], Exception):
+                            result = {'error': str(results[0]), 'norma_data': nv.to_dict()}
+                        else:
+                            article_text, url = results[0]
+                            result = {
+                                'article_text': article_text,
+                                'norma_data': nv.to_dict(),
+                                'url': url
+                            }
+
+                            # Add Brocardi info if available
+                            if show_brocardi and len(results) > 1:
+                                if isinstance(results[1], Exception):
+                                    result['brocardi_error'] = str(results[1])
+                                else:
+                                    brocardi_info = results[1]
+                                    result['brocardi_info'] = {
+                                        'position': brocardi_info[0] if brocardi_info[0] else None,
+                                        'link': brocardi_info[2],
+                                        'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
+                                        'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
+                                        'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
+                                        'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
+                                        'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
+                                        'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
+                                        'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
+                                        'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
+                                        'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
+                                    }
+
                     except Exception as exc:
                         result = {'error': str(exc), 'norma_data': nv.to_dict()}
-                    
+
                     # Send result immediately
                     yield json.dumps(result) + "\n"
-                    
-                    # Small pause between results
-                    await asyncio.sleep(0.05)
-            
-            return Response(result_generator(), mimetype="application/json")
+
+            return Response(
+                result_generator(),
+                mimetype='application/x-ndjson',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'X-Accel-Buffering': 'no'  # Disable nginx buffering
+                }
+            )
         except ValidationError as e:
             return jsonify({'error': str(e)}), 400
         except Exception as e:

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
@@ -37,6 +37,9 @@ export function SearchPanel() {
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
   const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
 
+  // Track active streaming tab to avoid creating duplicates
+  const streamingTabRef = useRef<{ normaKey: string; tabId: string } | null>(null);
+
   // Mobile: active tab index for swipe navigation
   const [mobileActiveTabIndex, setMobileActiveTabIndex] = useState(0);
 
@@ -54,7 +57,7 @@ export function SearchPanel() {
     isLoading: false
   });
 
-  const processResult = useCallback((result: ArticleData, versionDate?: string) => {
+  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false) => {
     if (result.error) {
       console.error("Backend Error for item:", result.error);
       return;
@@ -87,31 +90,53 @@ export function SearchPanel() {
     const key = generateNormaKey(norma);
     if (!key) return;
 
-    // Buffer results temporarily during streaming
-    setResultsBuffer(prev => {
-      const existing = prev[key];
-      const newArticles = existing ? [...existing.articles] : [];
+    // If streaming, add directly to workspace instead of buffering
+    if (isStreaming) {
+      const isHistorical = result.versionInfo?.isHistorical;
 
-      const isNewArticle = !newArticles.find(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
+      // Check if we're streaming to the same norma as before
+      const isSameNorma = streamingTabRef.current && streamingTabRef.current.normaKey === key;
 
-      if (isNewArticle) {
-        newArticles.push(result);
-        newArticles.sort((a, b) => {
-          const numA = parseInt(a.norma_data.numero_articolo) || 0;
-          const numB = parseInt(b.norma_data.numero_articolo) || 0;
-          return numA - numB;
-        });
+      if (isSameNorma && streamingTabRef.current) {
+        // Add article to the tab we created for this streaming session
+        addNormaToTab(streamingTabRef.current.tabId, norma, [result]);
       } else {
-        const idx = newArticles.findIndex(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
-        newArticles[idx] = result;
-      }
+        // First article of a new norma - create new tab
+        const versionSuffix = isHistorical && versionDate ? ` - Ver. ${versionDate}` : '';
+        const label = customTabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
+        const newTabId = addWorkspaceTab(label, norma, [result]);
 
-      return {
-        ...prev,
-        [key]: { norma, articles: newArticles, versionDate }
-      };
-    });
-  }, []);
+        // Track this tab for subsequent articles
+        streamingTabRef.current = { normaKey: key, tabId: newTabId };
+        setCustomTabLabel(null); // Clear after first use
+      }
+    } else {
+      // Buffer results for batch processing
+      setResultsBuffer(prev => {
+        const existing = prev[key];
+        const newArticles = existing ? [...existing.articles] : [];
+
+        const isNewArticle = !newArticles.find(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
+
+        if (isNewArticle) {
+          newArticles.push(result);
+          newArticles.sort((a, b) => {
+            const numA = parseInt(a.norma_data.numero_articolo) || 0;
+            const numB = parseInt(b.norma_data.numero_articolo) || 0;
+            return numA - numB;
+          });
+        } else {
+          const idx = newArticles.findIndex(a => a.norma_data.numero_articolo === result.norma_data.numero_articolo);
+          newArticles[idx] = result;
+        }
+
+        return {
+          ...prev,
+          [key]: { norma, articles: newArticles, versionDate }
+        };
+      });
+    }
+  }, [workspaceTabs, addNormaToTab, addWorkspaceTab, customTabLabel]);
 
   const processResults = useCallback((items: ArticleData[], versionDate?: string) => {
     items.forEach(item => processResult(item, versionDate));
@@ -122,10 +147,11 @@ export function SearchPanel() {
     setIsLoading(true);
     setError(null);
     setResultsBuffer({}); // Clear buffer before new search
+    streamingTabRef.current = null; // Reset streaming tab tracker
 
     try {
-      const endpoint = params.show_brocardi_info ? '/fetch_all_data' : '/stream_article_text';
-      const response = await fetch(endpoint, {
+      // Always use streaming endpoint (now supports Brocardi too!)
+      const response = await fetch('/stream_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)
@@ -133,38 +159,39 @@ export function SearchPanel() {
 
       if (!response.ok) throw new Error('Errore nella richiesta');
 
-      if (params.show_brocardi_info) {
-        const data = await response.json();
-        processResults(data, params.version_date);
-      } else {
-        if (!response.body) return;
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
+      // Stream results - articles appear as they're fetched
+      if (!response.body) return;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-          for (const line of lines) {
-            if (line.trim()) {
-              try {
-                const result = JSON.parse(line);
-                processResult(result, params.version_date);
-              } catch (e) {
-                console.error("Error parsing line", line, e);
-              }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const result = JSON.parse(line);
+              processResult(result, params.version_date, true); // isStreaming = true
+            } catch (e) {
+              console.error("Error parsing line", line, e);
             }
           }
         }
-        if (buffer.trim()) {
-          try {
-            const result = JSON.parse(buffer);
-            processResult(result, params.version_date);
-          } catch (e) { }
+      }
+
+      // Process any remaining data in buffer
+      if (buffer.trim()) {
+        try {
+          const result = JSON.parse(buffer);
+          processResult(result, params.version_date, true); // isStreaming = true
+        } catch (e) {
+          console.error("Error parsing final buffer", e);
         }
       }
 
@@ -175,7 +202,7 @@ export function SearchPanel() {
     } finally {
       setIsLoading(false);
     }
-  }, [processResults, processResult]);
+  }, [processResult]);
 
   // Process results buffer and create workspace tabs
   useEffect(() => {

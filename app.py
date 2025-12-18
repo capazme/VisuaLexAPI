@@ -22,7 +22,7 @@ from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
-from visualex_api.services.pdfextractor import extract_pdf
+from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
@@ -157,22 +157,27 @@ class NormaController:
 
     async def start_background_services(self):
         await self.fetch_queue.start()
+        log.info("Background services started")
 
     async def stop_background_services(self):
         await self.fetch_queue.stop()
+        await cleanup_browser_pool()
+        log.info("Background services stopped and browser pool cleaned up")
 
 
     async def stream_article_text(self):
         """
         Endpoint che invia in streaming i risultati della ricerca degli articoli.
         I risultati vengono inviati man mano che vengono trovati.
+        Supporta anche info Brocardi in parallelo.
         """
         data = await request.get_json()
         log.info("Received data for stream_article_text", data=data)
         add_to_history(data)
         normavisitate = await self.create_norma_visitata_from_data(data)
+        show_brocardi = data.get('show_brocardi_info', False)
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
-        
+
         async def result_generator():
             for nv in normavisitate:
                 scraper = self.get_scraper_for_norma(nv)
@@ -182,21 +187,46 @@ class NormaController:
                     continue
 
                 try:
-                    article_text, url = await scraper.get_document(nv)
-                    result = {
-                        'article_text': article_text,
-                        'norma_data': nv.to_dict(),
-                        'url': url
-                    }
+                    # Fetch article text and Brocardi info in parallel if requested
+                    tasks = [scraper.get_document(nv)]
+                    if show_brocardi and isinstance(scraper, NormattivaScraper):
+                        tasks.append(brocardi_scraper.get_info(nv))
+
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                    # Process article text
+                    if isinstance(results[0], Exception):
+                        result = {'error': str(results[0]), 'norma_data': nv.to_dict()}
+                    else:
+                        article_text, url = results[0]
+                        result = {
+                            'article_text': article_text,
+                            'norma_data': nv.to_dict(),
+                            'url': url
+                        }
+
+                        # Add Brocardi info if available
+                        if show_brocardi and len(results) > 1:
+                            if isinstance(results[1], Exception):
+                                result['brocardi_error'] = str(results[1])
+                            else:
+                                result['brocardi_info'] = results[1]
+
                 except Exception as exc:
                     result = {'error': str(exc), 'norma_data': nv.to_dict()}
-                # Invia subito il risultato corrente
+
+                # Send result immediately
                 yield json.dumps(result) + "\n"
-                # Se vuoi dare una piccola pausa tra un risultato e l'altro:
-                await asyncio.sleep(0.05)
-        
-        # Restituisce una Response in streaming
-        return Response(result_generator(), mimetype="application/json")
+
+        # Return streaming response with proper headers
+        return Response(
+            result_generator(),
+            mimetype='application/x-ndjson',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'  # Disable nginx buffering
+            }
+        )
 
     async def record_start_time(self):
         g.start_time = time()

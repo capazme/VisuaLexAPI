@@ -1,33 +1,5 @@
 [
   {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "1178",
-    "date": "",
-    "timestamp": "2025-12-17T18:51:31.295865Z"
-  },
-  {
-    "act_type": "codice civile",
-    "act_number": "",
-    "article": "1179",
-    "date": "",
-    "timestamp": "2025-12-17T18:53:06.182706Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "1",
-    "date": "",
-    "timestamp": "2025-12-17T18:53:55.637782Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "2",
-    "date": "",
-    "timestamp": "2025-12-17T19:12:29.900196Z"
-  },
-  {
     "act_type": "costituzione",
     "act_number": "",
     "article": "3",
@@ -348,5 +320,33 @@
     "article": "12",
     "date": "",
     "timestamp": "2025-12-18T12:54:20.885432Z"
+  },
+  {
+    "act_type": "codice civile",
+    "act_number": "",
+    "article": "832,833,834,840,844,948,949",
+    "date": "",
+    "timestamp": "2025-12-18T15:43:39.794552Z"
+  },
+  {
+    "act_type": "codice civile",
+    "act_number": "",
+    "article": "922,934,935,1158,1159,1159 bis,1161",
+    "date": "",
+    "timestamp": "2025-12-18T15:52:31.207278Z"
+  },
+  {
+    "act_type": "preleggi",
+    "act_number": "",
+    "article": "1-12",
+    "date": "",
+    "timestamp": "2025-12-18T15:56:23.338499Z"
+  },
+  {
+    "act_type": "codice del consumo",
+    "act_number": "",
+    "article": "1-10",
+    "date": "",
+    "timestamp": "2025-12-18T15:59:48.473205Z"
   }
 ]
