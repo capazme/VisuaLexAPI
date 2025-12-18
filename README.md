@@ -1,158 +1,97 @@
 # VisuaLex Web/API
 
-Applicazione Quart (async Flask-like) per ricercare e visualizzare testi normativi da Normattiva/EUR‑Lex e note da Brocardi, con UI web e API.
+> **Intelligent Legal Visualization and Research**
 
-## Requisiti
-- Python 3.10+
-- macOS/Linux/Windows
-- Google Chrome installato (per l'esportazione PDF)
-- ChromeDriver nel PATH (necessario solo per `/export_pdf`)
-  - macOS (Homebrew):
-    ```bash
-    brew install chromedriver
-    ```
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## Installazione
+VisuaLex is an advanced web application designed to research, visualize, and study legal texts from **Normattiva**, **EUR-Lex**, and **Brocardi**. It combines a powerful async Python backend with a rich React-based frontend to transform complex regulations into interactive knowledge graphs and structured views.
+
+### 📚 Documentation
+- **[User Guide](docs/user_guide.md)**: specialized instructions on how to use the Workspace and Study Mode.
+- **[Architecture](docs/architecture.md)**: Technical deep-dive into the Quart backend and React frontend.
+
+---
+
+## Quick Start
+
+### Prerequisites
+- **Python 3.10+**
+- **Node.js 18+** (for frontend development)
+- **Google Chrome** (for PDF export)
+- **ChromeDriver** (matching your Chrome version)
+
+### Installation
+
+1. **Clone and Setup Backend**
+   ```bash
+   cd VisuaLexAPI
+   python -m venv .venv
+   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+2. **Frontend Setup (Optional/Dev)**
+   If you need to build the frontend:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   ```
+
+### Running the App
 ```bash
-cd VisuaLexAPI
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-```
-
-## Avvio
-```bash
-# Assicurati di essere nella cartella principale del progetto (VisuaLexAPI)
-# e di aver attivato l'ambiente virtuale.
-# Esempio: source .venv/bin/activate
-
-# Avvia l'applicazione
+# From root directory
+source .venv/bin/activate
 python app.py
 ```
-- Interfaccia Utente: [http://localhost:5000](http://localhost:5000)
-- Gli endpoint API sono disponibili alla root (es. `/fetch_article_text`).
+- **Web Interface**: [http://localhost:5000](http://localhost:5000)
+- **API Docs**: Available at root endpoints (e.g., `/fetch_article_text`).
 
 ---
 
-## Endpoints
+## Core Features
 
-### GET `/`
-Rende la pagina web (`templates/index.html`).
+- **Multi-Source Search**: Unified interface for Italian Laws (Normattiva) and EU Regulations (EUR-Lex).
+- **Study Mode**: Distraction-free reading environment with annotation tools.
+- **Brocardi Integration**: Automatic retrieval of legal maxims and explanatory notes.
+- **PDF Export**: Generate high-quality PDFs of regulations for offline use.
+- **Knowledge Graph**: (Beta) Visualize connections between laws.
 
-### POST `/fetch_norma_data`
-Crea una o più strutture di norma a partire dai parametri forniti.
-- Body (JSON):
-  - `act_type` (string, richiesto)
-  - `date` (string, opz.)
-  - `act_number` (string, opz.)
-  - `article` (string, richiesto; singolo, lista "1,2" o range "3-5")
-  - `version` (string: `vigente` | `originale`, opz.)
-  - `version_date` (string YYYY-MM-DD, opz.)
-  - `annex` (string, opz.)
-- 200: `{ "norma_data": [NormaVisitata...] }`
-- 400/500: `{ "error": string }`
+## Project Structure
 
-Esempio:
-```bash
-curl -X POST http://localhost:5000/fetch_norma_data \
-  -H 'Content-Type: application/json' \
-  -d '{"act_type":"codice civile","article":"2043"}'
-```
-
-### POST `/fetch_article_text`
-Recupera in parallelo il testo degli articoli richiesti.
-- Body: come sopra
-- 200: `[{ article_text, norma_data, url } | { error, norma_data }]`
-
-```bash
-curl -X POST http://localhost:5000/fetch_article_text \
-  -H 'Content-Type: application/json' \
-  -d '{"act_type":"legge","act_number":"241","date":"1990-08-07","article":"22","version":"vigente"}'
-```
-
-### POST `/stream_article_text`
-Streaming NDJSON dei risultati man mano che sono disponibili.
-- Body: come sopra
-- 200: stream con una riga JSON per articolo separata da `\n`.
-
-```bash
-curl -N -X POST http://localhost:5000/stream_article_text \
-  -H 'Content-Type: application/json' \
-  -d '{"act_type":"codice civile","article":"2043,2051"}'
-```
-
-### POST `/fetch_brocardi_info`
-Recupera le note da Brocardi (se applicabile alla fonte).
-- Body: come `/fetch_norma_data`
-- 200: `[{ norma_data, brocardi_info | null } | { error, norma_data }]`
-
-### POST `/fetch_all_data`
-Combina testo articolo + info Brocardi in un'unica risposta per ciascuna norma.
-- Body: come `/fetch_norma_data`
-- 200: `[{ article_text, url, norma_data, brocardi_info } | { error, norma_data }]`
-
-### POST `/fetch_tree`
-Restituisce l'albero degli articoli (eventualmente con link e dettagli) per una `urn` completa.
-- Body:
-  - `urn` (string, richiesto)
-  - `link` (bool, default false)
-  - `details` (bool, default false)
-- 200: `{ articles: any[], count: number }`
-
-```bash
-curl -X POST http://localhost:5000/fetch_tree \
-  -H 'Content-Type: application/json' \
-  -d '{"urn":"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241","link":true,"details":false}'
-```
-
-### GET `/history`
-Restituisce l'ultima history in memoria del server.
-- 200: `{ history: any[] }`
-
-### POST `/export_pdf`
-Esporta in PDF la risorsa identificata da `urn`, utilizzando Selenium/Chrome.
-- Body: `{ "urn": string }`
-- 200: `application/pdf` (attachment)
-- Requisiti: Google Chrome + ChromeDriver nel PATH
-
-```bash
-curl -X POST http://localhost:5000/export_pdf \
-  -H 'Content-Type: application/json' \
-  -d '{"urn":"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241"}' \
-  -o legge_241_1990.pdf
-```
-
----
-
-## Rate limiting
-Configurabile in `visualex_api/tools/config.py`:
-- `RATE_LIMIT`, `RATE_LIMIT_WINDOW` (per IP). Di default molto permissivo in sviluppo.
-
-## Note su scraping e compatibilità
-- Lo scraping dipende da Normattiva/EUR‑Lex/Brocardi: modifiche HTML dei siti possono richiedere aggiornamenti.
-- Per `EUR‑Lex` gli atti (TUE/TFUE/CDFUE, regolamenti/direttive) usano mapping dedicato.
-
-## Struttura Progetto
-```
+```text
 VisuaLexAPI/
-├── app.py                 # Applicazione principale (UI + API)
-├── requirements.txt
-├── README.md
-├── data/                  # File di testo (es. codice_civile_articoli.txt)
-├── static/                # CSS/JS
-├── templates/             # Pagine HTML
-├── tests/                 # Test
-└── visualex_api/
-    ├── services/          # Scraper e altri servizi
-    └── tools/             # Utilità (URN, parsing, config)
+├── app.py                 # Backend Entry Point (Quart)
+├── visualex_api/          # Backend Source Code
+│   ├── services/          # Scrapers & Logic
+│   └── tools/             # Utilities
+├── frontend/              # Frontend Source Code (React/Vite)
+│   ├── src/
+│   │   ├── components/    # Reusable UI & Features
+│   │   └── services/      # API Integration
+│   └── public/            # Static Assets (Favicon, Manifest)
+├── docs/                  # Documentation
+└── data/                  # Local data storage
 ```
+
+## API Endpoints Overview
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/` | Serves the main web application |
+| `POST` | `/fetch_norma_data` | Retreives structure metadata for a law |
+| `POST` | `/fetch_article_text` | Retreives full text of specific articles |
+| `POST` | `/export_pdf` | Generates a PDF of the current view |
+
+See `app.py` or the Architecture docs for detailed payload specs.
 
 ## Troubleshooting
-- "selenium: no such driver": installa `chromedriver` ed assicurati sia nel PATH (`chromedriver --version`).
-- PDF vuoto: riprova; assicurati che l'atto sia accessibile pubblicamente e che Chrome si apra in headless.
-- CORS: di default è consentito `http://localhost:3000` (vedi app).
 
----
+- **"Selenium: no such driver"**: Ensure `chromedriver` is in your PATH.
+- **PDF Export Fails**: Check if Chrome is installed and accessible in headless mode.
 
-## Licenza
-Uso interno/didattico. Verifica i termini d'uso delle fonti (Normattiva, EUR‑Lex, Brocardi) prima di utilizzi in produzione.
+## License
+Internal/Educational Use. Please respect the Terms of Service of source data providers (Normattiva, EUR-Lex).
