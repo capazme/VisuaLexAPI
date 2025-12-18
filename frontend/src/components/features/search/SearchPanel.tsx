@@ -138,10 +138,6 @@ export function SearchPanel() {
     }
   }, [workspaceTabs, addNormaToTab, addWorkspaceTab, customTabLabel]);
 
-  const processResults = useCallback((items: ArticleData[], versionDate?: string) => {
-    items.forEach(item => processResult(item, versionDate));
-  }, [processResult]);
-
   const handleSearch = useCallback(async (params: SearchParams) => {
     console.log('🔍 SearchPanel handleSearch called with:', params);
     setIsLoading(true);
