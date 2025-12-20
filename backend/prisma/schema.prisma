@@ -13,15 +13,17 @@ datasource db {
 // ============================================
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  username  String   @unique
-  password  String
-  isActive  Boolean  @default(true) @map("is_active")
-  isVerified Boolean @default(false) @map("is_verified")
-  isAdmin   Boolean  @default(false) @map("is_admin")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(uuid())
+  email       String    @unique
+  username    String    @unique
+  password    String
+  isActive    Boolean   @default(true) @map("is_active")
+  isVerified  Boolean   @default(false) @map("is_verified")
+  isAdmin     Boolean   @default(false) @map("is_admin")
+  loginCount  Int       @default(0) @map("login_count")
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relationships
   folders     Folder[]
@@ -29,6 +31,7 @@ model User {
   annotations Annotation[]
   highlights  Highlight[]
   dossiers    Dossier[]
+  feedbacks   Feedback[]
 
   @@map("users")
 }
@@ -189,4 +192,38 @@ model DossierItem {
 
   @@index([dossierId])
   @@map("dossier_items")
+}
+
+// ============================================
+// FEEDBACK (Bug Reports & Suggestions)
+// ============================================
+
+enum FeedbackType {
+  bug
+  suggestion
+  other
+}
+
+enum FeedbackStatus {
+  new
+  read
+  resolved
+  dismissed
+}
+
+model Feedback {
+  id        String         @id @default(uuid())
+  type      FeedbackType
+  message   String
+  status    FeedbackStatus @default(new)
+  userId    String         @map("user_id")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@map("feedbacks")
 }

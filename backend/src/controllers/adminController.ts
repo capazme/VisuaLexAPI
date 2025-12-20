@@ -39,6 +39,8 @@ export const listUsers = async (req: Request, res: Response) => {
       isActive: true,
       isVerified: true,
       isAdmin: true,
+      loginCount: true,
+      lastLoginAt: true,
       createdAt: true,
       updatedAt: true,
       _count: {
@@ -60,6 +62,8 @@ export const listUsers = async (req: Request, res: Response) => {
     is_active: user.isActive,
     is_verified: user.isVerified,
     is_admin: user.isAdmin,
+    login_count: user.loginCount,
+    last_login_at: user.lastLoginAt,
     created_at: user.createdAt,
     updated_at: user.updatedAt,
     stats: {
@@ -86,6 +90,8 @@ export const getUser = async (req: Request, res: Response) => {
       isActive: true,
       isVerified: true,
       isAdmin: true,
+      loginCount: true,
+      lastLoginAt: true,
       createdAt: true,
       updatedAt: true,
       _count: {
@@ -111,6 +117,8 @@ export const getUser = async (req: Request, res: Response) => {
     is_active: user.isActive,
     is_verified: user.isVerified,
     is_admin: user.isAdmin,
+    login_count: user.loginCount,
+    last_login_at: user.lastLoginAt,
     created_at: user.createdAt,
     updated_at: user.updatedAt,
     stats: {

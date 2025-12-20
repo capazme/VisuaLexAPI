@@ -45,3 +45,59 @@ export const deleteUser = async (id: string): Promise<void> => {
 export const resetPassword = async (id: string, data: AdminResetPassword): Promise<{ message: string }> => {
   return post<{ message: string }>(`/admin/users/${id}/reset-password`, data);
 };
+
+// ============================================
+// Feedback Management
+// ============================================
+
+export type FeedbackType = 'bug' | 'suggestion' | 'other';
+export type FeedbackStatus = 'new' | 'read' | 'resolved' | 'dismissed';
+
+export interface AdminFeedback {
+  id: string;
+  type: FeedbackType;
+  message: string;
+  status: FeedbackStatus;
+  user_id: string;
+  created_at: string;
+  user: {
+    id: string;
+    email: string;
+    username: string;
+  };
+}
+
+export interface FeedbackStats {
+  total: number;
+  new: number;
+  bugs: number;
+  suggestions: number;
+}
+
+/**
+ * Get all feedbacks
+ */
+export const listFeedbacks = async (params?: { status?: FeedbackStatus; type?: FeedbackType }): Promise<AdminFeedback[]> => {
+  return get<AdminFeedback[]>('/admin/feedbacks', params);
+};
+
+/**
+ * Get feedback statistics
+ */
+export const getFeedbackStats = async (): Promise<FeedbackStats> => {
+  return get<FeedbackStats>('/admin/feedbacks/stats');
+};
+
+/**
+ * Update feedback status
+ */
+export const updateFeedbackStatus = async (id: string, status: FeedbackStatus): Promise<AdminFeedback> => {
+  return put<AdminFeedback>(`/admin/feedbacks/${id}`, { status });
+};
+
+/**
+ * Delete feedback
+ */
+export const deleteFeedback = async (id: string): Promise<void> => {
+  return del(`/admin/feedbacks/${id}`);
+};

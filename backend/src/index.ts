@@ -10,6 +10,7 @@ import bookmarkRoutes from './routes/bookmarks';
 import highlightRoutes from './routes/highlights';
 import annotationRoutes from './routes/annotations';
 import dossierRoutes from './routes/dossiers';
+import feedbackRoutes from './routes/feedback';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/api', bookmarkRoutes);
 app.use('/api', highlightRoutes);
 app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
+app.use('/api', feedbackRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -67,6 +69,7 @@ app.listen(config.port, () => {
 ║  - Bookmarks: http://localhost:${config.port}/api/bookmarks/*    ║
 ║  - Highlights: http://localhost:${config.port}/api/highlights/*  ║
 ║  - Annotations: http://localhost:${config.port}/api/annotations/*║
+║  - Feedback: http://localhost:${config.port}/api/feedback/*      ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
 });

@@ -5,11 +5,14 @@ import { Sidebar } from './Sidebar';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { SettingsModal } from '../ui/SettingsModal';
+import { FeedbackButton } from '../ui/FeedbackButton';
 import { cn } from '../../lib/utils';
 import { useTour } from '../../hooks/useTour';
+import { useAuth } from '../../hooks/useAuth';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore();
+  const { isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigate = useNavigate();
@@ -176,6 +179,9 @@ export function Layout() {
       </main>
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetAndStartTour} />
+
+      {/* Feedback Button - only for authenticated users */}
+      {isAuthenticated && <FeedbackButton />}
     </div>
   );
 }

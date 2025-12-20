@@ -99,22 +99,33 @@ export const login = async (req: Request, res: Response) => {
     throw new AppError(401, 'User account is inactive');
   }
 
+  // Update login stats
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      loginCount: { increment: 1 },
+      lastLoginAt: new Date(),
+    },
+  });
+
   // Generate tokens
-  const accessToken = generateAccessToken(user.id, user.email);
-  const refreshToken = generateRefreshToken(user.id, user.email);
+  const accessToken = generateAccessToken(updatedUser.id, updatedUser.email);
+  const refreshToken = generateRefreshToken(updatedUser.id, updatedUser.email);
 
   res.json({
     access_token: accessToken,
     refresh_token: refreshToken,
     token_type: 'Bearer',
     user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      is_active: user.isActive,
-      is_verified: user.isVerified,
-      is_admin: user.isAdmin,
-      created_at: user.createdAt,
+      id: updatedUser.id,
+      email: updatedUser.email,
+      username: updatedUser.username,
+      is_active: updatedUser.isActive,
+      is_verified: updatedUser.isVerified,
+      is_admin: updatedUser.isAdmin,
+      created_at: updatedUser.createdAt,
+      login_count: updatedUser.loginCount,
+      last_login_at: updatedUser.lastLoginAt,
     },
   });
 };
@@ -163,6 +174,8 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     is_verified: req.user.isVerified,
     is_admin: req.user.isAdmin,
     created_at: req.user.createdAt,
+    login_count: req.user.loginCount,
+    last_login_at: req.user.lastLoginAt,
   });
 };
 

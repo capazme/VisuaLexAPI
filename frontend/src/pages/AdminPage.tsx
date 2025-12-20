@@ -1,11 +1,12 @@
 /**
- * Admin page for user management
+ * Admin page for user and feedback management
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
 import type { AdminUserResponse } from '../types/api';
+import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType } from '../services/adminService';
 import {
   Users,
   UserPlus,
@@ -19,15 +20,36 @@ import {
   RefreshCw,
   LogOut,
   Home,
+  MessageSquare,
+  Bug,
+  Lightbulb,
+  HelpCircle,
+  Eye,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+type AdminTab = 'users' | 'feedback';
 
 export function AdminPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<AdminTab>('users');
+
+  // Users state
   const [users, setUsers] = useState<AdminUserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Feedback state
+  const [feedbacks, setFeedbacks] = useState<AdminFeedback[]>([]);
+  const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackFilter, setFeedbackFilter] = useState<{ status?: FeedbackStatus; type?: FeedbackType }>({});
+  const [showDeleteFeedbackConfirm, setShowDeleteFeedbackConfirm] = useState<string | null>(null);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -53,9 +75,81 @@ export function AdminPage() {
     }
   };
 
+  const loadFeedbacks = async () => {
+    try {
+      setFeedbackLoading(true);
+      const [data, stats] = await Promise.all([
+        adminService.listFeedbacks(feedbackFilter),
+        adminService.getFeedbackStats(),
+      ]);
+      setFeedbacks(data);
+      setFeedbackStats(stats);
+    } catch (err: any) {
+      setError(err.message || 'Errore nel caricamento dei feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
+    loadFeedbacks();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'feedback') {
+      loadFeedbacks();
+    }
+  }, [feedbackFilter]);
+
+  const handleUpdateFeedbackStatus = async (id: string, status: FeedbackStatus) => {
+    try {
+      setActionLoading(true);
+      await adminService.updateFeedbackStatus(id, status);
+      await loadFeedbacks();
+    } catch (err: any) {
+      setError(err.message || 'Errore nell\'aggiornamento');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteFeedback = async () => {
+    if (!showDeleteFeedbackConfirm) return;
+    try {
+      setActionLoading(true);
+      await adminService.deleteFeedback(showDeleteFeedbackConfirm);
+      setShowDeleteFeedbackConfirm(null);
+      await loadFeedbacks();
+    } catch (err: any) {
+      setError(err.message || 'Errore nell\'eliminazione');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getFeedbackTypeIcon = (type: FeedbackType) => {
+    switch (type) {
+      case 'bug': return <Bug size={16} className="text-red-500" />;
+      case 'suggestion': return <Lightbulb size={16} className="text-amber-500" />;
+      default: return <HelpCircle size={16} className="text-blue-500" />;
+    }
+  };
+
+  const getFeedbackStatusBadge = (status: FeedbackStatus) => {
+    const styles = {
+      new: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      read: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+      resolved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      dismissed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    };
+    const labels = { new: 'Nuovo', read: 'Letto', resolved: 'Risolto', dismissed: 'Ignorato' };
+    return (
+      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', styles[status])}>
+        {labels[status]}
+      </span>
+    );
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,13 +226,48 @@ export function AdminPage() {
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-lg flex items-center justify-center">
-                <Shield size={20} />
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-lg flex items-center justify-center">
+                  <Shield size={20} />
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Panel</h1>
+                  <p className="text-xs text-gray-500">VisuaLex</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Admin Panel</h1>
-                <p className="text-xs text-gray-500">Gestione utenti VisuaLex</p>
+
+              {/* Tabs */}
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
+                <button
+                  onClick={() => setActiveTab('users')}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                    activeTab === 'users'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  )}
+                >
+                  <Users size={16} />
+                  Utenti
+                </button>
+                <button
+                  onClick={() => setActiveTab('feedback')}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors relative',
+                    activeTab === 'feedback'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  )}
+                >
+                  <MessageSquare size={16} />
+                  Feedback
+                  {feedbackStats && feedbackStats.new > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {feedbackStats.new}
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
             <div className="flex items-center gap-3 relative z-50">
@@ -166,33 +295,6 @@ export function AdminPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 isolate">
-        {/* Actions Bar */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <Users size={20} className="text-gray-500" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Utenti ({users.length})
-            </h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadUsers}
-              disabled={loading}
-              className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-              title="Aggiorna"
-            >
-              <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-            >
-              <UserPlus size={18} />
-              Nuovo Utente
-            </button>
-          </div>
-        </div>
-
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
@@ -204,8 +306,38 @@ export function AdminPage() {
           </div>
         )}
 
-        {/* Users Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* ==================== USERS TAB ==================== */}
+        {activeTab === 'users' && (
+          <>
+            {/* Actions Bar */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Users size={20} className="text-gray-500" />
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Utenti ({users.length})
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={loadUsers}
+                  disabled={loading}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  title="Aggiorna"
+                >
+                  <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <UserPlus size={18} />
+                  Nuovo Utente
+                </button>
+              </div>
+            </div>
+
+            {/* Users Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           {loading && users.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
@@ -230,7 +362,7 @@ export function AdminPage() {
                       Ruolo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Statistiche
+                      Attività
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Creato
@@ -282,12 +414,17 @@ export function AdminPage() {
                         </button>
                       </td>
                       <td className="px-6 py-4">
-                        {u.stats && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                            <p>{u.stats.bookmarks} bookmarks</p>
-                            <p>{u.stats.dossiers} dossiers</p>
-                          </div>
-                        )}
+                        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                          <p className="font-medium text-gray-700 dark:text-gray-300">
+                            {u.login_count ?? 0} accessi
+                          </p>
+                          {u.last_login_at && (
+                            <p>Ultimo: {new Date(u.last_login_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                          )}
+                          {u.stats && (
+                            <p className="text-gray-400">{u.stats.bookmarks} bookmarks</p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                         {new Date(u.created_at).toLocaleDateString('it-IT')}
@@ -322,7 +459,157 @@ export function AdminPage() {
               </table>
             </div>
           )}
-        </div>
+            </div>
+          </>
+        )}
+
+        {/* ==================== FEEDBACK TAB ==================== */}
+        {activeTab === 'feedback' && (
+          <>
+            {/* Actions Bar */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <MessageSquare size={20} className="text-gray-500" />
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Feedback ({feedbacks.length})
+                  </h2>
+                </div>
+                {feedbackStats && (
+                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Bug size={14} className="text-red-500" />
+                      {feedbackStats.bugs} bug
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Lightbulb size={14} className="text-amber-500" />
+                      {feedbackStats.suggestions} suggerimenti
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Filters */}
+                <select
+                  value={feedbackFilter.status || ''}
+                  onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: e.target.value as FeedbackStatus || undefined })}
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">Tutti gli stati</option>
+                  <option value="new">Nuovo</option>
+                  <option value="read">Letto</option>
+                  <option value="resolved">Risolto</option>
+                  <option value="dismissed">Ignorato</option>
+                </select>
+                <select
+                  value={feedbackFilter.type || ''}
+                  onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: e.target.value as FeedbackType || undefined })}
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">Tutti i tipi</option>
+                  <option value="bug">Bug</option>
+                  <option value="suggestion">Suggerimento</option>
+                  <option value="other">Altro</option>
+                </select>
+                <button
+                  onClick={loadFeedbacks}
+                  disabled={feedbackLoading}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  title="Aggiorna"
+                >
+                  <RefreshCw size={20} className={feedbackLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Feedback List */}
+            <div className="space-y-4">
+              {feedbackLoading && feedbacks.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
+                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                  Caricamento feedback...
+                </div>
+              ) : feedbacks.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
+                  <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                  Nessun feedback trovato
+                </div>
+              ) : (
+                feedbacks.map((f) => (
+                  <div
+                    key={f.id}
+                    className={cn(
+                      'bg-white dark:bg-gray-800 rounded-xl border p-4 transition-colors',
+                      f.status === 'new'
+                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10'
+                        : 'border-gray-200 dark:border-gray-700'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          {getFeedbackTypeIcon(f.type)}
+                          <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                            {f.type === 'bug' ? 'Bug' : f.type === 'suggestion' ? 'Suggerimento' : 'Altro'}
+                          </span>
+                          {getFeedbackStatusBadge(f.status)}
+                          <span className="text-xs text-gray-400">
+                            {new Date(f.created_at).toLocaleString('it-IT')}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {f.message}
+                        </p>
+                        <p className="mt-2 text-xs text-gray-500">
+                          Da: <span className="font-medium">{f.user.username}</span> ({f.user.email})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {f.status === 'new' && (
+                          <button
+                            onClick={() => handleUpdateFeedbackStatus(f.id, 'read')}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            title="Segna come letto"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        )}
+                        {f.status !== 'resolved' && (
+                          <button
+                            onClick={() => handleUpdateFeedbackStatus(f.id, 'resolved')}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                            title="Segna come risolto"
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                        )}
+                        {f.status !== 'dismissed' && (
+                          <button
+                            onClick={() => handleUpdateFeedbackStatus(f.id, 'dismissed')}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                            title="Ignora"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setShowDeleteFeedbackConfirm(f.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title="Elimina"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
       </main>
 
       {/* Create User Modal */}
@@ -486,6 +773,40 @@ export function AdminPage() {
                 </button>
                 <button
                   onClick={handleDeleteUser}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? 'Eliminazione...' : 'Elimina'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Feedback Confirmation Modal */}
+      {showDeleteFeedbackConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Elimina Feedback
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">
+                Sei sicuro di voler eliminare questo feedback? L'azione non può essere annullata.
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setShowDeleteFeedbackConfirm(null)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handleDeleteFeedback}
                   disabled={actionLoading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >

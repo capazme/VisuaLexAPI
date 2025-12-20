@@ -52,6 +52,8 @@ export interface AdminUserUpdate {
 }
 
 export interface AdminUserResponse extends UserResponse {
+  login_count?: number;
+  last_login_at?: string | null;
   stats?: {
     bookmarks: number;
     dossiers: number;
