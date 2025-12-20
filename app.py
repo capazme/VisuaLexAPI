@@ -419,21 +419,35 @@ class NormaController:
 
             link = data.get('link', False)
             details = data.get('details', False)
+            return_metadata = data.get('return_metadata', True)  # Default to True for annex detection
+
             if not isinstance(link, bool):
                 log.error("'link' must be a boolean")
                 return jsonify({'error': "'link' must be a boolean"}), 400
             if not isinstance(details, bool):
                 log.error("'details' must be a boolean")
                 return jsonify({'error': "'details' must be a boolean"}), 400
+            if not isinstance(return_metadata, bool):
+                log.error("'return_metadata' must be a boolean")
+                return jsonify({'error': "'return_metadata' must be a boolean"}), 400
 
-            log.debug("Flags received", link=link, details=details)
-            articles, count = await get_tree(urn, link=link, details=details)
+            log.debug("Flags received", link=link, details=details, return_metadata=return_metadata)
+
+            if return_metadata:
+                articles, count, metadata = await get_tree(urn, link=link, details=details, return_metadata=True)
+            else:
+                articles, count = await get_tree(urn, link=link, details=details, return_metadata=False)
+                metadata = {}
+
             if isinstance(articles, str):
                 log.error("Error fetching tree", error=articles)
                 return jsonify({'error': articles}), 500
 
             response = {'articles': articles, 'count': count}
-            log.info("Tree fetched successfully", response=response)
+            if return_metadata and metadata:
+                response['metadata'] = metadata
+
+            log.info("Tree fetched successfully", count=count, has_metadata=bool(metadata))
             return jsonify(response)
         except Exception as e:
             log.error("Error in fetch_tree", error=str(e), exc_info=True)
@@ -766,8 +780,9 @@ class NormaController:
         return jsonify(results), status_code
 
     async def get_version(self):
-        """Returns version info and latest git commit details."""
+        """Returns version info, latest git commit details, and changelog."""
         import subprocess
+        from pathlib import Path
 
         def run_git_command(args: list[str]) -> str:
             try:
@@ -781,6 +796,15 @@ class NormaController:
             except Exception:
                 return ''
 
+        # Read version from version.txt
+        version = '1.0.0'
+        version_file = Path(__file__).parent / 'version.txt'
+        if version_file.exists():
+            try:
+                version = version_file.read_text().strip()
+            except Exception:
+                pass
+
         # Get git info in thread pool to not block
         commit_hash = await asyncio.to_thread(run_git_command, ['rev-parse', '--short', 'HEAD'])
         commit_hash_full = await asyncio.to_thread(run_git_command, ['rev-parse', 'HEAD'])
@@ -789,8 +813,26 @@ class NormaController:
         commit_author = await asyncio.to_thread(run_git_command, ['log', '-1', '--format=%an'])
         branch = await asyncio.to_thread(run_git_command, ['rev-parse', '--abbrev-ref', 'HEAD'])
 
+        # Get changelog (last 10 commits)
+        changelog_raw = await asyncio.to_thread(
+            run_git_command,
+            ['log', '-10', '--format=%h|%s|%ci|%an']
+        )
+        changelog = []
+        if changelog_raw:
+            for line in changelog_raw.split('\n'):
+                if line and '|' in line:
+                    parts = line.split('|', 3)
+                    if len(parts) >= 4:
+                        changelog.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'date': parts[2],
+                            'author': parts[3]
+                        })
+
         return jsonify({
-            'version': '1.0.0',
+            'version': version,
             'git': {
                 'branch': branch or 'unknown',
                 'commit': {
@@ -800,7 +842,8 @@ class NormaController:
                     'date': commit_date or 'unknown',
                     'author': commit_author or 'unknown'
                 }
-            }
+            },
+            'changelog': changelog
         })
 
     async def export_pdf(self):

@@ -5,6 +5,13 @@ import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
+interface CommitInfo {
+    hash: string;
+    message: string;
+    date: string;
+    author: string;
+}
+
 interface VersionInfo {
     version: string;
     git: {
@@ -17,6 +24,7 @@ interface VersionInfo {
             author: string;
         };
     };
+    changelog: CommitInfo[];
 }
 
 interface SettingsModalProps {
@@ -207,41 +215,66 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
                         >
                             <Info size={16} />
-                            {showInfo ? 'Nascondi dettagli' : 'Mostra versione'}
+                            {showInfo ? 'Nascondi dettagli' : `Versione ${versionInfo?.version || '...'}`}
                         </button>
 
                         {showInfo && versionInfo && (
-                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-2 text-xs">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-500">Versione</span>
-                                    <span className="font-mono font-medium text-gray-900 dark:text-white">
-                                        v{versionInfo.version}
-                                    </span>
+                            <div className="mt-3 space-y-3">
+                                {/* Version & Git Info */}
+                                <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl space-y-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500">Versione</span>
+                                        <span className="font-mono font-medium text-blue-600 dark:text-blue-400">
+                                            v{versionInfo.version}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 flex items-center gap-1">
+                                            <GitBranch size={12} /> Branch
+                                        </span>
+                                        <span className="font-mono text-gray-700 dark:text-gray-300">
+                                            {versionInfo.git.branch}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 flex items-center gap-1">
+                                            <GitCommit size={12} /> Commit
+                                        </span>
+                                        <span className="font-mono text-gray-700 dark:text-gray-300">
+                                            {versionInfo.git.commit.hash}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-500 flex items-center gap-1">
-                                        <GitBranch size={12} /> Branch
-                                    </span>
-                                    <span className="font-mono text-gray-700 dark:text-gray-300">
-                                        {versionInfo.git.branch}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-500 flex items-center gap-1">
-                                        <GitCommit size={12} /> Commit
-                                    </span>
-                                    <span className="font-mono text-gray-700 dark:text-gray-300">
-                                        {versionInfo.git.commit.hash}
-                                    </span>
-                                </div>
-                                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    <p className="text-gray-600 dark:text-gray-400 truncate" title={versionInfo.git.commit.message}>
-                                        {versionInfo.git.commit.message}
-                                    </p>
-                                    <p className="text-gray-400 dark:text-gray-500 mt-1">
-                                        {versionInfo.git.commit.author} · {formatDate(versionInfo.git.commit.date)}
-                                    </p>
-                                </div>
+
+                                {/* Changelog */}
+                                {versionInfo.changelog && versionInfo.changelog.length > 0 && (
+                                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs">
+                                        <p className="text-gray-500 font-medium mb-2 flex items-center gap-1">
+                                            <GitCommit size={12} /> Changelog
+                                        </p>
+                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            {versionInfo.changelog.map((commit, idx) => (
+                                                <div
+                                                    key={commit.hash}
+                                                    className={cn(
+                                                        "py-1.5",
+                                                        idx !== versionInfo.changelog.length - 1 && "border-b border-gray-200 dark:border-gray-700"
+                                                    )}
+                                                >
+                                                    <div className="flex items-start gap-2">
+                                                        <span className="font-mono text-blue-500 shrink-0">{commit.hash}</span>
+                                                        <p className="text-gray-700 dark:text-gray-300 line-clamp-2">
+                                                            {commit.message}
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-gray-400 dark:text-gray-500 mt-0.5 text-[10px]">
+                                                        {commit.author} · {formatDate(commit.date)}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 

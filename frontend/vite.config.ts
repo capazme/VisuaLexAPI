@@ -14,6 +14,8 @@ export default defineConfig({
       '/fetch_tree': 'http://localhost:5000',
       '/history': 'http://localhost:5000',
       '/export_pdf': 'http://localhost:5000',
+      '/version': 'http://localhost:5000',
+      '/health': 'http://localhost:5000',
     }
   }
 })
