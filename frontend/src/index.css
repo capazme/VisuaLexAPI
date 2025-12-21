@@ -143,6 +143,27 @@
   @apply font-sans font-semibold text-slate-900 dark:text-slate-100 mt-6 mb-3;
 }
 
+/* Citation Hover Preview */
+.citation-hover {
+  cursor: default;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  border-radius: 2px;
+  padding: 0 1px;
+  margin: 0 -1px;
+}
+
+.citation-hover:hover {
+  text-decoration: underline dotted;
+  text-decoration-color: hsl(var(--primary));
+  text-underline-offset: 3px;
+  background-color: hsl(var(--primary) / 0.08);
+}
+
+.dark .citation-hover:hover {
+  background-color: hsl(var(--primary) / 0.15);
+}
+
 /* Utilities */
 .glass {
   @apply bg-white/70 dark:bg-slate-950/70 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-sm;
