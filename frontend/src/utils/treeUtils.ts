@@ -10,7 +10,7 @@
  */
 export function normalizeArticleId(id: string): string {
   if (!id) return id;
-  return id.trim().toLowerCase().replace(/\s+/g, '-');
+  return id.trim().toLowerCase().replace(/\s+/g, '-').replace(/\.$/, '');
 }
 
 export function extractArticleIdsFromTree(treeData: any[]): string[] {
@@ -49,7 +49,7 @@ export function extractArticleIdsFromTree(treeData: any[]): string[] {
           const normalized = normalizeArticleId(articleNumber);
           if (!seen.has(normalized)) {
             seen.add(normalized);
-            articleIds.push(articleNumber);
+            articleIds.push(articleNumber); // Keep original format without annex prefix
           }
         }
 
@@ -112,6 +112,12 @@ function getArticleNumber(node: any): string | null {
   // Direct numero field
   if (node.numero) {
     return node.numero;
+  }
+
+  // Handle { "1": "url" } format from legacy Eur-Lex/Normattiva tree
+  const keys = Object.keys(node);
+  if (keys.length === 1 && extractArticleFromString(keys[0])) {
+    return keys[0];
   }
 
   // Check label for "Art. X" pattern

@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen } from 'lucide-react';
+import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen, Loader2 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type NormaBlock } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { ArticleNavigation } from './ArticleNavigation';
 import { TreeViewPanel } from '../search/TreeViewPanel';
+import { AnnexSuggestion } from '../search/AnnexSuggestion';
 import { StudyMode } from './StudyMode';
 import { cn } from '../../../lib/utils';
-import { extractArticleIdsFromTree, normalizeArticleId } from '../../../utils/treeUtils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
+import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 
 interface NormaBlockComponentProps {
   tabId: string;
@@ -31,48 +32,52 @@ export function NormaBlockComponent({
   onRemoveArticle,
   onRemoveNorma
 }: NormaBlockComponentProps) {
-  const [activeArticleId, setActiveArticleId] = useState<string | null>(
-    normaBlock.articles[0]?.norma_data?.numero_articolo || null
-  );
-  const [treeVisible, setTreeVisible] = useState(false);
-  const [treeData, setTreeData] = useState<any[] | null>(null);
-  const [treeLoading, setTreeLoading] = useState(false);
+  const { toggleNormaCollapse, settings } = useAppStore();
   const [studyModeOpen, setStudyModeOpen] = useState(false);
 
-  const { toggleNormaCollapse, addNormaToTab, settings } = useAppStore();
-  const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
+  // Helper to get a unique identifier for an article (includes allegato to avoid collisions)
+  const getUniqueId = (article: ArticleData) => {
+    const allegato = article.norma_data.allegato;
+    const numero = article.norma_data.numero_articolo;
+    return allegato ? `all${allegato}:${numero}` : numero;
+  };
+
+  const [activeArticleId, setActiveArticleId] = useState<string | null>(
+    normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null
+  );
+
+  // Derive active article from activeArticleId (needed before hook for correct annex detection)
+  const activeArticle = normaBlock.articles.find(
+    a => getUniqueId(a) === activeArticleId
+  );
+
+  // Use the shared annex navigation hook - pass activeArticle for correct annex detection
+  const {
+    treeData,
+    treeMetadata,
+    treeLoading,
+    treeVisible,
+    setTreeVisible,
+    currentAnnex,
+    allArticleIds,
+    loadingArticle,
+    fetchTree,
+    handleAnnexSelect,
+    handleLoadArticle,
+    isArticleLoaded,
+    loadedArticleIds
+  } = useAnnexNavigation({
+    norma: normaBlock.norma,
+    articles: normaBlock.articles,
+    tabId, // Enable direct article loading into this tab
+    activeArticle
+  });
 
   // Trigger NormaBlock tour on first render
   const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
   useEffect(() => {
     tryStartTour('normaBlock');
   }, [tryStartTour]);
-
-  const fetchTree = async () => {
-    if (!normaBlock.norma.urn || treeData) return; // Don't refetch if already loaded
-    try {
-      setTreeLoading(true);
-      const res = await fetch('/fetch_tree', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urn: normaBlock.norma.urn, link: false, details: true })
-      });
-      if (!res.ok) throw new Error('Impossibile caricare la struttura');
-      const payload = await res.json();
-      setTreeData(payload.articles || payload);
-    } catch (e) {
-      console.error('Error fetching tree:', e);
-    } finally {
-      setTreeLoading(false);
-    }
-  };
-
-  // Auto-fetch tree structure when norma has URN
-  useEffect(() => {
-    if (normaBlock.norma.urn && !treeData && !treeLoading) {
-      fetchTree();
-    }
-  }, [normaBlock.norma.urn]);
 
   // Make this norma draggable
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
@@ -101,70 +106,23 @@ export function NormaBlockComponent({
     setDropRef(node);
   };
 
-  const activeArticle = normaBlock.articles.find(
-    a => a.norma_data.numero_articolo === activeArticleId
-  );
+  // Wraps handleLoadArticle to also navigate to the active article unique ID
+  // targetAnnex: if provided, use it (null = dispositivo); if undefined, use currentAnnex
+  const handleLoadArticleWithNavigation = (articleNumber: string, targetAnnex?: string | null) => {
+    // Determine which annex context to use
+    const annexContext = targetAnnex !== undefined ? targetAnnex : currentAnnex;
+    // Construct unique ID based on annex context
+    const constructUniqueId = (num: string) => annexContext ? `all${annexContext}:${num}` : num;
 
-  // Loaded article IDs
-  const loadedArticleIds = normaBlock.articles.map(a => a.norma_data.numero_articolo);
-
-  // Normalized set for faster lookups (handles "3 bis" vs "3-bis" differences)
-  const loadedArticleIdsNormalized = new Set(loadedArticleIds.map(normalizeArticleId));
-
-  // Helper to check if an article is loaded (handles format differences)
-  const isArticleLoaded = (articleId: string) => loadedArticleIdsNormalized.has(normalizeArticleId(articleId));
-
-  // All article IDs from structure (if available)
-  const allArticleIds = treeData ? extractArticleIdsFromTree(treeData) : undefined;
-
-  // Function to load a new article directly into this tab
-  const handleLoadArticle = async (articleNumber: string) => {
-    // Don't load if already loading or already loaded
-    if (loadingArticle) return;
-    if (isArticleLoaded(articleNumber)) {
-      // Find the actual ID in loadedArticleIds (might have different format)
-      const actualId = loadedArticleIds.find(id => normalizeArticleId(id) === normalizeArticleId(articleNumber));
-      setActiveArticleId(actualId || articleNumber);
+    const uniqueIdToCheck = constructUniqueId(articleNumber);
+    if (isArticleLoaded(uniqueIdToCheck)) {
+      // Already loaded - just navigate to it
+      setActiveArticleId(uniqueIdToCheck);
       return;
     }
-
-    setLoadingArticle(articleNumber);
-
-    try {
-      const response = await fetch('/fetch_all_data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          act_type: normaBlock.norma.tipo_atto,
-          act_number: normaBlock.norma.numero_atto || '',
-          date: normaBlock.norma.data || '',
-          article: articleNumber,
-          version: 'vigente',
-          version_date: '',
-          show_brocardi_info: true
-        })
-      });
-
-      if (!response.ok) throw new Error('Errore nel caricamento');
-
-      const data = await response.json();
-      const articles = Array.isArray(data) ? data : [data];
-
-      // Filter out any errors
-      const validArticles = articles.filter((a: any) => !a.error && a.norma_data);
-
-      if (validArticles.length > 0) {
-        // Add to current tab's norma block
-        addNormaToTab(tabId, normaBlock.norma, validArticles);
-        // Set active to the newly loaded article using the actual ID from response
-        const loadedArticleId = validArticles[0].norma_data?.numero_articolo;
-        setActiveArticleId(loadedArticleId || articleNumber);
-      }
-    } catch (e) {
-      console.error('Error loading article:', e);
-    } finally {
-      setLoadingArticle(null);
-    }
+    // Load the article via the hook, passing the target annex
+    handleLoadArticle(articleNumber, targetAnnex);
+    // Note: The hook loading is async. We rely on the user clicking again or effect logic if auto-switch is needed.
   };
 
   return (
@@ -277,7 +235,7 @@ export function NormaBlockComponent({
         )}
       </div>
 
-      {/* Tree View Side Panel */}
+      {/* Tree View Side Panel - Now includes annex selection */}
       <TreeViewPanel
         isOpen={treeVisible}
         onClose={() => setTreeVisible(false)}
@@ -285,79 +243,118 @@ export function NormaBlockComponent({
         urn={normaBlock.norma.urn || ''}
         title="Struttura Atto"
         loadedArticles={loadedArticleIds}
-        onArticleSelect={(articleNumber) => {
-          handleLoadArticle(articleNumber);
+        onArticleSelect={(articleNumber, targetAnnex) => {
+          handleLoadArticleWithNavigation(articleNumber, targetAnnex);
           setTreeVisible(false);
         }}
+        annexes={treeMetadata?.annexes}
+        currentAnnex={currentAnnex}
       />
 
       {/* Articles */}
       {!normaBlock.isCollapsed && (
         <div className="bg-slate-50/50 dark:bg-slate-900/50">
+          {/* Annex suggestion - show when article exists in other annexes */}
+          {treeMetadata?.annexes && treeMetadata.annexes.length > 1 && activeArticle && (
+            <div className="px-3 pt-3">
+              <AnnexSuggestion
+                articleNumber={activeArticle.norma_data.numero_articolo}
+                currentAnnex={activeArticle.norma_data.allegato || null}
+                annexes={treeMetadata.annexes}
+                onSwitchAnnex={async (annexNumber): Promise<string | null> => {
+                  const articleId = await handleAnnexSelect(annexNumber);
+                  if (articleId) {
+                    const uniqueId = annexNumber ? `all${annexNumber}:${articleId}` : articleId;
+                    setActiveArticleId(uniqueId);
+                  }
+                  return articleId;
+                }}
+              />
+            </div>
+          )}
+
           {/* Navigation bar - Desktop only: show when structure available OR multiple articles loaded */}
           {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
             <div className="hidden md:flex px-3 pt-2 items-center justify-end">
               <ArticleNavigation
                 allArticleIds={allArticleIds}
-                loadedArticleIds={loadedArticleIds}
-                activeArticleId={activeArticleId}
-                onNavigate={setActiveArticleId}
-                onLoadArticle={handleLoadArticle}
+                loadedArticleIds={loadedArticleIds
+                  .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
+                  .map(id => id.includes(':') ? id.split(':').pop()! : id)
+                }
+                activeArticleId={activeArticle?.norma_data.numero_articolo || null}
+                loadingArticleId={loadingArticle}
+                onNavigate={(number) => {
+                  const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
+                  setActiveArticleId(uniqueId);
+                }}
+                onLoadArticle={handleLoadArticleWithNavigation}
               />
             </div>
           )}
 
-          {/* Mobile: Scrollable list of ALL articles */}
           <div className="md:hidden bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
-            {normaBlock.articles.map((article) => (
-              <div key={article.norma_data.numero_articolo} className="p-4">
-                {/* Article header with close button */}
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-slate-900 dark:text-white">
-                    Art. {article.norma_data.numero_articolo}
-                  </h4>
-                  <button
-                    onClick={() => onRemoveArticle(article.norma_data.numero_articolo)}
-                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-                    title="Chiudi articolo"
-                  >
-                    <X size={16} />
-                  </button>
+            {normaBlock.articles.map((article) => {
+              const uniqueId = getUniqueId(article);
+              return (
+                <div key={uniqueId} className="p-4">
+                  {/* Article header with close button */}
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-slate-900 dark:text-white">
+                      Art. {article.norma_data.numero_articolo}
+                      {article.norma_data.allegato && (
+                        <span className="ml-2 text-xs font-normal text-slate-500">
+                          (Allegato {article.norma_data.allegato})
+                        </span>
+                      )}
+                    </h4>
+                    <button
+                      onClick={() => onRemoveArticle(uniqueId)}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                      title="Chiudi articolo"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <ArticleTabContent
+                    data={article}
+                    onCrossReferenceNavigate={onCrossReference}
+                    onOpenStudyMode={() => setStudyModeOpen(true)}
+                  />
                 </div>
-                <ArticleTabContent
-                  data={article}
-                  onCrossReferenceNavigate={onCrossReference}
-                  onOpenStudyMode={() => setStudyModeOpen(true)}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Desktop Article tabs */}
           <div className="norma-article-tabs hidden md:flex px-3 pt-3 border-b border-slate-200 dark:border-slate-700 gap-2 overflow-x-auto custom-scrollbar">
             {normaBlock.articles.map((article) => {
-              const id = article.norma_data.numero_articolo;
-              const isActive = id === activeArticleId;
+              const uniqueId = getUniqueId(article);
+              const isActive = uniqueId === activeArticleId;
 
               return (
                 <div
-                  key={id}
+                  key={uniqueId}
                   className={cn(
                     "group flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap border-t border-x",
                     isActive
                       ? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 border-b-0 text-primary-600 dark:text-primary-400 relative -bottom-px z-10"
                       : "bg-slate-100 dark:bg-slate-800/50 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50"
                   )}
-                  onClick={() => setActiveArticleId(id)}
+                  onClick={() => setActiveArticleId(uniqueId)}
                 >
-                  <span>Art. {id}</span>
+                  <div className="flex flex-col items-start leading-tight">
+                    <span>Art. {article.norma_data.numero_articolo}</span>
+                    {article.norma_data.allegato && (
+                      <span className="text-[9px] opacity-60">All. {article.norma_data.allegato}</span>
+                    )}
+                  </div>
                   {isActive && (
                     <div className="flex items-center gap-0.5 ml-1">
                       <button
                         className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onExtractArticle(id);
+                          onExtractArticle(uniqueId);
                         }}
                         title="Estrai come articolo loose"
                       >
@@ -367,7 +364,7 @@ export function NormaBlockComponent({
                         className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRemoveArticle(id);
+                          onRemoveArticle(uniqueId);
                         }}
                         title="Chiudi articolo"
                       >
@@ -380,16 +377,42 @@ export function NormaBlockComponent({
             })}
           </div>
 
-          {/* Desktop: Active article content with tab navigation */}
-          <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden relative">
+            {/* Loading Overlay */}
+            <AnimatePresence>
+              {loadingArticle && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute inset-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center"
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="flex flex-col items-center gap-3"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                      <Loader2 size={20} className="text-primary-600 dark:text-primary-400 animate-spin" />
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Caricamento...
+                    </p>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
                 <motion.div
-                  key={activeArticle.norma_data.numero_articolo}
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.15 }}
+                  key={activeArticleId || 'empty'}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.12, ease: 'easeOut' }}
                   className="p-5"
                 >
                   <ArticleTabContent
@@ -400,7 +423,7 @@ export function NormaBlockComponent({
                 </motion.div>
               )}
             </AnimatePresence>
-            {!activeArticle && (
+            {!activeArticle && !loadingArticle && (
               <div className="flex items-center justify-center h-40 text-slate-400">
                 <p className="text-sm">Nessun articolo selezionato</p>
               </div>
@@ -419,7 +442,7 @@ export function NormaBlockComponent({
         onCrossReferenceNavigate={onCrossReference}
         normaLabel={`${normaBlock.norma.tipo_atto}${normaBlock.norma.numero_atto ? ` n. ${normaBlock.norma.numero_atto}` : ''}`}
         allArticleIds={allArticleIds}
-        onLoadArticle={handleLoadArticle}
+        onLoadArticle={handleLoadArticleWithNavigation}
       />
     </div>
   );

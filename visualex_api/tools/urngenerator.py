@@ -72,9 +72,9 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     str -- The generated URN
     """
     logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
-    codici_urn = NORMATTIVA_URN_CODICI  
+    codici_urn = NORMATTIVA_URN_CODICI
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
-    normalized_act_type = normalize_act_type(act_type)  
+    normalized_act_type = normalize_act_type(act_type)
     
     # Check if 'article' is a valid string before attempting to split it
     extension = None
@@ -83,19 +83,38 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         article = parts[0]
         extension = parts[1]
     
-    # Handle EURLEX cases
+    # Handle EURLEX cases (check before replacing spaces with dots)
     if normalized_act_type.lower() in EURLEX:
         eurlex_scraper = EurlexScraper()
         return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number)
 
-    # Handle other cases with codici_urn
+    # Handle special codes (codice civile, codice penale, etc.)
+    # IMPORTANT: Check BEFORE replacing spaces with dots, as codici_urn uses spaces
     if normalized_act_type in codici_urn:
         urn = codici_urn[normalized_act_type]
         logging.info(f"URN found in codici_urn: {urn}")
+
+        # IMPORTANT: The URN from codici_urn may already contain an allegato suffix (e.g., ":1")
+        # Pattern: "regio.decreto:1930-10-19;1398:1" where the final ":1" is the allegato
+        # We need to strip this default allegato so we can control it via the `annex` parameter
+        # This allows requesting dispositivo (annex=None) even for codici that default to an allegato
+        allegato_match = re.match(r'^(.+;\d+):(\d+)$', urn)
+        if allegato_match:
+            base_urn = allegato_match.group(1)  # URN without allegato
+            default_allegato = allegato_match.group(2)  # The default allegato from the map
+            logging.info(f"Stripped default allegato {default_allegato} from codice URN, base: {base_urn}")
+
+            # If annex is explicitly None, use the base URN (dispositivo)
+            # If annex is provided, it will be added later in the code
+            # If annex is None but we want the default, the caller should pass the allegato explicitly
+            urn = base_urn
     else:
+        # For regular act types, replace spaces with dots for NIR URN format
+        # (e.g., "regio decreto" -> "regio.decreto")
+        normalized_act_type_urn = normalized_act_type.replace(' ', '.')
         try:
-            formatted_date = complete_date_or_parse(date, act_type, act_number)  # Assuming this function is defined
-            urn = f"{normalized_act_type}:{formatted_date};{act_number}"
+            formatted_date = complete_date_or_parse(date, act_type, act_number)
+            urn = f"{normalized_act_type_urn}:{formatted_date};{act_number}"
             logging.info(f"Generated base URN: {urn}")
         except Exception as e:
             logging.error(f"Error generating URN: {e}", exc_info=True)
@@ -126,6 +145,9 @@ def complete_date_or_parse(date, act_type, act_number):
     Returns:
     str -- Formatted date
     """
+    # Handle None or empty date for special codes (e.g., codice civile)
+    if date is None or date == '':
+        return None
     if re.match(r"^\d{4}$", date) and act_number:
         act_type_for_search = normalize_act_type(act_type, search=True)
         full_date = complete_date(act_type=act_type_for_search, date=date, act_number=act_number)

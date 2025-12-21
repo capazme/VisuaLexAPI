@@ -332,18 +332,58 @@ class NormaController:
         if isinstance(articles, dict) and 'error' in articles:
             raise ValidationError(articles['error'])
 
+        # Validate and sanitize annex parameter
+        annex_value = data.get('annex')
+        if annex_value is not None:
+            # Convert empty string or "null" string to None
+            if isinstance(annex_value, str):
+                annex_value = annex_value.strip()
+                if annex_value == '' or annex_value.lower() == 'null' or annex_value.lower() == 'undefined':
+                    annex_value = None
+            # Convert to string if it's a number
+            elif isinstance(annex_value, (int, float)):
+                annex_value = str(int(annex_value))
+
+        # If no annex specified, check if this is a codice with a default annex
+        # e.g., "codice civile" maps to "regio.decreto:1942-03-16;262:2" where :2 is the annex
+        if annex_value is None:
+            from visualex_api.tools.map import NORMATTIVA_URN_CODICI
+            from visualex_api.tools.text_op import normalize_act_type
+            import re
+            normalized_type = normalize_act_type(act_type)
+            logger.info("Checking for default annex", extra={
+                "act_type": act_type,
+                "normalized_type": normalized_type,
+                "in_codici_map": normalized_type in NORMATTIVA_URN_CODICI
+            })
+            if normalized_type in NORMATTIVA_URN_CODICI:
+                codice_urn = NORMATTIVA_URN_CODICI[normalized_type]
+                logger.info("Found codice URN", extra={"codice_urn": codice_urn})
+                # Extract annex from URN pattern like "regio.decreto:1942-03-16;262:2"
+                # The annex is after the last colon if there's a number;number:annex pattern
+                annex_match = re.search(r';\d+:(\d+)$', codice_urn)
+                logger.info("Annex regex match", extra={"match": str(annex_match)})
+                if annex_match:
+                    annex_value = annex_match.group(1)
+                    logger.info("Using default annex from codice URN", extra={
+                        "codice": normalized_type,
+                        "default_annex": annex_value
+                    })
+
+        logger.debug("Validated annex value", extra={"annex": annex_value})
+
         # Create NormaVisitata instances for each article
         norma_visitata_list = []
         for article in articles:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             logger.debug("Processing article", extra={"article": cleaned_article})
-            
+
             norma_visitata_list.append(NormaVisitata(
                 norma=norma,
                 numero_articolo=cleaned_article,
                 versione=data.get('version'),
                 data_versione=data.get('version_date'),
-                allegato=data.get('annex')
+                allegato=annex_value
             ))
             logger.debug("NormaVisitata instance created", extra={
                 "norma_visitata": norma_visitata_list[-1].to_dict()
@@ -674,9 +714,9 @@ class NormaController:
     async def fetch_tree(self):
         """
         Fetch the tree structure of a norm.
-        
+
         Returns:
-            JSON response with tree structure
+            JSON response with tree structure and optional annex metadata
         """
         try:
             data = await request.get_json()
@@ -689,25 +729,38 @@ class NormaController:
 
             link = data.get('link', False)
             details = data.get('details', False)
-            
+            return_metadata = data.get('return_metadata', True)  # Default to True for annex detection
+
             if not isinstance(link, bool):
                 logger.error("'link' must be a boolean")
                 raise ValidationError("'link' must be a boolean")
-            
+
             if not isinstance(details, bool):
                 logger.error("'details' must be a boolean")
                 raise ValidationError("'details' must be a boolean")
 
-            logger.debug("Fetching tree", extra={"link": link, "details": details})
-            articles, count = await get_tree(urn, link=link, details=details)
-            
+            if not isinstance(return_metadata, bool):
+                logger.error("'return_metadata' must be a boolean")
+                raise ValidationError("'return_metadata' must be a boolean")
+
+            logger.debug("Fetching tree", extra={"link": link, "details": details, "return_metadata": return_metadata})
+
+            if return_metadata:
+                articles, count, metadata = await get_tree(urn, link=link, details=details, return_metadata=True)
+            else:
+                articles, count = await get_tree(urn, link=link, details=details, return_metadata=False)
+                metadata = {}
+
             if isinstance(articles, str):
                 logger.error("Error fetching tree", extra={"error": articles})
                 raise ResourceNotFoundError(articles)
 
             response = {'articles': articles, 'count': count}
-            logger.info("Tree fetched successfully", extra={"count": count})
-            
+            if return_metadata and metadata:
+                response['metadata'] = metadata
+
+            logger.info("Tree fetched successfully", extra={"count": count, "has_metadata": bool(metadata)})
+
             return jsonify(response)
         except ValidationError as e:
             return jsonify({'error': str(e)}), 400

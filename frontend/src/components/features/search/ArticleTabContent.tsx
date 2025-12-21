@@ -64,13 +64,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         const parts = [norma_data.tipo_atto];
         if (norma_data.numero_atto?.trim()) parts.push(norma_data.numero_atto);
         if (norma_data.data?.trim()) parts.push(norma_data.data);
+        if (norma_data.allegato?.trim()) parts.push(`all${norma_data.allegato}`);
         if (norma_data.numero_articolo?.trim()) parts.push(norma_data.numero_articolo);
         return parts.map(part => sanitize(part || '')).join('--');
     };
 
     const itemKey = generateKey();
-    const itemAnnotations = annotations.filter(a => a.normaKey === itemKey && a.articleId === norma_data.numero_articolo);
-    const articleHighlights = highlights.filter(h => h.normaKey === itemKey && h.articleId === norma_data.numero_articolo);
+    const uniqueArticleId = norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo;
+
+    const itemAnnotations = annotations.filter(a => a.normaKey === itemKey && a.articleId === uniqueArticleId);
+    const articleHighlights = highlights.filter(h => h.normaKey === itemKey && h.articleId === uniqueArticleId);
 
     useEffect(() => {
         if (!toastMessage) return;
@@ -120,12 +123,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleAddToQuickNorms = () => {
-        const label = `Art. ${norma_data.numero_articolo} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
         addQuickNorm(label, {
             act_type: norma_data.tipo_atto,
             act_number: norma_data.numero_atto || '',
             date: norma_data.data || '',
             article: norma_data.numero_articolo,
+            annex: norma_data.allegato,
             version: 'vigente',
             show_brocardi_info: true,
         });
@@ -142,7 +146,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             }
 
             if (options.includeCitation) {
-                const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`;
+                const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
                 textToCopy += citation;
             }
 
@@ -166,7 +170,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast('Inserisci una nota', 'error');
             return;
         }
-        addAnnotation(itemKey, norma_data.numero_articolo, noteText);
+        addAnnotation(itemKey, uniqueArticleId, noteText);
         setNoteText('');
         showToast('Nota aggiunta', 'success');
     };
@@ -178,6 +182,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 act_number: norma_data.numero_atto || '',
                 date: norma_data.data || '',
                 article: norma_data.numero_articolo,
+                annex: norma_data.allegato,
                 version: (norma_data.versione as 'vigente' | 'originale') || 'vigente',
                 version_date: norma_data.data_versione || '',
                 show_brocardi_info: true
@@ -209,7 +214,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     setShowHighlightPicker(false);
                     return;
                 }
-                addHighlight(itemKey, norma_data.numero_articolo, saved.text, '', color || highlightColor);
+                addHighlight(itemKey, uniqueArticleId, saved.text, '', color || highlightColor);
                 showToast('Testo evidenziato', 'success');
                 highlightSelectionRef.current = null;
             } else {
@@ -231,7 +236,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
 
         const finalColor = color || highlightColor;
-        addHighlight(itemKey, norma_data.numero_articolo, selectedText, '', finalColor);
+        addHighlight(itemKey, uniqueArticleId, selectedText, '', finalColor);
         showToast(`Testo evidenziato in ${finalColor}`, 'success');
         setShowHighlightPicker(false);
         highlightSelectionRef.current = null;
@@ -249,7 +254,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast('Questo testo è già evidenziato', 'info');
             return;
         }
-        addHighlight(itemKey, norma_data.numero_articolo, text, '', color);
+        addHighlight(itemKey, uniqueArticleId, text, '', color);
         showToast(`Testo evidenziato in ${color}`, 'success');
     };
 
@@ -263,7 +268,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Handler for SelectionPopup copy action
     const handlePopupCopy = async (text: string) => {
         try {
-            const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}`;
+            const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
             await navigator.clipboard.writeText(text + citation);
             showToast('Testo copiato con citazione', 'success');
         } catch (err) {
@@ -323,7 +328,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         <div className="animate-in fade-in duration-300 relative">
             {/* Sticky Reading Toolbar */}
             <div className="glass-toolbar sticky top-0 z-10 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50">
-                {/* Version Info */}
+                {/* Version Info & Annex Source Badge */}
                 <div className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                     {versionInfo?.isHistorical ? (
                         <span className={cn("px-2 py-1 rounded-md",
@@ -339,6 +344,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                         <>
                             <span className="text-slate-300 dark:text-slate-700">|</span>
                             <span>Aggiornato al: {norma_data.data_versione}</span>
+                        </>
+                    )}
+                    {/* Annex Source Badge */}
+                    {norma_data.allegato && (
+                        <>
+                            <span className="text-slate-300 dark:text-slate-700">|</span>
+                            <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                Allegato {norma_data.allegato}
+                            </span>
                         </>
                     )}
                 </div>

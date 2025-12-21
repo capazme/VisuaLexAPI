@@ -193,6 +193,7 @@ const generateKey = (n: NormaVisitata) => {
     const parts = [n.tipo_atto];
     if (n.numero_atto?.trim()) parts.push(n.numero_atto);
     if (n.data?.trim()) parts.push(n.data);
+    if (n.allegato?.trim()) parts.push(`all${n.allegato}`); // Include attachment info
     if (n.numero_articolo?.trim()) parts.push(n.numero_articolo);
     return parts.map(part => sanitize(part || '')).join('--');
 };
@@ -356,6 +357,12 @@ const appStore = createStore<AppState>()(
 
                     if (norma && articles) {
                         const sortedArticles = [...articles].sort((a, b) => {
+                            // Sort by attachment first, then number
+                            if (a.norma_data.allegato !== b.norma_data.allegato) {
+                                if (!a.norma_data.allegato) return -1;
+                                if (!b.norma_data.allegato) return 1;
+                                return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
+                            }
                             const numA = parseInt(a.norma_data.numero_articolo) || 0;
                             const numB = parseInt(b.norma_data.numero_articolo) || 0;
                             return numA - numB;
@@ -380,6 +387,13 @@ const appStore = createStore<AppState>()(
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
 
+                // Helper to get a unique key for an article within a norma block
+                const getArticleKey = (a: ArticleData) => {
+                    return a.norma_data.allegato
+                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
+                        : a.norma_data.numero_articolo;
+                };
+
                 const existingNorma = tab.content.find(
                     c => c.type === 'norma' &&
                         c.norma.tipo_atto === norma.tipo_atto &&
@@ -388,17 +402,23 @@ const appStore = createStore<AppState>()(
                 ) as NormaBlock | undefined;
 
                 if (existingNorma) {
-                    const existingArticleIds = new Set(
-                        existingNorma.articles.map(a => a.norma_data.numero_articolo)
+                    const existingArticleKeys = new Set(
+                        existingNorma.articles.map(getArticleKey)
                     );
 
                     const newArticles = articles.filter(
-                        a => !existingArticleIds.has(a.norma_data.numero_articolo)
+                        a => !existingArticleKeys.has(getArticleKey(a))
                     );
 
                     if (newArticles.length > 0) {
                         existingNorma.articles = [...existingNorma.articles, ...newArticles];
                         existingNorma.articles.sort((a, b) => {
+                            // Sort by attachment first, then number
+                            if (a.norma_data.allegato !== b.norma_data.allegato) {
+                                if (!a.norma_data.allegato) return -1;
+                                if (!b.norma_data.allegato) return 1;
+                                return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
+                            }
                             const numA = parseInt(a.norma_data.numero_articolo) || 0;
                             const numB = parseInt(b.norma_data.numero_articolo) || 0;
                             return numA - numB;
@@ -406,6 +426,11 @@ const appStore = createStore<AppState>()(
                     }
                 } else {
                     const sortedArticles = [...articles].sort((a, b) => {
+                        if (a.norma_data.allegato !== b.norma_data.allegato) {
+                            if (!a.norma_data.allegato) return -1;
+                            if (!b.norma_data.allegato) return 1;
+                            return a.norma_data.allegato.localeCompare(b.norma_data.allegato, undefined, { numeric: true });
+                        }
                         const numA = parseInt(a.norma_data.numero_articolo) || 0;
                         const numB = parseInt(b.norma_data.numero_articolo) || 0;
                         return numA - numB;
@@ -515,10 +540,17 @@ const appStore = createStore<AppState>()(
                 const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
                 if (!norma) return;
 
-                const article = norma.articles.find(a => a.norma_data.numero_articolo === articleId);
+                // Helper to get a unique key for comparison
+                const getArticleKey = (a: ArticleData) => {
+                    return a.norma_data.allegato
+                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
+                        : a.norma_data.numero_articolo;
+                };
+
+                const article = norma.articles.find(a => getArticleKey(a) === articleId);
                 if (!article) return;
 
-                norma.articles = norma.articles.filter(a => a.norma_data.numero_articolo !== articleId);
+                norma.articles = norma.articles.filter(a => getArticleKey(a) !== articleId);
 
                 if (norma.articles.length === 0) {
                     tab.content = tab.content.filter(c => c.id !== normaId);
@@ -554,7 +586,13 @@ const appStore = createStore<AppState>()(
                 const norma = tab.content.find(c => c.type === 'norma' && c.id === normaId) as NormaBlock | undefined;
                 if (!norma) return;
 
-                norma.articles = norma.articles.filter(a => a.norma_data.numero_articolo !== articleId);
+                const getArticleKey = (a: ArticleData) => {
+                    return a.norma_data.allegato
+                        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
+                        : a.norma_data.numero_articolo;
+                };
+
+                norma.articles = norma.articles.filter(a => getArticleKey(a) !== articleId);
 
                 if (norma.articles.length === 0) {
                     tab.content = tab.content.filter(c => c.id !== normaId);
@@ -1096,9 +1134,9 @@ const appStore = createStore<AppState>()(
                 // Check for duplicates based on search params
                 const isDuplicate = state.quickNorms.some(
                     qn => qn.searchParams.act_type === searchParams.act_type &&
-                          qn.searchParams.article === searchParams.article &&
-                          qn.searchParams.act_number === searchParams.act_number &&
-                          qn.searchParams.date === searchParams.date
+                        qn.searchParams.article === searchParams.article &&
+                        qn.searchParams.act_number === searchParams.act_number &&
+                        qn.searchParams.date === searchParams.date
                 );
 
                 if (!isDuplicate) {

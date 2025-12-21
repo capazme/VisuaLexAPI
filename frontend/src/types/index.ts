@@ -123,7 +123,37 @@ export interface SearchParams {
     version: 'vigente' | 'originale';
     version_date?: string;
     show_brocardi_info: boolean;
+    annex?: string; // Optional annex number/letter (e.g., "1", "2", "A", "B")
     tabLabel?: string; // Optional custom label for the workspace tab
+}
+
+// Annex metadata returned by tree endpoint
+export interface AnnexMetadata {
+    number: string | null;  // null for main text, "1"/"2"/"A" for annexes
+    label: string;          // Display label (e.g., "Allegato A", "Legge di Emanazione")
+    article_count: number;  // Number of articles in this annex
+    article_numbers: string[];  // List of article numbers (limited to first 50)
+}
+
+export interface TreeMetadata {
+    annexes?: AnnexMetadata[];  // List of annexes detected in the document
+}
+
+// Tree node for nested document structure
+export interface TreeNode {
+    numero?: string;
+    label?: string;
+    title?: string;
+    name?: string;
+    children?: TreeNode[];
+    items?: TreeNode[];
+    articoli?: TreeNode[];
+}
+
+export interface ArticleTreeResponse {
+    articles: (string | TreeNode | Record<string, string>)[];  // Mixed format
+    count: number;
+    metadata?: TreeMetadata;  // Optional annex metadata
 }
 
 // --- New Utility Features Types ---

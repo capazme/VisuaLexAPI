@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, RefreshCw, Eraser, Plus, Minus, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, RefreshCw, Eraser, Plus, Minus, Loader2, ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { SearchParams } from '../../../types';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
@@ -75,8 +75,12 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     article: '1',
     version: 'vigente',
     version_date: '',
-    show_brocardi_info: false
+    show_brocardi_info: false,
+    annex: ''
   });
+
+  // State for Advanced Options collapsible
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // State for real article navigation
   const [articleList, setArticleList] = useState<string[]>([]);
@@ -233,10 +237,12 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       article: '1',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: false
+      show_brocardi_info: false,
+      annex: ''
     });
     setArticleList([]);
     setLastFetchedNorma('');
+    setShowAdvanced(false);
   };
 
   // Group options
@@ -454,6 +460,62 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 transition={{ type: "spring", stiffness: 500, damping: 25 }}
               />
             </div>
+          </div>
+
+          {/* Advanced Options - Collapsible */}
+          <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between p-4 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors"
+            >
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Opzioni Avanzate</span>
+              <motion.div
+                animate={{ rotate: showAdvanced ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronDown size={16} className="text-slate-400" />
+              </motion.div>
+            </button>
+
+            <AnimatePresence>
+              {showAdvanced && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 pt-0 space-y-3">
+                    <div className="space-y-2">
+                      <label htmlFor="annex" className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Allegato (opzionale)
+                      </label>
+                      <input
+                        type="text"
+                        id="annex"
+                        name="annex"
+                        value={formData.annex}
+                        onChange={handleChange}
+                        placeholder="Es: 1, 2, A, B"
+                        maxLength={3}
+                        className={cn(
+                          "w-24 text-sm font-semibold rounded-xl px-4 py-3 border shadow-sm transition-all",
+                          "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
+                          "border-slate-200 dark:border-slate-700",
+                          "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none",
+                          "placeholder:text-slate-400 placeholder:font-normal"
+                        )}
+                      />
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        Specifica il numero o la lettera dell'allegato da consultare
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Action Buttons */}

@@ -45,7 +45,7 @@ async def _fetch_with_playwright(url: str) -> str:
 
 
 @cached(ttl=3600, cache=Cache.MEMORY, serializer=JsonSerializer())
-async def get_tree(normurn, link=False, details=False):
+async def get_tree(normurn, link=False, details=False, return_metadata=False):
     """
     Recupera l'albero degli articoli da un URN normativo e ne estrae le informazioni.
 
@@ -53,22 +53,30 @@ async def get_tree(normurn, link=False, details=False):
         normurn (str): URL della norma.
         link (bool): Se includere i link agli articoli.
         details (bool): Se includere i testi delle sezioni.
+        return_metadata (bool): Se includere i metadati sugli allegati (disponibile solo per Normattiva).
 
     Returns:
-        tuple: Lista di articoli (e sezioni, se richiesto) estratti e conteggio, oppure un messaggio di errore.
+        tuple: Se return_metadata=True: (articles, count, metadata)
+               Altrimenti: (articles, count)
     """
-    logging.info(f"Fetching tree for norm URN: {normurn}")
+    logging.info(f"Fetching tree for norm URN: {normurn} (metadata={return_metadata})")
     if not normurn or not isinstance(normurn, str):
         logging.error("Invalid URN provided")
+        if return_metadata:
+            return "Invalid URN provided", 0, {}
         return "Invalid URN provided", 0
 
     # Build cache key including options
-    cache_key = f"{normurn}|link={link}|details={details}"
-    
+    cache_key = f"{normurn}|link={link}|details={details}|metadata={return_metadata}"
+
     # Check persistent cache first (survives server restarts)
     cached_result = await _tree_cache.get(cache_key)
     if cached_result:
         logging.info(f"Persistent cache hit for tree: {normurn[:50]}")
+        if return_metadata:
+            return (cached_result.get("result", []),
+                   cached_result.get("count", 0),
+                   cached_result.get("metadata", {}))
         return cached_result.get("result", []), cached_result.get("count", 0)
 
     # Use different fetch methods based on source
@@ -86,84 +94,230 @@ async def get_tree(normurn, link=False, details=False):
                     text = await response.text()
     except aiohttp.ClientError as e:
         logging.error(f"HTTP error while fetching page: {e}", exc_info=True)
-        return f"Failed to retrieve the page: {e}", 0
+        error_msg = f"Failed to retrieve the page: {e}"
+        if return_metadata:
+            return error_msg, 0, {}
+        return error_msg, 0
     except asyncio.TimeoutError:
         logging.error("Request timed out")
+        if return_metadata:
+            return "Request timed out", 0, {}
         return "Request timed out", 0
     except Exception as e:
         logging.error(f"Unexpected error: {e}", exc_info=True)
-        return f"Unexpected error: {e}", 0
+        error_msg = f"Unexpected error: {e}"
+        if return_metadata:
+            return error_msg, 0, {}
+        return error_msg, 0
 
     if not text or len(text) < 500:
         logging.error(f"Empty or too short response from {normurn[:50]}")
+        if return_metadata:
+            return "Empty response from server", 0, {}
         return "Empty response from server", 0
 
     soup = BeautifulSoup(text, 'html.parser')
 
     if "normattiva" in normurn:
-        result, count = await _parse_normattiva_tree(soup, normurn, link, details)
+        if return_metadata:
+            result, count, metadata = await _parse_normattiva_tree(soup, normurn, link, details, return_metadata=True)
+        else:
+            result, count = await _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False)
+            metadata = {}
     elif is_eurlex:
         result, count = await _parse_eurlex_tree(soup, normurn, link, details)
+        metadata = {}  # EUR-Lex doesn't support annex metadata yet
     else:
         logging.warning(f"Unrecognized norm URN format: {normurn}")
+        if return_metadata:
+            return "Unrecognized norm URN format", 0, {}
         return "Unrecognized norm URN format", 0
-    
+
     # Store in persistent cache for future restarts
     if count > 0:
-        await _tree_cache.set(cache_key, {"result": result, "count": count})
+        cache_data = {"result": result, "count": count}
+        if return_metadata:
+            cache_data["metadata"] = metadata
+        await _tree_cache.set(cache_key, cache_data)
         logging.info(f"Stored tree in persistent cache: {normurn[:50]}, {count} articles")
-    
+
+    if return_metadata:
+        return result, count, metadata
     return result, count
 
 
-async def _parse_normattiva_tree(soup, normurn, link, details):
-    """Parsa la struttura dell'albero degli articoli per Normattiva."""
-    logging.info("Parsing Normattiva structure")
-    tree = soup.find('div', id='albero')
+async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
+    """
+    Parsa la struttura dell'albero degli articoli per Normattiva.
 
-    if not tree:
+    La struttura di Normattiva per i codici (es. Codice Civile RD 262/1942) è:
+    - box_articoli "Articoli" → inizio corpo dell'atto (legge di emanazione)
+    - box_articoli "Allegati" → marker che indica inizio sezione allegati
+    - box_allegati "Disposizioni sulla legge in generale" → Allegato 1 (Preleggi)
+    - box_allegati_small "CODICE CIVILE" → Allegato 2 (Codice Civile vero e proprio)
+
+    URN Normattiva usa :1, :2 per gli allegati:
+    - urn:...;262~art2 → art. 2 del corpo dell'atto
+    - urn:...;262:1~art2 → art. 2 del primo allegato
+    - urn:...;262:2~art7 → art. 7 del secondo allegato
+    """
+    logging.info("Parsing Normattiva structure (flat stateful iteration)")
+    tree_div = soup.find('div', id='albero')
+
+    if not tree_div:
         logging.warning("Div with id 'albero' not found")
+        if return_metadata:
+            return "Div with id 'albero' not found", 0, {}
         return "Div with id 'albero' not found", 0
 
-    uls = tree.find_all('ul')
-    if not uls:
-        logging.warning("No 'ul' elements found within the 'albero' div")
-        return "No 'ul' elements found within the 'albero' div", 0
-
     result = []
-    count_articles = 0  # Contatore solo per gli articoli
+    count_articles = 0
+    annexes_metadata = {}
+    annex_labels = {}  # Map annex number -> original label text
+    current_attachment = None
+    annex_counter = 0
+    in_allegati_section = False  # True after we see box_articoli "Allegati"
 
-    current_attachment = None  # Variabile per tracciare il numero dell'allegato corrente
+    # Initialize main text (dispositivo) tracking - will be populated before annexes
+    annexes_metadata[None] = {'articles': [], 'count': 0}
+    annex_labels[None] = "Dispositivo"
 
-    for ul in uls:
-        for li in ul.find_all('li', recursive=False):
-            # Check if the list item is a section/title
-            if 'singolo_risultato_collapse' in li.get('class', []):
-                if details:
-                    section_text = li.get_text(separator=" ", strip=True)
-                    result.append(section_text)
-                continue  # Skip further processing for section items
+    # Iteriamo su tutti gli elementi <li> nell'ordine in cui appaiono nel DOM
+    for li in tree_div.find_all('li'):
+        classes = li.get('class', [])
 
-            # Check if the list item indicates an allegato
-            allegato_tag = li.find('a', class_='link_allegato')  # Supponendo che gli allegati abbiano questa classe
-            if allegato_tag:
-                # Estrai il numero dell'allegato
-                allegato_text = allegato_tag.get_text(strip=True)
-                match = re.match(r'Allegato\s+(\d+)', allegato_text, re.IGNORECASE)
+        # 0. Verifica se è un box_articoli (marker di sezione "Articoli" o "Allegati")
+        if 'box_articoli' in classes:
+            box_text = li.get_text(strip=True).lower()
+            if 'allegat' in box_text:  # "Allegati" o simili
+                in_allegati_section = True
+                logging.info("Entered 'Allegati' section - subsequent box_allegati/box_allegati_small will create annexes")
+            continue
+
+        # 1. Verifica se è un'intestazione di allegato esplicita
+        # Structure 1: <a class="link_allegato">
+        allegato_tag = li.find('a', class_='link_allegato')
+        if allegato_tag and allegato_tag.find_parent('li') == li:
+            allegato_text = allegato_tag.get_text(strip=True)
+            # Preserve the original label text
+            original_label = allegato_text
+
+            match = re.search(r'Allegato\s+(\d+)', allegato_text, re.IGNORECASE)
+            if match:
+                current_attachment = match.group(1)
+                annex_counter = max(annex_counter, int(current_attachment))
+            else:
+                match = re.search(r'Allegato\s+([A-Z])', allegato_text, re.IGNORECASE)
                 if match:
-                    current_attachment = int(match.group(1))
-                    logging.info(f"Detected attachment number: {current_attachment}")
-                continue  # Passa agli articoli successivi
+                    annex_counter += 1 # We use a numeric counter internally to sync with Normattiva URNs
+                    current_attachment = str(annex_counter)
+                else:
+                    annex_counter += 1
+                    current_attachment = str(annex_counter)
 
-            # Process regular articles
-            a_tag = li.find('a', class_='numero_articolo')
-            if a_tag:
-                article_data = _extract_normattiva_article(a_tag, normurn, link, attachment_number=current_attachment)
-                if article_data:
-                    result.append(article_data)
-                    count_articles += 1
+            logging.info(f"Detected link_allegato: {current_attachment} (label: {original_label})")
+            if current_attachment not in annexes_metadata:
+                annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
+                annex_labels[current_attachment] = original_label
 
-    logging.info(f"Extracted {count_articles} unique articles from Normattiva")
+            if details:
+                result.append(allegato_tag.get_text(separator=" ", strip=True))
+            continue
+
+        # 2. Verifica se è un box_allegati (es. "Disposizioni sulla legge in generale")
+        # Questo crea un NUOVO allegato solo se siamo nella sezione "Allegati"
+        if 'box_allegati' in classes and 'box_allegati_small' not in classes:
+            span_tag = li.find('span')
+            if span_tag and span_tag.find_parent('li') == li:
+                original_label = span_tag.get_text(separator=" ", strip=True)
+
+                if in_allegati_section:
+                    # Crea nuovo allegato
+                    annex_counter += 1
+                    current_attachment = str(annex_counter)
+                    annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
+                    annex_labels[current_attachment] = original_label
+                    logging.info(f"Detected box_allegati -> new Allegato {current_attachment}: {original_label}")
+                else:
+                    logging.info(f"Detected box_allegati (before Allegati section, ignoring): {original_label}")
+
+                if details:
+                    result.append(original_label)
+                continue
+
+        # 2b. Verifica se è un box_allegati_small (es. "CODICE CIVILE", "Codice Penale")
+        # Questo crea SEMPRE un nuovo allegato (indica contenuto principale di un codice)
+        if 'box_allegati_small' in classes:
+            box_text = li.get_text(strip=True)
+            original_label = box_text
+
+            # Crea nuovo allegato
+            annex_counter += 1
+            current_attachment = str(annex_counter)
+            annexes_metadata[current_attachment] = {'articles': [], 'count': 0}
+            annex_labels[current_attachment] = original_label
+            logging.info(f"Detected box_allegati_small -> new Allegato {current_attachment}: {original_label}")
+
+            if details:
+                result.append(original_label)
+            continue
+
+        # 3. Verifica se è un'intestazione di sezione
+        if 'singolo_risultato_collapse' in li.get('class', []):
+            if details:
+                section_text = li.get_text(separator=" ", strip=True)
+                result.append(section_text)
+            continue
+
+        # 4. Processa l'articolo
+        a_tag = li.find('a', class_='numero_articolo')
+        if a_tag and a_tag.find_parent('li') == li:
+            text_content = a_tag.get_text(separator=" ", strip=True)
+            # Rimuove "art. ", spazi e punti finali
+            article_num = re.sub(r'^\s*art\.\s*', '', text_content, flags=re.IGNORECASE).strip().rstrip('.')
+
+            # Skip invalid article numbers (e.g., "orig", empty strings, non-article text)
+            if not article_num or not re.match(r'^[\dIVXLCDM]', article_num, re.IGNORECASE):
+                logging.debug(f"Skipping invalid article number: '{article_num}'")
+                continue
+
+            article_data = _extract_normattiva_article(a_tag, normurn, link, attachment_number=current_attachment)
+            if article_data:
+                article_data["numero"] = article_num # Sync cleaned number
+                result.append(article_data)
+                count_articles += 1
+
+                # Track in metadata
+                if return_metadata:
+                    key = current_attachment
+                    if key not in annexes_metadata:
+                        annexes_metadata[key] = {'articles': [], 'count': 0}
+                    annexes_metadata[key]['count'] += 1
+                    # Store all article numbers for navigation (was limited to 50)
+                    annexes_metadata[key]['articles'].append(article_num)
+
+    # Build structured metadata response
+    metadata = {}
+    if return_metadata and annexes_metadata:
+        metadata['annexes'] = []
+        # Sort: None (main text) first, then numeric annexes
+        sorted_keys = sorted(annexes_metadata.keys(), key=lambda x: (x is not None, int(x) if (x and str(x).isdigit()) else 999))
+        for annex_num in sorted_keys:
+            data = annexes_metadata[annex_num]
+            # Only include if there are articles or it's the main text
+            if data['count'] == 0 and annex_num is not None:
+                continue
+            # Use preserved label or fallback
+            label = annex_labels.get(annex_num, f"Allegato {annex_num}" if annex_num is not None else "Dispositivo")
+            metadata['annexes'].append({
+                'number': annex_num,
+                'label': label,
+                'article_count': data['count'],
+                'article_numbers': data['articles']
+            })
+
+    if return_metadata:
+        return result, count_articles, metadata
     return result, count_articles
 
 
@@ -184,6 +338,11 @@ def _extract_normattiva_article(a_tag, normurn, link, attachment_number=None):
     text_content = a_tag.get_text(separator=" ", strip=True)
     text_content = re.sub(r'^\s*art\.\s*', '', text_content, flags=re.IGNORECASE)
 
+    article_data = {
+        "numero": text_content,
+        "allegato": attachment_number
+    }
+
     if link:
         # Estrai eventuali estensioni dall'articolo
         match = re.match(r'^(\d+)([a-zA-Z.]*)$', text_content)
@@ -196,8 +355,9 @@ def _extract_normattiva_article(a_tag, normurn, link, attachment_number=None):
             article_number = text_content  # In caso di formato inatteso
 
         modified_url = _generate_article_url(normurn, article_number, attachment_number=attachment_number)
-        return {text_content: modified_url}
-    return text_content
+        article_data["url"] = modified_url
+
+    return article_data
 
 
 def _generate_article_url(normurn, article_number, attachment_number=None):
@@ -386,17 +546,20 @@ def _format_eurlex_article(article_num, normurn, eli_info, link):
     Returns:
         str or dict: Numero articolo o dizionario {numero: url}
     """
-    if not link:
-        return article_num
+    article_data = {
+        "numero": article_num
+    }
 
-    # Genera URL ELI per l'articolo specifico
-    if eli_info['type'] and eli_info['year'] and eli_info['num']:
-        article_url = f"https://eur-lex.europa.eu/eli/{eli_info['type']}/{eli_info['year']}/{eli_info['num']}/art_{article_num}/oj"
-    else:
-        # Fallback: usa URL base con ancora
-        article_url = f"{normurn}#art_{article_num}"
+    if link:
+        # Genera URL ELI per l'articolo specifico
+        if eli_info['type'] and eli_info['year'] and eli_info['num']:
+            article_url = f"https://eur-lex.europa.eu/eli/{eli_info['type']}/{eli_info['year']}/{eli_info['num']}/art_{article_num}/oj"
+        else:
+            # Fallback: usa URL base con ancora
+            article_url = f"{normurn}#art_{article_num}"
+        article_data["url"] = article_url
 
-    return {article_num: article_url}
+    return article_data
 
 
 def _sort_eurlex_results(results, link):

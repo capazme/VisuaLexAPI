@@ -7,11 +7,13 @@ import { QuickNormsManager } from './QuickNormsManager';
 import { PDFViewer } from '../../ui/PDFViewer';
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import { NormaCard } from './NormaCard';
+import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
-import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
+import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
 
 // Helper to generate keys (replicates original JS logic)
 const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -29,7 +31,7 @@ export function SearchPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
-    addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma,
+    addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma, removeTab,
     searchTrigger, clearSearchTrigger,
     quickNorms, useQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
@@ -311,6 +313,42 @@ export function SearchPanel() {
     }
   }, [searchTrigger, handleSearch, clearSearchTrigger]);
 
+  // Auto-switch hook for annex detection
+  const {
+    registerSearch,
+    dialogState: autoSwitchDialog,
+    confirmSwitch,
+    cancelSwitch,
+    toast: annexToast,
+    dismissToast: dismissAnnexToast
+  } = useAutoSwitch({
+    onSearch: handleSearch,
+    isLoading,
+    onRemoveDuplicateTabs: (params) => {
+      // Remove any existing tabs with the same norma (from the initial search without annex)
+      const duplicateTabs = workspaceTabs.filter(tab =>
+        tab.content.some(item =>
+          item.type === 'norma' &&
+          item.norma.tipo_atto.toLowerCase() === params.act_type.toLowerCase() &&
+          item.norma.numero_atto === params.act_number &&
+          item.norma.data === params.date
+        )
+      );
+
+      duplicateTabs.forEach(tab => {
+        console.log('🗑️ Auto-switch: Removing duplicate tab', tab.id, tab.label);
+        removeTab(tab.id);
+      });
+    }
+  });
+
+  // Register search for auto-switch detection when search trigger is used
+  useEffect(() => {
+    if (searchTrigger && !searchTrigger.annex) {
+      registerSearch(searchTrigger);
+    }
+  }, [searchTrigger, registerSearch]);
+
   const handleCrossReferenceNavigate = useCallback((articleNumber: string, normaData: ArticleData['norma_data']) => {
     const params: SearchParams = {
       act_type: normaData.tipo_atto,
@@ -319,7 +357,8 @@ export function SearchPanel() {
       article: articleNumber,
       version: (normaData.versione as 'vigente' | 'originale') || 'vigente',
       version_date: normaData.data_versione || '',
-      show_brocardi_info: true
+      show_brocardi_info: true,
+      annex: normaData.allegato || undefined  // Preserve annex when navigating via cross-reference
     };
     handleSearch(params);
   }, [handleSearch]);
@@ -458,6 +497,7 @@ export function SearchPanel() {
                         key={normaBlock.id}
                         norma={normaBlock.norma}
                         articles={normaBlock.articles || []}
+                        tabId={workspaceTabs[mobileActiveTabIndex].id}
                         onCloseArticle={(articleId) => {
                           removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
                         }}
@@ -628,7 +668,7 @@ export function SearchPanel() {
             exit={{ opacity: 0, y: -20, x: '-50%' }}
             className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
           >
-            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-2xl flex items-start gap-4 ring-4 ring-primary-500/5">
+            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
                 <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
               </div>
@@ -667,7 +707,7 @@ export function SearchPanel() {
             exit={{ opacity: 0, y: -20, x: '-50%' }}
             className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
           >
-            <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-2xl shadow-2xl flex items-start gap-4 ring-4 ring-red-500/5">
+            <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-2xl shadow-lg shadow-red-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500">
                 <SearchX size={20} />
               </div>
@@ -677,7 +717,7 @@ export function SearchPanel() {
               </div>
               <button
                 onClick={() => setError(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
               >
                 <X size={16} />
               </button>
@@ -685,6 +725,44 @@ export function SearchPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Annex Auto-Switch Toast Notification */}
+      <AnimatePresence>
+        {annexToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className="fixed top-24 left-1/2 z-[9999] w-full max-w-md px-4"
+          >
+            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
+                <Info size={20} />
+              </div>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Navigazione allegato</h4>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">{annexToast.message}</p>
+              </div>
+              <button
+                onClick={dismissAnnexToast}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Annex Switch Confirmation Dialog */}
+      <AnnexSwitchDialog
+        isOpen={autoSwitchDialog.showDialog}
+        onConfirm={confirmSwitch}
+        onCancel={cancelSwitch}
+        articleNumber={autoSwitchDialog.articleNumber}
+        annexLabel={autoSwitchDialog.annexLabel}
+        annexNumber={autoSwitchDialog.annexNumber}
+      />
 
       {/* PDF Viewer Modal */}
       <PDFViewer

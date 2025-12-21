@@ -7,30 +7,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 VisuaLexAPI is an async web application and REST API for fetching and displaying Italian legal texts from multiple sources (Normattiva, EUR-Lex, Brocardi). Built with Quart (async Flask-like framework), it provides both a web UI and API endpoints for retrieving legal norms, article texts, Brocardi annotations, and PDF exports.
 
 The project consists of:
-- **Backend**: Quart-based async Python API with web scraping capabilities
-- **Frontend**: React + TypeScript SPA with Vite, Tailwind CSS, and Zustand state management
+- **Python API**: Quart-based async API with web scraping (port 5000)
+- **Node.js Backend**: Express + Prisma platform backend (port 3001)
+- **Frontend**: React + TypeScript SPA with Vite (port 5173)
 
 ## Architecture
 
-### Backend Structure
+### Python API (`/visualex_api`)
 
-The backend uses a controller-service architecture:
+Controller-service architecture for legal data retrieval:
 
-- **`src/app.py`**: Standalone server with UI + root-level API endpoints (e.g., `/fetch_article_text`)
-- **`src/visualex_api/app.py`**: Alternative server with `/api/*` prefixed endpoints + Swagger UI
-- **`src/visualex_api/services/`**: Scraper services for different legal sources
-  - `normattiva_scraper.py`: Scrapes Normattiva (Italian state laws)
-  - `eurlex_scraper.py`: Scrapes EUR-Lex (EU regulations/directives)
-  - `brocardi_scraper.py`: Scrapes Brocardi.it (legal annotations/commentary)
-  - `pdfextractor.py`: Selenium-based PDF extraction using Chrome headless
-- **`src/visualex_api/tools/`**: Utility modules
+- **`app.py`** (root): Main server with UI + API endpoints
+- **`visualex_api/app.py`**: Alternative server with `/api/*` prefix + Swagger UI
+- **`visualex_api/services/`**: Scraper services
+  - `normattiva_scraper.py`: Italian state laws (Normattiva)
+  - `eurlex_scraper.py`: EU regulations/directives (EUR-Lex)
+  - `brocardi_scraper.py`: Legal annotations (Brocardi.it)
+  - `pdfextractor.py`: PDF extraction using Playwright browser pool
+- **`visualex_api/tools/`**: Utilities
   - `norma.py`: Core data models (`Norma`, `NormaVisitata`)
   - `urngenerator.py`: URN generation for legal documents
-  - `treextractor.py`: Extracts article tree structures
+  - `treextractor.py`: Article tree structures
   - `text_op.py`: Text parsing and normalization
-  - `sys_op.py`: WebDriver management for Selenium
-  - `config.py`: Configuration constants (rate limiting, cache size)
-  - `map.py`: Act type mappings for EUR-Lex
+  - `config.py`: Rate limiting, cache size
+  - `map.py`: Act type mappings
+
+### Node.js Backend (`/backend`)
+
+Express server with Prisma ORM for platform features (authentication, user data).
 
 ### Frontend Structure
 
@@ -50,59 +54,51 @@ React SPA with component-based architecture:
 
 ## Development Commands
 
-### Backend Setup and Running
+### Quick Start (All Services)
 
 ```bash
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+./start.sh  # Starts Python API (5000), Node backend (3001), Frontend (5173)
+```
 
-# Install dependencies
+### Python API
+
+```bash
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# Run main server (UI + root API)
-cd src
+# Main server (UI + API)
 python app.py
-# Server runs at http://localhost:5000
 
-# Run alternative server (API with /api/* prefix + Swagger)
-cd src
+# Alternative server with /api/* prefix + Swagger
 python -m visualex_api.app
-# API at http://localhost:5000/api/*
-# Swagger UI at http://localhost:5000/api/docs
 ```
 
-### Frontend Setup and Running
+### Node.js Backend
 
 ```bash
-# Install dependencies
+cd backend
+npm install
+npm run dev
+```
+
+### Frontend
+
+```bash
 cd frontend
 npm install
-
-# Development server with hot reload
-npm run dev
-# Runs at http://localhost:5173 (proxies API calls to :5000)
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Lint
-npm run lint
+npm run dev      # Dev server at :5173
+npm run build    # Production build
+npm run lint     # ESLint
+npm run test     # Vitest
+npm run test:ui  # Vitest with UI
 ```
 
-### PDF Export Prerequisites
+### PDF Export
 
-PDF export functionality requires Chrome and ChromeDriver:
-
+Requires Playwright browsers:
 ```bash
-# macOS
-brew install chromedriver
-
-# Verify installation
-chromedriver --version
+pip install playwright
+playwright install chromium
 ```
 
 ## Key API Endpoints
@@ -118,7 +114,7 @@ All endpoints are POST unless specified, accepting JSON bodies.
 - **POST `/fetch_all_data`**: Combined endpoint returning both article text and Brocardi info
 - **POST `/fetch_tree`**: Get article tree for complete URN (with optional link/details flags)
 - **GET `/history`**: Retrieve server-side search history
-- **POST `/export_pdf`**: Export document to PDF using Selenium + Chrome headless
+- **POST `/export_pdf`**: Export document to PDF using Playwright
 
 ### API Request Format
 
@@ -136,7 +132,7 @@ All endpoints are POST unless specified, accepting JSON bodies.
 
 ## Data Models
 
-### Core Classes (src/visualex_api/tools/norma.py)
+### Core Classes (visualex_api/tools/norma.py)
 
 - **`Norma`**: Represents a legal norm
   - Properties: `tipo_atto`, `data`, `numero_atto`, `url`, `tree`
@@ -215,39 +211,32 @@ Always check for existing utilities before implementing:
 
 ### Rate Limiting
 
-Configured in `src/visualex_api/tools/config.py`:
+Configured in `visualex_api/tools/config.py`:
 - Default: 1000 requests per 600 seconds (10 minutes) per IP
 - Middleware in `NormaController.rate_limit_middleware()`
 - Returns 429 status when limit exceeded
 
 ### Scraping Fragility
 
-Web scrapers depend on HTML structure of external sites:
-- Normattiva (normattiva.it)
-- EUR-Lex (eur-lex.europa.eu)
-- Brocardi (brocardi.it)
-
-HTML changes on these sites will break scrapers and require updates to parsing logic.
+Web scrapers depend on HTML structure of external sites (Normattiva, EUR-Lex, Brocardi). HTML changes on these sites will break scrapers and require updates to parsing logic.
 
 ### Async Patterns
 
-The codebase extensively uses Python's `asyncio`:
 - All scraper methods are async (`async def get_document()`, `async def get_info()`)
 - Use `asyncio.gather()` for parallel operations
-- Use `asyncio.to_thread()` for blocking operations (file I/O, Selenium)
+- Use `asyncio.to_thread()` for blocking operations (file I/O, Playwright)
 - Quart routes are async by default
 
 ### Frontend-Backend Communication
 
-- Development: Vite dev server proxies API calls from `:5173` to `:5000`
-- Production: Frontend build should be served by backend or separate static server
-- CORS configured for `http://localhost:3000` in backend
+- Development: Vite proxies API calls from `:5173` to `:5000`
+- CORS configured for localhost origins
 
 ## Common Patterns
 
 ### Adding a New Scraper
 
-1. Create new scraper class in `src/visualex_api/services/`
+1. Create new scraper class in `visualex_api/services/`
 2. Implement async `get_document(normavisitata: NormaVisitata) -> Tuple[str, str]`
 3. Add act type detection in `NormaController.get_scraper_for_norma()`
 4. Update `tools/map.py` if new act type mappings are needed
@@ -268,33 +257,16 @@ The codebase extensively uses Python's `asyncio`:
 4. Use Tailwind CSS for styling (configured with v4)
 5. Export as default for lazy loading if needed
 
-## Testing and Debugging
+## Debugging
 
-### Backend Debugging
-
-- Logs use structlog with ISO timestamps and color output
-- Log level: DEBUG (configured in both app.py files)
-- Query statistics logged automatically (duration, token count)
-- Check ChromeDriver with: `chromedriver --version`
-
-### Frontend Debugging
-
-- React DevTools for component inspection
-- Zustand DevTools for state inspection
-- Network tab for API call debugging
-- Console logs for errors (check browser console)
-
-## File Naming Conventions
-
-- Backend: `snake_case.py`
-- Frontend: `PascalCase.tsx` for components, `camelCase.ts` for utilities
-- Types: Defined in `frontend/src/types/index.ts`
-- CSS: Tailwind utility classes (no separate CSS files)
+- Python: Logs use structlog with ISO timestamps and color output (DEBUG level)
+- Frontend: React DevTools, Zustand DevTools, browser console
+- Playwright: Check with `playwright install --dry-run`
 
 ## Environment Variables
 
-Backend supports:
+Python API:
 - `HOST`: Server host (default: `0.0.0.0`)
 - `PORT`: Server port (default: `5000`)
 
-No `.env` file required for basic operation. Configuration in `tools/config.py`.
+Node.js Backend: See `backend/.env.example` for required variables.

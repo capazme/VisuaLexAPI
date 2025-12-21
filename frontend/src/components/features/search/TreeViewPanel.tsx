@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, FileText, FolderOpen, List } from 'lucide-react';
+import { X, Check, FileText, FolderOpen, List, Layers } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import type { AnnexMetadata } from '../../../types';
 
 // Normalize article ID for comparison (handles "3 bis" vs "3-bis")
 function normalizeArticleId(id: string): string {
@@ -15,8 +16,13 @@ export interface TreeViewPanelProps {
   treeData: any[];
   urn: string;
   title?: string;
-  onArticleSelect?: (articleNumber: string) => void;
+  /** Callback when article is selected - includes target annex (null for dispositivo) */
+  onArticleSelect?: (articleNumber: string, targetAnnex: string | null) => void;
   loadedArticles?: string[];
+  /** Annex metadata for tabs - if provided, shows annex tabs */
+  annexes?: AnnexMetadata[];
+  /** Currently selected annex (from loaded articles) */
+  currentAnnex?: string | null;
 }
 
 // Check if a string is an article number (numeric or roman numeral)
@@ -37,27 +43,36 @@ function isArticleString(str: string): boolean {
   return false;
 }
 
-// Parse flat string array into structured sections
+// Parse tree data into structured sections
+// Handles both flat string arrays ["1", "2", ...] and object arrays [{numero: "1"}, ...]
 interface ParsedSection {
   title: string;
   articles: string[];
 }
 
-function parseFlatTreeData(data: any[]): ParsedSection[] {
+function parseTreeData(data: any[]): ParsedSection[] {
   const sections: ParsedSection[] = [];
   let currentSection: ParsedSection = { title: 'Dispositivo', articles: [] };
 
   for (const item of data) {
-    if (typeof item !== 'string') continue;
-
-    if (isArticleString(item)) {
-      currentSection.articles.push(item);
-    } else {
-      // It's a section title
-      if (currentSection.articles.length > 0) {
-        sections.push(currentSection);
+    // Handle string items (section titles or article numbers)
+    if (typeof item === 'string') {
+      if (isArticleString(item)) {
+        currentSection.articles.push(item);
+      } else {
+        // It's a section title
+        if (currentSection.articles.length > 0) {
+          sections.push(currentSection);
+        }
+        currentSection = { title: item, articles: [] };
       }
-      currentSection = { title: item, articles: [] };
+      continue;
+    }
+
+    // Handle object items (article data from treextractor)
+    if (item && typeof item === 'object' && item.numero) {
+      currentSection.articles.push(item.numero);
+      continue;
     }
   }
 
@@ -75,28 +90,80 @@ export function TreeViewPanel({
   treeData,
   title = 'Struttura Atto',
   onArticleSelect,
-  loadedArticles = []
+  loadedArticles = [],
+  annexes,
+  currentAnnex
 }: TreeViewPanelProps) {
-  // Check if data is flat string array
-  const isFlatStringArray = useMemo(() => {
-    return treeData && treeData.length > 0 && typeof treeData[0] === 'string';
-  }, [treeData]);
+  // Track which annex tab is selected in the UI
+  // This is separate from currentAnnex (which reflects loaded articles)
+  // Allows user to select a tab and click articles before loading completes
+  const [selectedAnnex, setSelectedAnnex] = useState<string | null | undefined>(undefined);
 
-  // Parse flat data into sections
+  // Reset selected annex when panel opens or when currentAnnex changes externally
+  useEffect(() => {
+    setSelectedAnnex(undefined);
+  }, [currentAnnex, isOpen]);
+
+  // The annex to use for display and article clicks
+  // If user selected a tab, use that; otherwise use the loaded annex
+  const effectiveAnnex = selectedAnnex !== undefined ? selectedAnnex : currentAnnex;
+
+  // Show annexes section if we have multiple annexes
+  const showAnnexes = annexes && annexes.length > 1;
+
+  // Handle annex tab click - just change the view, don't load articles
+  // User will click on a specific article to load it
+  const handleAnnexTabClick = (annexNumber: string | null) => {
+    // Skip if already on this annex
+    if (annexNumber === effectiveAnnex) return;
+
+    // Just update the selected tab - this changes which articles are displayed
+    // No article is loaded until user clicks one
+    setSelectedAnnex(annexNumber);
+  };
+  // Parse tree data into sections (handles both string and object formats)
   const parsedSections = useMemo(() => {
-    if (isFlatStringArray) {
-      return parseFlatTreeData(treeData);
+    if (treeData && treeData.length > 0) {
+      return parseTreeData(treeData);
     }
     return null;
-  }, [treeData, isFlatStringArray]);
+  }, [treeData]);
 
-  // Count stats
+  // Get articles for the currently selected annex from metadata
+  // This ensures we show the correct articles for each annex tab
+  const articlesForCurrentAnnex = useMemo(() => {
+    if (!annexes || annexes.length === 0) return null;
+
+    // Find the annex matching effectiveAnnex
+    const currentAnnexInfo = annexes.find(a =>
+      a.number === effectiveAnnex ||
+      (a.number === null && effectiveAnnex === null)
+    );
+
+    if (currentAnnexInfo?.article_numbers && currentAnnexInfo.article_numbers.length > 0) {
+      return currentAnnexInfo.article_numbers;
+    }
+
+    return null;
+  }, [annexes, effectiveAnnex]);
+
+  // Determine which articles to display:
+  // - If we have annex-specific articles from metadata, use those
+  // - Otherwise fall back to parsed tree data
+  const displayArticles = articlesForCurrentAnnex;
+  const useFallbackTree = !displayArticles && parsedSections;
+
+  // Count stats based on what we're displaying
   const stats = useMemo(() => {
-    if (!parsedSections) return null;
-    const totalArticles = parsedSections.reduce((sum, s) => sum + s.articles.length, 0);
-    const loadedCount = loadedArticles.length;
-    return { total: totalArticles, loaded: loadedCount };
-  }, [parsedSections, loadedArticles]);
+    if (displayArticles) {
+      return { total: displayArticles.length, loaded: loadedArticles.length };
+    }
+    if (parsedSections) {
+      const totalArticles = parsedSections.reduce((sum, s) => sum + s.articles.length, 0);
+      return { total: totalArticles, loaded: loadedArticles.length };
+    }
+    return null;
+  }, [displayArticles, parsedSections, loadedArticles]);
 
   // Create normalized set for comparison
   const loadedSetNormalized = useMemo(
@@ -105,28 +172,51 @@ export function TreeViewPanel({
   );
   const isArticleLoaded = (id: string) => loadedSetNormalized.has(normalizeArticleId(id));
 
-  // Render article button
-  const renderArticleButton = (articleNum: string) => {
-    const isLoaded = isArticleLoaded(articleNum);
+  // Render article button with section index for unique keys
+  const renderArticleButton = (articleNum: string, sectionIdx: number, articleIdx: number) => {
+    // Build unique ID with current annex context to check if THIS specific article is loaded
+    // e.g., Allegato 1 Art. 1 = "all1:1", Dispositivo Art. 1 = "1"
+    const uniqueIdForContext = effectiveAnnex
+      ? `all${effectiveAnnex}:${articleNum}`
+      : articleNum;
+    const isLoaded = isArticleLoaded(uniqueIdForContext);
     const isClickable = onArticleSelect && !isLoaded;
+    // Create unique key: section index + article index + article number
+    const uniqueKey = `sec${sectionIdx}-art${articleIdx}-${articleNum}`;
 
     return (
-      <button
-        key={articleNum}
-        onClick={() => isClickable && onArticleSelect(articleNum)}
+      <motion.button
+        key={uniqueKey}
+        onClick={() => isClickable && onArticleSelect(articleNum, effectiveAnnex ?? null)}
         disabled={!isClickable}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: articleIdx * 0.02, duration: 0.2 }}
+        whileHover={isClickable ? { scale: 1.05, y: -2 } : {}}
+        whileTap={isClickable ? { scale: 0.95 } : {}}
         className={cn(
-          "relative px-4 py-2 text-xs font-bold rounded-xl transition-all border",
+          "relative px-4 py-2.5 text-xs font-bold rounded-xl transition-colors border",
           isLoaded
-            ? "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800/50 dark:text-emerald-400 cursor-default"
-            : "bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:border-primary-300 dark:hover:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-700 dark:hover:text-primary-400 cursor-pointer shadow-sm active:scale-95"
+            ? "bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700 dark:from-emerald-900/30 dark:to-emerald-900/10 dark:border-emerald-800/50 dark:text-emerald-400 cursor-default shadow-inner"
+            : "bg-white border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:border-primary-400 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/40 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer shadow-sm hover:shadow-md"
         )}
       >
         {articleNum}
-        {isLoaded && (
-          <Check size={10} className="absolute -top-1 -right-1 text-emerald-600 bg-emerald-100 rounded-full p-0.5 border border-white dark:border-slate-900" />
-        )}
-      </button>
+        <AnimatePresence>
+          {isLoaded && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="absolute -top-1.5 -right-1.5"
+            >
+              <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-md shadow-emerald-500/30 ring-2 ring-white dark:ring-slate-900">
+                <Check size={10} className="text-white" strokeWidth={3} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.button>
     );
   };
 
@@ -190,34 +280,137 @@ export function TreeViewPanel({
               )}
             </div>
 
+            {/* Annex Tabs - Show when multiple annexes exist */}
+            {showAnnexes && (
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-slate-50/80 to-white dark:from-slate-800/50 dark:to-slate-900">
+                <div className="flex items-center gap-2 mb-3">
+                  <Layers size={14} className="text-primary-500" />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    Sezioni documento
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {annexes!.map((annex) => {
+                    const isActive = effectiveAnnex === annex.number ||
+                      (effectiveAnnex === null && annex.number === null);
+
+                    return (
+                      <motion.button
+                        key={annex.number ?? 'main'}
+                        onClick={() => handleAnnexTabClick(annex.number)}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        layout
+                        className={cn(
+                          "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
+                          isActive
+                            ? "bg-gradient-to-br from-primary-500 to-primary-600 text-white border-primary-500 shadow-lg shadow-primary-500/25"
+                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400 hover:shadow-md"
+                        )}
+                      >
+                        {/* Active indicator glow */}
+                        {isActive && (
+                          <motion.div
+                            layoutId="annexActiveGlow"
+                            className="absolute inset-0 bg-gradient-to-br from-primary-400/20 to-transparent"
+                            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                          />
+                        )}
+                        <span className="relative block truncate max-w-[140px]">{annex.label}</span>
+                        <span className={cn(
+                          "relative text-[10px] block mt-0.5 font-medium",
+                          isActive ? "text-primary-100" : "text-slate-400 dark:text-slate-500"
+                        )}>
+                          {annex.article_count} articoli
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-              {parsedSections ? (
-                <div className="space-y-8 pb-10">
-                  {parsedSections.map((section, idx) => (
-                    <div key={idx} className="space-y-4">
+              {/* Show annex-specific articles when available */}
+              {displayArticles ? (
+                <motion.div
+                  key={effectiveAnnex ?? 'dispositivo'}
+                  className="pb-10"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Section header for current annex */}
+                  <div className="flex items-start gap-3 mb-6">
+                    <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                      <FileText size={16} className="text-primary-600 dark:text-primary-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                        {annexes?.find(a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null))?.label || 'Articoli'}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                        {displayArticles.length} articoli disponibili
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Articles Grid */}
+                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
+                    {displayArticles.map((articleNum, artIdx) => renderArticleButton(articleNum, 0, artIdx))}
+                  </div>
+                </motion.div>
+              ) : useFallbackTree ? (
+                <motion.div
+                  className="space-y-8 pb-10"
+                  initial="hidden"
+                  animate="visible"
+                  variants={{
+                    visible: { transition: { staggerChildren: 0.05 } }
+                  }}
+                >
+                  {parsedSections!.map((section, idx) => (
+                    <motion.div
+                      key={idx}
+                      className="space-y-4"
+                      variants={{
+                        hidden: { opacity: 0, y: 10 },
+                        visible: { opacity: 1, y: 0 }
+                      }}
+                      transition={{ duration: 0.3 }}
+                    >
                       {/* Section Title */}
-                      <div className="flex items-start gap-4">
-                        <div className="mt-1 flex-shrink-0">
-                          <FolderOpen size={18} className="text-amber-500/80" />
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                          <FolderOpen size={16} className="text-amber-600 dark:text-amber-400" />
                         </div>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug flex-1">
-                          {section.title}
-                        </h4>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                            {section.title}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                            {section.articles.length} articoli
+                          </p>
+                        </div>
                       </div>
 
                       {/* Articles Grid - More compact/modern grid */}
-                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 pl-8">
-                        {section.articles.map(renderArticleButton)}
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 pl-11">
+                        {section.articles.map((articleNum, artIdx) => renderArticleButton(articleNum, idx, artIdx))}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center justify-center py-20 text-slate-400"
+                >
                   <List size={48} className="opacity-20 mb-4" />
-                  <p className="text-sm font-medium">Struttura non ancora disponibile per questa norma</p>
-                </div>
+                  <p className="text-sm font-medium">Struttura non ancora disponibile</p>
+                </motion.div>
               )}
             </div>
 

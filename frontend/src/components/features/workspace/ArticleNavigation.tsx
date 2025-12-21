@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 
@@ -10,6 +10,8 @@ interface ArticleNavigationProps {
   loadedArticleIds: string[];
   /** Currently active article ID */
   activeArticleId: string | null;
+  /** Article ID currently being loaded (shows spinner) */
+  loadingArticleId?: string | null;
   /** Callback when navigating to a loaded article */
   onNavigate: (id: string) => void;
   /** Callback when navigating to an unloaded article (triggers fetch) */
@@ -26,6 +28,7 @@ export function ArticleNavigation({
   allArticleIds,
   loadedArticleIds,
   activeArticleId,
+  loadingArticleId,
   onNavigate,
   onLoadArticle,
   className
@@ -54,8 +57,9 @@ export function ArticleNavigation({
   const isLoaded = (id: string) => loadedSetNormalized.has(normalizeArticleId(id));
 
   // Find current index using normalized comparison
-  const currentIndex = activeArticleId
-    ? navigationIds.findIndex(id => normalizeArticleId(id) === normalizeArticleId(activeArticleId))
+  const normalizedActiveId = activeArticleId ? normalizeArticleId(activeArticleId) : null;
+  const currentIndex = normalizedActiveId
+    ? navigationIds.findIndex(id => normalizeArticleId(id) === normalizedActiveId)
     : -1;
 
   const isFirst = currentIndex <= 0;
@@ -86,6 +90,11 @@ export function ArticleNavigation({
   const nextId = !isLast ? navigationIds[currentIndex + 1] : null;
   const prevWillLoad = prevId && !isLoaded(prevId);
   const nextWillLoad = nextId && !isLoaded(nextId);
+
+  // Check if currently loading an article
+  const isLoading = !!loadingArticleId;
+  const isPrevLoading = prevId && loadingArticleId && normalizeArticleId(prevId) === normalizeArticleId(loadingArticleId);
+  const isNextLoading = nextId && loadingArticleId && normalizeArticleId(nextId) === normalizeArticleId(loadingArticleId);
 
   // Show structure info
   const hasStructure = allArticleIds && allArticleIds.length > loadedArticleIds.length;
@@ -135,19 +144,23 @@ export function ArticleNavigation({
     <div className={cn("flex items-center gap-1", className)}>
       <button
         onClick={handlePrev}
-        disabled={isFirst}
+        disabled={isFirst || isLoading}
         className={cn(
           "p-1 rounded-md transition-colors relative",
-          isFirst
+          isFirst || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : prevWillLoad
               ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
               : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
-        title={prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
+        title={isPrevLoading ? 'Caricamento...' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
       >
-        <ChevronLeft size={16} />
-        {prevWillLoad && (
+        {isPrevLoading ? (
+          <Loader2 size={16} className="animate-spin text-primary-500" />
+        ) : (
+          <ChevronLeft size={16} />
+        )}
+        {prevWillLoad && !isPrevLoading && (
           <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
         )}
       </button>
@@ -182,19 +195,23 @@ export function ArticleNavigation({
 
       <button
         onClick={handleNext}
-        disabled={isLast}
+        disabled={isLast || isLoading}
         className={cn(
           "p-1 rounded-md transition-colors relative",
-          isLast
+          isLast || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : nextWillLoad
               ? "text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30"
               : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
-        title={nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
+        title={isNextLoading ? 'Caricamento...' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
       >
-        <ChevronRight size={16} />
-        {nextWillLoad && (
+        {isNextLoading ? (
+          <Loader2 size={16} className="animate-spin text-primary-500" />
+        ) : (
+          <ChevronRight size={16} />
+        )}
+        {nextWillLoad && !isNextLoading && (
           <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
         )}
       </button>

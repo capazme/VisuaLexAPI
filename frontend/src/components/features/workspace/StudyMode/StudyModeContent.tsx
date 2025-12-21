@@ -178,7 +178,7 @@ export function StudyModeContent({
         {/* Article Title */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={norma_data.numero_articolo}
+            key={norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}

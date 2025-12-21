@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink } from 'lucide-react';
+import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
+import { AnnexSuggestion } from './AnnexSuggestion';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { ArticleMinimap } from '../workspace/ArticleMinimap';
 import { StudyMode } from '../workspace/StudyMode';
 import { useAppStore } from '../../../store/useAppStore';
-import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
+import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 
 interface NormaCardProps {
   norma: Norma;
@@ -21,22 +22,56 @@ interface NormaCardProps {
   onCrossReference?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
   onPopOut?: (articleId: string) => void;
   isNew?: boolean;
+  searchedArticle?: string; // Original article number requested by user
+  tabId?: string; // ID of the workspace tab containing this card
 }
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle: _onCompareArticle, onCrossReference, isNew }: NormaCardProps) {
+// Helper to generate unique article ID
+const getUniqueId = (article: ArticleData) => {
+  return article.norma_data.allegato
+    ? `all${article.norma_data.allegato}:${article.norma_data.numero_articolo}`
+    : article.norma_data.numero_articolo;
+};
+
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle: _onCompareArticle, onCrossReference, isNew, searchedArticle, tabId }: NormaCardProps) {
+  // Local UI state - defined first so we can derive activeArticle
   const [isOpen, setIsOpen] = useState(true);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [treeVisible, setTreeVisible] = useState(false);
-  const [treeLoading, setTreeLoading] = useState(false);
-  const [treeData, setTreeData] = useState<any[] | null>(null);
-  const [_treeError, _setTreeError] = useState<string | null>(null);
+  // Initialize with unique ID of the first article
+  const [activeTabId, setActiveTabId] = useState<string | null>(
+    articles[0] ? getUniqueId(articles[0]) : null
+  );
+
+  // Derive active article from activeTabId
+  const activeArticle = articles.find(a => getUniqueId(a) === activeTabId) || null;
+
+  // Use the shared annex navigation hook - pass activeArticle for correct annex detection
+  const {
+    treeData,
+    treeMetadata,
+    treeLoading: _treeLoading,
+    treeVisible,
+    setTreeVisible,
+    currentAnnex,
+    allArticleIds,
+    loadingArticle,
+    fetchTree,
+    handleAnnexSelect,
+    handleLoadArticle,
+    loadedArticleIds
+  } = useAnnexNavigation({
+    norma,
+    articles,
+    searchedArticle,
+    tabId,
+    activeArticle
+  });
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddValue, setQuickAddValue] = useState('');
 
-  // Mobile: track which articles are expanded (by default first one is expanded)
+  // Mobile: track which articles are expanded (using unique IDs)
   const [expandedArticles, setExpandedArticles] = useState<Set<string>>(() => {
-    const first = articles[0]?.norma_data?.numero_articolo;
-    return first ? new Set([first]) : new Set();
+    const first = articles[0];
+    return first ? new Set([getUniqueId(first)]) : new Set();
   });
 
   // Study Mode state
@@ -44,13 +79,13 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
   const [studyModeArticle, setStudyModeArticle] = useState<ArticleData | null>(null);
   const { triggerSearch } = useAppStore();
 
-  const toggleArticleExpanded = (articleId: string) => {
+  const toggleArticleExpanded = (uniqueId: string) => {
     setExpandedArticles(prev => {
       const next = new Set(prev);
-      if (next.has(articleId)) {
-        next.delete(articleId);
+      if (next.has(uniqueId)) {
+        next.delete(uniqueId);
       } else {
-        next.add(articleId);
+        next.add(uniqueId);
       }
       return next;
     });
@@ -65,7 +100,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
     e.preventDefault();
     if (!quickAddValue.trim()) return;
 
-    // Trigger search for the new article
+    // Trigger search for the new article, preserving current annex
     triggerSearch({
       act_type: norma.tipo_atto,
       act_number: norma.numero_atto || '',
@@ -73,77 +108,57 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
       article: quickAddValue.trim(),
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: true
+      show_brocardi_info: true,
+      annex: currentAnnex || undefined
     });
 
     setQuickAddValue('');
     setQuickAddOpen(false);
   };
 
-  const fetchTree = async () => {
-    if (!norma.urn || treeData) return; // Don't refetch if already loaded
-    try {
-      setTreeLoading(true);
-      const res = await fetch('/fetch_tree', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urn: norma.urn, link: false, details: true })
-      });
-      if (!res.ok) throw new Error('Impossibile caricare la struttura');
-      const payload = await res.json();
-      setTreeData(payload.articles || payload);
-    } catch (e: any) {
-      console.error('Error fetching tree:', e);
-    } finally {
-      setTreeLoading(false);
-    }
-  };
-
-  // Auto-fetch tree structure when norma has URN
-  useEffect(() => {
-    if (norma.urn && !treeData && !treeLoading) {
-      fetchTree();
-    }
-  }, [norma.urn]);
-
   // Set first tab active when articles change if no tab is active
   useEffect(() => {
-    if (articles.length > 0 && !activeTabId) {
-      setActiveTabId(articles[0].norma_data.numero_articolo);
-    } else if (articles.length > 0 && activeTabId && !articles.find(a => a.norma_data.numero_articolo === activeTabId)) {
-      // If active tab was closed, switch to first available
-      setActiveTabId(articles[0].norma_data.numero_articolo);
+    if (articles.length > 0) {
+      const firstUniqueId = getUniqueId(articles[0]);
+
+      if (!activeTabId) {
+        setActiveTabId(firstUniqueId);
+      } else {
+        // Check if current active tab still exists
+        const exists = articles.some(a => getUniqueId(a) === activeTabId);
+        if (!exists) {
+          setActiveTabId(firstUniqueId);
+        }
+      }
     }
   }, [articles, activeTabId]);
 
-  const activeArticle = articles.find(a => a.norma_data.numero_articolo === activeTabId);
   const contentRef = useRef<HTMLDivElement>(null);
-
-  // Loaded article IDs
-  const loadedArticleIds = articles.map(a => a.norma_data.numero_articolo);
-
-  // All article IDs from structure (if available)
-  const allArticleIds = treeData ? extractArticleIdsFromTree(treeData) : undefined;
-
-  // Function to load a new article
-  const handleLoadArticle = (articleNumber: string) => {
-    triggerSearch({
-      act_type: norma.tipo_atto,
-      act_number: norma.numero_atto || '',
-      date: norma.data || '',
-      article: articleNumber,
-      version: 'vigente',
-      version_date: '',
-      show_brocardi_info: true
-    });
-  };
 
   // Function to navigate to a loaded article or load it if not present
   const handleArticleSelect = (articleNumber: string) => {
-    if (loadedArticleIds.includes(articleNumber)) {
-      setActiveTabId(articleNumber);
+    // Construct unique ID based on current context (annex)
+    // Note: This assumes selection comes from the current tree context (TreeViewPanel)
+    const targetUniqueId = currentAnnex
+      ? `all${currentAnnex}:${articleNumber}`
+      : articleNumber;
+
+    // Check if loaded (using unique ID check)
+    const isLoaded = articles.some(a => getUniqueId(a) === targetUniqueId);
+
+    if (isLoaded) {
+      setActiveTabId(targetUniqueId);
     } else {
       handleLoadArticle(articleNumber);
+      // We rely on useEffect to switch tab once loaded, 
+      // or we could optimistically set it but it wouldn't match any article yet.
+      // Better to let useEffect handle the switch IF we want auto-switch on load (which we do logic for).
+      // But handleLoadArticle is async in hook.
+      // If we want immediate feedback, we might need to track "pending" state.
+      // For now, rely on previous logic + effect.
+      // Wait, effect logic selects FIRST article if active is missing.
+      // If we load a specific one, we want THAT one active.
+      // NormaBlockComponent handles this. NormaCard relies on user action?
     }
   };
 
@@ -344,7 +359,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         </div>
       </div>
 
-      {/* Tree View Side Panel */}
+      {/* Tree View Side Panel - Now includes annex selection */}
       <TreeViewPanel
         isOpen={treeVisible}
         onClose={() => setTreeVisible(false)}
@@ -352,36 +367,61 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
         urn={norma.urn || ''}
         title="Struttura dell'Atto"
         loadedArticles={loadedArticleIds}
-        onArticleSelect={(articleNumber) => {
-          triggerSearch({
-            act_type: norma.tipo_atto,
-            act_number: norma.numero_atto || '',
-            date: norma.data || '',
-            article: articleNumber,
-            version: 'vigente',
-            version_date: '',
-            show_brocardi_info: true
-          });
+        onArticleSelect={(articleNumber, targetAnnex) => {
+          handleLoadArticle(articleNumber, targetAnnex);
           setTreeVisible(false);
         }}
+        annexes={treeMetadata?.annexes}
+        currentAnnex={currentAnnex}
       />
 
       {/* Content */}
       {isOpen && (
         <div className="bg-slate-50/50 dark:bg-slate-900/30">
+          {/* Annex suggestion - show when article exists in other annexes */}
+          {treeMetadata?.annexes && treeMetadata.annexes.length > 1 && activeArticle && (
+            <div className="px-4 md:px-6 pt-4">
+              <AnnexSuggestion
+                articleNumber={activeArticle.norma_data.numero_articolo}
+                currentAnnex={activeArticle.norma_data.allegato || null}
+                annexes={treeMetadata.annexes}
+                onSwitchAnnex={async (annexNumber): Promise<string | null> => {
+                  const targetArticle = await handleAnnexSelect(annexNumber);
+                  if (targetArticle) {
+                    const uniqueId = annexNumber ? `all${annexNumber}:${targetArticle}` : targetArticle;
+                    setActiveTabId(uniqueId);
+                  }
+                  return targetArticle;
+                }}
+              />
+            </div>
+          )}
+
           {/* Internal Navigation bar */}
           {(allArticleIds && allArticleIds.length > 1) || articles.length > 1 ? (
             <div className="hidden md:flex px-6 py-4 items-center justify-between border-b border-slate-200/50 dark:border-slate-800/50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+              {/* Navigation Bar - Filtered for current context */}
               <ArticleNavigation
                 allArticleIds={allArticleIds}
-                loadedArticleIds={loadedArticleIds}
-                activeArticleId={activeTabId}
-                onNavigate={setActiveTabId}
+                loadedArticleIds={loadedArticleIds
+                  .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
+                  .map(id => id.includes(':') ? id.split(':').pop()! : id)
+                }
+                activeArticleId={activeArticle?.norma_data.numero_articolo || null}
+                loadingArticleId={loadingArticle}
+                onNavigate={(number) => {
+                  // Convert back to unique ID for navigation
+                  const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
+                  setActiveTabId(uniqueId);
+                }}
                 onLoadArticle={handleLoadArticle}
               />
               <ArticleMinimap
-                loadedArticleIds={loadedArticleIds}
-                activeArticleId={activeTabId}
+                loadedArticleIds={loadedArticleIds
+                  .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
+                  .map(id => id.includes(':') ? id.split(':').pop()! : id)
+                }
+                activeArticleId={activeArticle?.norma_data.numero_articolo || null}
                 onArticleClick={handleArticleSelect}
                 className="max-w-[400px]"
               />
@@ -392,17 +432,20 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           <div className="hidden md:flex px-6 border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto no-scrollbar relative bg-white dark:bg-slate-900">
             {articles.map((article) => {
               const id = article.norma_data.numero_articolo;
-              const isActive = id === activeTabId;
+              const allegato = article.norma_data.allegato;
+              const uniqueKey = allegato ? `all${allegato}:${id}` : id;
+              const isActive = uniqueKey === activeTabId;
+
               return (
                 <div
-                  key={id}
+                  key={uniqueKey}
                   className={cn(
                     "relative px-6 py-4 text-sm font-bold transition-all group flex items-center gap-3 flex-shrink-0 cursor-pointer overflow-hidden",
                     isActive
                       ? "text-primary-600 dark:text-primary-400"
                       : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   )}
-                  onClick={() => setActiveTabId(id)}
+                  onClick={() => setActiveTabId(uniqueKey)}
                 >
                   <span className="relative z-10 uppercase tracking-wide text-xs">Art. {id}</span>
 
@@ -421,7 +464,8 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                       className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onCloseArticle(id);
+                        // Pass unique ID to onCloseArticle - the store's remove func supports it
+                        onCloseArticle(uniqueKey);
                       }}
                       title="Chiudi sessione"
                     >
@@ -437,11 +481,13 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           <div className="md:hidden bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
             {articles.map((article) => {
               const articleId = article.norma_data.numero_articolo;
-              const isExpanded = expandedArticles.has(articleId);
+              const allegato = article.norma_data.allegato;
+              const uniqueKey = allegato ? `all${allegato}:${articleId}` : articleId;
+              const isExpanded = expandedArticles.has(uniqueKey);
               return (
-                <div key={articleId} className="overflow-hidden">
+                <div key={uniqueKey} className="overflow-hidden">
                   <div
-                    onClick={() => toggleArticleExpanded(articleId)}
+                    onClick={() => toggleArticleExpanded(uniqueKey)}
                     className={cn(
                       "w-full p-4 flex items-center justify-between transition-colors cursor-pointer",
                       isExpanded ? "bg-primary-50/30 dark:bg-primary-900/10" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -465,7 +511,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onCloseArticle(articleId);
+                          onCloseArticle(uniqueKey);
                         }}
                         className="p-2 text-slate-400 hover:text-red-500 rounded-lg"
                       >
@@ -508,12 +554,39 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           {/* Desktop Content Area */}
           <div
             ref={contentRef}
-            className="hidden md:block bg-white dark:bg-slate-900 min-h-[400px] overflow-hidden"
+            className="hidden md:block bg-white dark:bg-slate-900 min-h-[400px] overflow-hidden relative"
           >
+            {/* Loading Overlay */}
+            <AnimatePresence>
+              {loadingArticle && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center"
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="flex flex-col items-center gap-3"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                      <Loader2 size={24} className="text-primary-600 dark:text-primary-400 animate-spin" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                      Caricamento articolo...
+                    </p>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
                 <motion.div
-                  key={activeArticle.norma_data.numero_articolo}
+                  key={activeArticle.norma_data.allegato ? `all${activeArticle.norma_data.allegato}:${activeArticle.norma_data.numero_articolo}` : activeArticle.norma_data.numero_articolo}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
@@ -528,7 +601,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                 </motion.div>
               )}
             </AnimatePresence>
-            {!activeArticle && (
+            {!activeArticle && !loadingArticle && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <Book size={48} className="opacity-20 mb-4" />
                 <p className="text-sm font-medium">Seleziona un articolo per visualizzarne il contenuto</p>

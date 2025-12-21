@@ -3,6 +3,7 @@ import os
 import logging
 import sys
 import json
+import re
 from collections import defaultdict
 from time import time
 
@@ -25,7 +26,8 @@ from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
 from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
-from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
+from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
+from visualex_api.tools.map import NORMATTIVA_URN_CODICI
 
 # Configurazione del logging
 logging.basicConfig(
@@ -329,6 +331,105 @@ class NormaController:
         articles = await parse_article_input(str(data.get('article')), norma.url)
         log.info("Articles parsed", articles=articles)
 
+        # Validate and sanitize annex parameter
+        annex_value = data.get('annex')
+        # Track if user explicitly requested dispositivo (empty string)
+        # This is different from "no preference" (null/undefined)
+        explicit_dispositivo = False
+
+        if annex_value is not None:
+            if isinstance(annex_value, str):
+                annex_value = annex_value.strip()
+                if annex_value == '':
+                    # Empty string = user explicitly wants dispositivo (skip smart lookup)
+                    explicit_dispositivo = True
+                    annex_value = None
+                elif annex_value.lower() == 'null' or annex_value.lower() == 'undefined':
+                    # null/undefined string = no preference (smart lookup may apply)
+                    annex_value = None
+            # Convert to string if it's a number
+            elif isinstance(annex_value, (int, float)):
+                annex_value = str(int(annex_value))
+
+        # If no annex specified (and not explicit dispositivo), check if this is a codice with a default annex
+        # e.g., "codice civile" maps to "regio.decreto:1942-03-16;262:2" where :2 is the annex
+        if annex_value is None and not explicit_dispositivo:
+            import re
+            normalized_type = normalize_act_type(act_type)
+            log.info("Checking for default annex", act_type=act_type, normalized_type=normalized_type,
+                     in_codici_map=normalized_type in NORMATTIVA_URN_CODICI)
+            if normalized_type in NORMATTIVA_URN_CODICI:
+                codice_urn = NORMATTIVA_URN_CODICI[normalized_type]
+                log.info("Found codice URN", codice_urn=codice_urn)
+                # Extract annex from URN pattern like "regio.decreto:1942-03-16;262:2"
+                # The annex is after the last colon if there's a number;number:annex pattern
+                annex_match = re.search(r';\d+:(\d+)$', codice_urn)
+                log.info("Annex regex match", match=str(annex_match))
+                if annex_match:
+                    annex_value = annex_match.group(1)
+                    log.info("Using default annex from codice URN", codice=normalized_type, default_annex=annex_value)
+
+        log.info("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
+
+        # Smart article lookup: if no annex specified and not a hardcoded codice,
+        # check if the article actually exists in the dispositivo or in an annex
+        # SKIP smart lookup if user explicitly requested dispositivo (empty string)
+        if annex_value is None and not explicit_dispositivo and norma.url:
+            try:
+                # Fetch tree with metadata to check article locations
+                tree_result = await get_tree(norma.url, link=False, details=False, return_metadata=True)
+                if len(tree_result) == 3:
+                    tree_data, tree_count, tree_metadata = tree_result
+                    log.info("Smart lookup: fetched tree", article_count=tree_count, has_metadata=bool(tree_metadata))
+
+                    if tree_metadata and 'annexes' in tree_metadata and tree_count > 0:
+                        annexes = tree_metadata['annexes']
+                        log.info("Smart lookup: found annexes", annex_count=len(annexes))
+
+                        # For each requested article, check where it exists
+                        for article in articles:
+                            article_normalized = article.strip().lower()
+                            found_in_dispositivo = False
+                            found_in_annex = None
+                            best_annex = None
+                            best_annex_count = 0
+
+                            for annex_info in annexes:
+                                annex_num = annex_info.get('number')  # None for dispositivo
+                                article_numbers = annex_info.get('article_numbers', [])
+                                article_count = annex_info.get('article_count', 0)
+
+                                # Check if article exists in this section
+                                article_exists = any(
+                                    art.strip().lower() == article_normalized
+                                    for art in article_numbers
+                                )
+
+                                if article_exists:
+                                    if annex_num is None:
+                                        # Found in dispositivo
+                                        found_in_dispositivo = True
+                                        log.info("Smart lookup: article found in dispositivo", article=article)
+                                    else:
+                                        # Found in an annex - track the one with most articles
+                                        if article_count > best_annex_count:
+                                            best_annex = annex_num
+                                            best_annex_count = article_count
+                                        log.info("Smart lookup: article found in annex", article=article,
+                                                 annex=annex_num, annex_article_count=article_count)
+
+                            # If article NOT in dispositivo but found in annex, auto-redirect
+                            if not found_in_dispositivo and best_annex is not None:
+                                annex_value = best_annex
+                                log.info("Smart lookup: auto-redirecting to annex",
+                                         article=article, target_annex=annex_value)
+                                break  # Use same annex for all articles in this request
+
+            except Exception as e:
+                log.warning("Smart lookup failed, proceeding without", error=str(e))
+
+        log.info("Final annex value after smart lookup", annex=annex_value)
+
         norma_visitata_list = []
         for article in articles:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
@@ -338,7 +439,7 @@ class NormaController:
                 numero_articolo=cleaned_article,
                 versione=data.get('version'),
                 data_versione=data.get('version_date'),
-                allegato=data.get('annex')
+                allegato=annex_value
             ))
             log.info("NormaVisitata instance created", norma_visitata=norma_visitata_list[-1])
 
@@ -507,6 +608,11 @@ class NormaController:
 
             normavisitate = await self.create_norma_visitata_from_data(data)
 
+            # Check if user explicitly requested dispositivo (annex='')
+            # If so, skip Brocardi for codici with allegati since Brocardi content is for the allegato
+            annex_value = data.get('annex')
+            explicit_dispositivo = isinstance(annex_value, str) and annex_value.strip() == ''
+
             async def fetch_data(nv):
                 scraper = self.get_scraper_for_norma(nv)
                 if scraper is None:
@@ -517,24 +623,39 @@ class NormaController:
                     article_text, url = await scraper.get_document(nv)
                     brocardi_info = None
                     if scraper == normattiva_scraper:
-                        try:
-                            b_info = await brocardi_scraper.get_info(nv)
-                            brocardi_info = {
-                                'position': b_info[0] if b_info[0] else None,
-                                'link': b_info[2],
-                                'Brocardi': b_info[1].get('Brocardi') if b_info[1] and 'Brocardi' in b_info[1] else None,
-                                'Ratio': b_info[1].get('Ratio') if b_info[1] and 'Ratio' in b_info[1] else None,
-                                'Spiegazione': b_info[1].get('Spiegazione') if b_info[1] and 'Spiegazione' in b_info[1] else None,
-                                'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None,
-                                'Relazioni': b_info[1].get('Relazioni') if b_info[1] and 'Relazioni' in b_info[1] else None,
-                                'RelazioneCostituzione': b_info[1].get('RelazioneCostituzione') if b_info[1] and 'RelazioneCostituzione' in b_info[1] else None,
-                                'Footnotes': b_info[1].get('Footnotes') if b_info[1] and 'Footnotes' in b_info[1] else None,
-                                'RelatedArticles': b_info[1].get('RelatedArticles') if b_info[1] and 'RelatedArticles' in b_info[1] else None,
-                                'CrossReferences': b_info[1].get('CrossReferences') if b_info[1] and 'CrossReferences' in b_info[1] else None
-                            }
-                        except Exception as exc:
-                            log.error("Error fetching Brocardi info", error=str(exc))
-                            brocardi_info = {'error': str(exc)}
+                        # Skip Brocardi for dispositivo articles of codes that have their content in allegati
+                        # Brocardi.it only has content for the actual code (allegato), not the dispositivo
+                        should_fetch_brocardi = True
+                        if explicit_dispositivo and nv.allegato is None:
+                            # Check if this is a codice with a default allegato
+                            normalized_type = normalize_act_type(nv.norma.tipo_atto)
+                            if normalized_type in NORMATTIVA_URN_CODICI:
+                                codice_urn = NORMATTIVA_URN_CODICI[normalized_type]
+                                # Codes with allegati have patterns like ":1" or ":2" at the end
+                                if re.search(r';\d+:\d+$', codice_urn):
+                                    should_fetch_brocardi = False
+                                    log.info("Skipping Brocardi for dispositivo of codice with allegato",
+                                             act_type=normalized_type, article=nv.numero_articolo)
+
+                        if should_fetch_brocardi:
+                            try:
+                                b_info = await brocardi_scraper.get_info(nv)
+                                brocardi_info = {
+                                    'position': b_info[0] if b_info[0] else None,
+                                    'link': b_info[2],
+                                    'Brocardi': b_info[1].get('Brocardi') if b_info[1] and 'Brocardi' in b_info[1] else None,
+                                    'Ratio': b_info[1].get('Ratio') if b_info[1] and 'Ratio' in b_info[1] else None,
+                                    'Spiegazione': b_info[1].get('Spiegazione') if b_info[1] and 'Spiegazione' in b_info[1] else None,
+                                    'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None,
+                                    'Relazioni': b_info[1].get('Relazioni') if b_info[1] and 'Relazioni' in b_info[1] else None,
+                                    'RelazioneCostituzione': b_info[1].get('RelazioneCostituzione') if b_info[1] and 'RelazioneCostituzione' in b_info[1] else None,
+                                    'Footnotes': b_info[1].get('Footnotes') if b_info[1] and 'Footnotes' in b_info[1] else None,
+                                    'RelatedArticles': b_info[1].get('RelatedArticles') if b_info[1] and 'RelatedArticles' in b_info[1] else None,
+                                    'CrossReferences': b_info[1].get('CrossReferences') if b_info[1] and 'CrossReferences' in b_info[1] else None
+                                }
+                            except Exception as exc:
+                                log.error("Error fetching Brocardi info", error=str(exc))
+                                brocardi_info = {'error': str(exc)}
                     return {
                         'article_text': article_text,
                         'url': url,

@@ -462,7 +462,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                   <Lightbulb size={16} fill={includeBrocardi ? "currentColor" : "none"} />
                 </div>
                 <div>
-                  <span className="block text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Includi Corredo Brocardi</span>
+                  <span className="block text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Includi dottrina</span>
                   <span className="text-[10px] font-bold text-slate-400">Ratio legis, spiegazioni e massime correlate</span>
                 </div>
               </div>
