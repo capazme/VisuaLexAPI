@@ -905,13 +905,17 @@ class NormaController:
         import subprocess
         from pathlib import Path
 
+        # Get the project root directory (where app.py is located)
+        project_root = Path(__file__).parent
+
         def run_git_command(args: list[str]) -> str:
             try:
                 result = subprocess.run(
                     ['git'] + args,
                     capture_output=True,
                     text=True,
-                    timeout=5
+                    timeout=5,
+                    cwd=str(project_root)  # Run git commands from project root
                 )
                 return result.stdout.strip() if result.returncode == 0 else ''
             except Exception:
@@ -919,7 +923,7 @@ class NormaController:
 
         # Read version from version.txt
         version = '1.0.0'
-        version_file = Path(__file__).parent / 'version.txt'
+        version_file = project_root / 'version.txt'
         if version_file.exists():
             try:
                 version = version_file.read_text().strip()
