@@ -38,16 +38,29 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     const { isAdmin } = useAuth();
     const { settings, updateSettings } = useAppStore();
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+    const [versionLoading, setVersionLoading] = useState(false);
+    const [versionError, setVersionError] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
 
     useEffect(() => {
-        if (isOpen && !versionInfo) {
-            fetch('/version')
-                .then(res => res.json())
-                .then(data => setVersionInfo(data))
-                .catch(() => setVersionInfo(null));
+        if (isOpen && !versionInfo && !versionLoading && !versionError) {
+            setVersionLoading(true);
+            fetch('/version', { signal: AbortSignal.timeout(5000) })
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to fetch version');
+                    return res.json();
+                })
+                .then(data => {
+                    setVersionInfo(data);
+                    setVersionError(false);
+                })
+                .catch(() => {
+                    setVersionError(true);
+                    setVersionInfo(null);
+                })
+                .finally(() => setVersionLoading(false));
         }
-    }, [isOpen, versionInfo]);
+    }, [isOpen, versionInfo, versionLoading, versionError]);
 
     if (!isOpen) return null;
 
@@ -215,7 +228,14 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
                         >
                             <Info size={16} />
-                            {showInfo ? 'Nascondi dettagli' : `Versione ${versionInfo?.version || '...'}`}
+                            {showInfo
+                                ? 'Nascondi dettagli'
+                                : versionLoading
+                                    ? 'Caricamento...'
+                                    : versionError
+                                        ? 'Versione (errore)'
+                                        : `Versione ${versionInfo?.version || '1.0.0'}`
+                            }
                         </button>
 
                         {showInfo && versionInfo && (
@@ -280,7 +300,17 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
 
                         {showInfo && !versionInfo && (
                             <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs text-gray-500 text-center">
-                                Caricamento...
+                                {versionLoading ? 'Caricamento...' : versionError ? (
+                                    <div className="space-y-2">
+                                        <p className="text-red-500">Impossibile caricare le informazioni</p>
+                                        <button
+                                            onClick={() => setVersionError(false)}
+                                            className="text-blue-500 hover:underline"
+                                        >
+                                            Riprova
+                                        </button>
+                                    </div>
+                                ) : 'Caricamento...'}
                             </div>
                         )}
                     </div>
