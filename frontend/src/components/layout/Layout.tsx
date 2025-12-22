@@ -20,12 +20,12 @@ export function Layout() {
   // Onboarding Tour
   const { startTour, hasSeenTour, resetAndStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
 
-  // Auto-start tour on first visit
+  // Auto-start welcome tour on first visit
   useEffect(() => {
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
-      if (!hasSeenTour('main')) {
-        startTour('main');
+      if (!hasSeenTour('welcome')) {
+        startTour('welcome');
       }
     }, 500);
     return () => clearTimeout(timer);

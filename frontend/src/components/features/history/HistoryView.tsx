@@ -4,6 +4,7 @@ import { cn } from '../../../lib/utils';
 import { useAppStore, appStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
+import { useTour } from '../../../hooks/useTour';
 
 // Converte un history item in NormaVisitata
 function historyToNormaVisitata(item: any): NormaVisitata {
@@ -68,6 +69,12 @@ export function HistoryView() {
         createDossier
     } = useAppStore();
     const navigate = useNavigate();
+    const { tryStartTour } = useTour();
+
+    // Start history tour on first visit
+    useEffect(() => {
+        tryStartTour('history');
+    }, [tryStartTour]);
 
     // Chiudi menu quando si clicca fuori
     useEffect(() => {
@@ -239,7 +246,7 @@ export function HistoryView() {
                     </h2>
 
                     <div className="flex items-center gap-2">
-                        <div className="relative w-full sm:w-64">
+                        <div id="tour-history-search" className="relative w-full sm:w-64">
                             <input
                                 type="text"
                                 placeholder="Cerca nella cronologia..."
@@ -336,7 +343,7 @@ export function HistoryView() {
                                     {/* Desktop: full timeline with dots */}
                                     <div className="hidden md:block space-y-3 pl-6 border-l-2 border-blue-100 dark:border-blue-900 relative">
                                         {items.map((item, idx) => (
-                                            <div key={idx} className="relative group">
+                                            <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
                                                 {/* Timeline dot */}
                                                 <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-gray-800 group-hover:scale-125 transition-transform" />
 
@@ -377,6 +384,7 @@ export function HistoryView() {
                                                             {/* Menu azioni */}
                                                             <div className="relative" ref={openMenu === item.timestamp ? menuRef : null}>
                                                                 <button
+                                                                    id={idx === 0 ? 'tour-history-actions' : undefined}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         setOpenMenu(openMenu === item.timestamp ? null : item.timestamp);
@@ -393,6 +401,7 @@ export function HistoryView() {
                                                                     <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
                                                                         {/* QuickNorm */}
                                                                         <button
+                                                                            id={idx === 0 ? 'tour-history-quick-norm' : undefined}
                                                                             onClick={(e) => handleAddQuickNorm(e, item)}
                                                                             className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                                                                         >

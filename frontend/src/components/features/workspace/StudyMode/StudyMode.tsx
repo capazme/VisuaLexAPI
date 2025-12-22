@@ -10,6 +10,7 @@ import { StudyModeBrocardiPopover } from './StudyModeBrocardiPopover';
 import { StudyModeSettings } from './StudyModeSettings';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData, NormaVisitata } from '../../../../types';
+import { useTour } from '../../../../hooks/useTour';
 
 export interface StudyModeProps {
   /** When true (default), the component is visible */
@@ -98,6 +99,19 @@ export function StudyMode({
     removeBookmark,
     isBookmarked
   } = useAppStore();
+
+  const { tryStartTour } = useTour();
+
+  // Start study mode tour on first open
+  useEffect(() => {
+    if (isOpen) {
+      // Small delay to ensure the component is rendered
+      const timer = setTimeout(() => {
+        tryStartTour('studyMode');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, tryStartTour]);
 
   // Navigation helpers
   const currentIndex = useMemo(() =>

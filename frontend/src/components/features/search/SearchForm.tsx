@@ -254,7 +254,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   }, {} as Record<string, typeof ACT_TYPES>);
 
   return (
-    <div className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl border border-slate-200 dark:border-slate-800 sticky top-6 overflow-hidden">
+    <div id="tour-search-form" className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl border border-slate-200 dark:border-slate-800 sticky top-6 overflow-hidden">
       {/* Header Container with premium gradient/glass look */}
       <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
         <h5 className="font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -268,7 +268,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       <div className="p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Act Type Selection */}
-          <div className="space-y-2">
+          <div id="tour-act-type" className="space-y-2">
             <label htmlFor="search-act-type" className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Fonte Normativa</label>
             <select
               id="search-act-type"
@@ -335,7 +335,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
 
           {/* Premium Article Navigator */}
-          <div className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+          <div id="tour-article-input" className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between px-1">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Articolo</label>
               {isLoadingArticles ? (
@@ -391,7 +391,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
 
           {/* Version Selection Card */}
-          <div className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
+          <div id="tour-version-select" className="bg-slate-50 dark:bg-slate-900/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Linea Temporale</label>
               <div className="p-1 px-2 rounded-lg bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-[10px] font-bold">ALPHA VERSION</div>
@@ -435,7 +435,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
 
           {/* Brocardi Toggle - Modern look */}
-          <div className="group flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-900/20 rounded-2xl cursor-pointer hover:border-purple-300 dark:hover:border-purple-800 transition-colors shadow-sm" onClick={() => setFormData(p => ({ ...p, show_brocardi_info: !p.show_brocardi_info }))}>
+          <div id="tour-brocardi-toggle" className="group flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-900/20 rounded-2xl cursor-pointer hover:border-purple-300 dark:hover:border-purple-800 transition-colors shadow-sm" onClick={() => setFormData(p => ({ ...p, show_brocardi_info: !p.show_brocardi_info }))}>
             <div className="flex items-center gap-3">
               <div className={cn(
                 "w-10 h-10 rounded-xl flex items-center justify-center transition-all",

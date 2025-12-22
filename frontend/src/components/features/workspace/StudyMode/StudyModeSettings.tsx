@@ -138,7 +138,7 @@ export function StudyModeSettings({
               </div>
 
               {/* Font Size */}
-              <div>
+              <div id="tour-study-typography">
                 <div className="flex items-center justify-between mb-3">
                   <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
                     Dimensione testo

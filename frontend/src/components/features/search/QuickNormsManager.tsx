@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Plus, Link, FileText, Star, Trash2, ExternalLink, Pencil, Check } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
@@ -6,6 +6,7 @@ import { parseNormattivaUrl, generateLabelFromParams, validateSearchParams } fro
 import type { SearchParams, QuickNorm } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
+import { useTour } from '../../../hooks/useTour';
 
 interface QuickNormsManagerProps {
   isOpen: boolean;
@@ -17,6 +18,15 @@ type InputMode = 'url' | 'manual';
 
 export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
   const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, useQuickNorm, triggerSearch } = useAppStore();
+  const { tryStartTour } = useTour();
+
+  // Start quickNorms tour on first open
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => tryStartTour('quickNorms'), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, tryStartTour]);
 
   const [inputMode, setInputMode] = useState<InputMode>('manual');
   const [urlInput, setUrlInput] = useState('');
@@ -159,7 +169,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Add New Section */}
-          <div className="space-y-4">
+          <div id="tour-qn-add" className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
               Aggiungi Nuova
             </h3>

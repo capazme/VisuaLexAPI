@@ -397,7 +397,7 @@ export function SearchPanel() {
 
       {/* Workspace Manager - renders all tabs */}
       {/* Desktop: Workspace floating panels - hidden on mobile */}
-      <div className="hidden md:block">
+      <div id="tour-results-area" className="hidden md:block">
         <WorkspaceManager
           onViewPdf={handleViewPdf}
           onCrossReference={handleCrossReferenceNavigate}
@@ -554,7 +554,7 @@ export function SearchPanel() {
           </div>
 
           {/* QuickNorms Section */}
-          <div id="tour-quicknorms" className="w-full max-w-2xl px-4">
+          <div id="tour-quick-norms" className="w-full max-w-2xl px-4">
             <div className="flex items-center justify-between mb-6 px-2">
               <div className="flex items-center gap-2.5 text-xs font-bold text-slate-400 uppercase tracking-widest">
                 <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">

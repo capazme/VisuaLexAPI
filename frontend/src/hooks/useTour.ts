@@ -72,7 +72,7 @@ export function useTour(options: UseTourOptions = {}) {
     const driverRef = useRef<Driver | null>(null);
 
     // Check if a specific tour has been completed
-    const hasSeenTour = useCallback((tourType: TourType = 'main'): boolean => {
+    const hasSeenTour = useCallback((tourType: TourType = 'welcome'): boolean => {
         if (typeof window === 'undefined') return true;
 
         // Skip on mobile if disabled
@@ -103,15 +103,15 @@ export function useTour(options: UseTourOptions = {}) {
         saveTourState(state);
     }, []);
 
-    // Reset all tours and immediately start the main tour
-    const resetAndStartTour = useCallback((tourType: TourType = 'main'): void => {
+    // Reset all tours and immediately start the welcome tour
+    const resetAndStartTour = useCallback((tourType: TourType = 'welcome'): void => {
         resetTour(tourType);
         // Small delay to ensure state is saved
         setTimeout(() => startTour(tourType), 100);
     }, []);
 
     // Start a specific tour
-    const startTour = useCallback((tourType: TourType = 'main'): void => {
+    const startTour = useCallback((tourType: TourType = 'welcome'): void => {
         // Skip on mobile if disabled
         if (disableOnMobile && isMobileDevice()) {
             console.log('[Tour] Skipped on mobile device');

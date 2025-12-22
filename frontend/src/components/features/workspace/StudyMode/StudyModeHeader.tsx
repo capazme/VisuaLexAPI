@@ -162,6 +162,7 @@ export function StudyModeHeader({
               {/* Panel Toggles */}
               {onToggleTools && (
                 <button
+                  id="tour-study-notes"
                   onClick={onToggleTools}
                   className={cn(
                     "p-1.5 sm:p-2 rounded-md transition-colors",
@@ -175,6 +176,7 @@ export function StudyModeHeader({
 
               {onToggleBrocardi && (
                 <button
+                  id="tour-study-brocardi"
                   onClick={onToggleBrocardi}
                   className={cn(
                     "p-1.5 sm:p-2 rounded-md transition-colors",
@@ -189,7 +191,7 @@ export function StudyModeHeader({
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
               {/* Quick Theme Toggle - hidden on mobile, use settings instead */}
-              <div className={cn(
+              <div id="tour-study-theme" className={cn(
                 "hidden sm:flex items-center rounded-lg p-0.5 border",
                 theme === 'dark' ? 'bg-slate-800 border-slate-700' : theme === 'sepia' ? 'bg-[#e4d4b8] border-[#d4c4a8]' : 'bg-slate-100 border-slate-200'
               )}>

@@ -17,6 +17,7 @@ import {
   canShareAsLink,
 } from '../../../utils/environmentUtils';
 import { exampleEnvironments } from '../../../data/exampleEnvironments';
+import { useTour } from '../../../hooks/useTour';
 
 export function EnvironmentPage() {
   const {
@@ -38,6 +39,12 @@ export function EnvironmentPage() {
   const [editingEnv, setEditingEnv] = useState<Environment | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { tryStartTour } = useTour();
+
+  // Start environments tour on first visit
+  useEffect(() => {
+    tryStartTour('environments');
+  }, [tryStartTour]);
 
   // Handle import from URL parameter
   useEffect(() => {
@@ -153,6 +160,7 @@ export function EnvironmentPage() {
             className="hidden"
           />
           <button
+            id="tour-env-create"
             onClick={() => setIsCreateModalOpen(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm flex-1 sm:flex-none min-h-[44px]"
           >
@@ -176,6 +184,7 @@ export function EnvironmentPage() {
             />
           </div>
           <select
+            id="tour-env-categories"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as EnvironmentCategory | 'all')}
             className="px-4 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px]"
@@ -229,10 +238,11 @@ export function EnvironmentPage() {
             )}
           </div>
         ) : (
-          filteredEnvironments.map((env) => (
+          filteredEnvironments.map((env, idx) => (
             <EnvironmentCard
               key={env.id}
               environment={env}
+              isFirst={idx === 0}
               onApply={() => setApplyModalEnv(env)}
               onEdit={() => setEditingEnv(env)}
               onExportJSON={() => handleExportJSON(env)}
@@ -299,6 +309,7 @@ export function EnvironmentPage() {
 
 interface EnvironmentCardProps {
   environment: Environment;
+  isFirst?: boolean;
   onApply: () => void;
   onEdit: () => void;
   onExportJSON: () => void;
@@ -309,6 +320,7 @@ interface EnvironmentCardProps {
 
 function EnvironmentCard({
   environment,
+  isFirst,
   onApply,
   onEdit,
   onExportJSON,
@@ -322,7 +334,7 @@ function EnvironmentCard({
   const canShare = canShareAsLink(environment);
 
   return (
-    <div className="dossier-card group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden">
+    <div id={isFirst ? 'tour-env-card' : undefined} className="dossier-card group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden">
       {/* Category Banner */}
       {category && (
         <div
@@ -429,6 +441,7 @@ function EnvironmentCard({
 
         {/* Apply Button */}
         <button
+          id={isFirst ? 'tour-env-apply' : undefined}
           onClick={onApply}
           className="w-full flex items-center justify-center gap-2 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium min-h-[44px]"
         >

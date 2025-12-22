@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, FileText, FolderOpen, List, Layers } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
+import { useTour } from '../../../hooks/useTour';
 
 // Normalize article ID for comparison (handles "3 bis" vs "3-bis")
 function normalizeArticleId(id: string): string {
@@ -98,6 +99,15 @@ export function TreeViewPanel({
   // This is separate from currentAnnex (which reflects loaded articles)
   // Allows user to select a tab and click articles before loading completes
   const [selectedAnnex, setSelectedAnnex] = useState<string | null | undefined>(undefined);
+  const { tryStartTour } = useTour();
+
+  // Start tree view tour on first open
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => tryStartTour('treeView'), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, tryStartTour]);
 
   // Reset selected annex when panel opens or when currentAnnex changes externally
   useEffect(() => {
@@ -263,7 +273,7 @@ export function TreeViewPanel({
 
               {/* Enhanced Stats */}
               {stats && (
-                <div className="flex items-center gap-4">
+                <div id="tour-tree-stats" className="flex items-center gap-4">
                   <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center gap-2">
                     <FileText size={14} className="text-slate-500" />
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -331,7 +341,7 @@ export function TreeViewPanel({
             )}
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div id="tour-tree-structure" className="flex-1 overflow-y-auto p-6 custom-scrollbar">
               {/* Show annex-specific articles when available */}
               {displayArticles ? (
                 <motion.div

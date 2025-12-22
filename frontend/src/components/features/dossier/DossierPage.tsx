@@ -11,6 +11,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTour } from '../../../hooks/useTour';
 
 // Status configuration
 type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
@@ -553,6 +554,12 @@ export function DossierPage() {
   const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { tryStartTour } = useTour();
+
+  // Start dossier tour on first visit
+  useEffect(() => {
+    tryStartTour('dossier');
+  }, [tryStartTour]);
 
   // Handle import from share link
   useEffect(() => {
@@ -896,7 +903,7 @@ export function DossierPage() {
               </div>
               {/* Statistics bar - scrollable on mobile */}
               {selectedDossier.items.length > 0 && (
-                <div className="flex gap-2 md:gap-3 mt-3 text-xs overflow-x-auto pb-2 md:pb-0 -mx-1 px-1">
+                <div id="tour-dossier-stats" className="flex gap-2 md:gap-3 mt-3 text-xs overflow-x-auto pb-2 md:pb-0 -mx-1 px-1">
                   <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300 whitespace-nowrap">
                     <Circle size={12} className="text-gray-400 flex-shrink-0" />
                     {selectedDossier.items.filter(i => !i.status || i.status === 'unread').length} da leggere
@@ -972,6 +979,7 @@ export function DossierPage() {
                 <Edit2 size={18} />
               </button>
               <button
+                id="tour-dossier-pin"
                 onClick={() => toggleDossierPin(selectedDossier.id)}
                 className={cn(
                   "p-2 rounded-md transition-colors",
@@ -984,6 +992,7 @@ export function DossierPage() {
                 <Star size={18} className={selectedDossier.isPinned ? "fill-current" : ""} />
               </button>
               <button
+                id="tour-dossier-export"
                 onClick={() => handleExportPdf(selectedDossier.id)}
                 className="dossier-export text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-2 rounded-md transition-colors"
                 title="Esporta PDF"
@@ -1087,7 +1096,7 @@ export function DossierPage() {
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={selectedDossier.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-3">
+            <div id="tour-dossier-items" className="space-y-3">
               {selectedDossier.items.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700">
                   <p className="text-gray-500">Questo dossier è vuoto.</p>
@@ -1179,6 +1188,7 @@ export function DossierPage() {
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
         <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">I tuoi Dossier</h2>
         <button
+          id="tour-dossier-create"
           onClick={() => setIsModalOpen(true)}
           className="dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] md:min-h-0"
         >
@@ -1189,7 +1199,7 @@ export function DossierPage() {
       {/* Search and filters */}
       <div className="mb-6 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
+          <div id="tour-dossier-search" className="relative flex-1">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -1200,6 +1210,7 @@ export function DossierPage() {
             />
           </div>
           <select
+            id="tour-dossier-sort"
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'date' | 'name' | 'items')}
             className="px-4 py-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] md:min-h-0"
@@ -1212,7 +1223,7 @@ export function DossierPage() {
 
         {/* Tags filter - scrollable on mobile */}
         {allTags.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+          <div id="tour-dossier-filters" className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
             <button
               onClick={() => setSelectedTag(null)}
               className={cn(
@@ -1263,9 +1274,10 @@ export function DossierPage() {
             )}
           </div>
         ) : (
-          filteredDossiers.map(dossier => (
+          filteredDossiers.map((dossier, idx) => (
             <div
               key={dossier.id}
+              id={idx === 0 ? 'tour-dossier-card' : undefined}
               onClick={() => setSelectedDossierId(dossier.id)}
               className="dossier-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative active:scale-[0.98]"
             >
