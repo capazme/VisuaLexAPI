@@ -102,7 +102,7 @@ export function CitationPreviewPopup({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -4 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="fixed z-[10000] w-[400px] max-w-[calc(100vw-24px)]"
+          className="fixed z-[80] w-[400px] max-w-[calc(100vw-24px)]"
           style={{
             top: position.top,
             left: position.left,
@@ -112,9 +112,9 @@ export function CitationPreviewPopup({
           role="tooltip"
           aria-live="polite"
         >
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm font-semibold text-blue-700 dark:text-blue-300 truncate">
                   {formatCitationLabel(citation)}
@@ -127,7 +127,7 @@ export function CitationPreviewPopup({
               </div>
               <button
                 onClick={onClose}
-                className="p-1 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors shrink-0"
+                className="p-1 rounded-lg hover:bg-slate-200/50 dark:hover:bg-slate-700/50 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors shrink-0"
                 aria-label="Chiudi"
               >
                 <X size={16} />
@@ -137,7 +137,7 @@ export function CitationPreviewPopup({
             {/* Content */}
             <div className="p-4">
               {isLoading && (
-                <div className="flex items-center justify-center gap-2 py-8 text-gray-500 dark:text-gray-400">
+                <div className="flex items-center justify-center gap-2 py-8 text-slate-500 dark:text-slate-400">
                   <Loader2 size={18} className="animate-spin" />
                   <span className="text-sm">Caricamento...</span>
                 </div>
@@ -153,15 +153,15 @@ export function CitationPreviewPopup({
               {!isLoading && !error && article && (
                 <div className="space-y-3">
                   {/* Article preview - scrollable without truncation */}
-                  <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed max-h-[300px] overflow-y-auto custom-scrollbar whitespace-pre-wrap">
+                  <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed max-h-[300px] overflow-y-auto custom-scrollbar whitespace-pre-wrap">
                     {getPreviewText() || (
-                      <span className="text-gray-400 italic">Nessun contenuto disponibile</span>
+                      <span className="text-slate-400 italic">Nessun contenuto disponibile</span>
                     )}
                   </div>
 
                   {/* Source info */}
                   {article.url && (
-                    <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                    <div className="text-xs text-slate-400 dark:text-slate-500 truncate">
                       Fonte: Normattiva
                     </div>
                   )}
@@ -169,22 +169,22 @@ export function CitationPreviewPopup({
               )}
 
               {!isLoading && !error && !article && (
-                <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">
+                <div className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">
                   Articolo non trovato
                 </div>
               )}
             </div>
 
             {/* Footer - Open in Tab button */}
-            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
+            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={handleOpenInTab}
                 disabled={isLoading}
                 className={cn(
                   "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                   "bg-blue-600 hover:bg-blue-700 text-white",
-                  "disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed",
-                  "dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+                  "disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed",
+                  "dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
                 )}
               >
                 <ExternalLink size={14} />

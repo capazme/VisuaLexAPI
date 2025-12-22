@@ -17,7 +17,7 @@ import { useTour } from '../../../hooks/useTour';
 type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
 
 const STATUS_CONFIG: Record<DossierItemStatus, { label: string; icon: any; color: string; bg: string }> = {
-  unread: { label: 'Da leggere', icon: Circle, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-700' },
+  unread: { label: 'Da leggere', icon: Circle, color: 'text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
   reading: { label: 'In lettura', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
   important: { label: 'Importante', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
   done: { label: 'Completato', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
@@ -59,18 +59,18 @@ function SortableItem({
       style={style}
       onClick={onView}
       className={cn(
-        "bg-white dark:bg-gray-800 p-3 md:p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer",
-        isSelected ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-gray-200 dark:border-gray-700"
+        "bg-white dark:bg-slate-800 p-3 md:p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer",
+        isSelected ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-slate-200 dark:border-slate-700"
       )}
     >
       <div className="flex items-center gap-2 md:gap-3">
         {showCheckbox && (
-          <button onClick={(e) => { e.stopPropagation(); onToggleSelect(); }} className="text-gray-400 hover:text-blue-500 p-2 -m-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 md:p-0 md:m-0 flex items-center justify-center">
+          <button onClick={(e) => { e.stopPropagation(); onToggleSelect(); }} className="text-slate-400 hover:text-blue-500 p-2 -m-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 md:p-0 md:m-0 flex items-center justify-center">
             {isSelected ? <CheckSquare size={20} className="text-blue-500" /> : <Square size={20} />}
           </button>
         )}
         {/* Hide drag handle on mobile - simplified UX */}
-        <div {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="hidden md:block text-gray-300 dark:text-gray-600 cursor-grab hover:text-gray-500">
+        <div {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="hidden md:block text-slate-300 dark:text-slate-600 cursor-grab hover:text-slate-500">
           <GripVertical size={20} />
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600 flex-shrink-0">
@@ -79,15 +79,15 @@ function SortableItem({
         <div className="flex-1 min-w-0">
           {item.type === 'norma' ? (
             <>
-              <h4 className="font-medium text-sm md:text-base text-gray-900 dark:text-white truncate">
+              <h4 className="font-medium text-sm md:text-base text-slate-900 dark:text-white truncate">
                 {item.data.tipo_atto} {item.data.numero_atto}
               </h4>
-              <p className="text-xs md:text-sm text-gray-500 truncate">Art. {item.data.numero_articolo} • {item.data.data}</p>
+              <p className="text-xs md:text-sm text-slate-500 truncate">Art. {item.data.numero_articolo} • {item.data.data}</p>
             </>
           ) : (
-            <p className="text-sm md:text-base text-gray-700 dark:text-gray-300 italic truncate">"{item.data}"</p>
+            <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 italic truncate">"{item.data}"</p>
           )}
-          <div className="text-xs text-gray-400 mt-1 hidden md:block">
+          <div className="text-xs text-slate-400 mt-1 hidden md:block">
             Aggiunto il {new Date(item.addedAt).toLocaleDateString()}
           </div>
         </div>
@@ -100,14 +100,14 @@ function SortableItem({
             >
               <StatusIcon size={18} />
             </button>
-            <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50 hidden group-hover/status:block">
+            <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50 hidden group-hover/status:block">
               {(Object.entries(STATUS_CONFIG) as [DossierItemStatus, typeof STATUS_CONFIG[DossierItemStatus]][]).map(([key, config]) => (
                 <button
                   key={key}
                   onClick={(e) => { e.stopPropagation(); onStatusChange(key); }}
                   className={cn(
-                    "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 min-h-[44px]",
-                    status === key && "bg-gray-100 dark:bg-gray-700"
+                    "w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 min-h-[44px]",
+                    status === key && "bg-slate-100 dark:bg-slate-700"
                   )}
                 >
                   <config.icon size={16} className={config.color} />
@@ -118,7 +118,7 @@ function SortableItem({
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            className="text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
+            className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center"
             title="Rimuovi"
           >
             <Trash2 size={18} />
@@ -150,10 +150,10 @@ function ArticleViewerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-          <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -164,7 +164,7 @@ function ArticleViewerModal({
               dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br />') }}
             />
           ) : (
-            <p className="text-gray-500 italic text-center py-8">Contenuto non disponibile</p>
+            <p className="text-slate-500 italic text-center py-8">Contenuto non disponibile</p>
           )}
         </div>
       </div>
@@ -199,39 +199,39 @@ function EditDossierModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-800">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-800">
         <div className="p-6">
-          <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-4">Modifica Dossier</h3>
+          <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-4">Modifica Dossier</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Titolo</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Titolo</label>
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrizione</label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white resize-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tag (separati da virgola)</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tag (separati da virgola)</label>
               <input
                 value={tagsInput}
                 onChange={e => setTagsInput(e.target.value)}
                 placeholder="diritto civile, contratti, obbligazioni"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <button onClick={onClose} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+            <button onClick={onClose} className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
               Annulla
             </button>
             <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
@@ -266,21 +266,21 @@ function ImportDossierModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
             <FolderInput className="text-blue-600" size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Importa Dossier</h2>
-            <p className="text-sm text-gray-500">Qualcuno ha condiviso un dossier con te</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Importa Dossier</h2>
+            <p className="text-sm text-slate-500">Qualcuno ha condiviso un dossier con te</p>
           </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-4">
-          <h3 className="font-medium text-gray-900 dark:text-white text-lg mb-2">{dossier.title}</h3>
+        <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4 mb-4">
+          <h3 className="font-medium text-slate-900 dark:text-white text-lg mb-2">{dossier.title}</h3>
           {dossier.description && (
-            <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">{dossier.description}</p>
+            <p className="text-slate-600 dark:text-slate-300 text-sm mb-3">{dossier.description}</p>
           )}
           <div className="flex flex-wrap gap-2 text-sm">
             <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
@@ -300,7 +300,7 @@ function ImportDossierModal({
           {dossier.tags && dossier.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-3">
               {dossier.tags.map(tag => (
-                <span key={tag} className="px-2 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs text-gray-600 dark:text-gray-300">
+                <span key={tag} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded text-xs text-slate-600 dark:text-slate-300">
                   {tag}
                 </span>
               ))}
@@ -311,7 +311,7 @@ function ImportDossierModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             Annulla
           </button>
@@ -426,9 +426,9 @@ function TreeNavigatorModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] border border-gray-200 dark:border-gray-800 flex flex-col">
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-          <h3 className="font-semibold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] border border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
             <TreeDeciduous size={20} className="text-green-600" />
             Importa articoli da norma
           </h3>
@@ -437,11 +437,11 @@ function TreeNavigatorModal({
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo atto</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo atto</label>
               <select
                 value={actType}
                 onChange={e => setActType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               >
                 <option value="codice civile">Codice Civile</option>
                 <option value="codice penale">Codice Penale</option>
@@ -455,22 +455,22 @@ function TreeNavigatorModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Numero</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Numero</label>
               <input
                 value={actNumber}
                 onChange={e => setActNumber(e.target.value)}
                 placeholder="241"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
               <input
                 type="text"
                 value={actDate}
                 onChange={e => setActDate(e.target.value)}
                 placeholder="aaaa o gg-mm-aaaa"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
           </div>
@@ -493,24 +493,24 @@ function TreeNavigatorModal({
           {tree.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 dark:text-gray-400">{tree.length} articoli trovati</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">{tree.length} articoli trovati</span>
                 <button onClick={selectAll} className="text-sm text-blue-600 hover:underline">
                   Seleziona tutti
                 </button>
               </div>
-              <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
+              <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
                 {tree.map((item, idx) => {
                   const articleNum = typeof item === 'string' ? item : Object.keys(item)[0];
                   return (
                     <button
                       key={idx}
                       onClick={() => toggleArticle(articleNum)}
-                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       {selectedArticles.has(articleNum) ? (
                         <CheckSquare size={16} className="text-blue-500" />
                       ) : (
-                        <Square size={16} className="text-gray-400" />
+                        <Square size={16} className="text-slate-400" />
                       )}
                       <span className="text-sm">Art. {articleNum}</span>
                     </button>
@@ -521,8 +521,8 @@ function TreeNavigatorModal({
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
             Annulla
           </button>
           <button
@@ -861,7 +861,7 @@ export function DossierPage() {
         {/* Mobile back button - prominent */}
         <button
           onClick={() => setSelectedDossierId(null)}
-          className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors w-full"
+          className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors w-full"
         >
           <ArrowLeft size={20} /> Torna ai Dossier
         </button>
@@ -869,16 +869,16 @@ export function DossierPage() {
         {/* Desktop back button - subtle */}
         <button
           onClick={() => setSelectedDossierId(null)}
-          className="hidden md:flex mb-4 items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+          className="hidden md:flex mb-4 items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors"
         >
           <ArrowLeft size={16} /> Torna ai Dossier
         </button>
 
-        <header className="mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
+        <header className="mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 md:gap-3">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 md:gap-3">
                   <Folder className="text-blue-500" size={24} />
                   <span className="truncate">{selectedDossier.title}</span>
                 </h2>
@@ -887,7 +887,7 @@ export function DossierPage() {
                 )}
               </div>
               {selectedDossier.description && (
-                <p className="text-sm md:text-base text-gray-500 mt-1 line-clamp-2 md:line-clamp-none">{selectedDossier.description}</p>
+                <p className="text-sm md:text-base text-slate-500 mt-1 line-clamp-2 md:line-clamp-none">{selectedDossier.description}</p>
               )}
               {selectedDossier.tags && selectedDossier.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
@@ -898,14 +898,14 @@ export function DossierPage() {
                   ))}
                 </div>
               )}
-              <div className="text-xs md:text-sm text-gray-400 mt-2">
+              <div className="text-xs md:text-sm text-slate-400 mt-2">
                 Creato il {new Date(selectedDossier.createdAt).toLocaleDateString()} • {selectedDossier.items.length} elementi
               </div>
               {/* Statistics bar - scrollable on mobile */}
               {selectedDossier.items.length > 0 && (
                 <div id="tour-dossier-stats" className="flex gap-2 md:gap-3 mt-3 text-xs overflow-x-auto pb-2 md:pb-0 -mx-1 px-1">
-                  <span className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                    <Circle size={12} className="text-gray-400 flex-shrink-0" />
+                  <span className="flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                    <Circle size={12} className="text-slate-400 flex-shrink-0" />
                     {selectedDossier.items.filter(i => !i.status || i.status === 'unread').length} da leggere
                   </span>
                   <span className="flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-300 whitespace-nowrap">
@@ -928,7 +928,7 @@ export function DossierPage() {
             <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
               <button
                 onClick={() => setEditingDossier(selectedDossier)}
-                className="flex-shrink-0 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 p-3 rounded-lg transition-colors"
+                className="flex-shrink-0 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-3 rounded-lg transition-colors"
                 title="Modifica"
               >
                 <Edit2 size={20} />
@@ -973,7 +973,7 @@ export function DossierPage() {
             <div className="hidden md:flex gap-2">
               <button
                 onClick={() => setEditingDossier(selectedDossier)}
-                className="text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-md transition-colors"
+                className="text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-md transition-colors"
                 title="Modifica"
               >
                 <Edit2 size={18} />
@@ -985,7 +985,7 @@ export function DossierPage() {
                   "p-2 rounded-md transition-colors",
                   selectedDossier.isPinned
                     ? "text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
-                    : "text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
                 title={selectedDossier.isPinned ? "Rimuovi dai preferiti" : "Aggiungi ai preferiti"}
               >
@@ -1046,7 +1046,7 @@ export function DossierPage() {
 
         {/* Bulk actions toolbar */}
         {selectedDossier.items.length > 0 && (
-          <div className="mb-4 flex flex-col md:flex-row items-stretch md:items-center gap-3 md:justify-between bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="mb-4 flex flex-col md:flex-row items-stretch md:items-center gap-3 md:justify-between bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setShowBulkActions(!showBulkActions)}
@@ -1054,7 +1054,7 @@ export function DossierPage() {
                   "px-4 py-2 md:px-3 md:py-1.5 rounded-md text-sm transition-colors min-h-[44px] md:min-h-0",
                   showBulkActions
                     ? "bg-blue-600 text-white"
-                    : "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    : "bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600"
                 )}
               >
                 {showBulkActions ? "Annulla selezione" : "Seleziona"}
@@ -1067,7 +1067,7 @@ export function DossierPage() {
                   >
                     Seleziona tutti
                   </button>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-slate-500">
                     {selectedItems.size} selezionati
                   </span>
                 </>
@@ -1098,9 +1098,9 @@ export function DossierPage() {
           <SortableContext items={selectedDossier.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
             <div id="tour-dossier-items" className="space-y-3">
               {selectedDossier.items.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700">
-                  <p className="text-gray-500">Questo dossier è vuoto.</p>
-                  <p className="text-xs text-gray-400 mt-1">Aggiungi articoli dai risultati di ricerca.</p>
+                <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
+                  <p className="text-slate-500">Questo dossier è vuoto.</p>
+                  <p className="text-xs text-slate-400 mt-1">Aggiungi articoli dai risultati di ricerca.</p>
                 </div>
               ) : (
                 selectedDossier.items.map((item) => (
@@ -1124,27 +1124,27 @@ export function DossierPage() {
         {moveToModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMoveToModalOpen(false)} />
-            <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-sm border border-gray-200 dark:border-gray-800">
+            <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-800">
               <div className="p-6">
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white mb-4">Sposta in altro dossier</h3>
+                <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-4">Sposta in altro dossier</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
                   {dossiers.filter(d => d.id !== selectedDossier.id).map(d => (
                     <button
                       key={d.id}
                       onClick={() => handleMoveToDossier(d.id)}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2"
                     >
                       <Folder size={16} className="text-blue-500" />
                       {d.title}
                     </button>
                   ))}
                   {dossiers.filter(d => d.id !== selectedDossier.id).length === 0 && (
-                    <p className="text-gray-500 text-sm text-center py-4">Nessun altro dossier disponibile</p>
+                    <p className="text-slate-500 text-sm text-center py-4">Nessun altro dossier disponibile</p>
                   )}
                 </div>
                 <button
                   onClick={() => setMoveToModalOpen(false)}
-                  className="mt-4 w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                  className="mt-4 w-full px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
                 >
                   Annulla
                 </button>
@@ -1186,7 +1186,7 @@ export function DossierPage() {
   return (
     <div className="animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">I tuoi Dossier</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">I tuoi Dossier</h2>
         <button
           id="tour-dossier-create"
           onClick={() => setIsModalOpen(true)}
@@ -1200,20 +1200,20 @@ export function DossierPage() {
       <div className="mb-6 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div id="tour-dossier-search" className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Cerca nei dossier..."
-              className="w-full pl-10 pr-4 py-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] md:min-h-0"
+              className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0"
             />
           </div>
           <select
             id="tour-dossier-sort"
             value={sortBy}
             onChange={e => setSortBy(e.target.value as 'date' | 'name' | 'items')}
-            className="px-4 py-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px] md:min-h-0"
+            className="px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0"
           >
             <option value="date">Ordina per data</option>
             <option value="name">Ordina per nome</option>
@@ -1230,7 +1230,7 @@ export function DossierPage() {
                 "px-4 py-2 md:px-3 md:py-1 rounded-full text-sm transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 flex items-center",
                 !selectedTag
                   ? "bg-blue-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               )}
             >
               Tutti
@@ -1243,7 +1243,7 @@ export function DossierPage() {
                   "px-4 py-2 md:px-3 md:py-1 rounded-full text-sm transition-colors flex items-center gap-1 whitespace-nowrap min-h-[44px] md:min-h-0",
                   selectedTag === tag
                     ? "bg-blue-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
                 )}
               >
                 <Tag size={14} />
@@ -1258,18 +1258,18 @@ export function DossierPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredDossiers.length === 0 ? (
           <div className="col-span-full text-center py-12 md:py-20">
-            <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Folder size={32} className="text-gray-400 md:w-10 md:h-10" />
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Folder size={32} className="text-slate-400 md:w-10 md:h-10" />
             </div>
             {searchQuery || selectedTag ? (
               <>
-                <h3 className="text-base md:text-lg font-medium text-gray-900 dark:text-white">Nessun risultato</h3>
-                <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2">Prova a modificare i filtri di ricerca.</p>
+                <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-white">Nessun risultato</h3>
+                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-2">Prova a modificare i filtri di ricerca.</p>
               </>
             ) : (
               <>
-                <h3 className="text-base md:text-lg font-medium text-gray-900 dark:text-white">Nessun dossier creato</h3>
-                <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2">Organizza le tue ricerche creando dei dossier tematici.</p>
+                <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-white">Nessun dossier creato</h3>
+                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-2">Organizza le tue ricerche creando dei dossier tematici.</p>
               </>
             )}
           </div>
@@ -1279,21 +1279,21 @@ export function DossierPage() {
               key={dossier.id}
               id={idx === 0 ? 'tour-dossier-card' : undefined}
               onClick={() => setSelectedDossierId(dossier.id)}
-              className="dossier-card bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative active:scale-[0.98]"
+              className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative active:scale-[0.98]"
             >
               {dossier.isPinned && (
                 <Star size={14} className="absolute top-3 right-3 text-yellow-500 fill-yellow-500" />
               )}
               <div className="flex justify-between items-start mb-3 md:mb-4">
                 <Folder className="text-blue-500 group-hover:scale-110 transition-transform flex-shrink-0" size={28} />
-                <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
+                <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
                   {dossier.items.length} elementi
                 </span>
               </div>
-              <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
+              <h3 className="font-bold text-base md:text-lg text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
                 {dossier.title}
               </h3>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 line-clamp-2 min-h-[2.5em]">
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 min-h-[2.5em]">
                 {dossier.description || "Nessuna descrizione"}
               </p>
               {dossier.tags && dossier.tags.length > 0 && (
@@ -1304,13 +1304,13 @@ export function DossierPage() {
                     </span>
                   ))}
                   {dossier.tags.length > 3 && (
-                    <span className="text-xs text-gray-400">+{dossier.tags.length - 3}</span>
+                    <span className="text-xs text-slate-400">+{dossier.tags.length - 3}</span>
                   )}
                 </div>
               )}
-              <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                <span className="text-xs text-gray-400">{new Date(dossier.createdAt).toLocaleDateString()}</span>
-                <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+              <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                <span className="text-xs text-slate-400">{new Date(dossier.createdAt).toLocaleDateString()}</span>
+                <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
               </div>
             </div>
           ))

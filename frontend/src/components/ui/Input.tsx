@@ -76,8 +76,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'text-slate-900 dark:text-slate-100',
               'placeholder:text-slate-400 dark:placeholder:text-slate-500',
               'text-sm font-medium',
-              // Focus states
-              'focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
+              // Disabled state
+              'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800',
+              // Focus states - using focus-visible for better keyboard accessibility
+              'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus:border-primary-500 focus:outline-none',
               inputVariants[variant],
               icon ? 'pl-10 pr-4' : 'px-4',
               className

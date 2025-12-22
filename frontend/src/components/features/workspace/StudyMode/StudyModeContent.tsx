@@ -186,7 +186,7 @@ export function StudyModeContent({
           >
             <h2 className={cn(
               "text-xl sm:text-2xl font-serif font-bold mb-4 sm:mb-8 pb-3 sm:pb-4 border-b",
-              theme === 'dark' ? 'border-gray-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-slate-200'
+              theme === 'dark' ? 'border-slate-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-slate-200'
             )}>
               Articolo {norma_data.numero_articolo}
             </h2>

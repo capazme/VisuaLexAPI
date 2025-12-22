@@ -183,17 +183,17 @@ export function SelectionPopup({
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Main popup */}
-      <div className="bg-gray-900 dark:bg-gray-800 text-white rounded-lg shadow-2xl border border-gray-700 overflow-hidden">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-2xl border border-slate-700 overflow-hidden">
         {showColorPicker ? (
           /* Color picker view */
           <div className="p-2 flex items-center gap-1">
             <button
               onClick={() => setShowColorPicker(false)}
-              className="p-1.5 rounded hover:bg-gray-700 text-gray-400"
+              className="p-1.5 rounded hover:bg-slate-700 text-slate-400"
             >
               <X size={14} />
             </button>
-            <div className="w-px h-5 bg-gray-700 mx-1" />
+            <div className="w-px h-5 bg-slate-700 mx-1" />
             {HIGHLIGHT_COLORS.map(({ name, bg, border, hover }) => (
               <button
                 key={name}
@@ -211,33 +211,33 @@ export function SelectionPopup({
           <div className="flex items-center">
             <button
               onClick={() => handleAction('highlight')}
-              className="p-2.5 hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-sm"
+              className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
               title="Evidenzia (H)"
             >
               <Highlighter size={16} className="text-yellow-400" />
             </button>
-            <div className="w-px h-5 bg-gray-700" />
+            <div className="w-px h-5 bg-slate-700" />
             <button
               onClick={() => handleAction('note')}
-              className="p-2.5 hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-sm"
+              className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
               title="Aggiungi nota (N)"
             >
               <StickyNote size={16} className="text-blue-400" />
             </button>
-            <div className="w-px h-5 bg-gray-700" />
+            <div className="w-px h-5 bg-slate-700" />
             <button
               onClick={() => handleAction('copy')}
-              className="p-2.5 hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-sm"
+              className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
               title="Copia (Cmd+C)"
             >
               <Copy size={16} className="text-green-400" />
             </button>
             {onSearch && (
               <>
-                <div className="w-px h-5 bg-gray-700" />
+                <div className="w-px h-5 bg-slate-700" />
                 <button
                   onClick={() => handleAction('search')}
-                  className="p-2.5 hover:bg-gray-700 transition-colors flex items-center gap-1.5 text-sm"
+                  className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Cerca"
                 >
                   <Search size={16} className="text-purple-400" />
@@ -250,7 +250,7 @@ export function SelectionPopup({
 
       {/* Arrow pointing down */}
       <div className="absolute left-1/2 transform -translate-x-1/2 top-full">
-        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-gray-900 dark:border-t-gray-800" />
+        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-slate-900 dark:border-t-slate-800" />
       </div>
     </div>
   );

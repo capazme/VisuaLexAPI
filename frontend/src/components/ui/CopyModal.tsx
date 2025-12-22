@@ -53,17 +53,17 @@ export function CopyModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+          <h3 className="font-semibold text-slate-900 dark:text-white">
             Copia Contenuto
           </h3>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
           >
-            <X size={18} className="text-gray-500" />
+            <X size={18} className="text-slate-500" />
           </button>
         </div>
 
@@ -71,10 +71,10 @@ export function CopyModal({
         <div className="p-4 space-y-4">
           {/* Content Section - Custom Checkboxes */}
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase mb-3">Contenuto</p>
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-1 space-y-1">
+            <p className="text-xs font-bold text-slate-500 uppercase mb-3">Contenuto</p>
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1 space-y-1">
               <label className={cn(
-                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-gray-800"
+                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-slate-800"
               )}>
                 <div className="relative flex items-center justify-center mt-0.5">
                   <input
@@ -87,19 +87,19 @@ export function CopyModal({
                     "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
                     options.includeText
                       ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
                   )}>
                     {options.includeText && <Check size={14} className="text-white" />}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <span className="font-medium text-gray-900 dark:text-white text-sm">Testo articolo</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Include il testo completo dell'articolo</p>
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">Testo articolo</span>
+                  <p className="text-xs text-slate-500 mt-0.5">Include il testo completo dell'articolo</p>
                 </div>
               </label>
 
               <label className={cn(
-                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-gray-800"
+                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-slate-800"
               )}>
                 <div className="relative flex items-center justify-center mt-0.5">
                   <input
@@ -112,20 +112,20 @@ export function CopyModal({
                     "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
                     options.includeCitation
                       ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
                   )}>
                     {options.includeCitation && <Check size={14} className="text-white" />}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <span className="font-medium text-gray-900 dark:text-white text-sm">Citazione</span>
-                  <p className="text-xs text-gray-500 mt-0.5">Riferimento normativo formale</p>
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">Citazione</span>
+                  <p className="text-xs text-slate-500 mt-0.5">Riferimento normativo formale</p>
                 </div>
               </label>
 
               <label className={cn(
                 "flex items-start gap-3 p-3 rounded-lg transition-colors",
-                hasNotes ? "cursor-pointer hover:bg-white dark:hover:bg-gray-800" : "opacity-50 cursor-not-allowed"
+                hasNotes ? "cursor-pointer hover:bg-white dark:hover:bg-slate-800" : "opacity-50 cursor-not-allowed"
               )}>
                 <div className="relative flex items-center justify-center mt-0.5">
                   <input
@@ -139,22 +139,22 @@ export function CopyModal({
                     "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
                     options.includeNotes
                       ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
                   )}>
                     {options.includeNotes && <Check size={14} className="text-white" />}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <span className="font-medium text-gray-900 dark:text-white text-sm">
-                    Note personali {!hasNotes && <span className="text-gray-400">(nessuna)</span>}
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">
+                    Note personali {!hasNotes && <span className="text-slate-400">(nessuna)</span>}
                   </span>
-                  <p className="text-xs text-gray-500 mt-0.5">Include le tue annotazioni</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Include le tue annotazioni</p>
                 </div>
               </label>
 
               <label className={cn(
                 "flex items-start gap-3 p-3 rounded-lg transition-colors",
-                hasHighlights ? "cursor-pointer hover:bg-white dark:hover:bg-gray-800" : "opacity-50 cursor-not-allowed"
+                hasHighlights ? "cursor-pointer hover:bg-white dark:hover:bg-slate-800" : "opacity-50 cursor-not-allowed"
               )}>
                 <div className="relative flex items-center justify-center mt-0.5">
                   <input
@@ -168,16 +168,16 @@ export function CopyModal({
                     "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
                     options.includeHighlights
                       ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600"
+                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
                   )}>
                     {options.includeHighlights && <Check size={14} className="text-white" />}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <span className="font-medium text-gray-900 dark:text-white text-sm">
-                    Evidenziazioni {!hasHighlights && <span className="text-gray-400">(nessuna)</span>}
+                  <span className="font-medium text-slate-900 dark:text-white text-sm">
+                    Evidenziazioni {!hasHighlights && <span className="text-slate-400">(nessuna)</span>}
                   </span>
-                  <p className="text-xs text-gray-500 mt-0.5">Include le parti evidenziate</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Include le parti evidenziate</p>
                 </div>
               </label>
             </div>
@@ -186,7 +186,7 @@ export function CopyModal({
           {/* Scope Section */}
           {(canCopyNorma || canCopyTab) && (
             <div>
-              <p className="text-xs font-bold text-gray-500 uppercase mb-3">Ambito</p>
+              <p className="text-xs font-bold text-slate-500 uppercase mb-3">Ambito</p>
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-1 space-y-1">
                 <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
                   <input
@@ -200,11 +200,11 @@ export function CopyModal({
                     "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
                     options.scope === 'article'
                       ? "border-blue-600 dark:border-blue-400"
-                      : "border-gray-300 dark:border-gray-600"
+                      : "border-slate-300 dark:border-slate-600"
                   )}>
                     {options.scope === 'article' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
                   </div>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Solo questo articolo</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">Solo questo articolo</span>
                 </label>
 
                 {canCopyNorma && (
@@ -220,11 +220,11 @@ export function CopyModal({
                       "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
                       options.scope === 'norma'
                         ? "border-blue-600 dark:border-blue-400"
-                        : "border-gray-300 dark:border-gray-600"
+                        : "border-slate-300 dark:border-slate-600"
                     )}>
                       {options.scope === 'norma' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
                     </div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">Tutti gli articoli della norma</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">Tutti gli articoli della norma</span>
                   </label>
                 )}
 
@@ -241,11 +241,11 @@ export function CopyModal({
                       "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
                       options.scope === 'tab'
                         ? "border-blue-600 dark:border-blue-400"
-                        : "border-gray-300 dark:border-gray-600"
+                        : "border-slate-300 dark:border-slate-600"
                     )}>
                       {options.scope === 'tab' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
                     </div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">Tutta la tab</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">Tutta la tab</span>
                   </label>
                 )}
               </div>
@@ -254,17 +254,17 @@ export function CopyModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
+        <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-lg">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
             Annulla
           </button>
           <button
             onClick={handleCopy}
             disabled={!options.includeText && !options.includeCitation && !options.includeNotes && !options.includeHighlights}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
           >
             <Copy size={16} />
             Copia

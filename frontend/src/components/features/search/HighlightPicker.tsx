@@ -68,11 +68,11 @@ export function HighlightPicker({
   return (
     <div
       ref={pickerRef}
-      className="absolute z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-200"
+      className="absolute z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-200"
       style={style}
     >
       <div className="flex flex-col gap-1">
-        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
           Colore evidenziatore
         </div>
         {COLORS.map((color) => (
@@ -80,17 +80,17 @@ export function HighlightPicker({
             key={color.value}
             onClick={() => handleSelect(color.value)}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 group",
-              selectedColor === color.value && "bg-gray-100 dark:bg-gray-800"
+              "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 group",
+              selectedColor === color.value && "bg-slate-100 dark:bg-slate-800"
             )}
           >
             <div
               className={cn(
-                "w-6 h-6 rounded-md ring-1 ring-gray-300 dark:ring-gray-600",
+                "w-6 h-6 rounded-md ring-1 ring-slate-300 dark:ring-slate-600",
                 color.bg
               )}
             />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1 text-left">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 flex-1 text-left">
               {color.label}
             </span>
             {selectedColor === color.value && (
@@ -101,8 +101,8 @@ export function HighlightPicker({
       </div>
 
       {/* Keyboard hint */}
-      <div className="mt-2 px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800">
-        <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs">Esc</kbd> per chiudere
+      <div className="mt-2 px-2 py-1.5 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800">
+        <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs">Esc</kbd> per chiudere
       </div>
     </div>
   );

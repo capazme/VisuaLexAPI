@@ -58,16 +58,16 @@ export function LoginForm() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 mb-2 transform transition-transform hover:scale-105 duration-300">
             <LogIn size={28} strokeWidth={2.5} />
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             Visua<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Lex</span>
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 font-medium">
+          <p className="text-slate-500 dark:text-slate-400 font-medium">
             Accedi alla tua piattaforma legale
           </p>
         </div>
 
         {/* Login Card with Glass Effect */}
-        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-gray-900/5 dark:ring-white/10 p-8 transition-all duration-300">
+        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 transition-all duration-300">
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
@@ -79,7 +79,7 @@ export function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Email
               </label>
               <div
@@ -93,7 +93,7 @@ export function LoginForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isEmailFocused ? 'text-blue-500' : 'text-gray-400'
+                      isEmailFocused ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -103,7 +103,7 @@ export function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setIsEmailFocused(true)}
                   onBlur={() => setIsEmailFocused(false)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="name@company.com"
                   disabled={loading}
                   autoComplete="email"
@@ -113,7 +113,7 @@ export function LoginForm() {
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Password
               </label>
               <div
@@ -127,7 +127,7 @@ export function LoginForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isPasswordFocused ? 'text-blue-500' : 'text-gray-400'
+                      isPasswordFocused ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -137,7 +137,7 @@ export function LoginForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setIsPasswordFocused(true)}
                   onBlur={() => setIsPasswordFocused(false)}
-                  className="w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
+                  className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="••••••••"
                   disabled={loading}
                   autoComplete="current-password"
@@ -145,7 +145,7 @@ export function LoginForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-white/5"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -171,7 +171,7 @@ export function LoginForm() {
           </form>
 
           {/* Alpha Notice - Registration disabled */}
-          <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500">
+          <p className="mt-8 text-center text-xs text-slate-400 dark:text-slate-500">
             Accesso riservato agli utenti autorizzati.
             <br />
             Contatta l'amministratore per ottenere un account.
@@ -179,7 +179,7 @@ export function LoginForm() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-6">
           © 2025 VisuaLex. All rights reserved.
         </p>
       </div>

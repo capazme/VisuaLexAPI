@@ -285,20 +285,20 @@ export function AdvancedExportModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Esporta Articolo</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Esporta Articolo</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Art. {norma_data.numero_articolo} - {norma_data.tipo_atto}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
-            <X size={20} className="text-gray-500" />
+            <X size={20} className="text-slate-500" />
           </button>
         </div>
 
@@ -306,7 +306,7 @@ export function AdvancedExportModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Sections */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Contenuto Base</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto Base</h3>
             <div className="grid grid-cols-2 gap-2">
               {sections.filter(s => ['text', 'citation'].includes(s.id)).map(section => (
                 <button
@@ -316,7 +316,7 @@ export function AdvancedExportModal({
                     "flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left",
                     section.enabled
                       ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                      : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                   )}
                 >
                   {section.icon}
@@ -330,7 +330,7 @@ export function AdvancedExportModal({
           {/* Brocardi Sections */}
           {hasBrocardiContent && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Approfondimenti Brocardi</h3>
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Approfondimenti Brocardi</h3>
               <div className="grid grid-cols-2 gap-2">
                 {sections.filter(s => ['brocardi', 'ratio', 'spiegazione'].includes(s.id)).map(section => {
                   // Check if content exists for this section
@@ -349,7 +349,7 @@ export function AdvancedExportModal({
                         "flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left",
                         section.enabled
                           ? "bg-purple-50 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300"
-                          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                          : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                       )}
                     >
                       {section.icon}
@@ -375,7 +375,7 @@ export function AdvancedExportModal({
                 className="flex items-center gap-2 w-full text-left"
               >
                 {massimeExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Massime ({massimeList.length} disponibili)
                 </h3>
                 {selectedMassime.size > 0 && (
@@ -395,7 +395,7 @@ export function AdvancedExportModal({
                     {selectedMassime.size === massimeList.length ? 'Deseleziona tutte' : 'Seleziona tutte'}
                   </button>
 
-                  <div className="max-h-64 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                  <div className="max-h-64 overflow-y-auto space-y-2 border border-slate-200 dark:border-slate-700 rounded-lg p-2">
                     {massimeList.map((massima, idx) => (
                       <label
                         key={massima.id}
@@ -403,18 +403,18 @@ export function AdvancedExportModal({
                           "flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors",
                           selectedMassime.has(massima.id)
                             ? "bg-purple-50 dark:bg-purple-900/30"
-                            : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800"
                         )}
                       >
                         <input
                           type="checkbox"
                           checked={selectedMassime.has(massima.id)}
                           onChange={() => toggleMassima(massima.id)}
-                          className="mt-1 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
+                          className="mt-1 rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
                         />
                         <div className="flex-1 min-w-0">
-                          <span className="text-xs font-semibold text-gray-400 mb-1 block">#{idx + 1}</span>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
+                          <span className="text-xs font-semibold text-slate-400 mb-1 block">#{idx + 1}</span>
+                          <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
                             {massima.text.substring(0, 200)}
                             {massima.text.length > 200 && '...'}
                           </p>
@@ -430,7 +430,7 @@ export function AdvancedExportModal({
           {/* Personal Content */}
           {(annotations.length > 0 || highlights.length > 0) && (
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Contenuto Personale</h3>
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Contenuto Personale</h3>
               <div className="grid grid-cols-2 gap-2">
                 {sections.filter(s => ['notes', 'highlights'].includes(s.id)).map(section => {
                   const hasContent =
@@ -449,7 +449,7 @@ export function AdvancedExportModal({
                         "flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left",
                         section.enabled
                           ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
-                          : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                          : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                       )}
                     >
                       {section.icon}
@@ -465,7 +465,7 @@ export function AdvancedExportModal({
 
           {/* Export Format */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Formato Esportazione</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato Esportazione</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setExportFormat('clipboard')}
@@ -473,7 +473,7 @@ export function AdvancedExportModal({
                   "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors",
                   exportFormat === 'clipboard'
                     ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-                    : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                 )}
               >
                 <Copy size={16} />
@@ -485,7 +485,7 @@ export function AdvancedExportModal({
                   "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors",
                   exportFormat === 'rtf'
                     ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-                    : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                 )}
               >
                 <FileText size={16} />
@@ -497,7 +497,7 @@ export function AdvancedExportModal({
                   "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors",
                   exportFormat === 'txt'
                     ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
-                    : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
                 )}
               >
                 <FileText size={16} />
@@ -508,10 +508,10 @@ export function AdvancedExportModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
             Annulla
           </button>

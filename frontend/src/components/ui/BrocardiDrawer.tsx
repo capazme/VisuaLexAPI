@@ -67,22 +67,22 @@ export function BrocardiDrawer({ isOpen, onClose, children, title = "Approfondim
             className={cn(
               "fixed right-0 top-0 bottom-0 z-50",
               "w-full sm:w-[500px] md:w-[600px] lg:w-[700px]",
-              "bg-white dark:bg-gray-900",
+              "bg-white dark:bg-slate-900",
               "shadow-2xl",
               "flex flex-col"
             )}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                   <Book size={20} className="text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                     {title}
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Annotazioni Brocardi
                   </p>
                 </div>
@@ -90,10 +90,10 @@ export function BrocardiDrawer({ isOpen, onClose, children, title = "Approfondim
 
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors group"
+                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors group"
                 title="Chiudi pannello (Esc)"
               >
-                <X size={20} className="text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200" />
+                <X size={20} className="text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
               </button>
             </div>
 
@@ -103,9 +103,9 @@ export function BrocardiDrawer({ isOpen, onClose, children, title = "Approfondim
             </div>
 
             {/* Footer Hint */}
-            <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 shrink-0">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                <kbd className="px-2 py-1 bg-white dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-700 text-xs">
+            <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 shrink-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                <kbd className="px-2 py-1 bg-white dark:bg-slate-900 rounded border border-slate-300 dark:border-slate-700 text-xs">
                   Esc
                 </kbd>
                 {' '}per chiudere

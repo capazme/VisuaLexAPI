@@ -73,16 +73,16 @@ export function RegisterForm() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 mb-2 transform transition-transform hover:scale-105 duration-300">
             <UserPlus size={28} strokeWidth={2.5} />
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white">
+          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             Visua<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Lex</span>
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 font-medium">
+          <p className="text-slate-500 dark:text-slate-400 font-medium">
             Crea il tuo account
           </p>
         </div>
 
         {/* Registration Card with Glass Effect */}
-        <div className="bg-white/70 dark:bg-gray-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-gray-900/5 dark:ring-white/10 p-8 transition-all duration-300">
+        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 transition-all duration-300">
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
@@ -94,7 +94,7 @@ export function RegisterForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Email
               </label>
               <div
@@ -108,7 +108,7 @@ export function RegisterForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isEmailFocused ? 'text-blue-500' : 'text-gray-400'
+                      isEmailFocused ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -118,7 +118,7 @@ export function RegisterForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setIsEmailFocused(true)}
                   onBlur={() => setIsEmailFocused(false)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="name@company.com"
                   disabled={loading}
                   autoComplete="email"
@@ -128,7 +128,7 @@ export function RegisterForm() {
 
             {/* Username Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Username
               </label>
               <div
@@ -142,7 +142,7 @@ export function RegisterForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isUsernameFocused ? 'text-blue-500' : 'text-gray-400'
+                      isUsernameFocused ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -152,7 +152,7 @@ export function RegisterForm() {
                   onChange={(e) => setUsername(e.target.value)}
                   onFocus={() => setIsUsernameFocused(true)}
                   onBlur={() => setIsUsernameFocused(false)}
-                  className="w-full pl-10 pr-10 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="johndoe"
                   disabled={loading}
                   autoComplete="username"
@@ -175,7 +175,7 @@ export function RegisterForm() {
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 ml-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
                 Password
               </label>
               <div
@@ -189,7 +189,7 @@ export function RegisterForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isPasswordFocused ? 'text-blue-500' : 'text-gray-400'
+                      isPasswordFocused ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -199,7 +199,7 @@ export function RegisterForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   onFocus={() => setIsPasswordFocused(true)}
                   onBlur={() => setIsPasswordFocused(false)}
-                  className="w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400/70"
+                  className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="••••••••"
                   disabled={loading}
                   autoComplete="new-password"
@@ -207,7 +207,7 @@ export function RegisterForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-white/5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-white/5"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -220,25 +220,25 @@ export function RegisterForm() {
                   <div
                     className={cn(
                       'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 1 ? 'bg-red-400' : 'bg-gray-200 dark:bg-gray-700'
+                      passwordStrength >= 1 ? 'bg-red-400' : 'bg-slate-200 dark:bg-slate-700'
                     )}
                   />
                   <div
                     className={cn(
                       'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 2 ? 'bg-yellow-400' : 'bg-gray-200 dark:bg-gray-700'
+                      passwordStrength >= 2 ? 'bg-yellow-400' : 'bg-slate-200 dark:bg-slate-700'
                     )}
                   />
                   <div
                     className={cn(
                       'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 3 ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'
+                      passwordStrength >= 3 ? 'bg-green-400' : 'bg-slate-200 dark:bg-slate-700'
                     )}
                   />
                   <div
                     className={cn(
                       'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 4 ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'
+                      passwordStrength >= 4 ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'
                     )}
                   />
                 </div>
@@ -263,7 +263,7 @@ export function RegisterForm() {
           </form>
 
           {/* Login Link */}
-          <p className="mt-8 text-center text-sm text-gray-500 bg-white/50 dark:bg-white/5 py-2 rounded-lg mx-auto w-fit px-4 border border-gray-100 dark:border-white/5">
+          <p className="mt-8 text-center text-sm text-slate-500 bg-white/50 dark:bg-white/5 py-2 rounded-lg mx-auto w-fit px-4 border border-slate-100 dark:border-white/5">
             Hai già un account?{' '}
             <Link
               to="/login"
@@ -275,7 +275,7 @@ export function RegisterForm() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-6">
           © 2025 VisuaLex. All rights reserved.
         </p>
       </div>

@@ -17,7 +17,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
   // Show loading state while checking authentication
   if (loading) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 z-50">
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 z-50">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -28,8 +28,8 @@ export function AdminRoute({ children }: AdminRouteProps) {
           <ShieldAlert className="w-16 h-16 text-amber-600 relative z-10" />
         </motion.div>
         <div className="space-y-2 text-center">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">VisuaLex Admin</h3>
-          <p className="text-sm text-gray-500 animate-pulse">Verifica autorizzazioni...</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">VisuaLex Admin</h3>
+          <p className="text-sm text-slate-500 animate-pulse">Verifica autorizzazioni...</p>
         </div>
       </div>
     );
@@ -43,15 +43,15 @@ export function AdminRoute({ children }: AdminRouteProps) {
   // Show access denied if not admin
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
         <div className="max-w-md w-full text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full mb-6">
             <ShieldAlert size={40} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
             Accesso Negato
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mb-6">
+          <p className="text-slate-500 dark:text-slate-400 mb-6">
             Non hai i permessi necessari per accedere a questa sezione.
             Contatta un amministratore se ritieni sia un errore.
           </p>

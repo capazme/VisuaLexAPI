@@ -34,7 +34,7 @@ export function AnnexSwitchDialog({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-md z-[9998]"
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-md z-[100]"
             onClick={onCancel}
           />
 
@@ -44,7 +44,7 @@ export function AnnexSwitchDialog({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] w-full max-w-md px-4"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] w-full max-w-md px-4"
           >
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl shadow-2xl shadow-slate-900/10 dark:shadow-black/30 border border-white/50 dark:border-slate-700/50 overflow-hidden">
               {/* Header - minimal, no background color */}

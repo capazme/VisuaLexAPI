@@ -135,11 +135,11 @@ export function EnvironmentPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">I tuoi Ambienti</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">I tuoi Ambienti</h2>
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={handleLoadExamples}
-            className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
+            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
             title="Carica ambienti di esempio (GDPR, DORA, AI Act, Consumatori)"
           >
             <Sparkles size={18} />
@@ -147,7 +147,7 @@ export function EnvironmentPage() {
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
+            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
           >
             <Upload size={18} />
             <span className="hidden sm:inline">Importa</span>
@@ -174,20 +174,20 @@ export function EnvironmentPage() {
       <div className="mb-6 space-y-3 md:space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:gap-4">
           <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Cerca negli ambienti..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px]"
+              className="w-full pl-10 pr-4 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px]"
             />
           </div>
           <select
             id="tour-env-categories"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as EnvironmentCategory | 'all')}
-            className="px-4 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[44px]"
+            className="px-4 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px]"
           >
             <option value="all">Tutte le categorie</option>
             {Object.entries(ENVIRONMENT_CATEGORIES).map(([key, { label, icon }]) => (
@@ -201,24 +201,24 @@ export function EnvironmentPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredEnvironments.length === 0 ? (
           <div className="col-span-full text-center py-12 md:py-20 px-4">
-            <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Globe size={32} className="md:w-10 md:h-10 text-gray-400" />
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Globe size={32} className="md:w-10 md:h-10 text-slate-400" />
             </div>
             {searchQuery || categoryFilter !== 'all' ? (
               <>
-                <h3 className="text-base md:text-lg font-medium text-gray-900 dark:text-white">Nessun risultato</h3>
-                <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2">Prova a modificare i filtri di ricerca.</p>
+                <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-white">Nessun risultato</h3>
+                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-2">Prova a modificare i filtri di ricerca.</p>
               </>
             ) : (
               <>
-                <h3 className="text-base md:text-lg font-medium text-gray-900 dark:text-white">Nessun ambiente</h3>
-                <p className="text-sm md:text-base text-gray-500 dark:text-gray-400 mt-2 max-w-md justify-center mx-auto px-2">
+                <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-white">Nessun ambiente</h3>
+                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-2 max-w-md justify-center mx-auto px-2">
                   Gli ambienti ti permettono di salvare e condividere configurazioni di dossier, ricerche frequenti e annotazioni.
                 </p>
                 <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
                   <button
                     onClick={handleLoadExamples}
-                    className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-5 py-3 md:py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-5 py-3 md:py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
                   >
                     <Sparkles size={18} />
                     Carica Esempi
@@ -231,7 +231,7 @@ export function EnvironmentPage() {
                     Crea Ambiente
                   </button>
                 </div>
-                <p className="text-xs md:text-sm text-gray-400 dark:text-gray-500 mt-4 px-2">
+                <p className="text-xs md:text-sm text-slate-400 dark:text-slate-500 mt-4 px-2">
                   Gli esempi includono: GDPR, DORA, AI Act, Diritto dei Consumatori
                 </p>
               </>
@@ -334,7 +334,7 @@ function EnvironmentCard({
   const canShare = canShareAsLink(environment);
 
   return (
-    <div id={isFirst ? 'tour-env-card' : undefined} className="dossier-card group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden">
+    <div id={isFirst ? 'tour-env-card' : undefined} className="dossier-card group bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden">
       {/* Category Banner */}
       {category && (
         <div
@@ -354,11 +354,11 @@ function EnvironmentCard({
               {category?.icon || '📁'}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-medium text-sm md:text-base text-gray-900 dark:text-white line-clamp-1">
+              <h3 className="font-medium text-sm md:text-base text-slate-900 dark:text-white line-clamp-1">
                 {environment.name}
               </h3>
               {category && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   {category.label}
                 </span>
               )}
@@ -369,42 +369,42 @@ function EnvironmentCard({
           <div className="relative flex-shrink-0">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 md:p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md md:opacity-0 md:group-hover:opacity-100 transition-opacity min-h-[44px] md:min-h-0 flex items-center justify-center"
+              className="p-2 md:p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md md:opacity-0 md:group-hover:opacity-100 transition-opacity min-h-[44px] md:min-h-0 flex items-center justify-center"
               aria-label="Menu azioni"
             >
-              <MoreHorizontal size={18} className="text-gray-500" />
+              <MoreHorizontal size={18} className="text-slate-500" />
             </button>
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-56 md:w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-20">
+                <div className="absolute right-0 top-full mt-1 w-56 md:w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-20">
                   <button
                     onClick={() => { onEdit(); setShowMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
+                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-left"
                   >
                     <Pencil size={16} /> Modifica
                   </button>
                   <button
                     onClick={() => { onExportJSON(); setShowMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
+                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-left"
                   >
                     <Download size={16} /> Esporta JSON
                   </button>
                   {canShare && (
                     <button
                       onClick={() => { onShareLink(); setShowMenu(false); }}
-                      className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
+                      className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-left"
                     >
                       <Link2 size={16} /> Copia Link
                     </button>
                   )}
                   <button
                     onClick={() => { onRefresh(); setShowMenu(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
+                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-left"
                   >
                     <RefreshCw size={16} /> Aggiorna da stato corrente
                   </button>
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                  <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                   <button
                     onClick={() => { onDelete(); setShowMenu(false); }}
                     className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
@@ -419,13 +419,13 @@ function EnvironmentCard({
 
         {/* Description */}
         {environment.description && (
-          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
+          <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">
             {environment.description}
           </p>
         )}
 
         {/* Stats */}
-        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 text-xs text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1">
             <FolderOpen size={14} /> {stats.dossiers} dossier
           </span>
@@ -483,12 +483,12 @@ function CreateEnvironmentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-          <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">Nuovo Ambiente</h2>
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white">Nuovo Ambiente</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center"
             aria-label="Chiudi"
           >
             <X size={20} />
@@ -497,34 +497,34 @@ function CreateEnvironmentModal({
 
         <div className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome *</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="es. DPO Compliance"
-              className="w-full px-3 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrizione</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Descrizione opzionale..."
               rows={2}
-              className="w-full px-3 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as EnvironmentCategory)}
-              className="w-full px-3 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
             >
               {Object.entries(ENVIRONMENT_CATEGORIES).map(([key, { label, icon }]) => (
                 <option key={key} value={key}>{icon} {label}</option>
@@ -537,28 +537,28 @@ function CreateEnvironmentModal({
               type="checkbox"
               checked={fromCurrent}
               onChange={(e) => setFromCurrent(e.target.checked)}
-              className="w-5 h-5 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+              className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
             />
             <div>
-              <span className="font-medium text-gray-900 dark:text-white text-sm">Includi stato corrente</span>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              <span className="font-medium text-slate-900 dark:text-white text-sm">Includi stato corrente</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Copia dossier, preferiti e annotazioni attuali
               </p>
             </div>
           </label>
         </div>
 
-        <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+            className="flex-1 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-h-[44px]"
           >
             Annulla
           </button>
           <button
             onClick={handleSubmit}
             disabled={!name.trim()}
-            className="flex-1 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white rounded-lg transition-colors disabled:cursor-not-allowed min-h-[44px]"
+            className="flex-1 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-lg transition-colors disabled:cursor-not-allowed min-h-[44px]"
           >
             Crea
           </button>
@@ -584,12 +584,12 @@ function EditEnvironmentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-          <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">Modifica Ambiente</h2>
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white">Modifica Ambiente</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center"
             aria-label="Chiudi"
           >
             <X size={20} />
@@ -598,32 +598,32 @@ function EditEnvironmentModal({
 
         <div className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrizione</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrizione</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as EnvironmentCategory)}
-              className="w-full px-3 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
             >
               {Object.entries(ENVIRONMENT_CATEGORIES).map(([key, { label, icon }]) => (
                 <option key={key} value={key}>{icon} {label}</option>
@@ -632,10 +632,10 @@ function EditEnvironmentModal({
           </div>
         </div>
 
-        <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+            className="flex-1 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-h-[44px]"
           >
             Annulla
           </button>
@@ -667,20 +667,20 @@ function ImportPreviewModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
               <FileJson className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">Importa Ambiente</h2>
-              <p className="text-xs text-gray-500">Anteprima contenuto</p>
+              <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white">Importa Ambiente</h2>
+              <p className="text-xs text-slate-500">Anteprima contenuto</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center flex-shrink-0"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center flex-shrink-0"
             aria-label="Chiudi"
           >
             <X size={20} />
@@ -688,15 +688,15 @@ function ImportPreviewModal({
         </div>
 
         <div className="p-4 md:p-6 overflow-y-auto flex-1">
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 md:p-4 mb-4">
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 md:p-4 mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-base md:text-lg">{category?.icon || '📁'}</span>
-              <h3 className="font-medium text-sm md:text-base text-gray-900 dark:text-white">{environment.name}</h3>
+              <h3 className="font-medium text-sm md:text-base text-slate-900 dark:text-white">{environment.name}</h3>
             </div>
             {environment.description && (
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mb-3">{environment.description}</p>
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mb-3">{environment.description}</p>
             )}
-            <div className="flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-slate-500 dark:text-slate-400">
               <span>{stats.dossiers} dossier</span>
               <span>{stats.quickNorms} preferiti</span>
               <span>{stats.annotations} annotazioni</span>
@@ -704,16 +704,16 @@ function ImportPreviewModal({
           </div>
 
           {environment.author && (
-            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
               Autore: {environment.author}
             </p>
           )}
         </div>
 
-        <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 md:py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+            className="flex-1 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors min-h-[44px]"
           >
             Annulla
           </button>
@@ -742,32 +742,32 @@ function ApplyEnvironmentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
             Applica "{environment.name}"
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
             <X size={20} />
           </button>
         </div>
 
         <div className="p-6 space-y-3">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             Come vuoi applicare questo ambiente?
           </p>
 
           <button
             onClick={() => onApply(environment, 'merge')}
-            className="w-full p-4 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors"
+            className="w-full p-4 text-left bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
                 <Plus className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <span className="font-medium text-gray-900 dark:text-white">Unisci</span>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="font-medium text-slate-900 dark:text-white">Unisci</span>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Aggiunge al contenuto esistente, salta duplicati
                 </p>
               </div>
@@ -776,15 +776,15 @@ function ApplyEnvironmentModal({
 
           <button
             onClick={() => onApply(environment, 'replace')}
-            className="w-full p-4 text-left bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors"
+            className="w-full p-4 text-left bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
                 <RefreshCw className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <span className="font-medium text-gray-900 dark:text-white">Sostituisci</span>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="font-medium text-slate-900 dark:text-white">Sostituisci</span>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
                   Sostituisce tutto il contenuto attuale
                 </p>
               </div>
@@ -806,19 +806,19 @@ function DeleteConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 text-center">
+      <div className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 text-center">
         <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-6 h-6 text-red-600" />
         </div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Elimina Ambiente?</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Elimina Ambiente?</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
           Questa azione non può essere annullata.
         </p>
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             Annulla
           </button>

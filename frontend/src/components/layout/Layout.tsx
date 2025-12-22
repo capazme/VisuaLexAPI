@@ -106,7 +106,7 @@ export function Layout() {
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="hidden lg:block overflow-hidden"
+        className="hidden lg:block flex-shrink-0"
       >
         {sidebarVisible && !settings.focusMode && (
           <Sidebar

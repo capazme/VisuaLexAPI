@@ -323,7 +323,7 @@ export function StudyMode({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -335,7 +335,7 @@ export function StudyMode({
         transition={{ duration: 0.2 }}
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
-          "fixed z-[9999] flex flex-col shadow-2xl overflow-hidden",
+          "fixed z-[130] flex flex-col shadow-2xl overflow-hidden",
           isFullscreen && "inset-0",
           !isFullscreen && "rounded-2xl border",
           isDragging && "cursor-grabbing select-none",

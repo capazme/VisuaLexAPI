@@ -156,7 +156,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   const selectedActLabel = ACT_TYPES.find(act => act.value === selectedAct)?.label;
 
   return (
-    <div className="fixed inset-0 z-[9999] p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 z-[130] p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar">
       {/* Premium Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}

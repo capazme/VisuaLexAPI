@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield } from 'lucide-react';
@@ -155,6 +156,20 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
   const { openCommandPalette, quickNorms } = useAppStore();
   const { user, isAdmin, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
+
+  // Calculate menu position when showing
+  useEffect(() => {
+    if (showUserMenu && userButtonRef.current) {
+      const rect = userButtonRef.current.getBoundingClientRect();
+      // Position the menu to the right of the button, aligned to bottom of button
+      setMenuPosition({
+        bottom: window.innerHeight - rect.bottom,
+        left: rect.right + 8, // 8px gap from button
+      });
+    }
+  }, [showUserMenu]);
 
   const handleSparklesClick = () => {
     // Navigate to search page first, then open command palette
@@ -226,8 +241,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
       </div>
 
       {/* User Menu */}
-      <div className="relative flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
+      <div className="flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
         <button
+          ref={userButtonRef}
           onClick={() => setShowUserMenu(!showUserMenu)}
           className={cn(
             "relative flex items-center justify-center rounded-xl transition-all duration-200",
@@ -252,70 +268,65 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
           </motion.div>
         </button>
 
-        {/* User Dropdown Menu */}
-        <AnimatePresence>
-          {showUserMenu && (
-            <>
-              {/* Mobile backdrop */}
-              <div
-                className="fixed inset-0 z-40 lg:hidden"
-                onClick={() => setShowUserMenu(false)}
-              />
-              <motion.div
-                initial={{ opacity: 0, x: -8, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: -8, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                className={cn(
-                  "absolute bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-50",
-                  "w-56 bottom-full mb-2 left-1/2 -translate-x-1/2",
-                  "md:w-48 lg:bottom-0 lg:mb-0 lg:left-full lg:ml-3 lg:translate-x-0"
+        {/* User Dropdown Menu - rendered via Portal */}
+        {showUserMenu && createPortal(
+          <>
+            {/* Backdrop - cattura click esterni */}
+            <div
+              className="fixed inset-0 z-[9990]"
+              onClick={() => setShowUserMenu(false)}
+            />
+            {/* Menu popup */}
+            <div
+              style={{ bottom: menuPosition.bottom, left: menuPosition.left }}
+              className="fixed z-[9991] w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150"
+            >
+              {/* User Info */}
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                <p className="font-medium text-slate-900 dark:text-white text-sm truncate">
+                  {user?.username}
+                </p>
+                <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
+                    <Shield size={10} />
+                    Admin
+                  </span>
                 )}
-              >
-                {/* User Info */}
-                <div className="px-4 py-3 md:py-2 border-b border-slate-100 dark:border-slate-700">
-                  <p className="font-medium text-slate-900 dark:text-white text-sm truncate">
-                    {user?.username}
-                  </p>
-                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
-                  {isAdmin && (
-                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full">
-                      <Shield size={10} />
-                      Admin
-                    </span>
-                  )}
-                </div>
+              </div>
 
-                {/* Menu Items */}
-                <div className="py-1">
-                  {isAdmin && (
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate('/admin');
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <Shield size={16} />
-                      Pannello Admin
-                    </button>
-                  )}
+              {/* Menu Items */}
+              <div className="py-1">
+                {isAdmin && (
                   <button
+                    type="button"
                     onClick={() => {
                       setShowUserMenu(false);
-                      logout();
-                      navigate('/login');
+                      navigate('/admin');
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 md:py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                   >
-                    <LogOut size={16} />
-                    Esci
+                    <Shield size={16} />
+                    Pannello Admin
                   </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    logout();
+                    navigate('/login');
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
+                >
+                  <LogOut size={16} />
+                  Esci
+                </button>
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
       </div>
     </aside>
   );

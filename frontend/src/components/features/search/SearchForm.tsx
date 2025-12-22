@@ -5,6 +5,9 @@ import type { SearchParams } from '../../../types';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
 import { cn } from '../../../lib/utils';
+import { Button } from '../../ui/Button';
+import { IconButton } from '../../ui/IconButton';
+import { FOCUS_RING } from '../../../constants/interactions';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -279,7 +282,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 "w-full text-sm rounded-xl px-4 py-3 appearance-none cursor-pointer border shadow-sm transition-all",
                 "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
                 "border-slate-200 dark:border-slate-700",
-                "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none"
+                FOCUS_RING, "focus:border-primary-500"
               )}
               required
             >
@@ -310,7 +313,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                   "w-full text-sm rounded-xl px-4 py-3 border shadow-sm transition-all",
                   "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
                   "border-slate-200 dark:border-slate-700 disabled:opacity-30 disabled:bg-slate-50 dark:disabled:bg-slate-900",
-                  "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none placeholder:text-slate-400"
+                  FOCUS_RING, "focus:border-primary-500 placeholder:text-slate-400"
                 )}
               />
             </div>
@@ -328,7 +331,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                   "w-full text-sm rounded-xl px-4 py-3 border shadow-sm transition-all",
                   "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
                   "border-slate-200 dark:border-slate-700 disabled:opacity-30 disabled:bg-slate-50 dark:disabled:bg-slate-900",
-                  "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none placeholder:text-slate-400"
+                  FOCUS_RING, "focus:border-primary-500 placeholder:text-slate-400"
                 )}
               />
             </div>
@@ -351,14 +354,14 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             </div>
 
             <div className="flex items-center bg-white dark:bg-slate-800 rounded-xl p-1.5 shadow-sm border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
+              <IconButton
+                icon={<Minus size={18} />}
                 onClick={handleDecrementArticle}
                 disabled={articleList.length > 0 && articlePosition <= 1}
-                className="w-12 h-12 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-90 transition-all text-slate-500 dark:text-slate-400 disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                <Minus size={18} />
-              </button>
+                size="lg"
+                variant="ghost"
+                aria-label="Articolo precedente"
+              />
 
               <input
                 type="text"
@@ -369,14 +372,14 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                 className="flex-1 bg-transparent text-center font-bold text-2xl tracking-tighter border-none focus:ring-0 text-slate-900 dark:text-white outline-none"
               />
 
-              <button
-                type="button"
+              <IconButton
+                icon={<Plus size={18} />}
                 onClick={handleIncrementArticle}
                 disabled={articleList.length > 0 && articlePosition >= articleList.length}
-                className="w-12 h-12 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-90 transition-all text-slate-500 dark:text-slate-400 disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                <Plus size={18} />
-              </button>
+                size="lg"
+                variant="ghost"
+                aria-label="Articolo successivo"
+              />
             </div>
 
             {articleList.length > 0 && (
@@ -504,7 +507,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
                           "w-24 text-sm font-semibold rounded-xl px-4 py-3 border shadow-sm transition-all",
                           "bg-white dark:bg-slate-800 text-slate-900 dark:text-white",
                           "border-slate-200 dark:border-slate-700",
-                          "focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 outline-none",
+                          FOCUS_RING, "focus:border-primary-500",
                           "placeholder:text-slate-400 placeholder:font-normal"
                         )}
                       />
@@ -520,42 +523,38 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
           {/* Action Buttons */}
           <div className="space-y-3 pt-4">
-            <button
+            <Button
               type="submit"
               disabled={isLoading}
-              className={cn(
-                "group w-full h-14 flex items-center justify-center gap-3 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]",
-                "bg-primary-600 hover:bg-primary-700 text-white shadow-primary-500/20",
-                "disabled:opacity-70 disabled:cursor-wait"
-              )}
+              loading={isLoading}
+              variant="primary"
+              size="lg"
+              icon={<Search size={18} />}
+              className="w-full h-14 font-black uppercase tracking-widest"
             >
-              {isLoading ? (
-                <div className="relative w-6 h-6">
-                  <div className="absolute inset-0 border-3 border-white/20 rounded-full" />
-                  <div className="absolute inset-0 border-3 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <>
-                  <Search size={18} className="group-hover:scale-110 transition-transform" />
-                  Estrai Contenuto
-                </>
-              )}
-            </button>
+              Estrai Contenuto
+            </Button>
             <div className="grid grid-cols-2 gap-3">
-              <button
+              <Button
                 type="button"
                 onClick={handleReset}
-                className="flex items-center justify-center gap-2 h-11 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                variant="outline"
+                size="md"
+                icon={<RefreshCw size={14} />}
+                className="text-xs font-bold uppercase tracking-wider"
               >
-                <RefreshCw size={14} /> Reset
-              </button>
-              <button
+                Reset
+              </Button>
+              <Button
                 type="button"
                 onClick={handleReset}
-                className="flex items-center justify-center gap-2 h-11 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                variant="outline"
+                size="md"
+                icon={<Eraser size={14} />}
+                className="text-xs font-bold uppercase tracking-wider"
               >
-                <Eraser size={14} /> Pulisci
-              </button>
+                Pulisci
+              </Button>
             </div>
           </div>
         </form>

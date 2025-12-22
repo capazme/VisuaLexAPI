@@ -56,7 +56,7 @@ export function Toast({
           exit={{ opacity: 0, y: position === 'top' ? -20 : 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className={cn(
-            'fixed z-[200] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-sm',
+            'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-sm',
             positionStyles,
             styles[type]
           )}

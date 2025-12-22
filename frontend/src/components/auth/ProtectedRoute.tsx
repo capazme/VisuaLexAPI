@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Show premium branded loading state while checking authentication
   if (loading) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 z-50">
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 z-50">
         {/* Pulsing Logo with Blur Effect */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -33,8 +33,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         {/* Branded Text */}
         <div className="space-y-2 text-center">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">VisuaLex API</h3>
-          <p className="text-sm text-gray-500 animate-pulse">Caricamento delle risorse in corso...</p>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">VisuaLex API</h3>
+          <p className="text-sm text-slate-500 animate-pulse">Caricamento delle risorse in corso...</p>
         </div>
       </div>
     );

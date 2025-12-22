@@ -24,20 +24,20 @@ export function NormeNavigator({ norme, onNavigateToNorma, className }: NormeNav
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden"
+            className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border-2 border-slate-200 dark:border-slate-700 overflow-hidden"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-900/20 dark:to-blue-900/10 p-3 border-b border-blue-200 dark:border-blue-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Compass size={16} className="text-blue-600 dark:text-blue-400" />
-                <span className="font-bold text-sm text-gray-900 dark:text-white">Navigator</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white">Navigator</span>
                 <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium">
                   {norme.length}
                 </span>
               </div>
               <button
                 onClick={() => setIsExpanded(false)}
-                className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md transition-colors text-gray-500 dark:text-gray-400"
+                className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-md transition-colors text-slate-500 dark:text-slate-400"
               >
                 <X size={14} />
               </button>
@@ -67,20 +67,20 @@ export function NormeNavigator({ norme, onNavigateToNorma, className }: NormeNav
                         <Book size={14} className="text-blue-600 dark:text-blue-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                        <h4 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
                           {norma.tipo_atto}
                         </h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                           {norma.numero_atto && `n. ${norma.numero_atto}`}
                           {norma.data && ` • ${norma.data}`}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
-                          <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full font-medium">
+                          <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-medium">
                             {articleCount} {articleCount === 1 ? 'articolo' : 'articoli'}
                           </span>
                         </div>
                       </div>
-                      <ChevronRight size={14} className="text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0" />
+                      <ChevronRight size={14} className="text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0" />
                     </div>
                   </button>
                 );

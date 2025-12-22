@@ -144,7 +144,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className={cn(
           'relative w-full max-w-2xl max-h-[85vh] overflow-hidden',
-          'bg-white/85 dark:bg-gray-900/85 backdrop-blur-2xl',
+          'bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl',
           'rounded-2xl shadow-glass-lg',
           'border border-white/20 dark:border-white/10',
           'flex flex-col'
@@ -154,13 +154,13 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-white/5">
           <div className="flex items-center gap-3">
             <Star className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               Ricerche Frequenti
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-gray-100/80 dark:hover:bg-gray-800/80 text-gray-500 transition-all"
+            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-all"
           >
             <X size={20} />
           </button>
@@ -170,19 +170,19 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Add New Section */}
           <div id="tour-qn-add" className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Aggiungi Nuova
             </h3>
 
             {/* Mode Toggle */}
-            <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+            <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
               <button
                 onClick={() => setInputMode('manual')}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
                   inputMode === 'manual'
-                    ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-400'
+                    ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                    : 'text-slate-600 dark:text-slate-400'
                 )}
               >
                 <FileText size={16} />
@@ -193,8 +193,8 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
                   inputMode === 'url'
-                    ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white'
-                    : 'text-gray-600 dark:text-gray-400'
+                    ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
+                    : 'text-slate-600 dark:text-slate-400'
                 )}
               >
                 <Link size={16} />
@@ -216,10 +216,10 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                     placeholder="Incolla link di Normattiva..."
                     className={cn(
                       'flex-1 px-4 py-2.5 rounded-xl text-sm',
-                      'bg-gray-50 dark:bg-gray-800 border',
+                      'bg-slate-50 dark:bg-slate-800 border',
                       urlError
                         ? 'border-red-300 dark:border-red-700'
-                        : 'border-gray-200 dark:border-gray-700',
+                        : 'border-slate-200 dark:border-slate-700',
                       'focus:outline-none focus:ring-2 focus:ring-blue-500/30'
                     )}
                   />
@@ -233,7 +233,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                 {urlError && (
                   <p className="text-sm text-red-500">{urlError}</p>
                 )}
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Esempio: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1
                 </p>
               </div>
@@ -244,13 +244,13 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
                       Tipo Atto
                     </label>
                     <select
                       value={actType}
                       onChange={(e) => setActType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     >
                       {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
                         <optgroup key={group} label={group}>
@@ -262,7 +262,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
                       Articolo
                     </label>
                     <input
@@ -270,55 +270,55 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                       value={article}
                       onChange={(e) => setArticle(e.target.value)}
                       placeholder="es. 2043"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                      Numero Atto <span className="text-gray-400">(opzionale)</span>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                      Numero Atto <span className="text-slate-400">(opzionale)</span>
                     </label>
                     <input
                       type="text"
                       value={actNumber}
                       onChange={(e) => setActNumber(e.target.value)}
                       placeholder="es. 241"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                      Data <span className="text-gray-400">(opzionale)</span>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                      Data <span className="text-slate-400">(opzionale)</span>
                     </label>
                     <input
                       type="text"
                       value={actDate}
                       onChange={(e) => setActDate(e.target.value)}
                       placeholder="aaaa-mm-gg"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                    Nome personalizzato <span className="text-gray-400">(opzionale)</span>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                    Nome personalizzato <span className="text-slate-400">(opzionale)</span>
                   </label>
                   <input
                     type="text"
                     value={customLabel}
                     onChange={(e) => setCustomLabel(e.target.value)}
                     placeholder="es. Risarcimento del danno"
-                    className="w-full px-3 py-2 rounded-xl text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   />
                 </div>
 
                 <button
                   onClick={handleAddQuickNorm}
                   disabled={!actType || !article}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
                 >
                   <Plus size={18} />
                   Aggiungi ai Preferiti
@@ -329,12 +329,12 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
 
           {/* Saved QuickNorms */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               Le tue Ricerche Frequenti ({quickNorms.length})
             </h3>
 
             {quickNorms.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 dark:text-gray-500">
+              <div className="text-center py-8 text-slate-400 dark:text-slate-500">
                 <Star className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="text-sm">Nessuna ricerca frequente salvata</p>
                 <p className="text-xs mt-1">Aggiungi le norme che consulti spesso per accedervi rapidamente</p>
@@ -344,7 +344,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                 {quickNorms.map((qn) => (
                   <div
                     key={qn.id}
-                    className="group flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="group flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     {editingId === qn.id ? (
                       // Edit mode
@@ -359,7 +359,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                               if (e.key === 'Enter') handleSaveEdit();
                               if (e.key === 'Escape') handleCancelEdit();
                             }}
-                            className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                             autoFocus
                           />
                           <button
@@ -371,7 +371,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500"
+                            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
                             title="Annulla"
                           >
                             <X size={16} />
@@ -387,10 +387,10 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                         >
                           <Star className="w-4 h-4 text-amber-500 shrink-0" />
                           <div className="min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                            <p className="font-medium text-slate-900 dark:text-white truncate">
                               {qn.label}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               {qn.searchParams.act_type}
                               {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
                               {qn.usageCount > 0 && ` · Usato ${qn.usageCount}x`}
@@ -401,7 +401,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleStartEdit(qn)}
-                            className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg text-gray-500 hover:text-blue-600"
+                            className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg text-slate-500 hover:text-blue-600"
                             title="Rinomina"
                           >
                             <Pencil size={16} />
@@ -411,7 +411,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                               href={qn.sourceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500"
+                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500"
                               title="Apri su Normattiva"
                             >
                               <ExternalLink size={16} />
@@ -419,7 +419,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                           )}
                           <button
                             onClick={() => removeQuickNorm(qn.id)}
-                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-gray-500 hover:text-red-600"
+                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-500 hover:text-red-600"
                             title="Rimuovi"
                           >
                             <Trash2 size={16} />

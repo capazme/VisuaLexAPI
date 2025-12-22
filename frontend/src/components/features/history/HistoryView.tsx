@@ -209,11 +209,11 @@ export function HistoryView() {
 
     return (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {/* Mobile Header */}
-                <div className="md:hidden p-3 border-b border-gray-200 dark:border-gray-700">
+                <div className="md:hidden p-3 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-2">
-                        <h2 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                             <Clock size={18} /> Cronologia
                         </h2>
                         {history.length > 0 && (
@@ -233,15 +233,15 @@ export function HistoryView() {
                             placeholder="Cerca..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900 transition-all min-h-[44px]"
+                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all min-h-[44px]"
                         />
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                 </div>
 
                 {/* Desktop Header */}
-                <div className="hidden md:flex p-4 border-b border-gray-200 dark:border-gray-700 flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="hidden md:flex p-4 border-b border-slate-200 dark:border-slate-700 flex-col sm:flex-row justify-between items-center gap-4">
+                    <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         <Clock size={20} /> Cronologia Ricerche
                     </h2>
 
@@ -252,9 +252,9 @@ export function HistoryView() {
                                 placeholder="Cerca nella cronologia..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-9 pr-4 py-1.5 text-sm rounded-full bg-gray-100 dark:bg-gray-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-gray-900 transition-all"
+                                className="w-full pl-9 pr-4 py-1.5 text-sm rounded-full bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all"
                             />
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         </div>
                         {history.length > 0 && (
                             <button
@@ -277,7 +277,7 @@ export function HistoryView() {
                             <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
                         </div>
                     ) : filteredHistory.length === 0 ? (
-                        <div className="p-12 text-center text-gray-500">
+                        <div className="p-12 text-center text-slate-500">
                             {searchTerm ? "Nessun risultato trovato." : "Nessuna ricerca recente."}
                         </div>
                     ) : (
@@ -286,7 +286,7 @@ export function HistoryView() {
                                 <div key={date} className="relative">
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
-                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-0 bg-white dark:bg-gray-800 py-1 z-10">
+                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-0 bg-white dark:bg-slate-800 py-1 z-10">
                                         <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
                                             <Calendar size={12} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{date}</span>
@@ -295,7 +295,7 @@ export function HistoryView() {
                                     </div>
 
                                     {/* Desktop: full date label */}
-                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-gray-800 py-2 z-10">
+                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-slate-800 py-2 z-10">
                                         <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
                                             <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{date}</span>
@@ -312,8 +312,8 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "bg-white dark:bg-gray-800 p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
-                                                        "border-gray-200 dark:border-gray-700",
+                                                        "bg-white dark:bg-slate-800 p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
+                                                        "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-blue-400"
                                                     )}
                                                 >
@@ -324,12 +324,12 @@ export function HistoryView() {
                                                                     Art. {item.article}
                                                                 </span>
                                                                 {item.act_number && (
-                                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    <span className="text-xs text-slate-500 dark:text-slate-400">
                                                                         n. {item.act_number}
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <p className="font-semibold text-sm text-gray-900 dark:text-white capitalize truncate">
+                                                            <p className="font-semibold text-sm text-slate-900 dark:text-white capitalize truncate">
                                                                 {item.act_type}
                                                             </p>
                                                         </div>
@@ -345,14 +345,14 @@ export function HistoryView() {
                                         {items.map((item, idx) => (
                                             <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
                                                 {/* Timeline dot */}
-                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-gray-800 group-hover:scale-125 transition-transform" />
+                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800 group-hover:scale-125 transition-transform" />
 
                                                 {/* Item card */}
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "bg-white dark:bg-gray-800 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                                                        "border-gray-200 dark:border-gray-700",
+                                                        "bg-white dark:bg-slate-800 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                                                        "border-slate-200 dark:border-slate-700",
                                                         "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
                                                     )}
                                                 >
@@ -363,17 +363,17 @@ export function HistoryView() {
                                                                     {item.act_type}
                                                                 </p>
                                                                 {item.act_number && (
-                                                                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                                                                    <span className="font-medium text-slate-700 dark:text-slate-300">
                                                                         n. {item.act_number}
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2 text-sm text-gray-500">
+                                                            <div className="flex flex-wrap gap-2 text-sm text-slate-500">
                                                                 <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-lg text-xs font-medium">
                                                                     Art. {item.article}
                                                                 </span>
                                                                 {item.date && (
-                                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                                    <span className="text-slate-500 dark:text-slate-400">
                                                                         del {item.date}
                                                                     </span>
                                                                 )}
@@ -390,7 +390,7 @@ export function HistoryView() {
                                                                         setOpenMenu(openMenu === item.timestamp ? null : item.timestamp);
                                                                         setShowDossierList(null);
                                                                     }}
-                                                                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                                                                     title="Altre azioni"
                                                                 >
                                                                     <MoreVertical size={16} />
@@ -398,19 +398,19 @@ export function HistoryView() {
 
                                                                 {/* Dropdown menu */}
                                                                 {openMenu === item.timestamp && (
-                                                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                                                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
                                                                         {/* QuickNorm */}
                                                                         <button
                                                                             id={idx === 0 ? 'tour-history-quick-norm' : undefined}
                                                                             onClick={(e) => handleAddQuickNorm(e, item)}
-                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                                                         >
                                                                             <Zap size={16} className="text-amber-500" />
                                                                             <span>Aggiungi a norme rapide</span>
                                                                         </button>
 
                                                                         {/* Divider */}
-                                                                        <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                                                                        <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
 
                                                                         {/* Dossier */}
                                                                         <div className="relative">
@@ -419,32 +419,32 @@ export function HistoryView() {
                                                                                     e.stopPropagation();
                                                                                     setShowDossierList(showDossierList === item.timestamp ? null : item.timestamp);
                                                                                 }}
-                                                                                className="w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                                                                className="w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                                                             >
                                                                                 <span className="flex items-center gap-2">
                                                                                     <FolderPlus size={16} className="text-blue-500" />
                                                                                     <span>Aggiungi a dossier</span>
                                                                                 </span>
-                                                                                <ArrowRight size={14} className="text-gray-400" />
+                                                                                <ArrowRight size={14} className="text-slate-400" />
                                                                             </button>
 
                                                                             {/* Sub-menu dossier */}
                                                                             {showDossierList === item.timestamp && (
-                                                                                <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 max-h-64 overflow-y-auto">
+                                                                                <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 max-h-64 overflow-y-auto">
                                                                                     {dossiers.length === 0 ? (
-                                                                                        <p className="px-3 py-2 text-sm text-gray-500">Nessun dossier</p>
+                                                                                        <p className="px-3 py-2 text-sm text-slate-500">Nessun dossier</p>
                                                                                     ) : (
                                                                                         dossiers.map(dossier => (
                                                                                             <button
                                                                                                 key={dossier.id}
                                                                                                 onClick={(e) => handleAddToDossier(e, item, dossier.id)}
-                                                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors truncate"
+                                                                                                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors truncate"
                                                                                             >
                                                                                                 {dossier.title}
                                                                                             </button>
                                                                                         ))
                                                                                     )}
-                                                                                    <div className="border-t border-gray-200 dark:border-gray-700 mt-1 pt-1">
+                                                                                    <div className="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1">
                                                                                         <button
                                                                                             onClick={(e) => handleCreateDossierAndAdd(e, item)}
                                                                                             className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
@@ -458,7 +458,7 @@ export function HistoryView() {
                                                                         </div>
 
                                                                         {/* Divider */}
-                                                                        <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                                                                        <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
 
                                                                         {/* Elimina */}
                                                                         <button

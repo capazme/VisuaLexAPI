@@ -88,7 +88,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     <div
       id="tour-workspace-dock"
       className={cn(
-        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]",
+        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]",
         className
       )}
     >
