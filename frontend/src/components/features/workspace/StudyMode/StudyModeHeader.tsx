@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Settings, Bookmark, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
@@ -241,9 +241,9 @@ export function StudyModeHeader({
                   "p-1.5 sm:p-2 rounded-md transition-colors",
                   isBookmarked ? 'text-amber-500 fill-amber-500' : styles.button
                 )}
-                title="Segnalibro (⌘B)"
+                title="Norma rapida (⌘B)"
               >
-                <Bookmark size={14} className={cn("sm:w-4 sm:h-4", isBookmarked ? 'fill-current' : '')} />
+                <Zap size={14} className={cn("sm:w-4 sm:h-4", isBookmarked ? 'fill-current' : '')} />
               </button>
 
               {/* Fullscreen Toggle */}

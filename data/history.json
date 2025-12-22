@@ -4,27 +4,6 @@
     "act_number": "",
     "article": "3",
     "date": "",
-    "timestamp": "2025-12-17T19:17:37.716029Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "1",
-    "date": "",
-    "timestamp": "2025-12-17T19:41:09.113984Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "2",
-    "date": "",
-    "timestamp": "2025-12-17T19:41:23.827841Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "3",
-    "date": "",
     "timestamp": "2025-12-17T19:41:28.080454Z"
   },
   {
@@ -348,5 +327,26 @@
     "article": "1-10",
     "date": "",
     "timestamp": "2025-12-18T15:59:48.473205Z"
+  },
+  {
+    "act_type": "codice della crisi d'impresa e dell'insolvenza",
+    "act_number": "",
+    "article": "1",
+    "date": "",
+    "timestamp": "2025-12-22T15:18:53.898853Z"
+  },
+  {
+    "act_type": "codice di procedura penale",
+    "act_number": "",
+    "article": "31",
+    "date": "",
+    "timestamp": "2025-12-22T15:50:01.749401Z"
+  },
+  {
+    "act_type": "codice della crisi d'impresa e dell'insolvenza",
+    "act_number": "",
+    "article": "31",
+    "date": "",
+    "timestamp": "2025-12-22T15:50:54.257513Z"
   }
 ]

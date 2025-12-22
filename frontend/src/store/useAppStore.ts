@@ -165,9 +165,11 @@ interface AppState {
     // QuickNorm Actions
     addQuickNorm: (label: string, searchParams: SearchParams, sourceUrl?: string) => void;
     removeQuickNorm: (id: string) => void;
+    removeQuickNormByParams: (searchParams: SearchParams) => void;
     updateQuickNormLabel: (id: string, label: string) => void;
     useQuickNorm: (id: string) => QuickNorm | undefined;
     getQuickNormsSorted: () => QuickNorm[];
+    isQuickNorm: (searchParams: SearchParams) => boolean;
 
     // Environment Actions
     createEnvironment: (name: string, options?: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => string;
@@ -289,6 +291,7 @@ const appStore = createStore<AppState>()(
             },
 
             clearUserData: () => set((state) => {
+                // Clear all user-specific data
                 state.bookmarks = [];
                 state.dossiers = [];
                 state.annotations = [];
@@ -297,6 +300,11 @@ const appStore = createStore<AppState>()(
                 state.environments = [];
                 state.isDataLoaded = false;
                 state.dataError = null;
+
+                // Clear workspace tabs to ensure user isolation
+                // Each user should start with a clean workspace
+                state.workspaceTabs = [];
+                state.highestZIndex = 100;
             }),
 
             // UI Actions
@@ -1156,6 +1164,15 @@ const appStore = createStore<AppState>()(
                 state.quickNorms = state.quickNorms.filter(qn => qn.id !== id);
             }),
 
+            removeQuickNormByParams: (searchParams) => set((state) => {
+                state.quickNorms = state.quickNorms.filter(
+                    qn => !(qn.searchParams.act_type === searchParams.act_type &&
+                        qn.searchParams.article === searchParams.article &&
+                        qn.searchParams.act_number === searchParams.act_number &&
+                        qn.searchParams.date === searchParams.date)
+                );
+            }),
+
             updateQuickNormLabel: (id, label) => set((state) => {
                 const qn = state.quickNorms.find(q => q.id === id);
                 if (qn) {
@@ -1192,6 +1209,16 @@ const appStore = createStore<AppState>()(
                     }
                     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
                 });
+            },
+
+            isQuickNorm: (searchParams) => {
+                const state = get();
+                return state.quickNorms.some(
+                    qn => qn.searchParams.act_type === searchParams.act_type &&
+                        qn.searchParams.article === searchParams.article &&
+                        qn.searchParams.act_number === searchParams.act_number &&
+                        qn.searchParams.date === searchParams.date
+                );
             },
 
             // Environment Actions

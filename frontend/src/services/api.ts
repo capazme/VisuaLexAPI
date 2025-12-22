@@ -4,10 +4,8 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-// API base URL - uses relative path in production, localhost in development
-const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.PROD ? '/api' : 'http://localhost:8000/api'
-);
+// API base URL - uses relative path to leverage Vite proxy in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance with default config
 const apiClient: AxiosInstance = axios.create({

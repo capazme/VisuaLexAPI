@@ -5,6 +5,7 @@ import { useAppStore, appStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
+import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
 
 // Converte un history item in NormaVisitata
 function historyToNormaVisitata(item: any): NormaVisitata {
@@ -52,7 +53,7 @@ function generateQuickNormLabel(item: any): string {
 }
 
 export function HistoryView() {
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<SearchHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [clearing, setClearing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -141,7 +142,7 @@ export function HistoryView() {
         if (!confirm('Sei sicuro di voler svuotare la cronologia?')) return;
         setClearing(true);
         try {
-            await fetch('/history', { method: 'DELETE' });
+            await clearHistory();
             setHistory([]);
         } catch (err) {
             console.error(err);
@@ -150,11 +151,11 @@ export function HistoryView() {
         }
     };
 
-    const handleDeleteItem = async (e: React.MouseEvent, timestamp: string) => {
+    const handleDeleteItem = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         try {
-            await fetch(`/history/${encodeURIComponent(timestamp)}`, { method: 'DELETE' });
-            setHistory(prev => prev.filter(item => item.timestamp !== timestamp));
+            await deleteHistoryItem(id);
+            setHistory(prev => prev.filter(item => item.id !== id));
         } catch (err) {
             console.error(err);
         }
@@ -175,10 +176,9 @@ export function HistoryView() {
     };
 
     useEffect(() => {
-        fetch('/history')
-            .then(res => res.json())
+        getHistory()
             .then(data => {
-                setHistory(data.history || []);
+                setHistory(data);
                 setLoading(false);
             })
             .catch(err => {
@@ -198,9 +198,9 @@ export function HistoryView() {
 
     // Group by date
     const groupedByDate = useMemo(() => {
-        const groups: Record<string, any[]> = {};
+        const groups: Record<string, SearchHistoryItem[]> = {};
         filteredHistory.forEach(item => {
-            const date = item.timestamp ? new Date(item.timestamp).toLocaleDateString('it-IT') : 'Senza data';
+            const date = item.created_at ? new Date(item.created_at).toLocaleDateString('it-IT') : 'Senza data';
             if (!groups[date]) groups[date] = [];
             groups[date].push(item);
         });
@@ -382,12 +382,12 @@ export function HistoryView() {
 
                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                                                             {/* Menu azioni */}
-                                                            <div className="relative" ref={openMenu === item.timestamp ? menuRef : null}>
+                                                            <div className="relative" ref={openMenu === item.id ? menuRef : null}>
                                                                 <button
                                                                     id={idx === 0 ? 'tour-history-actions' : undefined}
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setOpenMenu(openMenu === item.timestamp ? null : item.timestamp);
+                                                                        setOpenMenu(openMenu === item.id ? null : item.id);
                                                                         setShowDossierList(null);
                                                                     }}
                                                                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -397,7 +397,7 @@ export function HistoryView() {
                                                                 </button>
 
                                                                 {/* Dropdown menu */}
-                                                                {openMenu === item.timestamp && (
+                                                                {openMenu === item.id && (
                                                                     <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
                                                                         {/* QuickNorm */}
                                                                         <button
@@ -417,7 +417,7 @@ export function HistoryView() {
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    setShowDossierList(showDossierList === item.timestamp ? null : item.timestamp);
+                                                                                    setShowDossierList(showDossierList === item.id ? null : item.id);
                                                                                 }}
                                                                                 className="w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                                                             >
@@ -429,7 +429,7 @@ export function HistoryView() {
                                                                             </button>
 
                                                                             {/* Sub-menu dossier */}
-                                                                            {showDossierList === item.timestamp && (
+                                                                            {showDossierList === item.id && (
                                                                                 <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 max-h-64 overflow-y-auto">
                                                                                     {dossiers.length === 0 ? (
                                                                                         <p className="px-3 py-2 text-sm text-slate-500">Nessun dossier</p>
@@ -463,7 +463,7 @@ export function HistoryView() {
                                                                         {/* Elimina */}
                                                                         <button
                                                                             onClick={(e) => {
-                                                                                handleDeleteItem(e, item.timestamp);
+                                                                                handleDeleteItem(e, item.id);
                                                                                 setOpenMenu(null);
                                                                             }}
                                                                             className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

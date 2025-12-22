@@ -28,7 +28,7 @@ const changePasswordSchema = z.object({
   new_password: z.string().min(3),
 });
 
-// Register
+// Register - creates inactive user pending admin approval
 export const register = async (req: Request, res: Response) => {
   const { email, username, password } = registerSchema.parse(req.body);
 
@@ -46,32 +46,20 @@ export const register = async (req: Request, res: Response) => {
   // Hash password
   const hashedPassword = await hashPassword(password);
 
-  // Create user
-  const user = await prisma.user.create({
+  // Create user with isActive: false (requires admin approval)
+  await prisma.user.create({
     data: {
       email,
       username,
       password: hashedPassword,
+      isActive: false, // User must be approved by admin
     },
   });
 
-  // Generate tokens
-  const accessToken = generateAccessToken(user.id, user.email);
-  const refreshToken = generateRefreshToken(user.id, user.email);
-
+  // Don't generate tokens - user cannot login until approved
   res.status(201).json({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-    token_type: 'Bearer',
-    user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      is_active: user.isActive,
-      is_verified: user.isVerified,
-      is_admin: user.isAdmin,
-      created_at: user.createdAt,
-    },
+    message: 'Registrazione completata. Il tuo account è in attesa di approvazione da parte di un amministratore.',
+    pending_approval: true,
   });
 };
 
@@ -96,7 +84,7 @@ export const login = async (req: Request, res: Response) => {
   }
 
   if (!user.isActive) {
-    throw new AppError(401, 'User account is inactive');
+    throw new AppError(403, 'Il tuo account è in attesa di approvazione. Contatta un amministratore.');
   }
 
   // Update login stats

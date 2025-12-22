@@ -9,7 +9,7 @@ import { StudyModeToolsPanel } from './StudyModeToolsPanel';
 import { StudyModeBrocardiPopover } from './StudyModeBrocardiPopover';
 import { StudyModeSettings } from './StudyModeSettings';
 import { cn } from '../../../../lib/utils';
-import type { ArticleData, NormaVisitata } from '../../../../types';
+import type { ArticleData, NormaVisitata, SearchParams } from '../../../../types';
 import { useTour } from '../../../../hooks/useTour';
 
 export interface StudyModeProps {
@@ -44,6 +44,39 @@ const THEME_STYLES: Record<StudyModeTheme, { bg: string; text: string }> = {
     text: 'text-[#5c4b37]'
   }
 };
+
+// Convert NormaVisitata to SearchParams for quickNorm
+function normaToSearchParams(norma: NormaVisitata): SearchParams {
+  return {
+    act_type: norma.tipo_atto || '',
+    act_number: norma.numero_atto || '',
+    date: norma.data || '',
+    article: norma.numero_articolo?.toString() || '',
+    version: (norma.versione === 'originale' ? 'originale' : 'vigente') as 'vigente' | 'originale',
+    show_brocardi_info: true,
+  };
+}
+
+// Generate a label for QuickNorm from NormaVisitata
+function generateQuickNormLabel(norma: NormaVisitata): string {
+  const parts = [`Art. ${norma.numero_articolo}`];
+  if (norma.tipo_atto) {
+    const abbrev = norma.tipo_atto
+      .replace('codice civile', 'CC')
+      .replace('codice penale', 'CP')
+      .replace('codice di procedura civile', 'CPC')
+      .replace('codice di procedura penale', 'CPP')
+      .replace('costituzione', 'Cost.')
+      .replace(/^decreto legislativo$/i, 'D.Lgs.')
+      .replace(/^decreto legge$/i, 'D.L.')
+      .replace(/^legge$/i, 'L.');
+    parts.push(abbrev);
+  }
+  if (norma.numero_atto) {
+    parts.push(`n. ${norma.numero_atto}`);
+  }
+  return parts.join(' ');
+}
 
 export function StudyMode({
   isOpen = true,
@@ -95,9 +128,9 @@ export function StudyMode({
     removeAnnotation,
     addHighlight,
     removeHighlight,
-    addBookmark,
-    removeBookmark,
-    isBookmarked
+    addQuickNorm,
+    removeQuickNormByParams,
+    isQuickNorm
   } = useAppStore();
 
   const { tryStartTour } = useTour();
@@ -233,13 +266,14 @@ export function StudyMode({
   }, []);
 
   const handleBookmark = useCallback(() => {
-    const normaKey = generateNormaKey(article.norma_data);
-    if (isBookmarked(normaKey)) {
-      removeBookmark(normaKey);
+    const searchParams = normaToSearchParams(article.norma_data);
+    if (isQuickNorm(searchParams)) {
+      removeQuickNormByParams(searchParams);
     } else {
-      addBookmark(article.norma_data);
+      const label = generateQuickNormLabel(article.norma_data);
+      addQuickNorm(label, searchParams);
     }
-  }, [article.norma_data, isBookmarked, addBookmark, removeBookmark]);
+  }, [article.norma_data, isQuickNorm, addQuickNorm, removeQuickNormByParams]);
 
   const handleNewNote = useCallback(() => {
     setShowToolsPanel(true);
@@ -301,7 +335,7 @@ export function StudyMode({
     [highlights, normaKey, article.norma_data.numero_articolo]
   );
 
-  const isCurrentlyBookmarked = isBookmarked(normaKey);
+  const isCurrentlyBookmarked = isQuickNorm(normaToSearchParams(article.norma_data));
   const themeStyle = THEME_STYLES[theme];
 
   if (!isOpen) return null;

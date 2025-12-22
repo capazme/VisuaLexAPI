@@ -23,6 +23,11 @@ export interface TokenResponse {
   token_type: string;
 }
 
+export interface RegisterResponse {
+  message: string;
+  pending_approval: boolean;
+}
+
 export interface UserResponse {
   id: string;
   email: string;

@@ -26,12 +26,13 @@ model User {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relationships
-  folders     Folder[]
-  bookmarks   Bookmark[]
-  annotations Annotation[]
-  highlights  Highlight[]
-  dossiers    Dossier[]
-  feedbacks   Feedback[]
+  folders       Folder[]
+  bookmarks     Bookmark[]
+  annotations   Annotation[]
+  highlights    Highlight[]
+  dossiers      Dossier[]
+  feedbacks     Feedback[]
+  searchHistory SearchHistory[]
 
   @@map("users")
 }
@@ -226,4 +227,26 @@ model Feedback {
   @@index([status])
   @@index([type])
   @@map("feedbacks")
+}
+
+// ============================================
+// SEARCH HISTORY
+// ============================================
+
+model SearchHistory {
+  id        String   @id @default(uuid())
+  actType   String   @map("act_type")
+  actNumber String?  @map("act_number")
+  article   String?
+  date      String?
+  version   String?  @default("vigente")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("search_history")
 }

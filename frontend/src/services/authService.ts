@@ -8,13 +8,14 @@ import type {
   TokenResponse,
   UserResponse,
   ChangePasswordRequest,
+  RegisterResponse,
 } from '../types/api';
 
 /**
- * Register a new user
+ * Register a new user (returns pending approval status)
  */
-export const register = async (data: UserRegisterRequest): Promise<UserResponse> => {
-  return post<UserResponse>('/auth/register', data);
+export const register = async (data: UserRegisterRequest): Promise<RegisterResponse> => {
+  return post<RegisterResponse>('/auth/register', data);
 };
 
 /**

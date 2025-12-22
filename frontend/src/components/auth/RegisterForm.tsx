@@ -1,24 +1,23 @@
 /**
- * Registration form component - Refactored with glassmorphism and micro-interactions
+ * Registration form component - Glassmorphism style with pending approval flow
  */
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { UserPlus, Mail, Lock, User, Eye, EyeOff, AlertCircle, ArrowRight, Check, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { register } from '../../services/authService';
+import { UserPlus, Mail, Lock, User, Eye, EyeOff, AlertCircle, ArrowLeft, CheckCircle, Check, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export function RegisterForm() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
-  const [isEmailFocused, setIsEmailFocused] = useState(false);
-  const [isUsernameFocused, setIsUsernameFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
 
-  const { register, loading, error: authError } = useAuth();
-  const navigate = useNavigate();
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Password strength calculation
   const getPasswordStrength = () => {
@@ -33,33 +32,101 @@ export function RegisterForm() {
   const passwordStrength = getPasswordStrength();
 
   // Username validation
-  const isUsernameValid = username.length > 0 && /^[a-zA-Z0-9_]+$/.test(username);
+  const isUsernameValid = username.length >= 3 && /^[a-zA-Z0-9_]+$/.test(username);
   const showUsernameValidation = username.length > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
-    // Basic validation
-    if (!email || !username || !password) {
-      setFormError('All fields are required');
+    // Client-side validation
+    if (!email || !username || !password || !confirmPassword) {
+      setFormError('Tutti i campi sono obbligatori');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setFormError('Formato email non valido');
+      return;
+    }
+
+    if (username.length < 3) {
+      setFormError('Username deve essere almeno 3 caratteri');
+      return;
+    }
+
+    if (!isUsernameValid) {
+      setFormError('Username può contenere solo lettere, numeri e underscore');
       return;
     }
 
     if (password.length < 3) {
-      setFormError('Password must be at least 3 characters');
+      setFormError('Password deve essere almeno 3 caratteri');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError('Le password non coincidono');
       return;
     }
 
     try {
-      await register(email, username, password);
-      navigate('/', { replace: true });
+      setLoading(true);
+      await register({ email, username, password });
+      setRegistrationComplete(true);
     } catch (error: any) {
-      setFormError(error.message || 'Registration failed. Please try again.');
+      setFormError(error.message || 'Errore durante la registrazione. Riprova.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const error = formError || authError;
+  // Success state - registration complete, pending approval
+  if (registrationComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F4F6] dark:bg-[#0F172A] relative overflow-hidden px-4">
+        {/* Background Decorative Elements */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-[420px] w-full relative z-10 p-6">
+          {/* Success Card */}
+          <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-green-500 to-emerald-500 text-white rounded-2xl shadow-lg shadow-green-500/20 mb-6">
+              <CheckCircle size={32} strokeWidth={2} />
+            </div>
+
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
+              Registrazione Completata!
+            </h1>
+
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
+              Il tuo account è stato creato con successo.
+              <br />
+              <strong className="text-slate-800 dark:text-slate-200">
+                È in attesa di approvazione da parte di un amministratore.
+              </strong>
+            </p>
+
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                Riceverai l'accesso quando un amministratore approverà il tuo account.
+                Nel frattempo, puoi tornare alla pagina di login.
+              </p>
+            </div>
+
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              <ArrowLeft size={18} />
+              Torna al Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F3F4F6] dark:bg-[#0F172A] relative overflow-hidden px-4">
@@ -69,7 +136,7 @@ export function RegisterForm() {
 
       <div className="max-w-[420px] w-full relative z-10 p-6">
         {/* Logo/Header */}
-        <div className="text-center mb-10 space-y-3">
+        <div className="text-center mb-8 space-y-3">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 mb-2 transform transition-transform hover:scale-105 duration-300">
             <UserPlus size={28} strokeWidth={2.5} />
           </div>
@@ -84,14 +151,14 @@ export function RegisterForm() {
         {/* Registration Card with Glass Effect */}
         <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 transition-all duration-300">
           {/* Error Message */}
-          {error && (
+          {formError && (
             <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
               <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">{formError}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
@@ -100,7 +167,7 @@ export function RegisterForm() {
               <div
                 className={cn(
                   'relative group transition-all duration-300',
-                  isEmailFocused ? 'transform scale-[1.02]' : ''
+                  focusedField === 'email' ? 'transform scale-[1.02]' : ''
                 )}
               >
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -108,7 +175,7 @@ export function RegisterForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isEmailFocused ? 'text-blue-500' : 'text-slate-400'
+                      focusedField === 'email' ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -116,10 +183,10 @@ export function RegisterForm() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setIsEmailFocused(true)}
-                  onBlur={() => setIsEmailFocused(false)}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="name@company.com"
+                  placeholder="nome@email.com"
                   disabled={loading}
                   autoComplete="email"
                 />
@@ -134,7 +201,7 @@ export function RegisterForm() {
               <div
                 className={cn(
                   'relative group transition-all duration-300',
-                  isUsernameFocused ? 'transform scale-[1.02]' : ''
+                  focusedField === 'username' ? 'transform scale-[1.02]' : ''
                 )}
               >
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -142,7 +209,7 @@ export function RegisterForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isUsernameFocused ? 'text-blue-500' : 'text-slate-400'
+                      focusedField === 'username' ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -150,10 +217,10 @@ export function RegisterForm() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  onFocus={() => setIsUsernameFocused(true)}
-                  onBlur={() => setIsUsernameFocused(false)}
+                  onFocus={() => setFocusedField('username')}
+                  onBlur={() => setFocusedField(null)}
                   className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="johndoe"
+                  placeholder="mario_rossi"
                   disabled={loading}
                   autoComplete="username"
                 />
@@ -169,7 +236,7 @@ export function RegisterForm() {
                 )}
               </div>
               {showUsernameValidation && !isUsernameValid && (
-                <p className="text-xs text-red-500 ml-1">Solo lettere, numeri e underscore</p>
+                <p className="text-xs text-red-500 ml-1">Solo lettere, numeri e underscore (min 3 caratteri)</p>
               )}
             </div>
 
@@ -181,7 +248,7 @@ export function RegisterForm() {
               <div
                 className={cn(
                   'relative group transition-all duration-300',
-                  isPasswordFocused ? 'transform scale-[1.02]' : ''
+                  focusedField === 'password' ? 'transform scale-[1.02]' : ''
                 )}
               >
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -189,7 +256,7 @@ export function RegisterForm() {
                     size={18}
                     className={cn(
                       'transition-colors',
-                      isPasswordFocused ? 'text-blue-500' : 'text-slate-400'
+                      focusedField === 'password' ? 'text-blue-500' : 'text-slate-400'
                     )}
                   />
                 </div>
@@ -197,8 +264,8 @@ export function RegisterForm() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setIsPasswordFocused(true)}
-                  onBlur={() => setIsPasswordFocused(false)}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
                   className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
                   placeholder="••••••••"
                   disabled={loading}
@@ -245,30 +312,71 @@ export function RegisterForm() {
               )}
             </div>
 
+            {/* Confirm Password Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
+                Conferma Password
+              </label>
+              <div
+                className={cn(
+                  'relative group transition-all duration-300',
+                  focusedField === 'confirmPassword' ? 'transform scale-[1.02]' : ''
+                )}
+              >
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock
+                    size={18}
+                    className={cn(
+                      'transition-colors',
+                      focusedField === 'confirmPassword' ? 'text-blue-500' : 'text-slate-400'
+                    )}
+                  />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onFocus={() => setFocusedField('confirmPassword')}
+                  onBlur={() => setFocusedField(null)}
+                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
+                  placeholder="••••••••"
+                  disabled={loading}
+                  autoComplete="new-password"
+                />
+                {/* Match indicator */}
+                {confirmPassword.length > 0 && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {password === confirmPassword ? (
+                      <Check size={18} className="text-green-500" />
+                    ) : (
+                      <X size={18} className="text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-6"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  Crea Account{' '}
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  Crea Account
+                  <UserPlus size={18} className="group-hover:scale-110 transition-transform" />
                 </>
               )}
             </button>
           </form>
 
           {/* Login Link */}
-          <p className="mt-8 text-center text-sm text-slate-500 bg-white/50 dark:bg-white/5 py-2 rounded-lg mx-auto w-fit px-4 border border-slate-100 dark:border-white/5">
+          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
             Hai già un account?{' '}
-            <Link
-              to="/login"
-              className="text-blue-600 font-semibold hover:text-blue-500 transition-colors"
-            >
+            <Link to="/login" className="text-blue-600 hover:underline font-medium">
               Accedi
             </Link>
           </p>
@@ -282,3 +390,4 @@ export function RegisterForm() {
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
  * Login form component - Refactored with glassmorphism and micro-interactions
  */
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -170,11 +170,12 @@ export function LoginForm() {
             </button>
           </form>
 
-          {/* Alpha Notice - Registration disabled */}
-          <p className="mt-8 text-center text-xs text-slate-400 dark:text-slate-500">
-            Accesso riservato agli utenti autorizzati.
-            <br />
-            Contatta l'amministratore per ottenere un account.
+          {/* Registration Link */}
+          <p className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            Non hai un account?{' '}
+            <Link to="/register" className="text-blue-600 hover:underline font-medium">
+              Registrati
+            </Link>
           </p>
         </div>
 

@@ -311,11 +311,20 @@ export function AdminPage() {
           <>
             {/* Actions Bar */}
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <Users size={20} className="text-gray-500" />
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Utenti ({users.length})
-                </h2>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Users size={20} className="text-gray-500" />
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Utenti ({users.length})
+                  </h2>
+                </div>
+                {/* Pending users badge */}
+                {users.filter(u => !u.is_active).length > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm font-medium">
+                    <AlertCircle size={14} />
+                    {users.filter(u => !u.is_active).length} in attesa di approvazione
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -338,127 +347,127 @@ export function AdminPage() {
 
             {/* Users Table */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          {loading && users.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
-              Caricamento utenti...
-            </div>
-          ) : users.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              Nessun utente trovato
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700/50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Utente
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Stato
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Ruolo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Attività
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Creato
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Azioni
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{u.username}</p>
-                          <p className="text-sm text-gray-500">{u.email}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleToggleActive(u.id, u.is_active)}
-                          disabled={u.id === user?.id}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                            u.is_active
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                            u.id === user?.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
-                          )}
-                        >
-                          {u.is_active ? <Check size={12} /> : <X size={12} />}
-                          {u.is_active ? 'Attivo' : 'Disattivo'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleToggleAdmin(u.id, u.is_admin)}
-                          disabled={u.id === user?.id}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
-                            u.is_admin
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
-                            u.id === user?.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
-                          )}
-                        >
-                          {u.is_admin ? <Shield size={12} /> : <ShieldOff size={12} />}
-                          {u.is_admin ? 'Admin' : 'Utente'}
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                          <p className="font-medium text-gray-700 dark:text-gray-300">
-                            {u.login_count ?? 0} accessi
-                          </p>
-                          {u.last_login_at && (
-                            <p>Ultimo: {new Date(u.last_login_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
-                          )}
-                          {u.stats && (
-                            <p className="text-gray-400">{u.stats.bookmarks} bookmarks</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(u.created_at).toLocaleDateString('it-IT')}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => setShowResetPasswordModal(u.id)}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                            title="Reset password"
-                          >
-                            <Key size={16} />
-                          </button>
-                          <button
-                            onClick={() => setShowDeleteConfirm(u.id)}
-                            disabled={u.id === user?.id}
-                            className={cn(
-                              'p-2 rounded-lg transition-colors',
-                              u.id === user?.id
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                            )}
-                            title="Elimina utente"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+              {loading && users.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                  Caricamento utenti...
+                </div>
+              ) : users.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  Nessun utente trovato
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Utente
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Stato
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Ruolo
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Attività
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Creato
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Azioni
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {users.map((u) => (
+                        <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">{u.username}</p>
+                              <p className="text-sm text-gray-500">{u.email}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              onClick={() => handleToggleActive(u.id, u.is_active)}
+                              disabled={u.id === user?.id}
+                              className={cn(
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                                u.is_active
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                                u.id === user?.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
+                              )}
+                            >
+                              {u.is_active ? <Check size={12} /> : <X size={12} />}
+                              {u.is_active ? 'Attivo' : 'Disattivo'}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              onClick={() => handleToggleAdmin(u.id, u.is_admin)}
+                              disabled={u.id === user?.id}
+                              className={cn(
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors',
+                                u.is_admin
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+                                u.id === user?.id ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'
+                              )}
+                            >
+                              {u.is_admin ? <Shield size={12} /> : <ShieldOff size={12} />}
+                              {u.is_admin ? 'Admin' : 'Utente'}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+                              <p className="font-medium text-gray-700 dark:text-gray-300">
+                                {u.login_count ?? 0} accessi
+                              </p>
+                              {u.last_login_at && (
+                                <p>Ultimo: {new Date(u.last_login_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                              )}
+                              {u.stats && (
+                                <p className="text-gray-400">{u.stats.bookmarks} bookmarks</p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(u.created_at).toLocaleDateString('it-IT')}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => setShowResetPasswordModal(u.id)}
+                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                title="Reset password"
+                              >
+                                <Key size={16} />
+                              </button>
+                              <button
+                                onClick={() => setShowDeleteConfirm(u.id)}
+                                disabled={u.id === user?.id}
+                                className={cn(
+                                  'p-2 rounded-lg transition-colors',
+                                  u.id === user?.id
+                                    ? 'text-gray-300 cursor-not-allowed'
+                                    : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                )}
+                                title="Elimina utente"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </>
         )}
