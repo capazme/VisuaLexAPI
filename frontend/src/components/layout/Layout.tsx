@@ -6,6 +6,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
+import { ChangelogNotification } from '../ui/ChangelogNotification';
 import { cn } from '../../lib/utils';
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
@@ -182,6 +183,9 @@ export function Layout() {
 
       {/* Feedback Button - only for authenticated users */}
       {isAuthenticated && <FeedbackButton />}
+
+      {/* Version changelog notification */}
+      <ChangelogNotification />
     </div>
   );
 }
