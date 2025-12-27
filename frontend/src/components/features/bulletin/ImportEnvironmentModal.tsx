@@ -20,7 +20,6 @@ export function ImportEnvironmentModal({
   // Options
   const [importNotes, setImportNotes] = useState(true);
   const [importHighlights, setImportHighlights] = useState(true);
-  const [mode, setMode] = useState<'merge' | 'replace'>('merge');
 
   // UI state
   const [loading, setLoading] = useState(false);

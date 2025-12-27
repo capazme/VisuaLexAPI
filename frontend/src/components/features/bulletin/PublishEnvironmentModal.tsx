@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Share2, FileText, Tag, Folder, Check, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
-import type { Environment, EnvironmentCategory, SharedEnvironment } from '../../../types';
+import type { EnvironmentCategory, SharedEnvironment } from '../../../types';
 import { getEnvironmentStats } from '../../../utils/environmentUtils';
 
 interface PublishEnvironmentModalProps {
@@ -161,10 +161,10 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
           {stats && (
             <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                <span className="font-medium">{stats.dossierCount}</span> dossier,{' '}
-                <span className="font-medium">{stats.quickNormCount}</span> norme rapide,{' '}
-                <span className="font-medium">{stats.annotationCount}</span> annotazioni,{' '}
-                <span className="font-medium">{stats.highlightCount}</span> evidenziazioni
+                <span className="font-medium">{stats.dossiers}</span> dossier,{' '}
+                <span className="font-medium">{stats.quickNorms}</span> norme rapide,{' '}
+                <span className="font-medium">{stats.annotations}</span> annotazioni,{' '}
+                <span className="font-medium">{stats.highlights}</span> evidenziazioni
               </p>
             </div>
           )}
