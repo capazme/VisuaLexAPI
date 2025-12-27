@@ -5,6 +5,7 @@ import { DossierModal } from '../../ui/DossierModal';
 import { jsPDF } from 'jspdf';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
+import { sanitizeHTML } from '../../../utils/sanitize';
 import type { Dossier, DossierItem } from '../../../types';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -161,7 +162,7 @@ function ArticleViewerModal({
           {content ? (
             <div
               className="prose prose-sm dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, '<br />') }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(content.replace(/\n/g, '<br />')) }}
             />
           ) : (
             <p className="text-slate-500 italic text-center py-8">Contenuto non disponibile</p>

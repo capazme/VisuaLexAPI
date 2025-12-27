@@ -7,11 +7,15 @@ import { AppError } from '../middleware/errorHandler';
 
 const prisma = new PrismaClient();
 
+// Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const passwordErrorMessage = 'Password must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 number';
+
 // Validation schemas
 const registerSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50),
-  password: z.string().min(3),
+  password: z.string().min(8).regex(passwordRegex, passwordErrorMessage),
 });
 
 const loginSchema = z.object({
@@ -25,7 +29,7 @@ const refreshSchema = z.object({
 
 const changePasswordSchema = z.object({
   current_password: z.string(),
-  new_password: z.string().min(3),
+  new_password: z.string().min(8).regex(passwordRegex, passwordErrorMessage),
 });
 
 // Register - creates inactive user pending admin approval

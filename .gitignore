@@ -10,3 +10,9 @@ download
 dist/*
 .claude
 data
+
+# Environment files - NEVER commit secrets
+.env
+.env.*
+!.env.example
+*.env.local
