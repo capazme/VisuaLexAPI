@@ -17,6 +17,7 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/react": "^0.27.16",
+    "@vitest/ui": "^4.0.16",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -26,7 +27,7 @@
     "driver.js": "^1.4.0",
     "framer-motion": "^12.23.24",
     "immer": "^10.1.1",
-    "jspdf": "^2.5.2",
+    "jspdf": "^3.0.4",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -59,6 +60,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.3",
     "vite": "^7.2.2",
-    "vitest": "^1.0.4"
+    "vitest": "^4.0.16"
   }
 }

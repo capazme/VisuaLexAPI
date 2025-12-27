@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import 'express-async-errors';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
@@ -16,7 +18,23 @@ import sharedEnvironmentRoutes from './routes/sharedEnvironments';
 
 const app = express();
 
-// Middleware
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: config.nodeEnv === 'production' ? undefined : false, // Disable CSP in dev for hot reload
+  crossOriginEmbedderPolicy: false, // Allow embedding resources
+}));
+
+// Global rate limiting: 100 requests per minute per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100,
+  message: { detail: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
+
+// CORS
 app.use(cors({
   origin: config.cors.origins,
   credentials: true,
