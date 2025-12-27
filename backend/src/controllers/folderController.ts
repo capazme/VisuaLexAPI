@@ -51,12 +51,12 @@ async function checkCircularReference(folderId: string, newParentId: string | nu
     }
     visited.add(currentId);
 
-    const folder = await prisma.folder.findUnique({
+    const parentFolder: { parentId: string | null } | null = await prisma.folder.findUnique({
       where: { id: currentId },
       select: { parentId: true },
     });
 
-    currentId = folder?.parentId || null;
+    currentId = parentFolder?.parentId || null;
   }
 
   return false;

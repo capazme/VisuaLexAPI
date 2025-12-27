@@ -30,7 +30,7 @@ const resetPasswordSchema = z.object({
 /**
  * List all users (admin only)
  */
-export const listUsers = async (req: Request, res: Response) => {
+export const listUsers = async (_req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     select: {
       id: true,

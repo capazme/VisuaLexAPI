@@ -18,6 +18,7 @@ import {
 } from '../../../utils/environmentUtils';
 import { exampleEnvironments } from '../../../data/exampleEnvironments';
 import { useTour } from '../../../hooks/useTour';
+import { Toast } from '../../ui/Toast';
 
 export function EnvironmentPage() {
   const {
@@ -38,8 +39,13 @@ export function EnvironmentPage() {
   const [applyModalEnv, setApplyModalEnv] = useState<Environment | null>(null);
   const [editingEnv, setEditingEnv] = useState<Environment | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour();
+
+  const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToastMessage({ text, type });
+  };
 
   // Start environments tour on first visit
   useEffect(() => {
@@ -54,7 +60,7 @@ export function EnvironmentPage() {
       if (result.success) {
         setImportingEnv(result.data);
       } else {
-        alert(result.error);
+        showToast(result.error || 'Errore durante l\'import', 'error');
       }
       setSearchParams({}, { replace: true });
     }
@@ -78,7 +84,7 @@ export function EnvironmentPage() {
     if (result.success) {
       setImportingEnv(result.data);
     } else {
-      alert(result.error);
+      showToast(result.error || 'Errore durante la lettura del file', 'error');
     }
     e.target.value = '';
   };
@@ -86,6 +92,7 @@ export function EnvironmentPage() {
   const handleConfirmImport = () => {
     if (importingEnv) {
       importEnvironment(importingEnv);
+      showToast(`Ambiente "${importingEnv.name}" importato con successo`, 'success');
       setImportingEnv(null);
     }
   };
@@ -98,14 +105,16 @@ export function EnvironmentPage() {
     const link = createEnvironmentShareLink(env);
     if (link) {
       await navigator.clipboard.writeText(link);
-      alert('Link copiato negli appunti!');
+      showToast('Link copiato negli appunti', 'success');
     } else {
-      alert('Ambiente troppo grande per condivisione via link. Usa l\'export JSON.');
+      showToast('Ambiente troppo grande per condivisione via link. Usa l\'export JSON.', 'error');
     }
   };
 
   const handleApply = (env: Environment, mode: 'replace' | 'merge') => {
     applyEnvironment(env.id, mode);
+    const modeText = mode === 'merge' ? 'unito' : 'applicato';
+    showToast(`Ambiente "${env.name}" ${modeText} con successo`, 'success');
     setApplyModalEnv(null);
   };
 
@@ -125,9 +134,9 @@ export function EnvironmentPage() {
       }
     });
     if (imported > 0) {
-      alert(`${imported} ambienti di esempio caricati con successo!`);
+      showToast(`${imported} ambienti di esempio caricati con successo`, 'success');
     } else {
-      alert('Tutti gli ambienti di esempio sono già presenti.');
+      showToast('Tutti gli ambienti di esempio sono già presenti', 'info');
     }
   };
 
@@ -299,6 +308,16 @@ export function EnvironmentPage() {
         <DeleteConfirmModal
           onClose={() => setDeleteConfirmId(null)}
           onConfirm={() => handleDelete(deleteConfirmId)}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage.text}
+          type={toastMessage.type}
+          isVisible={!!toastMessage}
+          onClose={() => setToastMessage(null)}
         />
       )}
     </div>

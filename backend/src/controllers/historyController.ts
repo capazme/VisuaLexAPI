@@ -76,7 +76,7 @@ export const addHistory = async (req: Request, res: Response) => {
       data: { createdAt: new Date() },
     });
 
-    return res.json({
+    res.json({
       id: updated.id,
       act_type: updated.actType,
       act_number: updated.actNumber,
@@ -85,6 +85,7 @@ export const addHistory = async (req: Request, res: Response) => {
       version: updated.version,
       created_at: updated.createdAt,
     });
+    return;
   }
 
   // Create new history entry
