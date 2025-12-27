@@ -102,7 +102,7 @@ export function CitationPreviewPopup({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -4 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="fixed z-[80] w-[400px] max-w-[calc(100vw-24px)]"
+          className="fixed z-[200] w-[400px] max-w-[calc(100vw-24px)]"
           style={{
             top: position.top,
             left: position.left,

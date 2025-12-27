@@ -45,34 +45,69 @@ function isArticleString(str: string): boolean {
 }
 
 // Parse tree data into structured sections
-// Handles both flat string arrays ["1", "2", ...] and object arrays [{numero: "1"}, ...]
+// Handles both flat string arrays ["1", "2", ...] and object arrays [{allegato, numero}, ...]
 interface ParsedSection {
   title: string;
   articles: string[];
 }
 
-function parseTreeData(data: any[]): ParsedSection[] {
+/**
+ * Parse tree data filtering by a specific annex.
+ * The tree contains a mix of:
+ * - Objects: {allegato: null|"1"|"2", numero: "X"} - articles with their annex
+ * - Strings: Section titles like "LIBRO PRIMO...", "TITOLO II...", "CAPO I..."
+ *
+ * Section titles are applied to following articles, but only sections with
+ * articles matching the target annex are included.
+ */
+function parseTreeDataForAnnex(data: any[], targetAnnex: string | null): ParsedSection[] {
   const sections: ParsedSection[] = [];
-  let currentSection: ParsedSection = { title: 'Dispositivo', articles: [] };
+  let currentSection: ParsedSection = { title: 'Articoli', articles: [] };
+  let pendingSectionTitle: string | null = null;
 
   for (const item of data) {
-    // Handle string items (section titles or article numbers)
+    // Handle string items (section titles or legacy article numbers)
     if (typeof item === 'string') {
       if (isArticleString(item)) {
-        currentSection.articles.push(item);
-      } else {
-        // It's a section title
-        if (currentSection.articles.length > 0) {
-          sections.push(currentSection);
+        // Legacy format: plain article number string (no annex info)
+        // Only include if targeting dispositivo (null annex)
+        if (targetAnnex === null) {
+          if (pendingSectionTitle && pendingSectionTitle !== currentSection.title) {
+            if (currentSection.articles.length > 0) {
+              sections.push(currentSection);
+            }
+            currentSection = { title: pendingSectionTitle, articles: [] };
+            pendingSectionTitle = null;
+          }
+          currentSection.articles.push(item);
         }
-        currentSection = { title: item, articles: [] };
+      } else {
+        // It's a section title - store it for when we find matching articles
+        pendingSectionTitle = item;
       }
       continue;
     }
 
-    // Handle object items (article data from treextractor)
-    if (item && typeof item === 'object' && item.numero) {
-      currentSection.articles.push(item.numero);
+    // Handle object items (article data with allegato info)
+    if (item && typeof item === 'object' && item.numero !== undefined) {
+      const itemAnnex = item.allegato ?? null;
+
+      // Check if this article belongs to the target annex
+      // Compare with type coercion: null === null, "1" === "1"
+      const annexMatches = (itemAnnex === null && targetAnnex === null) ||
+                           (itemAnnex !== null && targetAnnex !== null && String(itemAnnex) === String(targetAnnex));
+
+      if (annexMatches) {
+        // Create new section if we have a pending title
+        if (pendingSectionTitle && pendingSectionTitle !== currentSection.title) {
+          if (currentSection.articles.length > 0) {
+            sections.push(currentSection);
+          }
+          currentSection = { title: pendingSectionTitle, articles: [] };
+          pendingSectionTitle = null;
+        }
+        currentSection.articles.push(item.numero);
+      }
       continue;
     }
   }
@@ -131,13 +166,14 @@ export function TreeViewPanel({
     // No article is loaded until user clicks one
     setSelectedAnnex(annexNumber);
   };
-  // Parse tree data into sections (handles both string and object formats)
+  // Parse tree data into sections filtered by current annex
+  // This ensures each annex tab shows its own section structure (titles/chapters)
   const parsedSections = useMemo(() => {
     if (treeData && treeData.length > 0) {
-      return parseTreeData(treeData);
+      return parseTreeDataForAnnex(treeData, effectiveAnnex ?? null);
     }
     return null;
-  }, [treeData]);
+  }, [treeData, effectiveAnnex]);
 
   // Get articles for the currently selected annex from metadata
   // This ensures we show the correct articles for each annex tab
@@ -157,10 +193,17 @@ export function TreeViewPanel({
     return null;
   }, [annexes, effectiveAnnex]);
 
-  // Determine which articles to display:
-  // - If we have annex-specific articles from metadata, use those
-  // - Otherwise fall back to parsed tree data
-  const displayArticles = articlesForCurrentAnnex;
+  // Check if parsedSections has actual structure (titles/chapters, not just one generic section)
+  const hasStructuredSections = parsedSections && (
+    parsedSections.length > 1 ||
+    (parsedSections.length === 1 && parsedSections[0].title !== 'Articoli')
+  );
+
+  // Determine display mode:
+  // - Prefer structured view (with titles/chapters) when available for ANY annex
+  // - Fall back to flat article list only when no section structure exists
+  const useStructuredView = hasStructuredSections;
+  const displayArticles = useStructuredView ? null : articlesForCurrentAnnex;
   const useFallbackTree = !displayArticles && parsedSections;
 
   // Count stats based on what we're displaying

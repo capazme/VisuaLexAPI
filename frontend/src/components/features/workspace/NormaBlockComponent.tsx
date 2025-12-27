@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen, Loader2 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -45,6 +45,23 @@ export function NormaBlockComponent({
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
     normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null
   );
+
+  // Track previous article count to detect new articles
+  const prevArticleCountRef = useRef(normaBlock.articles.length);
+
+  // Auto-select new articles when they are added
+  useEffect(() => {
+    const currentCount = normaBlock.articles.length;
+    const prevCount = prevArticleCountRef.current;
+
+    if (currentCount > prevCount && currentCount > 0) {
+      // New article(s) added - select the last one
+      const lastArticle = normaBlock.articles[currentCount - 1];
+      setActiveArticleId(getUniqueId(lastArticle));
+    }
+
+    prevArticleCountRef.current = currentCount;
+  }, [normaBlock.articles]);
 
   // Derive active article from activeArticleId (needed before hook for correct annex detection)
   const activeArticle = normaBlock.articles.find(
