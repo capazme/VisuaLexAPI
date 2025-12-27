@@ -10,6 +10,7 @@ import { NormaCard } from './NormaCard';
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
 import { SearchX, Search, X, Star, Plus, Sparkles, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { addToHistory } from '../../../services/historyService';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
@@ -220,6 +221,18 @@ export function SearchPanel() {
           console.error("Error parsing final buffer", e);
         }
       }
+
+      // Save to search history (fire and forget - don't block on this)
+      addToHistory({
+        act_type: params.act_type,
+        act_number: params.act_number,
+        article: params.article,
+        date: params.date,
+        version: params.version,
+      }).catch(err => {
+        // Silently fail - history is not critical
+        console.debug('Failed to save search history:', err);
+      });
 
       // Results buffer will be processed by useEffect below
 

@@ -253,3 +253,82 @@ export interface EnvironmentExport {
     exportedAt: string;
     data: Environment;
 }
+
+// ============================================
+// SHARED ENVIRONMENTS (Bulletin Board)
+// ============================================
+
+export type ReportReason = 'spam' | 'inappropriate' | 'copyright' | 'other';
+export type ReportStatus = 'pending' | 'reviewed' | 'dismissed';
+
+export interface SharedEnvironmentContent {
+    dossiers: Dossier[];
+    quickNorms: QuickNorm[];
+    annotations: Annotation[];
+    highlights: Highlight[];
+}
+
+export interface SharedEnvironmentUser {
+    id: string;
+    username: string;
+}
+
+export interface SharedEnvironment {
+    id: string;
+    title: string;
+    description?: string;
+    content: SharedEnvironmentContent;
+    category: EnvironmentCategory;
+    tags: string[];
+    includeNotes: boolean;
+    includeHighlights: boolean;
+
+    // Metrics
+    viewCount: number;
+    downloadCount: number;
+    likeCount: number;
+
+    // Author
+    user: SharedEnvironmentUser;
+
+    // Current user state
+    userLiked: boolean;
+    isOwner: boolean;
+
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SharedEnvironmentListResponse {
+    data: SharedEnvironment[];
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        pages: number;
+    };
+}
+
+export interface PublishEnvironmentPayload {
+    title: string;
+    description?: string;
+    content: SharedEnvironmentContent;
+    category: EnvironmentCategory;
+    tags?: string[];
+    includeNotes?: boolean;
+    includeHighlights?: boolean;
+}
+
+export interface SharedEnvironmentReport {
+    id: string;
+    reason: ReportReason;
+    details?: string;
+    status: ReportStatus;
+    createdAt: string;
+    environment: {
+        id: string;
+        title: string;
+        userId: string;
+    };
+    reporter: SharedEnvironmentUser;
+}

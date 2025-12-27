@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { EnvironmentPage } from './components/features/environments/EnvironmentPage';
+import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="dossier" element={<DossierPage />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentPage />} />
+          <Route path="bulletin" element={<BulletinBoardPage />} />
         </Route>
 
         {/* Admin routes */}

@@ -34,6 +34,11 @@ model User {
   feedbacks     Feedback[]
   searchHistory SearchHistory[]
 
+  // Shared Environments (Bulletin Board)
+  sharedEnvironments       SharedEnvironment[]
+  sharedEnvironmentLikes   SharedEnvironmentLike[]
+  sharedEnvironmentReports SharedEnvironmentReport[]
+
   @@map("users")
 }
 
@@ -249,4 +254,101 @@ model SearchHistory {
   @@index([userId])
   @@index([createdAt])
   @@map("search_history")
+}
+
+// ============================================
+// SHARED ENVIRONMENTS (Bulletin Board)
+// ============================================
+
+enum EnvironmentCategory {
+  compliance
+  civil
+  penal
+  administrative
+  eu
+  other
+}
+
+enum ReportReason {
+  spam
+  inappropriate
+  copyright
+  other
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  dismissed
+}
+
+model SharedEnvironment {
+  id          String              @id @default(uuid())
+  title       String
+  description String?
+
+  // Environment content (dossiers, quickNorms, annotations, highlights)
+  content Json
+
+  // Sharing options
+  includeNotes      Boolean @default(true) @map("include_notes")
+  includeHighlights Boolean @default(true) @map("include_highlights")
+
+  // Categorization
+  category EnvironmentCategory
+  tags     String[]
+
+  // Metrics
+  viewCount     Int @default(0) @map("view_count")
+  downloadCount Int @default(0) @map("download_count")
+
+  // Ownership
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user    User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes   SharedEnvironmentLike[]
+  reports SharedEnvironmentReport[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("shared_environments")
+}
+
+model SharedEnvironmentLike {
+  id        String   @id @default(uuid())
+  envId     String   @map("env_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  environment SharedEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([envId, userId])
+  @@index([envId])
+  @@index([userId])
+  @@map("shared_environment_likes")
+}
+
+model SharedEnvironmentReport {
+  id        String       @id @default(uuid())
+  envId     String       @map("env_id")
+  userId    String       @map("user_id")
+  reason    ReportReason
+  details   String?
+  status    ReportStatus @default(pending)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  // Relationships
+  environment SharedEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([envId, userId])
+  @@index([envId])
+  @@index([status])
+  @@map("shared_environment_reports")
 }

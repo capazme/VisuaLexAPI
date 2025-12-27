@@ -12,6 +12,7 @@ import annotationRoutes from './routes/annotations';
 import dossierRoutes from './routes/dossiers';
 import feedbackRoutes from './routes/feedback';
 import historyRoutes from './routes/history';
+import sharedEnvironmentRoutes from './routes/sharedEnvironments';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api', sharedEnvironmentRoutes);
 
 // 404 handler
 app.use((_req, res) => {
@@ -73,6 +75,7 @@ app.listen(config.port, () => {
 ║  - Annotations: http://localhost:${config.port}/api/annotations/*║
 ║  - Feedback: http://localhost:${config.port}/api/feedback/*      ║
 ║  - History: http://localhost:${config.port}/api/history/*        ║
+║  - Bulletin: http://localhost:${config.port}/api/shared-environments/*║
 ╚═══════════════════════════════════════════════════════════╝
   `);
 });

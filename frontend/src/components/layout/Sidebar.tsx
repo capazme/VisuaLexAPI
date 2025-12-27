@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -223,6 +223,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
+        <NavItem to="/bulletin" icon={Users} label="Bacheca" onClick={closeMobile} />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 
