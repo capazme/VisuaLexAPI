@@ -179,7 +179,7 @@ echo ""
 if [[ "$DO_PULL" == true ]]; then
     print_step "Pulling latest changes..."
     cd "$SCRIPT_DIR"
-    git pull origin "$(git branch --show-current)"
+    git pull -r origin "$(git branch --show-current)"
     print_success "Git pull completed"
 else
     print_warning "Skipping git pull (--no-pull)"
