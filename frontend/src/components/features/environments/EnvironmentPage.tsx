@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Globe, Plus, Search, Download, Link2, Trash2, Play, RefreshCw,
+  Plus, Search, Download, Link2, Trash2, Play, RefreshCw,
   FileJson, Upload, X, Check, AlertTriangle, FolderOpen, Star,
   FileText, Pencil, MoreHorizontal, Sparkles
 } from 'lucide-react';

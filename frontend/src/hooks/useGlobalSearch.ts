@@ -56,7 +56,7 @@ export function useGlobalSearch() {
     const matches: GlobalSearchMatch[] = [];
     const searchQuery = query.toLowerCase();
 
-    workspaceTabs.forEach((tab: WorkspaceTab) => {
+    workspaceTabs.forEach((tab) => {
       tab.content.forEach((content) => {
         if (content.type === 'norma') {
           const normaBlock = content as NormaBlock;

@@ -546,12 +546,10 @@ export function CompareView() {
     isOpen,
     leftArticle,
     rightArticle,
-    mode,
     syncScroll,
     close,
     swap,
     remove,
-    setMode,
     setSyncScroll,
     isComplete,
   } = useCompare();

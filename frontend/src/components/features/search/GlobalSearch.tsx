@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ChevronDown, ChevronRight, FileText, Layers } from 'lucide-react';
 import { useGlobalSearch, setGlobalHighlight } from '../../../hooks/useGlobalSearch';
 import { useAppStore } from '../../../store/useAppStore';
-import { cn } from '../../../lib/utils';
 
 interface GlobalSearchProps {
   isOpen: boolean;
