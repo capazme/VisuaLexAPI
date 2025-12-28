@@ -7,8 +7,8 @@ import { requireAdmin } from '../middleware/admin';
 const router = Router();
 
 // All admin routes require authentication + admin privileges
-router.use(authenticate);
-router.use(requireAdmin);
+// Use path prefix to ensure middleware only runs for /admin/* routes
+router.use('/admin', authenticate, requireAdmin);
 
 // User management
 router.get('/admin/users', adminController.listUsers);
