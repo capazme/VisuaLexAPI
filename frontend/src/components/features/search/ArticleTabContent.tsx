@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { SelectionPopup } from './SelectionPopup';
-import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, MoreHorizontal, Clock, BookOpen } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
@@ -13,6 +13,7 @@ import { SafeHTML } from '../../../utils/sanitize';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
+import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -626,6 +627,31 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                                     >
                                         <Clock size={14} className="text-slate-400" />
                                         Cerca versione...
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+                                            openCompareWithArticle({
+                                                article: data,
+                                                sourceNorma: {
+                                                    tipo_atto: norma_data.tipo_atto,
+                                                    numero_atto: norma_data.numero_atto,
+                                                    data: norma_data.data,
+                                                },
+                                                label,
+                                            });
+                                            setShowMoreMenu(false);
+                                            const state = getCompareState();
+                                            if (state.leftArticle && !state.rightArticle) {
+                                                showToast('Articolo aggiunto. Seleziona un altro articolo per completare il confronto.', 'info');
+                                            } else if (state.isOpen && state.leftArticle && state.rightArticle) {
+                                                showToast('Confronto pronto!', 'success');
+                                            }
+                                        }}
+                                        className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <GitCompare size={14} className="text-slate-400" />
+                                        Confronta con...
                                     </button>
                                 </div>
                             </>

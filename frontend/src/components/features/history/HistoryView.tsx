@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { EmptyState } from '../../ui/EmptyState';
 import { useAppStore, appStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
@@ -277,9 +278,26 @@ export function HistoryView() {
                             <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
                         </div>
                     ) : filteredHistory.length === 0 ? (
-                        <div className="p-12 text-center text-slate-500">
-                            {searchTerm ? "Nessun risultato trovato." : "Nessuna ricerca recente."}
-                        </div>
+                        <EmptyState
+                            variant="history"
+                            title={searchTerm ? "Nessun risultato" : "Nessuna ricerca recente"}
+                            description={
+                                searchTerm
+                                    ? "Prova a modificare i termini di ricerca."
+                                    : "Le tue ricerche appariranno qui. Inizia cercando una norma per vedere la cronologia."
+                            }
+                            action={
+                                !searchTerm && (
+                                    <button
+                                        onClick={() => navigate('/')}
+                                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
+                                    >
+                                        <Search size={18} />
+                                        Inizia una ricerca
+                                    </button>
+                                )
+                            }
+                        />
                     ) : (
                         <div className="space-y-6 md:space-y-8">
                             {Object.entries(groupedByDate).map(([date, items]) => (

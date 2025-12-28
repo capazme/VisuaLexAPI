@@ -7,6 +7,7 @@ import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { sanitizeHTML } from '../../../utils/sanitize';
 import type { Dossier, DossierItem } from '../../../types';
+import { EmptyState } from '../../ui/EmptyState';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -1099,9 +1100,30 @@ export function DossierPage() {
           <SortableContext items={selectedDossier.items.map(i => i.id)} strategy={verticalListSortingStrategy}>
             <div id="tour-dossier-items" className="space-y-3">
               {selectedDossier.items.length === 0 ? (
-                <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
-                  <p className="text-slate-500">Questo dossier è vuoto.</p>
-                  <p className="text-xs text-slate-400 mt-1">Aggiungi articoli dai risultati di ricerca.</p>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
+                  <EmptyState
+                    variant="dossier"
+                    title="Dossier vuoto"
+                    description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
+                    action={
+                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button
+                          onClick={() => navigate('/')}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                        >
+                          <Search size={18} />
+                          Cerca articoli
+                        </button>
+                        <button
+                          onClick={() => setTreeNavigatorOpen(true)}
+                          className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                        >
+                          <TreeDeciduous size={18} />
+                          Importa da norma
+                        </button>
+                      </div>
+                    }
+                  />
                 </div>
               ) : (
                 selectedDossier.items.map((item) => (
@@ -1258,21 +1280,27 @@ export function DossierPage() {
       {/* Dossier grid - full width cards on mobile */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredDossiers.length === 0 ? (
-          <div className="col-span-full text-center py-12 md:py-20">
-            <div className="w-20 h-20 md:w-24 md:h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Folder size={32} className="text-slate-400 md:w-10 md:h-10" />
-            </div>
-            {searchQuery || selectedTag ? (
-              <>
-                <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-white">Nessun risultato</h3>
-                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-2">Prova a modificare i filtri di ricerca.</p>
-              </>
-            ) : (
-              <>
-                <h3 className="text-base md:text-lg font-medium text-slate-900 dark:text-white">Nessun dossier creato</h3>
-                <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-2">Organizza le tue ricerche creando dei dossier tematici.</p>
-              </>
-            )}
+          <div className="col-span-full">
+            <EmptyState
+              variant="dossier"
+              title={searchQuery || selectedTag ? "Nessun risultato" : "Nessun dossier creato"}
+              description={
+                searchQuery || selectedTag
+                  ? "Prova a modificare i filtri di ricerca."
+                  : "I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier per iniziare."
+              }
+              action={
+                !(searchQuery || selectedTag) && (
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
+                  >
+                    <FolderPlus size={18} />
+                    Crea il tuo primo dossier
+                  </button>
+                )
+              }
+            />
           </div>
         ) : (
           filteredDossiers.map((dossier, idx) => (

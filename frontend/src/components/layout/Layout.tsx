@@ -7,7 +7,11 @@ import { useAppStore } from '../../store/useAppStore';
 import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
+import { UndoToastContainer } from '../ui/Toast';
+import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
+import { GlobalSearch } from '../features/search/GlobalSearch';
+import { CompareView } from '../features/compare/CompareView';
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -16,6 +20,8 @@ export function Layout() {
   const { isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const navigate = useNavigate();
 
   // Onboarding Tour
@@ -61,6 +67,9 @@ export function Layout() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         openCommandPalette();
@@ -80,6 +89,16 @@ export function Layout() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault();
         toggleSearchPanel();
+      }
+      // Cmd/Ctrl+F for global search
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+      // Open keyboard shortcuts with '?' (Shift + /)
+      if (e.key === '?' && !isTyping) {
+        e.preventDefault();
+        setKeyboardShortcutsOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
@@ -116,6 +135,7 @@ export function Layout() {
             isOpen={true}
             closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
+            openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
           />
         )}
       </motion.div>
@@ -129,6 +149,7 @@ export function Layout() {
             isOpen={sidebarOpen}
             closeMobile={() => setSidebarOpen(false)}
             openSettings={() => setSettingsOpen(true)}
+            openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
           />
         </div>
       )}
@@ -181,11 +202,23 @@ export function Layout() {
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetAndStartTour} />
 
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
+
       {/* Feedback Button - only for authenticated users */}
       {isAuthenticated && <FeedbackButton />}
 
       {/* Version changelog notification */}
       <ChangelogNotification />
+
+      {/* Global Undo Toast Container */}
+      <UndoToastContainer />
+
+      {/* Global Search (Cmd+F) */}
+      <GlobalSearch isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
+
+      {/* Article Compare View */}
+      <CompareView />
     </div>
   );
 }
