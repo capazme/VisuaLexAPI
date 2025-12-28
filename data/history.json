@@ -1,19 +1,5 @@
 [
   {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "3",
-    "date": "",
-    "timestamp": "2025-12-17T19:41:28.080454Z"
-  },
-  {
-    "act_type": "costituzione",
-    "act_number": "",
-    "article": "4",
-    "date": "",
-    "timestamp": "2025-12-17T19:41:28.946560Z"
-  },
-  {
     "act_type": "codice civile",
     "act_number": "",
     "article": "1173",
@@ -348,5 +334,19 @@
     "article": "31",
     "date": "",
     "timestamp": "2025-12-22T15:50:54.257513Z"
+  },
+  {
+    "act_type": "codice penale",
+    "act_number": "",
+    "article": "14",
+    "date": "",
+    "timestamp": "2025-12-27T13:32:03.988683Z"
+  },
+  {
+    "act_type": "codice civile",
+    "act_number": "",
+    "article": "1",
+    "date": "",
+    "timestamp": "2025-12-27T17:47:27.620138Z"
   }
 ]
