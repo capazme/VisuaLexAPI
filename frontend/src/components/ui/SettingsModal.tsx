@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
+import { Z_INDEX } from '../../constants/zIndex';
 
 interface CommitInfo {
     hash: string;
@@ -81,7 +82,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", Z_INDEX.settings)}>
             <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={onClose} />
             <div className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-2xl shadow-glass-lg w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20 dark:border-white/10">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-white/5">

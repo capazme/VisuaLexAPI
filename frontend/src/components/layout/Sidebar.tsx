@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
+import { Z_INDEX } from '../../constants/zIndex';
 
 interface SidebarProps {
   theme: string;
@@ -13,6 +14,7 @@ interface SidebarProps {
   isOpen: boolean;
   closeMobile: () => void;
   openSettings: () => void;
+  openKeyboardShortcuts: () => void;
 }
 
 interface NavItemProps {
@@ -151,7 +153,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts }: SidebarProps) {
   const navigate = useNavigate();
   const { openCommandPalette, quickNorms } = useAppStore();
   const { user, isAdmin, logout } = useAuth();
@@ -235,6 +237,11 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
           onClick={openSettings}
         />
         <ActionButton
+          icon={Keyboard}
+          label="Scorciatoie (?)"
+          onClick={openKeyboardShortcuts}
+        />
+        <ActionButton
           icon={theme === 'dark' ? Sun : Moon}
           label={theme === 'dark' ? 'Tema Chiaro' : 'Tema Scuro'}
           onClick={toggleTheme}
@@ -274,13 +281,13 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings 
           <>
             {/* Backdrop - cattura click esterni */}
             <div
-              className="fixed inset-0 z-[9990]"
+              className={cn("fixed inset-0", Z_INDEX.menuBackdrop)}
               onClick={() => setShowUserMenu(false)}
             />
             {/* Menu popup */}
             <div
               style={{ bottom: menuPosition.bottom, left: menuPosition.left }}
-              className="fixed z-[9991] w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150"
+              className={cn("fixed w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">

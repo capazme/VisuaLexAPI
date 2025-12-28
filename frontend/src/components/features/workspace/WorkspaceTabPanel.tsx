@@ -10,6 +10,8 @@ import { ArticleCollectionComponent } from './ArticleCollectionComponent';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
+import { useCompare } from '../../../hooks/useCompare';
+import { Z_INDEX_VALUES } from '../../../constants/zIndex';
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -42,8 +44,13 @@ export function WorkspaceTabPanel({
     dossiers,
     addToDossier,
     createDossier,
-    settings
+    settings,
+    commandPaletteOpen,
   } = useAppStore();
+
+  // Check if overlays are open that should hide workspace tabs
+  const { isOpen: isCompareOpen } = useCompare();
+  const shouldHide = isCompareOpen || commandPaletteOpen;
 
   // Trigger workspace tab tour on first tab render
   const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
@@ -283,6 +290,12 @@ export function WorkspaceTabPanel({
     bringTabToFront(tab.id);
   };
 
+  // When heavy overlays are open, hide the tab panels
+  if (shouldHide) return null;
+
+  // Clamp tab zIndex to stay below overlays (max 79, since dock is 80 and compare is 90)
+  const effectiveZIndex = Math.min(tab.zIndex, Z_INDEX_VALUES.dock - 1);
+
   return (
     <motion.div
       drag
@@ -298,7 +311,7 @@ export function WorkspaceTabPanel({
         y: springY,
         width: tab.isMinimized ? 300 : width,
         height: tab.isMinimized ? 44 : height,
-        zIndex: tab.zIndex
+        zIndex: effectiveZIndex
       }}
       className={cn(
         "fixed",

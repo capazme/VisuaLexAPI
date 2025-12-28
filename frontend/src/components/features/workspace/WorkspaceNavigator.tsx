@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
+import { useCompare } from '../../../hooks/useCompare';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 interface WorkspaceNavigatorProps {
   className?: string;
@@ -35,10 +37,17 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     removeTab,
     toggleTabPin,
     toggleTabMinimize,
-    toggleTabVisibility
+    toggleTabVisibility,
+    commandPaletteOpen,
   } = useAppStore();
 
-  if (workspaceTabs.length === 0) return null;
+  // Check if compare view is open
+  const { isOpen: isCompareOpen } = useCompare();
+
+  // Hide dock when heavy overlays are active
+  const shouldHide = isCompareOpen || commandPaletteOpen;
+
+  if (workspaceTabs.length === 0 || shouldHide) return null;
 
   // Sort by zIndex (most recent on top)
   const sortedTabs = [...workspaceTabs].sort((a, b) => b.zIndex - a.zIndex);
@@ -88,7 +97,8 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     <div
       id="tour-workspace-dock"
       className={cn(
-        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[80]",
+        "fixed bottom-6 left-1/2 -translate-x-1/2",
+        Z_INDEX.dock,
         className
       )}
     >
