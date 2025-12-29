@@ -24,7 +24,7 @@ from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
-from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
+from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
 from visualex_api.tools.map import NORMATTIVA_URN_CODICI
@@ -321,7 +321,7 @@ class NormaController:
         act_type = data.get('act_type')
         if act_type in allowed_types:
             log.info("Act type is allowed", act_type=act_type)
-            data_completa = complete_date_or_parse(
+            data_completa = await complete_date_or_parse_async(
                 date=data.get('date'),
                 act_type=act_type,
                 act_number=data.get('act_number')

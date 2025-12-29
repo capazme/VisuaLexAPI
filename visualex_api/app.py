@@ -26,7 +26,7 @@ from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool
 from visualex_api.tools.sys_op import WebDriverManager
-from visualex_api.tools.urngenerator import complete_date_or_parse, urn_to_filename
+from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
 from visualex_api.tools.cache_warmup import warmup_cache_background
@@ -304,7 +304,7 @@ class NormaController:
         # Process and complete date if needed
         if act_type in allowed_types:
             logger.debug("Act type is allowed", extra={"act_type": act_type})
-            data_completa = complete_date_or_parse(
+            data_completa = await complete_date_or_parse_async(
                 date=data.get('date'),
                 act_type=act_type,
                 act_number=data.get('act_number')
