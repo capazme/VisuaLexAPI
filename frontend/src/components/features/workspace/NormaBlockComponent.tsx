@@ -12,6 +12,7 @@ import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
+import { formatDateItalianLong } from '../../../utils/dateUtils';
 
 interface NormaBlockComponentProps {
   tabId: string;
@@ -202,7 +203,7 @@ export function NormaBlockComponent({
                 {normaBlock.norma.numero_atto && ` n. ${normaBlock.norma.numero_atto}`}
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {normaBlock.norma.data || 'Estremi non disponibili'} · {normaBlock.articles.length} articoli
+                {normaBlock.norma.data ? formatDateItalianLong(normaBlock.norma.data) : 'Estremi non disponibili'} · {normaBlock.articles.length} articoli
               </p>
             </div>
           </div>

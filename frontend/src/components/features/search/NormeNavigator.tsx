@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Book, ChevronRight, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { Norma, ArticleData } from '../../../types';
+import { formatDateItalianLong } from '../../../utils/dateUtils';
 
 interface NormeNavigatorProps {
   norme: Array<{ norma: Norma; articles: ArticleData[]; versionDate?: string }>;
@@ -72,7 +73,7 @@ export function NormeNavigator({ norme, onNavigateToNorma, className }: NormeNav
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                           {norma.numero_atto && `n. ${norma.numero_atto}`}
-                          {norma.data && ` • ${norma.data}`}
+                          {norma.data && ` • ${formatDateItalianLong(norma.data)}`}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
                           <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-medium">

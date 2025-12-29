@@ -97,10 +97,9 @@ const ITALIAN_MONTHS_DISPLAY = [
 
 /**
  * Formats a date in extended Italian format (e.g., "7 agosto 1990").
- * If the date is January 1st, displays only the year (likely year-only input).
  *
  * @param isoDate - Date in YYYY-MM-DD format
- * @returns Date in extended Italian format or just year if Jan 1st
+ * @returns Date in extended Italian format
  */
 export function formatDateItalianLong(isoDate: string): string {
   if (!isoDate) return '';
@@ -115,11 +114,6 @@ export function formatDateItalianLong(isoDate: string): string {
     const [, year, month, day] = match;
     const monthNum = parseInt(month, 10);
     const dayNum = parseInt(day, 10);
-
-    // If January 1st, show only year (likely was year-only input)
-    if (monthNum === 1 && dayNum === 1) {
-      return year;
-    }
 
     const monthName = ITALIAN_MONTHS_DISPLAY[monthNum - 1];
     return `${dayNum} ${monthName} ${year}`;
