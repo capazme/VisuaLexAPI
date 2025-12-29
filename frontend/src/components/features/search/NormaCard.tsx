@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
 import { AnnexSuggestion } from './AnnexSuggestion';
@@ -203,7 +204,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
-              {norma.data ? `Data: ${norma.data}` : 'Estremi non disponibili'}
+              {norma.data ? `Data: ${formatDateItalianLong(norma.data)}` : 'Estremi non disponibili'}
             </p>
             <span className="inline-block text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
               {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'} caricati
@@ -275,7 +276,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
             </div>
             <div className="flex items-center gap-3 mt-1.5">
               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                {norma.data ? `Edizione del ${norma.data}` : 'Data non disponibile'}
+                {norma.data ? `Edizione del ${formatDateItalianLong(norma.data)}` : 'Data non disponibile'}
               </p>
               <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
               <span className="text-xs bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">

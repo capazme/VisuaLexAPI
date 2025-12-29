@@ -270,3 +270,221 @@ Python API:
 - `PORT`: Server port (default: `5000`)
 
 Node.js Backend: See `backend/.env.example` for required variables.
+
+---
+
+## Multi-Agent Workflow
+
+This project is optimized for multi-agent collaboration. Use specialized agents for different types of tasks to maximize efficiency and code quality.
+
+### Recommended Agents by Task Type
+
+| Task Type | Agent | Why |
+|-----------|-------|-----|
+| **Python API - New Endpoints** | `api-designer` | Design OpenAPI spec, then `builder` implements |
+| **Python API - Scraper Issues** | `scraper-builder` | Expert in retry logic, rate limiting, checkpointing |
+| **Python API - Async Bugs** | `debugger` | Specializes in asyncio issues, race conditions |
+| **Python API - Performance** | `performance-optimization` | Optimize without breaking existing logic |
+| **Frontend - New Components** | `frontend-builder` | React/TypeScript/Tailwind expert, follows rules |
+| **Frontend - UI/UX Review** | `ux-reviewer` | Can use Chrome DevTools for visual testing |
+| **Frontend - State Management** | `frontend-architect` | Zustand patterns, state design |
+| **Frontend - Visual Bugs** | `debugger` + `frontend-builder` | Debug + fix with browser testing |
+| **Backend - Database Schema** | `database-architect` | Prisma schema design and migrations |
+| **Backend - Auth/Security** | `security-audit` | Review auth, middleware, input validation |
+| **Documentation** | `scribe` | README, API docs, inline comments |
+| **Testing** | `validator` | Write tests, run test suites |
+| **Complex Multi-Step** | `orchestrator` | Coordinates multiple agents |
+
+### Quick Multi-Agent Commands
+
+```bash
+# Design new API endpoint
+> Usa api-designer per progettare endpoint /api/compare_versions
+
+# Fix scraper breakage
+> Usa scraper-builder per fixare normattiva_scraper - cambio HTML
+
+# Review frontend UX
+> Usa ux-reviewer per valutare la UX del workspace con browser testing
+
+# Optimize performance
+> Usa performance-optimization per ottimizzare fetch_article_text
+
+# Add new feature end-to-end
+> Usa orchestrator per implementare feature "export to Word"
+```
+
+### Entry Points for Agents
+
+**Python API Work:**
+- Main controller: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/app.py`
+- Scrapers: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/services/*_scraper.py`
+- Models: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/norma.py`
+- Config: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/config.py`
+
+**Frontend Work:**
+- App entry: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/App.tsx`
+- Store: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/store/useAppStore.ts`
+- Types: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/types/index.ts`
+- Components: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/`
+
+**Backend Work:**
+- Server: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/backend/src/index.ts`
+- Prisma schema: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/backend/prisma/schema.prisma`
+
+### Common Workflows
+
+#### 1. Add New Scraper Source
+
+```
+1. Use architect to research the target site structure
+2. Use scraper-builder to implement with retry/rate-limiting
+3. Use builder to integrate into NormaController.get_scraper_for_norma()
+4. Use validator to write integration tests
+```
+
+#### 2. Add New Frontend Feature
+
+```
+1. Use frontend-architect to design component structure and state
+2. Use frontend-builder to implement (auto-follows Tailwind/React rules)
+3. Use ux-reviewer with browser testing to validate UX
+4. Use validator to add Vitest tests
+```
+
+#### 3. Fix Scraper Breakage
+
+```
+1. Use debugger to identify HTML structure changes
+2. Use scraper-builder to update selectors and parsing logic
+3. Use validator to verify fix with real requests
+```
+
+#### 4. Performance Issue
+
+```
+1. Use debugger to profile and identify bottleneck
+2. Use performance-optimization for idempotent optimization
+3. Use validator to ensure no regression
+```
+
+#### 5. Add API Endpoint
+
+```
+1. Use api-designer to design request/response schema
+2. Use builder to implement in NormaController._setup_routes()
+3. Use frontend-builder to add corresponding frontend service call
+4. Use validator to test end-to-end
+```
+
+### Browser Testing (Frontend)
+
+When working on frontend, agents can use Chrome DevTools MCP for visual verification:
+
+**Dev Server URL:** `http://localhost:5173`
+
+**Workflow:**
+1. Start dev server: `cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend && npm run dev`
+2. Agent uses `navigate_page(http://localhost:5173)`
+3. Agent uses `take_screenshot()` for visual check
+4. Agent uses `list_console_messages()` for errors
+5. Agent uses `resize_page(375, 667)` for mobile testing
+
+**Agents with browser access:** `frontend-builder`, `ux-reviewer`, `validator`, `debugger`
+
+### Project-Specific Patterns
+
+**Async Patterns (Python):**
+- All scraper methods return `async def get_document() -> Tuple[str, str]`
+- Use `asyncio.gather()` for parallel fetching
+- Use `asyncio.to_thread()` for blocking I/O (Playwright, file ops)
+- Quart routes are async by default
+
+**State Management (Frontend):**
+- Zustand store in `useAppStore.ts` with Immer
+- Always use actions, never mutate state directly
+- Store structure: `searchResults`, `history`, `bookmarks`, `dossiers`, `workspace`, `settings`
+
+**Error Handling:**
+- Python: Custom exceptions in `visualex_api/tools/exceptions.py`
+- Raise `ValidationError`, `ResourceNotFoundError`, `RateLimitExceededError`
+- Global error handler in `NormaController.handle_error()`
+
+**Code Reuse:**
+- URN generation: Use `urngenerator.py` functions
+- Text parsing: Use `text_op.py` utilities
+- Tree extraction: Use `treextractor.py`
+- Never duplicate these utilities
+
+### Critical Files - DO NOT BREAK
+
+**Python:**
+- `visualex_api/app.py` - Main controller
+- `visualex_api/tools/norma.py` - Core data models
+- `visualex_api/services/*_scraper.py` - Fragile HTML parsers
+
+**Frontend:**
+- `frontend/src/store/useAppStore.ts` - Global state
+- `frontend/src/types/index.ts` - Type definitions
+- `frontend/src/services/api.ts` - API client
+
+**Backend:**
+- `backend/prisma/schema.prisma` - Database schema
+
+### Testing Strategy
+
+**Python:**
+```bash
+# Manual testing
+cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI
+source .venv/bin/activate
+python app.py
+
+# Test endpoint
+curl -X POST http://localhost:5000/api/fetch_norma_data \
+  -H "Content-Type: application/json" \
+  -d '{"act_type": "codice civile", "article": "2043"}'
+```
+
+**Frontend:**
+```bash
+cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend
+npm run test        # Run all tests
+npm run test:ui     # Interactive test UI
+npm run lint        # Lint check
+```
+
+**Backend:**
+```bash
+cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/backend
+npm run dev         # Start dev server
+npm run prisma:studio  # Prisma database GUI
+```
+
+### Gotchas and Known Issues
+
+1. **Scraper Fragility**: All scrapers depend on external HTML structure (Normattiva, EUR-Lex, Brocardi). HTML changes break parsers.
+2. **Async Context**: Python API is fully async - never use blocking operations without `asyncio.to_thread()`
+3. **Rate Limiting**: Configured in `config.py` - 1000 requests per 10 minutes per IP
+4. **Playwright**: PDF extraction requires `playwright install chromium`
+5. **CORS**: Frontend dev server proxies to Python API - check `vite.config.ts`
+6. **Annex Handling**: Codici have default annex in URN - see `create_norma_visitata_from_data()`
+
+### Skills to Use
+
+For this project, these skills are particularly useful:
+
+**Python/Backend:**
+- `async-patterns` - For asyncio debugging and optimization
+- `fastapi-patterns` - Similar patterns apply to Quart
+- `scraping-patterns` - For scraper fixes and improvements
+- `error-handling` - For custom exception hierarchy
+
+**Frontend:**
+- `react-patterns` - Component design and hooks
+- `ui-ux-review` - Complete UX evaluation
+- `performance-optimization` - Frontend bundle and render optimization
+
+**General:**
+- `code-review` - Before merging significant changes
+- `security-audit` - For auth and input validation
