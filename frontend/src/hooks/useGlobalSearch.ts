@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import type { WorkspaceTab, NormaBlock, LooseArticle } from '../store/workspaceTabActions';
+import type { NormaBlock, LooseArticle } from '../store/workspaceTabActions';
 
 export interface GlobalSearchMatch {
   tabId: string;
