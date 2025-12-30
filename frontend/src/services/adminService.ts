@@ -101,3 +101,74 @@ export const updateFeedbackStatus = async (id: string, status: FeedbackStatus): 
 export const deleteFeedback = async (id: string): Promise<void> => {
   return del(`/admin/feedbacks/${id}`);
 };
+
+// ============================================
+// Shared Environments Management (Admin)
+// ============================================
+
+export interface AdminSharedEnvironment {
+  id: string;
+  title: string;
+  description?: string;
+  category: string;
+  tags: string[];
+  currentVersion: number;
+  isActive: boolean;
+  viewCount: number;
+  downloadCount: number;
+  likeCount: number;
+  versionCount: number;
+  suggestionsCount: number;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminEnvironmentListResponse {
+  data: AdminSharedEnvironment[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface AdminEnvironmentListParams {
+  page?: number;
+  limit?: number;
+  status?: 'active' | 'withdrawn' | 'all';
+  search?: string;
+}
+
+/**
+ * Get all shared environments (admin)
+ */
+export const listSharedEnvironments = async (params?: AdminEnvironmentListParams): Promise<AdminEnvironmentListResponse> => {
+  return get<AdminEnvironmentListResponse>('/admin/shared-environments', params);
+};
+
+/**
+ * Withdraw shared environment (admin)
+ */
+export const withdrawSharedEnvironment = async (id: string): Promise<{ id: string; isActive: boolean }> => {
+  return post<{ id: string; isActive: boolean }>(`/admin/shared-environments/${id}/withdraw`);
+};
+
+/**
+ * Republish shared environment (admin)
+ */
+export const republishSharedEnvironment = async (id: string): Promise<{ id: string; isActive: boolean }> => {
+  return post<{ id: string; isActive: boolean }>(`/admin/shared-environments/${id}/republish`);
+};
+
+/**
+ * Delete shared environment (admin)
+ */
+export const deleteSharedEnvironment = async (id: string): Promise<void> => {
+  return del(`/admin/shared-environments/${id}`);
+};

@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
 import type { AdminUserResponse } from '../types/api';
-import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType } from '../services/adminService';
+import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminSharedEnvironment } from '../services/adminService';
 import {
   Users,
   UserPlus,
@@ -25,12 +25,18 @@ import {
   Lightbulb,
   HelpCircle,
   Eye,
+  EyeOff,
   CheckCircle,
   XCircle,
+  Package,
+  Search,
+  TrendingUp,
+  Download,
+  Heart,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type AdminTab = 'users' | 'feedback';
+type AdminTab = 'users' | 'feedback' | 'environments';
 
 export function AdminPage() {
   const navigate = useNavigate();
@@ -50,6 +56,14 @@ export function AdminPage() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackFilter, setFeedbackFilter] = useState<{ status?: FeedbackStatus; type?: FeedbackType }>({});
   const [showDeleteFeedbackConfirm, setShowDeleteFeedbackConfirm] = useState<string | null>(null);
+
+  // Environments state
+  const [environments, setEnvironments] = useState<AdminSharedEnvironment[]>([]);
+  const [envPagination, setEnvPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [envLoading, setEnvLoading] = useState(false);
+  const [envSearch, setEnvSearch] = useState('');
+  const [envStatusFilter, setEnvStatusFilter] = useState<'active' | 'withdrawn' | 'all'>('all');
+  const [showDeleteEnvConfirm, setShowDeleteEnvConfirm] = useState<string | null>(null);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -91,6 +105,28 @@ export function AdminPage() {
     }
   };
 
+  const loadEnvironments = async (page = 1) => {
+    try {
+      setEnvLoading(true);
+      const response = await adminService.listSharedEnvironments({
+        page,
+        limit: 20,
+        status: envStatusFilter,
+        search: envSearch || undefined,
+      });
+      setEnvironments(response.data);
+      setEnvPagination({
+        page: response.pagination.page,
+        pages: response.pagination.pages,
+        total: response.pagination.total,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Errore nel caricamento degli ambienti');
+    } finally {
+      setEnvLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadFeedbacks();
@@ -101,6 +137,56 @@ export function AdminPage() {
       loadFeedbacks();
     }
   }, [feedbackFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'environments') {
+      loadEnvironments(1);
+    }
+  }, [activeTab, envStatusFilter]);
+
+  // Environment handlers
+  const handleWithdrawEnv = async (id: string) => {
+    try {
+      setActionLoading(true);
+      await adminService.withdrawSharedEnvironment(id);
+      setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: false } : e));
+    } catch (err: any) {
+      setError(err.message || 'Errore nel ritirare l\'ambiente');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRepublishEnv = async (id: string) => {
+    try {
+      setActionLoading(true);
+      await adminService.republishSharedEnvironment(id);
+      setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: true } : e));
+    } catch (err: any) {
+      setError(err.message || 'Errore nel ripubblicare l\'ambiente');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteEnv = async () => {
+    if (!showDeleteEnvConfirm) return;
+    try {
+      setActionLoading(true);
+      await adminService.deleteSharedEnvironment(showDeleteEnvConfirm);
+      setEnvironments(prev => prev.filter(e => e.id !== showDeleteEnvConfirm));
+      setShowDeleteEnvConfirm(null);
+    } catch (err: any) {
+      setError(err.message || 'Errore nell\'eliminazione dell\'ambiente');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEnvSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadEnvironments(1);
+  };
 
   const handleUpdateFeedbackStatus = async (id: string, status: FeedbackStatus) => {
     try {
@@ -267,6 +353,18 @@ export function AdminPage() {
                       {feedbackStats.new}
                     </span>
                   )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('environments')}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                    activeTab === 'environments'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  )}
+                >
+                  <Package size={16} />
+                  Ambienti
                 </button>
               </div>
             </div>
@@ -619,6 +717,219 @@ export function AdminPage() {
             </div>
           </>
         )}
+
+        {/* ==================== ENVIRONMENTS TAB ==================== */}
+        {activeTab === 'environments' && (
+          <>
+            {/* Actions Bar */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Package size={20} className="text-gray-500" />
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Ambienti Pubblicati ({envPagination.total})
+                  </h2>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Search */}
+                <form onSubmit={handleEnvSearch} className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={envSearch}
+                      onChange={(e) => setEnvSearch(e.target.value)}
+                      placeholder="Cerca ambiente..."
+                      className="pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                  >
+                    Cerca
+                  </button>
+                </form>
+                {/* Status Filter */}
+                <select
+                  value={envStatusFilter}
+                  onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')}
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="all">Tutti</option>
+                  <option value="active">Attivi</option>
+                  <option value="withdrawn">Ritirati</option>
+                </select>
+                <button
+                  onClick={() => loadEnvironments(envPagination.page)}
+                  disabled={envLoading}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  title="Aggiorna"
+                >
+                  <RefreshCw size={20} className={envLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Environments Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {envLoading && environments.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                  Caricamento ambienti...
+                </div>
+              ) : environments.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Package size={32} className="mx-auto mb-2 opacity-50" />
+                  Nessun ambiente trovato
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-700/50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Ambiente
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Autore
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Stato
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Statistiche
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Creato
+                          </th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Azioni
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {environments.map((env) => (
+                          <tr key={env.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                            <td className="px-6 py-4">
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {env.title}
+                                </p>
+                                <p className="text-sm text-gray-500 truncate max-w-xs">
+                                  {env.description || 'Nessuna descrizione'}
+                                </p>
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">
+                                    {env.category}
+                                  </span>
+                                  <span className="text-xs text-gray-400">v{env.currentVersion}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm">
+                                <p className="font-medium text-gray-900 dark:text-white">{env.user.username}</p>
+                                <p className="text-gray-500">{env.user.email}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={cn(
+                                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
+                                env.isActive
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                              )}>
+                                {env.isActive ? <Eye size={12} /> : <EyeOff size={12} />}
+                                {env.isActive ? 'Attivo' : 'Ritirato'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span className="flex items-center gap-1" title="Visualizzazioni">
+                                  <TrendingUp size={12} />
+                                  {env.viewCount}
+                                </span>
+                                <span className="flex items-center gap-1" title="Download">
+                                  <Download size={12} />
+                                  {env.downloadCount}
+                                </span>
+                                <span className="flex items-center gap-1" title="Like">
+                                  <Heart size={12} />
+                                  {env.likeCount}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                              {new Date(env.createdAt).toLocaleDateString('it-IT')}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {env.isActive ? (
+                                  <button
+                                    onClick={() => handleWithdrawEnv(env.id)}
+                                    disabled={actionLoading}
+                                    className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                                    title="Ritira"
+                                  >
+                                    <EyeOff size={16} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleRepublishEnv(env.id)}
+                                    disabled={actionLoading}
+                                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                    title="Ripubblica"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setShowDeleteEnvConfirm(env.id)}
+                                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="Elimina"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pagination */}
+                  {envPagination.pages > 1 && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                      <p className="text-sm text-gray-500">
+                        Pagina {envPagination.page} di {envPagination.pages} ({envPagination.total} ambienti)
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => loadEnvironments(envPagination.page - 1)}
+                          disabled={envPagination.page <= 1 || envLoading}
+                          className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Precedente
+                        </button>
+                        <button
+                          onClick={() => loadEnvironments(envPagination.page + 1)}
+                          disabled={envPagination.page >= envPagination.pages || envLoading}
+                          className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Successiva
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
       </main>
 
       {/* Create User Modal */}
@@ -816,6 +1127,40 @@ export function AdminPage() {
                 </button>
                 <button
                   onClick={handleDeleteFeedback}
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? 'Eliminazione...' : 'Elimina'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Environment Confirmation Modal */}
+      {showDeleteEnvConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Elimina Ambiente
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-6">
+                Sei sicuro di voler eliminare questo ambiente? L'azione eliminerà permanentemente l'ambiente e tutte le sue versioni.
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setShowDeleteEnvConfirm(null)}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  Annulla
+                </button>
+                <button
+                  onClick={handleDeleteEnv}
                   disabled={actionLoading}
                   className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >

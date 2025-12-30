@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient, EnvironmentCategory, ReportReason } from '@prisma/client';
+import { PrismaClient, EnvironmentCategory, ReportReason, SuggestionStatus } from '@prisma/client';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 
@@ -36,10 +36,48 @@ const reportSchema = z.object({
   details: z.string().max(500).optional(),
 });
 
+// Suggestion schemas
+const createSuggestionSchema = z.object({
+  content: z.object({
+    dossiers: z.array(z.any()),
+    quickNorms: z.array(z.any()),
+    customAliases: z.array(z.any()),
+  }),
+  message: z.string().max(500).optional(),
+});
+
+const approveSuggestionSchema = z.object({
+  changelog: z.string().max(500).optional(),
+  versionMode: z.enum(['replace', 'coexist']).default('replace'),
+  mergeMode: z.enum(['merge', 'replace']).default('merge'),
+});
+
+const rejectSuggestionSchema = z.object({
+  reviewNote: z.string().max(500).optional(),
+});
+
+// Update with versioning schema
+const updateWithVersionSchema = z.object({
+  title: z.string().min(3).max(100).optional(),
+  description: z.string().max(500).optional().nullable(),
+  content: z.object({
+    dossiers: z.array(z.any()),
+    quickNorms: z.array(z.any()),
+    customAliases: z.array(z.any()).optional(),
+    annotations: z.array(z.any()),
+    highlights: z.array(z.any()),
+  }).optional(),
+  category: z.enum(['compliance', 'civil', 'penal', 'administrative', 'eu', 'other']).optional(),
+  tags: z.array(z.string().max(30)).max(10).optional(),
+  changelog: z.string().max(500).optional(),
+  versionMode: z.enum(['replace', 'coexist']).default('replace'),
+});
+
 // Helper: format shared environment for response
 function formatSharedEnvironment(env: any, userId: string) {
   const likeCount = env._count?.likes ?? env.likes?.length ?? 0;
   const userLiked = env.likes?.some((l: any) => l.userId === userId) ?? false;
+  const pendingSuggestionsCount = env._count?.suggestions ?? 0;
 
   return {
     id: env.id,
@@ -53,6 +91,12 @@ function formatSharedEnvironment(env: any, userId: string) {
     viewCount: env.viewCount,
     downloadCount: env.downloadCount,
     likeCount,
+    // Versioning fields
+    currentVersion: env.currentVersion ?? 1,
+    isActive: env.isActive ?? true,
+    replacedById: env.replacedById,
+    // Suggestions count (only for owner)
+    pendingSuggestionsCount: env.userId === userId ? pendingSuggestionsCount : undefined,
     user: {
       id: env.user.id,
       username: env.user.username,
@@ -62,6 +106,71 @@ function formatSharedEnvironment(env: any, userId: string) {
     createdAt: env.createdAt,
     updatedAt: env.updatedAt,
   };
+}
+
+// Helper: format suggestion for response
+function formatSuggestion(suggestion: any, currentUserId: string) {
+  return {
+    id: suggestion.id,
+    sharedEnvironmentId: suggestion.sharedEnvironmentId,
+    sharedEnvironment: suggestion.sharedEnvironment ? {
+      id: suggestion.sharedEnvironment.id,
+      title: suggestion.sharedEnvironment.title,
+      user: suggestion.sharedEnvironment.user,
+    } : undefined,
+    suggester: {
+      id: suggestion.suggester.id,
+      username: suggestion.suggester.username,
+    },
+    content: suggestion.content,
+    message: suggestion.message,
+    status: suggestion.status,
+    reviewedAt: suggestion.reviewedAt,
+    reviewNote: suggestion.reviewNote,
+    createdAt: suggestion.createdAt,
+    isOwn: suggestion.suggesterId === currentUserId,
+  };
+}
+
+// Helper: create a new version snapshot
+async function createVersionSnapshot(
+  envId: string,
+  content: any,
+  changelog?: string,
+  suggestionId?: string
+) {
+  // Get next version number
+  const latestVersion = await prisma.sharedEnvironmentVersion.findFirst({
+    where: { sharedEnvironmentId: envId },
+    orderBy: { version: 'desc' },
+  });
+
+  const nextVersion = (latestVersion?.version ?? 0) + 1;
+
+  return prisma.sharedEnvironmentVersion.create({
+    data: {
+      sharedEnvironmentId: envId,
+      version: nextVersion,
+      content,
+      changelog,
+      suggestionId,
+    },
+  });
+}
+
+// Helper: merge content arrays avoiding duplicates by ID
+function mergeContentArrays(existing: any[], incoming: any[]): any[] {
+  const existingIds = new Set(existing.map(item => item.id));
+  const merged = [...existing];
+
+  for (const item of incoming) {
+    if (!existingIds.has(item.id)) {
+      merged.push(item);
+      existingIds.add(item.id);
+    }
+  }
+
+  return merged;
 }
 
 /**
@@ -484,4 +593,650 @@ export const adminDeleteEnvironment = async (req: Request, res: Response) => {
   });
 
   res.status(204).send();
+};
+
+/**
+ * Admin list all shared environments
+ */
+export const adminListEnvironments = async (req: Request, res: Response) => {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+  const status = req.query.status as string; // 'active', 'withdrawn', 'all'
+  const search = req.query.search as string;
+
+  const where: any = {};
+
+  // Filter by status
+  if (status === 'active') {
+    where.isActive = true;
+  } else if (status === 'withdrawn') {
+    where.isActive = false;
+  }
+  // 'all' or undefined: no filter
+
+  // Search
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { user: { username: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+
+  const [environments, total] = await Promise.all([
+    prisma.sharedEnvironment.findMany({
+      where,
+      include: {
+        user: { select: { id: true, username: true, email: true } },
+        _count: { select: { likes: true, versions: true, suggestions: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.sharedEnvironment.count({ where }),
+  ]);
+
+  res.json({
+    data: environments.map(env => ({
+      id: env.id,
+      title: env.title,
+      description: env.description,
+      category: env.category,
+      tags: env.tags,
+      currentVersion: env.currentVersion,
+      isActive: env.isActive,
+      viewCount: env.viewCount,
+      downloadCount: env.downloadCount,
+      likeCount: env._count.likes,
+      versionCount: env._count.versions,
+      suggestionsCount: env._count.suggestions,
+      user: env.user,
+      createdAt: env.createdAt,
+      updatedAt: env.updatedAt,
+    })),
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  });
+};
+
+/**
+ * Admin withdraw any environment
+ */
+export const adminWithdrawEnvironment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const env = await prisma.sharedEnvironment.findUnique({
+    where: { id },
+  });
+
+  if (!env) {
+    throw new AppError(404, 'Shared environment not found');
+  }
+
+  if (!env.isActive) {
+    throw new AppError(400, 'Environment is already withdrawn');
+  }
+
+  const updated = await prisma.sharedEnvironment.update({
+    where: { id },
+    data: { isActive: false },
+  });
+
+  res.json({ id: updated.id, isActive: updated.isActive });
+};
+
+/**
+ * Admin republish any environment
+ */
+export const adminRepublishEnvironment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const env = await prisma.sharedEnvironment.findUnique({
+    where: { id },
+  });
+
+  if (!env) {
+    throw new AppError(404, 'Shared environment not found');
+  }
+
+  if (env.isActive) {
+    throw new AppError(400, 'Environment is already active');
+  }
+
+  const updated = await prisma.sharedEnvironment.update({
+    where: { id },
+    data: { isActive: true },
+  });
+
+  res.json({ id: updated.id, isActive: updated.isActive });
+};
+
+// ============================================
+// ENVIRONMENT MANAGEMENT (OWNER)
+// ============================================
+
+/**
+ * Withdraw/unpublish a shared environment (soft delete)
+ */
+export const withdrawEnvironment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Check ownership
+  const existing = await prisma.sharedEnvironment.findFirst({
+    where: { id, userId: req.user!.id },
+  });
+
+  if (!existing) {
+    throw new AppError(404, 'Shared environment not found or not owned by you');
+  }
+
+  const env = await prisma.sharedEnvironment.update({
+    where: { id },
+    data: { isActive: false },
+    include: {
+      user: { select: { id: true, username: true } },
+      likes: { where: { userId: req.user!.id }, select: { userId: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  res.json(formatSharedEnvironment(env, req.user!.id));
+};
+
+/**
+ * Republish a withdrawn environment
+ */
+export const republishEnvironment = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Check ownership
+  const existing = await prisma.sharedEnvironment.findFirst({
+    where: { id, userId: req.user!.id },
+  });
+
+  if (!existing) {
+    throw new AppError(404, 'Shared environment not found or not owned by you');
+  }
+
+  const env = await prisma.sharedEnvironment.update({
+    where: { id },
+    data: { isActive: true },
+    include: {
+      user: { select: { id: true, username: true } },
+      likes: { where: { userId: req.user!.id }, select: { userId: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  res.json(formatSharedEnvironment(env, req.user!.id));
+};
+
+/**
+ * Update shared environment with versioning
+ */
+export const updateEnvironmentWithVersion = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const data = updateWithVersionSchema.parse(req.body);
+
+  // Check ownership
+  const existing = await prisma.sharedEnvironment.findFirst({
+    where: { id, userId: req.user!.id },
+    include: {
+      user: { select: { id: true, username: true } },
+    },
+  });
+
+  if (!existing) {
+    throw new AppError(404, 'Shared environment not found or not owned by you');
+  }
+
+  // Validate content size if updating content
+  if (data.content) {
+    const contentSize = JSON.stringify(data.content).length;
+    if (contentSize > 1024 * 1024) {
+      throw new AppError(400, 'Environment content exceeds maximum size (1MB)');
+    }
+  }
+
+  // Handle coexist mode: create a NEW environment, keep original as is
+  if (data.versionMode === 'coexist' && data.content) {
+    // Create a version snapshot of the original
+    await createVersionSnapshot(id, existing.content, 'Versione originale (prima di coesistenza)');
+
+    // Create NEW environment with updated content
+    const newEnv = await prisma.sharedEnvironment.create({
+      data: {
+        title: data.title ?? existing.title,
+        description: data.description !== undefined ? data.description : existing.description,
+        content: data.content,
+        category: (data.category ?? existing.category) as EnvironmentCategory,
+        tags: data.tags ?? (existing.tags as string[]),
+        includeNotes: existing.includeNotes,
+        includeHighlights: existing.includeHighlights,
+        userId: req.user!.id,
+        currentVersion: existing.currentVersion + 1,
+        isActive: true,
+        // Link to original via replacedById (new version points to old)
+        // This allows tracking the lineage
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+        likes: { where: { userId: req.user!.id }, select: { userId: true } },
+        _count: { select: { likes: true } },
+      },
+    });
+
+    // Create version snapshot for new environment
+    if (data.changelog) {
+      await createVersionSnapshot(newEnv.id, data.content, data.changelog);
+    }
+
+    // Original environment stays active and unchanged
+    // User now has both versions in their "I miei ambienti"
+
+    res.json(formatSharedEnvironment(newEnv, req.user!.id));
+    return;
+  }
+
+  // Handle replace mode (default): update existing environment in place
+  if (data.content) {
+    // Save current content as a version before replacing
+    await createVersionSnapshot(id, existing.content, 'Versione precedente');
+  }
+
+  const updateData: any = {
+    ...(data.title !== undefined && { title: data.title }),
+    ...(data.description !== undefined && { description: data.description }),
+    ...(data.category !== undefined && { category: data.category as EnvironmentCategory }),
+    ...(data.tags !== undefined && { tags: data.tags }),
+  };
+
+  if (data.content) {
+    updateData.content = data.content;
+    updateData.currentVersion = existing.currentVersion + 1;
+  }
+
+  const env = await prisma.sharedEnvironment.update({
+    where: { id },
+    data: updateData,
+    include: {
+      user: { select: { id: true, username: true } },
+      likes: { where: { userId: req.user!.id }, select: { userId: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  // Create new version snapshot with changelog
+  if (data.content && data.changelog) {
+    await createVersionSnapshot(id, data.content, data.changelog);
+  }
+
+  res.json(formatSharedEnvironment(env, req.user!.id));
+};
+
+// ============================================
+// SUGGESTIONS
+// ============================================
+
+/**
+ * Create a suggestion for a shared environment
+ */
+export const createSuggestion = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const data = createSuggestionSchema.parse(req.body);
+
+  // Check environment exists and is active
+  const env = await prisma.sharedEnvironment.findFirst({
+    where: { id, isActive: true },
+  });
+
+  if (!env) {
+    throw new AppError(404, 'Shared environment not found or not active');
+  }
+
+  // Can't suggest to own environment
+  if (env.userId === req.user!.id) {
+    throw new AppError(400, 'You cannot suggest to your own environment');
+  }
+
+  // Check if user already has a pending suggestion for this environment
+  const existingPending = await prisma.environmentSuggestion.findFirst({
+    where: {
+      sharedEnvironmentId: id,
+      suggesterId: req.user!.id,
+      status: 'pending',
+    },
+  });
+
+  if (existingPending) {
+    throw new AppError(400, 'You already have a pending suggestion for this environment');
+  }
+
+  // Validate content size
+  const contentSize = JSON.stringify(data.content).length;
+  if (contentSize > 512 * 1024) {
+    throw new AppError(400, 'Suggestion content exceeds maximum size (512KB)');
+  }
+
+  const suggestion = await prisma.environmentSuggestion.create({
+    data: {
+      sharedEnvironmentId: id,
+      suggesterId: req.user!.id,
+      content: data.content,
+      message: data.message,
+    },
+    include: {
+      suggester: { select: { id: true, username: true } },
+      sharedEnvironment: {
+        select: {
+          id: true,
+          title: true,
+          user: { select: { id: true, username: true } },
+        },
+      },
+    },
+  });
+
+  res.status(201).json(formatSuggestion(suggestion, req.user!.id));
+};
+
+/**
+ * Get suggestions received for user's environments
+ */
+export const getReceivedSuggestions = async (req: Request, res: Response) => {
+  const status = req.query.status as SuggestionStatus | undefined;
+
+  const where: any = {
+    sharedEnvironment: {
+      userId: req.user!.id,
+    },
+  };
+
+  if (status) {
+    where.status = status;
+  }
+
+  const suggestions = await prisma.environmentSuggestion.findMany({
+    where,
+    include: {
+      suggester: { select: { id: true, username: true } },
+      sharedEnvironment: {
+        select: {
+          id: true,
+          title: true,
+          user: { select: { id: true, username: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json(suggestions.map(s => formatSuggestion(s, req.user!.id)));
+};
+
+/**
+ * Get suggestions sent by current user
+ */
+export const getSentSuggestions = async (req: Request, res: Response) => {
+  const suggestions = await prisma.environmentSuggestion.findMany({
+    where: {
+      suggesterId: req.user!.id,
+    },
+    include: {
+      suggester: { select: { id: true, username: true } },
+      sharedEnvironment: {
+        select: {
+          id: true,
+          title: true,
+          user: { select: { id: true, username: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  res.json(suggestions.map(s => formatSuggestion(s, req.user!.id)));
+};
+
+/**
+ * Get count of pending suggestions for user's environments
+ */
+export const getPendingSuggestionsCount = async (req: Request, res: Response) => {
+  const count = await prisma.environmentSuggestion.count({
+    where: {
+      sharedEnvironment: {
+        userId: req.user!.id,
+      },
+      status: 'pending',
+    },
+  });
+
+  res.json({ count });
+};
+
+/**
+ * Approve a suggestion (creates new version)
+ */
+export const approveSuggestion = async (req: Request, res: Response) => {
+  const { suggestionId } = req.params;
+  const data = approveSuggestionSchema.parse(req.body);
+
+  // Get suggestion with environment
+  const suggestion = await prisma.environmentSuggestion.findUnique({
+    where: { id: suggestionId },
+    include: {
+      sharedEnvironment: {
+        include: {
+          user: { select: { id: true, username: true } },
+        },
+      },
+      suggester: { select: { id: true, username: true } },
+    },
+  });
+
+  if (!suggestion) {
+    throw new AppError(404, 'Suggestion not found');
+  }
+
+  // Check ownership of the environment
+  if (suggestion.sharedEnvironment.userId !== req.user!.id) {
+    throw new AppError(403, 'You can only approve suggestions for your own environments');
+  }
+
+  // Check suggestion is pending
+  if (suggestion.status !== 'pending') {
+    throw new AppError(400, 'This suggestion has already been reviewed');
+  }
+
+  const env = suggestion.sharedEnvironment;
+  const existingContent = env.content as any;
+  const suggestedContent = suggestion.content as any;
+
+  // Create version snapshot of current state
+  await createVersionSnapshot(env.id, existingContent, 'Prima del suggerimento');
+
+  // Merge or replace content
+  let newContent: any;
+  if (data.mergeMode === 'merge') {
+    newContent = {
+      ...existingContent,
+      dossiers: mergeContentArrays(existingContent.dossiers || [], suggestedContent.dossiers || []),
+      quickNorms: mergeContentArrays(existingContent.quickNorms || [], suggestedContent.quickNorms || []),
+      customAliases: mergeContentArrays(existingContent.customAliases || [], suggestedContent.customAliases || []),
+    };
+  } else {
+    newContent = {
+      ...existingContent,
+      dossiers: suggestedContent.dossiers || [],
+      quickNorms: suggestedContent.quickNorms || [],
+      customAliases: suggestedContent.customAliases || [],
+    };
+  }
+
+  // Update suggestion status
+  await prisma.environmentSuggestion.update({
+    where: { id: suggestionId },
+    data: {
+      status: 'approved',
+      reviewedAt: new Date(),
+      reviewNote: data.changelog,
+    },
+  });
+
+  // Update environment with new content
+  const changelog = data.changelog || `Approvato suggerimento da @${suggestion.suggester.username}`;
+
+  const updatedEnv = await prisma.sharedEnvironment.update({
+    where: { id: env.id },
+    data: {
+      content: newContent,
+      currentVersion: env.currentVersion + 1,
+    },
+    include: {
+      user: { select: { id: true, username: true } },
+      likes: { where: { userId: req.user!.id }, select: { userId: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  // Create new version with reference to suggestion
+  await createVersionSnapshot(env.id, newContent, changelog, suggestionId);
+
+  res.json(formatSharedEnvironment(updatedEnv, req.user!.id));
+};
+
+/**
+ * Reject a suggestion
+ */
+export const rejectSuggestion = async (req: Request, res: Response) => {
+  const { suggestionId } = req.params;
+  const data = rejectSuggestionSchema.parse(req.body);
+
+  // Get suggestion with environment
+  const suggestion = await prisma.environmentSuggestion.findUnique({
+    where: { id: suggestionId },
+    include: {
+      sharedEnvironment: true,
+    },
+  });
+
+  if (!suggestion) {
+    throw new AppError(404, 'Suggestion not found');
+  }
+
+  // Check ownership of the environment
+  if (suggestion.sharedEnvironment.userId !== req.user!.id) {
+    throw new AppError(403, 'You can only reject suggestions for your own environments');
+  }
+
+  // Check suggestion is pending
+  if (suggestion.status !== 'pending') {
+    throw new AppError(400, 'This suggestion has already been reviewed');
+  }
+
+  await prisma.environmentSuggestion.update({
+    where: { id: suggestionId },
+    data: {
+      status: 'rejected',
+      reviewedAt: new Date(),
+      reviewNote: data.reviewNote,
+    },
+  });
+
+  res.json({ message: 'Suggestion rejected' });
+};
+
+// ============================================
+// VERSIONING
+// ============================================
+
+/**
+ * Get version history for an environment
+ */
+export const getVersions = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  // Check environment exists
+  const env = await prisma.sharedEnvironment.findUnique({
+    where: { id },
+  });
+
+  if (!env) {
+    throw new AppError(404, 'Shared environment not found');
+  }
+
+  const versions = await prisma.sharedEnvironmentVersion.findMany({
+    where: { sharedEnvironmentId: id },
+    include: {
+      suggestion: {
+        select: {
+          id: true,
+          suggester: { select: { id: true, username: true } },
+        },
+      },
+    },
+    orderBy: { version: 'desc' },
+  });
+
+  res.json(versions.map(v => ({
+    id: v.id,
+    version: v.version,
+    changelog: v.changelog,
+    suggestion: v.suggestion ? {
+      id: v.suggestion.id,
+      suggester: v.suggestion.suggester,
+    } : undefined,
+    createdAt: v.createdAt,
+  })));
+};
+
+/**
+ * Restore a previous version
+ */
+export const restoreVersion = async (req: Request, res: Response) => {
+  const { id, versionId } = req.params;
+
+  // Check ownership
+  const env = await prisma.sharedEnvironment.findFirst({
+    where: { id, userId: req.user!.id },
+  });
+
+  if (!env) {
+    throw new AppError(404, 'Shared environment not found or not owned by you');
+  }
+
+  // Get the version to restore
+  const version = await prisma.sharedEnvironmentVersion.findFirst({
+    where: { id: versionId, sharedEnvironmentId: id },
+  });
+
+  if (!version) {
+    throw new AppError(404, 'Version not found');
+  }
+
+  // Create snapshot of current state before restoring
+  await createVersionSnapshot(id, env.content, 'Prima del ripristino');
+
+  // Restore the content
+  const updatedEnv = await prisma.sharedEnvironment.update({
+    where: { id },
+    data: {
+      content: version.content as object,
+      currentVersion: env.currentVersion + 1,
+    },
+    include: {
+      user: { select: { id: true, username: true } },
+      likes: { where: { userId: req.user!.id }, select: { userId: true } },
+      _count: { select: { likes: true } },
+    },
+  });
+
+  // Create version entry for the restore
+  await createVersionSnapshot(id, version.content, `Ripristinato alla versione ${version.version}`);
+
+  res.json(formatSharedEnvironment(updatedEnv, req.user!.id));
 };

@@ -7,6 +7,12 @@ import type {
   EnvironmentCategory,
   ReportReason,
   SharedEnvironmentReport,
+  EnvironmentSuggestion,
+  SharedEnvironmentVersion,
+  SuggestionStatus,
+  CreateSuggestionPayload,
+  ApproveSuggestionPayload,
+  UpdateEnvironmentWithVersionPayload,
 } from '../types';
 
 export interface ListSharedEnvironmentsParams {
@@ -102,6 +108,110 @@ export const sharedEnvironmentService = {
    */
   async report(id: string, reason: ReportReason, details?: string): Promise<void> {
     await apiClient.post(`/shared-environments/${id}/report`, { reason, details });
+  },
+
+  // ============================================
+  // OWNER MANAGEMENT
+  // ============================================
+
+  /**
+   * Withdraw/unpublish a shared environment (soft delete)
+   */
+  async withdraw(id: string): Promise<SharedEnvironment> {
+    const response = await apiClient.post(`/shared-environments/${id}/withdraw`);
+    return response.data;
+  },
+
+  /**
+   * Republish a withdrawn environment
+   */
+  async republish(id: string): Promise<SharedEnvironment> {
+    const response = await apiClient.post(`/shared-environments/${id}/republish`);
+    return response.data;
+  },
+
+  /**
+   * Update a shared environment with versioning
+   */
+  async updateWithVersion(
+    id: string,
+    data: UpdateEnvironmentWithVersionPayload
+  ): Promise<SharedEnvironment> {
+    const response = await apiClient.put(`/shared-environments/${id}`, data);
+    return response.data;
+  },
+
+  // ============================================
+  // VERSIONING
+  // ============================================
+
+  /**
+   * Get version history for an environment
+   */
+  async getVersions(id: string): Promise<SharedEnvironmentVersion[]> {
+    const response = await apiClient.get(`/shared-environments/${id}/versions`);
+    return response.data;
+  },
+
+  /**
+   * Restore a previous version
+   */
+  async restoreVersion(envId: string, versionId: string): Promise<SharedEnvironment> {
+    const response = await apiClient.post(`/shared-environments/${envId}/versions/${versionId}/restore`);
+    return response.data;
+  },
+
+  // ============================================
+  // SUGGESTIONS
+  // ============================================
+
+  /**
+   * Create a suggestion for a shared environment
+   */
+  async createSuggestion(envId: string, data: CreateSuggestionPayload): Promise<EnvironmentSuggestion> {
+    const response = await apiClient.post(`/shared-environments/${envId}/suggestions`, data);
+    return response.data;
+  },
+
+  /**
+   * Get suggestions received for user's environments
+   */
+  async getReceivedSuggestions(status?: SuggestionStatus): Promise<EnvironmentSuggestion[]> {
+    const response = await apiClient.get('/shared-environments-suggestions/received', {
+      params: status ? { status } : undefined,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get suggestions sent by current user
+   */
+  async getSentSuggestions(): Promise<EnvironmentSuggestion[]> {
+    const response = await apiClient.get('/shared-environments-suggestions/sent');
+    return response.data;
+  },
+
+  /**
+   * Get count of pending suggestions for user's environments
+   */
+  async getPendingSuggestionsCount(): Promise<number> {
+    const response = await apiClient.get('/shared-environments-suggestions/pending-count');
+    return response.data.count;
+  },
+
+  /**
+   * Approve a suggestion (creates new version)
+   */
+  async approveSuggestion(suggestionId: string, data: ApproveSuggestionPayload): Promise<SharedEnvironment> {
+    const response = await apiClient.post(`/shared-environments-suggestions/${suggestionId}/approve`, data);
+    return response.data;
+  },
+
+  /**
+   * Reject a suggestion
+   */
+  async rejectSuggestion(suggestionId: string, reviewNote?: string): Promise<void> {
+    await apiClient.post(`/shared-environments-suggestions/${suggestionId}/reject`, { reviewNote });
   },
 
   // ============================================

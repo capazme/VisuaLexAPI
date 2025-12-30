@@ -38,6 +38,7 @@ model User {
   sharedEnvironments       SharedEnvironment[]
   sharedEnvironmentLikes   SharedEnvironmentLike[]
   sharedEnvironmentReports SharedEnvironmentReport[]
+  suggestionsMade          EnvironmentSuggestion[]   @relation("SuggestionsMade")
 
   @@map("users")
 }
@@ -302,19 +303,27 @@ model SharedEnvironment {
   viewCount     Int @default(0) @map("view_count")
   downloadCount Int @default(0) @map("download_count")
 
+  // Versioning
+  currentVersion Int      @default(1) @map("current_version")
+  isActive       Boolean  @default(true) @map("is_active")
+  replacedById   String?  @map("replaced_by_id")
+
   // Ownership
   userId    String   @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  user    User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  likes   SharedEnvironmentLike[]
-  reports SharedEnvironmentReport[]
+  user        User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes       SharedEnvironmentLike[]
+  reports     SharedEnvironmentReport[]
+  versions    SharedEnvironmentVersion[]
+  suggestions EnvironmentSuggestion[]
 
   @@index([userId])
   @@index([category])
   @@index([createdAt])
+  @@index([isActive])
   @@map("shared_environments")
 }
 
@@ -351,4 +360,67 @@ model SharedEnvironmentReport {
   @@index([envId])
   @@index([status])
   @@map("shared_environment_reports")
+}
+
+// ============================================
+// ENVIRONMENT SUGGESTIONS & VERSIONING
+// ============================================
+
+enum SuggestionStatus {
+  pending
+  approved
+  rejected
+}
+
+model EnvironmentSuggestion {
+  id                  String            @id @default(uuid())
+  sharedEnvironmentId String            @map("shared_environment_id")
+  suggesterId         String            @map("suggester_id")
+
+  // Suggested content (only dossiers, quickNorms, customAliases)
+  content Json
+
+  // Optional message from suggester
+  message String?
+
+  // Review status
+  status     SuggestionStatus @default(pending)
+  reviewedAt DateTime?        @map("reviewed_at")
+  reviewNote String?          @map("review_note")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  sharedEnvironment SharedEnvironment         @relation(fields: [sharedEnvironmentId], references: [id], onDelete: Cascade)
+  suggester         User                      @relation("SuggestionsMade", fields: [suggesterId], references: [id], onDelete: Cascade)
+  version           SharedEnvironmentVersion?
+
+  @@index([sharedEnvironmentId])
+  @@index([suggesterId])
+  @@index([status])
+  @@map("environment_suggestions")
+}
+
+model SharedEnvironmentVersion {
+  id                  String @id @default(uuid())
+  sharedEnvironmentId String @map("shared_environment_id")
+
+  // Version info
+  version   Int     // Sequential version number (1, 2, 3...)
+  content   Json    // Snapshot of environment content at this version
+  changelog String? // Description of changes
+
+  // Link to suggestion that created this version (if applicable)
+  suggestionId String?               @unique @map("suggestion_id")
+  suggestion   EnvironmentSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  sharedEnvironment SharedEnvironment @relation(fields: [sharedEnvironmentId], references: [id], onDelete: Cascade)
+
+  @@unique([sharedEnvironmentId, version])
+  @@index([sharedEnvironmentId])
+  @@map("shared_environment_versions")
 }

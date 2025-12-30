@@ -312,6 +312,14 @@ export interface SharedEnvironment {
     downloadCount: number;
     likeCount: number;
 
+    // Versioning
+    currentVersion: number;
+    isActive: boolean;
+    replacedById?: string;
+
+    // Suggestions count (only for owner)
+    pendingSuggestionsCount?: number;
+
     // Author
     user: SharedEnvironmentUser;
 
@@ -355,4 +363,66 @@ export interface SharedEnvironmentReport {
         userId: string;
     };
     reporter: SharedEnvironmentUser;
+}
+
+// ============================================
+// ENVIRONMENT SUGGESTIONS & VERSIONING
+// ============================================
+
+export type SuggestionStatus = 'pending' | 'approved' | 'rejected';
+
+export interface SuggestionContent {
+    dossiers: Dossier[];
+    quickNorms: QuickNorm[];
+    customAliases: CustomAlias[];
+}
+
+export interface EnvironmentSuggestion {
+    id: string;
+    sharedEnvironmentId: string;
+    sharedEnvironment?: {
+        id: string;
+        title: string;
+        user: SharedEnvironmentUser;
+    };
+    suggester: SharedEnvironmentUser;
+    content: SuggestionContent;
+    message?: string;
+    status: SuggestionStatus;
+    reviewedAt?: string;
+    reviewNote?: string;
+    createdAt: string;
+    isOwn: boolean;
+}
+
+export interface SharedEnvironmentVersion {
+    id: string;
+    version: number;
+    changelog?: string;
+    suggestion?: {
+        id: string;
+        suggester: SharedEnvironmentUser;
+    };
+    createdAt: string;
+}
+
+export interface CreateSuggestionPayload {
+    content: SuggestionContent;
+    message?: string;
+}
+
+export interface ApproveSuggestionPayload {
+    changelog?: string;
+    versionMode: 'replace' | 'coexist';
+    mergeMode: 'merge' | 'replace';
+}
+
+export interface UpdateEnvironmentWithVersionPayload {
+    title?: string;
+    description?: string | null;
+    content?: SharedEnvironmentContent;
+    category?: EnvironmentCategory;
+    tags?: string[];
+    changelog?: string;
+    versionMode?: 'replace' | 'coexist';
 }
