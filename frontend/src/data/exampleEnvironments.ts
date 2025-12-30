@@ -132,6 +132,7 @@ export const gdprEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -213,6 +214,7 @@ export const doraEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -291,6 +293,7 @@ export const aiActEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -391,6 +394,7 @@ export const consumerLawEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -486,6 +490,7 @@ export const codicePenaleGeneraleEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -578,6 +583,7 @@ export const codicePenaleReatiEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -680,6 +686,7 @@ export const codiceCivileObbligazioniEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -759,6 +766,7 @@ export const codiceCivileResponsabilitaEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -847,6 +855,7 @@ export const codiceCivileProprietaEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -946,6 +955,7 @@ export const codiceCivileFamigliaEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1038,6 +1048,7 @@ export const legge241Environment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1131,6 +1142,7 @@ export const contrattiPubbliciEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1211,6 +1223,7 @@ export const statutoLavoratoriEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1288,6 +1301,7 @@ export const jobsActEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1384,6 +1398,7 @@ export const costituzioneEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1488,6 +1503,7 @@ export const societarioEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1590,6 +1606,7 @@ export const cpcEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1691,6 +1708,7 @@ export const cppEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1761,6 +1779,7 @@ export const tributarioEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // ============================================
@@ -1861,6 +1880,7 @@ export const trattatiUEEnvironment: Environment = {
 
     annotations: [],
     highlights: [],
+    customAliases: [],
 };
 
 // Export all example environments

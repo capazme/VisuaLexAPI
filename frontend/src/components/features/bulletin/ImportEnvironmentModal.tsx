@@ -60,6 +60,7 @@ export function ImportEnvironmentModal({
         createdAt: new Date().toISOString(),
         dossiers: content.dossiers,
         quickNorms: content.quickNorms,
+        customAliases: content.customAliases || [],
         annotations: filteredAnnotations,
         highlights: filteredHighlights,
         tags: sharedEnvironment.tags,

@@ -91,6 +91,7 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
         content: {
           dossiers: selectedEnv.dossiers,
           quickNorms: selectedEnv.quickNorms,
+          customAliases: selectedEnv.customAliases || [],
           annotations: includeNotes ? selectedEnv.annotations : [],
           highlights: includeHighlights ? selectedEnv.highlights : [],
         },

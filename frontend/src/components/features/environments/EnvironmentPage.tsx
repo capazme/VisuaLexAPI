@@ -15,7 +15,13 @@ import {
   parseEnvironmentFromBase64,
   getEnvironmentStats,
   canShareAsLink,
+  createFullSelection,
+  createEmptySelection,
+  countSelectedItems,
+  isAllSelected,
+  type EnvironmentSelection,
 } from '../../../utils/environmentUtils';
+import { EnvironmentContentViewer } from './EnvironmentContentViewer';
 import { exampleEnvironments } from '../../../data/exampleEnvironments';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
@@ -24,10 +30,17 @@ import { EmptyState } from '../../ui/EmptyState';
 export function EnvironmentPage() {
   const {
     environments,
+    dossiers,
+    quickNorms,
+    customAliases,
+    annotations,
+    highlights,
     createEnvironment,
+    createEnvironmentWithSelection,
     updateEnvironment,
     deleteEnvironment,
     importEnvironment,
+    importEnvironmentPartial,
     applyEnvironment,
     refreshEnvironmentFromCurrent,
   } = useAppStore();
@@ -39,6 +52,7 @@ export function EnvironmentPage() {
   const [importingEnv, setImportingEnv] = useState<Environment | null>(null);
   const [applyModalEnv, setApplyModalEnv] = useState<Environment | null>(null);
   const [editingEnv, setEditingEnv] = useState<Environment | null>(null);
+  const [detailEnv, setDetailEnv] = useState<Environment | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,10 +104,11 @@ export function EnvironmentPage() {
     e.target.value = '';
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = (selection: EnvironmentSelection, mode: 'merge' | 'replace') => {
     if (importingEnv) {
-      importEnvironment(importingEnv);
-      showToast(`Ambiente "${importingEnv.name}" importato con successo`, 'success');
+      importEnvironmentPartial(importingEnv, selection, mode);
+      const modeText = mode === 'merge' ? 'unito' : 'importato';
+      showToast(`Ambiente "${importingEnv.name}" ${modeText} con successo`, 'success');
       setImportingEnv(null);
     }
   };
@@ -253,6 +268,7 @@ export function EnvironmentPage() {
               environment={env}
               isFirst={idx === 0}
               onApply={() => setApplyModalEnv(env)}
+              onViewDetail={() => setDetailEnv(env)}
               onEdit={() => setEditingEnv(env)}
               onExportJSON={() => handleExportJSON(env)}
               onShareLink={() => handleShareLink(env)}
@@ -267,9 +283,15 @@ export function EnvironmentPage() {
       <CreateEnvironmentModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onCreate={(name, options) => {
-          createEnvironment(name, options);
+        currentState={{ dossiers, quickNorms, customAliases, annotations, highlights }}
+        onCreate={(name, selection, options) => {
+          if (selection) {
+            createEnvironmentWithSelection(name, selection, options);
+          } else {
+            createEnvironment(name, { ...options, fromCurrent: false });
+          }
           setIsCreateModalOpen(false);
+          showToast(`Ambiente "${name}" creato con successo`, 'success');
         }}
       />
 
@@ -311,6 +333,19 @@ export function EnvironmentPage() {
         />
       )}
 
+      {/* Detail Modal */}
+      {detailEnv && (
+        <EnvironmentDetailModal
+          environment={detailEnv}
+          onClose={() => setDetailEnv(null)}
+          onApply={() => setApplyModalEnv(detailEnv)}
+          onEdit={() => setEditingEnv(detailEnv)}
+          onExportJSON={() => handleExportJSON(detailEnv)}
+          onShareLink={() => handleShareLink(detailEnv)}
+          onDelete={() => setDeleteConfirmId(detailEnv.id)}
+        />
+      )}
+
       {/* Toast Notification */}
       {toastMessage && (
         <Toast
@@ -330,6 +365,7 @@ interface EnvironmentCardProps {
   environment: Environment;
   isFirst?: boolean;
   onApply: () => void;
+  onViewDetail: () => void;
   onEdit: () => void;
   onExportJSON: () => void;
   onShareLink: () => void;
@@ -341,6 +377,7 @@ function EnvironmentCard({
   environment,
   isFirst,
   onApply,
+  onViewDetail,
   onEdit,
   onExportJSON,
   onShareLink,
@@ -353,7 +390,11 @@ function EnvironmentCard({
   const canShare = canShareAsLink(environment);
 
   return (
-    <div id={isFirst ? 'tour-env-card' : undefined} className="dossier-card group bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden">
+    <div
+      id={isFirst ? 'tour-env-card' : undefined}
+      className="dossier-card group bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden cursor-pointer"
+      onClick={onViewDetail}
+    >
       {/* Category Banner */}
       {category && (
         <div
@@ -387,7 +428,7 @@ function EnvironmentCard({
           {/* Menu */}
           <div className="relative flex-shrink-0">
             <button
-              onClick={() => setShowMenu(!showMenu)}
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
               className="p-2 md:p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md md:opacity-0 md:group-hover:opacity-100 transition-opacity min-h-[44px] md:min-h-0 flex items-center justify-center"
               aria-label="Menu azioni"
             >
@@ -461,7 +502,7 @@ function EnvironmentCard({
         {/* Apply Button */}
         <button
           id={isFirst ? 'tour-env-apply' : undefined}
-          onClick={onApply}
+          onClick={(e) => { e.stopPropagation(); onApply(); }}
           className="w-full flex items-center justify-center gap-2 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium min-h-[44px]"
         >
           <Play size={16} />
@@ -478,31 +519,87 @@ function CreateEnvironmentModal({
   isOpen,
   onClose,
   onCreate,
+  currentState,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, options: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => void;
+  onCreate: (name: string, selection: EnvironmentSelection | null, options: { description?: string; author?: string; version?: string; category?: EnvironmentCategory }) => void;
+  currentState: {
+    dossiers: any[];
+    quickNorms: any[];
+    customAliases: any[];
+    annotations: any[];
+    highlights: any[];
+  };
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [author, setAuthor] = useState('');
+  const [version, setVersion] = useState('');
   const [category, setCategory] = useState<EnvironmentCategory>('other');
-  const [fromCurrent, setFromCurrent] = useState(true);
+  const [includeContent, setIncludeContent] = useState(true);
+
+  // Create environment representation of current state
+  const currentAsEnv = {
+    dossiers: currentState.dossiers,
+    quickNorms: currentState.quickNorms,
+    customAliases: currentState.customAliases,
+    annotations: currentState.annotations,
+    highlights: currentState.highlights,
+  };
+
+  const [selection, setSelection] = useState<EnvironmentSelection>(() => createFullSelection(currentAsEnv));
+
+  // Update selection when includeContent changes
+  const toggleIncludeContent = (include: boolean) => {
+    setIncludeContent(include);
+    if (include) {
+      setSelection(createFullSelection(currentAsEnv));
+    } else {
+      setSelection(createEmptySelection());
+    }
+  };
 
   if (!isOpen) return null;
 
+  const selectedCount = countSelectedItems(selection);
+  const allSelected = isAllSelected(currentAsEnv, selection);
+  const hasContent = currentState.dossiers.length > 0 ||
+    currentState.quickNorms.length > 0 ||
+    currentState.customAliases.length > 0 ||
+    currentState.annotations.length > 0 ||
+    currentState.highlights.length > 0;
+
   const handleSubmit = () => {
     if (!name.trim()) return;
-    onCreate(name.trim(), { description: description.trim() || undefined, category, fromCurrent });
+    const selectionToUse = includeContent && selectedCount > 0 ? selection : null;
+    onCreate(name.trim(), selectionToUse, {
+      description: description.trim() || undefined,
+      author: author.trim() || undefined,
+      version: version.trim() || undefined,
+      category
+    });
     setName('');
     setDescription('');
+    setAuthor('');
+    setVersion('');
     setCategory('other');
-    setFromCurrent(true);
+    setIncludeContent(true);
+    setSelection(createFullSelection(currentAsEnv));
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelection(createEmptySelection());
+    } else {
+      setSelection(createFullSelection(currentAsEnv));
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
           <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white">Nuovo Ambiente</h2>
           <button
@@ -515,16 +612,41 @@ function CreateEnvironmentModal({
         </div>
 
         <div className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="es. DPO Compliance"
-              className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
-              autoFocus
-            />
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="es. DPO Compliance"
+                className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Autore</label>
+              <input
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder="es. Mario Rossi"
+                className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Versione</label>
+              <input
+                type="text"
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                placeholder="es. 1.0"
+                className="w-full px-3 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 min-h-[44px]"
+              />
+            </div>
           </div>
 
           <div>
@@ -551,20 +673,57 @@ function CreateEnvironmentModal({
             </select>
           </div>
 
-          <label className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer">
-            <input
-              type="checkbox"
-              checked={fromCurrent}
-              onChange={(e) => setFromCurrent(e.target.checked)}
-              className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-            />
-            <div>
-              <span className="font-medium text-slate-900 dark:text-white text-sm">Includi stato corrente</span>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Copia dossier, preferiti e annotazioni attuali
+          {/* Content Selection */}
+          {hasContent && (
+            <>
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                  <input
+                    type="checkbox"
+                    checked={includeContent}
+                    onChange={(e) => toggleIncludeContent(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Includi contenuto dallo stato corrente
+                  </span>
+                </label>
+
+                {includeContent && (
+                  <>
+                    <label className="flex items-center gap-2 cursor-pointer mb-3 ml-6">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-xs text-slate-600 dark:text-slate-400">
+                        Seleziona tutto
+                      </span>
+                    </label>
+
+                    <EnvironmentContentViewer
+                      environment={currentAsEnv}
+                      selectable
+                      selection={selection}
+                      onSelectionChange={setSelection}
+                      maxHeight="200px"
+                      compact
+                    />
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {!hasContent && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                Non hai ancora dossier, QuickNorms o annotazioni. L'ambiente verra' creato vuoto.
               </p>
             </div>
-          </label>
+          )}
         </div>
 
         <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
@@ -579,7 +738,7 @@ function CreateEnvironmentModal({
             disabled={!name.trim()}
             className="flex-1 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-lg transition-colors disabled:cursor-not-allowed min-h-[44px]"
           >
-            Crea
+            Crea {includeContent && selectedCount > 0 && `(${selectedCount} elementi)`}
           </button>
         </div>
       </div>
@@ -678,15 +837,26 @@ function ImportPreviewModal({
 }: {
   environment: Environment;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (selection: EnvironmentSelection, mode: 'merge' | 'replace') => void;
 }) {
-  const stats = getEnvironmentStats(environment);
+  const [selection, setSelection] = useState<EnvironmentSelection>(() => createFullSelection(environment));
+  const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const category = environment.category ? ENVIRONMENT_CATEGORIES[environment.category] : null;
+  const selectedCount = countSelectedItems(selection);
+  const allSelected = isAllSelected(environment, selection);
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelection(createEmptySelection());
+    } else {
+      setSelection(createFullSelection(environment));
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -694,7 +864,7 @@ function ImportPreviewModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-base md:text-lg font-semibold text-slate-900 dark:text-white">Importa Ambiente</h2>
-              <p className="text-xs text-slate-500">Anteprima contenuto</p>
+              <p className="text-xs text-slate-500">Seleziona cosa importare</p>
             </div>
           </div>
           <button
@@ -706,27 +876,95 @@ function ImportPreviewModal({
           </button>
         </div>
 
-        <div className="p-4 md:p-6 overflow-y-auto flex-1">
-          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 md:p-4 mb-4">
+        <div className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4">
+          {/* Environment Header */}
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 md:p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-base md:text-lg">{category?.icon || '📁'}</span>
               <h3 className="font-medium text-sm md:text-base text-slate-900 dark:text-white">{environment.name}</h3>
             </div>
             {environment.description && (
-              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mb-3">{environment.description}</p>
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mb-2">{environment.description}</p>
             )}
-            <div className="flex flex-wrap gap-2 md:gap-3 text-xs md:text-sm text-slate-500 dark:text-slate-400">
-              <span>{stats.dossiers} dossier</span>
-              <span>{stats.quickNorms} preferiti</span>
-              <span>{stats.annotations} annotazioni</span>
-            </div>
+            {(environment.author || environment.version) && (
+              <div className="flex gap-3 text-xs text-slate-500 dark:text-slate-400">
+                {environment.author && <span>Autore: {environment.author}</span>}
+                {environment.version && <span>v{environment.version}</span>}
+              </div>
+            )}
           </div>
 
-          {environment.author && (
-            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
-              Autore: {environment.author}
-            </p>
-          )}
+          {/* Select All Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer px-1">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Seleziona tutto
+            </span>
+          </label>
+
+          {/* Content Viewer with Selection */}
+          <EnvironmentContentViewer
+            environment={environment}
+            selectable
+            selection={selection}
+            onSelectionChange={setSelection}
+            maxHeight="250px"
+          />
+
+          {/* Import Mode */}
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">
+              Modalita' Import
+            </label>
+            <div className="flex gap-3">
+              <label className={`
+                flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors
+                ${importMode === 'merge'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }
+              `}>
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="merge"
+                  checked={importMode === 'merge'}
+                  onChange={() => setImportMode('merge')}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <div>
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">Unisci</span>
+                  <p className="text-xs text-slate-500">Aggiunge ai dati esistenti</p>
+                </div>
+              </label>
+
+              <label className={`
+                flex-1 flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors
+                ${importMode === 'replace'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }
+              `}>
+                <input
+                  type="radio"
+                  name="importMode"
+                  value="replace"
+                  checked={importMode === 'replace'}
+                  onChange={() => setImportMode('replace')}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <div>
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">Sostituisci</span>
+                  <p className="text-xs text-slate-500">Rimpiazza i dati attuali</p>
+                </div>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-3 px-4 md:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
@@ -737,11 +975,12 @@ function ImportPreviewModal({
             Annulla
           </button>
           <button
-            onClick={onConfirm}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors min-h-[44px]"
+            onClick={() => onConfirm(selection, importMode)}
+            disabled={selectedCount === 0}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-lg transition-colors disabled:cursor-not-allowed min-h-[44px]"
           >
             <Check size={18} />
-            Importa
+            Importa {selectedCount > 0 && `(${selectedCount})`}
           </button>
         </div>
       </div>
@@ -847,6 +1086,125 @@ function DeleteConfirmModal({
           >
             Elimina
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EnvironmentDetailModal({
+  environment,
+  onClose,
+  onApply,
+  onEdit,
+  onExportJSON,
+  onShareLink,
+  onDelete,
+}: {
+  environment: Environment;
+  onClose: () => void;
+  onApply: () => void;
+  onEdit: () => void;
+  onExportJSON: () => void;
+  onShareLink: () => void;
+  onDelete: () => void;
+}) {
+  const category = environment.category ? ENVIRONMENT_CATEGORIES[environment.category] : null;
+  const canShare = canShareAsLink(environment);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between px-4 md:px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div
+              className="w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center text-xl"
+              style={{ backgroundColor: `${category?.color || '#6B7280'}15` }}
+            >
+              {category?.icon || '📁'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white line-clamp-1">
+                {environment.name}
+              </h2>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
+                {category && <span>{category.label}</span>}
+                {environment.author && <span>• {environment.author}</span>}
+                {environment.version && <span>• v{environment.version}</span>}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-2 -mr-2 min-h-[44px] flex items-center justify-center flex-shrink-0"
+            aria-label="Chiudi"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Description */}
+        {environment.description && (
+          <div className="px-4 md:px-6 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {environment.description}
+            </p>
+          </div>
+        )}
+
+        {/* Content Viewer */}
+        <div className="p-4 md:p-6 overflow-y-auto flex-1">
+          <EnvironmentContentViewer
+            environment={environment}
+            maxHeight="350px"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="px-4 md:px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex-shrink-0">
+          <div className="flex flex-wrap gap-2 justify-between">
+            <div className="flex gap-2">
+              <button
+                onClick={() => { onDelete(); onClose(); }}
+                className="px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 size={16} />
+                <span className="hidden sm:inline">Elimina</span>
+              </button>
+              <button
+                onClick={() => { onEdit(); onClose(); }}
+                className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <Pencil size={16} />
+                <span className="hidden sm:inline">Modifica</span>
+              </button>
+              <button
+                onClick={onExportJSON}
+                className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                <Download size={16} />
+                <span className="hidden sm:inline">Esporta</span>
+              </button>
+              {canShare && (
+                <button
+                  onClick={onShareLink}
+                  className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <Link2 size={16} />
+                  <span className="hidden sm:inline">Link</span>
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => { onApply(); onClose(); }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+            >
+              <Play size={16} />
+              Applica
+            </button>
+          </div>
         </div>
       </div>
     </div>

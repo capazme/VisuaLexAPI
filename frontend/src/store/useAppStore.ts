@@ -3,7 +3,8 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, AliasType, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -191,9 +192,11 @@ interface AppState {
 
     // Environment Actions
     createEnvironment: (name: string, options?: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => string;
+    createEnvironmentWithSelection: (name: string, selection: EnvironmentSelection, options?: { description?: string; author?: string; version?: string; category?: EnvironmentCategory }) => string;
     updateEnvironment: (id: string, updates: Partial<Omit<Environment, 'id' | 'createdAt'>>) => void;
     deleteEnvironment: (id: string) => void;
     importEnvironment: (env: Environment) => string;
+    importEnvironmentPartial: (envData: Partial<Environment>, selection: EnvironmentSelection, mode: 'merge' | 'replace') => void;
     applyEnvironment: (id: string, mode: 'replace' | 'merge') => void;
     refreshEnvironmentFromCurrent: (id: string) => void;
     getCurrentStateAsEnvironment: (name: string) => Environment;
@@ -1386,6 +1389,41 @@ const appStore = createStore<AppState>()(
                 return envId;
             },
 
+            createEnvironmentWithSelection: (name, selection, options = {}) => {
+                const envId = uuidv4();
+                const state = get();
+
+                // Filter current state by selection
+                const currentAsEnv = {
+                    dossiers: state.dossiers,
+                    quickNorms: state.quickNorms,
+                    customAliases: state.customAliases,
+                    annotations: state.annotations,
+                    highlights: state.highlights,
+                };
+                const filtered = filterEnvironmentBySelection(currentAsEnv, selection);
+
+                set((draft) => {
+                    const newEnv: Environment = {
+                        id: envId,
+                        name,
+                        description: options.description,
+                        author: options.author,
+                        version: options.version,
+                        category: options.category,
+                        createdAt: new Date().toISOString(),
+                        dossiers: JSON.parse(JSON.stringify(filtered.dossiers || [])),
+                        quickNorms: JSON.parse(JSON.stringify(filtered.quickNorms || [])),
+                        customAliases: JSON.parse(JSON.stringify(filtered.customAliases || [])),
+                        annotations: JSON.parse(JSON.stringify(filtered.annotations || [])),
+                        highlights: JSON.parse(JSON.stringify(filtered.highlights || [])),
+                        tags: [],
+                    };
+                    draft.environments.push(newEnv);
+                });
+                return envId;
+            },
+
             updateEnvironment: (id, updates) => set((state) => {
                 const env = state.environments.find(e => e.id === id);
                 if (env) {
@@ -1414,6 +1452,73 @@ const appStore = createStore<AppState>()(
                 });
                 return newId;
             },
+
+            importEnvironmentPartial: (envData, selection, mode) => set((state) => {
+                // Filter environment by selection
+                const filtered = filterEnvironmentBySelection(envData, selection);
+
+                // Deep clone and regenerate IDs
+                const clonedDossiers = JSON.parse(JSON.stringify(filtered.dossiers || [])).map((d: Dossier) => ({
+                    ...d,
+                    id: uuidv4(),
+                    items: d.items.map((i: any) => ({ ...i, id: uuidv4() }))
+                }));
+                const clonedQuickNorms = JSON.parse(JSON.stringify(filtered.quickNorms || [])).map((q: QuickNorm) => ({
+                    ...q,
+                    id: uuidv4(),
+                    usageCount: 0,
+                    lastUsedAt: undefined
+                }));
+                const clonedCustomAliases = JSON.parse(JSON.stringify(filtered.customAliases || [])).map((a: CustomAlias) => ({
+                    ...a,
+                    id: uuidv4(),
+                    usageCount: 0,
+                    lastUsedAt: undefined
+                }));
+                const clonedAnnotations = JSON.parse(JSON.stringify(filtered.annotations || [])).map((a: Annotation) => ({
+                    ...a,
+                    id: uuidv4()
+                }));
+                const clonedHighlights = JSON.parse(JSON.stringify(filtered.highlights || [])).map((h: Highlight) => ({
+                    ...h,
+                    id: uuidv4()
+                }));
+
+                if (mode === 'replace') {
+                    state.dossiers = clonedDossiers;
+                    state.quickNorms = clonedQuickNorms;
+                    state.customAliases = clonedCustomAliases;
+                    state.annotations = clonedAnnotations;
+                    state.highlights = clonedHighlights;
+                } else {
+                    // Merge mode: add new items, skip duplicates
+                    const existingDossierTitles = new Set(state.dossiers.map(d => d.title.toLowerCase()));
+                    const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
+                    const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
+
+                    clonedDossiers.forEach((d: Dossier) => {
+                        if (!existingDossierTitles.has(d.title.toLowerCase())) {
+                            state.dossiers.push(d);
+                        }
+                    });
+
+                    clonedQuickNorms.forEach((q: QuickNorm) => {
+                        if (!existingQuickNormLabels.has(q.label.toLowerCase())) {
+                            state.quickNorms.push(q);
+                        }
+                    });
+
+                    clonedCustomAliases.forEach((a: CustomAlias) => {
+                        if (!existingAliasTriggers.has(a.trigger.toLowerCase())) {
+                            state.customAliases.push(a);
+                        }
+                    });
+
+                    // For annotations and highlights, add all
+                    state.annotations.push(...clonedAnnotations);
+                    state.highlights.push(...clonedHighlights);
+                }
+            }),
 
             applyEnvironment: (id, mode) => set((state) => {
                 const env = state.environments.find(e => e.id === id);
