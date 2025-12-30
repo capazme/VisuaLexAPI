@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book } from 'lucide-react';
-import type { SearchParams } from '../../../types';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag } from 'lucide-react';
+import type { SearchParams, CustomAlias } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -19,7 +19,10 @@ interface CommandPaletteProps {
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
 
 export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProps) {
-  const { quickNorms, useQuickNorm, settings, openQuickNormsManager } = useAppStore();
+  const {
+    quickNorms, selectQuickNorm, settings, openQuickNormsManager,
+    customAliases, trackAliasUsage, openAliasManager
+  } = useAppStore();
   const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
@@ -36,11 +39,19 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
     }
   }, [isOpen, tryStartTour]);
 
-  // Smart citation parsing
+  // Sorted custom aliases for display (by usage, then alphabetically)
+  const sortedAliases = useMemo(() => {
+    return [...customAliases].sort((a, b) =>
+      b.usageCount - a.usageCount || a.trigger.localeCompare(b.trigger)
+    );
+  }, [customAliases]);
+
+  // Smart citation parsing - include custom aliases for resolution
+  // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
   const parsedCitation = useMemo<ParsedCitation | null>(() => {
-    if (!inputValue || inputValue.length < 3) return null;
-    return parseLegalCitation(inputValue);
-  }, [inputValue]);
+    if (!inputValue || inputValue.length < 2) return null;
+    return parseLegalCitation(inputValue, customAliases);
+  }, [inputValue, customAliases]);
 
   const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
   const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
@@ -85,12 +96,12 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   }, []);
 
   const handleSelectQuickNorm = useCallback((id: string) => {
-    const qn = useQuickNorm(id);
+    const qn = selectQuickNorm(id);
     if (qn) {
       onSearch(qn.searchParams);
       onClose();
     }
-  }, [useQuickNorm, onSearch, onClose]);
+  }, [selectQuickNorm, onSearch, onClose]);
 
   const handleOpenQuickNormsManager = useCallback(() => {
     onClose();
@@ -98,8 +109,36 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
     setTimeout(() => openQuickNormsManager(), 100);
   }, [onClose, openQuickNormsManager]);
 
+  const handleOpenAliasManager = useCallback(() => {
+    onClose();
+    setTimeout(() => openAliasManager(), 100);
+  }, [onClose, openAliasManager]);
+
+  const handleSelectAlias = useCallback((alias: CustomAlias) => {
+    trackAliasUsage(alias.id);
+
+    if (alias.searchParams) {
+      // Reference alias: execute search directly
+      onSearch({
+        act_type: alias.searchParams.act_type || '',
+        act_number: alias.searchParams.act_number || '',
+        date: alias.searchParams.date ? parseItalianDate(alias.searchParams.date) : '',
+        article: alias.searchParams.article || '1',
+        version: 'vigente',
+        version_date: '',
+        show_brocardi_info: includeBrocardi
+      });
+      onClose();
+    }
+  }, [trackAliasUsage, onSearch, onClose, includeBrocardi]);
+
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
+
+    // Track alias usage if citation was resolved from an alias
+    if (parsedCitation.fromAlias && parsedCitation.aliasId) {
+      trackAliasUsage(parsedCitation.aliasId);
+    }
 
     if (citationReady) {
       const params = toSearchParams(parsedCitation);
@@ -128,7 +167,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi]);
+  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi, trackAliasUsage]);
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -237,7 +276,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                   <Command.Input
                     value={inputValue}
                     onValueChange={setInputValue}
-                    placeholder="Es. 'art 2043 cc' o seleziona Atto..."
+                    placeholder="Es. 'cc', 'art 2043 cc' o seleziona..."
                     className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 outline-none text-xl font-bold tracking-tight"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && parsedCitation) {
@@ -247,6 +286,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                     }}
                   />
                   <AnimatePresence>
+                    {/* Citation Match Indicator (shows alias badge if from alias) */}
                     {parsedCitation && citationPreview && (
                       <motion.div
                         initial={{ opacity: 0, y: 5 }}
@@ -255,14 +295,22 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                       >
                         <div className={cn(
                           "w-5 h-5 rounded-md flex items-center justify-center",
-                          citationReady ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+                          parsedCitation.fromAlias
+                            ? "bg-indigo-500 text-white"
+                            : citationReady ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
                         )}>
-                          <Zap size={10} fill="currentColor" strokeWidth={3} />
+                          {parsedCitation.fromAlias
+                            ? <Tag size={10} strokeWidth={3} />
+                            : <Zap size={10} fill="currentColor" strokeWidth={3} />
+                          }
                         </div>
                         <span className={cn(
                           "text-xs font-bold uppercase tracking-wider",
-                          citationReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                          parsedCitation.fromAlias
+                            ? "text-indigo-600 dark:text-indigo-400"
+                            : citationReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                         )}>
+                          {parsedCitation.fromAlias && <span className="opacity-60 mr-1">via alias →</span>}
                           {citationPreview}
                         </span>
                         <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
@@ -360,29 +408,78 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {quickNorms.slice(0, 6).map((qn) => (
-                      <Command.Item
-                        key={qn.id}
-                        value={`preferito ${qn.label}`}
-                        onSelect={() => handleSelectQuickNorm(qn.id)}
-                        className={cn(
-                          "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
-                          "bg-white dark:bg-slate-900 border border-transparent",
-                          "aria-selected:bg-primary-50 dark:aria-selected:bg-primary-900/10 aria-selected:border-primary-200/50 dark:aria-selected:border-primary-800/30"
-                        )}
-                      >
-                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center group-aria-selected:scale-110 transition-transform">
-                          <Star size={18} fill="currentColor" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{qn.label}</span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">{qn.searchParams.act_type}</span>
-                        </div>
-                      </Command.Item>
-                    ))}
-                  </div>
+                  {quickNorms.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {quickNorms.slice(0, 6).map((qn) => (
+                        <Command.Item
+                          key={qn.id}
+                          value={`preferito ${qn.label}`}
+                          onSelect={() => handleSelectQuickNorm(qn.id)}
+                          className={cn(
+                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                            "bg-white dark:bg-slate-900 border border-transparent",
+                            "aria-selected:bg-primary-50 dark:aria-selected:bg-primary-900/10 aria-selected:border-primary-200/50 dark:aria-selected:border-primary-800/30"
+                          )}
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center group-aria-selected:scale-110 transition-transform">
+                            <Star size={18} fill="currentColor" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{qn.label}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">{qn.searchParams.act_type}</span>
+                          </div>
+                        </Command.Item>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 text-center py-2">Nessun preferito salvato</p>
+                  )}
                 </Command.Group>
+
+                {/* Custom Aliases Section */}
+                {sortedAliases.length > 0 && (
+                  <Command.Group className="mb-4">
+                    <div className="flex items-center justify-between px-3 mb-3">
+                      <div className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                        <Tag size={12} strokeWidth={3} />
+                        Alias Personalizzati
+                      </div>
+                      <button
+                        onClick={handleOpenAliasManager}
+                        className="p-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        Gestisci
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {sortedAliases.slice(0, 8).map((alias) => (
+                        <Command.Item
+                          key={alias.id}
+                          value={`alias ${alias.trigger} ${alias.expandTo}`}
+                          onSelect={() => handleSelectAlias(alias)}
+                          className={cn(
+                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                            "bg-white dark:bg-slate-900 border border-transparent",
+                            "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-200/50 dark:aria-selected:border-indigo-800/30"
+                          )}
+                        >
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500">
+                            <Tag size={18} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                              {alias.trigger}
+                            </span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                              → {alias.expandTo}
+                            </span>
+                          </div>
+                        </Command.Item>
+                      ))}
+                    </div>
+                  </Command.Group>
+                )}
 
                 {/* Unified Act Types Section */}
                 <div className="space-y-4">

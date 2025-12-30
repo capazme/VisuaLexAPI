@@ -1,3 +1,43 @@
+import re
+
+def extract_codice_details(codice_name: str) -> dict | None:
+    """
+    Extracts date and act number from a codice URN in NORMATTIVA_URN_CODICI.
+
+    Example: "codice civile" -> "regio.decreto:1942-03-16;262:2"
+    Returns: {"tipo_atto_reale": "regio decreto", "data": "1942-03-16", "numero_atto": "262"}
+
+    Returns None if codice not found or URN doesn't contain extractable details.
+    """
+    codice_name_lower = codice_name.lower().strip()
+    urn = NORMATTIVA_URN_CODICI.get(codice_name_lower)
+
+    if not urn:
+        return None
+
+    # Skip special cases like "costituzione" that don't have date/number
+    if ':' not in urn or ';' not in urn:
+        return None
+
+    # Pattern: "tipo.atto:YYYY-MM-DD;numero" or "tipo.atto:YYYY-MM-DD;numero:allegato"
+    # Examples:
+    #   "regio.decreto:1942-03-16;262:2"
+    #   "decreto.legislativo:2005-09-06;206"
+    match = re.match(r'^([^:]+):(\d{4}-\d{2}-\d{2});(\d+)(?::\d+)?$', urn)
+
+    if match:
+        tipo_atto_urn, data, numero = match.groups()
+        # Convert URN format to readable format: "regio.decreto" -> "regio decreto"
+        tipo_atto_reale = tipo_atto_urn.replace('.', ' ')
+        return {
+            "tipo_atto_reale": tipo_atto_reale,
+            "data": data,
+            "numero_atto": numero
+        }
+
+    return None
+
+
 NORMATTIVA_URN_CODICI = {
     "costituzione": "costituzione",
     "codice penale": "regio.decreto:1930-10-19;1398:1",

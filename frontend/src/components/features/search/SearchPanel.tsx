@@ -4,6 +4,7 @@ import type { PanInfo } from 'framer-motion';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
 import { QuickNormsManager } from './QuickNormsManager';
+import { AliasManager } from '../settings/AliasManager';
 import { PDFViewer } from '../../ui/PDFViewer';
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import { NormaCard } from './NormaCard';
@@ -34,7 +35,7 @@ export function SearchPanel() {
   const {
     addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma, removeTab,
     searchTrigger, clearSearchTrigger,
-    quickNorms, useQuickNorm, triggerSearch,
+    quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
   } = useAppStore();
@@ -88,6 +89,7 @@ export function SearchPanel() {
       tipo_atto: normaData.tipo_atto,
       data: normaData.data,
       numero_atto: normaData.numero_atto,
+      tipo_atto_reale: normaData.tipo_atto_reale,
       urn: normaData.url
     };
 
@@ -533,6 +535,9 @@ export function SearchPanel() {
         onSearch={handleSearch}
       />
 
+      {/* Alias Manager Modal */}
+      <AliasManager />
+
       {/* Main Content Area - Empty state when no tabs */}
       {!hasTabs && !isLoading && (
         <div id="tour-main-content" className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 bg-slate-50 dark:bg-slate-950">
@@ -612,7 +617,7 @@ export function SearchPanel() {
                   <button
                     key={qn.id}
                     onClick={() => {
-                      useQuickNorm(qn.id);
+                      selectQuickNorm(qn.id);
                       triggerSearch(qn.searchParams);
                     }}
                     className={cn(

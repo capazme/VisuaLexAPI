@@ -17,7 +17,7 @@ interface QuickNormsManagerProps {
 type InputMode = 'url' | 'manual';
 
 export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
-  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, useQuickNorm, triggerSearch } = useAppStore();
+  const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm, triggerSearch } = useAppStore();
   const { tryStartTour } = useTour();
 
   // Start quickNorms tour on first open
@@ -100,10 +100,10 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
   }, [actType, actNumber, actDate, article, customLabel, urlInput, inputMode, addQuickNorm, resetForm]);
 
   const handleUseQuickNorm = useCallback((qn: QuickNorm) => {
-    useQuickNorm(qn.id);
+    selectQuickNorm(qn.id);
     triggerSearch(qn.searchParams);
     onClose();
-  }, [useQuickNorm, triggerSearch, onClose]);
+  }, [selectQuickNorm, triggerSearch, onClose]);
 
   const handleStartEdit = useCallback((qn: QuickNorm) => {
     setEditingId(qn.id);

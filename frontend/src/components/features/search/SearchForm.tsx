@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, RefreshCw, Eraser, Plus, Minus, Loader2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SearchParams } from '../../../types';
@@ -8,6 +8,7 @@ import { cn } from '../../../lib/utils';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { FOCUS_RING } from '../../../constants/interactions';
+import { useAppStore } from '../../../store/useAppStore';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -71,6 +72,16 @@ const ACT_TYPES_REQUIRING_DETAILS = [
 ];
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
+  // Get alias data and functions from store
+  const { customAliases, trackAliasUsage } = useAppStore();
+
+  // Memoized sorted aliases for dropdown (by usage, then alphabetically)
+  const sortedAliases = useMemo(() => {
+    return [...customAliases].sort((a, b) =>
+      b.usageCount - a.usageCount || a.trigger.localeCompare(b.trigger)
+    );
+  }, [customAliases]);
+
   const [formData, setFormData] = useState<SearchParams>({
     act_type: '',
     act_number: '',
@@ -178,6 +189,32 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
+
+    // Check if this is an alias selection (special prefix)
+    if (name === 'act_type' && value.startsWith('__ALIAS__:')) {
+      const aliasId = value.replace('__ALIAS__:', '');
+      const alias = customAliases.find(a => a.id === aliasId);
+
+      if (alias) {
+        // Increment usage count
+        trackAliasUsage(alias.id);
+
+        if (alias.searchParams) {
+          // Reference alias: fill all params
+          setFormData(prev => ({
+            ...prev,
+            act_type: alias.searchParams!.act_type || '',
+            act_number: alias.searchParams!.act_number || '',
+            date: alias.searchParams!.date || '',
+            article: alias.searchParams!.article || prev.article
+          }));
+          // Reset article list since norma changed
+          setArticleList([]);
+          setLastFetchedNorma('');
+        }
+      }
+      return;
+    }
 
     setFormData(prev => ({
       ...prev,
@@ -287,6 +324,22 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
               required
             >
               <option value="">Seleziona Atto...</option>
+
+              {/* Custom Aliases */}
+              {sortedAliases.length > 0 && (
+                <optgroup label="📌 Alias Personalizzati" className="font-bold text-indigo-500 bg-white dark:bg-slate-900">
+                  {sortedAliases.map(alias => (
+                    <option
+                      value={`__ALIAS__:${alias.id}`}
+                      key={`alias-${alias.id}`}
+                      className="text-indigo-600 dark:text-indigo-400 font-medium"
+                    >
+                      {alias.trigger} → {alias.expandTo}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
               {Object.entries(groupedOptions).map(([group, options]) => (
                 <optgroup label={group} key={group} className="font-bold text-slate-400 bg-white dark:bg-slate-900">
                   {options.map(opt => (

@@ -17,6 +17,7 @@ class Norma:
     tipo_atto: str
     data: str = None
     numero_atto: str = None
+    tipo_atto_reale: str = None  # Real act type when tipo_atto is an alias (e.g., "codice civile" -> "regio decreto")
     _url: str = None
     _tree: any = field(default=None, repr=False)
 
@@ -25,10 +26,10 @@ class Norma:
         if not self.tipo_atto or not isinstance(self.tipo_atto, str):
             raise ValueError("tipo_atto must be a non-empty string")
 
-        # Validazione data (formato YYYY-MM-DD se presente)
+        # Validazione data (formato YYYY-MM-DD o solo YYYY se presente)
         if self.data:
-            if not re.match(r'^\d{4}-\d{2}-\d{2}$', self.data):
-                raise ValueError(f"Invalid date format: {self.data} (expected YYYY-MM-DD)")
+            if not re.match(r'^\d{4}(-\d{2}-\d{2})?$', self.data):
+                raise ValueError(f"Invalid date format: {self.data} (expected YYYY-MM-DD or YYYY)")
 
         log.debug("Initializing Norma", tipo_atto=self.tipo_atto, data=self.data, numero_atto=self.numero_atto)
         self.tipo_atto_str = normalize_act_type(self.tipo_atto, search=True)
@@ -65,12 +66,16 @@ class Norma:
         return " ".join(parts)
 
     def to_dict(self):
-        return {
+        result = {
             'tipo_atto': self.tipo_atto_str,
             'data': self.data,
             'numero_atto': self.numero_atto,
             'url': self.url,
         }
+        # Include tipo_atto_reale only when it's an alias (e.g., "codice civile" -> "regio decreto")
+        if self.tipo_atto_reale:
+            result['tipo_atto_reale'] = self.tipo_atto_reale
+        return result
 
 @dataclass(eq=False)
 class NormaVisitata:

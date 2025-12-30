@@ -31,6 +31,7 @@ from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
 from visualex_api.tools.cache_warmup import warmup_cache_background
 from visualex_api.tools.cache_manager import get_cache_manager
+from visualex_api.tools.map import extract_codice_details
 import os
 from visualex_api.tools.exceptions import ExtractionError
 # Configure logging
@@ -291,37 +292,50 @@ class NormaController:
             ValidationError: If the request data is invalid
         """
         logger.info("Creating NormaVisitata from data", extra={"data": data})
-        
+
         # Validate required fields
         if 'act_type' not in data:
             raise ValidationError("Missing required field: act_type")
         if 'article' not in data:
             raise ValidationError("Missing required field: article")
-        
+
         allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
-        
+        act_number = data.get('act_number')
+        norma_date = data.get('date')
+
+        # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
+        codice_details = extract_codice_details(act_type) if act_type else None
+        tipo_atto_reale = None
+        if codice_details and not norma_date and not act_number:
+            logger.debug("Extracted codice details from URN map", extra={"codice_details": codice_details})
+            norma_date = codice_details['data']
+            act_number = codice_details['numero_atto']
+            tipo_atto_reale = codice_details['tipo_atto_reale']
+            # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
+
         # Process and complete date if needed
         if act_type in allowed_types:
             logger.debug("Act type is allowed", extra={"act_type": act_type})
             data_completa = await complete_date_or_parse_async(
-                date=data.get('date'),
+                date=norma_date,
                 act_type=act_type,
-                act_number=data.get('act_number')
+                act_number=act_number
             )
             logger.debug("Completed date parsed", extra={"data_completa": data_completa})
             data_completa_estesa = format_date_to_extended(data_completa)
             logger.debug("Extended date formatted", extra={"data_completa_estesa": data_completa_estesa})
         else:
             logger.debug("Act type is not in allowed types", extra={"act_type": act_type})
-            data_completa_estesa = data.get('date')
+            data_completa_estesa = norma_date
             logger.debug("Using provided date", extra={"data_completa_estesa": data_completa_estesa})
 
         # Create Norma instance
         norma = Norma(
             tipo_atto=act_type,
             data=data_completa_estesa if data_completa_estesa else None,
-            numero_atto=data.get('act_number')
+            numero_atto=act_number,
+            tipo_atto_reale=tipo_atto_reale
         )
         logger.debug("Norma instance created", extra={"norma": norma.to_dict()})
 

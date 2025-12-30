@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, AliasType, Environment, EnvironmentCategory } from '../types';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -70,6 +70,7 @@ interface AppState {
     annotations: Annotation[];
     highlights: Highlight[];
     quickNorms: QuickNorm[];
+    customAliases: CustomAlias[];
     environments: Environment[];
 
     // Data Loading State (for API sync)
@@ -81,6 +82,7 @@ interface AppState {
     sidebarVisible: boolean;
     commandPaletteOpen: boolean;
     quickNormsManagerOpen: boolean;
+    aliasManagerOpen: boolean;
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
@@ -102,6 +104,8 @@ interface AppState {
     closeCommandPalette: () => void;
     openQuickNormsManager: () => void;
     closeQuickNormsManager: () => void;
+    openAliasManager: () => void;
+    closeAliasManager: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
     bringSearchPanelToFront: () => void;  // Bring search panel to front
@@ -167,9 +171,23 @@ interface AppState {
     removeQuickNorm: (id: string) => void;
     removeQuickNormByParams: (searchParams: SearchParams) => void;
     updateQuickNormLabel: (id: string, label: string) => void;
-    useQuickNorm: (id: string) => QuickNorm | undefined;
+    selectQuickNorm: (id: string) => QuickNorm | undefined;
     getQuickNormsSorted: () => QuickNorm[];
     isQuickNorm: (searchParams: SearchParams) => boolean;
+
+    // CustomAlias Actions
+    addCustomAlias: (alias: Omit<CustomAlias, 'id' | 'createdAt' | 'usageCount'>) => boolean;
+    updateCustomAlias: (id: string, updates: Partial<Omit<CustomAlias, 'id' | 'createdAt'>>) => void;
+    removeCustomAlias: (id: string) => void;
+    trackAliasUsage: (id: string) => void;
+    resolveAlias: (input: string) => {
+        found: boolean;
+        alias?: CustomAlias;
+        resolvedActType?: string;
+        resolvedParams?: Partial<SearchParams>;
+    };
+    isAliasTriggerTaken: (trigger: string, excludeId?: string) => boolean;
+    getCustomAliasesSorted: () => CustomAlias[];
 
     // Environment Actions
     createEnvironment: (name: string, options?: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => string;
@@ -209,6 +227,7 @@ const appStore = createStore<AppState>()(
             annotations: [],
             highlights: [],
             quickNorms: [],
+            customAliases: [],
             environments: [],
 
             // Data Loading State
@@ -223,6 +242,7 @@ const appStore = createStore<AppState>()(
             sidebarVisible: true,
             commandPaletteOpen: false,
             quickNormsManagerOpen: false,
+            aliasManagerOpen: false,
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
@@ -330,6 +350,14 @@ const appStore = createStore<AppState>()(
 
             closeQuickNormsManager: () => set((state) => {
                 state.quickNormsManagerOpen = false;
+            }),
+
+            openAliasManager: () => set((state) => {
+                state.aliasManagerOpen = true;
+            }),
+
+            closeAliasManager: () => set((state) => {
+                state.aliasManagerOpen = false;
             }),
 
             toggleSearchPanel: () => set((state) => {
@@ -1180,7 +1208,7 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
-            useQuickNorm: (id) => {
+            selectQuickNorm: (id) => {
                 const state = get();
                 const qn = state.quickNorms.find(q => q.id === id);
                 if (qn) {
@@ -1221,6 +1249,118 @@ const appStore = createStore<AppState>()(
                 );
             },
 
+            // CustomAlias Actions
+            addCustomAlias: (aliasData) => {
+                const state = get();
+                const triggerLower = aliasData.trigger.toLowerCase().trim();
+
+                // Validate trigger: min 2 chars, alphanumeric + dash/underscore
+                if (triggerLower.length < 2 || !/^[a-zA-Z0-9\-_.]+$/.test(triggerLower)) {
+                    return false;
+                }
+
+                // Check for duplicates
+                const exists = state.customAliases.some(
+                    a => a.trigger.toLowerCase() === triggerLower
+                );
+
+                if (exists) {
+                    return false;
+                }
+
+                set((draft) => {
+                    draft.customAliases.push({
+                        ...aliasData,
+                        id: uuidv4(),
+                        trigger: triggerLower,
+                        createdAt: new Date().toISOString(),
+                        usageCount: 0,
+                    });
+                });
+                return true;
+            },
+
+            updateCustomAlias: (id, updates) => set((state) => {
+                const alias = state.customAliases.find(a => a.id === id);
+                if (alias) {
+                    if (updates.trigger) {
+                        updates.trigger = updates.trigger.toLowerCase().trim();
+                    }
+                    Object.assign(alias, updates);
+                }
+            }),
+
+            removeCustomAlias: (id) => set((state) => {
+                state.customAliases = state.customAliases.filter(a => a.id !== id);
+            }),
+
+            trackAliasUsage: (id) => set((state) => {
+                const alias = state.customAliases.find(a => a.id === id);
+                if (alias) {
+                    alias.usageCount += 1;
+                    alias.lastUsedAt = new Date().toISOString();
+                }
+            }),
+
+            resolveAlias: (input) => {
+                const state = get();
+                const inputLower = input.toLowerCase().trim();
+
+                // Find matching user alias
+                const userAlias = state.customAliases.find(
+                    a => a.trigger.toLowerCase() === inputLower
+                );
+
+                if (userAlias) {
+                    if (userAlias.type === 'shortcut') {
+                        return {
+                            found: true,
+                            alias: userAlias,
+                            resolvedActType: userAlias.expandTo,
+                        };
+                    } else {
+                        // Reference type - return full search params
+                        return {
+                            found: true,
+                            alias: userAlias,
+                            resolvedActType: userAlias.searchParams?.act_type || userAlias.expandTo,
+                            resolvedParams: userAlias.searchParams ? {
+                                act_type: userAlias.searchParams.act_type,
+                                act_number: userAlias.searchParams.act_number || '',
+                                date: userAlias.searchParams.date || '',
+                                article: userAlias.searchParams.article || '1',
+                            } : undefined,
+                        };
+                    }
+                }
+
+                return { found: false };
+            },
+
+            isAliasTriggerTaken: (trigger, excludeId) => {
+                const state = get();
+                const triggerLower = trigger.toLowerCase().trim();
+                return state.customAliases.some(
+                    a => a.trigger.toLowerCase() === triggerLower && a.id !== excludeId
+                );
+            },
+
+            getCustomAliasesSorted: () => {
+                const state = get();
+                return [...state.customAliases].sort((a, b) => {
+                    // Sort by type first (shortcuts before references)
+                    if (a.type !== b.type) {
+                        return a.type === 'shortcut' ? -1 : 1;
+                    }
+                    // Then by usage count (descending)
+                    if (b.usageCount !== a.usageCount) {
+                        return b.usageCount - a.usageCount;
+                    }
+                    // Then alphabetically by trigger
+                    return a.trigger.localeCompare(b.trigger);
+                });
+            },
+
             // Environment Actions
             createEnvironment: (name, options = {}) => {
                 const envId = uuidv4();
@@ -1236,6 +1376,7 @@ const appStore = createStore<AppState>()(
                         // If fromCurrent, snapshot current state
                         dossiers: options.fromCurrent ? JSON.parse(JSON.stringify(state.dossiers)) : [],
                         quickNorms: options.fromCurrent ? JSON.parse(JSON.stringify(state.quickNorms)) : [],
+                        customAliases: options.fromCurrent ? JSON.parse(JSON.stringify(state.customAliases)) : [],
                         annotations: options.fromCurrent ? JSON.parse(JSON.stringify(state.annotations)) : [],
                         highlights: options.fromCurrent ? JSON.parse(JSON.stringify(state.highlights)) : [],
                         tags: [],
@@ -1290,6 +1431,12 @@ const appStore = createStore<AppState>()(
                     usageCount: 0,
                     lastUsedAt: undefined
                 }));
+                const clonedCustomAliases = JSON.parse(JSON.stringify(env.customAliases || [])).map((a: CustomAlias) => ({
+                    ...a,
+                    id: uuidv4(),
+                    usageCount: 0,
+                    lastUsedAt: undefined
+                }));
                 const clonedAnnotations = JSON.parse(JSON.stringify(env.annotations)).map((a: Annotation) => ({
                     ...a,
                     id: uuidv4()
@@ -1302,12 +1449,14 @@ const appStore = createStore<AppState>()(
                 if (mode === 'replace') {
                     state.dossiers = clonedDossiers;
                     state.quickNorms = clonedQuickNorms;
+                    state.customAliases = clonedCustomAliases;
                     state.annotations = clonedAnnotations;
                     state.highlights = clonedHighlights;
                 } else {
-                    // Merge mode: add new items, skip duplicates by title/label
+                    // Merge mode: add new items, skip duplicates by title/label/trigger
                     const existingDossierTitles = new Set(state.dossiers.map(d => d.title.toLowerCase()));
                     const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
+                    const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
 
                     clonedDossiers.forEach((d: Dossier) => {
                         if (!existingDossierTitles.has(d.title.toLowerCase())) {
@@ -1318,6 +1467,12 @@ const appStore = createStore<AppState>()(
                     clonedQuickNorms.forEach((q: QuickNorm) => {
                         if (!existingQuickNormLabels.has(q.label.toLowerCase())) {
                             state.quickNorms.push(q);
+                        }
+                    });
+
+                    clonedCustomAliases.forEach((a: CustomAlias) => {
+                        if (!existingAliasTriggers.has(a.trigger.toLowerCase())) {
+                            state.customAliases.push(a);
                         }
                     });
 
@@ -1332,6 +1487,7 @@ const appStore = createStore<AppState>()(
                 if (env) {
                     env.dossiers = JSON.parse(JSON.stringify(state.dossiers));
                     env.quickNorms = JSON.parse(JSON.stringify(state.quickNorms));
+                    env.customAliases = JSON.parse(JSON.stringify(state.customAliases));
                     env.annotations = JSON.parse(JSON.stringify(state.annotations));
                     env.highlights = JSON.parse(JSON.stringify(state.highlights));
                     env.updatedAt = new Date().toISOString();
@@ -1346,6 +1502,7 @@ const appStore = createStore<AppState>()(
                     createdAt: new Date().toISOString(),
                     dossiers: JSON.parse(JSON.stringify(state.dossiers)),
                     quickNorms: JSON.parse(JSON.stringify(state.quickNorms)),
+                    customAliases: JSON.parse(JSON.stringify(state.customAliases)),
                     annotations: JSON.parse(JSON.stringify(state.annotations)),
                     highlights: JSON.parse(JSON.stringify(state.highlights)),
                     tags: [],
@@ -1361,6 +1518,7 @@ const appStore = createStore<AppState>()(
                 searchPanelState: state.searchPanelState,
                 workspaceTabs: state.workspaceTabs,
                 highestZIndex: state.highestZIndex,
+                customAliases: state.customAliases,
                 // Note: We intentionally exclude bookmarks, dossiers, annotations, highlights,
                 // quickNorms, environments - these are synced from the server
             }),

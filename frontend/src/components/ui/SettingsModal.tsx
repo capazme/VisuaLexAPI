@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Monitor, Moon, Sun, Eye, HelpCircle, Shield, Info, GitBranch, GitCommit } from 'lucide-react';
+import { X, Monitor, Moon, Sun, Eye, HelpCircle, Shield, Info, GitBranch, GitCommit, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -37,7 +37,7 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalProps) {
     const navigate = useNavigate();
     const { isAdmin } = useAuth();
-    const { settings, updateSettings } = useAppStore();
+    const { settings, updateSettings, openAliasManager, customAliases } = useAppStore();
     const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
     const [versionLoading, setVersionLoading] = useState(false);
     const [versionError, setVersionError] = useState(false);
@@ -184,6 +184,21 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Custom Aliases */}
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">Alias Personalizzati</label>
+                        <button
+                            onClick={() => {
+                                onClose();
+                                setTimeout(() => openAliasManager(), 200);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors text-sm font-medium"
+                        >
+                            <Tag size={16} />
+                            Gestisci Alias ({customAliases.length})
+                        </button>
                     </div>
 
                     {/* Restart Tour */}

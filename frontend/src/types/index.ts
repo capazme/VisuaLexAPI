@@ -2,6 +2,7 @@ export interface Norma {
     tipo_atto: string;
     data: string;
     numero_atto?: string;
+    tipo_atto_reale?: string;  // Real act type when tipo_atto is an alias (e.g., "codice civile" -> "regio decreto")
     urn?: string;
 }
 
@@ -11,6 +12,7 @@ export interface NormaVisitata {
     tipo_atto: string;
     data: string;
     numero_atto?: string;
+    tipo_atto_reale?: string;  // Real act type when tipo_atto is an alias
     url?: string; // Internal URL used by backend
 
     // Properties from NormaVisitata
@@ -222,6 +224,26 @@ export interface QuickNorm {
     lastUsedAt?: string;
 }
 
+// CustomAlias - User-defined shortcuts and references
+export type AliasType = 'shortcut' | 'reference';
+
+export interface CustomAlias {
+    id: string;
+    trigger: string;           // "cc", "gdpr", "mia-norma" (lowercase, alphanumeric)
+    type: AliasType;
+    expandTo: string;          // For shortcuts: act_type to expand to. For references: display name
+    searchParams?: {           // Only for 'reference' type
+        act_type: string;
+        act_number?: string;
+        date?: string;
+        article?: string;      // Default article to load
+    };
+    description?: string;      // Optional user note
+    createdAt: string;
+    usageCount: number;
+    lastUsedAt?: string;
+}
+
 // Environment - Bundled configuration for sharing
 export type EnvironmentCategory = 'compliance' | 'civil' | 'penal' | 'administrative' | 'eu' | 'other';
 
@@ -237,6 +259,7 @@ export interface Environment {
     // Content (snapshots)
     dossiers: Dossier[];
     quickNorms: QuickNorm[];
+    customAliases: CustomAlias[];
     annotations: Annotation[];
     highlights: Highlight[];
 
@@ -264,6 +287,7 @@ export type ReportStatus = 'pending' | 'reviewed' | 'dismissed';
 export interface SharedEnvironmentContent {
     dossiers: Dossier[];
     quickNorms: QuickNorm[];
+    customAliases: CustomAlias[];
     annotations: Annotation[];
     highlights: Highlight[];
 }

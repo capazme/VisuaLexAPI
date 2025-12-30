@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { formatDateItalianLong } from '../../../utils/dateUtils';
+import { formatDateItalianLong, abbreviateActType } from '../../../utils/dateUtils';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
 import { AnnexSuggestion } from './AnnexSuggestion';
@@ -195,7 +195,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight">
-                {norma.tipo_atto} {norma.numero_atto}
+                {norma.tipo_atto}
+                {/* Show number only if NOT an alias */}
+                {!norma.tipo_atto_reale && norma.numero_atto && ` ${norma.numero_atto}`}
               </h3>
               {isNew && (
                 <span className="flex-shrink-0 px-2 py-0.5 text-[10px] font-bold uppercase bg-primary-600 text-white rounded-full shadow-sm">
@@ -204,7 +206,16 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
-              {norma.data ? `Data: ${formatDateItalianLong(norma.data)}` : 'Estremi non disponibili'}
+              {norma.tipo_atto_reale ? (
+                // For aliases: show real type + date + number
+                <>
+                  {abbreviateActType(norma.tipo_atto_reale)}
+                  {norma.data && ` ${formatDateItalianLong(norma.data)}`}
+                  {norma.numero_atto && `, n. ${norma.numero_atto}`}
+                </>
+              ) : (
+                norma.data ? `Data: ${formatDateItalianLong(norma.data)}` : 'Estremi non disponibili'
+              )}
             </p>
             <span className="inline-block text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
               {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'} caricati
@@ -266,7 +277,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
           <div>
             <div className="flex items-center gap-3">
               <h3 className="font-bold text-slate-900 dark:text-white text-xl leading-tight">
-                {norma.tipo_atto} {norma.numero_atto}
+                {norma.tipo_atto}
+                {/* Show number only if NOT an alias */}
+                {!norma.tipo_atto_reale && norma.numero_atto && ` ${norma.numero_atto}`}
               </h3>
               {isNew && (
                 <span className="px-2 py-0.5 text-[10px] font-bold uppercase bg-primary-600 text-white rounded-full shadow-sm tracking-wider">
@@ -276,7 +289,16 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
             </div>
             <div className="flex items-center gap-3 mt-1.5">
               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                {norma.data ? `Edizione del ${formatDateItalianLong(norma.data)}` : 'Data non disponibile'}
+                {norma.tipo_atto_reale ? (
+                  // For aliases: show real type abbreviation + date + number
+                  <>
+                    {abbreviateActType(norma.tipo_atto_reale)}
+                    {norma.data && ` ${formatDateItalianLong(norma.data)}`}
+                    {norma.numero_atto && `, n. ${norma.numero_atto}`}
+                  </>
+                ) : (
+                  norma.data ? `Edizione del ${formatDateItalianLong(norma.data)}` : 'Data non disponibile'
+                )}
               </p>
               <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
               <span className="text-xs bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">

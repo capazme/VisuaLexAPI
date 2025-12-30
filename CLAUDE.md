@@ -28,9 +28,10 @@ Controller-service architecture for legal data retrieval:
   - `norma.py`: Core data models (`Norma`, `NormaVisitata`)
   - `urngenerator.py`: URN generation for legal documents
   - `treextractor.py`: Article tree structures
-  - `text_op.py`: Text parsing and normalization
-  - `config.py`: Rate limiting, cache size
+  - `text_op.py`: Text parsing, normalization, and date handling
+  - `config.py`: Rate limiting, cache size, Playwright browser pool
   - `map.py`: Act type mappings
+  - `browser_manager.py`: Playwright browser pool management (`PlaywrightManager`)
 
 ### Node.js Backend (`/backend`)
 
@@ -145,6 +146,51 @@ All endpoints are POST unless specified, accepting JSON bodies.
 
 Both classes have `to_dict()` and `from_dict()` methods for JSON serialization.
 
+## Date Handling System
+
+The project uses a dual-approach system for date handling, optimizing between speed and accuracy:
+
+### Backend Date System (`visualex_api/tools/text_op.py`)
+
+**Sync approach (for URN generation):**
+- `complete_date_or_parse(date_str)`: Fast, synchronous function for URN generation
+  - If date is year-only (e.g., "1990"), returns "1990-01-01" for URN
+  - If date is partial (e.g., "1990-08"), queries cache first, falls back to year-only
+  - Used in `urngenerator.py` to avoid blocking on date lookup
+
+**Async approach (for accurate dates):**
+- `complete_date_or_parse_async(date_str)`: Fetches real dates from Normattiva via Playwright
+  - Uses Playwright browser to navigate Normattiva and extract actual publication date
+  - Implements manual caching in `_date_cache` dict to avoid repeated requests
+  - Returns accurate date in YYYY-MM-DD format
+  - Used in endpoints that need precise dates (version comparison, metadata display)
+
+**Low-level function:**
+- `complete_date()`: Direct Playwright-based date completion (used by async wrapper)
+
+### Frontend Date System (`frontend/src/utils/dateUtils.ts`)
+
+- `parseItalianDate(dateStr)`: Parses date strings while preserving original year (no conversion to YYYY-01-01)
+  - Returns Date object with original precision maintained
+  - Critical for avoiding artificial date standardization
+
+- `formatDateItalianLong(date)`: Formats dates to Italian extended format
+  - Example output: "7 agosto 1990" for 1990-08-07
+  - Used in: `NormaCard`, `NormaBlockComponent`, `NormeNavigator`
+  - Respects actual dates from backend (doesn't show synthetic YYYY-01-01)
+
+### When to Use Which Approach
+
+| Use Case | Backend Function | Frontend Function |
+|----------|------------------|-------------------|
+| URN Generation | `complete_date_or_parse()` | N/A |
+| Display in UI | N/A | `formatDateItalianLong()` |
+| Article Metadata | `complete_date_or_parse_async()` | `formatDateItalianLong()` |
+| Version Comparison | `complete_date_or_parse_async()` | `formatDateItalianLong()` |
+| Internal Parsing | `complete_date_or_parse()` | `parseItalianDate()` |
+
+**Key Principle**: Never force year-only dates to "YYYY-01-01" in UI display. The frontend respects backend precision.
+
 ## Scraping Architecture
 
 The application uses async web scraping with intelligent source routing:
@@ -157,6 +203,8 @@ The application uses async web scraping with intelligent source routing:
 2. **Parallel Fetching**: `asyncio.gather()` fetches multiple articles concurrently
 
 3. **Streaming**: `/stream_article_text` uses Quart's `Response` generator for real-time results
+
+4. **Browser Management**: Playwright browser pool via `PlaywrightManager` singleton for efficient resource usage
 
 ## Frontend State Management
 
@@ -207,7 +255,14 @@ Always check for existing utilities before implementing:
 - **URN generation**: Use `urngenerator.py` functions
 - **Text parsing**: Use `text_op.py` for normalization and parsing
 - **Tree extraction**: Use `treextractor.py` for article structures
-- **Date handling**: Use `complete_date_or_parse()` and `format_date_to_extended()`
+- **Date handling** (backend): Use `text_op.py` date functions:
+  - `complete_date_or_parse(date_str)`: Sync version for URN generation (year-only dates become YYYY-01-01)
+  - `complete_date_or_parse_async(date_str)`: Async version using Playwright to fetch real dates from Normattiva
+  - `complete_date()`: Low-level async Playwright-based date completion
+  - Manual cache in `_date_cache` dict for repeated requests
+- **Date handling** (frontend): Use `src/utils/dateUtils.ts`:
+  - `parseItalianDate(dateStr)`: Parses dates keeping year as-is (no conversion to YYYY-01-01)
+  - `formatDateItalianLong(date)`: Formats to Italian extended format (e.g., "7 agosto 1990")
 
 ### Rate Limiting
 
@@ -224,8 +279,10 @@ Web scrapers depend on HTML structure of external sites (Normattiva, EUR-Lex, Br
 
 - All scraper methods are async (`async def get_document()`, `async def get_info()`)
 - Use `asyncio.gather()` for parallel operations
-- Use `asyncio.to_thread()` for blocking operations (file I/O, Playwright)
+- Use `asyncio.to_thread()` for blocking operations (file I/O, Playwright browser calls)
 - Quart routes are async by default
+- **Browser management**: Use `PlaywrightManager` singleton from `browser_manager.py` for browser pooling and resource efficiency
+- Date completion is async via Playwright: `complete_date_or_parse_async()` fetches real dates from Normattiva asynchronously
 
 ### Frontend-Backend Communication
 
@@ -256,6 +313,26 @@ Web scrapers depend on HTML structure of external sites (Normattiva, EUR-Lex, Br
 3. Access global state with `useAppStore()` hook
 4. Use Tailwind CSS for styling (configured with v4)
 5. Export as default for lazy loading if needed
+
+### Backend: Browser Operations (Playwright)
+
+All browser automation is now async via Playwright. The `PlaywrightManager` singleton handles pooling:
+
+1. **For PDF extraction**: `pdfextractor.py` uses `PlaywrightManager` to pool browser instances
+2. **For date completion**: `text_op.py` functions `complete_date()` and `complete_date_or_parse_async()` use Playwright
+3. **Usage pattern**:
+   ```python
+   from visualex_api.tools.browser_manager import PlaywrightManager
+
+   manager = PlaywrightManager()
+   browser = await manager.get_browser()
+   page = await browser.new_page()
+   # ... do work
+   await page.close()
+   ```
+4. **Important**: All Playwright calls are async. Use `asyncio.to_thread()` only if wrapping synchronous code
+5. **Installation**: Run `playwright install chromium` before first use
+6. **Resource cleanup**: `PlaywrightManager` handles browser lifecycle - no manual cleanup needed for `get_browser()`
 
 ## Debugging
 
@@ -320,12 +397,15 @@ This project is optimized for multi-agent collaboration. Use specialized agents 
 - Main controller: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/app.py`
 - Scrapers: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/services/*_scraper.py`
 - Models: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/norma.py`
+- Text/Date utilities: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/text_op.py`
+- Browser management: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/browser_manager.py`
 - Config: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/config.py`
 
 **Frontend Work:**
 - App entry: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/App.tsx`
 - Store: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/store/useAppStore.ts`
 - Types: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/types/index.ts`
+- Date utilities: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/utils/dateUtils.ts`
 - Components: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/`
 
 **Backend Work:**
@@ -377,6 +457,25 @@ This project is optimized for multi-agent collaboration. Use specialized agents 
 4. Use validator to test end-to-end
 ```
 
+#### 6. Fix Date Display Issues
+
+```
+Backend:
+1. For URN generation: Use sync complete_date_or_parse() in urngenerator.py
+2. For metadata endpoints: Use async complete_date_or_parse_async() to get accurate dates
+3. Always return actual dates in JSON response (not synthetic YYYY-01-01)
+
+Frontend:
+1. Replace date.toLocaleDateString() with formatDateItalianLong()
+2. Verify parseItalianDate() is used for date input parsing
+3. Test with year-only entries to ensure they display correctly (not forced to MM-01)
+4. Use ux-reviewer with browser testing to validate date display
+
+Pattern:
+- Backend: Sync (fast) for URNs, Async (accurate) for display
+- Frontend: Always use formatDateItalianLong() for display, parseItalianDate() for input
+```
+
 ### Browser Testing (Frontend)
 
 When working on frontend, agents can use Chrome DevTools MCP for visual verification:
@@ -399,6 +498,13 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 - Use `asyncio.gather()` for parallel fetching
 - Use `asyncio.to_thread()` for blocking I/O (Playwright, file ops)
 - Quart routes are async by default
+- Playwright operations are async via `PlaywrightManager` singleton
+
+**Date Handling (Python/Frontend):**
+- Backend URN generation: Use sync `complete_date_or_parse()` (fast, year-only dates → YYYY-01-01)
+- Backend metadata/comparison: Use async `complete_date_or_parse_async()` (slow, accurate dates via Playwright)
+- Frontend display: Always use `formatDateItalianLong()` to show Italian dates (respects backend precision)
+- Never display synthetic YYYY-01-01 dates in UI (use actual dates from backend)
 
 **State Management (Frontend):**
 - Zustand store in `useAppStore.ts` with Immer
@@ -412,8 +518,10 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 
 **Code Reuse:**
 - URN generation: Use `urngenerator.py` functions
-- Text parsing: Use `text_op.py` utilities
+- Text parsing: Use `text_op.py` utilities (includes date functions)
 - Tree extraction: Use `treextractor.py`
+- Date utilities: Use `text_op.py` backend or `dateUtils.ts` frontend
+- Browser operations: Use `PlaywrightManager` singleton
 - Never duplicate these utilities
 
 ### Critical Files - DO NOT BREAK
@@ -421,12 +529,15 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 **Python:**
 - `visualex_api/app.py` - Main controller
 - `visualex_api/tools/norma.py` - Core data models
+- `visualex_api/tools/text_op.py` - Text parsing AND date handling (critical for both URN and date completion)
+- `visualex_api/tools/browser_manager.py` - Playwright browser pooling singleton
 - `visualex_api/services/*_scraper.py` - Fragile HTML parsers
 
 **Frontend:**
 - `frontend/src/store/useAppStore.ts` - Global state
 - `frontend/src/types/index.ts` - Type definitions
 - `frontend/src/services/api.ts` - API client
+- `frontend/src/utils/dateUtils.ts` - Date parsing and formatting (used in NormaCard, NormaBlockComponent, NormeNavigator)
 
 **Backend:**
 - `backend/prisma/schema.prisma` - Database schema
@@ -466,9 +577,36 @@ npm run prisma:studio  # Prisma database GUI
 1. **Scraper Fragility**: All scrapers depend on external HTML structure (Normattiva, EUR-Lex, Brocardi). HTML changes break parsers.
 2. **Async Context**: Python API is fully async - never use blocking operations without `asyncio.to_thread()`
 3. **Rate Limiting**: Configured in `config.py` - 1000 requests per 10 minutes per IP
-4. **Playwright**: PDF extraction requires `playwright install chromium`
-5. **CORS**: Frontend dev server proxies to Python API - check `vite.config.ts`
-6. **Annex Handling**: Codici have default annex in URN - see `create_norma_visitata_from_data()`
+4. **Playwright**: Required for PDF extraction and date completion. Install with `playwright install chromium`. Uses `PlaywrightManager` singleton for pooling.
+5. **Date Handling**: Two complementary approaches:
+   - Sync `complete_date_or_parse()` for URN generation (fast, approximate: year-only dates become YYYY-01-01)
+   - Async `complete_date_or_parse_async()` for actual date resolution via Playwright (slower, accurate)
+   - Frontend uses `formatDateItalianLong()` for display (e.g., "7 agosto 1990"), respecting actual dates
+6. **CORS**: Frontend dev server proxies to Python API - check `vite.config.ts`
+7. **Annex Handling**: Codici have default annex in URN - see `create_norma_visitata_from_data()`
+8. **Selenium Removed**: All browser automation now uses Playwright. `WebDriverManager` is deprecated alias of `PlaywrightManager`.
+
+### Date System Troubleshooting
+
+**Problem**: Dates showing as "YYYY-01-01" in UI (synthetic dates)
+- **Cause**: `parseItalianDate()` or `formatDateItalianLong()` not used in component
+- **Fix**: Use `formatDateItalianLong()` instead of `date.toLocaleDateString()`
+- **Example**: `formatDateItalianLong(new Date(normVisitata.data_versione))` returns "7 agosto 1990"
+
+**Problem**: Date completion is slow in backend
+- **Cause**: Using `complete_date_or_parse_async()` for high-volume requests (launches Playwright for each)
+- **Fix**: Use cache-aware approach or batch requests. Check `_date_cache` implementation in `text_op.py`
+- **For URN generation**: Use sync `complete_date_or_parse()` instead (never launches Playwright)
+
+**Problem**: Playwright browser timeout during date completion
+- **Cause**: Normattiva.it site slow or unresponsive, or `PlaywrightManager` browser exhausted
+- **Fix**: Increase timeout in `complete_date()`, check Playwright browser pool size in `browser_manager.py`
+- **Fallback**: `complete_date_or_parse_async()` catches timeouts and returns cached/synthetic date
+
+**Problem**: Year-only dates not rendering in display
+- **Cause**: `parseItalianDate()` returning Date object with month/day as 01
+- **Fix**: This is expected behavior. Frontend should NOT try to "normalize" to full dates - show "1990" for year-only entries
+- **Principle**: Backend `complete_date_or_parse()` returns synthetic YYYY-01-01 for URNs only. Display layer uses actual dates from metadata.
 
 ### Skills to Use
 

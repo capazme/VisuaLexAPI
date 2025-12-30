@@ -1,7 +1,10 @@
 /**
  * Parser per citazioni normative non strutturate.
  * Converte input come "art 3 dlgs 233/1990" in SearchParams strutturati.
+ * Supporta alias personalizzati utente (es. "gdpr" → Regolamento UE 679/2016).
  */
+
+import type { CustomAlias } from '../types';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -9,6 +12,8 @@ export interface ParsedCitation {
   date?: string;
   article?: string;
   confidence: number; // 0-1 quanto siamo sicuri del parsing
+  fromAlias?: boolean; // true se risolto da alias utente
+  aliasId?: string; // ID dell'alias usato
 }
 
 // Tipi di atto che richiedono numero e data
@@ -207,11 +212,46 @@ function normalizeInput(input: string): string {
 }
 
 /**
- * Estrae il tipo di atto dall'input
+ * Risultato estrazione tipo atto (può includere info da alias)
  */
-function extractActType(normalized: string): { actType: string | undefined; remaining: string } {
+interface ActTypeExtraction {
+  actType: string | undefined;
+  actNumber?: string;
+  date?: string;
+  remaining: string;
+  fromAlias?: boolean;
+  aliasId?: string;
+}
+
+/**
+ * Estrae il tipo di atto dall'input, controllando prima gli alias utente
+ */
+function extractActType(normalized: string, customAliases: CustomAlias[] = []): ActTypeExtraction {
+  // Prima controlla gli alias utente (hanno priorità)
+  // Ordina per lunghezza trigger decrescente per match più specifico
+  const sortedAliases = [...customAliases].sort((a, b) => b.trigger.length - a.trigger.length);
+
+  for (const alias of sortedAliases) {
+    const triggerLower = alias.trigger.toLowerCase();
+    const regex = new RegExp(`\\b${triggerLower.replace(/\./g, '\\.?')}\\b`, 'i');
+
+    if (regex.test(normalized) && alias.searchParams) {
+      const remaining = normalized.replace(regex, ' ').replace(/\s+/g, ' ').trim();
+
+      // Reference alias: espande a act_type + numero + data
+      return {
+        actType: alias.searchParams.act_type,
+        actNumber: alias.searchParams.act_number,
+        date: alias.searchParams.date,
+        remaining,
+        fromAlias: true,
+        aliasId: alias.id
+      };
+    }
+  }
+
+  // Poi controlla le abbreviazioni di sistema
   for (const abbr of SORTED_ABBREVIATIONS) {
-    // Cerca l'abbreviazione come parola intera
     const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.?')}\\b`, 'i');
     if (regex.test(normalized)) {
       const actType = ABBREVIATION_MAP[abbr];
@@ -219,6 +259,7 @@ function extractActType(normalized: string): { actType: string | undefined; rema
       return { actType, remaining };
     }
   }
+
   return { actType: undefined, remaining: normalized };
 }
 
@@ -317,26 +358,38 @@ function calculateConfidence(parsed: ParsedCitation): number {
 
 /**
  * Parser principale: converte una citazione testuale in dati strutturati
+ * @param input - La stringa da parsare (es. "art 5 gdpr", "art 2043 cc")
+ * @param customAliases - Array opzionale di alias personalizzati utente
  */
-export function parseLegalCitation(input: string): ParsedCitation | null {
+export function parseLegalCitation(input: string, customAliases: CustomAlias[] = []): ParsedCitation | null {
   if (!input || input.trim().length < 2) {
     return null;
   }
 
   const normalized = normalizeInput(input);
 
-  // Step 1: Estrai tipo atto
-  const { actType, remaining: afterActType } = extractActType(normalized);
+  // Step 1: Estrai tipo atto (controlla prima alias utente, poi sistema)
+  const actTypeResult = extractActType(normalized, customAliases);
+  const { actType, remaining: afterActType, fromAlias, aliasId } = actTypeResult;
 
   // Step 2: Estrai articolo
   let { article, remaining: afterArticle } = extractArticle(afterActType);
 
-  // Step 3: Estrai numero e anno
-  const { actNumber, date, remaining: afterNumYear } = extractNumberAndYear(afterArticle);
+  // Step 3: Estrai numero e anno (ma se da alias reference, usa quelli dell'alias)
+  let actNumber = actTypeResult.actNumber;
+  let date = actTypeResult.date;
+
+  // Se non abbiamo numero/data dall'alias, estrai dall'input
+  if (!actNumber && !date) {
+    const numYearResult = extractNumberAndYear(afterArticle);
+    actNumber = numYearResult.actNumber;
+    date = numYearResult.date;
+    afterArticle = numYearResult.remaining;
+  }
 
   // Step 4: Se non abbiamo trovato articolo ma abbiamo tipo atto, cerca articolo standalone
   if (!article && actType) {
-    article = extractStandaloneArticle(afterNumYear, true);
+    article = extractStandaloneArticle(afterArticle, true);
   }
 
   // Se non abbiamo estratto nulla di significativo, ritorna null
@@ -350,6 +403,8 @@ export function parseLegalCitation(input: string): ParsedCitation | null {
     date: date,
     article: article,
     confidence: 0,
+    fromAlias,
+    aliasId,
   };
 
   parsed.confidence = calculateConfidence(parsed);
@@ -396,6 +451,10 @@ export function formatParsedCitation(parsed: ParsedCitation): string {
       'codice di procedura civile': 'C.P.C.',
       'codice di procedura penale': 'C.P.P.',
       'costituzione': 'Cost.',
+      'Regolamento UE': 'Reg. UE',
+      'regolamento ue': 'Reg. UE',
+      'Direttiva UE': 'Dir. UE',
+      'direttiva ue': 'Dir. UE',
     };
     parts.push(shortNames[parsed.act_type] || parsed.act_type);
   }

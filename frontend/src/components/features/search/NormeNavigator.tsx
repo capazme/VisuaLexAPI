@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Compass, Book, ChevronRight, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { Norma, ArticleData } from '../../../types';
-import { formatDateItalianLong } from '../../../utils/dateUtils';
+import { formatDateItalianLong, abbreviateActType } from '../../../utils/dateUtils';
 
 interface NormeNavigatorProps {
   norme: Array<{ norma: Norma; articles: ArticleData[]; versionDate?: string }>;
@@ -70,10 +70,21 @@ export function NormeNavigator({ norme, onNavigateToNorma, className }: NormeNav
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
                           {norma.tipo_atto}
+                          {/* Show number only if NOT an alias */}
+                          {!norma.tipo_atto_reale && norma.numero_atto && ` n. ${norma.numero_atto}`}
                         </h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                          {norma.numero_atto && `n. ${norma.numero_atto}`}
-                          {norma.data && ` • ${formatDateItalianLong(norma.data)}`}
+                          {norma.tipo_atto_reale ? (
+                            // For aliases: show abbreviated real type + date + number
+                            <>
+                              {abbreviateActType(norma.tipo_atto_reale)}
+                              {norma.data && ` ${formatDateItalianLong(norma.data)}`}
+                              {norma.numero_atto && `, n. ${norma.numero_atto}`}
+                            </>
+                          ) : (
+                            // For regular norms: just show date
+                            norma.data ? formatDateItalianLong(norma.data) : 'Data non disponibile'
+                          )}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
                           <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-medium">

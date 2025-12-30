@@ -27,7 +27,7 @@ from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
-from visualex_api.tools.map import NORMATTIVA_URN_CODICI
+from visualex_api.tools.map import NORMATTIVA_URN_CODICI, extract_codice_details
 
 # Configurazione del logging
 logging.basicConfig(
@@ -319,25 +319,38 @@ class NormaController:
         log.info("Creating NormaVisitata from data", data=data)
         allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
+        act_number = data.get('act_number')
+        norma_date = data.get('date')
+
+        # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
+        codice_details = extract_codice_details(act_type) if act_type else None
+        tipo_atto_reale = None
+        if codice_details and not norma_date and not act_number:
+            log.info("Extracted codice details from URN map", codice_details=codice_details)
+            norma_date = codice_details['data']
+            act_number = codice_details['numero_atto']
+            tipo_atto_reale = codice_details['tipo_atto_reale']
+            # Note: we keep act_type as the alias (e.g., "codice civile") for display purposes
+
         if act_type in allowed_types:
             log.info("Act type is allowed", act_type=act_type)
             data_completa = await complete_date_or_parse_async(
-                date=data.get('date'),
+                date=norma_date,
                 act_type=act_type,
-                act_number=data.get('act_number')
+                act_number=act_number
             )
             log.info("Completed date parsed", data_completa=data_completa)
             # Keep YYYY-MM-DD format for Norma validation
             norma_date = data_completa
         else:
             log.info("Act type is not in allowed types", act_type=act_type)
-            norma_date = data.get('date')
             log.info("Using provided date", norma_date=norma_date)
 
         norma = Norma(
             tipo_atto=act_type,
             data=norma_date if norma_date else None,
-            numero_atto=data.get('act_number')
+            numero_atto=act_number,
+            tipo_atto_reale=tipo_atto_reale
         )
         log.info("Norma instance created", norma=norma)
 
