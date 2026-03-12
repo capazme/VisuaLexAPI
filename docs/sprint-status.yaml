@@ -1,0 +1,88 @@
+version: "6.0.0"
+project_name: "Visualex Platform"
+project_level: 3
+current_sprint: 1
+sprint_plan_path: "docs/sprint-plan-visualex-platform-2026-03-12.md"
+
+sprints:
+  - sprint_number: 1
+    goal: "Infrastructure foundation (Redis, rate limiting, circuit breakers) + search intelligence backend (NL parser, aliases, citation linker)"
+    capacity_points: 30
+    committed_points: 29
+    completed_points: 0
+    status: "not_started"
+    stories:
+      - story_id: "STORY-001"
+        title: "Redis cache layer for Python API"
+        points: 5
+        status: "completed"
+      - story_id: "STORY-042"
+        title: "Redis-based rate limiting upgrade"
+        points: 3
+        status: "not_started"
+      - story_id: "STORY-044"
+        title: "Circuit breaker for scrapers"
+        points: 3
+        status: "not_started"
+      - story_id: "STORY-002"
+        title: "Natural language input parser"
+        points: 5
+        status: "not_started"
+      - story_id: "STORY-003"
+        title: "Smart preset alias library"
+        points: 5
+        status: "not_started"
+      - story_id: "STORY-004"
+        title: "Contextual norm linking engine"
+        points: 8
+        status: "not_started"
+
+  - sprint_number: 2
+    goal: "Search & article experience redesign + onboarding flow"
+    capacity_points: 30
+    committed_points: 28
+    status: "not_started"
+
+  - sprint_number: 3
+    goal: "Workspace & reading experience overhaul + knowledge management start"
+    capacity_points: 30
+    committed_points: 29
+    status: "not_started"
+
+  - sprint_number: 4
+    goal: "Knowledge management + environments redesign + GDPR compliance"
+    capacity_points: 30
+    committed_points: 29
+    status: "not_started"
+
+  - sprint_number: 5
+    goal: "Disputatio Fori backend (schema, APIs, moderation)"
+    capacity_points: 30
+    committed_points: 26
+    status: "not_started"
+
+  - sprint_number: 6
+    goal: "Disputatio Fori frontend + social schema"
+    capacity_points: 30
+    committed_points: 27
+    status: "not_started"
+
+  - sprint_number: 7
+    goal: "Social layer backend + environment comments"
+    capacity_points: 30
+    committed_points: 29
+    status: "not_started"
+
+  - sprint_number: 8
+    goal: "Social frontend + responsive audit + global UI polish"
+    capacity_points: 30
+    committed_points: 26
+    status: "not_started"
+
+velocity:
+  rolling_average: null
+
+team:
+  size: 1
+  sprint_length_weeks: 2
+  capacity_per_sprint: 30

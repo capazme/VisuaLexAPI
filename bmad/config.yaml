@@ -1,0 +1,17 @@
+# BMAD Method v6 - Project Configuration
+# Generated: 2026-03-12
+
+project_name: "Visualex Platform"
+project_type: "web-app"
+project_level: 3
+
+output_folder: "docs"
+
+bmm:
+  workflow_status_file: "docs/bmm-workflow-status.yaml"
+  sprint_status_file: "docs/sprint-status.yaml"
+
+paths:
+  docs: "docs"
+  stories: "docs/stories"
+  tests: "tests"

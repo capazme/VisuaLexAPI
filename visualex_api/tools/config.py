@@ -15,6 +15,10 @@ RATE_LIMIT_WINDOW = 600  # Window size in seconds
 PERSISTENT_CACHE_DIR = BASE_PATH / "download" / "cache"
 PERSISTENT_CACHE_TTL = int(os.getenv("PERSISTENT_CACHE_TTL", 86400))
 
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_ENABLED = os.getenv("REDIS_ENABLED", "false").lower() in ("true", "1", "yes")
+REDIS_CACHE_PREFIX = os.getenv("REDIS_CACHE_PREFIX", "vlx")
+
 HTTP_MAX_CONCURRENCY = int(os.getenv("HTTP_MAX_CONCURRENCY", 3))
 HTTP_MIN_INTERVAL = float(os.getenv("HTTP_MIN_INTERVAL", 0.5))
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", 4))

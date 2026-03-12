@@ -6,3 +6,4 @@ structlog
 playwright
 aiocache
 aiohttp
+redis>=5.0
