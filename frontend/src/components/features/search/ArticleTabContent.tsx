@@ -1,25 +1,23 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
-import { SelectionPopup } from './SelectionPopup';
-import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
+import { ExternalLink, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
-import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
-import { SafeHTML } from '../../../utils/sanitize';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
-import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
-import { Z_INDEX } from '../../../constants/zIndex';
 import { getPlainTextOffset, getSelectionPlainOffset } from '../../../utils/selectionOffset';
+import { ReadingToolbar } from './ReadingToolbar';
+import { NotesPanel } from './NotesPanel';
+import { ArticleBody } from './ArticleBody';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -205,6 +203,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
+    const handleMobileCopy = async () => {
+        try {
+            const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
+            const citation = `\n\n---\nArt. ${norma_data.numero_articolo} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+            await navigator.clipboard.writeText(plainText + citation);
+            showToast('Testo copiato', 'success');
+        } catch {
+            showToast('Errore durante la copia', 'error');
+        }
+    };
+
     const handleAddNote = () => {
         if (!noteText.trim()) {
             showToast('Inserisci una nota', 'error');
@@ -348,6 +357,25 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         });
     }, [triggerSearch]);
 
+    const handleCompare = () => {
+        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+        openCompareWithArticle({
+            article: data,
+            sourceNorma: {
+                tipo_atto: norma_data.tipo_atto,
+                numero_atto: norma_data.numero_atto,
+                data: norma_data.data,
+            },
+            label,
+        });
+        const state = getCompareState();
+        if (state.leftArticle && !state.rightArticle) {
+            showToast('Articolo aggiunto. Seleziona un altro articolo per completare il confronto.', 'info');
+        } else if (state.isOpen && state.leftArticle && state.rightArticle) {
+            showToast('Confronto pronto!', 'success');
+        }
+    };
+
     // Highlights + note anchors are applied by the shared useArticleMarkers
     // hook (reusable on Brocardi sections too). Dictionary + citation
     // wrapping are article-specific and happen after.
@@ -448,364 +476,57 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     return (
         <div className="animate-in fade-in duration-300 relative">
-            {/* Sticky Reading Toolbar */}
-            <div className={cn('glass-toolbar sticky top-0 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
-                {/* Version Info & Annex Source Badge */}
-                <div className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                    {versionInfo?.isHistorical ? (
-                        <span className={cn("px-2 py-1 rounded-md",
-                            versionInfo.isHistorical ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300")}>
-                            {versionInfo.isHistorical ? "Storica" : "Vigente"}
-                        </span>
-                    ) : (
-                        <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                            Vigente
-                        </span>
-                    )}
-                    {norma_data.data_versione && (
-                        <>
-                            <span className="text-slate-300 dark:text-slate-700">|</span>
-                            <span>Aggiornato al: {norma_data.data_versione}</span>
-                        </>
-                    )}
-                    {/* Annex Source Badge */}
-                    {norma_data.allegato && (
-                        <>
-                            <span className="text-slate-300 dark:text-slate-700">|</span>
-                            <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                Allegato {norma_data.allegato}
-                            </span>
-                        </>
-                    )}
-                </div>
-
-                {/* Mobile: Quick Actions + Study Mode toggle */}
-                <div className="flex md:hidden items-center gap-1">
-                    <button
-                        onClick={handleAddToQuickNorms}
-                        className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-amber-500"
-                        title="Aggiungi a norme rapide"
-                    >
-                        <Zap size={20} />
-                    </button>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-                                const citation = `\n\n---\nArt. ${norma_data.numero_articolo} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
-                                await navigator.clipboard.writeText(plainText + citation);
-                                showToast('Testo copiato', 'success');
-                            } catch {
-                                showToast('Errore durante la copia', 'error');
-                            }
-                        }}
-                        className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
-                        title="Copia testo"
-                    >
-                        <Copy size={20} />
-                    </button>
-                    {/* Study Mode button - sempre visibile */}
-                    <button
-                        onClick={onOpenStudyMode}
-                        className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
-                        title="Modalità studio"
-                    >
-                        <BookOpen size={20} />
-                    </button>
-                    {url && (
-                        <a
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500 transition-colors"
-                            title="Apri fonte"
-                        >
-                            <ExternalLink size={20} />
-                        </a>
-                    )}
-                </div>
-
-                {/* Desktop: Full Quick Actions */}
-                <div className="hidden md:flex items-center gap-1">
-                    {/* Primary buttons */}
-                    <button
-                        onClick={handleAddToQuickNorms}
-                        className="p-1.5 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 text-slate-400 hover:text-amber-500 transition-colors"
-                        title="Aggiungi a norme rapide"
-                    >
-                        <Zap size={16} />
-                    </button>
-                    <button
-                        onClick={() => setShowNotes(!showNotes)}
-                        className={cn("p-1.5 rounded-md transition-colors relative",
-                            showNotes || allPanelAnnotations.length > 0
-                                ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500"
-                        )}
-                        title="Note Personali"
-                    >
-                        <StickyNote size={16} />
-                        {allPanelAnnotations.length > 0 && (
-                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary-500 text-white text-[9px] rounded-full flex items-center justify-center">
-                                {allPanelAnnotations.length}
-                            </span>
-                        )}
-                    </button>
-                    <div className="relative" data-highlight-picker>
-                        <button
-                            data-highlight-button
-                            onClick={() => {
-                                const selection = window.getSelection()?.toString().trim();
-                                if (!selection && !highlightSelectionRef.current) {
-                                    showToast('Seleziona del testo da evidenziare', 'error');
-                                    return;
-                                }
-                                setShowHighlightPicker(!showHighlightPicker);
-                            }}
-                            className={cn(
-                                "p-1.5 rounded-md transition-colors relative",
-                                allPanelHighlights.length > 0
-                                    ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
-                                    : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-500"
-                            )}
-                            title="Evidenzia Testo"
-                        >
-                            <Highlighter size={16} />
-                            {allPanelHighlights.length > 0 && (
-                                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-purple-500 text-white text-[9px] rounded-full flex items-center justify-center">
-                                    {allPanelHighlights.length}
-                                </span>
-                            )}
-                        </button>
-                        {showHighlightPicker && (
-                            <div className={cn('absolute left-1/2 -translate-x-1/2 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 flex gap-2 animate-in fade-in zoom-in-95 duration-200', Z_INDEX.dropdown)}>
-                                {(['yellow', 'green', 'red', 'blue'] as const).map(color => (
-                                    <button
-                                        key={color}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleHighlightAdd(color);
-                                        }}
-                                        className={cn(
-                                            "w-6 h-6 rounded-full border-2 transition-all hover:scale-110",
-                                            color === 'yellow' && 'bg-yellow-200 border-yellow-400',
-                                            color === 'green' && 'bg-emerald-200 border-emerald-400',
-                                            color === 'red' && 'bg-red-200 border-red-400',
-                                            color === 'blue' && 'bg-blue-200 border-blue-400',
-                                            color === 'yellow' && 'ring-2 ring-offset-1 ring-purple-500'
-                                        )}
-                                        title={`Evidenzia in ${color}`}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <button
-                        onClick={() => setShowCopyModal(true)}
-                        className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
-                        title="Copia"
-                    >
-                        <Copy size={16} />
-                    </button>
-
-                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
-
-                    {/* More menu */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowMoreMenu(!showMoreMenu)}
-                            className={cn(
-                                "p-1.5 rounded-md transition-colors",
-                                showMoreMenu
-                                    ? "bg-slate-100 dark:bg-slate-800 text-primary-500"
-                                    : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                            )}
-                            title="Altre azioni"
-                        >
-                            <MoreHorizontal size={16} />
-                        </button>
-                        {showMoreMenu && (
-                            <>
-                                <div className={cn('fixed inset-0', Z_INDEX.dropdown)} onClick={() => setShowMoreMenu(false)} />
-                                <div className={cn('absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 py-1', Z_INDEX.dropdown)}>
-                                    <button
-                                        onClick={() => {
-                                            setShowDossierModal(true);
-                                            setShowMoreMenu(false);
-                                        }}
-                                        className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    >
-                                        <FolderPlus size={14} className="text-slate-400" />
-                                        Aggiungi a dossier
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            handleShareLink();
-                                            setShowMoreMenu(false);
-                                        }}
-                                        className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    >
-                                        <Share2 size={14} className="text-slate-400" />
-                                        Condividi link
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowAdvancedExport(true);
-                                            setShowMoreMenu(false);
-                                        }}
-                                        className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    >
-                                        <Download size={14} className="text-slate-400" />
-                                        Esporta...
-                                    </button>
-
-                                    <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
-
-                                    <button
-                                        onClick={() => {
-                                            setShowVersionInput(true);
-                                            setShowMoreMenu(false);
-                                        }}
-                                        className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    >
-                                        <Clock size={14} className="text-slate-400" />
-                                        Cerca versione...
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
-                                            openCompareWithArticle({
-                                                article: data,
-                                                sourceNorma: {
-                                                    tipo_atto: norma_data.tipo_atto,
-                                                    numero_atto: norma_data.numero_atto,
-                                                    data: norma_data.data,
-                                                },
-                                                label,
-                                            });
-                                            setShowMoreMenu(false);
-                                            const state = getCompareState();
-                                            if (state.leftArticle && !state.rightArticle) {
-                                                showToast('Articolo aggiunto. Seleziona un altro articolo per completare il confronto.', 'info');
-                                            } else if (state.isOpen && state.leftArticle && state.rightArticle) {
-                                                showToast('Confronto pronto!', 'success');
-                                            }
-                                        }}
-                                        className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    >
-                                        <GitCompare size={14} className="text-slate-400" />
-                                        Confronta con...
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <ReadingToolbar
+                normaData={norma_data}
+                versionInfo={versionInfo}
+                url={url}
+                articleText={article_text || ''}
+                showNotes={showNotes}
+                notesCount={allPanelAnnotations.length}
+                highlightsCount={allPanelHighlights.length}
+                showHighlightPicker={showHighlightPicker}
+                showMoreMenu={showMoreMenu}
+                highlightSelectionRef={highlightSelectionRef}
+                onToggleNotes={() => setShowNotes(!showNotes)}
+                onToggleHighlightPicker={setShowHighlightPicker}
+                onToggleMoreMenu={setShowMoreMenu}
+                onAddToQuickNorms={handleAddToQuickNorms}
+                onMobileCopy={handleMobileCopy}
+                onOpenStudyMode={onOpenStudyMode}
+                onOpenCopyModal={() => setShowCopyModal(true)}
+                onHighlightAdd={handleHighlightAdd}
+                onOpenDossier={() => setShowDossierModal(true)}
+                onShareLink={handleShareLink}
+                onOpenAdvancedExport={() => setShowAdvancedExport(true)}
+                onOpenVersionInput={() => setShowVersionInput(true)}
+                onCompare={handleCompare}
+                onShowToast={showToast}
+            />
 
             {/* Notes panel (study feature) */}
             {(showNotes || allPanelAnnotations.length > 0) && (
-                <div className="hidden md:block mb-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/20 rounded-lg p-4 transition-all">
-                    <h6 className="text-xs font-bold text-amber-700 dark:text-amber-500 uppercase mb-3 flex items-center gap-2">
-                        <StickyNote size={14} /> Note Personali
-                    </h6>
-
-                    <div className="space-y-3 mb-3">
-                        {allPanelAnnotations.map(note => (
-                            <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-sm relative group border border-amber-100 dark:border-amber-900/20">
-                                {note.anchorText && (
-                                    <div className="text-xs italic text-amber-700 dark:text-amber-400 mb-1.5 flex items-start gap-1.5 pr-6">
-                                        <StickyNote size={11} className="mt-0.5 shrink-0" />
-                                        <span className="line-clamp-2">&ldquo;{note.anchorText}&rdquo;</span>
-                                    </div>
-                                )}
-                                <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{note.text}</p>
-                                <div className="text-xs text-slate-400 mt-2">{new Date(note.createdAt).toLocaleString()}</div>
-                                <button
-                                    onClick={() => removeAnnotation(note.id)}
-                                    className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <X size={14} />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-
-                    {showNotes && (
-                        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                            {noteAnchor && (
-                                <div className="flex items-center gap-2 mb-2 px-2.5 py-1.5 bg-amber-100/70 dark:bg-amber-900/30 rounded-md text-xs border border-amber-300/60 dark:border-amber-800/40">
-                                    <StickyNote size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                                    <span className="italic flex-1 truncate text-amber-800 dark:text-amber-300">
-                                        Ancorata a: &ldquo;{noteAnchor.anchorText}&rdquo;
-                                    </span>
-                                    <button
-                                        onClick={() => setNoteAnchor(null)}
-                                        className="p-0.5 hover:bg-amber-200 dark:hover:bg-amber-800/50 rounded text-amber-700 dark:text-amber-400 transition-colors"
-                                        title="Rimuovi ancoraggio"
-                                    >
-                                        <X size={12} />
-                                    </button>
-                                </div>
-                            )}
-                            <div className="flex gap-2">
-                                <textarea
-                                    value={noteText}
-                                    onChange={e => setNoteText(e.target.value)}
-                                    placeholder={noteAnchor ? `Scrivi una nota su "${noteAnchor.anchorText.slice(0, 30)}${noteAnchor.anchorText.length > 30 ? '…' : ''}"` : 'Scrivi una nota...'}
-                                    className="flex-1 text-sm rounded-lg border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 p-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[60px]"
-                                />
-                                <button
-                                    onClick={handleAddNote}
-                                    className="self-end bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    Salva
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-
-            {/* Article Content with Prose Styling */}
-            <div className="relative group/content" ref={contentRef}>
-                <SelectionPopup
-                    containerRef={contentRef}
-                    onHighlight={handlePopupHighlight}
-                    onAddNote={handlePopupAddNote}
-                    onCopy={handlePopupCopy}
+                <NotesPanel
+                    annotations={allPanelAnnotations}
+                    showComposer={showNotes}
+                    noteAnchor={noteAnchor}
+                    noteText={noteText}
+                    onNoteTextChange={setNoteText}
+                    onClearAnchor={() => setNoteAnchor(null)}
+                    onSaveNote={handleAddNote}
+                    onRemoveAnnotation={removeAnnotation}
                 />
-                <div className="prose prose-lg dark:prose-invert max-w-none legal-prose prose-slate prose-headings:font-bold font-serif px-2 sm:px-4" id={`article-content-${itemKey}`}>
-                    {processedContent ? (
-                        <SafeHTML html={processedContent} />
-                    ) : (
-                        <div className="text-slate-400 italic text-center py-8 flex flex-col items-center gap-2">
-                            <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-primary-500 animate-spin" />
-                            Caricamento testo...
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Desktop only: Highlights summary panel (study feature) */}
-            {allPanelHighlights.length > 0 && (
-                <div className="hidden md:block mt-8 mb-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 text-sm">
-                    <h6 className="font-semibold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2">
-                        <Highlighter size={14} /> Evidenziazioni
-                    </h6>
-                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                        {allPanelHighlights.map(h => (
-                            <div key={h.id} className="flex justify-between items-start gap-2 bg-white dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-700">
-                                <span style={{ ...parseInlineStyle(HIGHLIGHT_STYLES[h.color]) }} className="rounded px-2 py-1 flex-1 text-xs">{h.text}</span>
-                                <button onClick={() => removeHighlight(h.id)} className="text-slate-400 hover:text-red-500 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
-                                    <X size={14} />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
             )}
+
+            <ArticleBody
+                contentRef={contentRef}
+                itemKey={itemKey}
+                processedContent={processedContent}
+                panelHighlights={allPanelHighlights}
+                onPopupHighlight={handlePopupHighlight}
+                onPopupAddNote={handlePopupAddNote}
+                onPopupCopy={handlePopupCopy}
+                onRemoveHighlight={removeHighlight}
+            />
 
             {brocardi_info !== undefined && (
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
@@ -969,4 +690,3 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         </div>
     );
 }
-
