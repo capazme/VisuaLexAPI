@@ -16,6 +16,7 @@ import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
+import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { getPlainTextOffset, getSelectionPlainOffset } from '../../../utils/selectionOffset';
@@ -67,7 +68,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // When the user picks "Aggiungi nota" from the selection popup the
     // selected span becomes the note's anchor. Kept in state so the panel
     // can render a chip ("Ancorata a: …") until the user submits.
-    const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number } | null>(null);
+    // scopedArticleId defaults to the article body; markable brocardi
+    // sections override it to target their own sub-section scope.
+    const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number; scopedArticleId: string } | null>(null);
     const versionDateInputRef = useRef<HTMLInputElement>(null);
 
     // Citation preview hook - destructure to get stable function references
@@ -88,8 +91,21 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const itemKey = generateKey();
     const uniqueArticleId = norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo;
 
+    // Markers pipeline for the article body uses ONLY strict scope.
     const itemAnnotations = annotations.filter(a => a.normaKey === itemKey && a.articleId === uniqueArticleId);
     const articleHighlights = highlights.filter(h => h.normaKey === itemKey && h.articleId === uniqueArticleId);
+
+    // Panel list (notes + highlights summary) includes brocardi sub-sections
+    // so users see everything they've saved for this article in one place.
+    const subSectionPrefix = `${uniqueArticleId}/`;
+    const allPanelAnnotations = annotations.filter(a =>
+        a.normaKey === itemKey &&
+        (a.articleId === uniqueArticleId || a.articleId.startsWith(subSectionPrefix))
+    );
+    const allPanelHighlights = highlights.filter(h =>
+        h.normaKey === itemKey &&
+        (h.articleId === uniqueArticleId || h.articleId.startsWith(subSectionPrefix))
+    );
 
     // Fetch persisted highlights + annotations from the Node backend when the
     // article first mounts (or when the user switches to a different article
@@ -174,12 +190,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 textToCopy += citation;
             }
 
-            if (options.includeNotes && itemAnnotations.length > 0) {
-                textToCopy += `\n\nNote personali:\n${itemAnnotations.map((n, i) => `${i + 1}. ${n.text}`).join('\n')}`;
+            if (options.includeNotes && allPanelAnnotations.length > 0) {
+                textToCopy += `\n\nNote personali:\n${allPanelAnnotations.map((n, i) => `${i + 1}. ${n.text}`).join('\n')}`;
             }
 
-            if (options.includeHighlights && articleHighlights.length > 0) {
-                textToCopy += `\n\nEvidenziazioni:\n${articleHighlights.map((h, i) => `${i + 1}. "${h.text}"`).join('\n')}`;
+            if (options.includeHighlights && allPanelHighlights.length > 0) {
+                textToCopy += `\n\nEvidenziazioni:\n${allPanelHighlights.map((h, i) => `${i + 1}. "${h.text}"`).join('\n')}`;
             }
 
             await navigator.clipboard.writeText(textToCopy);
@@ -194,8 +210,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast('Inserisci una nota', 'error');
             return;
         }
-        const anchor = noteAnchor ?? undefined;
-        addAnnotation(itemKey, uniqueArticleId, noteText, anchor);
+        const anchor = noteAnchor;
+        const targetArticleId = anchor?.scopedArticleId ?? uniqueArticleId;
+        const anchorPayload = anchor
+            ? { anchorText: anchor.anchorText, startOffset: anchor.startOffset }
+            : undefined;
+        addAnnotation(itemKey, targetArticleId, noteText, anchorPayload);
         setNoteText('');
         setNoteAnchor(null);
         showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
@@ -288,11 +308,19 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         showToast(`Testo evidenziato in ${color}`, 'success');
     };
 
-    // Handler for SelectionPopup note action.
-    // The selected span becomes the note's anchor; the note body is filled
-    // by the user in the panel textarea (left empty here).
+    // Handler for SelectionPopup note action in the article body.
     const handlePopupAddNote = (text: string, startOffset: number) => {
-        setNoteAnchor({ anchorText: text, startOffset });
+        setNoteAnchor({ anchorText: text, startOffset, scopedArticleId: uniqueArticleId });
+        setNoteText('');
+        setShowNotes(true);
+    };
+
+    // Called by a markable brocardi sub-section (Ratio / Spiegazione) when
+    // the user chooses "Aggiungi nota" inside it. The anchor offset is
+    // relative to that section's own textContent, so the scopedArticleId
+    // carries the sub-section identifier.
+    const handleBrocardiAddNote = (scopedArticleId: string, text: string, startOffset: number) => {
+        setNoteAnchor({ anchorText: text, startOffset, scopedArticleId });
         setNoteText('');
         setShowNotes(true);
     };
@@ -320,101 +348,27 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         });
     }, [triggerSearch]);
 
+    // Highlights + note anchors are applied by the shared useArticleMarkers
+    // hook (reusable on Brocardi sections too). Dictionary + citation
+    // wrapping are article-specific and happen after.
+    const markedHtml = useArticleMarkers({
+        rawText: article_text || '',
+        highlights: articleHighlights,
+        annotations: itemAnnotations,
+    });
+
     const processedContent = useMemo(() => {
-        // Start from the raw article text (still containing \n). Marks are
-        // inserted at raw offsets derived from each entry's plain-text
-        // offset (computed against the *original* raw text so every
-        // insertion sees consistent offsets), then applied right-to-left
-        // so earlier positions stay valid. \n → <br /> happens last.
-        const raw = article_text || '';
+        let html = markedHtml;
 
-        // Convert a plain-text offset (DOM textContent, no \n) to the
-        // corresponding offset in the raw text (which has \n).
-        const plainToRaw = (plainOffset: number) => {
-            let rawIdx = 0;
-            let plainIdx = 0;
-            while (plainIdx < plainOffset && rawIdx < raw.length) {
-                if (raw[rawIdx] !== '\n') plainIdx++;
-                rawIdx++;
-            }
-            return rawIdx;
-        };
-
-        const escapeAttr = (s: string) =>
-            s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-
-        type Insertion = { pos: number; markup: string; isOpen: boolean; order: number };
-        const insertions: Insertion[] = [];
-        let order = 0;
-
-        // Highlights with a valid plain-text offset
-        articleHighlights.forEach((h) => {
-            if (typeof h.startOffset !== 'number' || h.startOffset < 0) return;
-            const rawStart = plainToRaw(h.startOffset);
-            const rawEnd = plainToRaw(h.startOffset + h.text.length);
-            const slice = raw.slice(rawStart, rawEnd).replace(/\n/g, '');
-            if (slice.toLowerCase() !== h.text.toLowerCase()) return;
-            insertions.push({ pos: rawStart, order: order++, isOpen: true,
-                markup: `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">` });
-            insertions.push({ pos: rawEnd, order: order++, isOpen: false,
-                markup: '</mark>' });
-        });
-
-        // Annotations anchored to a text span
-        itemAnnotations.forEach((a) => {
-            if (typeof a.startOffset !== 'number' || a.startOffset < 0) return;
-            if (!a.anchorText) return;
-            const rawStart = plainToRaw(a.startOffset);
-            const rawEnd = plainToRaw(a.startOffset + a.anchorText.length);
-            const slice = raw.slice(rawStart, rawEnd).replace(/\n/g, '');
-            if (slice.toLowerCase() !== a.anchorText.toLowerCase()) return;
-            insertions.push({ pos: rawStart, order: order++, isOpen: true,
-                markup: `<span class="note-anchor" data-note-id="${a.id}" title="${escapeAttr(a.text)}" style="text-decoration:underline wavy hsl(var(--hl-yellow-fg));text-decoration-thickness:2px;text-underline-offset:3px;cursor:help;">` });
-            insertions.push({ pos: rawEnd, order: order++, isOpen: false,
-                markup: '</span>' });
-        });
-
-        // Apply from latest position to earliest. At the same position,
-        // close tags come before open tags so nesting stays well-formed.
-        insertions.sort((x, y) => {
-            if (y.pos !== x.pos) return y.pos - x.pos;
-            if (x.isOpen !== y.isOpen) return x.isOpen ? 1 : -1;
-            return y.order - x.order;
-        });
-
-        let html = raw;
-        insertions.forEach((ins) => {
-            html = html.slice(0, ins.pos) + ins.markup + html.slice(ins.pos);
-        });
-
-        // Legacy highlights without offset fall back to global match (every
-        // occurrence), matching the pre-offset behaviour for older saves.
-        const legacyHighlights = articleHighlights.filter(
-            (h) => typeof h.startOffset !== 'number' || h.startOffset < 0
-        );
-        const sortedLegacy = [...legacyHighlights].sort((a, b) => b.text.length - a.text.length);
-        sortedLegacy.forEach((h) => {
-            const escaped = h.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
-            html = html.replace(regex, (match) =>
-                `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${match}</mark>`);
-        });
-
-        // Convert raw newlines to <br /> after marks are placed.
-        html = html.replace(/\n/g, '<br />');
-
-        // Dictionary terms (avoiding already highlighted text)
         Object.entries(DICTIONARY_TERMS).forEach(([term, definition]) => {
             const regex = new RegExp(`(?<!<mark[^>]*>)\\b${term}\\b(?!</mark>)`, 'gi');
             html = html.replace(regex, (match) => `<span class="dictionary-term" data-definition="${definition}">${match}</span>`);
         });
 
-        // Citation detection with hover preview — norma_data lets simple
-        // "art. X" references resolve against the current norm.
         html = wrapCitationsInHtml(html, norma_data);
 
         return html;
-    }, [article_text, articleHighlights, itemAnnotations, norma_data]);
+    }, [markedHtml, norma_data]);
 
     // Handle citation hover and click events
     useEffect(() => {
@@ -584,16 +538,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     <button
                         onClick={() => setShowNotes(!showNotes)}
                         className={cn("p-1.5 rounded-md transition-colors relative",
-                            showNotes || itemAnnotations.length > 0
+                            showNotes || allPanelAnnotations.length > 0
                                 ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400"
                                 : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500"
                         )}
                         title="Note Personali"
                     >
                         <StickyNote size={16} />
-                        {itemAnnotations.length > 0 && (
+                        {allPanelAnnotations.length > 0 && (
                             <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary-500 text-white text-[9px] rounded-full flex items-center justify-center">
-                                {itemAnnotations.length}
+                                {allPanelAnnotations.length}
                             </span>
                         )}
                     </button>
@@ -610,16 +564,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                             }}
                             className={cn(
                                 "p-1.5 rounded-md transition-colors relative",
-                                articleHighlights.length > 0
+                                allPanelHighlights.length > 0
                                     ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
                                     : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-500"
                             )}
                             title="Evidenzia Testo"
                         >
                             <Highlighter size={16} />
-                            {articleHighlights.length > 0 && (
+                            {allPanelHighlights.length > 0 && (
                                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-purple-500 text-white text-[9px] rounded-full flex items-center justify-center">
-                                    {articleHighlights.length}
+                                    {allPanelHighlights.length}
                                 </span>
                             )}
                         </button>
@@ -750,14 +704,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             </div>
 
             {/* Notes panel (study feature) */}
-            {(showNotes || itemAnnotations.length > 0) && (
+            {(showNotes || allPanelAnnotations.length > 0) && (
                 <div className="hidden md:block mb-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/20 rounded-lg p-4 transition-all">
                     <h6 className="text-xs font-bold text-amber-700 dark:text-amber-500 uppercase mb-3 flex items-center gap-2">
                         <StickyNote size={14} /> Note Personali
                     </h6>
 
                     <div className="space-y-3 mb-3">
-                        {itemAnnotations.map(note => (
+                        {allPanelAnnotations.map(note => (
                             <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-sm relative group border border-amber-100 dark:border-amber-900/20">
                                 {note.anchorText && (
                                     <div className="text-xs italic text-amber-700 dark:text-amber-400 mb-1.5 flex items-start gap-1.5 pr-6">
@@ -835,13 +789,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             </div>
 
             {/* Desktop only: Highlights summary panel (study feature) */}
-            {articleHighlights.length > 0 && (
+            {allPanelHighlights.length > 0 && (
                 <div className="hidden md:block mt-8 mb-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700 text-sm">
                     <h6 className="font-semibold text-slate-600 dark:text-slate-300 mb-2 flex items-center gap-2">
                         <Highlighter size={14} /> Evidenziazioni
                     </h6>
                     <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-                        {articleHighlights.map(h => (
+                        {allPanelHighlights.map(h => (
                             <div key={h.id} className="flex justify-between items-start gap-2 bg-white dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-700">
                                 <span style={{ ...parseInlineStyle(HIGHLIGHT_STYLES[h.color]) }} className="rounded px-2 py-1 flex-1 text-xs">{h.text}</span>
                                 <button onClick={() => removeHighlight(h.id)} className="text-slate-400 hover:text-red-500 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
@@ -857,6 +811,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
                     <BrocardiDisplay
                         info={brocardi_info}
+                        itemKey={itemKey}
+                        uniqueArticleId={uniqueArticleId}
+                        onRequestAddNote={handleBrocardiAddNote}
                         currentNorma={{
                             tipo_atto: norma_data.tipo_atto,
                             data: norma_data.data,
@@ -917,16 +874,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isOpen={showCopyModal}
                 onClose={() => setShowCopyModal(false)}
                 onCopy={handleAdvancedCopy}
-                hasNotes={itemAnnotations.length > 0}
-                hasHighlights={articleHighlights.length > 0}
+                hasNotes={allPanelAnnotations.length > 0}
+                hasHighlights={allPanelHighlights.length > 0}
             />
 
             <AdvancedExportModal
                 isOpen={showAdvancedExport}
                 onClose={() => setShowAdvancedExport(false)}
                 articleData={data}
-                annotations={itemAnnotations}
-                highlights={articleHighlights}
+                annotations={allPanelAnnotations}
+                highlights={allPanelHighlights}
             />
 
             <Modal

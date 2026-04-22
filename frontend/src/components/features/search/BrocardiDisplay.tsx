@@ -5,6 +5,7 @@ import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
 import { MassimeSection } from './MassimeSection';
 import { FootnoteTooltip } from './FootnoteTooltip';
+import { MarkableBrocardiSection } from './MarkableBrocardiSection';
 import { useAppStore } from '../../../store/useAppStore';
 
 // Error Boundary for BrocardiSection — surfaces the failure instead of hiding
@@ -434,6 +435,17 @@ interface BrocardiDisplayProps {
   info: BrocardiInfoType | null;
   currentNorma?: { tipo_atto: string; data?: string; numero_atto?: string };
   onArticleClick?: (articleNumber: string, tipoAtto: string) => void;
+  /**
+   * Parent article identity. When both are provided, the Ratio and
+   * Spiegazione sections become markable (users can highlight text and
+   * anchor notes to spans). Highlights/notes are scoped per section via
+   * a derived sectionArticleId so they don't collide with the main
+   * article text's offset space.
+   */
+  itemKey?: string;
+  uniqueArticleId?: string;
+  /** Called when the user picks "Aggiungi nota" inside a markable section. */
+  onRequestAddNote?: (scopedArticleId: string, text: string, startOffset: number) => void;
 }
 
 function BrocardiEmptyState({ link }: { link?: string | null }) {
@@ -462,7 +474,8 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
   );
 }
 
-export function BrocardiDisplay({ info, currentNorma, onArticleClick }: BrocardiDisplayProps) {
+export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, uniqueArticleId, onRequestAddNote }: BrocardiDisplayProps) {
+  const canMark = Boolean(itemKey && uniqueArticleId && onRequestAddNote);
   // Default collapsed on mobile (<768px), expanded on desktop
   const [isMainOpen, setIsMainOpen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 768 : true
@@ -510,15 +523,33 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick }: Brocardi
             title="Brocardi"
             content={info.Brocardi || null}
           />
-          <BrocardiSection
-            title="Ratio"
-            content={info.Ratio || null}
-          />
-          <BrocardiSection
-            title="Spiegazione"
-            content={info.Spiegazione || null}
-            icon={<FileText size={16} className="text-primary-500" />}
-          />
+          {canMark && typeof info.Ratio === 'string' && info.Ratio.trim().length > 0 ? (
+            <MarkableBrocardiSection
+              title="Ratio"
+              content={info.Ratio}
+              itemKey={itemKey!}
+              sectionArticleId={`${uniqueArticleId}/brocardi/ratio`}
+              onRequestAddNote={onRequestAddNote!}
+            />
+          ) : (
+            <BrocardiSection title="Ratio" content={info.Ratio || null} />
+          )}
+          {canMark && typeof info.Spiegazione === 'string' && info.Spiegazione.trim().length > 0 ? (
+            <MarkableBrocardiSection
+              title="Spiegazione"
+              content={info.Spiegazione}
+              itemKey={itemKey!}
+              sectionArticleId={`${uniqueArticleId}/brocardi/spiegazione`}
+              onRequestAddNote={onRequestAddNote!}
+              icon={<FileText size={16} className="text-primary-500" />}
+            />
+          ) : (
+            <BrocardiSection
+              title="Spiegazione"
+              content={info.Spiegazione || null}
+              icon={<FileText size={16} className="text-primary-500" />}
+            />
+          )}
 
           {/* Massime with search and filter */}
           {info.Massime && info.Massime.length > 0 && (
