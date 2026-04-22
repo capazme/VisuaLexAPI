@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, Command } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -231,6 +231,30 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
       {/* System Actions */}
       <div className="flex flex-col items-center py-4 gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50">
+        <button
+          type="button"
+          onClick={handleSparklesClick}
+          aria-label="Apri ricerca rapida (Cmd+K)"
+          title="Ricerca rapida"
+          className={cn(
+            "group flex flex-col items-center justify-center rounded-xl transition-all duration-200",
+            "hover:bg-slate-100 dark:hover:bg-slate-800",
+            "w-12 py-1.5 md:w-11",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          )}
+        >
+          <Command
+            size={18}
+            className="text-slate-500 dark:text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200"
+          />
+          <span className="sr-only">Ricerca rapida</span>
+          <kbd
+            aria-hidden="true"
+            className="hidden md:inline-flex mt-1 items-center gap-0.5 px-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm text-[9px] font-black text-slate-400 uppercase tracking-widest"
+          >
+            ⌘K
+          </kbd>
+        </button>
         <ActionButton
           icon={Settings}
           label="Impostazioni"
