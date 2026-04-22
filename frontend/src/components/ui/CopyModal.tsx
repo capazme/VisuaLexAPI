@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Copy, Check } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Modal } from './Modal';
 
 interface CopyModalProps {
   isOpen: boolean;
@@ -27,250 +28,192 @@ export function CopyModal({
   hasNotes,
   hasHighlights,
   canCopyTab = false,
-  canCopyNorma = false
+  canCopyNorma = false,
 }: CopyModalProps) {
   const [options, setOptions] = useState<CopyOptions>({
     includeText: true,
     includeCitation: true,
     includeNotes: false,
     includeHighlights: false,
-    scope: 'article'
+    scope: 'article',
   });
-
-  if (!isOpen) return null;
 
   const handleCopy = () => {
     onCopy(options);
     onClose();
   };
 
+  const disabled =
+    !options.includeText &&
+    !options.includeCitation &&
+    !options.includeNotes &&
+    !options.includeHighlights;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="font-semibold text-slate-900 dark:text-white">
-            Copia Contenuto
-          </h3>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      title="Copia Contenuto"
+      icon={<Copy size={20} />}
+      variant="info"
+      footer={
+        <>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
-          >
-            <X size={18} className="text-slate-500" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4">
-          {/* Content Section - Custom Checkboxes */}
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase mb-3">Contenuto</p>
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1 space-y-1">
-              <label className={cn(
-                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-slate-800"
-              )}>
-                <div className="relative flex items-center justify-center mt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={options.includeText}
-                    onChange={(e) => setOptions({ ...options, includeText: e.target.checked })}
-                    className="sr-only"
-                  />
-                  <div className={cn(
-                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                    options.includeText
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                  )}>
-                    {options.includeText && <Check size={14} className="text-white" />}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <span className="font-medium text-slate-900 dark:text-white text-sm">Testo articolo</span>
-                  <p className="text-xs text-slate-500 mt-0.5">Include il testo completo dell'articolo</p>
-                </div>
-              </label>
-
-              <label className={cn(
-                "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-slate-800"
-              )}>
-                <div className="relative flex items-center justify-center mt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={options.includeCitation}
-                    onChange={(e) => setOptions({ ...options, includeCitation: e.target.checked })}
-                    className="sr-only"
-                  />
-                  <div className={cn(
-                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                    options.includeCitation
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                  )}>
-                    {options.includeCitation && <Check size={14} className="text-white" />}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <span className="font-medium text-slate-900 dark:text-white text-sm">Citazione</span>
-                  <p className="text-xs text-slate-500 mt-0.5">Riferimento normativo formale</p>
-                </div>
-              </label>
-
-              <label className={cn(
-                "flex items-start gap-3 p-3 rounded-lg transition-colors",
-                hasNotes ? "cursor-pointer hover:bg-white dark:hover:bg-slate-800" : "opacity-50 cursor-not-allowed"
-              )}>
-                <div className="relative flex items-center justify-center mt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={options.includeNotes}
-                    onChange={(e) => setOptions({ ...options, includeNotes: e.target.checked })}
-                    disabled={!hasNotes}
-                    className="sr-only"
-                  />
-                  <div className={cn(
-                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                    options.includeNotes
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                  )}>
-                    {options.includeNotes && <Check size={14} className="text-white" />}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <span className="font-medium text-slate-900 dark:text-white text-sm">
-                    Note personali {!hasNotes && <span className="text-slate-400">(nessuna)</span>}
-                  </span>
-                  <p className="text-xs text-slate-500 mt-0.5">Include le tue annotazioni</p>
-                </div>
-              </label>
-
-              <label className={cn(
-                "flex items-start gap-3 p-3 rounded-lg transition-colors",
-                hasHighlights ? "cursor-pointer hover:bg-white dark:hover:bg-slate-800" : "opacity-50 cursor-not-allowed"
-              )}>
-                <div className="relative flex items-center justify-center mt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={options.includeHighlights}
-                    onChange={(e) => setOptions({ ...options, includeHighlights: e.target.checked })}
-                    disabled={!hasHighlights}
-                    className="sr-only"
-                  />
-                  <div className={cn(
-                    "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
-                    options.includeHighlights
-                      ? "bg-blue-600 border-blue-600"
-                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
-                  )}>
-                    {options.includeHighlights && <Check size={14} className="text-white" />}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <span className="font-medium text-slate-900 dark:text-white text-sm">
-                    Evidenziazioni {!hasHighlights && <span className="text-slate-400">(nessuna)</span>}
-                  </span>
-                  <p className="text-xs text-slate-500 mt-0.5">Include le parti evidenziate</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Scope Section */}
-          {(canCopyNorma || canCopyTab) && (
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase mb-3">Ambito</p>
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-1 space-y-1">
-                <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
-                  <input
-                    type="radio"
-                    name="scope"
-                    checked={options.scope === 'article'}
-                    onChange={() => setOptions({ ...options, scope: 'article' })}
-                    className="sr-only"
-                  />
-                  <div className={cn(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-                    options.scope === 'article'
-                      ? "border-blue-600 dark:border-blue-400"
-                      : "border-slate-300 dark:border-slate-600"
-                  )}>
-                    {options.scope === 'article' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-white">Solo questo articolo</span>
-                </label>
-
-                {canCopyNorma && (
-                  <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
-                    <input
-                      type="radio"
-                      name="scope"
-                      checked={options.scope === 'norma'}
-                      onChange={() => setOptions({ ...options, scope: 'norma' })}
-                      className="sr-only"
-                    />
-                    <div className={cn(
-                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-                      options.scope === 'norma'
-                        ? "border-blue-600 dark:border-blue-400"
-                        : "border-slate-300 dark:border-slate-600"
-                    )}>
-                      {options.scope === 'norma' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
-                    </div>
-                    <span className="text-sm font-medium text-slate-900 dark:text-white">Tutti gli articoli della norma</span>
-                  </label>
-                )}
-
-                {canCopyTab && (
-                  <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-blue-900/30">
-                    <input
-                      type="radio"
-                      name="scope"
-                      checked={options.scope === 'tab'}
-                      onChange={() => setOptions({ ...options, scope: 'tab' })}
-                      className="sr-only"
-                    />
-                    <div className={cn(
-                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
-                      options.scope === 'tab'
-                        ? "border-blue-600 dark:border-blue-400"
-                        : "border-slate-300 dark:border-slate-600"
-                    )}>
-                      {options.scope === 'tab' && <div className="w-2.5 h-2.5 bg-blue-600 dark:bg-blue-400 rounded-full" />}
-                    </div>
-                    <span className="text-sm font-medium text-slate-900 dark:text-white">Tutta la tab</span>
-                  </label>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
             Annulla
           </button>
           <button
             onClick={handleCopy}
-            disabled={!options.includeText && !options.includeCitation && !options.includeNotes && !options.includeHighlights}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+            disabled={disabled}
+            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
             <Copy size={16} />
             Copia
           </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase mb-3">Contenuto</p>
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-1 space-y-1">
+            <CheckboxRow
+              checked={options.includeText}
+              onChange={(v) => setOptions({ ...options, includeText: v })}
+              label="Testo articolo"
+              description="Include il testo completo dell'articolo"
+            />
+            <CheckboxRow
+              checked={options.includeCitation}
+              onChange={(v) => setOptions({ ...options, includeCitation: v })}
+              label="Citazione"
+              description="Riferimento normativo formale"
+            />
+            <CheckboxRow
+              checked={options.includeNotes}
+              onChange={(v) => setOptions({ ...options, includeNotes: v })}
+              disabled={!hasNotes}
+              label={
+                <>
+                  Note personali {!hasNotes && <span className="text-slate-400">(nessuna)</span>}
+                </>
+              }
+              description="Include le tue annotazioni"
+            />
+            <CheckboxRow
+              checked={options.includeHighlights}
+              onChange={(v) => setOptions({ ...options, includeHighlights: v })}
+              disabled={!hasHighlights}
+              label={
+                <>
+                  Evidenziazioni {!hasHighlights && <span className="text-slate-400">(nessuna)</span>}
+                </>
+              }
+              description="Include le parti evidenziate"
+            />
+          </div>
+        </div>
+
+        {(canCopyNorma || canCopyTab) && (
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-3">Ambito</p>
+            <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-1 space-y-1">
+              <RadioRow
+                name="scope"
+                checked={options.scope === 'article'}
+                onChange={() => setOptions({ ...options, scope: 'article' })}
+                label="Solo questo articolo"
+              />
+              {canCopyNorma && (
+                <RadioRow
+                  name="scope"
+                  checked={options.scope === 'norma'}
+                  onChange={() => setOptions({ ...options, scope: 'norma' })}
+                  label="Tutti gli articoli della norma"
+                />
+              )}
+              {canCopyTab && (
+                <RadioRow
+                  name="scope"
+                  checked={options.scope === 'tab'}
+                  onChange={() => setOptions({ ...options, scope: 'tab' })}
+                  label="Tutta la tab"
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+interface CheckboxRowProps {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  label: React.ReactNode;
+  description: string;
+}
+
+function CheckboxRow({ checked, onChange, disabled = false, label, description }: CheckboxRowProps) {
+  return (
+    <label
+      className={cn(
+        'flex items-start gap-3 p-3 rounded-lg transition-colors',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-white dark:hover:bg-slate-800'
+      )}
+    >
+      <div className="relative flex items-center justify-center mt-0.5">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          disabled={disabled}
+          className="sr-only"
+        />
+        <div
+          className={cn(
+            'w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
+            checked
+              ? 'bg-primary-600 border-primary-600'
+              : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600'
+          )}
+        >
+          {checked && <Check size={14} className="text-white" />}
         </div>
       </div>
-    </div>
+      <div className="flex-1">
+        <span className="font-medium text-slate-900 dark:text-white text-sm">{label}</span>
+        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+      </div>
+    </label>
+  );
+}
+
+interface RadioRowProps {
+  name: string;
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}
+
+function RadioRow({ name, checked, onChange, label }: RadioRowProps) {
+  return (
+    <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-white dark:hover:bg-primary-900/30">
+      <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only" />
+      <div
+        className={cn(
+          'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+          checked ? 'border-primary-600 dark:border-primary-400' : 'border-slate-300 dark:border-slate-600'
+        )}
+      >
+        {checked && <div className="w-2.5 h-2.5 bg-primary-600 dark:bg-primary-400 rounded-full" />}
+      </div>
+      <span className="text-sm font-medium text-slate-900 dark:text-white">{label}</span>
+    </label>
   );
 }

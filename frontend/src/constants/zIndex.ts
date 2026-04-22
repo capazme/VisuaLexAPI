@@ -39,8 +39,8 @@ export const Z_INDEX = {
   /** Sidebar navigation */
   sidebar: 'z-50',
 
-  /** Standard modals and dialogs */
-  modal: 'z-50',
+  /** Standard modals and dialogs — above workspace tabs (dynamic 100+) and search panel (1000+) */
+  modal: 'z-[1100]',
 
   /** Drawers and slide-out panels */
   drawer: 'z-50',
@@ -86,7 +86,7 @@ export const Z_INDEX_VALUES = {
   dropdown: 30,
   floating: 40,
   sidebar: 50,
-  modal: 50,
+  modal: 1100,
   drawer: 50,
   toast: 60,
   menuBackdrop: 60,
