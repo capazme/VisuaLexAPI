@@ -16,6 +16,11 @@ export interface ToastProps {
     label: string;
     onClick: () => void;
   };
+  /**
+   * aria-live politeness. Defaults to 'polite', but errors are announced
+   * with 'assertive' so screen readers interrupt.
+   */
+  ariaLive?: 'polite' | 'assertive' | 'off';
 }
 
 export function Toast({
@@ -26,6 +31,7 @@ export function Toast({
   duration = 3000,
   position = 'bottom',
   action,
+  ariaLive,
 }: ToastProps) {
   useEffect(() => {
     if (isVisible && duration > 0) {
@@ -68,6 +74,8 @@ export function Toast({
             styles[type]
           )}
           role="alert"
+          aria-live={ariaLive ?? (type === 'error' ? 'assertive' : 'polite')}
+          aria-atomic="true"
         >
           <div className="shrink-0">{icons[type]}</div>
           <p className="flex-1 font-medium text-sm leading-tight">{message}</p>

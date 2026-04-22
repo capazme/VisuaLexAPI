@@ -23,6 +23,15 @@ interface NormaCardProps {
   isNew?: boolean;
   searchedArticle?: string; // Original article number requested by user
   tabId?: string; // ID of the workspace tab containing this card
+  /**
+   * When true, an inline progress bar is rendered at the top edge of the card
+   * to signal that articles are still arriving for this tab.
+   */
+  isStreaming?: boolean;
+  /**
+   * Optional progress data for the inline streaming indicator.
+   */
+  streamProgress?: { loaded: number; total?: number } | null;
 }
 
 // Helper to generate unique article ID
@@ -32,7 +41,7 @@ const getUniqueId = (article: ArticleData) => {
     : article.norma_data.numero_articolo;
 };
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId, isStreaming, streamProgress }: NormaCardProps) {
   // Local UI state - defined first so we can derive activeArticle
   const [isOpen, setIsOpen] = useState(true);
   // Initialize with unique ID of the first article
@@ -163,9 +172,13 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
 
   if (articles.length === 0) return null;
 
+  const streamProgressPct = isStreaming && streamProgress && streamProgress.total
+    ? Math.min(100, Math.round((streamProgress.loaded / streamProgress.total) * 100))
+    : null;
+
   return (
     <div className={cn(
-      "rounded-xl overflow-hidden mb-6",
+      "relative rounded-xl overflow-hidden mb-6",
       "bg-white dark:bg-slate-900",
       "border shadow-lg",
       "transition-all duration-300",
@@ -174,6 +187,29 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
         ? "border-primary-500 ring-4 ring-primary-500/10"
         : "border-slate-200 dark:border-slate-800"
     )}>
+      {/* Inline streaming progress bar - pinned to top edge */}
+      {isStreaming && (
+        <div
+          className="absolute top-0 left-0 right-0 h-0.5 bg-primary-500/10 overflow-hidden z-20 pointer-events-none"
+          role="progressbar"
+          aria-label="Caricamento articoli in corso"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={streamProgressPct ?? undefined}
+        >
+          {streamProgressPct !== null ? (
+            <motion.div
+              className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+              initial={{ width: 0 }}
+              animate={{ width: `${streamProgressPct}%` }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            />
+          ) : (
+            <div className="h-full w-1/3 bg-gradient-to-r from-primary-500 to-primary-600 animate-pulse" />
+          )}
+        </div>
+      )}
+
       {/* Mobile Header */}
       <div
         className={cn(

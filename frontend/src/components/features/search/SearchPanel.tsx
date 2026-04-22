@@ -28,6 +28,28 @@ const generateNormaKey = (norma: Norma) => {
   return parts.map(part => sanitize(part || '')).join('--');
 };
 
+// Estimate the number of articles a search will return based on the `article`
+// field. Used both for the streaming progress bar and the loading skeleton.
+const calculateExpectedArticles = (article: string): number => {
+  if (!article) return 0;
+
+  // Handle ranges (e.g., "1-10")
+  const rangeMatch = article.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1]);
+    const end = parseInt(rangeMatch[2]);
+    return Math.abs(end - start) + 1;
+  }
+
+  // Handle comma-separated (e.g., "1,2,3")
+  if (article.includes(',')) {
+    return article.split(',').filter(a => a.trim()).length;
+  }
+
+  // Single article
+  return 1;
+};
+
 export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +64,9 @@ export function SearchPanel() {
   } = useAppStore();
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
   const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
+  // Remember the expected article count for the current search so the loading
+  // skeleton can render a meaningful number of placeholder cards (M-4).
+  const [expectedSkeletonCount, setExpectedSkeletonCount] = useState<number>(1);
 
   // Track active streaming tab to avoid creating duplicates
   const streamingTabRef = useRef<{ normaKey: string; tabId: string } | null>(null);
@@ -165,29 +190,16 @@ export function SearchPanel() {
     setResultsBuffer({}); // Clear buffer before new search
     streamingTabRef.current = null; // Reset streaming tab tracker
 
-    // Calculate expected number of articles for progress tracking
-    const calculateExpectedArticles = (article: string): number => {
-      if (!article) return 0;
-
-      // Handle ranges (e.g., "1-10")
-      const rangeMatch = article.match(/^(\d+)-(\d+)$/);
-      if (rangeMatch) {
-        const start = parseInt(rangeMatch[1]);
-        const end = parseInt(rangeMatch[2]);
-        return Math.abs(end - start) + 1;
-      }
-
-      // Handle comma-separated (e.g., "1,2,3")
-      if (article.includes(',')) {
-        return article.split(',').filter(a => a.trim()).length;
-      }
-
-      // Single article
-      return 1;
-    };
-
     const expectedTotal = calculateExpectedArticles(params.article || '');
     setLoadingProgress({ loaded: 0, total: expectedTotal });
+    // Skeleton count: at least 1, at most 10, mirrors the expected article
+    // count (M-4). Avoids a fixed 2-card skeleton for ranges like "1-50".
+    setExpectedSkeletonCount(Math.min(Math.max(expectedTotal || 1, 1), 10));
+
+    // Count of NDJSON lines that failed to parse so we can surface a summary
+    // error once the stream ends (M-2). Local to this search run so a later
+    // search starts clean.
+    let parseFailures = 0;
 
     try {
       // Always use streaming endpoint (now supports Brocardi too!)
@@ -220,6 +232,7 @@ export function SearchPanel() {
               const result = JSON.parse(line);
               processResult(result, params.version_date, true); // isStreaming = true
             } catch (e) {
+              parseFailures += 1;
               console.error("Error parsing line", line, e);
             }
           }
@@ -232,8 +245,17 @@ export function SearchPanel() {
           const result = JSON.parse(buffer);
           processResult(result, params.version_date, true); // isStreaming = true
         } catch (e) {
+          parseFailures += 1;
           console.error("Error parsing final buffer", e);
         }
+      }
+
+      // If any NDJSON lines were malformed, let the user know something was
+      // dropped instead of silently showing a partial result (M-2).
+      if (parseFailures > 0) {
+        setError(
+          `Errore durante lo streaming: ${parseFailures} ${parseFailures === 1 ? 'articolo non è stato elaborato' : 'articoli non sono stati elaborati'}.`
+        );
       }
 
       // Save to search history (fire and forget - don't block on this)
@@ -267,11 +289,15 @@ export function SearchPanel() {
     }
   }, [processResult]);
 
-  // Abort any in-flight stream on unmount so the reader stops writing to state.
+  // On unmount: abort any in-flight stream (C-2) and drop the buffered
+  // results + streaming tab ref (M-1) so nothing leaks into a future
+  // SearchPanel mount if the user navigates away mid-batch.
   useEffect(() => {
     return () => {
       streamAbortRef.current?.abort();
       streamAbortRef.current = null;
+      streamingTabRef.current = null;
+      setResultsBuffer({});
     };
   }, []);
 
@@ -536,19 +562,26 @@ export function SearchPanel() {
                 >
                   {workspaceTabs[mobileActiveTabIndex].content
                     .filter((item): item is typeof item & { type: 'norma' } => item.type === 'norma')
-                    .map((normaBlock) => (
-                      <NormaCard
-                        key={normaBlock.id}
-                        norma={normaBlock.norma}
-                        articles={normaBlock.articles || []}
-                        tabId={workspaceTabs[mobileActiveTabIndex].id}
-                        onCloseArticle={(articleId) => {
-                          removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
-                        }}
-                        onViewPdf={handleViewPdf}
-                        onCrossReference={handleCrossReferenceNavigate}
-                      />
-                    ))}
+                    .map((normaBlock) => {
+                      const tabIsStreaming =
+                        isLoading &&
+                        streamingTabRef.current?.tabId === workspaceTabs[mobileActiveTabIndex].id;
+                      return (
+                        <NormaCard
+                          key={normaBlock.id}
+                          norma={normaBlock.norma}
+                          articles={normaBlock.articles || []}
+                          tabId={workspaceTabs[mobileActiveTabIndex].id}
+                          onCloseArticle={(articleId) => {
+                            removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
+                          }}
+                          onViewPdf={handleViewPdf}
+                          onCrossReference={handleCrossReferenceNavigate}
+                          isStreaming={tabIsStreaming}
+                          streamProgress={tabIsStreaming ? loadingProgress : null}
+                        />
+                      );
+                    })}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -683,7 +716,7 @@ export function SearchPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-6">
-            {[1, 2].map(i => (
+            {Array.from({ length: expectedSkeletonCount }, (_, i) => i + 1).map(i => (
               <div key={i} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 <div className="p-8 space-y-6">
                   <div className="flex gap-4 items-center">
@@ -713,6 +746,9 @@ export function SearchPanel() {
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -20, x: '-50%' }}
             className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
           >
             <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
@@ -752,6 +788,9 @@ export function SearchPanel() {
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -20, x: '-50%' }}
             className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
           >
             <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-2xl shadow-lg shadow-red-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500">
