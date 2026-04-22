@@ -185,30 +185,52 @@ else
     print_warning "Skipping git pull (--no-pull)"
 fi
 
-# Step 2: Backend dependencies
+# Step 2: Python API dependencies + Playwright browser
+print_step "Installing Python API dependencies..."
+VENV_PIP="$SCRIPT_DIR/.venv/bin/pip"
+VENV_PLAYWRIGHT="$SCRIPT_DIR/.venv/bin/playwright"
+if [[ -x "$VENV_PIP" ]]; then
+    "$VENV_PIP" install --quiet -r "$SCRIPT_DIR/requirements.txt"
+    print_success "Python API dependencies installed"
+else
+    print_error "Python venv not found at $SCRIPT_DIR/.venv — create it with 'python -m venv .venv && .venv/bin/pip install -r requirements.txt'"
+    exit 1
+fi
+
+# Ensure Playwright Chromium browser matches the installed package version
+# (pip install does not download browser binaries; PDF export and date
+# completion require chromium to be present in the Playwright cache).
+if [[ -x "$VENV_PLAYWRIGHT" ]]; then
+    print_step "Syncing Playwright Chromium browser..."
+    "$VENV_PLAYWRIGHT" install chromium > /dev/null 2>&1 \
+        && print_success "Playwright Chromium ready" \
+        || print_warning "Playwright install failed — PDF export and date completion may break. Run '.venv/bin/playwright install chromium' manually."
+fi
+
+# Step 3: Backend dependencies
 print_step "Installing backend dependencies..."
 cd "$SCRIPT_DIR/backend"
 npm install --silent
 print_success "Backend dependencies installed"
 
-# Step 3: Frontend dependencies
+# Step 4: Frontend dependencies
 print_step "Installing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
 npm install --silent
 print_success "Frontend dependencies installed"
 
-# Step 4: Frontend build
+# Step 5: Frontend build
 print_step "Building frontend..."
 npm run build
 print_success "Frontend build completed"
 
-# Step 5: TypeScript check for backend
+# Step 6: TypeScript check for backend
 print_step "Checking backend TypeScript..."
 cd "$SCRIPT_DIR/backend"
 npx tsc --noEmit
 print_success "Backend TypeScript check passed"
 
-# Step 6: Update version (only if build succeeded and bump requested)
+# Step 7: Update version (only if build succeeded and bump requested)
 if [[ -n "$VERSION_BUMP" ]]; then
     print_step "Updating version to ${NEW_VERSION}..."
     update_version_file "$NEW_VERSION"
@@ -223,7 +245,7 @@ if [[ -n "$VERSION_BUMP" ]]; then
     print_success "Version commit created"
 fi
 
-# Step 7: Restart services
+# Step 8: Restart services
 if [[ "$DO_RESTART" == true ]]; then
     print_step "Restarting services..."
 

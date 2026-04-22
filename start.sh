@@ -42,12 +42,42 @@ check_port 3001 || exit 1
 check_port 5173 || exit 1
 echo -e "${GREEN}All ports available${NC}"
 
+# Preflight: Python venv, required packages, Playwright browser
+echo -e "\n${YELLOW}Checking Python environment...${NC}"
+VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
+VENV_PLAYWRIGHT="$PROJECT_ROOT/.venv/bin/playwright"
+
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo -e "${RED}.venv not found at $PROJECT_ROOT/.venv${NC}"
+    echo -e "  Run: ${YELLOW}python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium${NC}"
+    exit 1
+fi
+
+if ! "$VENV_PYTHON" -c "import redis, playwright" 2>/dev/null; then
+    echo -e "${RED}Python dependencies missing (redis and/or playwright not importable)${NC}"
+    echo -e "  Run: ${YELLOW}.venv/bin/pip install -r requirements.txt${NC}"
+    exit 1
+fi
+
+# Detect Playwright browser cache location (OS-aware, honors override env var)
+PW_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-}"
+if [ -z "$PW_CACHE" ]; then
+    case "$OSTYPE" in
+        darwin*) PW_CACHE="$HOME/Library/Caches/ms-playwright" ;;
+        linux*)  PW_CACHE="$HOME/.cache/ms-playwright" ;;
+    esac
+fi
+if [ -n "$PW_CACHE" ] && ! ls "$PW_CACHE" 2>/dev/null | grep -q chromium; then
+    echo -e "${RED}Playwright Chromium browser not found in $PW_CACHE${NC}"
+    echo -e "  Run: ${YELLOW}.venv/bin/playwright install chromium${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Python environment OK${NC}"
+
 # 1. Start VisuaLex API (Python/Quart - port 5000)
 echo -e "\n${YELLOW}[1/3] Starting VisuaLex API (port 5000)...${NC}"
 cd "$PROJECT_ROOT"
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
-fi
+source .venv/bin/activate
 python app.py &
 API_PID=$!
 echo -e "${GREEN}VisuaLex API started (PID: $API_PID)${NC}"
