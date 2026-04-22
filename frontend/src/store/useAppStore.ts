@@ -9,9 +9,15 @@ import { filterEnvironmentBySelection, type EnvironmentSelection } from '../util
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
 import { dossierService, type DossierApi } from '../services/dossierService';
-// Note: annotationService and highlightService will be used when per-article sync is implemented
-// import { annotationService } from '../services/annotationService';
-// import { highlightService } from '../services/highlightService';
+import { annotationService } from '../services/annotationService';
+import { highlightService } from '../services/highlightService';
+import {
+    annotationApiToStore,
+    annotationStoreToCreate,
+    buildWireNormaKey,
+    highlightApiToStore,
+    highlightStoreToCreate,
+} from '../utils/storeApiMappers';
 
 // Content types for WorkspaceTab
 interface NormaBlock {
@@ -156,10 +162,12 @@ interface AppState {
 
     addAnnotation: (normaKey: string, articleId: string, text: string) => void;
     removeAnnotation: (id: string) => void;
+    loadAnnotationsForArticle: (normaKey: string, articleId: string) => Promise<void>;
 
     addHighlight: (normaKey: string, articleId: string, text: string, range: string, color: Highlight['color'], startOffset?: number) => void;
     removeHighlight: (id: string) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
+    loadHighlightsForArticle: (normaKey: string, articleId: string) => Promise<void>;
 
     // Search Actions
     triggerSearch: (params: SearchParams) => void;
@@ -1119,38 +1127,137 @@ const appStore = createStore<AppState>()(
                 return newId;
             },
 
-            addAnnotation: (normaKey, articleId, text) => set((state) => {
-                state.annotations.push({
-                    id: uuidv4(),
+            // ── Annotation actions: optimistic update + server sync ────────
+            addAnnotation: (normaKey, articleId, text) => {
+                const tempId = uuidv4();
+                const optimistic: Annotation = {
+                    id: tempId,
                     normaKey,
                     articleId,
                     text,
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString(),
+                };
+                set((state) => { state.annotations.push(optimistic); });
+
+                annotationService
+                    .create(annotationStoreToCreate(optimistic))
+                    .then((serverAnnotation) => {
+                        const mapped = annotationApiToStore(serverAnnotation);
+                        set((state) => {
+                            const idx = state.annotations.findIndex(a => a.id === tempId);
+                            if (idx !== -1) state.annotations[idx] = mapped;
+                        });
+                    })
+                    .catch((err) => {
+                        console.error('Failed to sync annotation:', err);
+                        // Roll back the optimistic insert
+                        set((state) => {
+                            state.annotations = state.annotations.filter(a => a.id !== tempId);
+                        });
+                    });
+            },
+
+            removeAnnotation: (id) => {
+                const previous = get().annotations.find(a => a.id === id);
+                set((state) => {
+                    state.annotations = state.annotations.filter(a => a.id !== id);
                 });
-            }),
+                if (!previous) return;
+                // Skip server delete for optimistic entries that never reached
+                // the server (e.g. removed before the create POST resolved).
+                // Server-side ids are UUIDv4; the temp ids are too, so we can't
+                // distinguish cheaply — just call delete and swallow 404s.
+                annotationService.delete(id).catch((err) => {
+                    if (err?.status === 404) return;
+                    console.error('Failed to sync annotation delete:', err);
+                    set((state) => { state.annotations.push(previous); });
+                });
+            },
 
-            removeAnnotation: (id) => set((state) => {
-                state.annotations = state.annotations.filter(a => a.id !== id);
-            }),
+            loadAnnotationsForArticle: async (normaKey, articleId) => {
+                try {
+                    const wireKey = buildWireNormaKey(normaKey, articleId);
+                    const server = await annotationService.getByNormaKey(wireKey);
+                    const mapped = server.map(annotationApiToStore);
+                    set((state) => {
+                        // Replace only this article's annotations, keep others intact
+                        state.annotations = state.annotations
+                            .filter(a => !(a.normaKey === normaKey && a.articleId === articleId))
+                            .concat(mapped);
+                    });
+                } catch (err) {
+                    console.error('Failed to load annotations for article:', err);
+                }
+            },
 
-            addHighlight: (normaKey, articleId, text, range, color, startOffset) => set((state) => {
-                state.highlights.push({
-                    id: uuidv4(),
+            // ── Highlight actions: optimistic update + server sync ─────────
+            addHighlight: (normaKey, articleId, text, range, color, startOffset) => {
+                const tempId = uuidv4();
+                const optimistic: Highlight = {
+                    id: tempId,
                     normaKey,
                     articleId,
                     text,
                     rangeSerialized: range,
                     color,
                     ...(typeof startOffset === 'number' ? { startOffset } : {}),
-                });
-            }),
+                };
+                set((state) => { state.highlights.push(optimistic); });
 
-            removeHighlight: (id) => set((state) => {
-                state.highlights = state.highlights.filter(h => h.id !== id);
-            }),
+                const wirePayload = highlightStoreToCreate(optimistic);
+                if (!wirePayload) {
+                    // No startOffset — cannot persist server-side. Keep the
+                    // optimistic entry local only (legacy behaviour).
+                    return;
+                }
+
+                highlightService
+                    .create(wirePayload)
+                    .then((serverHighlight) => {
+                        const mapped = highlightApiToStore(serverHighlight);
+                        set((state) => {
+                            const idx = state.highlights.findIndex(h => h.id === tempId);
+                            if (idx !== -1) state.highlights[idx] = mapped;
+                        });
+                    })
+                    .catch((err) => {
+                        console.error('Failed to sync highlight:', err);
+                        set((state) => {
+                            state.highlights = state.highlights.filter(h => h.id !== tempId);
+                        });
+                    });
+            },
+
+            removeHighlight: (id) => {
+                const previous = get().highlights.find(h => h.id === id);
+                set((state) => {
+                    state.highlights = state.highlights.filter(h => h.id !== id);
+                });
+                if (!previous) return;
+                highlightService.delete(id).catch((err) => {
+                    if (err?.status === 404) return;
+                    console.error('Failed to sync highlight delete:', err);
+                    set((state) => { state.highlights.push(previous); });
+                });
+            },
 
             getHighlights: (normaKey, articleId) => {
                 return get().highlights.filter(h => h.normaKey === normaKey && h.articleId === articleId);
+            },
+
+            loadHighlightsForArticle: async (normaKey, articleId) => {
+                try {
+                    const wireKey = buildWireNormaKey(normaKey, articleId);
+                    const server = await highlightService.getByNormaKey(wireKey);
+                    const mapped = server.map(highlightApiToStore);
+                    set((state) => {
+                        state.highlights = state.highlights
+                            .filter(h => !(h.normaKey === normaKey && h.articleId === articleId))
+                            .concat(mapped);
+                    });
+                } catch (err) {
+                    console.error('Failed to load highlights for article:', err);
+                }
             },
 
             // Search Actions
