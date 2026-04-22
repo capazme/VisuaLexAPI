@@ -15,6 +15,7 @@ import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -399,7 +400,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     return (
         <div className="animate-in fade-in duration-300 relative">
             {/* Sticky Reading Toolbar */}
-            <div className="glass-toolbar sticky top-0 z-10 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50">
+            <div className={cn('glass-toolbar sticky top-0 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
                 {/* Version Info & Annex Source Badge */}
                 <div className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                     {versionInfo?.isHistorical ? (
@@ -528,7 +529,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                             )}
                         </button>
                         {showHighlightPicker && (
-                            <div className="absolute left-1/2 -translate-x-1/2 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 flex gap-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                            <div className={cn('absolute left-1/2 -translate-x-1/2 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 flex gap-2 animate-in fade-in zoom-in-95 duration-200', Z_INDEX.dropdown)}>
                                 {(['yellow', 'green', 'red', 'blue'] as const).map(color => (
                                     <button
                                         key={color}
@@ -576,8 +577,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                         </button>
                         {showMoreMenu && (
                             <>
-                                <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
-                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 animate-in fade-in zoom-in-95 duration-200 py-1">
+                                <div className={cn('fixed inset-0', Z_INDEX.dropdown)} onClick={() => setShowMoreMenu(false)} />
+                                <div className={cn('absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 py-1', Z_INDEX.dropdown)}>
                                     <button
                                         onClick={() => {
                                             setShowDossierModal(true);
@@ -811,7 +812,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             />
 
             {showVersionInput && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className={cn('fixed inset-0 flex items-center justify-center', Z_INDEX.modal)}>
                     <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowVersionInput(false)} />
                     <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm mx-4 p-5 animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between mb-4">

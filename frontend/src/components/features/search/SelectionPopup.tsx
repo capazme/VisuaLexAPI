@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Highlighter, StickyNote, Copy, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 interface SelectionPopupProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -173,8 +174,9 @@ export function SelectionPopup({
     <div
       ref={popupRef}
       className={cn(
-        "absolute z-50 transform -translate-x-1/2 -translate-y-full",
-        "animate-in fade-in zoom-in-95 duration-150"
+        'absolute transform -translate-x-1/2 -translate-y-full',
+        'animate-in fade-in zoom-in-95 duration-150',
+        Z_INDEX.floating
       )}
       style={{
         left: popup.x,

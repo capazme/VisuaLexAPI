@@ -4,6 +4,7 @@ import { X, ArrowUpRight } from 'lucide-react';
 import type { Footnote } from '../../../types';
 import { extractArticleRefs, type ArticleRef } from '../../../utils/citationParser';
 import { cn } from '../../../lib/utils';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 interface FootnoteTooltipProps {
   footnote: Footnote;
@@ -151,7 +152,7 @@ export function FootnoteTooltip({
           <div
             ref={tooltipRef}
             role="tooltip"
-            className="fixed z-50 max-w-xs w-full animate-in fade-in-0 zoom-in-95 duration-150"
+            className={cn('fixed max-w-xs w-full animate-in fade-in-0 zoom-in-95 duration-150', Z_INDEX.tooltip)}
             style={{
               top: position.top,
               left: position.left,
