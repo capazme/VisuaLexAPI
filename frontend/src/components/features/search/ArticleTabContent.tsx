@@ -46,7 +46,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [showDossierModal, setShowDossierModal] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
     const [noteText, setNoteText] = useState('');
-    const [highlightColor] = useState<'yellow' | 'green' | 'red' | 'blue'>('yellow');
     const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
@@ -217,7 +216,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     setShowHighlightPicker(false);
                     return;
                 }
-                addHighlight(itemKey, uniqueArticleId, saved.text, '', color || highlightColor);
+                addHighlight(itemKey, uniqueArticleId, saved.text, '', color || 'yellow');
                 showToast('Testo evidenziato', 'success');
                 highlightSelectionRef.current = null;
             } else {
@@ -238,7 +237,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             return;
         }
 
-        const finalColor = color || highlightColor;
+        const finalColor = color || 'yellow';
         addHighlight(itemKey, uniqueArticleId, selectedText, '', finalColor);
         showToast(`Testo evidenziato in ${finalColor}`, 'success');
         setShowHighlightPicker(false);
@@ -543,7 +542,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                                             color === 'green' && 'bg-emerald-200 border-emerald-400',
                                             color === 'red' && 'bg-red-200 border-red-400',
                                             color === 'blue' && 'bg-blue-200 border-blue-400',
-                                            highlightColor === color && 'ring-2 ring-offset-1 ring-purple-500'
+                                            color === 'yellow' && 'ring-2 ring-offset-1 ring-purple-500'
                                         )}
                                         title={`Evidenzia in ${color}`}
                                     />
@@ -735,7 +734,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 </div>
             )}
 
-            {brocardi_info && (
+            {brocardi_info !== undefined && (
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
                     <BrocardiDisplay
                         info={brocardi_info}
@@ -851,7 +850,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                                                 version_date: versionDate,
                                                 show_brocardi_info: true
                                             };
-                                            console.log('🔎 Triggering version search with params:', searchParams);
                                             showToast(`Ricerca versione del ${versionDate}`, 'info');
                                             setShowVersionInput(false);
                                             setVersionDate('');

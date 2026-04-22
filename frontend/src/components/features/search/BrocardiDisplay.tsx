@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lightbulb, ExternalLink, ChevronDown, BookOpen, Link2, FileText, ChevronRight } from 'lucide-react';
+import { Lightbulb, ExternalLink, ChevronDown, BookOpen, Link2, FileText, ChevronRight, AlertTriangle, RotateCw } from 'lucide-react';
 import type { BrocardiInfo as BrocardiInfoType, RelazioneContent, Footnote, CrossReference } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
@@ -7,27 +7,52 @@ import { MassimeSection } from './MassimeSection';
 import { FootnoteTooltip } from './FootnoteTooltip';
 import { useAppStore } from '../../../store/useAppStore';
 
-// Error Boundary for BrocardiSection
+// Error Boundary for BrocardiSection — surfaces the failure instead of hiding
+// the section silently so users know something went wrong and can retry.
 class BrocardiSectionErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
+  { children: React.ReactNode; sectionTitle?: string },
+  { hasError: boolean; errorMessage: string }
 > {
-  constructor(props: { children: React.ReactNode }) {
+  constructor(props: { children: React.ReactNode; sectionTitle?: string }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, errorMessage: '' };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, errorMessage: error.message || 'Errore di rendering' };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('BrocardiSection error:', error, errorInfo);
   }
 
+  handleRetry = () => {
+    this.setState({ hasError: false, errorMessage: '' });
+  };
+
   render() {
     if (this.state.hasError) {
-      return null; // Silently fail - don't show broken section
+      return (
+        <div className="card bg-red-50/60 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-xl p-4 mb-3 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-red-700 dark:text-red-400">
+              Errore nel caricamento {this.props.sectionTitle ? `"${this.props.sectionTitle}"` : 'della sezione'}
+            </div>
+            <div className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
+              {this.state.errorMessage}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={this.handleRetry}
+            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-white dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg border border-red-200 dark:border-red-900/50 transition-colors"
+          >
+            <RotateCw size={12} />
+            Riprova
+          </button>
+        </div>
+      );
     }
     return this.props.children;
   }
@@ -115,7 +140,7 @@ function BrocardiSectionContent({ title, content, icon }: BrocardiSectionProps) 
 // Wrapper with error boundary
 function BrocardiSection(props: BrocardiSectionProps) {
   return (
-    <BrocardiSectionErrorBoundary>
+    <BrocardiSectionErrorBoundary sectionTitle={props.title}>
       <BrocardiSectionContent {...props} />
     </BrocardiSectionErrorBoundary>
   );
@@ -406,9 +431,35 @@ function CrossReferencesSection({
 }
 
 interface BrocardiDisplayProps {
-  info: BrocardiInfoType;
+  info: BrocardiInfoType | null;
   currentNorma?: { tipo_atto: string; data?: string; numero_atto?: string };
   onArticleClick?: (articleNumber: string, tipoAtto: string) => void;
+}
+
+function BrocardiEmptyState({ link }: { link?: string | null }) {
+  return (
+    <div className="brocardi-display bg-slate-50/50 dark:bg-slate-800/30 rounded-xl p-4 sm:p-5 border border-dashed border-slate-200 dark:border-slate-700/60 text-center">
+      <div className="flex flex-col items-center gap-2 py-2">
+        <BookOpen size={22} className="text-slate-400 dark:text-slate-500" />
+        <div className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+          Nessun approfondimento disponibile
+        </div>
+        <div className="text-xs text-slate-400 dark:text-slate-500 max-w-md">
+          Brocardi.it non pubblica dottrina o massime per questo articolo.
+        </div>
+        {link && (
+          <a
+            href={link}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline inline-flex items-center gap-1.5"
+          >
+            Verifica su Brocardi.it <ExternalLink size={11} />
+          </a>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function BrocardiDisplay({ info, currentNorma, onArticleClick }: BrocardiDisplayProps) {
@@ -417,7 +468,10 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick }: Brocardi
     typeof window !== 'undefined' ? window.innerWidth >= 768 : true
   );
 
-  // Check if we have any content to display
+  if (!info) {
+    return <BrocardiEmptyState />;
+  }
+
   const hasContent = info.Brocardi || info.Ratio || info.Spiegazione ||
     (info.Massime && info.Massime.length > 0) ||
     (info.Relazioni && info.Relazioni.length > 0) ||
@@ -425,7 +479,9 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick }: Brocardi
     (info.Footnotes && info.Footnotes.length > 0) ||
     info.RelazioneCostituzione;
 
-  if (!hasContent) return null;
+  if (!hasContent) {
+    return <BrocardiEmptyState link={info.link} />;
+  }
 
   return (
     <div className="brocardi-display bg-slate-50/50 dark:bg-slate-800/30 rounded-xl p-4 sm:p-5 border border-slate-100 dark:border-slate-800">

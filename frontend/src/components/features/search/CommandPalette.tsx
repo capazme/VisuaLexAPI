@@ -8,6 +8,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 import { useTour } from '../../../hooks/useTour';
 import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
+import { Z_INDEX } from '../../../constants/zIndex';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CommandPaletteProps {
@@ -195,7 +196,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   const selectedActLabel = ACT_TYPES.find(act => act.value === selectedAct)?.label;
 
   return (
-    <div className="fixed inset-0 z-[130] p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar">
+    <div className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
       {/* Premium Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}

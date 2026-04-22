@@ -598,6 +598,18 @@ class BrocardiScraper(BaseScraper):
         if isinstance(norma_visitata, NormaVisitata):
             norma = norma_visitata.norma
             tipo_norm = normalize_act_type(norma.tipo_atto_str, True, 'brocardi')
+            # BROCARDI_CODICI keys for codes have shape "Codice Civile (R.D. 16 marzo 1942, n. 262)".
+            # Appending `data` / `numero_atto` in a different format ("1942-03-16, n. 262") would
+            # break the substring match in do_know. For codes the name alone uniquely identifies
+            # the entry, so we skip the decorative components.
+            tipo_lower = tipo_norm.lower()
+            is_code = (
+                tipo_lower in ('costituzione', 'preleggi')
+                or tipo_lower.startswith('codice')
+                or tipo_lower.startswith('disposizioni')
+            )
+            if is_code:
+                return tipo_norm
             components = [tipo_norm]
             if norma.data:
                 components.append(f"{norma.data},")

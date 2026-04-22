@@ -46,6 +46,9 @@ export function SearchPanel() {
   // Track active streaming tab to avoid creating duplicates
   const streamingTabRef = useRef<{ normaKey: string; tabId: string } | null>(null);
 
+  // Abort in-flight streaming fetch when a new search starts or component unmounts
+  const streamAbortRef = useRef<AbortController | null>(null);
+
   // Mobile: active tab index for swipe navigation
   const [mobileActiveTabIndex, setMobileActiveTabIndex] = useState(0);
 
@@ -150,6 +153,13 @@ export function SearchPanel() {
 
   const handleSearch = useCallback(async (params: SearchParams) => {
     console.log('🔍 SearchPanel handleSearch called with:', params);
+
+    // Cancel any in-flight streaming fetch so its reader does not keep writing
+    // into the workspace after this new search took over.
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+
     setIsLoading(true);
     setError(null);
     setResultsBuffer({}); // Clear buffer before new search
@@ -184,7 +194,8 @@ export function SearchPanel() {
       const response = await fetch('/stream_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
+        body: JSON.stringify(params),
+        signal: controller.signal,
       });
 
       if (!response.ok) throw new Error('Errore nella richiesta');
@@ -240,12 +251,29 @@ export function SearchPanel() {
       // Results buffer will be processed by useEffect below
 
     } catch (err: any) {
+      // A new search (or unmount) aborted this stream — not a user-facing error.
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        return;
+      }
       setError(err.message || "Si è verificato un errore.");
     } finally {
-      setIsLoading(false);
-      setLoadingProgress(null); // Clear progress when done
+      // Only clear transient UI state if this controller is still the active one.
+      // A newer search replaces streamAbortRef before reaching finally.
+      if (streamAbortRef.current === controller) {
+        setIsLoading(false);
+        setLoadingProgress(null);
+        streamAbortRef.current = null;
+      }
     }
   }, [processResult]);
+
+  // Abort any in-flight stream on unmount so the reader stops writing to state.
+  useEffect(() => {
+    return () => {
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = null;
+    };
+  }, []);
 
   // Process results buffer and create workspace tabs
   useEffect(() => {
@@ -517,7 +545,6 @@ export function SearchPanel() {
                         onCloseArticle={(articleId) => {
                           removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
                         }}
-                        onPinArticle={() => { }}
                         onViewPdf={handleViewPdf}
                         onCrossReference={handleCrossReferenceNavigate}
                       />

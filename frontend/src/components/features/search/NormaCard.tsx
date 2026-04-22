@@ -17,9 +17,7 @@ interface NormaCardProps {
   norma: Norma;
   articles: ArticleData[];
   onCloseArticle: (articleId: string) => void;
-  onPinArticle: (articleId: string) => void; // Placeholder for future use
   onViewPdf: (urn: string) => void;
-  onCompareArticle?: (article: ArticleData) => void;
   onCrossReference?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
   onPopOut?: (articleId: string) => void;
   isNew?: boolean;
@@ -34,7 +32,7 @@ const getUniqueId = (article: ArticleData) => {
     : article.norma_data.numero_articolo;
 };
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompareArticle: _onCompareArticle, onCrossReference, isNew, searchedArticle, tabId }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId }: NormaCardProps) {
   // Local UI state - defined first so we can derive activeArticle
   const [isOpen, setIsOpen] = useState(true);
   // Initialize with unique ID of the first article

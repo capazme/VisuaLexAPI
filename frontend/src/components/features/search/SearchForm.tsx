@@ -9,6 +9,7 @@ import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
+import { fetchNormaData, fetchArticleTree } from '../../../services/legalApi';
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void;
@@ -89,7 +90,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     article: '1',
     version: 'vigente',
     version_date: '',
-    show_brocardi_info: false,
+    show_brocardi_info: true,
     annex: ''
   });
 
@@ -108,7 +109,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
 
   // Fetch article tree when norma details change
   useEffect(() => {
-    const fetchArticleTree = async () => {
+    const loadArticleTree = async () => {
       const normaKey = getNormaKey();
 
       if (!formData.act_type) {
@@ -130,25 +131,13 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       setIsLoadingArticles(true);
 
       try {
-        // First get the URN
-        const requestBody = {
+        const normaData = await fetchNormaData({
           act_type: formData.act_type,
           act_number: formData.act_number || undefined,
           date: formData.date ? parseItalianDate(formData.date) : undefined,
-          article: '1'
-        };
-
-        const normaRes = await fetch('/fetch_norma_data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody)
+          article: '1',
         });
 
-        if (!normaRes.ok) {
-          throw new Error('Errore fetch norma');
-        }
-
-        const normaData = await normaRes.json();
         const urnToUse = normaData.norma_data?.[0]?.urn || normaData.norma_data?.[0]?.url;
 
         if (!urnToUse) {
@@ -156,19 +145,10 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           return;
         }
 
-        // Then fetch the tree
-        const treeRes = await fetch('/fetch_tree', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ urn: urnToUse, link: false, details: false })
-        });
-
-        if (!treeRes.ok) {
-          throw new Error('Errore fetch tree');
-        }
-
-        const treeResponse = await treeRes.json();
-        const treeData = treeResponse.articles || treeResponse;
+        const treeResponse = await fetchArticleTree({ urn: urnToUse, link: false, details: false });
+        const treeData = Array.isArray(treeResponse)
+          ? treeResponse
+          : (treeResponse as { articles?: unknown[] }).articles ?? [];
         const articles = extractArticleIdsFromTree(treeData);
 
         setArticleList(articles);
@@ -182,7 +162,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
     };
 
     // Debounce the fetch
-    const timeout = setTimeout(fetchArticleTree, 500);
+    const timeout = setTimeout(loadArticleTree, 500);
     return () => clearTimeout(timeout);
   }, [formData.act_type, formData.act_number, formData.date, getNormaKey, lastFetchedNorma]);
 
@@ -277,7 +257,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
       article: '1',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: false,
+      show_brocardi_info: true,
       annex: ''
     });
     setArticleList([]);
