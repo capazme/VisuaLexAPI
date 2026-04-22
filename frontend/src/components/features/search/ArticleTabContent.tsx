@@ -40,9 +40,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         annotations,
         addAnnotation,
         removeAnnotation,
+        loadAnnotationsForArticle,
         highlights,
         addHighlight,
         removeHighlight,
+        loadHighlightsForArticle,
         triggerSearch,
         addQuickNorm,
     } = useAppStore();
@@ -84,6 +86,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     const itemAnnotations = annotations.filter(a => a.normaKey === itemKey && a.articleId === uniqueArticleId);
     const articleHighlights = highlights.filter(h => h.normaKey === itemKey && h.articleId === uniqueArticleId);
+
+    // Fetch persisted highlights + annotations from the Node backend when the
+    // article first mounts (or when the user switches to a different article
+    // inside the same NormaCard). The store actions guard against racing
+    // against in-flight optimistic inserts by replacing only the entries for
+    // this specific (normaKey, articleId) pair.
+    useEffect(() => {
+        if (!itemKey || !uniqueArticleId) return;
+        loadHighlightsForArticle(itemKey, uniqueArticleId);
+        loadAnnotationsForArticle(itemKey, uniqueArticleId);
+    }, [itemKey, uniqueArticleId, loadHighlightsForArticle, loadAnnotationsForArticle]);
 
     useEffect(() => {
         if (!toastMessage) return;
