@@ -185,6 +185,13 @@ export interface Highlight {
     rangeSerialized: string; // Simple range serialization
     text: string;
     color: 'yellow' | 'green' | 'red' | 'blue';
+    /**
+     * Character offset of this highlight's start in the article's *plain* text
+     * (i.e. `article_text` with newlines stripped — matches DOM textContent).
+     * Optional for backward compatibility with highlights saved before this
+     * field existed: those fall back to global-match rendering.
+     */
+    startOffset?: number;
 }
 
 export interface Dossier {

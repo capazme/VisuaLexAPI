@@ -3,10 +3,11 @@ import { Highlighter, StickyNote, Copy, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
+import { getPlainTextOffset } from '../../../utils/selectionOffset';
 
 interface SelectionPopupProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  onHighlight: (text: string, color: HighlightColor) => void;
+  onHighlight: (text: string, color: HighlightColor, startOffset: number) => void;
   onAddNote: (text: string) => void;
   onCopy: (text: string) => void;
   onSearch?: (text: string) => void;
@@ -17,6 +18,7 @@ interface PopupState {
   x: number;
   y: number;
   text: string;
+  startOffset: number; // plain-text offset of the selection start in container.textContent
 }
 
 export function SelectionPopup({
@@ -26,7 +28,7 @@ export function SelectionPopup({
   onCopy,
   onSearch
 }: SelectionPopupProps) {
-  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '' });
+  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1 });
   const [showColorPicker, setShowColorPicker] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -71,11 +73,16 @@ export function SelectionPopup({
       const x = rect.left + rect.width / 2 - containerRect.left;
       const y = rect.top - containerRect.top - 10;
 
+      // Capture the plain-text offset of the selection start so the renderer
+      // can pin the mark to this exact occurrence (not every copy of the string).
+      const startOffset = getPlainTextOffset(containerRef.current, range.startContainer, range.startOffset);
+
       setPopup({
         visible: true,
         x: Math.max(80, Math.min(x, containerRect.width - 80)), // Keep within bounds
         y: Math.max(50, y), // Ensure not too high
-        text: selectedText
+        text: selectedText,
+        startOffset,
       });
     }, 10);
   }, [containerRef, hidePopup]);
@@ -115,7 +122,7 @@ export function SelectionPopup({
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'h' && !e.metaKey && !e.ctrlKey) {
         // Quick highlight with default color
-        onHighlight(popup.text, 'yellow');
+        onHighlight(popup.text, 'yellow', popup.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
@@ -130,7 +137,7 @@ export function SelectionPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [popup.visible, popup.text, onHighlight, onAddNote, hidePopup]);
+  }, [popup.visible, popup.text, popup.startOffset, onHighlight, onAddNote, hidePopup]);
 
   const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search') => {
     switch (action) {
@@ -156,7 +163,7 @@ export function SelectionPopup({
   };
 
   const handleHighlightColor = (color: HighlightColor) => {
-    onHighlight(popup.text, color);
+    onHighlight(popup.text, color, popup.startOffset);
     hidePopup();
     setShowColorPicker(false);
     window.getSelection()?.removeAllRanges();

@@ -157,7 +157,7 @@ interface AppState {
     addAnnotation: (normaKey: string, articleId: string, text: string) => void;
     removeAnnotation: (id: string) => void;
 
-    addHighlight: (normaKey: string, articleId: string, text: string, range: string, color: Highlight['color']) => void;
+    addHighlight: (normaKey: string, articleId: string, text: string, range: string, color: Highlight['color'], startOffset?: number) => void;
     removeHighlight: (id: string) => void;
     getHighlights: (normaKey: string, articleId: string) => Highlight[];
 
@@ -1133,14 +1133,15 @@ const appStore = createStore<AppState>()(
                 state.annotations = state.annotations.filter(a => a.id !== id);
             }),
 
-            addHighlight: (normaKey, articleId, text, range, color) => set((state) => {
+            addHighlight: (normaKey, articleId, text, range, color, startOffset) => set((state) => {
                 state.highlights.push({
                     id: uuidv4(),
                     normaKey,
                     articleId,
                     text,
                     rangeSerialized: range,
-                    color
+                    color,
+                    ...(typeof startOffset === 'number' ? { startOffset } : {}),
                 });
             }),
 

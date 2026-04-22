@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import type { ArticleData, SearchParams } from '../../../types';
+import type { ArticleData, SearchParams, Highlight } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { SelectionPopup } from './SelectionPopup';
 import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
@@ -18,6 +18,7 @@ import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } fro
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { getPlainTextOffset, getSelectionPlainOffset } from '../../../utils/selectionOffset';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -57,7 +58,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [showHighlightPicker, setShowHighlightPicker] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
-    const highlightSelectionRef = useRef<{ start: number; end: number; text: string } | null>(null);
+    // Tracks the last valid text selection inside the article body so the
+    // toolbar highlight button can apply a highlight even after the user
+    // moves focus away (selection may be cleared by the click).
+    const highlightSelectionRef = useRef<{ text: string; startOffset: number } | null>(null);
     const versionDateInputRef = useRef<HTMLInputElement>(null);
 
     // Citation preview hook - destructure to get stable function references
@@ -91,16 +95,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     useEffect(() => {
         const handleSelection = () => {
             const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
+            if (selection && selection.rangeCount > 0 && contentRef.current) {
                 const range = selection.getRangeAt(0);
                 const selectedText = selection.toString().trim();
 
-                if (selectedText && contentRef.current?.contains(range.commonAncestorContainer)) {
-                    highlightSelectionRef.current = {
-                        start: range.startOffset,
-                        end: range.endOffset,
-                        text: selectedText
-                    };
+                if (selectedText && contentRef.current.contains(range.commonAncestorContainer)) {
+                    const startOffset = getPlainTextOffset(contentRef.current, range.startContainer, range.startOffset);
+                    highlightSelectionRef.current = { text: selectedText, startOffset };
                 }
             }
         };
@@ -207,20 +208,20 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         const selectedText = selection?.toString().trim();
 
         if (!selectedText) {
-            // Try to use saved selection
+            // Try to use saved selection (user may have clicked the toolbar
+            // button which stole focus and cleared the live selection).
             if (highlightSelectionRef.current) {
                 const saved = highlightSelectionRef.current;
-                // Check if already highlighted
                 const alreadyHighlighted = articleHighlights.some(h =>
-                    h.text.toLowerCase() === saved.text.toLowerCase()
+                    h.text.toLowerCase() === saved.text.toLowerCase() && h.startOffset === saved.startOffset
                 );
                 if (alreadyHighlighted) {
-                    showToast('Questo testo è già evidenziato', 'info');
+                    showToast('Questa occorrenza è già evidenziata', 'info');
                     highlightSelectionRef.current = null;
                     setShowHighlightPicker(false);
                     return;
                 }
-                addHighlight(itemKey, uniqueArticleId, saved.text, '', color || 'yellow');
+                addHighlight(itemKey, uniqueArticleId, saved.text, '', color || 'yellow', saved.startOffset);
                 showToast('Testo evidenziato', 'success');
                 highlightSelectionRef.current = null;
             } else {
@@ -230,19 +231,23 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             return;
         }
 
-        // Check if already highlighted
+        const liveOffset = getSelectionPlainOffset(contentRef.current, selection);
+
+        // Already-highlighted check: same text AND same occurrence (startOffset).
+        // A user can legitimately highlight two different occurrences of the
+        // same word, so we don't block on text alone.
         const alreadyHighlighted = articleHighlights.some(h =>
-            h.text.toLowerCase() === selectedText.toLowerCase()
+            h.text.toLowerCase() === selectedText.toLowerCase() && h.startOffset === liveOffset
         );
         if (alreadyHighlighted) {
-            showToast('Questo testo è già evidenziato', 'info');
+            showToast('Questa occorrenza è già evidenziata', 'info');
             setShowHighlightPicker(false);
             selection?.removeAllRanges();
             return;
         }
 
         const finalColor = color || 'yellow';
-        addHighlight(itemKey, uniqueArticleId, selectedText, '', finalColor);
+        addHighlight(itemKey, uniqueArticleId, selectedText, '', finalColor, liveOffset);
         showToast(`Testo evidenziato in ${finalColor}`, 'success');
         setShowHighlightPicker(false);
         highlightSelectionRef.current = null;
@@ -252,15 +257,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     // Handler for SelectionPopup highlight action
-    const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue') => {
+    const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
         const alreadyHighlighted = articleHighlights.some(h =>
-            h.text.toLowerCase() === text.toLowerCase()
+            h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
         );
         if (alreadyHighlighted) {
-            showToast('Questo testo è già evidenziato', 'info');
+            showToast('Questa occorrenza è già evidenziata', 'info');
             return;
         }
-        addHighlight(itemKey, uniqueArticleId, text, '', color);
+        addHighlight(itemKey, uniqueArticleId, text, '', color, startOffset);
         showToast(`Testo evidenziato in ${color}`, 'success');
     };
 
@@ -294,35 +299,80 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         });
     }, [triggerSearch]);
 
-    const formattedText = article_text?.replace(/\n/g, '<br />') || '';
-
     const processedContent = useMemo(() => {
-        let html = formattedText;
+        // Start from the raw article text (still containing \n). Highlight
+        // marks are inserted at raw offsets derived from each highlight's
+        // plain-text offset, then \n → <br /> conversion happens afterwards.
+        let html = article_text || '';
 
-        // First, apply highlights (before other processing to avoid conflicts)
-        // Sort highlights by length (longest first) to avoid partial matches
-        const sortedHighlights = [...articleHighlights].sort((a, b) => b.text.length - a.text.length);
-        sortedHighlights.forEach(h => {
-            const escaped = h.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-            // Only replace if not already inside a mark tag
-            const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
-            html = html.replace(regex, (match) => {
-                return `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${match}</mark>`;
-            });
+        const wrap = (h: Highlight, matched: string) =>
+            `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${matched}</mark>`;
+
+        // Split highlights by whether they carry a precise plain-text offset
+        const withOffset = articleHighlights.filter(
+            (h): h is Highlight & { startOffset: number } =>
+                typeof h.startOffset === 'number' && h.startOffset >= 0
+        );
+        const legacyHighlights = articleHighlights.filter(
+            (h) => typeof h.startOffset !== 'number' || h.startOffset < 0
+        );
+
+        // Offset-based highlights: pin each mark to its specific occurrence.
+        // Apply from latest offset to earliest so earlier rawStart positions
+        // remain valid after insertion.
+        const sortedByOffset = [...withOffset].sort((a, b) => b.startOffset - a.startOffset);
+        sortedByOffset.forEach((h) => {
+            // Convert plain-text offset (no \n, matches DOM textContent) into
+            // an offset in the raw text (which still contains \n).
+            let rawIdx = 0;
+            let plainIdx = 0;
+            while (plainIdx < h.startOffset && rawIdx < html.length) {
+                if (html[rawIdx] !== '\n') plainIdx++;
+                rawIdx++;
+            }
+            const rawStart = rawIdx;
+
+            // Advance by h.text.length plain chars (skipping any \n we cross).
+            let remaining = h.text.length;
+            while (remaining > 0 && rawIdx < html.length) {
+                if (html[rawIdx] !== '\n') remaining--;
+                rawIdx++;
+            }
+            const rawEnd = rawIdx;
+
+            // Sanity check: make sure the slice (minus \n) matches h.text
+            // case-insensitively. If not, the article text changed since the
+            // highlight was saved — skip rather than mis-mark random content.
+            const slice = html.slice(rawStart, rawEnd).replace(/\n/g, '');
+            if (slice.toLowerCase() !== h.text.toLowerCase()) return;
+
+            html = html.slice(0, rawStart) + wrap(h, html.slice(rawStart, rawEnd)) + html.slice(rawEnd);
         });
 
-        // Then apply dictionary terms (avoiding already highlighted text)
+        // Legacy highlights without offset fall back to global match (every
+        // occurrence), matching the pre-offset behaviour for older saves.
+        const sortedLegacy = [...legacyHighlights].sort((a, b) => b.text.length - a.text.length);
+        sortedLegacy.forEach((h) => {
+            const escaped = h.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
+            html = html.replace(regex, (match) => wrap(h, match));
+        });
+
+        // Convert raw newlines to <br /> after highlights are placed.
+        html = html.replace(/\n/g, '<br />');
+
+        // Dictionary terms (avoiding already highlighted text)
         Object.entries(DICTIONARY_TERMS).forEach(([term, definition]) => {
             const regex = new RegExp(`(?<!<mark[^>]*>)\\b${term}\\b(?!</mark>)`, 'gi');
             html = html.replace(regex, (match) => `<span class="dictionary-term" data-definition="${definition}">${match}</span>`);
         });
 
-        // Finally, apply citation detection with hover preview
-        // Pass norma_data so simple "art. X" references use the current norm context
+        // Citation detection with hover preview — norma_data lets simple
+        // "art. X" references resolve against the current norm.
         html = wrapCitationsInHtml(html, norma_data);
 
         return html;
-    }, [formattedText, articleHighlights, norma_data]);
+    }, [article_text, articleHighlights, norma_data]);
 
     // Handle citation hover and click events
     useEffect(() => {

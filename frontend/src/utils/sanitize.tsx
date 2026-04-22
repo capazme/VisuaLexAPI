@@ -28,6 +28,7 @@ const DEFAULT_CONFIG: Config = {
   ],
   ALLOWED_ATTR: [
     'href', 'title', 'class', 'id', 'target', 'rel',
+    'style', // Needed for inline highlight colors (HIGHLIGHT_STYLES CSS vars)
     'data-*', // Allow data attributes for custom functionality
   ],
   ALLOW_DATA_ATTR: true,
