@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Z_INDEX } from '../../constants/zIndex';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
 
@@ -107,11 +108,11 @@ export function Modal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeOnBackdrop ? onClose : undefined}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1100]"
+            className={cn('fixed inset-0 bg-slate-900/40 backdrop-blur-sm', Z_INDEX.modal)}
             aria-hidden="true"
           />
 
-          <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 pointer-events-none">
+          <div className={cn('fixed inset-0 flex items-center justify-center p-4 pointer-events-none', Z_INDEX.modal)}>
             <motion.div
               role={role}
               aria-modal="true"

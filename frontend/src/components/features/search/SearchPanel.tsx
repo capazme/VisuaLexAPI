@@ -16,6 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
+import { Z_INDEX } from '../../../constants/zIndex';
 
 // Helper to generate keys (replicates original JS logic)
 const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -684,7 +685,7 @@ export function SearchPanel() {
             initial={{ opacity: 0, y: -20, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -20, x: '-50%' }}
-            className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
+            className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
           >
             <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
@@ -723,7 +724,7 @@ export function SearchPanel() {
             initial={{ opacity: 0, y: -20, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -20, x: '-50%' }}
-            className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
+            className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
           >
             <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/30 p-4 rounded-2xl shadow-lg shadow-red-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500">
@@ -751,7 +752,7 @@ export function SearchPanel() {
             initial={{ opacity: 0, y: -20, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: -20, x: '-50%' }}
-            className="fixed top-24 left-1/2 z-[100] w-full max-w-md px-4"
+            className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
           >
             <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">

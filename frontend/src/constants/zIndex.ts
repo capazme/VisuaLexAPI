@@ -1,111 +1,114 @@
 /**
  * Standardized z-index values for consistent layering.
  *
- * Layer hierarchy (lowest to highest):
- * 1. Base content (no z-index needed)
- * 2. Local stacking within components (z-10)
- * 3. Sticky headers (z-20)
- * 4. Dropdowns base (z-30)
- * 5. Floating buttons (z-40)
- * 6. Sidebar navigation (z-50)
- * 7. Standard modals and drawers (z-50)
- * 8. Toast notifications (z-[60])
- * 9. User menu backdrop (z-[60])
- * 10. User menu popup (z-[70])
- * 11. Workspace dock (z-[80])
- * 12. Tooltips and previews (z-[85])
- * 13. Compare view overlay (z-[90])
- * 14. Heavy modals - Dossier, PDF, Annex (z-[100])
- * 15. Study mode (z-[120] backdrop, z-[130] panel)
- * 16. Command palette (z-[130])
- * 17. Settings modal (z-[200]) - ALWAYS on top
+ * TWO BANDS design:
+ * - BASE BAND (0-99): in-document stacking, sidebar, dock, floating panels
+ * - OVERLAY BAND (1000+): modals, drawers, tooltips, toasts, settings
  *
- * IMPORTANT: Import and use these constants instead of hardcoding z-index values!
+ * The gap (100-999) is intentionally unused: it isolates the base band from
+ * the overlay band so modals cannot be hidden by dynamic counters used for
+ * floating windows (workspace tabs, search panel).
+ *
+ * The workspace tab dynamic counter is clamped in WorkspaceTabPanel.tsx to
+ * stay below Z_INDEX_VALUES.dock, so stack ordering among tabs works but
+ * never leaks into the overlay band.
+ *
+ * IMPORTANT: Import and use these constants instead of hardcoding z-index.
  */
 
 export const Z_INDEX = {
-  /** Local stacking within a component */
+  // ── BASE BAND ────────────────────────────────────────────────────
+  /** Within-component stacking (e.g. active indicator bar) */
   local: 'z-10',
 
-  /** Sticky headers, fixed navigation */
+  /** Sticky headers, fixed toolbars */
   sticky: 'z-20',
 
-  /** Dropdowns, menus, popovers */
+  /** Inline dropdown menus, popovers within cards */
   dropdown: 'z-30',
 
-  /** Floating buttons, FABs */
+  /** Floating action buttons, FABs */
   floating: 'z-40',
 
-  /** Sidebar navigation */
+  /** App sidebar navigation */
   sidebar: 'z-50',
 
-  /** Standard modals and dialogs — above workspace tabs (dynamic 100+) and search panel (1000+) */
-  modal: 'z-[1100]',
-
-  /** Drawers and slide-out panels */
-  drawer: 'z-50',
-
-  /** Toast notifications */
-  toast: 'z-[60]',
-
-  /** User menu and dropdown backdrops */
-  menuBackdrop: 'z-[60]',
-
-  /** User menu and dropdown panels */
-  menuPanel: 'z-[70]',
-
-  /** Workspace dock/navigator - hidden when heavy overlays are open */
+  /** Workspace dock / navigator — tabs clamp below this */
   dock: 'z-[80]',
 
-  /** Tooltips and previews - above dock */
-  tooltip: 'z-[85]',
+  /** Floating search panel — above dock, below overlay band */
+  searchPanel: 'z-[100]',
 
-  /** Compare view overlay - above dock, below heavy modals */
-  compare: 'z-[90]',
+  // ── OVERLAY BAND (1000+) ─────────────────────────────────────────
+  /** Side drawers (Brocardi drawer, etc.) */
+  drawer: 'z-[1000]',
 
-  /** Heavy modals (Dossier, PDF, Annex) - above dock and compare */
-  heavyModal: 'z-[100]',
+  /** Standard modals and dialogs (Modal base consumed here) */
+  modal: 'z-[1100]',
+
+  /** @deprecated use `modal` instead */
+  heavyModal: 'z-[1100]',
+
+  /** Compare view overlay */
+  compare: 'z-[1150]',
+
+  /** Citation preview popover */
+  citationPreview: 'z-[1200]',
+
+  /** Command palette */
+  commandPalette: 'z-[1250]',
 
   /** Study mode backdrop */
-  studyBackdrop: 'z-[120]',
+  studyBackdrop: 'z-[1300]',
 
   /** Study mode panel */
-  studyPanel: 'z-[130]',
+  studyPanel: 'z-[1310]',
 
-  /** Command palette - above most things */
-  commandPalette: 'z-[130]',
+  /** Tooltips — above everything normal so they work inside modals */
+  tooltip: 'z-[1400]',
 
-  /** Settings modal - ALWAYS on top of everything */
-  settings: 'z-[200]',
+  /** Toast notifications — above tooltips so errors always surface */
+  toast: 'z-[1450]',
+
+  /** User menu backdrop */
+  menuBackdrop: 'z-[1500]',
+
+  /** User menu popup */
+  menuPanel: 'z-[1510]',
+
+  /** Settings modal — ALWAYS on top of everything */
+  settings: 'z-[1900]',
 } as const;
 
-/** Numeric values for use in inline styles or dynamic z-index */
+/** Numeric values for inline styles or dynamic z-index (parallel to Z_INDEX) */
 export const Z_INDEX_VALUES = {
   local: 10,
   sticky: 20,
   dropdown: 30,
   floating: 40,
   sidebar: 50,
-  modal: 1100,
-  drawer: 50,
-  toast: 60,
-  menuBackdrop: 60,
-  menuPanel: 70,
   dock: 80,
-  tooltip: 85,
-  compare: 90,
-  heavyModal: 100,
-  studyBackdrop: 120,
-  studyPanel: 130,
-  commandPalette: 130,
-  settings: 200,
+  searchPanel: 100,
+  drawer: 1000,
+  modal: 1100,
+  heavyModal: 1100,
+  compare: 1150,
+  citationPreview: 1200,
+  commandPalette: 1250,
+  studyBackdrop: 1300,
+  studyPanel: 1310,
+  tooltip: 1400,
+  toast: 1450,
+  menuBackdrop: 1500,
+  menuPanel: 1510,
+  settings: 1900,
 } as const;
 
 /**
- * Check if an overlay should hide the workspace dock.
- * Returns true for overlays that need the full screen without dock interference.
+ * Overlays that should hide the workspace dock when active — prevents
+ * interaction conflicts between floating content and full-screen overlays.
  */
 export const shouldHideDock = (activeOverlay: string | null): boolean => {
-  const overlaysThatHideDock = ['compare', 'settings', 'commandPalette', 'heavyModal', 'study'];
+  const overlaysThatHideDock = ['compare', 'settings', 'commandPalette', 'heavyModal', 'modal', 'study'];
   return activeOverlay !== null && overlaysThatHideDock.includes(activeOverlay);
 };

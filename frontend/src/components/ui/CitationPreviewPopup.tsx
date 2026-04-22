@@ -12,6 +12,7 @@ import type { ArticleData } from '../../types';
 import type { ParsedCitationData } from '../../utils/citationMatcher';
 import { formatCitationLabel } from '../../utils/citationMatcher';
 import { cn } from '../../lib/utils';
+import { Z_INDEX } from '../../constants/zIndex';
 
 interface CitationPreviewPopupProps {
   isVisible: boolean;
@@ -102,7 +103,7 @@ export function CitationPreviewPopup({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -4 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="fixed z-[200] w-[400px] max-w-[calc(100vw-24px)]"
+          className={cn('fixed w-[400px] max-w-[calc(100vw-24px)]', Z_INDEX.citationPreview)}
           style={{
             top: position.top,
             left: position.left,

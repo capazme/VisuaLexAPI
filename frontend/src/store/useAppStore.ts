@@ -61,7 +61,6 @@ interface WorkspaceTab {
 interface SearchPanelState {
     isCollapsed: boolean;
     position: { x: number; y: number };
-    zIndex: number;  // Dynamic z-index for stacking order
 }
 
 interface AppState {
@@ -109,7 +108,6 @@ interface AppState {
     closeAliasManager: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
-    bringSearchPanelToFront: () => void;  // Bring search panel to front
 
     // Workspace Tab Actions
     addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[]) => string;
@@ -249,7 +247,6 @@ const appStore = createStore<AppState>()(
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
-                zIndex: 1000  // Start high so it's above tabs
             },
             workspaceTabs: [],
             highestZIndex: 100,
@@ -369,10 +366,6 @@ const appStore = createStore<AppState>()(
 
             setSearchPanelPosition: (position) => set((state) => {
                 state.searchPanelState.position = position;
-            }),
-
-            bringSearchPanelToFront: () => set((state) => {
-                state.searchPanelState.zIndex = ++state.highestZIndex;
             }),
 
             // Workspace Tab Actions - Complete refactor
