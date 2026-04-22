@@ -2,10 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Highlighter, StickyNote, Copy, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
 
 interface SelectionPopupProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  onHighlight: (text: string, color: 'yellow' | 'green' | 'red' | 'blue') => void;
+  onHighlight: (text: string, color: HighlightColor) => void;
   onAddNote: (text: string) => void;
   onCopy: (text: string) => void;
   onSearch?: (text: string) => void;
@@ -17,13 +18,6 @@ interface PopupState {
   y: number;
   text: string;
 }
-
-const HIGHLIGHT_COLORS = [
-  { name: 'yellow', bg: 'bg-yellow-200', border: 'border-yellow-400', hover: 'hover:bg-yellow-300' },
-  { name: 'green', bg: 'bg-green-200', border: 'border-green-400', hover: 'hover:bg-green-300' },
-  { name: 'blue', bg: 'bg-blue-200', border: 'border-blue-400', hover: 'hover:bg-blue-300' },
-  { name: 'red', bg: 'bg-red-200', border: 'border-red-400', hover: 'hover:bg-red-300' },
-] as const;
 
 export function SelectionPopup({
   containerRef,
@@ -161,7 +155,7 @@ export function SelectionPopup({
     }
   };
 
-  const handleHighlightColor = (color: 'yellow' | 'green' | 'red' | 'blue') => {
+  const handleHighlightColor = (color: HighlightColor) => {
     onHighlight(popup.text, color);
     hidePopup();
     setShowColorPicker(false);
@@ -196,15 +190,13 @@ export function SelectionPopup({
               <X size={14} />
             </button>
             <div className="w-px h-5 bg-slate-700 mx-1" />
-            {HIGHLIGHT_COLORS.map(({ name, bg, border, hover }) => (
+            {HIGHLIGHT_COLORS.map((color) => (
               <button
-                key={name}
-                onClick={() => handleHighlightColor(name as 'yellow' | 'green' | 'red' | 'blue')}
-                className={cn(
-                  "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110",
-                  bg, border, hover
-                )}
-                title={`Evidenzia in ${name}`}
+                key={color}
+                onClick={() => handleHighlightColor(color)}
+                className="w-7 h-7 rounded-full border-2 border-white/40 transition-transform hover:scale-110 hover:ring-2 hover:ring-white/60"
+                style={{ backgroundColor: getHighlightSwatch(color) }}
+                title={`Evidenzia in ${color}`}
               />
             ))}
           </div>

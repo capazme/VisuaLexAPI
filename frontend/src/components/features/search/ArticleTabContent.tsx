@@ -9,6 +9,8 @@ import { DossierModal } from '../../ui/DossierModal';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
+import { Modal } from '../../ui/Modal';
+import { Button } from '../../ui/Button';
 import { SafeHTML } from '../../../utils/sanitize';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
@@ -56,6 +58,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [showHighlightPicker, setShowHighlightPicker] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
     const highlightSelectionRef = useRef<{ start: number; end: number; text: string } | null>(null);
+    const versionDateInputRef = useRef<HTMLInputElement>(null);
 
     // Citation preview hook - destructure to get stable function references
     const citationPreviewState = useCitationPreview();
@@ -811,65 +814,68 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 highlights={articleHighlights}
             />
 
-            {showVersionInput && (
-                <div className={cn('fixed inset-0 flex items-center justify-center', Z_INDEX.modal)}>
-                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowVersionInput(false)} />
-                    <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm mx-4 p-5 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-semibold text-slate-900 dark:text-white">Cerca Versione Storica</h3>
-                            <button onClick={() => setShowVersionInput(false)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
-                                <X size={18} className="text-slate-500" />
-                            </button>
-                        </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 leading-relaxed">
-                            Inserisci una data per visualizzare la versione dell'articolo vigente in quel momento.
-                        </p>
-                        <div className="space-y-4">
-                            <input
-                                type="date"
-                                value={versionDate}
-                                onChange={(e) => setVersionDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
-                            />
-                            <div className="flex justify-end gap-2">
-                                <button
-                                    onClick={() => setShowVersionInput(false)}
-                                    className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    Annulla
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (versionDate) {
-                                            // Trigger search with version date
-                                            const searchParams: SearchParams = {
-                                                act_type: norma_data.tipo_atto,
-                                                act_number: norma_data.numero_atto || '',
-                                                date: norma_data.data || '',
-                                                article: norma_data.numero_articolo,
-                                                version: 'vigente',
-                                                version_date: versionDate,
-                                                show_brocardi_info: true
-                                            };
-                                            showToast(`Ricerca versione del ${versionDate}`, 'info');
-                                            setShowVersionInput(false);
-                                            setVersionDate('');
-                                            triggerSearch(searchParams);
-                                        } else {
-                                            showToast('Seleziona una data', 'error');
-                                        }
-                                    }}
-                                    disabled={!versionDate}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                                >
-                                    <Clock size={16} />
-                                    Cerca versione
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <Modal
+                isOpen={showVersionInput}
+                onClose={() => {
+                    setShowVersionInput(false);
+                    setVersionDate('');
+                }}
+                title="Cerca Versione Storica"
+                description="Inserisci una data per visualizzare la versione dell'articolo vigente in quel momento."
+                size="sm"
+                variant="info"
+                icon={<Clock size={20} />}
+                initialFocusRef={versionDateInputRef}
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setShowVersionInput(false);
+                                setVersionDate('');
+                            }}
+                        >
+                            Annulla
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={!versionDate}
+                            onClick={() => {
+                                if (!versionDate) {
+                                    showToast('Seleziona una data', 'error');
+                                    return;
+                                }
+                                const searchParams: SearchParams = {
+                                    act_type: norma_data.tipo_atto,
+                                    act_number: norma_data.numero_atto || '',
+                                    date: norma_data.data || '',
+                                    article: norma_data.numero_articolo,
+                                    version: 'vigente',
+                                    version_date: versionDate,
+                                    show_brocardi_info: true,
+                                };
+                                showToast(`Ricerca versione del ${versionDate}`, 'info');
+                                setShowVersionInput(false);
+                                setVersionDate('');
+                                triggerSearch(searchParams);
+                            }}
+                        >
+                            <Clock size={16} />
+                            Cerca versione
+                        </Button>
+                    </>
+                }
+            >
+                <input
+                    ref={versionDateInputRef}
+                    type="date"
+                    value={versionDate}
+                    onChange={(e) => setVersionDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                />
+            </Modal>
 
             {/* Citation Preview Popup */}
             <CitationPreviewPopup
