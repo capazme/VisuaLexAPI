@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { highlightService } from '../services/highlightService';
-import type { Highlight, HighlightCreate, HighlightUpdate } from '../types/api';
+import type { HighlightResponse, HighlightCreate, HighlightUpdate } from '../types/api';
 
 interface UseHighlightsReturn {
-  highlights: Highlight[];
+  highlights: HighlightResponse[];
   loading: boolean;
   error: string | null;
-  createHighlight: (data: HighlightCreate) => Promise<Highlight>;
-  updateHighlight: (id: string, data: HighlightUpdate) => Promise<Highlight>;
+  createHighlight: (data: HighlightCreate) => Promise<HighlightResponse>;
+  updateHighlight: (id: string, data: HighlightUpdate) => Promise<HighlightResponse>;
   deleteHighlight: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
-  getById: (id: string) => Highlight | undefined;
+  getById: (id: string) => HighlightResponse | undefined;
 }
 
 export function useHighlights(normaKey: string | null): UseHighlightsReturn {
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [highlights, setHighlights] = useState<HighlightResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +44,7 @@ export function useHighlights(normaKey: string | null): UseHighlightsReturn {
   }, [fetchHighlights]);
 
   // Create highlight (optimistic update)
-  const createHighlight = useCallback(async (data: HighlightCreate): Promise<Highlight> => {
+  const createHighlight = useCallback(async (data: HighlightCreate): Promise<HighlightResponse> => {
     setError(null);
     try {
       const newHighlight = await highlightService.create(data);
@@ -57,7 +57,7 @@ export function useHighlights(normaKey: string | null): UseHighlightsReturn {
   }, []);
 
   // Update highlight (optimistic update)
-  const updateHighlight = useCallback(async (id: string, data: HighlightUpdate): Promise<Highlight> => {
+  const updateHighlight = useCallback(async (id: string, data: HighlightUpdate): Promise<HighlightResponse> => {
     setError(null);
     const previousHighlights = highlights;
     setHighlights(prev => prev.map(h => h.id === id ? { ...h, ...data } : h));

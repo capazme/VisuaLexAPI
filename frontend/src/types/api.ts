@@ -173,24 +173,25 @@ export interface BookmarkResponse {
 export type Bookmark = BookmarkResponse;
 
 // ============================================================================
-// Annotation Types (for future implementation)
+// Annotation Types — wire protocol with Node backend (backend uses camelCase
+// via zod validation, Prisma models). Store-side types live in types/index.ts.
 // ============================================================================
 
 export type AnnotationType = 'note' | 'question' | 'important' | 'follow_up' | 'summary';
 
 export interface AnnotationCreate {
-  norma_key: string;
+  normaKey: string;
   content: string;
-  annotation_type?: AnnotationType;
-  bookmark_id?: string;
-  text_context?: string;
-  position?: string;
+  annotationType?: AnnotationType;
+  bookmarkId?: string;
+  textContext?: string;
+  position?: number;
 }
 
 export interface AnnotationUpdate {
   content?: string;
-  annotation_type?: AnnotationType;
-  text_context?: string;
+  annotationType?: AnnotationType;
+  textContext?: string;
   position?: number;
 }
 
@@ -207,22 +208,18 @@ export interface AnnotationResponse {
   updatedAt?: string;
 }
 
-// Aliases for camelCase
-export type Annotation = AnnotationResponse;
-
 // ============================================================================
-// Highlight Types (for future implementation)
+// Highlight Types — wire protocol with Node backend.
 // ============================================================================
 
 export interface HighlightCreate {
-  norma_key: string;
+  normaKey: string;
   text: string;
-  color: string;
-  start_offset?: number;
-  end_offset?: number;
-  container_id?: string;
+  color: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
+  startOffset: number;
+  endOffset: number;
   note?: string;
-  bookmark_id?: string;
+  bookmarkId?: string;
 }
 
 export interface HighlightUpdate {
@@ -242,9 +239,6 @@ export interface HighlightResponse {
   userId: string;
   createdAt: string;
 }
-
-// Aliases for camelCase
-export type Highlight = HighlightResponse;
 
 // ============================================================================
 // API Error Types

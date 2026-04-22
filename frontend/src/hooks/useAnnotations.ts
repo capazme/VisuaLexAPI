@@ -1,21 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { annotationService } from '../services/annotationService';
-import type { Annotation, AnnotationCreate, AnnotationUpdate } from '../types/api';
+import type { AnnotationResponse, AnnotationCreate, AnnotationUpdate } from '../types/api';
 
 interface UseAnnotationsReturn {
-  annotations: Annotation[];
+  annotations: AnnotationResponse[];
   loading: boolean;
   error: string | null;
-  createAnnotation: (data: AnnotationCreate) => Promise<Annotation>;
-  updateAnnotation: (id: string, data: AnnotationUpdate) => Promise<Annotation>;
+  createAnnotation: (data: AnnotationCreate) => Promise<AnnotationResponse>;
+  updateAnnotation: (id: string, data: AnnotationUpdate) => Promise<AnnotationResponse>;
   deleteAnnotation: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
-  getById: (id: string) => Annotation | undefined;
-  getByType: (type: string) => Annotation[];
+  getById: (id: string) => AnnotationResponse | undefined;
+  getByType: (type: string) => AnnotationResponse[];
 }
 
 export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotations, setAnnotations] = useState<AnnotationResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
   }, [fetchAnnotations]);
 
   // Create annotation (optimistic update)
-  const createAnnotation = useCallback(async (data: AnnotationCreate): Promise<Annotation> => {
+  const createAnnotation = useCallback(async (data: AnnotationCreate): Promise<AnnotationResponse> => {
     setError(null);
     try {
       const newAnnotation = await annotationService.create(data);
@@ -58,7 +58,7 @@ export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
   }, []);
 
   // Update annotation (optimistic update)
-  const updateAnnotation = useCallback(async (id: string, data: AnnotationUpdate): Promise<Annotation> => {
+  const updateAnnotation = useCallback(async (id: string, data: AnnotationUpdate): Promise<AnnotationResponse> => {
     setError(null);
     const previousAnnotations = annotations;
     setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
