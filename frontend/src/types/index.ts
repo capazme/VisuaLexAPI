@@ -161,7 +161,7 @@ export interface ArticleTreeResponse {
 // --- New Utility Features Types ---
 
 export interface AppSettings {
-    theme: 'light' | 'dark' | 'sepia' | 'high-contrast';
+    theme: 'light' | 'dark';
     fontSize: 'small' | 'medium' | 'large' | 'xlarge';
     fontFamily: 'sans' | 'serif' | 'mono';
     focusMode: boolean;

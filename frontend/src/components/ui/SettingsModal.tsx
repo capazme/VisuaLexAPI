@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Monitor, Moon, Sun, Eye, HelpCircle, Shield, Info, GitBranch, GitCommit, Tag } from 'lucide-react';
+import { X, Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -104,7 +104,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 className={cn(
                                     "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
                                     settings.theme === 'light'
-                                        ? "bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400"
+                                        ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                 )}
                             >
@@ -115,33 +115,11 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 className={cn(
                                     "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
                                     settings.theme === 'dark'
-                                        ? "bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400"
+                                        ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                                 )}
                             >
                                 <Moon size={16} /> Scuro
-                            </button>
-                            <button
-                                onClick={() => updateSettings({ theme: 'sepia' })}
-                                className={cn(
-                                    "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
-                                    settings.theme === 'sepia'
-                                        ? "bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-400"
-                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                )}
-                            >
-                                <Eye size={16} /> Seppia
-                            </button>
-                            <button
-                                onClick={() => updateSettings({ theme: 'high-contrast' })}
-                                className={cn(
-                                    "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
-                                    settings.theme === 'high-contrast'
-                                        ? "bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white"
-                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                )}
-                            >
-                                <Monitor size={16} /> Contrasto
                             </button>
                         </div>
                     </div>

@@ -44,15 +44,31 @@ export interface DetailedEnvironmentStats {
 // Current export format version
 export const ENVIRONMENT_EXPORT_VERSION = 1;
 
-// Category configuration
+// Category configuration — color values resolve to CSS variables defined in index.css
+// (light + dark theme variants handled automatically)
 export const ENVIRONMENT_CATEGORIES: Record<EnvironmentCategory, { label: string; icon: string; color: string }> = {
-  compliance: { label: 'Compliance', icon: '🔒', color: '#8B5CF6' },
-  civil: { label: 'Diritto Civile', icon: '⚖️', color: '#3B82F6' },
-  penal: { label: 'Diritto Penale', icon: '⚔️', color: '#EF4444' },
-  administrative: { label: 'Diritto Amministrativo', icon: '🏛️', color: '#F59E0B' },
-  eu: { label: 'Diritto UE', icon: '🇪🇺', color: '#10B981' },
-  other: { label: 'Altro', icon: '📁', color: '#6B7280' },
+  compliance: { label: 'Compliance', icon: '🔒', color: 'hsl(var(--category-compliance))' },
+  civil: { label: 'Diritto Civile', icon: '⚖️', color: 'hsl(var(--category-civil))' },
+  penal: { label: 'Diritto Penale', icon: '⚔️', color: 'hsl(var(--category-penal))' },
+  administrative: { label: 'Diritto Amministrativo', icon: '🏛️', color: 'hsl(var(--category-administrative))' },
+  eu: { label: 'Diritto UE', icon: '🇪🇺', color: 'hsl(var(--category-eu))' },
+  other: { label: 'Altro', icon: '📁', color: 'hsl(var(--category-other))' },
 };
+
+/**
+ * Returns an HSL color string for a category background with configurable alpha.
+ * Uses the CSS variable, so light/dark theme handled automatically.
+ *
+ * @param category - category key or null/undefined → defaults to 'other'
+ * @param alpha    - 0 to 1 (e.g. 0.08 for subtle tint)
+ */
+export function getCategoryBgAlpha(
+  category: EnvironmentCategory | null | undefined,
+  alpha: number,
+): string {
+  const key = category ?? 'other';
+  return `hsl(var(--category-${key}) / ${alpha})`;
+}
 
 /**
  * Export an environment to a downloadable JSON file

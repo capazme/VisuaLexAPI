@@ -9,6 +9,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { Environment, EnvironmentCategory } from '../../../types';
 import {
   ENVIRONMENT_CATEGORIES,
+  getCategoryBgAlpha,
   exportEnvironmentToFile,
   createEnvironmentShareLink,
   parseEnvironmentFromFile,
@@ -409,7 +410,7 @@ function EnvironmentCard({
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <div
               className="w-10 h-10 md:w-10 md:h-10 flex-shrink-0 rounded-lg flex items-center justify-center text-base md:text-lg"
-              style={{ backgroundColor: `${category?.color || '#6B7280'}15` }}
+              style={{ backgroundColor: getCategoryBgAlpha(environment.category, 0.08) }}
             >
               {category?.icon || '📁'}
             </div>
@@ -1121,7 +1122,7 @@ function EnvironmentDetailModal({
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div
               className="w-12 h-12 flex-shrink-0 rounded-lg flex items-center justify-center text-xl"
-              style={{ backgroundColor: `${category?.color || '#6B7280'}15` }}
+              style={{ backgroundColor: getCategoryBgAlpha(environment.category, 0.08) }}
             >
               {category?.icon || '📁'}
             </div>
