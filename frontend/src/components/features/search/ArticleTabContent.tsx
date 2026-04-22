@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import type { ArticleData, SearchParams, Highlight } from '../../../types';
+import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { SelectionPopup } from './SelectionPopup';
 import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, X, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
@@ -64,6 +64,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // toolbar highlight button can apply a highlight even after the user
     // moves focus away (selection may be cleared by the click).
     const highlightSelectionRef = useRef<{ text: string; startOffset: number } | null>(null);
+    // When the user picks "Aggiungi nota" from the selection popup the
+    // selected span becomes the note's anchor. Kept in state so the panel
+    // can render a chip ("Ancorata a: …") until the user submits.
+    const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number } | null>(null);
     const versionDateInputRef = useRef<HTMLInputElement>(null);
 
     // Citation preview hook - destructure to get stable function references
@@ -190,9 +194,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             showToast('Inserisci una nota', 'error');
             return;
         }
-        addAnnotation(itemKey, uniqueArticleId, noteText);
+        const anchor = noteAnchor ?? undefined;
+        addAnnotation(itemKey, uniqueArticleId, noteText, anchor);
         setNoteText('');
-        showToast('Nota aggiunta', 'success');
+        setNoteAnchor(null);
+        showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
     };
 
     const handleShareLink = async () => {
@@ -282,11 +288,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         showToast(`Testo evidenziato in ${color}`, 'success');
     };
 
-    // Handler for SelectionPopup note action
-    const handlePopupAddNote = (text: string) => {
-        setNoteText(text);
+    // Handler for SelectionPopup note action.
+    // The selected span becomes the note's anchor; the note body is filled
+    // by the user in the panel textarea (left empty here).
+    const handlePopupAddNote = (text: string, startOffset: number) => {
+        setNoteAnchor({ anchorText: text, startOffset });
+        setNoteText('');
         setShowNotes(true);
-        showToast('Testo aggiunto alla nota', 'info');
     };
 
     // Handler for SelectionPopup copy action
@@ -313,65 +321,86 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     }, [triggerSearch]);
 
     const processedContent = useMemo(() => {
-        // Start from the raw article text (still containing \n). Highlight
-        // marks are inserted at raw offsets derived from each highlight's
-        // plain-text offset, then \n → <br /> conversion happens afterwards.
-        let html = article_text || '';
+        // Start from the raw article text (still containing \n). Marks are
+        // inserted at raw offsets derived from each entry's plain-text
+        // offset (computed against the *original* raw text so every
+        // insertion sees consistent offsets), then applied right-to-left
+        // so earlier positions stay valid. \n → <br /> happens last.
+        const raw = article_text || '';
 
-        const wrap = (h: Highlight, matched: string) =>
-            `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${matched}</mark>`;
-
-        // Split highlights by whether they carry a precise plain-text offset
-        const withOffset = articleHighlights.filter(
-            (h): h is Highlight & { startOffset: number } =>
-                typeof h.startOffset === 'number' && h.startOffset >= 0
-        );
-        const legacyHighlights = articleHighlights.filter(
-            (h) => typeof h.startOffset !== 'number' || h.startOffset < 0
-        );
-
-        // Offset-based highlights: pin each mark to its specific occurrence.
-        // Apply from latest offset to earliest so earlier rawStart positions
-        // remain valid after insertion.
-        const sortedByOffset = [...withOffset].sort((a, b) => b.startOffset - a.startOffset);
-        sortedByOffset.forEach((h) => {
-            // Convert plain-text offset (no \n, matches DOM textContent) into
-            // an offset in the raw text (which still contains \n).
+        // Convert a plain-text offset (DOM textContent, no \n) to the
+        // corresponding offset in the raw text (which has \n).
+        const plainToRaw = (plainOffset: number) => {
             let rawIdx = 0;
             let plainIdx = 0;
-            while (plainIdx < h.startOffset && rawIdx < html.length) {
-                if (html[rawIdx] !== '\n') plainIdx++;
+            while (plainIdx < plainOffset && rawIdx < raw.length) {
+                if (raw[rawIdx] !== '\n') plainIdx++;
                 rawIdx++;
             }
-            const rawStart = rawIdx;
+            return rawIdx;
+        };
 
-            // Advance by h.text.length plain chars (skipping any \n we cross).
-            let remaining = h.text.length;
-            while (remaining > 0 && rawIdx < html.length) {
-                if (html[rawIdx] !== '\n') remaining--;
-                rawIdx++;
-            }
-            const rawEnd = rawIdx;
+        const escapeAttr = (s: string) =>
+            s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-            // Sanity check: make sure the slice (minus \n) matches h.text
-            // case-insensitively. If not, the article text changed since the
-            // highlight was saved — skip rather than mis-mark random content.
-            const slice = html.slice(rawStart, rawEnd).replace(/\n/g, '');
+        type Insertion = { pos: number; markup: string; isOpen: boolean; order: number };
+        const insertions: Insertion[] = [];
+        let order = 0;
+
+        // Highlights with a valid plain-text offset
+        articleHighlights.forEach((h) => {
+            if (typeof h.startOffset !== 'number' || h.startOffset < 0) return;
+            const rawStart = plainToRaw(h.startOffset);
+            const rawEnd = plainToRaw(h.startOffset + h.text.length);
+            const slice = raw.slice(rawStart, rawEnd).replace(/\n/g, '');
             if (slice.toLowerCase() !== h.text.toLowerCase()) return;
+            insertions.push({ pos: rawStart, order: order++, isOpen: true,
+                markup: `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">` });
+            insertions.push({ pos: rawEnd, order: order++, isOpen: false,
+                markup: '</mark>' });
+        });
 
-            html = html.slice(0, rawStart) + wrap(h, html.slice(rawStart, rawEnd)) + html.slice(rawEnd);
+        // Annotations anchored to a text span
+        itemAnnotations.forEach((a) => {
+            if (typeof a.startOffset !== 'number' || a.startOffset < 0) return;
+            if (!a.anchorText) return;
+            const rawStart = plainToRaw(a.startOffset);
+            const rawEnd = plainToRaw(a.startOffset + a.anchorText.length);
+            const slice = raw.slice(rawStart, rawEnd).replace(/\n/g, '');
+            if (slice.toLowerCase() !== a.anchorText.toLowerCase()) return;
+            insertions.push({ pos: rawStart, order: order++, isOpen: true,
+                markup: `<span class="note-anchor" data-note-id="${a.id}" title="${escapeAttr(a.text)}" style="text-decoration:underline wavy hsl(var(--hl-yellow-fg));text-decoration-thickness:2px;text-underline-offset:3px;cursor:help;">` });
+            insertions.push({ pos: rawEnd, order: order++, isOpen: false,
+                markup: '</span>' });
+        });
+
+        // Apply from latest position to earliest. At the same position,
+        // close tags come before open tags so nesting stays well-formed.
+        insertions.sort((x, y) => {
+            if (y.pos !== x.pos) return y.pos - x.pos;
+            if (x.isOpen !== y.isOpen) return x.isOpen ? 1 : -1;
+            return y.order - x.order;
+        });
+
+        let html = raw;
+        insertions.forEach((ins) => {
+            html = html.slice(0, ins.pos) + ins.markup + html.slice(ins.pos);
         });
 
         // Legacy highlights without offset fall back to global match (every
         // occurrence), matching the pre-offset behaviour for older saves.
+        const legacyHighlights = articleHighlights.filter(
+            (h) => typeof h.startOffset !== 'number' || h.startOffset < 0
+        );
         const sortedLegacy = [...legacyHighlights].sort((a, b) => b.text.length - a.text.length);
         sortedLegacy.forEach((h) => {
             const escaped = h.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
-            html = html.replace(regex, (match) => wrap(h, match));
+            html = html.replace(regex, (match) =>
+                `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${match}</mark>`);
         });
 
-        // Convert raw newlines to <br /> after highlights are placed.
+        // Convert raw newlines to <br /> after marks are placed.
         html = html.replace(/\n/g, '<br />');
 
         // Dictionary terms (avoiding already highlighted text)
@@ -385,7 +414,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         html = wrapCitationsInHtml(html, norma_data);
 
         return html;
-    }, [article_text, articleHighlights, norma_data]);
+    }, [article_text, articleHighlights, itemAnnotations, norma_data]);
 
     // Handle citation hover and click events
     useEffect(() => {
@@ -730,6 +759,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     <div className="space-y-3 mb-3">
                         {itemAnnotations.map(note => (
                             <div key={note.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm text-sm relative group border border-amber-100 dark:border-amber-900/20">
+                                {note.anchorText && (
+                                    <div className="text-xs italic text-amber-700 dark:text-amber-400 mb-1.5 flex items-start gap-1.5 pr-6">
+                                        <StickyNote size={11} className="mt-0.5 shrink-0" />
+                                        <span className="line-clamp-2">&ldquo;{note.anchorText}&rdquo;</span>
+                                    </div>
+                                )}
                                 <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{note.text}</p>
                                 <div className="text-xs text-slate-400 mt-2">{new Date(note.createdAt).toLocaleString()}</div>
                                 <button
@@ -743,19 +778,36 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     </div>
 
                     {showNotes && (
-                        <div className="flex gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <textarea
-                                value={noteText}
-                                onChange={e => setNoteText(e.target.value)}
-                                placeholder="Scrivi una nota..."
-                                className="flex-1 text-sm rounded-lg border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 p-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[60px]"
-                            />
-                            <button
-                                onClick={handleAddNote}
-                                className="self-end bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                            >
-                                Salva
-                            </button>
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                            {noteAnchor && (
+                                <div className="flex items-center gap-2 mb-2 px-2.5 py-1.5 bg-amber-100/70 dark:bg-amber-900/30 rounded-md text-xs border border-amber-300/60 dark:border-amber-800/40">
+                                    <StickyNote size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <span className="italic flex-1 truncate text-amber-800 dark:text-amber-300">
+                                        Ancorata a: &ldquo;{noteAnchor.anchorText}&rdquo;
+                                    </span>
+                                    <button
+                                        onClick={() => setNoteAnchor(null)}
+                                        className="p-0.5 hover:bg-amber-200 dark:hover:bg-amber-800/50 rounded text-amber-700 dark:text-amber-400 transition-colors"
+                                        title="Rimuovi ancoraggio"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                            )}
+                            <div className="flex gap-2">
+                                <textarea
+                                    value={noteText}
+                                    onChange={e => setNoteText(e.target.value)}
+                                    placeholder={noteAnchor ? `Scrivi una nota su "${noteAnchor.anchorText.slice(0, 30)}${noteAnchor.anchorText.length > 30 ? '…' : ''}"` : 'Scrivi una nota...'}
+                                    className="flex-1 text-sm rounded-lg border-amber-300 dark:border-amber-800 bg-white dark:bg-slate-900 p-2 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 min-h-[60px]"
+                                />
+                                <button
+                                    onClick={handleAddNote}
+                                    className="self-end bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Salva
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

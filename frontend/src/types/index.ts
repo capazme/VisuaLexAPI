@@ -172,10 +172,23 @@ export interface Annotation {
     id: string;
     normaKey: string; // key to link to specific norm/article
     articleId: string;
-    text: string;
+    text: string; // Note body (user-authored content)
     createdAt: string;
     range?: string; // serialized range for highlights
     color?: 'yellow' | 'green' | 'red';
+    /**
+     * Text span inside the article that this note is anchored to. When
+     * present, the article renderer draws a wavy underline around it and
+     * clicking the span opens the note. Optional for backward compatibility:
+     * notes saved before the anchor feature have no span attached and
+     * remain visible only in the notes panel list.
+     */
+    anchorText?: string;
+    /**
+     * Plain-text char offset of anchorText's start in the article's DOM
+     * textContent (same semantics as Highlight.startOffset).
+     */
+    startOffset?: number;
 }
 
 export interface Highlight {

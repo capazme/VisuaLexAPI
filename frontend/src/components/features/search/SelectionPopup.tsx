@@ -8,7 +8,7 @@ import { getPlainTextOffset } from '../../../utils/selectionOffset';
 interface SelectionPopupProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   onHighlight: (text: string, color: HighlightColor, startOffset: number) => void;
-  onAddNote: (text: string) => void;
+  onAddNote: (text: string, startOffset: number) => void;
   onCopy: (text: string) => void;
   onSearch?: (text: string) => void;
 }
@@ -126,7 +126,7 @@ export function SelectionPopup({
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
-        onAddNote(popup.text);
+        onAddNote(popup.text, popup.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if ((e.key === 'c' && (e.metaKey || e.ctrlKey))) {
@@ -145,7 +145,7 @@ export function SelectionPopup({
         setShowColorPicker(true);
         break;
       case 'note':
-        onAddNote(popup.text);
+        onAddNote(popup.text, popup.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;

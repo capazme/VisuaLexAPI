@@ -75,6 +75,12 @@ export function annotationStoreToCreate(a: StoreAnnotation): AnnotationCreate {
     normaKey: buildWireNormaKey(a.normaKey, a.articleId),
     content: a.text,
     annotationType: 'note',
+    // Anchor span metadata: backend stores it in textContext + position.
+    // Omitted for legacy notes saved without an anchor.
+    ...(a.anchorText ? { textContext: a.anchorText } : {}),
+    ...(typeof a.startOffset === 'number' && a.startOffset >= 0
+      ? { position: a.startOffset }
+      : {}),
   };
 }
 
@@ -86,5 +92,7 @@ export function annotationApiToStore(r: AnnotationResponse): StoreAnnotation {
     articleId,
     text: r.content,
     createdAt: r.createdAt,
+    ...(r.textContext ? { anchorText: r.textContext } : {}),
+    ...(typeof r.position === 'number' ? { startOffset: r.position } : {}),
   };
 }

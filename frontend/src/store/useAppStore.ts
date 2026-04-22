@@ -169,7 +169,7 @@ interface AppState {
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     importDossier: (dossier: Dossier) => string; // returns new dossier ID
 
-    addAnnotation: (normaKey: string, articleId: string, text: string) => void;
+    addAnnotation: (normaKey: string, articleId: string, text: string, anchor?: { anchorText: string; startOffset: number }) => void;
     removeAnnotation: (id: string) => void;
     loadAnnotationsForArticle: (normaKey: string, articleId: string) => Promise<void>;
 
@@ -1147,7 +1147,7 @@ const appStore = createStore<AppState>()(
             },
 
             // ── Annotation actions: optimistic update + server sync ────────
-            addAnnotation: (normaKey, articleId, text) => {
+            addAnnotation: (normaKey, articleId, text, anchor) => {
                 const tempId = uuidv4();
                 const optimistic: Annotation = {
                     id: tempId,
@@ -1155,6 +1155,7 @@ const appStore = createStore<AppState>()(
                     articleId,
                     text,
                     createdAt: new Date().toISOString(),
+                    ...(anchor ? { anchorText: anchor.anchorText, startOffset: anchor.startOffset } : {}),
                 };
                 set((state) => { state.annotations.push(optimistic); });
 
