@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 
-interface EmptyStateProps {
-  variant: 'dossier' | 'history' | 'environment' | 'search' | 'bookmarks' | 'generic';
+export interface EmptyStateProps {
+  variant: 'dossier' | 'history' | 'environment' | 'search' | 'bookmarks' | 'threads' | 'notifications' | 'generic';
   title: string;
   description?: string;
   action?: ReactNode;
@@ -152,12 +152,46 @@ function GenericIllustration() {
   );
 }
 
+function ThreadsIllustration() {
+  return (
+    <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Chat bubbles */}
+      <rect x="15" y="25" width="60" height="35" rx="8" className="fill-slate-100 dark:fill-slate-800 stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
+      <rect x="22" y="36" width="35" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
+      <rect x="22" y="45" width="45" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
+      <rect x="45" y="60" width="60" height="35" rx="8" className="fill-blue-50 dark:fill-blue-900/30 stroke-blue-300 dark:stroke-blue-700" strokeWidth="2" />
+      <rect x="52" y="71" width="40" height="4" rx="2" className="fill-blue-200 dark:fill-blue-800" />
+      <rect x="52" y="80" width="30" height="4" rx="2" className="fill-blue-200 dark:fill-blue-800" />
+      {/* Upvote arrow */}
+      <path d="M30 85L33 80L36 85" className="stroke-slate-400 dark:stroke-slate-500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function NotificationsIllustration() {
+  return (
+    <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Bell */}
+      <path d="M60 20C60 20 42 25 42 52V70L35 80H85L78 70V52C78 25 60 20 60 20Z" className="fill-slate-100 dark:fill-slate-800 stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
+      <rect x="52" y="80" width="16" height="8" rx="4" className="fill-slate-300 dark:fill-slate-600" />
+      <line x1="60" y1="12" x2="60" y2="20" className="stroke-slate-400 dark:stroke-slate-500" strokeWidth="2" strokeLinecap="round" />
+      {/* Notification dot */}
+      <circle cx="78" cy="32" r="10" className="fill-blue-500" />
+      <text x="78" y="36" textAnchor="middle" className="fill-white" fontSize="12" fontWeight="bold">3</text>
+      {/* Sound waves */}
+      <path d="M88 48C92 44 92 38 88 34" className="stroke-blue-300 dark:stroke-blue-600" strokeWidth="2" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
 const illustrations = {
   dossier: DossierIllustration,
   history: HistoryIllustration,
   environment: EnvironmentIllustration,
   search: SearchIllustration,
   bookmarks: BookmarksIllustration,
+  threads: ThreadsIllustration,
+  notifications: NotificationsIllustration,
   generic: GenericIllustration,
 };
 

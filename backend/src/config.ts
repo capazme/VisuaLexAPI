@@ -30,4 +30,9 @@ export const config = {
   database: {
     url: process.env.DATABASE_URL!, // Validated above
   },
+
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379/0',
+    enabled: (process.env.REDIS_ENABLED || 'false').toLowerCase() === 'true',
+  },
 };

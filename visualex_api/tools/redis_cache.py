@@ -5,6 +5,8 @@ Drop-in replacement for PersistentCache (filesystem) with the same
 async get/set interface. Falls back gracefully if Redis is unavailable.
 """
 
+import asyncio
+import hashlib
 import json
 import time
 from typing import Any, Optional
@@ -12,6 +14,8 @@ from typing import Any, Optional
 import structlog
 
 from .config import PERSISTENT_CACHE_TTL, REDIS_CACHE_PREFIX, REDIS_URL
+
+_RETRY_BACKOFF_SECONDS = 60.0
 
 log = structlog.get_logger()
 
@@ -37,9 +41,10 @@ class RedisCache:
         self._prefix = REDIS_CACHE_PREFIX
         self._client: Optional["aioredis.Redis"] = None
         self._connect_failed = False
+        self._retry_after: float = 0.0
+        self._connect_lock = asyncio.Lock()
 
     def _make_key(self, key: str) -> str:
-        import hashlib
         digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
         return f"{self._prefix}:{self.namespace}:{digest}"
 
@@ -47,24 +52,32 @@ class RedisCache:
         if not REDIS_AVAILABLE:
             return None
         if self._connect_failed:
-            return None
+            if time.monotonic() < self._retry_after:
+                return None
+            self._connect_failed = False
+            log.info("Redis retry window reached, attempting reconnect", namespace=self.namespace)
         if self._client is not None:
             return self._client
-        try:
-            self._client = aioredis.from_url(
-                REDIS_URL,
-                decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2,
-            )
-            await self._client.ping()
-            log.info("Redis connected", namespace=self.namespace)
-            return self._client
-        except Exception as exc:
-            log.warning("Redis connection failed, cache disabled", error=str(exc))
-            self._connect_failed = True
-            self._client = None
-            return None
+        async with self._connect_lock:
+            if self._client is not None:
+                return self._client
+            try:
+                client = aioredis.from_url(
+                    REDIS_URL,
+                    decode_responses=True,
+                    socket_connect_timeout=2,
+                    socket_timeout=2,
+                )
+                await client.ping()
+                self._client = client
+                log.info("Redis connected", namespace=self.namespace)
+                return self._client
+            except Exception as exc:
+                log.warning("Redis connection failed, retrying after backoff", error=str(exc))
+                self._connect_failed = True
+                self._retry_after = time.monotonic() + _RETRY_BACKOFF_SECONDS
+                self._client = None
+                return None
 
     async def get(self, key: str) -> Optional[Any]:
         client = await self._get_client()

@@ -1,0 +1,356 @@
+# Preset alias library for common Italian and EU norms.
+# Each alias maps a colloquial name to structured API parameters.
+# Fields: act_type, act_number, date (all optional — omit if not applicable).
+
+# --- EU Regulations ---
+gdpr:
+  act_type: "regolamento UE"
+  act_number: "679"
+  date: "2016"
+
+regolamento privacy:
+  act_type: "regolamento UE"
+  act_number: "679"
+  date: "2016"
+
+regolamento ue 2016/679:
+  act_type: "regolamento UE"
+  act_number: "679"
+  date: "2016"
+
+# --- Codici (with underlying act details) ---
+codice privacy:
+  act_type: "codice in materia di protezione dei dati personali"
+
+codice consumo:
+  act_type: "codice del consumo"
+
+codice appalti:
+  act_type: "codice dei contratti pubblici"
+
+nuovo codice appalti:
+  act_type: "codice dei contratti pubblici"
+
+codice ambiente:
+  act_type: "norme in materia ambientale"
+
+codice beni culturali:
+  act_type: "codice dei beni culturali e del paesaggio"
+
+codice comunicazioni:
+  act_type: "codice delle comunicazioni elettroniche"
+
+codice antimafia:
+  act_type: "codice antimafia"
+
+codice crisi impresa:
+  act_type: "codice della crisi d'impresa e dell'insolvenza"
+
+codice terzo settore:
+  act_type: "codice del Terzo settore"
+
+codice protezione civile:
+  act_type: "codice della protezione civile"
+
+codice proprietà industriale:
+  act_type: "codice della proprietà industriale"
+
+codice amministrazione digitale:
+  act_type: "codice dell'amministrazione digitale"
+
+codice nautica:
+  act_type: "codice della nautica da diporto"
+
+codice assicurazioni:
+  act_type: "codice delle assicurazioni private"
+
+codice pari opportunità:
+  act_type: "codice delle pari opportunità"
+
+codice ordinamento militare:
+  act_type: "codice dell'ordinamento militare"
+
+codice processo amministrativo:
+  act_type: "codice del processo amministrativo"
+
+codice processo tributario:
+  act_type: "codice del processo tributario"
+
+codice turismo:
+  act_type: "codice del turismo"
+
+codice giustizia contabile:
+  act_type: "codice di giustizia contabile"
+
+# --- Leggi fondamentali ---
+statuto lavoratori:
+  act_type: "legge"
+  act_number: "300"
+  date: "1970"
+
+statuto dei lavoratori:
+  act_type: "legge"
+  act_number: "300"
+  date: "1970"
+
+legge 104:
+  act_type: "legge"
+  act_number: "104"
+  date: "1992"
+
+legge fallimentare:
+  act_type: "regio decreto"
+  act_number: "267"
+  date: "1942"
+
+legge sul procedimento amministrativo:
+  act_type: "legge"
+  act_number: "241"
+  date: "1990"
+
+legge 241:
+  act_type: "legge"
+  act_number: "241"
+  date: "1990"
+
+legge procedimento amministrativo:
+  act_type: "legge"
+  act_number: "241"
+  date: "1990"
+
+legge divorzio:
+  act_type: "legge"
+  act_number: "898"
+  date: "1970"
+
+legge sul divorzio:
+  act_type: "legge"
+  act_number: "898"
+  date: "1970"
+
+legge aborto:
+  act_type: "legge"
+  act_number: "194"
+  date: "1978"
+
+legge equo canone:
+  act_type: "legge"
+  act_number: "392"
+  date: "1978"
+
+legge professione forense:
+  act_type: "legge"
+  act_number: "247"
+  date: "2012"
+
+legge diritto autore:
+  act_type: "legge"
+  act_number: "633"
+  date: "1941"
+
+legge biotestamento:
+  act_type: "legge"
+  act_number: "219"
+  date: "2017"
+
+legge cirinnà:
+  act_type: "legge"
+  act_number: "76"
+  date: "2016"
+
+unioni civili:
+  act_type: "legge"
+  act_number: "76"
+  date: "2016"
+
+legge adozione:
+  act_type: "legge"
+  act_number: "184"
+  date: "1983"
+
+legge ordinamento penitenziario:
+  act_type: "legge"
+  act_number: "354"
+  date: "1975"
+
+legge licenziamenti:
+  act_type: "legge"
+  act_number: "604"
+  date: "1966"
+
+legge reati tributari:
+  act_type: "decreto legislativo"
+  act_number: "74"
+  date: "2000"
+
+statuto contribuente:
+  act_type: "legge"
+  act_number: "212"
+  date: "2000"
+
+responsabilità 231:
+  act_type: "decreto legislativo"
+  act_number: "231"
+  date: "2001"
+
+decreto 231:
+  act_type: "decreto legislativo"
+  act_number: "231"
+  date: "2001"
+
+# --- Testi Unici ---
+testo unico edilizia:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "380"
+  date: "2001"
+
+tu edilizia:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "380"
+  date: "2001"
+
+testo unico sicurezza:
+  act_type: "decreto legislativo"
+  act_number: "81"
+  date: "2008"
+
+testo unico sicurezza lavoro:
+  act_type: "decreto legislativo"
+  act_number: "81"
+  date: "2008"
+
+tus:
+  act_type: "decreto legislativo"
+  act_number: "81"
+  date: "2008"
+
+testo unico bancario:
+  act_type: "decreto legislativo"
+  act_number: "385"
+  date: "1993"
+
+tub:
+  act_type: "decreto legislativo"
+  act_number: "385"
+  date: "1993"
+
+testo unico finanza:
+  act_type: "decreto legislativo"
+  act_number: "58"
+  date: "1998"
+
+tuf:
+  act_type: "decreto legislativo"
+  act_number: "58"
+  date: "1998"
+
+testo unico imposte redditi:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "917"
+  date: "1986"
+
+tuir:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "917"
+  date: "1986"
+
+testo unico iva:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "633"
+  date: "1972"
+
+testo unico immigrazione:
+  act_type: "decreto legislativo"
+  act_number: "286"
+  date: "1998"
+
+testo unico enti locali:
+  act_type: "decreto legislativo"
+  act_number: "267"
+  date: "2000"
+
+tuel:
+  act_type: "decreto legislativo"
+  act_number: "267"
+  date: "2000"
+
+testo unico pubblico impiego:
+  act_type: "decreto legislativo"
+  act_number: "165"
+  date: "2001"
+
+testo unico pubblica sicurezza:
+  act_type: "regio decreto"
+  act_number: "773"
+  date: "1931"
+
+tulps:
+  act_type: "regio decreto"
+  act_number: "773"
+  date: "1931"
+
+testo unico stupefacenti:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "309"
+  date: "1990"
+
+testo unico espropriazioni:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "327"
+  date: "2001"
+
+testo unico successioni:
+  act_type: "decreto legislativo"
+  act_number: "346"
+  date: "1990"
+
+testo unico registro:
+  act_type: "decreto del presidente della repubblica"
+  act_number: "131"
+  date: "1986"
+
+# --- Decreti noti ---
+jobs act:
+  act_type: "decreto legislativo"
+  act_number: "81"
+  date: "2015"
+
+tutele crescenti:
+  act_type: "decreto legislativo"
+  act_number: "23"
+  date: "2015"
+
+mediazione civile:
+  act_type: "decreto legislativo"
+  act_number: "28"
+  date: "2010"
+
+diritto internazionale privato:
+  act_type: "legge"
+  act_number: "218"
+  date: "1995"
+
+legge gelli:
+  act_type: "legge"
+  act_number: "24"
+  date: "2017"
+
+responsabilità sanitaria:
+  act_type: "legge"
+  act_number: "24"
+  date: "2017"
+
+lavoro agile:
+  act_type: "legge"
+  act_number: "81"
+  date: "2017"
+
+smart working:
+  act_type: "legge"
+  act_number: "81"
+  date: "2017"
+
+orario lavoro:
+  act_type: "decreto legislativo"
+  act_number: "66"
+  date: "2003"

@@ -30,6 +30,13 @@ class PersistentCache:
     async def set(self, key: str, value: Any) -> None:
         await asyncio.to_thread(self._write_to_disk, key, value)
 
+    async def delete(self, key: str) -> None:
+        path = self._path_for_key(key)
+        try:
+            await asyncio.to_thread(path.unlink, True)
+        except OSError:
+            pass
+
     def _read_from_disk(self, key: str) -> Optional[Any]:
         path = self._path_for_key(key)
         if not path.exists():

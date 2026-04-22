@@ -5,7 +5,6 @@ Provides a singleton pattern for managing caches across all services.
 Uses Redis when available and enabled, falling back to filesystem cache.
 """
 
-import asyncio
 import time
 from typing import Any, Dict, Optional, Union
 import structlog
@@ -18,15 +17,33 @@ log = structlog.get_logger()
 CacheBackend = Any  # PersistentCache or RedisCache — same async get/set interface
 
 
+_redis_fallback_warned = False
+
+
 def _create_cache(namespace: str, ttl: int) -> CacheBackend:
     """Create a cache backend: Redis if enabled and available, else filesystem."""
+    global _redis_fallback_warned
     if REDIS_ENABLED:
         try:
             from .redis_cache import RedisCache, REDIS_AVAILABLE
             if REDIS_AVAILABLE:
                 return RedisCache(namespace, ttl=ttl)
+            if not _redis_fallback_warned:
+                log.warning(
+                    "REDIS_ENABLED=true but redis package not installed — falling back to filesystem cache",
+                )
+                _redis_fallback_warned = True
         except ImportError:
-            pass
+            if not _redis_fallback_warned:
+                log.warning(
+                    "REDIS_ENABLED=true but redis_cache import failed — falling back to filesystem cache",
+                )
+                _redis_fallback_warned = True
+    elif not _redis_fallback_warned:
+        log.info(
+            "REDIS_ENABLED=false — using filesystem cache. Set REDIS_ENABLED=true to share cache across instances.",
+        )
+        _redis_fallback_warned = True
     return PersistentCache(namespace, ttl=ttl)
 
 
@@ -39,7 +56,6 @@ class CacheManager:
     Both backends share the same async get/set interface.
     """
     _instance: Optional["CacheManager"] = None
-    _lock = asyncio.Lock()
 
     def __new__(cls) -> "CacheManager":
         if cls._instance is None:

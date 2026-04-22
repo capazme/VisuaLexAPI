@@ -1279,10 +1279,15 @@ So that I know what's happening and can continue using other features
 
 **Technical Notes:**
 - Implement in Python API scraper layer
-- State stored in Redis (shared across Python API instances if scaled later)
+- State stored in-memory per-instance (module `visualex_api/tools/circuit_breaker.py`, registry `_breakers: Dict[str, CircuitBreaker]`)
+- Redis-backed shared state deferred to future scaling phase (YAGNI: current deployment is single-instance on Lightsail; multi-instance upgrade is tracked as tech debt)
 - Logging of circuit breaker state changes
 
-**Dependencies:** STORY-001 (Redis)
+**Implementation Status (Sprint 1 close-out):**
+- AC 1-6 satisfied
+- Technical note "State stored in Redis" downgraded to in-memory per-instance on 2026-04-22 to reflect actual deployment topology. Upgrade path: swap internal dict for Redis hash using the same async Redis client already used by `redis_cache.py`.
+
+**Dependencies:** STORY-001 (Redis) — cache only, not breaker state
 
 ---
 

@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import 'express-async-errors';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
+import { globalRateLimiter, writeRateLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import folderRoutes from './routes/folders';
@@ -18,21 +18,18 @@ import sharedEnvironmentRoutes from './routes/sharedEnvironments';
 
 const app = express();
 
+// Trust first proxy (load balancer) for accurate req.ip
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: config.nodeEnv === 'production' ? undefined : false, // Disable CSP in dev for hot reload
   crossOriginEmbedderPolicy: false, // Allow embedding resources
 }));
 
-// Global rate limiting: 100 requests per minute per IP
-const globalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 100,
-  message: { detail: 'Too many requests, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(globalLimiter);
+// Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
+// Uses Redis if REDIS_ENABLED=true, otherwise in-memory
+app.use(globalRateLimiter);
 
 // CORS
 app.use(cors({
@@ -42,6 +39,15 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Additional write rate limit on mutation endpoints (POST/PUT/PATCH/DELETE)
+app.use('/api', (req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+    writeRateLimiter(req, res, next);
+    return;
+  }
+  next();
+});
 
 // Health check
 app.get('/api/health', (_req, res) => {

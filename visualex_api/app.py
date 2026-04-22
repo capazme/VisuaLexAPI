@@ -32,6 +32,10 @@ from visualex_api.tools.text_op import format_date_to_extended, parse_article_in
 from visualex_api.tools.cache_warmup import warmup_cache_background
 from visualex_api.tools.cache_manager import get_cache_manager
 from visualex_api.tools.map import extract_codice_details
+from visualex_api.tools.circuit_breaker import get_breaker, get_all_statuses, CircuitOpenError
+from visualex_api.tools.nl_parser import parse_nl_query
+from visualex_api.tools.alias_resolver import resolve_alias, get_all_presets
+from visualex_api.tools.citation_linker import extract_citations
 import os
 from visualex_api.tools.exceptions import ExtractionError
 # Configure logging
@@ -133,6 +137,14 @@ class NormaController:
         self.app.add_url_rule('/api/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/api/export_pdf', view_func=self.export_pdf, methods=['POST'])
         
+        # NL parser, alias resolution, and citation linking
+        self.app.add_url_rule('/api/parse_query', view_func=self.parse_query, methods=['POST'])
+        self.app.add_url_rule('/api/preset_aliases', view_func=self.list_preset_aliases, methods=['GET'])
+        self.app.add_url_rule('/api/extract_citations', view_func=self.extract_citations_endpoint, methods=['POST'])
+
+        # Monitoring
+        self.app.add_url_rule('/api/circuit-breakers', view_func=self.circuit_breaker_status, methods=['GET'])
+
         # Swagger documentation
         self.app.add_url_rule('/api/docs', view_func=self.swagger_ui)
         self.app.add_url_rule('/api/openapi.json', view_func=self.openapi_spec)
@@ -263,20 +275,20 @@ class NormaController:
     def get_scraper_for_norma(self, normavisitata):
         """
         Get the appropriate scraper for a given norm.
-        
+
         Args:
             normavisitata: The norm to get a scraper for
-            
+
         Returns:
-            The appropriate scraper instance or None if not found
+            Tuple of (scraper_instance, source_name)
         """
         act_type_normalized = normavisitata.norma.tipo_atto.lower()
         logger.debug("Determining scraper for norma", extra={"act_type": act_type_normalized})
-        
+
         if act_type_normalized in ['tue', 'tfue', 'cdfue', 'regolamento ue', 'direttiva ue']:
-            return self.eurlex_scraper
+            return self.eurlex_scraper, "eurlex"
         else:
-            return self.normattiva_scraper
+            return self.normattiva_scraper, "normattiva"
     
     async def create_norma_visitata_from_data(self, data):
         """
@@ -429,6 +441,10 @@ class NormaController:
             'cache': cache_stats
         })
     
+    async def circuit_breaker_status(self):
+        """Return status of all circuit breakers."""
+        return jsonify(get_all_statuses())
+
     async def swagger_ui(self):
         """Render the Swagger UI documentation page."""
         return await render_template('swagger_ui.html')
@@ -438,15 +454,107 @@ class NormaController:
         with open('static/swagger.yaml', 'r') as file:
             return file.read(), 200, {'Content-Type': 'application/yaml'}
     
+    async def parse_query(self):
+        """Parse a natural language query into structured API parameters.
+
+        Resolution order: preset alias → NL parser → unrecognized.
+        """
+        try:
+            data = await request.get_json()
+            query = data.get("query", "").strip() if data else ""
+            if not query:
+                return jsonify({"error": "Missing required field: query"}), 400
+
+            # 1. Try preset alias resolution first
+            alias_result = resolve_alias(query)
+            if alias_result:
+                return jsonify({"parsed": alias_result, "recognized": True, "source": "alias"})
+
+            # 2. Fall back to NL parser
+            parsed = parse_nl_query(query)
+            if parsed is None:
+                return jsonify({"parsed": None, "recognized": False})
+
+            return jsonify({"parsed": parsed.to_api_params(), "recognized": True, "source": "nl_parser"})
+        except Exception as e:
+            logger.error("Error in parse_query", extra={"error": str(e)})
+            return jsonify({"error": str(e)}), 500
+
+    async def list_preset_aliases(self):
+        """Return the full preset alias library."""
+        return jsonify({"aliases": get_all_presets()})
+
+    async def extract_citations_endpoint(self):
+        """Extract normative citations from legal text."""
+        try:
+            data = await request.get_json()
+            if not data or "text" not in data:
+                return jsonify({"error": "Missing required field: text"}), 400
+
+            text = data["text"]
+            if not isinstance(text, str):
+                return jsonify({"error": "text must be a string"}), 400
+            if len(text) > 500_000:
+                return jsonify({"error": "Text too large (max 500KB)"}), 413
+
+            context_act_type = data.get("context_act_type")
+            if context_act_type is not None and not isinstance(context_act_type, str):
+                return jsonify({"error": "context_act_type must be a string"}), 400
+
+            citations = extract_citations(text, context_act_type=context_act_type)
+            return jsonify({
+                "citations": [c.to_dict() for c in citations],
+                "count": len(citations),
+            })
+        except Exception as e:
+            logger.error("Error in extract_citations", extra={"error": str(e)})
+            return jsonify({"error": str(e)}), 500
+
+    def _resolve_nl_query(self, data: dict) -> dict:
+        """If data contains a 'query' field, resolve via alias → NL parser → merge."""
+        if not data:
+            return data
+        query = data.get("query")
+        if not query or not isinstance(query, str):
+            return data
+
+        query = query.strip()
+        result = dict(data)
+
+        # 1. Try preset alias first
+        alias_result = resolve_alias(query)
+        if alias_result:
+            # If caller already set act_type and it differs from alias, skip alias merge
+            # to avoid mixing unrelated act_number/date from the alias
+            if "act_type" in result and result["act_type"] != alias_result.get("act_type"):
+                return result
+            for key in ("act_type", "date", "act_number", "article"):
+                if key not in result and key in alias_result:
+                    result[key] = alias_result[key]
+            return result
+
+        # 2. Fall back to NL parser
+        parsed = parse_nl_query(query)
+        if parsed is None:
+            return data
+        params = parsed.to_api_params()
+        if "act_type" in result and result["act_type"] != params.get("act_type"):
+            return result
+        for key in ("act_type", "date", "act_number", "article"):
+            if key not in result and key in params:
+                result[key] = params[key]
+        return result
+
     async def fetch_norma_data(self):
         """
         Fetch norm data based on the request.
-        
+
         Returns:
             JSON response with norm data
         """
         try:
             data = await request.get_json()
+            data = self._resolve_nl_query(data)
             logger.info("Received data for fetch_norma_data", extra={"data": data})
 
             normavisitate = await self.create_norma_visitata_from_data(data)
@@ -468,19 +576,18 @@ class NormaController:
         """
         try:
             data = await request.get_json()
+            data = self._resolve_nl_query(data)
             logger.info("Received data for fetch_article_text", extra={"data": data})
 
             normavisitate = await self.create_norma_visitata_from_data(data)
 
             async def fetch_text(nv):
                 """Helper function to fetch text for a single norm."""
-                scraper = self.get_scraper_for_norma(nv)
-                if scraper is None:
-                    logger.warning("Unsupported act type for scraper", extra={"norma_data": nv.to_dict()})
-                    return {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
+                scraper, source = self.get_scraper_for_norma(nv)
 
                 try:
-                    article_text, url = await scraper.get_document(nv)
+                    breaker = get_breaker(source)
+                    article_text, url = await breaker.call(scraper.get_document, nv)
                     logger.info("Document fetched successfully", extra={
                         "url": url,
                         "text_length": len(article_text) if article_text else 0
@@ -490,6 +597,8 @@ class NormaController:
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
+                except CircuitOpenError as exc:
+                    return {'error': str(exc), 'norma_data': nv.to_dict()}
                 except Exception as exc:
                     logger.error("Error fetching article text", extra={"error": str(exc)})
                     return {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -523,6 +632,7 @@ class NormaController:
         """
         try:
             data = await request.get_json()
+            data = self._resolve_nl_query(data)
             logger.info("Received data for stream_article_text", extra={"data": data})
 
             normavisitate = await self.create_norma_visitata_from_data(data)
@@ -531,17 +641,15 @@ class NormaController:
             async def result_generator():
                 """Generator function for streaming results."""
                 for nv in normavisitate:
-                    scraper = self.get_scraper_for_norma(nv)
-                    if scraper is None:
-                        result = {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
-                        yield json.dumps(result) + "\n"
-                        continue
+                    scraper, source = self.get_scraper_for_norma(nv)
 
                     try:
+                        breaker = get_breaker(source)
                         # Fetch article text and Brocardi info in parallel if requested
-                        tasks = [scraper.get_document(nv)]
+                        tasks = [breaker.call(scraper.get_document, nv)]
                         if show_brocardi and isinstance(scraper, NormattivaScraper):
-                            tasks.append(self.brocardi_scraper.get_info(nv))
+                            brocardi_breaker = get_breaker("brocardi")
+                            tasks.append(brocardi_breaker.call(self.brocardi_scraper.get_info, nv))
 
                         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -605,6 +713,7 @@ class NormaController:
         """
         try:
             data = await request.get_json()
+            data = self._resolve_nl_query(data)
             logger.info("Received data for fetch_brocardi_info", extra={"data": data})
 
             normavisitate = await self.create_norma_visitata_from_data(data)
@@ -616,7 +725,8 @@ class NormaController:
                     return {'norma_data': nv.to_dict(), 'brocardi_info': None}
 
                 try:
-                    brocardi_info = await self.brocardi_scraper.get_info(nv)
+                    brocardi_breaker = get_breaker("brocardi")
+                    brocardi_info = await brocardi_breaker.call(self.brocardi_scraper.get_info, nv)
                     return {
                         'norma_data': nv.to_dict(),
                         'brocardi_info': {
@@ -633,6 +743,8 @@ class NormaController:
                             'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
                         }
                     }
+                except CircuitOpenError as exc:
+                    return {'error': str(exc), 'norma_data': nv.to_dict()}
                 except Exception as exc:
                     logger.error("Error fetching Brocardi info", extra={"error": str(exc)})
                     return {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -664,26 +776,25 @@ class NormaController:
         """
         try:
             data = await request.get_json()
+            data = self._resolve_nl_query(data)
             logger.info("Received data for fetch_all_data", extra={"data": data})
 
             normavisitate = await self.create_norma_visitata_from_data(data)
 
             async def fetch_data(nv):
                 """Helper function to fetch all data for a single norm."""
-                scraper = self.get_scraper_for_norma(nv)
-                if scraper is None:
-                    logger.warning("Unsupported act type for scraper", extra={"norma_data": nv.to_dict()})
-                    return {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
+                scraper, source = self.get_scraper_for_norma(nv)
 
                 try:
-                    # Fetch article text
-                    article_text, url = await scraper.get_document(nv)
-                    
+                    breaker = get_breaker(source)
+                    article_text, url = await breaker.call(scraper.get_document, nv)
+
                     # Fetch Brocardi info if appropriate
                     brocardi_info = None
                     if scraper == self.normattiva_scraper:
                         try:
-                            b_info = await self.brocardi_scraper.get_info(nv)
+                            brocardi_breaker = get_breaker("brocardi")
+                            b_info = await brocardi_breaker.call(self.brocardi_scraper.get_info, nv)
                             brocardi_info = {
                                 'position': b_info[0] if b_info[0] else None,
                                 'link': b_info[2],
@@ -692,16 +803,20 @@ class NormaController:
                                 'Spiegazione': b_info[1].get('Spiegazione') if b_info[1] and 'Spiegazione' in b_info[1] else None,
                                 'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None
                             }
+                        except CircuitOpenError:
+                            brocardi_info = {'error': 'Brocardi non disponibile al momento'}
                         except Exception as exc:
                             logger.error("Error fetching Brocardi info", extra={"error": str(exc)})
                             brocardi_info = {'error': str(exc)}
-                    
+
                     return {
                         'article_text': article_text,
                         'url': url,
                         'norma_data': nv.to_dict(),
                         'brocardi_info': brocardi_info
                     }
+                except CircuitOpenError as exc:
+                    return {'error': str(exc), 'norma_data': nv.to_dict()}
                 except Exception as exc:
                     logger.error("Error fetching all data", extra={"error": str(exc)})
                     return {'error': str(exc), 'norma_data': nv.to_dict()}

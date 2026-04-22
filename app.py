@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from time import time
 
-from quart import Quart, request, jsonify, render_template, send_file, Response, g
+from quart import Quart, request, jsonify, send_file, Response, g
 from quart_cors import cors
 import structlog
 
@@ -310,7 +310,12 @@ class NormaController:
 
 
     async def home(self):
-        return await render_template('index.html')
+        return jsonify({
+            "service": "VisuaLex API",
+            "status": "running",
+            "docs": "/api/docs" if hasattr(self, 'swagger_ui') else None,
+            "frontend": "http://localhost:5173",
+        })
 
     async def create_norma_visitata_from_data(self, data):
         """

@@ -52,7 +52,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div
           className={cn(
             'relative group transition-all duration-200 ease-smooth-out',
-            isFocused && 'transform scale-[1.005]'
+            isFocused && ''
           )}
         >
           {icon && (

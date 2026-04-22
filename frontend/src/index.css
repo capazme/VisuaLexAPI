@@ -2,7 +2,13 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ═══════════════════════════════════════════════════════════
+   VISUALEX DESIGN SYSTEM — Consolidated Token Layer
+   Single source of truth. All tokens live here.
+   ═══════════════════════════════════════════════════════════ */
+
 @theme {
+  /* Semantic color tokens (shadcn-compatible) */
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-card: hsl(var(--card));
@@ -22,17 +28,34 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+
+  /* Feature-specific semantic colors */
+  --color-brocardi: hsl(var(--brocardi));
+  --color-brocardi-foreground: hsl(var(--brocardi-foreground));
+  --color-tree: hsl(var(--tree));
+  --color-tree-foreground: hsl(var(--tree-foreground));
+  --color-quicknorm: hsl(var(--quicknorm));
+  --color-quicknorm-foreground: hsl(var(--quicknorm-foreground));
+  --color-alias: hsl(var(--alias));
+  --color-alias-foreground: hsl(var(--alias-foreground));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  /* Radius */
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 }
 
+/* ═══════════════════════════════════════════════════════════
+   LIGHT THEME
+   ═══════════════════════════════════════════════════════════ */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    /* White */
     --foreground: 222.2 84% 4.9%;
-    /* Slate 950 */
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -41,17 +64,13 @@
     --popover-foreground: 222.2 84% 4.9%;
 
     --primary: 221.2 83.2% 53.3%;
-    /* Blue 600 */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
-    /* Slate 100 */
     --secondary-foreground: 222.2 47.4% 11.2%;
-    /* Slate 900 */
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    /* Slate 500 */
 
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
@@ -60,18 +79,32 @@
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
-    /* Slate 200 */
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
+
+    /* Feature colors — light */
+    --brocardi: 270 60% 62%;
+    --brocardi-foreground: 270 80% 20%;
+    --tree: 160 84% 39%;
+    --tree-foreground: 160 80% 15%;
+    --quicknorm: 38 92% 50%;
+    --quicknorm-foreground: 38 80% 15%;
+    --alias: 245 58% 51%;
+    --alias-foreground: 245 80% 20%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 80% 15%;
 
     --radius: 0.5rem;
   }
 
+  /* ═══════════════════════════════════════════════════════════
+     DARK THEME
+     ═══════════════════════════════════════════════════════════ */
   .dark {
     --background: 222.2 84% 4.9%;
-    /* Slate 950 */
     --foreground: 210 40% 98%;
-    /* Slate 50 */
 
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
@@ -97,9 +130,26 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    /* Feature colors — dark (reduced intensity, higher opacity bg) */
+    --brocardi: 270 60% 70%;
+    --brocardi-foreground: 270 30% 90%;
+    --tree: 160 60% 55%;
+    --tree-foreground: 160 30% 90%;
+    --quicknorm: 38 70% 55%;
+    --quicknorm-foreground: 38 30% 90%;
+    --alias: 245 58% 65%;
+    --alias-foreground: 245 30% 90%;
+    --success: 142 60% 55%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 70% 55%;
+    --warning-foreground: 38 30% 90%;
   }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════ */
 @layer base {
   * {
     @apply border-border;
@@ -108,13 +158,31 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    /* Optimize typography */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Accessibility: respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Skip navigation link */
+  .skip-nav {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[999]
+           focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground
+           focus:rounded-lg focus:shadow-lg focus:font-medium;
+  }
 }
 
-/* Scrollbar Polish */
+/* ═══════════════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════════════ */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -125,12 +193,20 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-700 rounded-full hover:bg-slate-400 dark:hover:bg-slate-600 transition-colors;
+  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  transition: background-color 0.15s ease;
 }
 
-/* Legal Text Readability Classes */
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-600;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LEGAL TEXT — The core reading experience
+   ═══════════════════════════════════════════════════════════ */
 .legal-content {
   @apply font-serif text-lg leading-relaxed text-slate-800 dark:text-slate-200;
+  letter-spacing: 0.01em;
 }
 
 .legal-content p {
@@ -143,7 +219,9 @@
   @apply font-sans font-semibold text-slate-900 dark:text-slate-100 mt-6 mb-3;
 }
 
-/* Citation Hover Preview */
+/* ═══════════════════════════════════════════════════════════
+   CITATION HOVER — Subtle recognition of norm references
+   ═══════════════════════════════════════════════════════════ */
 .citation-hover {
   cursor: default;
   text-decoration: none;
@@ -164,11 +242,32 @@
   background-color: hsl(var(--primary) / 0.15);
 }
 
-/* Utilities */
+/* ═══════════════════════════════════════════════════════════
+   HIGHLIGHT OVERLAYS — For text highlighting feature
+   ═══════════════════════════════════════════════════════════ */
+.highlight-yellow { background-color: rgb(253 224 71 / 0.5); }
+.highlight-green  { background-color: rgb(110 231 183 / 0.45); }
+.highlight-red    { background-color: rgb(252 165 165 / 0.45); }
+.highlight-blue   { background-color: rgb(147 197 253 / 0.45); }
+
+.dark .highlight-yellow { background-color: rgb(234 179 8 / 0.3); }
+.dark .highlight-green  { background-color: rgb(16 185 129 / 0.25); }
+.dark .highlight-red    { background-color: rgb(239 68 68 / 0.25); }
+.dark .highlight-blue   { background-color: rgb(59 130 246 / 0.25); }
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════ */
 .glass {
   @apply bg-white/70 dark:bg-slate-950/70 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-sm;
 }
 
 .focus-ring {
   @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background;
+}
+
+/* Touch target minimum — apply to interactive elements that are too small */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
 }

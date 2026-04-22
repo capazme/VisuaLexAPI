@@ -412,7 +412,6 @@ class BrocardiScraper(BaseScraper):
         log.warning(f"No knowledge found for norma: {norma_visitata}")
         return None
 
-    @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def look_up(self, norma_visitata: NormaVisitata) -> Optional[str]:
         log.info(f"Looking up norma: {norma_visitata}")
 

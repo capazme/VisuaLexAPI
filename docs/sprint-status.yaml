@@ -9,33 +9,36 @@ sprints:
     goal: "Infrastructure foundation (Redis, rate limiting, circuit breakers) + search intelligence backend (NL parser, aliases, citation linker)"
     capacity_points: 30
     committed_points: 29
-    completed_points: 0
-    status: "not_started"
+    completed_points: 29
+    status: "completed"
+    completed_on: "2026-04-22"
     stories:
       - story_id: "STORY-001"
         title: "Redis cache layer for Python API"
         points: 5
         status: "completed"
+        note: "Module path is visualex_api/tools/redis_cache.py (sprint-plan referenced visualex_api/cache/redis_client.py — path updated informally)."
       - story_id: "STORY-042"
         title: "Redis-based rate limiting upgrade"
         points: 3
-        status: "not_started"
+        status: "completed"
       - story_id: "STORY-044"
         title: "Circuit breaker for scrapers"
         points: 3
-        status: "not_started"
+        status: "completed"
+        note: "Technical note downgraded 2026-04-22: state is in-memory per-instance, not Redis. Acceptable for current single-instance Lightsail deployment. Redis-backed shared state tracked as tech debt."
       - story_id: "STORY-002"
         title: "Natural language input parser"
         points: 5
-        status: "not_started"
+        status: "completed"
       - story_id: "STORY-003"
         title: "Smart preset alias library"
         points: 5
-        status: "not_started"
+        status: "completed"
       - story_id: "STORY-004"
         title: "Contextual norm linking engine"
         points: 8
-        status: "not_started"
+        status: "completed"
 
   - sprint_number: 2
     goal: "Search & article experience redesign + onboarding flow"

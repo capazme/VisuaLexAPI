@@ -29,13 +29,22 @@ Controller-service architecture for legal data retrieval:
   - `urngenerator.py`: URN generation for legal documents
   - `treextractor.py`: Article tree structures
   - `text_op.py`: Text parsing, normalization, and date handling
-  - `config.py`: Rate limiting, cache size, Playwright browser pool
+  - `config.py`: Rate limiting, cache size, Playwright browser pool, Redis config (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py`: Act type mappings
   - `browser_manager.py`: Playwright browser pool management (`PlaywrightManager`)
+  - `nl_parser.py` (Sprint 1): Natural language query parser — normalizes inputs like "art. 3 cc" into structured API params. Exposed at `POST /api/parse_query`.
+  - `alias_resolver.py` + `preset_aliases.yaml` (Sprint 1): Preset alias library (e.g. `gdpr` → Regolamento UE 2016/679). Runs before the NL parser.
+  - `citation_linker.py` (Sprint 1): Detects explicit and contextual citations in article text; emits `{start, end, display_text, article, act_type, date, act_number}`. Exposed at `POST /api/extract_citations`.
+  - `circuit_breaker.py` (Sprint 1): Per-source scraper circuit breaker. **State is in-memory per-instance** (registry `_breakers: Dict[str, CircuitBreaker]`) — single-instance deployment only. Redis-backed shared state is deferred tech debt if scaling becomes needed. Status endpoint: `GET /api/circuit-breakers`.
+  - `redis_cache.py` + `cache_manager.py` (Sprint 1): Redis-backed async cache with automatic filesystem fallback. Both backends implement the same async `get`/`set`/`delete`. Startup emits a warning when `REDIS_ENABLED=false` or when the redis package is missing while enabled.
 
 ### Node.js Backend (`/backend`)
 
 Express server with Prisma ORM for platform features (authentication, user data).
+
+Sprint 1 additions:
+- `src/middleware/rateLimiter.ts`: `rate-limiter-flexible` based middleware. Tiers: anonymous 100/min (by IP), authenticated 300/min (by userId), writes 20/min. Uses `RateLimiterRedis` when `REDIS_ENABLED=true`, else falls back to `RateLimiterMemory` and logs a startup warning. Mounted globally in `src/index.ts`.
+- `src/utils/redis.ts`: `ioredis` client factory (`getRedisClient()`). Returns `null` if Redis is disabled. Connection errors fail open (rate limiter continues on memory).
 
 ### Frontend Structure
 
@@ -345,8 +354,13 @@ All browser automation is now async via Playwright. The `PlaywrightManager` sing
 Python API:
 - `HOST`: Server host (default: `0.0.0.0`)
 - `PORT`: Server port (default: `5000`)
+- `REDIS_ENABLED`: `true`/`false` (default: `false`). When `false`, the cache uses filesystem backend (per-instance). A warning is logged at startup.
+- `REDIS_URL`: Redis connection string (default: `redis://localhost:6379/0`)
+- `REDIS_CACHE_PREFIX`: Key prefix for cache entries (default: `vlx`)
+- `PERSISTENT_CACHE_TTL`: Cache TTL in seconds (default: `86400`)
+- `HTTP_MAX_CONCURRENCY`, `HTTP_TIMEOUT`, `HTTP_MAX_RETRIES`, etc.: HTTP client tuning (see `config.py`)
 
-Node.js Backend: See `backend/.env.example` for required variables.
+Node.js Backend: See `backend/.env.example` for required variables. `REDIS_ENABLED` defaults to `"true"` in the example to mirror production topology — set to `"false"` if running dev without a Redis instance (rate limiter will use in-memory fallback with warning log).
 
 ---
 
