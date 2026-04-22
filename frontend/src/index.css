@@ -97,6 +97,16 @@
     --warning-foreground: 38 80% 15%;
 
     --radius: 0.5rem;
+
+    /* Text highlight tokens — light theme */
+    --hl-yellow-bg: 48 96% 89%;
+    --hl-yellow-fg: 23 82% 31%;
+    --hl-green-bg: 152 76% 90%;
+    --hl-green-fg: 158 89% 20%;
+    --hl-red-bg: 0 93% 94%;
+    --hl-red-fg: 0 70% 35%;
+    --hl-blue-bg: 214 95% 93%;
+    --hl-blue-fg: 226 71% 33%;
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -130,6 +140,16 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    /* Text highlight tokens — dark theme (inverted: dark saturated bg, light fg) */
+    --hl-yellow-bg: 21 91% 30%;
+    --hl-yellow-fg: 48 96% 89%;
+    --hl-green-bg: 158 89% 20%;
+    --hl-green-fg: 152 76% 90%;
+    --hl-red-bg: 0 70% 35%;
+    --hl-red-fg: 0 93% 94%;
+    --hl-blue-bg: 226 71% 33%;
+    --hl-blue-fg: 214 95% 93%;
 
     /* Feature colors — dark (reduced intensity, higher opacity bg) */
     --brocardi: 270 60% 70%;
@@ -241,19 +261,6 @@
 .dark .citation-hover:hover {
   background-color: hsl(var(--primary) / 0.15);
 }
-
-/* ═══════════════════════════════════════════════════════════
-   HIGHLIGHT OVERLAYS — For text highlighting feature
-   ═══════════════════════════════════════════════════════════ */
-.highlight-yellow { background-color: rgb(253 224 71 / 0.5); }
-.highlight-green  { background-color: rgb(110 231 183 / 0.45); }
-.highlight-red    { background-color: rgb(252 165 165 / 0.45); }
-.highlight-blue   { background-color: rgb(147 197 253 / 0.45); }
-
-.dark .highlight-yellow { background-color: rgb(234 179 8 / 0.3); }
-.dark .highlight-green  { background-color: rgb(16 185 129 / 0.25); }
-.dark .highlight-red    { background-color: rgb(239 68 68 / 0.25); }
-.dark .highlight-blue   { background-color: rgb(59 130 246 / 0.25); }
 
 /* ═══════════════════════════════════════════════════════════
    UTILITIES

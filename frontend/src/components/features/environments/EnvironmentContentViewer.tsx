@@ -15,6 +15,7 @@ import {
 import type { Environment } from '../../../types';
 import type { EnvironmentSelection, DetailedEnvironmentStats } from '../../../utils/environmentUtils';
 import { getDetailedEnvironmentStats } from '../../../utils/environmentUtils';
+import { getHighlightSwatch } from '../../../utils/highlightColors';
 
 type TabType = 'dossiers' | 'quickNorms' | 'aliases' | 'annotations' | 'highlights';
 
@@ -382,13 +383,7 @@ export function EnvironmentContentViewer({
               {renderCheckbox('highlights', hl.id)}
               <div
                 className="w-3 h-3 rounded mr-2 mt-0.5 flex-shrink-0"
-                style={{
-                  backgroundColor:
-                    hl.color === 'yellow' ? '#FEF08A' :
-                    hl.color === 'green' ? '#BBF7D0' :
-                    hl.color === 'red' ? '#FECACA' :
-                    '#BFDBFE'
-                }}
+                style={{ backgroundColor: getHighlightSwatch(hl.color) }}
               />
               <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
                 {hl.text}

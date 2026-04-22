@@ -14,6 +14,7 @@ import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
+import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -27,13 +28,6 @@ const DICTIONARY_TERMS: Record<string, string> = {
     'erga omnes': 'Efficace nei confronti di tutti.',
     'ex tunc': 'Con effetti retroattivi.',
     'ex nunc': 'Con effetti solo per il futuro.',
-};
-
-const HIGHLIGHT_STYLES: Record<string, string> = {
-    yellow: 'background-color:#FEF3C7;color:#92400E;',
-    green: 'background-color:#D1FAE5;color:#065F46;',
-    red: 'background-color:#FEE2E2;color:#991B1B;',
-    blue: 'background-color:#DBEAFE;color:#1E3A8A;',
 };
 
 export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode }: ArticleTabContentProps) {
@@ -899,12 +893,3 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     );
 }
 
-function parseInlineStyle(style: string): React.CSSProperties {
-    const entries = style.split(';').filter(Boolean).map(rule => {
-        const [prop, value] = rule.split(':');
-        // Convert CSS property name to camelCase (e.g., background-color -> backgroundColor)
-        const camelProp = prop.trim().replace(/-([a-z])/g, (_, char) => char.toUpperCase());
-        return [camelProp, value.trim()];
-    });
-    return Object.fromEntries(entries);
-}

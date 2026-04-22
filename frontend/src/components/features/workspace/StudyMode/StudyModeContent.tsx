@@ -7,6 +7,7 @@ import { cn } from '../../../../lib/utils';
 import { extractArticleRefs } from '../../../../utils/citationParser';
 import type { ArticleData, NormaVisitata, Highlight, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
+import { HIGHLIGHT_STYLES } from '../../../../utils/highlightColors';
 
 interface StudyModeContentProps {
   article: ArticleData;
@@ -19,13 +20,6 @@ interface StudyModeContentProps {
   onAddHighlight: (normaKey: string, articleId: string, text: string, range: string, color: 'yellow' | 'green' | 'red' | 'blue') => void;
   onCrossReferenceNavigate?: (articleNumber: string, normaData: NormaVisitata) => void;
 }
-
-const HIGHLIGHT_STYLES: Record<string, string> = {
-  yellow: 'background-color:#FEF3C7;color:#92400E;',
-  green: 'background-color:#D1FAE5;color:#065F46;',
-  red: 'background-color:#FEE2E2;color:#991B1B;',
-  blue: 'background-color:#DBEAFE;color:#1E3A8A;',
-};
 
 const THEME_CONTENT_STYLES: Record<StudyModeTheme, { prose: string }> = {
   light: {
