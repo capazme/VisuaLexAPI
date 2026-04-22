@@ -115,6 +115,8 @@ export default {
         'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
         'subtle': '0 2px 10px rgba(0, 0, 0, 0.03)',
         'glow': '0 0 20px rgba(59, 130, 246, 0.15)',
+        'glow-sm': '0 0 8px rgba(59, 130, 246, 0.5)',
+        'glow-up': '0 -4px 10px rgba(59, 130, 246, 0.3)',
         'glass-lg': '0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)',
       },
       keyframes: {

@@ -271,3 +271,12 @@
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Resize handle — diagonal hash pattern at bottom-right corner */
+.resize-handle {
+  background: linear-gradient(135deg, transparent 50%, hsl(215 20% 65% / 0.3) 50%);
+}
+
+.dark .resize-handle {
+  background: linear-gradient(135deg, transparent 50%, hsl(215 16% 47% / 0.4) 50%);
+}

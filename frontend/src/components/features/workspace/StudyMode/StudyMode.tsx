@@ -474,10 +474,7 @@ export function StudyMode({
         {!isFullscreen && (
           <div
             onMouseDown={handleResizeStart}
-            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
-            style={{
-              background: 'linear-gradient(135deg, transparent 50%, rgba(148,163,184,0.3) 50%)'
-            }}
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize resize-handle"
           />
         )}
 

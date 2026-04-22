@@ -476,7 +476,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCompar
                   {isActive && (
                     <motion.span
                       layoutId="activeNormaTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 shadow-[0_-4px_10px_rgba(59,130,246,0.3)]"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 shadow-glow-up"
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                     />
                   )}

@@ -458,7 +458,7 @@ export function SearchPanel() {
                       className={cn(
                         "h-1.5 rounded-full transition-all duration-300",
                         idx === mobileActiveTabIndex
-                          ? "w-6 bg-primary-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                          ? "w-6 bg-primary-500 shadow-glow-sm"
                           : "w-1.5 bg-slate-300 dark:bg-slate-700"
                       )}
                     />

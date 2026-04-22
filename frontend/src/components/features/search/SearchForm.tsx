@@ -438,7 +438,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             {articleList.length > 0 && (
               <div className="w-full h-1 bg-slate-200 dark:bg-slate-800 rounded-full mt-1 overflow-hidden">
                 <motion.div
-                  className="h-full bg-primary-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                  className="h-full bg-primary-500 shadow-glow-sm"
                   initial={{ width: 0 }}
                   animate={{ width: `${(articlePosition / articleList.length) * 100}%` }}
                 />
