@@ -84,6 +84,15 @@ interface AppState {
     dataError: string | null;
     isDataLoaded: boolean;
 
+    /**
+     * Transient user-facing error for server sync failures (highlights /
+     * annotations save, delete, load). Shown as a top-right toast and
+     * auto-dismissed. Newest error supersedes the previous one.
+     */
+    lastSyncError: { id: string; message: string } | null;
+    pushSyncError: (message: string) => void;
+    dismissSyncError: (id: string) => void;
+
     // UI State
     sidebarVisible: boolean;
     commandPaletteOpen: boolean;
@@ -243,6 +252,16 @@ const appStore = createStore<AppState>()(
             isLoadingData: false,
             dataError: null,
             isDataLoaded: false,
+
+            lastSyncError: null,
+            pushSyncError: (message) => set((state) => {
+                state.lastSyncError = { id: uuidv4(), message };
+            }),
+            dismissSyncError: (id) => set((state) => {
+                if (state.lastSyncError?.id === id) {
+                    state.lastSyncError = null;
+                }
+            }),
 
             // Search State
             searchTrigger: null,
@@ -1150,10 +1169,10 @@ const appStore = createStore<AppState>()(
                     })
                     .catch((err) => {
                         console.error('Failed to sync annotation:', err);
-                        // Roll back the optimistic insert
                         set((state) => {
                             state.annotations = state.annotations.filter(a => a.id !== tempId);
                         });
+                        get().pushSyncError('Impossibile salvare la nota. Riprova.');
                     });
             },
 
@@ -1163,14 +1182,13 @@ const appStore = createStore<AppState>()(
                     state.annotations = state.annotations.filter(a => a.id !== id);
                 });
                 if (!previous) return;
-                // Skip server delete for optimistic entries that never reached
-                // the server (e.g. removed before the create POST resolved).
-                // Server-side ids are UUIDv4; the temp ids are too, so we can't
-                // distinguish cheaply — just call delete and swallow 404s.
+                // 404 is fine: entry may have been a local-only optimistic
+                // insert that never reached the server.
                 annotationService.delete(id).catch((err) => {
                     if (err?.status === 404) return;
                     console.error('Failed to sync annotation delete:', err);
                     set((state) => { state.annotations.push(previous); });
+                    get().pushSyncError('Impossibile eliminare la nota. Riprova.');
                 });
             },
 
@@ -1180,13 +1198,13 @@ const appStore = createStore<AppState>()(
                     const server = await annotationService.getByNormaKey(wireKey);
                     const mapped = server.map(annotationApiToStore);
                     set((state) => {
-                        // Replace only this article's annotations, keep others intact
                         state.annotations = state.annotations
                             .filter(a => !(a.normaKey === normaKey && a.articleId === articleId))
                             .concat(mapped);
                     });
                 } catch (err) {
                     console.error('Failed to load annotations for article:', err);
+                    get().pushSyncError('Impossibile caricare le note dal server.');
                 }
             },
 
@@ -1225,6 +1243,7 @@ const appStore = createStore<AppState>()(
                         set((state) => {
                             state.highlights = state.highlights.filter(h => h.id !== tempId);
                         });
+                        get().pushSyncError('Impossibile salvare l\'evidenziazione. Riprova.');
                     });
             },
 
@@ -1238,6 +1257,7 @@ const appStore = createStore<AppState>()(
                     if (err?.status === 404) return;
                     console.error('Failed to sync highlight delete:', err);
                     set((state) => { state.highlights.push(previous); });
+                    get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
                 });
             },
 
@@ -1257,6 +1277,7 @@ const appStore = createStore<AppState>()(
                     });
                 } catch (err) {
                     console.error('Failed to load highlights for article:', err);
+                    get().pushSyncError('Impossibile caricare le evidenziazioni dal server.');
                 }
             },
 

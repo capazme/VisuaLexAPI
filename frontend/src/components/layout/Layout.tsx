@@ -8,6 +8,7 @@ import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
 import { UndoToastContainer } from '../ui/Toast';
+import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
 import { GlobalSearch } from '../features/search/GlobalSearch';
@@ -213,6 +214,9 @@ export function Layout() {
 
       {/* Global Undo Toast Container */}
       <UndoToastContainer />
+
+      {/* Global sync error toast (highlights / annotations save/load) */}
+      <SyncErrorToast />
 
       {/* Global Search (Cmd+F) */}
       <GlobalSearch isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
