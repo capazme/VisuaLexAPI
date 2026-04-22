@@ -27,15 +27,19 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow embedding resources
 }));
 
-// Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
-// Uses Redis if REDIS_ENABLED=true, otherwise in-memory
-app.use(globalRateLimiter);
-
-// CORS
+// CORS must be registered before any middleware that can short-circuit
+// the request (rate limiter, auth, etc.). Otherwise early responses
+// (429, 401) miss the Access-Control-Allow-Origin header and the
+// browser flags them as CORS failures instead of surfacing the real
+// status code.
 app.use(cors({
   origin: config.cors.origins,
   credentials: true,
 }));
+
+// Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
+// Uses Redis if REDIS_ENABLED=true, otherwise in-memory
+app.use(globalRateLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
