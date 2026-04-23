@@ -91,7 +91,7 @@ function DesktopPicker({ anchorEl, onClose, ...rest }: HighlightsActionsPickerPr
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'w-[240px] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
+                            'w-[180px] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >
@@ -173,18 +173,23 @@ function PickerBody({
                 </button>
             </header>
 
-            <div className="p-1.5 flex flex-col">
-                <PickerAction
-                    icon={highlightsHidden ? <Eye size={15} /> : <EyeOff size={15} />}
-                    label={highlightsHidden ? 'Mostra evidenziazioni' : 'Nascondi evidenziazioni'}
-                    hint={empty ? 'Nessuna evidenziazione su questo articolo' : undefined}
+            <div className="p-2 flex items-center justify-center gap-2">
+                <IconAction
+                    icon={highlightsHidden ? <Eye size={18} /> : <EyeOff size={18} />}
+                    title={
+                        empty
+                            ? 'Nessuna evidenziazione'
+                            : highlightsHidden
+                                ? 'Mostra evidenziazioni'
+                                : 'Nascondi evidenziazioni'
+                    }
+                    pressed={highlightsHidden}
                     disabled={empty}
                     onClick={() => { onToggleVisibility(); }}
                 />
-                <PickerAction
-                    icon={<Download size={15} />}
-                    label="Esporta in .txt"
-                    hint={empty ? 'Nessuna evidenziazione da esportare' : undefined}
+                <IconAction
+                    icon={<Download size={18} />}
+                    title={empty ? 'Nessuna evidenziazione da esportare' : 'Esporta in .txt'}
                     disabled={empty}
                     onClick={() => { onExportTxt(); onClose(); }}
                 />
@@ -193,31 +198,33 @@ function PickerBody({
     );
 }
 
-interface PickerActionProps {
+interface IconActionProps {
     icon: React.ReactNode;
-    label: string;
-    hint?: string;
+    title: string;
+    pressed?: boolean;
     disabled?: boolean;
     onClick: () => void;
 }
 
-function PickerAction({ icon, label, hint, disabled, onClick }: PickerActionProps) {
+function IconAction({ icon, title, pressed, disabled, onClick }: IconActionProps) {
     return (
         <button
             onClick={onClick}
             disabled={disabled}
-            title={hint}
+            title={title}
+            aria-label={title}
+            aria-pressed={pressed}
             className={cn(
-                'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm text-left transition-colors',
+                'inline-flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
                 disabled
-                    ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
-                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40',
+                    ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                    : pressed
+                        ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300'
+                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-purple-500',
             )}
         >
-            <span className={cn('shrink-0', disabled ? 'text-slate-300 dark:text-slate-600' : 'text-purple-500')}>
-                {icon}
-            </span>
-            <span className="flex-1 truncate">{label}</span>
+            {icon}
         </button>
     );
 }
