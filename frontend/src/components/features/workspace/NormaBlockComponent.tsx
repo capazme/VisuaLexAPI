@@ -322,7 +322,7 @@ export function NormaBlockComponent({
 
       {/* Articles */}
       {!normaBlock.isCollapsed && (
-        <div className="bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="bg-slate-50 dark:bg-slate-900">
           {/* Annex suggestion - show when article exists in other annexes */}
           {treeMetadata?.annexes && treeMetadata.annexes.length > 1 && activeArticle && (
             <div className="px-3 pt-3">
@@ -395,7 +395,7 @@ export function NormaBlockComponent({
             })}
           </div>
 
-          <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 bg-slate-50 dark:bg-slate-900 gap-2 overflow-x-auto custom-scrollbar items-end">
+          <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 gap-2 overflow-x-auto overflow-y-hidden custom-scrollbar items-end">
             {normaBlock.articles.map((article, idx) => {
               const uniqueId = getUniqueId(article);
               const isActive = uniqueId === activeArticleId;
