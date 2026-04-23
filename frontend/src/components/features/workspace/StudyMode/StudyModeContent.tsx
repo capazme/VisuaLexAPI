@@ -8,6 +8,7 @@ import { extractArticleRefs } from '../../../../utils/citationParser';
 import type { ArticleData, NormaVisitata, Highlight, Annotation, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
+import { extractPreamble } from './extractPreamble';
 
 interface StudyModeContentProps {
   article: ArticleData;
@@ -53,6 +54,12 @@ export function StudyModeContent({
   onAddHighlight,
   onCrossReferenceNavigate
 }: StudyModeContentProps) {
+  // `scrollRef` tracks the outer scrollable container (used for the
+  // progress bar). `contentRef` wraps only the prose so selection
+  // offsets exclude the title / rubric — otherwise `getPlainTextOffset`
+  // would count the H2 characters and the highlight anchor would land
+  // way off the actual text once shifted into document coords.
+  const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [activeFootnote, setActiveFootnote] = useState<Footnote | null>(null);
@@ -62,7 +69,7 @@ export function StudyModeContent({
 
   // Track scroll progress
   useEffect(() => {
-    const container = contentRef.current?.parentElement;
+    const container = scrollRef.current;
     if (!container) return;
 
     const handleScroll = () => {
@@ -77,14 +84,45 @@ export function StudyModeContent({
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Split off the "Art. N. (Rubrica)." preamble so the rendered body doesn't
+  // duplicate what the H2 + rubric subtitle already show.
+  const { rubric, body: bodyText, offset: preambleOffset } = useMemo(
+    () => extractPreamble(article_text || ''),
+    [article_text],
+  );
+
+  // Highlights and annotations are stored document-relative (matching the
+  // main article view). Shift them into body-relative coordinates for this
+  // view, and drop anything that falls inside the hidden preamble — users
+  // never interact with that region here.
+  const bodyHighlights = useMemo<Highlight[]>(() => {
+    if (preambleOffset === 0) return highlights;
+    return highlights.flatMap((h) => {
+      if (typeof h.startOffset !== 'number') return [h];
+      const shifted = h.startOffset - preambleOffset;
+      if (shifted < 0) return [];
+      return [{ ...h, startOffset: shifted }];
+    });
+  }, [highlights, preambleOffset]);
+
+  const bodyAnnotations = useMemo<Annotation[]>(() => {
+    if (preambleOffset === 0) return annotations;
+    return annotations.flatMap((a) => {
+      if (typeof a.startOffset !== 'number') return [a];
+      const shifted = a.startOffset - preambleOffset;
+      if (shifted < 0) return [];
+      return [{ ...a, startOffset: shifted }];
+    });
+  }, [annotations, preambleOffset]);
+
   // Shared marker pipeline: pins highlights to specific occurrences via
   // startOffset, renders note-anchor spans for annotations, and handles
   // adjacent/nested boundaries correctly. Same hook the main article flow
   // uses — Study Mode no longer has its own divergent renderer.
   const markedHtml = useArticleMarkers({
-    rawText: article_text || '',
-    highlights,
-    annotations,
+    rawText: bodyText,
+    highlights: bodyHighlights,
+    annotations: bodyAnnotations,
   });
 
   // Cross-references are Study-Mode-specific: simple `art. N` → button wrap.
@@ -140,15 +178,18 @@ export function StudyModeContent({
   }, [activeFootnote]);
 
   // Handle highlight from selection popup. SelectionPopup supplies the
-  // plain-text startOffset of the selection — pass it through so the
-  // highlight pins to *this* occurrence (not every copy of the string)
-  // and persists server-side (highlightStoreToCreate requires offset).
+  // plain-text startOffset relative to the rendered body (which now
+  // excludes the preamble). Shift it back to document coords so the
+  // stored offset matches what the main article view would produce for
+  // the same span — otherwise the same highlight would point to
+  // different places depending on where it was created.
   const handleHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
+    const documentOffset = startOffset + preambleOffset;
     const alreadyHighlighted = highlights.some(h =>
-      h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
+      h.text.toLowerCase() === text.toLowerCase() && h.startOffset === documentOffset
     );
     if (!alreadyHighlighted) {
-      onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color, startOffset);
+      onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color, documentOffset);
     }
   };
 
@@ -165,7 +206,7 @@ export function StudyModeContent({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto relative custom-scrollbar">
+    <div className="flex-1 overflow-y-auto relative custom-scrollbar" ref={scrollRef}>
       {/* Progress Bar */}
       <div className="sticky top-0 left-0 right-0 h-1 bg-transparent z-10 pointer-events-none">
         <motion.div
@@ -177,7 +218,7 @@ export function StudyModeContent({
       </div>
 
       {/* Centered Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-6 sm:py-12" ref={contentRef}>
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-6 sm:py-10">
         {/* Article Title */}
         <AnimatePresence mode="wait">
           <motion.div
@@ -187,40 +228,52 @@ export function StudyModeContent({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <h2 className={cn(
-              "text-xl sm:text-2xl font-serif font-bold mb-4 sm:mb-8 pb-3 sm:pb-4 border-b",
-              theme === 'dark' ? 'border-slate-700' : theme === 'sepia' ? 'border-[#d4c4a8]' : 'border-slate-200'
-            )}>
-              Articolo {norma_data.numero_articolo}
-            </h2>
-
-            {/* Selection Popup */}
-            <SelectionPopup
-              containerRef={contentRef}
-              onHighlight={handleHighlight}
-              onAddNote={handleAddNote}
-              onCopy={handleCopy}
-            />
-
-            {/* Article Text */}
-            <div
-              className={cn(
-                "prose max-w-none font-serif leading-relaxed",
-                styles.prose
+            <header className="mb-6 sm:mb-8">
+              <h2 className="text-xl sm:text-2xl font-serif font-bold leading-tight tracking-tight">
+                Articolo {norma_data.numero_articolo}
+                {norma_data.allegato && (
+                  <span className="opacity-60 font-normal text-base sm:text-lg"> — Allegato {norma_data.allegato}</span>
+                )}
+              </h2>
+              {rubric && (
+                <p className={cn(
+                  "mt-1.5 font-serif italic text-sm sm:text-base leading-snug",
+                  theme === 'dark' ? 'text-slate-400' : theme === 'sepia' ? 'text-[#8b7355]' : 'text-slate-500'
+                )}>
+                  {rubric}
+                </p>
               )}
-              style={{
-                fontSize: `${fontSize}px`,
-                lineHeight: lineHeight
-              }}
-            >
-              {processedContent ? (
-                <SafeHTML html={processedContent} />
-              ) : (
-                <div className="text-center py-8 opacity-50 flex flex-col items-center gap-2">
-                  <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                  Caricamento testo...
-                </div>
-              )}
+            </header>
+
+            {/* Article body — ref scoped to this wrapper so selection
+                offsets align with the body text fed to useArticleMarkers. */}
+            <div className="relative" ref={contentRef}>
+              <SelectionPopup
+                containerRef={contentRef}
+                onHighlight={handleHighlight}
+                onAddNote={handleAddNote}
+                onCopy={handleCopy}
+              />
+
+              <div
+                className={cn(
+                  "prose max-w-none font-serif leading-relaxed",
+                  styles.prose
+                )}
+                style={{
+                  fontSize: `${fontSize}px`,
+                  lineHeight: lineHeight
+                }}
+              >
+                {processedContent ? (
+                  <SafeHTML html={processedContent} />
+                ) : (
+                  <div className="text-center py-8 opacity-50 flex flex-col items-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    Caricamento testo...
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         </AnimatePresence>
