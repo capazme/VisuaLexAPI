@@ -349,7 +349,7 @@ export function TreeViewPanel({
 
                     return (
                       <motion.button
-                        key={annex.number ?? 'main'}
+                        key={annex.number || 'main'}
                         onClick={() => handleAnnexTabClick(annex.number)}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
@@ -388,7 +388,7 @@ export function TreeViewPanel({
               {/* Show annex-specific articles when available */}
               {displayArticles ? (
                 <motion.div
-                  key={effectiveAnnex ?? 'dispositivo'}
+                  key={effectiveAnnex || 'dispositivo'}
                   className="pb-10"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
