@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, Lightbulb, ChevronDown } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
-import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
+import type { BrocardiInfo, MassimaStructured } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPopoverProps {
@@ -145,66 +145,6 @@ function BrocardiSection({ title, content, theme, defaultOpen = false }: Section
   );
 }
 
-interface FootnotesSectionProps {
-  footnotes: Footnote[];
-  theme: StudyModeTheme;
-}
-
-function FootnotesSection({ footnotes, theme }: FootnotesSectionProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const styles = THEME_STYLES[theme];
-
-  if (!footnotes || footnotes.length === 0) return null;
-
-  return (
-    <div className={cn("rounded-lg border overflow-hidden transition-colors", styles.border)}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "w-full flex items-center justify-between px-3 py-2 transition-colors text-left",
-          styles.section,
-          styles.sectionHover
-        )}
-      >
-        <span className={cn("text-xs font-semibold uppercase tracking-wide", styles.muted)}>
-          Note
-          <span className="ml-1 opacity-60 font-normal">({footnotes.length})</span>
-        </span>
-        <ChevronDown
-          size={14}
-          className={cn("transition-transform opacity-60", styles.muted, isOpen && "rotate-180")}
-        />
-      </button>
-
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="overflow-hidden"
-          >
-            <div className={cn("p-3 text-sm max-h-48 overflow-y-auto space-y-3 custom-scrollbar", styles.text)}>
-              {footnotes.map((footnote) => (
-                <div key={`popover-footnote-${footnote.numero}`} className="flex gap-2 text-xs">
-                  <span className={cn(
-                    "shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold mt-0.5",
-                    "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
-                  )}>
-                    {footnote.numero}
-                  </span>
-                  <p className="flex-1 leading-relaxed">{footnote.testo}</p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export function StudyModeBrocardiPopover({
   visible,
   onClose,
@@ -213,12 +153,15 @@ export function StudyModeBrocardiPopover({
 }: StudyModeBrocardiPopoverProps) {
   const styles = THEME_STYLES[theme];
 
+  // Footnotes deliberately excluded: the Study Mode content area
+  // already surfaces them via a dedicated floating button + panel
+  // (StudyModeContent). Rendering them here too produced two identical
+  // footnote lists when both panels were open.
   const hasContent = brocardiInfo && (
     brocardiInfo.Brocardi ||
     brocardiInfo.Ratio ||
     brocardiInfo.Spiegazione ||
-    (brocardiInfo.Massime && brocardiInfo.Massime.length > 0) ||
-    (brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0)
+    (brocardiInfo.Massime && brocardiInfo.Massime.length > 0)
   );
 
   return (
@@ -266,9 +209,6 @@ export function StudyModeBrocardiPopover({
                 <BrocardiSection title="Ratio" content={brocardiInfo.Ratio} theme={theme} />
                 <BrocardiSection title="Spiegazione" content={brocardiInfo.Spiegazione} theme={theme} />
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
-                {brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0 && (
-                  <FootnotesSection footnotes={brocardiInfo.Footnotes} theme={theme} />
-                )}
 
                 {brocardiInfo.link && (
                   <a
