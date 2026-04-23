@@ -16,9 +16,9 @@ import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } fro
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
-import { getPlainTextOffset, getSelectionPlainOffset } from '../../../utils/selectionOffset';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
+import { HighlightsPeekPanel } from './HighlightsPeekPanel';
 import { InlineNotePopover } from './InlineNotePopover';
 import { ArticleBody } from './ArticleBody';
 import type { Annotation } from '../../../types';
@@ -86,12 +86,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [showVersionInput, setShowVersionInput] = useState(false);
     const [versionDate, setVersionDate] = useState('');
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-    const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+    const [isHighlightsPeekOpen, setIsHighlightsPeekOpen] = useState(false);
+    const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    // Tracks the last valid text selection inside the article body so the
-    // toolbar highlight button can apply a highlight even after the user
-    // moves focus away (selection may be cleared by the click).
-    const highlightSelectionRef = useRef<{ text: string; startOffset: number } | null>(null);
     // When the user picks "Aggiungi nota" from the selection popup the
     // selected span becomes the note's anchor. Kept in state so the panel
     // can render a chip ("Ancorata a: …") until the user submits.
@@ -211,40 +208,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         return () => container.removeEventListener('click', handler);
     }, [itemAnnotations]);
 
-    // Capture text selection for highlighting
-    useEffect(() => {
-        const handleSelection = () => {
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0 && contentRef.current) {
-                const range = selection.getRangeAt(0);
-                const selectedText = selection.toString().trim();
-
-                if (selectedText && contentRef.current.contains(range.commonAncestorContainer)) {
-                    const startOffset = getPlainTextOffset(contentRef.current, range.startContainer, range.startOffset);
-                    highlightSelectionRef.current = { text: selectedText, startOffset };
-                }
-            }
-        };
-
-        document.addEventListener('selectionchange', handleSelection);
-        return () => document.removeEventListener('selectionchange', handleSelection);
-    }, []);
-
-    // Close highlight picker on outside click
-    useEffect(() => {
-        if (!showHighlightPicker) return;
-
-        const handleClickOutside = (e: MouseEvent) => {
-            const target = e.target as HTMLElement;
-            if (!target.closest('[data-highlight-picker]') && !target.closest('[data-highlight-button]')) {
-                setShowHighlightPicker(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showHighlightPicker]);
-
     const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
         setToastMessage({ text, type });
     };
@@ -344,59 +307,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         } catch (err) {
             showToast('Errore durante la copia del link', 'error');
         }
-    };
-
-    const handleHighlightAdd = (color?: 'yellow' | 'green' | 'red' | 'blue') => {
-        const selection = window.getSelection();
-        const selectedText = selection?.toString().trim();
-
-        if (!selectedText) {
-            // Try to use saved selection (user may have clicked the toolbar
-            // button which stole focus and cleared the live selection).
-            if (highlightSelectionRef.current) {
-                const saved = highlightSelectionRef.current;
-                const alreadyHighlighted = articleHighlights.some(h =>
-                    h.text.toLowerCase() === saved.text.toLowerCase() && h.startOffset === saved.startOffset
-                );
-                if (alreadyHighlighted) {
-                    showToast('Questa occorrenza è già evidenziata', 'info');
-                    highlightSelectionRef.current = null;
-                    setShowHighlightPicker(false);
-                    return;
-                }
-                addHighlight(itemKey, uniqueArticleId, saved.text, '', color || 'yellow', saved.startOffset);
-                showToast('Testo evidenziato', 'success');
-                highlightSelectionRef.current = null;
-            } else {
-                showToast('Seleziona del testo da evidenziare', 'error');
-            }
-            setShowHighlightPicker(false);
-            return;
-        }
-
-        const liveOffset = getSelectionPlainOffset(contentRef.current, selection);
-
-        // Already-highlighted check: same text AND same occurrence (startOffset).
-        // A user can legitimately highlight two different occurrences of the
-        // same word, so we don't block on text alone.
-        const alreadyHighlighted = articleHighlights.some(h =>
-            h.text.toLowerCase() === selectedText.toLowerCase() && h.startOffset === liveOffset
-        );
-        if (alreadyHighlighted) {
-            showToast('Questa occorrenza è già evidenziata', 'info');
-            setShowHighlightPicker(false);
-            selection?.removeAllRanges();
-            return;
-        }
-
-        const finalColor = color || 'yellow';
-        addHighlight(itemKey, uniqueArticleId, selectedText, '', finalColor, liveOffset);
-        showToast(`Testo evidenziato in ${finalColor}`, 'success');
-        setShowHighlightPicker(false);
-        highlightSelectionRef.current = null;
-
-        // Clear selection
-        selection?.removeAllRanges();
     };
 
     // Handler for SelectionPopup highlight action
@@ -577,25 +487,23 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isNotesPeekOpen={isPeekOpen}
                 notesButtonRef={setNotesButtonEl}
                 notesCount={allPanelAnnotations.length}
+                isHighlightsPeekOpen={isHighlightsPeekOpen}
+                highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={allPanelHighlights.length}
-                showHighlightPicker={showHighlightPicker}
                 showMoreMenu={showMoreMenu}
-                highlightSelectionRef={highlightSelectionRef}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
-                onToggleHighlightPicker={setShowHighlightPicker}
+                onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
                 onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
                 onMobileCopy={handleMobileCopy}
                 onOpenStudyMode={onOpenStudyMode}
                 onOpenCopyModal={() => setShowCopyModal(true)}
-                onHighlightAdd={handleHighlightAdd}
                 onOpenDossier={() => setShowDossierModal(true)}
                 onShareLink={handleShareLink}
                 onOpenAdvancedExport={() => setShowAdvancedExport(true)}
                 onOpenVersionInput={() => setShowVersionInput(true)}
                 onCompare={handleCompare}
-                onShowToast={showToast}
             />
 
             <NotesPeekPanel
@@ -610,6 +518,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onRemoveNote={removeAnnotation}
                 onClearAnchor={() => setNoteAnchor(null)}
                 onOpenStudyMode={onOpenStudyMode}
+            />
+
+            <HighlightsPeekPanel
+                isOpen={isHighlightsPeekOpen}
+                anchorEl={highlightsButtonEl}
+                highlights={allPanelHighlights}
+                articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
+                contentRef={contentRef}
+                onClose={() => setIsHighlightsPeekOpen(false)}
+                onRemoveHighlight={removeHighlight}
             />
 
             {inlineNote && (

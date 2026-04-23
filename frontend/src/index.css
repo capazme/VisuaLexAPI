@@ -239,6 +239,16 @@
     color: hsl(24 80% 14%);
     box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.5);
   }
+
+  /* Brief pulse when the Highlights Peek jumps to a mark, so the user
+     sees where in the article the highlight lives. */
+  .highlight-mark.highlight-flash {
+    animation: highlight-flash-pulse 1.2s ease-out;
+  }
+  @keyframes highlight-flash-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    20% { box-shadow: 0 0 0 4px hsl(var(--hl-yellow-fg) / 0.45); }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

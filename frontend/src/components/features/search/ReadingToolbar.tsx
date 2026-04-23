@@ -1,4 +1,4 @@
-import type { RefObject, Ref } from 'react';
+import type { Ref } from 'react';
 import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -12,25 +12,23 @@ export interface ReadingToolbarProps {
     isNotesPeekOpen: boolean;
     notesButtonRef?: Ref<HTMLButtonElement | null>;
     notesCount: number;
+    isHighlightsPeekOpen: boolean;
+    highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
-    showHighlightPicker: boolean;
     showMoreMenu: boolean;
     isPinnedQuick: boolean;
-    highlightSelectionRef: RefObject<{ text: string; startOffset: number } | null>;
     onToggleNotes: () => void;
-    onToggleHighlightPicker: (next: boolean) => void;
+    onToggleHighlightsPeek: () => void;
     onToggleMoreMenu: (next: boolean) => void;
     onToggleQuickNorm: () => void;
     onMobileCopy: () => Promise<void> | void;
     onOpenStudyMode?: () => void;
     onOpenCopyModal: () => void;
-    onHighlightAdd: (color?: 'yellow' | 'green' | 'red' | 'blue') => void;
     onOpenDossier: () => void;
     onShareLink: () => void;
     onOpenAdvancedExport: () => void;
     onOpenVersionInput: () => void;
     onCompare: () => void;
-    onShowToast: (text: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export function ReadingToolbar({
@@ -41,25 +39,23 @@ export function ReadingToolbar({
     isNotesPeekOpen,
     notesButtonRef,
     notesCount,
+    isHighlightsPeekOpen,
+    highlightsButtonRef,
     highlightsCount,
-    showHighlightPicker,
     showMoreMenu,
     isPinnedQuick,
-    highlightSelectionRef,
     onToggleNotes,
-    onToggleHighlightPicker,
+    onToggleHighlightsPeek,
     onToggleMoreMenu,
     onToggleQuickNorm,
     onMobileCopy,
     onOpenStudyMode,
     onOpenCopyModal,
-    onHighlightAdd,
     onOpenDossier,
     onShareLink,
     onOpenAdvancedExport,
     onOpenVersionInput,
     onCompare,
-    onShowToast,
 }: ReadingToolbarProps) {
     return (
         <div className={cn('glass-toolbar sticky top-0 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
@@ -172,55 +168,28 @@ export function ReadingToolbar({
                         </span>
                     )}
                 </button>
-                <div className="relative" data-highlight-picker>
-                    <button
-                        data-highlight-button
-                        onClick={() => {
-                            const selection = window.getSelection()?.toString().trim();
-                            if (!selection && !highlightSelectionRef.current) {
-                                onShowToast('Seleziona del testo da evidenziare', 'error');
-                                return;
-                            }
-                            onToggleHighlightPicker(!showHighlightPicker);
-                        }}
-                        className={cn(
-                            "p-1.5 rounded-md transition-colors relative",
-                            highlightsCount > 0
-                                ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+                <button
+                    ref={highlightsButtonRef}
+                    onClick={onToggleHighlightsPeek}
+                    aria-expanded={isHighlightsPeekOpen}
+                    aria-haspopup="dialog"
+                    className={cn(
+                        "p-1.5 rounded-md transition-colors relative",
+                        isHighlightsPeekOpen
+                            ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+                            : highlightsCount > 0
+                                ? "text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                                 : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-500"
-                        )}
-                        title="Evidenzia Testo"
-                    >
-                        <Highlighter size={16} />
-                        {highlightsCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-purple-500 text-white text-[9px] rounded-full flex items-center justify-center">
-                                {highlightsCount}
-                            </span>
-                        )}
-                    </button>
-                    {showHighlightPicker && (
-                        <div className={cn('absolute left-1/2 -translate-x-1/2 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 flex gap-2 animate-in fade-in zoom-in-95 duration-200', Z_INDEX.dropdown)}>
-                            {(['yellow', 'green', 'red', 'blue'] as const).map(color => (
-                                <button
-                                    key={color}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onHighlightAdd(color);
-                                    }}
-                                    className={cn(
-                                        "w-6 h-6 rounded-full border-2 transition-all hover:scale-110",
-                                        color === 'yellow' && 'bg-yellow-200 border-yellow-400',
-                                        color === 'green' && 'bg-emerald-200 border-emerald-400',
-                                        color === 'red' && 'bg-red-200 border-red-400',
-                                        color === 'blue' && 'bg-blue-200 border-blue-400',
-                                        color === 'yellow' && 'ring-2 ring-offset-1 ring-purple-500'
-                                    )}
-                                    title={`Evidenzia in ${color}`}
-                                />
-                            ))}
-                        </div>
                     )}
-                </div>
+                    title={isHighlightsPeekOpen ? "Chiudi evidenziazioni" : "Gestisci evidenziazioni"}
+                >
+                    <Highlighter size={16} />
+                    {highlightsCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-purple-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                            {highlightsCount}
+                        </span>
+                    )}
+                </button>
                 <button
                     onClick={onOpenCopyModal}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
