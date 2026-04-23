@@ -3,6 +3,7 @@
  */
 import axios from 'axios';
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { isAccessTokenExpired } from './authService';
 
 // API base URL - uses relative path to leverage Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -17,11 +18,63 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 /**
- * Request interceptor to add authentication token to headers
+ * Single in-flight refresh promise. Multiple concurrent expired-token
+ * requests piggyback on the same `/auth/refresh` call instead of each
+ * firing their own (which produced N duplicate refreshes per article
+ * mount before). Cleared once settled so the next genuine refresh goes
+ * through.
+ */
+let refreshInFlight: Promise<string> | null = null;
+
+function handleUnauthenticated(): void {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  window.location.href = '/login';
+}
+
+async function refreshAccessToken(): Promise<string> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) {
+    throw new Error('No refresh token');
+  }
+
+  refreshInFlight = axios
+    .post(`${API_BASE_URL}/auth/refresh`, { refresh_token: refreshToken })
+    .then((response) => {
+      const { access_token, refresh_token: nextRefresh } = response.data as {
+        access_token: string;
+        refresh_token: string;
+      };
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', nextRefresh);
+      return access_token;
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
+}
+
+/**
+ * Request interceptor: attach access token. If the token is expired and
+ * a refresh_token is present, refresh *before* sending so the request
+ * doesn't hit the server just to bounce back with 401.
  */
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('access_token');
+  async (config: InternalAxiosRequestConfig) => {
+    let token = localStorage.getItem('access_token');
+
+    if (token && isAccessTokenExpired() && localStorage.getItem('refresh_token')) {
+      try {
+        token = await refreshAccessToken();
+      } catch {
+        // Fall through with the stale token: the response interceptor
+        // will catch the resulting 401 and perform the final redirect.
+      }
+    }
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -47,28 +100,8 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const access_token = await refreshAccessToken();
 
-        if (!refreshToken) {
-          // No refresh token, redirect to login
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
-          return Promise.reject(error);
-        }
-
-        // Attempt to refresh the access token
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refresh_token: refreshToken,
-        });
-
-        const { access_token, refresh_token } = response.data;
-
-        // Store new tokens
-        localStorage.setItem('access_token', access_token);
-        localStorage.setItem('refresh_token', refresh_token);
-
-        // Retry original request with new token
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${access_token}`;
         }
@@ -76,9 +109,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         // Refresh failed, clear tokens and redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+        handleUnauthenticated();
         return Promise.reject(refreshError);
       }
     }
