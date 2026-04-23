@@ -15,6 +15,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
 import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -39,7 +40,15 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     toggleTabMinimize,
     toggleTabVisibility,
     commandPaletteOpen,
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    workspaceTabs: s.workspaceTabs,
+    bringTabToFront: s.bringTabToFront,
+    removeTab: s.removeTab,
+    toggleTabPin: s.toggleTabPin,
+    toggleTabMinimize: s.toggleTabMinimize,
+    toggleTabVisibility: s.toggleTabVisibility,
+    commandPaletteOpen: s.commandPaletteOpen,
+  })));
 
   // Check if compare view is open
   const { isOpen: isCompareOpen } = useCompare();

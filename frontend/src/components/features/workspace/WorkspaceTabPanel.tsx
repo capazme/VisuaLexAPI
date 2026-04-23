@@ -4,6 +4,7 @@ import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus, FileText } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useAppStore, appStore, type WorkspaceTab } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { NormaBlockComponent } from './NormaBlockComponent';
 import { LooseArticleCard } from './LooseArticleCard';
 import { ArticleCollectionComponent } from './ArticleCollectionComponent';
@@ -46,7 +47,22 @@ export function WorkspaceTabPanel({
     createDossier,
     settings,
     commandPaletteOpen,
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    updateTab: s.updateTab,
+    removeTab: s.removeTab,
+    bringTabToFront: s.bringTabToFront,
+    toggleTabPin: s.toggleTabPin,
+    toggleTabMinimize: s.toggleTabMinimize,
+    setTabLabel: s.setTabLabel,
+    extractArticleFromNorma: s.extractArticleFromNorma,
+    removeArticleFromNorma: s.removeArticleFromNorma,
+    removeContentFromTab: s.removeContentFromTab,
+    dossiers: s.dossiers,
+    addToDossier: s.addToDossier,
+    createDossier: s.createDossier,
+    settings: s.settings,
+    commandPaletteOpen: s.commandPaletteOpen,
+  })));
 
   // Check if overlays are open that should hide workspace tabs
   const { isOpen: isCompareOpen } = useCompare();
