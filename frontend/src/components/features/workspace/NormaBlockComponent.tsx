@@ -363,10 +363,10 @@ export function NormaBlockComponent({
           )}
 
           <div className="md:hidden bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
-            {normaBlock.articles.map((article) => {
+            {normaBlock.articles.map((article, idx) => {
               const uniqueId = getUniqueId(article);
               return (
-                <div key={uniqueId} className="p-4">
+                <div key={uniqueId || `idx-${idx}`} className="p-4">
                   {/* Article header with close button */}
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-bold text-slate-900 dark:text-white">
@@ -396,14 +396,14 @@ export function NormaBlockComponent({
           </div>
 
           <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 gap-2 overflow-x-auto custom-scrollbar items-end">
-            {normaBlock.articles.map((article) => {
+            {normaBlock.articles.map((article, idx) => {
               const uniqueId = getUniqueId(article);
               const isActive = uniqueId === activeArticleId;
               const isUnread = !isActive && !viewedArticleIds.has(uniqueId);
 
               return (
                 <div
-                  key={uniqueId}
+                  key={uniqueId || `idx-${idx}`}
                   className={cn(
                     "group flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap border-t border-x",
                     isActive

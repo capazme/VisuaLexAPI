@@ -487,7 +487,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
 
           {/* Desktop Article Tabs */}
           <div className="hidden md:flex px-6 border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto no-scrollbar relative bg-white dark:bg-slate-900">
-            {articles.map((article) => {
+            {articles.map((article, idx) => {
               const id = article.norma_data.numero_articolo;
               const allegato = article.norma_data.allegato;
               const uniqueKey = allegato ? `all${allegato}:${id}` : id;
@@ -495,7 +495,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
 
               return (
                 <div
-                  key={uniqueKey}
+                  key={uniqueKey || `idx-${idx}`}
                   className={cn(
                     "relative px-6 py-4 text-sm font-bold transition-all group flex items-center gap-3 flex-shrink-0 cursor-pointer overflow-hidden",
                     isActive
@@ -536,13 +536,13 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
 
           {/* Mobile: Expandable List */}
           <div className="md:hidden bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
-            {articles.map((article) => {
+            {articles.map((article, idx) => {
               const articleId = article.norma_data.numero_articolo;
               const allegato = article.norma_data.allegato;
               const uniqueKey = allegato ? `all${allegato}:${articleId}` : articleId;
               const isExpanded = expandedArticles.has(uniqueKey);
               return (
-                <div key={uniqueKey} className="overflow-hidden">
+                <div key={uniqueKey || `idx-${idx}`} className="overflow-hidden">
                   <div
                     onClick={() => toggleArticleExpanded(uniqueKey)}
                     className={cn(
