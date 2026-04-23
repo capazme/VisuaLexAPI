@@ -10,6 +10,13 @@ export interface GlobalSearchMatch {
   matchText: string;
   matchIndex: number;
   matchLength: number;
+  /**
+   * Ordinal of this match inside its article body (0-based). Mirrors
+   * the `data-search-idx` attribute emitted by useArticleMarkers so
+   * the click-to-scroll handler can target this specific occurrence
+   * rather than just the first one.
+   */
+  occurrenceIdx: number;
 }
 
 export interface GlobalSearchResult {
@@ -69,17 +76,23 @@ export function useGlobalSearch() {
 
             // Find all matches in the text
             let matchIndex = 0;
+            let occurrenceIdx = 0;
+            const uid = article.norma_data.allegato
+              ? `all${article.norma_data.allegato}:${article.norma_data.numero_articolo}`
+              : article.norma_data.numero_articolo;
             while ((matchIndex = lowerText.indexOf(searchQuery, matchIndex)) !== -1) {
               matches.push({
                 tabId: tab.id,
                 tabLabel: tab.label,
-                articleId: article.norma_data.numero_articolo,
+                articleId: uid,
                 normaLabel,
                 matchText: extractMatchContext(plainText, matchIndex, query.length),
                 matchIndex,
                 matchLength: query.length,
+                occurrenceIdx,
               });
               matchIndex += 1; // Move past this match
+              occurrenceIdx += 1;
             }
           });
         } else if (content.type === 'loose-article') {
@@ -91,17 +104,23 @@ export function useGlobalSearch() {
 
           // Find all matches in the text
           let matchIndex = 0;
+          let occurrenceIdx = 0;
+          const uid = looseArticle.article.norma_data.allegato
+            ? `all${looseArticle.article.norma_data.allegato}:${looseArticle.article.norma_data.numero_articolo}`
+            : looseArticle.article.norma_data.numero_articolo;
           while ((matchIndex = lowerText.indexOf(searchQuery, matchIndex)) !== -1) {
             matches.push({
               tabId: tab.id,
               tabLabel: tab.label,
-              articleId: looseArticle.article.norma_data.numero_articolo,
+              articleId: uid,
               normaLabel,
               matchText: extractMatchContext(plainText, matchIndex, query.length),
               matchIndex,
               matchLength: query.length,
+              occurrenceIdx,
             });
             matchIndex += 1;
+            occurrenceIdx += 1;
           }
         }
       });
@@ -177,4 +196,48 @@ export function getGlobalHighlight(): string | null {
 export function subscribeToHighlight(listener: (query: string | null) => void): () => void {
   highlightListeners.add(listener);
   return () => highlightListeners.delete(listener);
+}
+
+// ── Cmd+F click → scroll-to-match coordination ───────────────────────
+//
+// When the user clicks a match in the GlobalSearch results, we fire a
+// nav request with the target article + occurrence ordinal. Whichever
+// ArticleTabContent renders that article picks it up, scrolls the
+// matching `.search-match[data-search-idx=N]` into view, and flashes
+// it. Stays a module-level observable (not store state) so we don't
+// thrash the persisted store over a transient UI gesture.
+
+export interface SearchMatchNavRequest {
+  tabId: string;
+  articleId: string;
+  occurrenceIdx: number;
+  /** Bumped on every request so identical consecutive targets still fire. */
+  nonce: number;
+}
+
+let pendingNav: SearchMatchNavRequest | null = null;
+const navListeners = new Set<(r: SearchMatchNavRequest | null) => void>();
+let navNonce = 0;
+
+export function requestSearchNavigation(target: Omit<SearchMatchNavRequest, 'nonce'>): void {
+  pendingNav = { ...target, nonce: ++navNonce };
+  navListeners.forEach((l) => l(pendingNav));
+}
+
+export function clearSearchNavigation(): void {
+  pendingNav = null;
+  navListeners.forEach((l) => l(null));
+}
+
+export function getSearchNavigation(): SearchMatchNavRequest | null {
+  return pendingNav;
+}
+
+export function subscribeSearchNavigation(
+  listener: (r: SearchMatchNavRequest | null) => void,
+): () => void {
+  navListeners.add(listener);
+  return () => {
+    navListeners.delete(listener);
+  };
 }

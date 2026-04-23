@@ -15,6 +15,7 @@ import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
+import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { getPlainTextOffset, getSelectionPlainOffset } from '../../../utils/selectionOffset';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPanel } from './NotesPanel';
@@ -146,6 +147,30 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         loadHighlightsForArticle(itemKey, uniqueArticleId);
         loadAnnotationsForArticle(itemKey, uniqueArticleId);
     }, [itemKey, uniqueArticleId, loadHighlightsForArticle, loadAnnotationsForArticle]);
+
+    // Cmd+F click → scroll this article body to the requested occurrence.
+    // useArticleMarkers tags each search hit with `data-search-idx`; we
+    // wait one frame (so the re-render from the setGlobalHighlight typing
+    // AND the article switch has settled) before querying the DOM.
+    useEffect(() => {
+        return subscribeSearchNavigation((req) => {
+            if (!req) return;
+            if (req.articleId !== uniqueArticleId) return;
+            const container = contentRef.current;
+            if (!container) return;
+            // rAF twice: first frame lets React commit, second lets the
+            // browser lay out the scrollIntoView target.
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                const target = container.querySelector<HTMLElement>(
+                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
+                );
+                if (!target) return;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('search-match-active');
+                setTimeout(() => target.classList.remove('search-match-active'), 1600);
+            }));
+        });
+    }, [uniqueArticleId]);
 
     useEffect(() => {
         if (!toastMessage) return;

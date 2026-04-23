@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ChevronDown, ChevronRight, FileText, Layers } from 'lucide-react';
-import { useGlobalSearch, setGlobalHighlight } from '../../../hooks/useGlobalSearch';
+import { useGlobalSearch, setGlobalHighlight, requestSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { useAppStore } from '../../../store/useAppStore';
 
 interface GlobalSearchProps {
@@ -13,6 +13,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { query, setQuery, groupedResults, searchResults, hasResults, clearQuery } = useGlobalSearch();
   const bringTabToFront = useAppStore((state) => state.bringTabToFront);
+  const focusArticleInTab = useAppStore((state) => state.focusArticleInTab);
   const [expandedTabs, setExpandedTabs] = useState<Set<string>>(new Set());
 
   // Focus input when opened
@@ -65,8 +66,15 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     });
   };
 
-  const handleMatchClick = (tabId: string) => {
+  // Jump from a result into the article body: bring the tab to front,
+  // switch the NormaBlock's active article to the match's article, then
+  // publish a nav request so the mounted ArticleTabContent can scroll
+  // to this specific occurrence and flash it.
+  const handleMatchClick = (tabId: string, articleId: string, occurrenceIdx: number) => {
+    focusArticleInTab(tabId, articleId);
     bringTabToFront(tabId);
+    requestSearchNavigation({ tabId, articleId, occurrenceIdx });
+    onClose();
   };
 
   // Expand all tabs by default when results change
@@ -178,7 +186,7 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                                 {group.matches.slice(0, 10).map((match, idx) => (
                                   <button
                                     key={`${match.articleId}-${idx}`}
-                                    onClick={() => handleMatchClick(group.tabId)}
+                                    onClick={() => handleMatchClick(group.tabId, match.articleId, match.occurrenceIdx)}
                                     className="w-full text-left p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                   >
                                     <div className="flex items-center gap-2 mb-1">

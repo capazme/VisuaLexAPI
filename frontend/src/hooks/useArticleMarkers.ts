@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from '../utils/highlightColors';
+import { getGlobalHighlight, subscribeToHighlight } from './useGlobalSearch';
 
 interface UseArticleMarkersInput {
   rawText: string;
@@ -10,6 +11,9 @@ interface UseArticleMarkersInput {
 
 const escapeAttr = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+const escapeRegex = (s: string) =>
+  s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
 
 /**
  * Applies highlight <mark> and note-anchor <span> markers to a raw plain
@@ -27,6 +31,13 @@ const escapeAttr = (s: string) =>
  * regex match (every occurrence), matching the pre-offset behaviour.
  */
 export function useArticleMarkers({ rawText, highlights, annotations }: UseArticleMarkersInput): string {
+  // Subscribe to the global Cmd+F query so every article body keeps
+  // its matches wrapped in a dedicated mark the moment the user types
+  // in the search bar, and we can jump to a specific occurrence by
+  // ordinal index when they click a result.
+  const [searchQuery, setSearchQuery] = useState<string | null>(() => getGlobalHighlight());
+  useEffect(() => subscribeToHighlight(setSearchQuery), []);
+
   return useMemo(() => {
     const raw = rawText || '';
 
@@ -73,6 +84,32 @@ export function useArticleMarkers({ rawText, highlights, annotations }: UseArtic
       insertions.push({ pos: rawEnd, order: order++, isOpen: false, markup: '</span>' });
     });
 
+    // Global Cmd+F search query — wrap every occurrence with a dedicated
+    // mark carrying a data-search-idx ordinal so the search panel can
+    // scroll to and flash a specific hit by index. Operates in plain-text
+    // space: indexOf into raw WITHOUT \n so cross-line matches behave
+    // like DOM textContent, then plainToRaw translates each hit back.
+    if (searchQuery && searchQuery.length >= 2) {
+      const plain = raw.replace(/\n/g, '');
+      const needle = searchQuery.toLowerCase();
+      const hay = plain.toLowerCase();
+      let from = 0;
+      let searchIdx = 0;
+      while (true) {
+        const hit = hay.indexOf(needle, from);
+        if (hit === -1) break;
+        const rawStart = plainToRaw(hit);
+        const rawEnd = plainToRaw(hit + searchQuery.length);
+        insertions.push({
+          pos: rawStart, order: order++, isOpen: true,
+          markup: `<mark class="search-match" data-search-idx="${searchIdx}">`,
+        });
+        insertions.push({ pos: rawEnd, order: order++, isOpen: false, markup: '</mark>' });
+        searchIdx++;
+        from = hit + 1;
+      }
+    }
+
     // Apply latest → earliest. Each insertion at a given position pushes
     // whatever was already there to the right, so the LAST entry inserted
     // at pos P ends up FIRST in the output at pos P. When two highlights
@@ -97,7 +134,7 @@ export function useArticleMarkers({ rawText, highlights, annotations }: UseArtic
     );
     const sortedLegacy = [...legacyHighlights].sort((a, b) => b.text.length - a.text.length);
     sortedLegacy.forEach((h) => {
-      const escaped = h.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const escaped = escapeRegex(h.text);
       const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
       html = html.replace(regex, (match) =>
         `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${match}</mark>`);
@@ -105,5 +142,5 @@ export function useArticleMarkers({ rawText, highlights, annotations }: UseArtic
 
     // \n → <br /> last, after markers are placed.
     return html.replace(/\n/g, '<br />');
-  }, [rawText, highlights, annotations]);
+  }, [rawText, highlights, annotations, searchQuery]);
 }
