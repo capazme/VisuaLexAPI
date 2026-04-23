@@ -222,6 +222,12 @@ export function StudyModeToolsPanel({
                       key={note.id}
                       className={cn("group relative p-3 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700", styles.card)}
                     >
+                      {note.anchorText && (
+                        <div className="text-xs italic text-amber-700 dark:text-amber-400 mb-1.5 flex items-start gap-1.5 pr-6">
+                          <StickyNote size={11} className="mt-0.5 shrink-0" />
+                          <span className="line-clamp-2">&ldquo;{note.anchorText}&rdquo;</span>
+                        </div>
+                      )}
                       <p className={cn("text-sm whitespace-pre-wrap pr-6 leading-relaxed", styles.text)}>
                         {note.text}
                       </p>
