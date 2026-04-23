@@ -342,10 +342,13 @@ export function WorkspaceTabPanel({
           // Liquid Glass container - Slate 800-900 based
           "workspace-tab-panel h-full flex flex-col rounded-2xl shadow-glass overflow-hidden",
           "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl",
-          "border transition-colors",
+          // When the outer wrapper already paints a 2px primary ring
+          // (pinned tabs), drop the panel's own 1px border so the two
+          // lines don't stack into a visible double stripe.
+          tab.isPinned ? "transition-colors" : "border transition-colors",
           isOver
             ? "border-primary-500 border-2 bg-primary-50/80 dark:bg-primary-950/80"
-            : "border-slate-200/60 dark:border-slate-800"
+            : !tab.isPinned && "border-slate-200/60 dark:border-slate-800"
         )}
       >
         {/* Header with macOS-style controls */}
