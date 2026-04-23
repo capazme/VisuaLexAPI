@@ -139,14 +139,34 @@ export function SearchPanel() {
         // Add article to the tab we created for this streaming session
         addNormaToTab(streamingTabRef.current.tabId, norma, [result]);
       } else {
-        // First article of a new norma - create new tab
-        const versionSuffix = isHistorical && versionDate ? ` - Ver. ${versionDate}` : '';
-        const label = customTabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
-        const newTabId = addWorkspaceTab(label, norma, [result]);
+        // First article of a new norma — R3 (streaming-ux): if a
+        // non-custom, non-historical tab already holds the same norma,
+        // merge into it instead of spawning a new tab. Skip the merge
+        // entirely when the current search came in with a custom label
+        // (e.g. from a dossier) — those always get their own tab.
+        const mergeTarget = !customTabLabel && !isHistorical
+          ? workspaceTabs.find(tab =>
+              !tab.labelIsCustom &&
+              tab.content.some(item =>
+                item.type === 'norma' &&
+                item.norma.tipo_atto === norma.tipo_atto &&
+                item.norma.numero_atto === norma.numero_atto &&
+                item.norma.data === norma.data &&
+                !item.articles?.some(a => a.versionInfo?.isHistorical)
+              )
+            )
+          : undefined;
 
-        // Track this tab for subsequent articles
-        streamingTabRef.current = { normaKey: key, tabId: newTabId };
-        setCustomTabLabel(null); // Clear after first use
+        if (mergeTarget) {
+          addNormaToTab(mergeTarget.id, norma, [result]);
+          streamingTabRef.current = { normaKey: key, tabId: mergeTarget.id };
+        } else {
+          const versionSuffix = isHistorical && versionDate ? ` - Ver. ${versionDate}` : '';
+          const label = customTabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
+          const newTabId = addWorkspaceTab(label, norma, [result], { isCustom: !!customTabLabel });
+          streamingTabRef.current = { normaKey: key, tabId: newTabId };
+          setCustomTabLabel(null); // Clear after first use
+        }
       }
     } else {
       // Buffer results for batch processing
@@ -314,36 +334,39 @@ export function SearchPanel() {
         const isHistorical = group.articles.some(a => a.versionInfo?.isHistorical);
         console.log('🏷️ Processing group:', key, 'isHistorical:', isHistorical, 'versionDate:', group.versionDate);
 
+        const isCustomForThisGroup = !!useCustomLabel && index === 0;
+
         if (isHistorical) {
           // Create new tab with version date in label
           const versionDate = group.versionDate ? ` - Ver. ${group.versionDate}` : ' - Storico';
-          const label = useCustomLabel && index === 0
-            ? customTabLabel
+          const label = isCustomForThisGroup
+            ? customTabLabel!
             : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionDate}`;
           console.log('➕ Creating historical tab with label:', label);
-          addWorkspaceTab(label, group.norma, group.articles);
+          addWorkspaceTab(label, group.norma, group.articles, { isCustom: isCustomForThisGroup });
         } else {
-          // Check if there's an existing tab with this norma (current version)
-          // Skip this check if we have a custom label (always create new tab for dossiers)
-          const existingTab = useCustomLabel ? null : workspaceTabs.find(tab =>
+          // R3 (streaming-ux): merge into an existing tab that holds the
+          // same norma, but only if that tab is not reserved (labelIsCustom)
+          // and is not a historical view. Custom-label searches (dossiers)
+          // always spawn a new tab.
+          const existingTab = isCustomForThisGroup ? null : workspaceTabs.find(tab =>
+            !tab.labelIsCustom &&
             tab.content.some(item =>
               item.type === 'norma' &&
               item.norma.tipo_atto === group.norma.tipo_atto &&
               item.norma.numero_atto === group.norma.numero_atto &&
               item.norma.data === group.norma.data &&
-              !item.articles?.some(a => a.versionInfo?.isHistorical) // Make sure it's not a historical tab
+              !item.articles?.some(a => a.versionInfo?.isHistorical)
             )
           );
 
           if (existingTab) {
-            // Add articles to existing tab's norma
             addNormaToTab(existingTab.id, group.norma, group.articles);
           } else {
-            // Create new tab - use custom label for first group only
-            const label = useCustomLabel && index === 0
-              ? customTabLabel
+            const label = isCustomForThisGroup
+              ? customTabLabel!
               : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}`;
-            addWorkspaceTab(label, group.norma, group.articles);
+            addWorkspaceTab(label, group.norma, group.articles, { isCustom: isCustomForThisGroup });
           }
         }
       });
