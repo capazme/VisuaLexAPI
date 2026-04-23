@@ -342,23 +342,47 @@ export function NormaBlockComponent({
             </div>
           )}
 
-          {/* Navigation bar - Desktop only: show when structure available OR multiple articles loaded */}
-          {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
-            <div className="hidden md:flex px-3 pt-2 items-center justify-end">
-              <ArticleNavigation
-                allArticleIds={allArticleIds}
-                loadedArticleIds={loadedArticleIds
-                  .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
-                  .map(id => id.includes(':') ? id.split(':').pop()! : id)
-                }
-                activeArticleId={activeArticle?.norma_data.numero_articolo || null}
-                loadingArticleId={loadingArticle}
-                onNavigate={(number) => {
-                  const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
-                  setActiveArticleId(uniqueId);
-                }}
-                onLoadArticle={handleLoadArticleWithNavigation}
-              />
+          {/* Top bar above the tab chip row — holds the article navigation
+              counter on the right and (when active) the loading chip on
+              the left. Shown whenever either needs to appear, so the chip
+              never lands among the tabs and never gets covered. */}
+          {(((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) || loadingArticle) && (
+            <div className="hidden md:flex px-3 pt-2 items-center gap-3 min-h-[28px]">
+              <AnimatePresence>
+                {loadingArticle && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -4 }}
+                    transition={{ duration: 0.18 }}
+                    className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/95 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-none"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Loader2 size={12} className="text-primary-600 dark:text-primary-400 animate-spin" />
+                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      Caricamento…
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <div className="flex-1" />
+              {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
+                <ArticleNavigation
+                  allArticleIds={allArticleIds}
+                  loadedArticleIds={loadedArticleIds
+                    .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
+                    .map(id => id.includes(':') ? id.split(':').pop()! : id)
+                  }
+                  activeArticleId={activeArticle?.norma_data.numero_articolo || null}
+                  loadingArticleId={loadingArticle}
+                  onNavigate={(number) => {
+                    const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
+                    setActiveArticleId(uniqueId);
+                  }}
+                  onLoadArticle={handleLoadArticleWithNavigation}
+                />
+              )}
             </div>
           )}
 
@@ -452,28 +476,6 @@ export function NormaBlockComponent({
                 </div>
               );
             })}
-
-            {/* Loading chip — lives inside the tab chip row so it sits
-                above the sticky reading toolbar and doesn't get covered
-                on scroll. */}
-            <AnimatePresence>
-              {loadingArticle && (
-                <motion.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.18 }}
-                  className="ml-auto mb-2 flex items-center gap-2 px-3 py-1 rounded-full bg-white/95 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-none"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <Loader2 size={12} className="text-primary-600 dark:text-primary-400 animate-spin" />
-                  <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                    Caricamento…
-                  </span>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
 
           <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden relative">
