@@ -1264,6 +1264,10 @@ const appStore = createStore<AppState>()(
             loadAnnotationsForArticle: async (normaKey, articleId) => {
                 const cacheKey = `${normaKey}::${articleId}`;
                 if (get().loadedAnnotationKeys[cacheKey]) return;
+                // Mark BEFORE awaiting so concurrent mounts (StrictMode, rapid
+                // article switches) coalesce onto the first in-flight request.
+                // Cleared on error so retries on the next mount still work.
+                set((state) => { state.loadedAnnotationKeys[cacheKey] = true; });
                 try {
                     const wireKey = buildWireNormaKey(normaKey, articleId);
                     const server = await annotationService.getByNormaKey(wireKey);
@@ -1272,11 +1276,16 @@ const appStore = createStore<AppState>()(
                         state.annotations = state.annotations
                             .filter(a => !(a.normaKey === normaKey && a.articleId === articleId))
                             .concat(mapped);
-                        state.loadedAnnotationKeys[cacheKey] = true;
                     });
                 } catch (err) {
+                    set((state) => { delete state.loadedAnnotationKeys[cacheKey]; });
                     console.error('Failed to load annotations for article:', err);
-                    get().pushSyncError('Impossibile caricare le note dal server.');
+                    // 429s can fan out across many articles at once; spamming
+                    // the sync-error toast for a known rate-limit condition
+                    // is noise, not signal. Swallow it for the toast only.
+                    if ((err as { status?: number } | undefined)?.status !== 429) {
+                        get().pushSyncError('Impossibile caricare le note dal server.');
+                    }
                 }
             },
 
@@ -1340,6 +1349,7 @@ const appStore = createStore<AppState>()(
             loadHighlightsForArticle: async (normaKey, articleId) => {
                 const cacheKey = `${normaKey}::${articleId}`;
                 if (get().loadedHighlightKeys[cacheKey]) return;
+                set((state) => { state.loadedHighlightKeys[cacheKey] = true; });
                 try {
                     const wireKey = buildWireNormaKey(normaKey, articleId);
                     const server = await highlightService.getByNormaKey(wireKey);
@@ -1348,11 +1358,13 @@ const appStore = createStore<AppState>()(
                         state.highlights = state.highlights
                             .filter(h => !(h.normaKey === normaKey && h.articleId === articleId))
                             .concat(mapped);
-                        state.loadedHighlightKeys[cacheKey] = true;
                     });
                 } catch (err) {
+                    set((state) => { delete state.loadedHighlightKeys[cacheKey]; });
                     console.error('Failed to load highlights for article:', err);
-                    get().pushSyncError('Impossibile caricare le evidenziazioni dal server.');
+                    if ((err as { status?: number } | undefined)?.status !== 429) {
+                        get().pushSyncError('Impossibile caricare le evidenziazioni dal server.');
+                    }
                 }
             },
 
