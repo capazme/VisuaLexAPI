@@ -59,22 +59,27 @@ export const createAnnotation = async (req: Request, res: Response) => {
   res.status(201).json(annotation);
 };
 
-// Get annotations by normaKey
+// Get annotations by normaKey (exact) or normaKeyPrefix (startsWith).
+// The prefix form lets the client pull the article body + all brocardi
+// sub-section annotations in one round trip instead of fanning out.
 export const getAnnotations = async (req: Request, res: Response) => {
   if (!req.user) {
     throw new AppError(401, 'Not authenticated');
   }
 
-  const normaKey = req.query.normaKey as string;
+  const normaKey = req.query.normaKey as string | undefined;
+  const normaKeyPrefix = req.query.normaKeyPrefix as string | undefined;
   const annotationType = req.query.type as string | undefined;
 
-  if (!normaKey) {
-    throw new AppError(400, 'normaKey query parameter is required');
+  if (!normaKey && !normaKeyPrefix) {
+    throw new AppError(400, 'normaKey or normaKeyPrefix query parameter is required');
   }
 
   const where: any = {
-    normaKey,
     userId: req.user.id,
+    ...(normaKeyPrefix
+      ? { normaKey: { startsWith: normaKeyPrefix } }
+      : { normaKey }),
   };
 
   if (annotationType) {

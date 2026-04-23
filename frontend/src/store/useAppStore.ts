@@ -15,7 +15,8 @@ import { isAuthenticated } from '../services/authService';
 import {
     annotationApiToStore,
     annotationStoreToCreate,
-    buildWireNormaKey,
+    articleRootOf,
+    buildWireNormaKeyPrefix,
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
@@ -1264,30 +1265,37 @@ const appStore = createStore<AppState>()(
 
             loadAnnotationsForArticle: async (normaKey, articleId) => {
                 // Notes sync is auth-gated. Without a token the call would
-                // always 401 and only burn rate-limit points — skip it and
-                // let the local/optimistic entries stand in.
+                // always 401 and only burn rate-limit points — skip it.
                 if (!isAuthenticated()) return;
-                const cacheKey = `${normaKey}::${articleId}`;
+                // Batch: cache by the article root (suffix-free) so the
+                // article body + every brocardi sub-section share a single
+                // round trip via normaKeyPrefix.
+                const articleRoot = articleRootOf(articleId);
+                const cacheKey = `${normaKey}::${articleRoot}`;
                 if (get().loadedAnnotationKeys[cacheKey]) return;
-                // Mark BEFORE awaiting so concurrent mounts (StrictMode, rapid
-                // article switches) coalesce onto the first in-flight request.
-                // Cleared on error so retries on the next mount still work.
+                // Mark BEFORE awaiting so concurrent mounts (StrictMode,
+                // rapid article switches, MarkableBrocardiSection siblings)
+                // coalesce onto the first in-flight request. Cleared on
+                // error so retries on the next mount still work.
                 set((state) => { state.loadedAnnotationKeys[cacheKey] = true; });
                 try {
-                    const wireKey = buildWireNormaKey(normaKey, articleId);
-                    const server = await annotationService.getByNormaKey(wireKey);
+                    const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
+                    const server = await annotationService.getByNormaKeyPrefix(wirePrefix);
                     const mapped = server.map(annotationApiToStore);
                     set((state) => {
+                        // Replace every annotation whose articleId sits under
+                        // this article root (main body + /brocardi/* sections)
+                        // so server state wins over stale local entries.
                         state.annotations = state.annotations
-                            .filter(a => !(a.normaKey === normaKey && a.articleId === articleId))
+                            .filter(a => !(
+                                a.normaKey === normaKey &&
+                                articleRootOf(a.articleId) === articleRoot
+                            ))
                             .concat(mapped);
                     });
                 } catch (err) {
                     set((state) => { delete state.loadedAnnotationKeys[cacheKey]; });
                     console.error('Failed to load annotations for article:', err);
-                    // 429s can fan out across many articles at once; spamming
-                    // the sync-error toast for a known rate-limit condition
-                    // is noise, not signal. Swallow it for the toast only.
                     if ((err as { status?: number } | undefined)?.status !== 429) {
                         get().pushSyncError('Impossibile caricare le note dal server.');
                     }
@@ -1353,16 +1361,20 @@ const appStore = createStore<AppState>()(
 
             loadHighlightsForArticle: async (normaKey, articleId) => {
                 if (!isAuthenticated()) return;
-                const cacheKey = `${normaKey}::${articleId}`;
+                const articleRoot = articleRootOf(articleId);
+                const cacheKey = `${normaKey}::${articleRoot}`;
                 if (get().loadedHighlightKeys[cacheKey]) return;
                 set((state) => { state.loadedHighlightKeys[cacheKey] = true; });
                 try {
-                    const wireKey = buildWireNormaKey(normaKey, articleId);
-                    const server = await highlightService.getByNormaKey(wireKey);
+                    const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
+                    const server = await highlightService.getByNormaKeyPrefix(wirePrefix);
                     const mapped = server.map(highlightApiToStore);
                     set((state) => {
                         state.highlights = state.highlights
-                            .filter(h => !(h.normaKey === normaKey && h.articleId === articleId))
+                            .filter(h => !(
+                                h.normaKey === normaKey &&
+                                articleRootOf(h.articleId) === articleRoot
+                            ))
                             .concat(mapped);
                     });
                 } catch (err) {

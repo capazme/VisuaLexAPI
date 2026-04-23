@@ -16,6 +16,15 @@ export const annotationService = {
     return response.data;
   },
 
+  // Get annotations for every row whose normaKey startsWith the given prefix.
+  // One round trip covers the article body + all its brocardi sub-sections.
+  async getByNormaKeyPrefix(normaKeyPrefix: string, type?: string): Promise<AnnotationResponse[]> {
+    const params: Record<string, string> = { normaKeyPrefix };
+    if (type) params.type = type;
+    const response = await apiClient.get('/annotations', { params });
+    return response.data;
+  },
+
   // Update annotation
   async update(id: string, data: AnnotationUpdate): Promise<AnnotationResponse> {
     const response = await apiClient.put(`/annotations/${id}`, data);

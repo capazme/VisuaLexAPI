@@ -14,6 +14,13 @@ export const highlightService = {
     return response.data;
   },
 
+  // Get highlights for every row whose normaKey startsWith the given prefix.
+  // One round trip covers the article body + all its brocardi sub-sections.
+  async getByNormaKeyPrefix(normaKeyPrefix: string): Promise<HighlightResponse[]> {
+    const response = await apiClient.get('/highlights', { params: { normaKeyPrefix } });
+    return response.data;
+  },
+
   // Update highlight
   async update(id: string, data: HighlightUpdate): Promise<HighlightResponse> {
     const response = await apiClient.put(`/highlights/${id}`, data);
