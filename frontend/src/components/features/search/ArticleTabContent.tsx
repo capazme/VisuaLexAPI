@@ -18,7 +18,7 @@ import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
-import { HighlightsPeekPanel } from './HighlightsPeekPanel';
+import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { ArticleBody } from './ArticleBody';
 import type { Annotation } from '../../../types';
@@ -88,6 +88,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isHighlightsPeekOpen, setIsHighlightsPeekOpen] = useState(false);
     const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
+    // Local visibility toggle: when true, the article body keeps the markup
+    // (so highlights aren't lost) but renders `.highlight-mark` transparent
+    // via the `.highlights-hidden` class scoped to contentRef. Per-article,
+    // not persisted across sessions.
+    const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
     // When the user picks "Aggiungi nota" from the selection popup the
     // selected span becomes the note's anchor. Kept in state so the panel
@@ -186,6 +191,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         const timeout = setTimeout(() => setToastMessage(null), 3000);
         return () => clearTimeout(timeout);
     }, [toastMessage]);
+
+    // Toggle a `highlights-hidden` class on the article body so CSS can
+    // make `.highlight-mark` spans transparent without rebuilding the
+    // markup. This way nothing is lost — re-toggling restores the colors.
+    useEffect(() => {
+        const container = contentRef.current;
+        if (!container) return;
+        container.classList.toggle('highlights-hidden', highlightsHidden);
+    }, [highlightsHidden]);
 
     // Delegated click handler on the article body: tap on a wavy
     // `.note-anchor` underline opens the compact InlineNotePopover for
@@ -286,6 +300,36 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         addAnnotation(itemKey, targetArticleId, trimmed, anchorPayload);
         setNoteAnchor(null);
         showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
+    };
+
+    const handleExportHighlightsTxt = () => {
+        if (allPanelHighlights.length === 0) {
+            showToast('Nessuna evidenziazione da esportare', 'info');
+            return;
+        }
+        const headerLines = [
+            `Evidenziazioni — Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`,
+            `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}`,
+            `Esportato il ${new Date().toLocaleString('it-IT')}`,
+            '─'.repeat(60),
+            '',
+        ];
+        const body = allPanelHighlights.map((h, i) => `${i + 1}. [${h.color}] ${h.text}`).join('\n\n');
+        const txt = headerLines.join('\n') + body + '\n';
+
+        const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'evidenziazioni';
+        const filenameBase = slug(`${norma_data.tipo_atto}-art-${norma_data.numero_articolo}`);
+        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `evidenziazioni-${filenameBase}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast(`Esportate ${allPanelHighlights.length} evidenziazioni`, 'success');
     };
 
     const handleShareLink = async () => {
@@ -520,14 +564,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onOpenStudyMode={onOpenStudyMode}
             />
 
-            <HighlightsPeekPanel
+            <HighlightsActionsPicker
                 isOpen={isHighlightsPeekOpen}
                 anchorEl={highlightsButtonEl}
-                highlights={allPanelHighlights}
-                articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
-                contentRef={contentRef}
+                highlightsCount={allPanelHighlights.length}
+                highlightsHidden={highlightsHidden}
                 onClose={() => setIsHighlightsPeekOpen(false)}
-                onRemoveHighlight={removeHighlight}
+                onToggleVisibility={() => setHighlightsHidden(v => !v)}
+                onExportTxt={handleExportHighlightsTxt}
             />
 
             {inlineNote && (
