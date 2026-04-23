@@ -157,5 +157,6 @@ export const STUDY_MODE_SHORTCUTS = [
   { key: 'S', label: 'Settings' },
   { key: 'N', label: 'Nota' },
   { key: '1/2/3', label: 'Tema' },
+  { key: '1-4', label: 'Evidenzia (con selezione)' },
   { key: '⌘B', label: 'Segnalibro' },
 ] as const;

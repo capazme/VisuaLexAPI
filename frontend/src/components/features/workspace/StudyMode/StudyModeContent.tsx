@@ -5,10 +5,18 @@ import { SelectionPopup } from '../../search/SelectionPopup';
 import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
 import { extractArticleRefs } from '../../../../utils/citationParser';
+import { getSelectionPlainOffset } from '../../../../utils/selectionOffset';
 import type { ArticleData, NormaVisitata, Highlight, Annotation, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
 import { extractPreamble } from './extractPreamble';
+
+const COLOR_SHORTCUTS: Record<string, 'yellow' | 'green' | 'red' | 'blue'> = {
+  '1': 'yellow',
+  '2': 'green',
+  '3': 'red',
+  '4': 'blue',
+};
 
 interface StudyModeContentProps {
   article: ArticleData;
@@ -183,15 +191,55 @@ export function StudyModeContent({
   // stored offset matches what the main article view would produce for
   // the same span — otherwise the same highlight would point to
   // different places depending on where it was created.
-  const handleHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-    const documentOffset = startOffset + preambleOffset;
-    const alreadyHighlighted = highlights.some(h =>
-      h.text.toLowerCase() === text.toLowerCase() && h.startOffset === documentOffset
-    );
-    if (!alreadyHighlighted) {
-      onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color, documentOffset);
-    }
-  };
+  const handleHighlight = useCallback(
+    (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
+      const documentOffset = startOffset + preambleOffset;
+      const alreadyHighlighted = highlights.some(h =>
+        h.text.toLowerCase() === text.toLowerCase() && h.startOffset === documentOffset
+      );
+      if (!alreadyHighlighted) {
+        onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color, documentOffset);
+      }
+    },
+    [preambleOffset, highlights, onAddHighlight, normaKey, norma_data.numero_articolo],
+  );
+
+  // Colour shortcut: 1/2/3/4 highlight the current selection when it
+  // sits inside the article body. Runs in the capture phase with
+  // stopImmediatePropagation so the theme shortcut in
+  // useStudyModeShortcuts (also bound to 1/2/3 on window) doesn't also
+  // fire and flip the theme while the user wanted a yellow highlight.
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const color = COLOR_SHORTCUTS[e.key];
+      if (!color) return;
+
+      const target = e.target as Node | null;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      if (!text || !selection?.rangeCount) return;
+
+      const range = selection.getRangeAt(0);
+      if (!container.contains(range.commonAncestorContainer)) return;
+
+      const offset = getSelectionPlainOffset(container, selection);
+      if (offset < 0) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      handleHighlight(text, color, offset);
+      selection.removeAllRanges();
+    };
+
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [handleHighlight]);
 
   // Handle note from selection popup
   const handleAddNote = (text: string) => {
@@ -248,8 +296,10 @@ export function StudyModeContent({
             </header>
 
             {/* Article body — ref scoped to this wrapper so selection
-                offsets align with the body text fed to useArticleMarkers. */}
-            <div className="relative" ref={contentRef}>
+                offsets align with the body text fed to useArticleMarkers.
+                The id is consumed by the colour-shortcut handler in
+                StudyMode.tsx to anchor document.getSelection() offsets. */}
+            <div className="relative" id="study-mode-article-body" ref={contentRef}>
               <SelectionPopup
                 containerRef={contentRef}
                 onHighlight={handleHighlight}
