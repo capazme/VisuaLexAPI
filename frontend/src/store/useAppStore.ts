@@ -26,6 +26,14 @@ interface NormaBlock {
     norma: any;
     articles: ArticleData[];
     isCollapsed: boolean;
+    /**
+     * Signal for R2 (streaming-ux): when set, the NormaBlockComponent should
+     * switch its local activeArticleId to this value once on mount/update,
+     * then call `consumeAutoFocusArticle` to clear it. Used for single-article
+     * searches that are merged into an existing tab (R3) so the user lands on
+     * the article they actually queried.
+     */
+    autoFocusArticleId?: string;
 }
 
 interface LooseArticle {
@@ -62,6 +70,13 @@ interface WorkspaceTab {
     isMinimized: boolean;
     isHidden: boolean;
     content: TabContent[]; // Mixed norme and loose articles
+    /**
+     * R3 (streaming-ux): true when the label was set by the user (rename) or
+     * provided explicitly at creation (e.g. from a dossier). Custom tabs are
+     * treated as reserved: subsequent searches for the same norma do NOT merge
+     * into them, they spawn a new tab instead.
+     */
+    labelIsCustom: boolean;
 }
 
 interface SearchPanelState {
@@ -125,8 +140,10 @@ interface AppState {
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
     // Workspace Tab Actions
-    addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[]) => string;
+    addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
     addNormaToTab: (tabId: string, norma: any, articles: ArticleData[]) => void;
+    setActiveArticleInBlock: (tabId: string, normaBlockId: string, articleId: string) => void;
+    consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
     addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: any) => void;
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
     removeTab: (id: string) => void;
@@ -396,7 +413,7 @@ const appStore = createStore<AppState>()(
             }),
 
             // Workspace Tab Actions - Complete refactor
-            addWorkspaceTab: (label, norma, articles) => {
+            addWorkspaceTab: (label, norma, articles, options) => {
                 let tabId = '';
                 set((state) => {
                     const tabCount = state.workspaceTabs.length;
@@ -411,7 +428,8 @@ const appStore = createStore<AppState>()(
                         isPinned: false,
                         isMinimized: false,
                         isHidden: false,
-                        content: []
+                        content: [],
+                        labelIsCustom: options?.isCustom === true,
                     };
 
                     if (norma && articles) {
@@ -574,6 +592,34 @@ const appStore = createStore<AppState>()(
                 const tab = state.workspaceTabs.find(t => t.id === id);
                 if (tab) {
                     tab.label = label;
+                    // Manual rename reserves the tab from R3 auto-merge.
+                    tab.labelIsCustom = true;
+                }
+            }),
+
+            setActiveArticleInBlock: (tabId, normaBlockId, articleId) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+                const block = tab.content.find(
+                    c => c.type === 'norma' && c.id === normaBlockId
+                ) as NormaBlock | undefined;
+                if (!block) return;
+                block.autoFocusArticleId = articleId;
+                // Surface the tab if it was minimized/hidden so the focus signal
+                // is actually visible (R3 + R2 edge case).
+                tab.isMinimized = false;
+                tab.isHidden = false;
+                tab.zIndex = ++state.highestZIndex;
+            }),
+
+            consumeAutoFocusArticle: (tabId, normaBlockId) => set((state) => {
+                const tab = state.workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return;
+                const block = tab.content.find(
+                    c => c.type === 'norma' && c.id === normaBlockId
+                ) as NormaBlock | undefined;
+                if (block) {
+                    block.autoFocusArticleId = undefined;
                 }
             }),
 
