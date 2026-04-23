@@ -36,7 +36,6 @@ export function WorkspaceTabPanel({
     updateTab,
     removeTab,
     bringTabToFront,
-    toggleTabPin,
     toggleTabMinimize,
     setTabLabel,
     extractArticleFromNorma,
@@ -51,7 +50,6 @@ export function WorkspaceTabPanel({
     updateTab: s.updateTab,
     removeTab: s.removeTab,
     bringTabToFront: s.bringTabToFront,
-    toggleTabPin: s.toggleTabPin,
     toggleTabMinimize: s.toggleTabMinimize,
     setTabLabel: s.setTabLabel,
     extractArticleFromNorma: s.extractArticleFromNorma,
@@ -331,7 +329,6 @@ export function WorkspaceTabPanel({
       }}
       className={cn(
         "fixed",
-        tab.isPinned && "ring-2 ring-primary-500 rounded-2xl",
         isDragging && "cursor-grabbing"
       )}
       onMouseDown={handleMouseDown}
@@ -342,13 +339,10 @@ export function WorkspaceTabPanel({
           // Liquid Glass container - Slate 800-900 based
           "workspace-tab-panel h-full flex flex-col rounded-2xl shadow-glass overflow-hidden",
           "bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl",
-          // When the outer wrapper already paints a 2px primary ring
-          // (pinned tabs), drop the panel's own 1px border so the two
-          // lines don't stack into a visible double stripe.
-          tab.isPinned ? "transition-colors" : "border transition-colors",
+          "border transition-colors",
           isOver
             ? "border-primary-500 border-2 bg-primary-50/80 dark:bg-primary-950/80"
-            : !tab.isPinned && "border-slate-200/60 dark:border-slate-800"
+            : "border-slate-200/60 dark:border-slate-800"
         )}
       >
         {/* Header with macOS-style controls */}
@@ -376,15 +370,6 @@ export function WorkspaceTabPanel({
                 onPointerDown={(e) => e.stopPropagation()}
                 className="w-3 h-3 bg-amber-400 hover:bg-amber-500 rounded-full transition-colors"
                 title="Minimizza"
-              />
-              <button
-                onClick={() => toggleTabPin(tab.id)}
-                onPointerDown={(e) => e.stopPropagation()}
-                className={cn(
-                  "w-3 h-3 rounded-full transition-colors",
-                  tab.isPinned ? "bg-primary-500 hover:bg-primary-600" : "bg-emerald-400 hover:bg-emerald-500"
-                )}
-                title={tab.isPinned ? "Rimuovi pin" : "Fissa"}
               />
             </div>
 
@@ -529,11 +514,6 @@ export function WorkspaceTabPanel({
               )}
             </div>
 
-            {tab.isPinned && (
-              <span className="text-[10px] px-2 py-0.5 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-300 rounded-full font-bold uppercase tracking-wider border border-primary-100 dark:border-primary-800">
-                Pinned
-              </span>
-            )}
           </div>
         </div>
 

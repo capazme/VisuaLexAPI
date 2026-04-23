@@ -24,7 +24,6 @@ export interface WorkspaceTab {
     position: { x: number; y: number };
     size: { width: number; height: number };
     zIndex: number;
-    isPinned: boolean;
     isMinimized: boolean;
     content: TabContent[];
 }
@@ -51,7 +50,6 @@ export function createWorkspaceTabActions(set: any, _get: any) {
                     position: { x: baseX + cascade, y: baseY + cascade },
                     size: { width: tabWidth, height: tabHeight },
                     zIndex: ++state.highestZIndex,
-                    isPinned: false,
                     isMinimized: false,
                     content: []
                 };
@@ -152,15 +150,8 @@ export function createWorkspaceTabActions(set: any, _get: any) {
 
         bringTabToFront: (id: string) => set((state: any) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === id);
-            if (tab && !tab.isPinned) {
-                tab.zIndex = ++state.highestZIndex;
-            }
-        }),
-
-        toggleTabPin: (id: string) => set((state: any) => {
-            const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === id);
             if (tab) {
-                tab.isPinned = !tab.isPinned;
+                tab.zIndex = ++state.highestZIndex;
             }
         }),
 

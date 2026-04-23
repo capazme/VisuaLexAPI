@@ -2,8 +2,6 @@ import { useState } from 'react';
 import {
   Layers,
   X,
-  Pin,
-  PinOff,
   Maximize2,
   Minimize2,
   FileText,
@@ -36,7 +34,6 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     workspaceTabs,
     bringTabToFront,
     removeTab,
-    toggleTabPin,
     toggleTabMinimize,
     toggleTabVisibility,
     commandPaletteOpen,
@@ -44,7 +41,6 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     workspaceTabs: s.workspaceTabs,
     bringTabToFront: s.bringTabToFront,
     removeTab: s.removeTab,
-    toggleTabPin: s.toggleTabPin,
     toggleTabMinimize: s.toggleTabMinimize,
     toggleTabVisibility: s.toggleTabVisibility,
     commandPaletteOpen: s.commandPaletteOpen,
@@ -168,9 +164,6 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
                   {tab.isHidden && (
                     <EyeOff size={10} className="text-slate-400" />
                   )}
-                  {tab.isPinned && (
-                    <Pin size={10} className="text-primary-500 fill-primary-500" />
-                  )}
                   {tab.isMinimized && (
                     <Minimize2 size={10} className="text-amber-500" />
                   )}
@@ -211,20 +204,6 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
                         <EyeOff size={12} />
                       ) : (
                         <Eye size={12} />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTabPin(tab.id);
-                      }}
-                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 hover:text-primary-600"
-                      title={tab.isPinned ? "Rimuovi pin" : "Fissa"}
-                    >
-                      {tab.isPinned ? (
-                        <PinOff size={12} />
-                      ) : (
-                        <Pin size={12} />
                       )}
                     </button>
                     <button

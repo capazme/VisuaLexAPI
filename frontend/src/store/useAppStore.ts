@@ -68,7 +68,6 @@ interface WorkspaceTab {
     position: { x: number; y: number };
     size: { width: number; height: number };
     zIndex: number;
-    isPinned: boolean;
     isMinimized: boolean;
     isHidden: boolean;
     content: TabContent[]; // Mixed norme and loose articles
@@ -166,7 +165,6 @@ interface AppState {
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
     removeTab: (id: string) => void;
     bringTabToFront: (id: string) => void;
-    toggleTabPin: (id: string) => void;
     toggleTabMinimize: (id: string) => void;
     toggleTabVisibility: (id: string) => void;
     toggleNormaCollapse: (tabId: string, normaId: string) => void;
@@ -456,7 +454,6 @@ const appStore = createStore<AppState>()(
                         position: { x: 100 + cascade, y: 100 + cascade },
                         size: { width: 800, height: 650 },
                         zIndex: ++state.highestZIndex,
-                        isPinned: false,
                         isMinimized: false,
                         isHidden: false,
                         content: [],
@@ -583,15 +580,8 @@ const appStore = createStore<AppState>()(
 
             bringTabToFront: (id) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === id);
-                if (tab && !tab.isPinned) {
-                    tab.zIndex = ++state.highestZIndex;
-                }
-            }),
-
-            toggleTabPin: (id) => set((state) => {
-                const tab = state.workspaceTabs.find(t => t.id === id);
                 if (tab) {
-                    tab.isPinned = !tab.isPinned;
+                    tab.zIndex = ++state.highestZIndex;
                 }
             }),
 
