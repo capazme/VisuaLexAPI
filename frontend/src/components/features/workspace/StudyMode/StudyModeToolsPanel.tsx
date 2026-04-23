@@ -194,8 +194,9 @@ export function StudyModeToolsPanel({
 
           {/* Tabs — minimal counter as a small monospace number; the
               active state alone uses the accent border, no per-tab
-              coloured pills. */}
-          <div className={cn("flex border-b", styles.border)}>
+              coloured pills. pt-2 gives the tab labels a little air
+              under the header so the row doesn't feel cramped. */}
+          <div className={cn("flex border-b pt-2", styles.border)}>
             <TabButton
               active={activeTab === 'summary'}
               onClick={() => setActiveTab('summary')}
