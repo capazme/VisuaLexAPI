@@ -349,11 +349,16 @@ export function StudyMode({
       height: size.height,
     };
 
-  // Render via Portal to escape tab stacking context
+  // Render via Portal to escape tab stacking context.
+  // AnimatePresence needs stable keys on each direct child — without
+  // them both motion.div's reconcile with an empty key, and React
+  // warns "two children with the same key \`\`" the moment Study
+  // Mode opens.
   return createPortal(
     <AnimatePresence>
       {/* Backdrop - covers entire viewport */}
       <motion.div
+        key="study-mode-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -363,6 +368,7 @@ export function StudyMode({
 
       {/* Window - above everything */}
       <motion.div
+        key="study-mode-window"
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
