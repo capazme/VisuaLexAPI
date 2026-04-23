@@ -253,32 +253,3 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
     </>
   );
 }
-
-// Export for highlighting in article content
-export function highlightSearchQuery(
-  html: string,
-  query: string | null
-): string {
-  if (!query || query.length < 2) return html;
-
-  // Create a regex that matches the query case-insensitively
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-
-  // We need to be careful not to replace text inside HTML tags
-  // This is a simplified approach - for production, use a proper HTML parser
-  const parts = html.split(/(<[^>]+>)/);
-
-  return parts
-    .map((part) => {
-      // If it's an HTML tag, don't modify it
-      if (part.startsWith('<') && part.endsWith('>')) {
-        return part;
-      }
-      // Otherwise, highlight matches
-      return part.replace(
-        regex,
-        '<mark class="bg-amber-200 dark:bg-amber-500/30 text-amber-900 dark:text-amber-200 px-0.5 rounded">$1</mark>'
-      );
-    })
-    .join('');
-}
