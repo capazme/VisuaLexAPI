@@ -19,7 +19,6 @@ interface NormaCardProps {
   onCloseArticle: (articleId: string) => void;
   onViewPdf: (urn: string) => void;
   onCrossReference?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
-  onPopOut?: (articleId: string) => void;
   isNew?: boolean;
   searchedArticle?: string; // Original article number requested by user
   tabId?: string; // ID of the workspace tab containing this card
@@ -56,7 +55,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
   const {
     treeData,
     treeMetadata,
-    treeLoading: _treeLoading,
+    treeLoading,
     treeVisible,
     setTreeVisible,
     currentAnnex,
@@ -65,6 +64,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     fetchTree,
     handleAnnexSelect,
     handleLoadArticle,
+    isArticleLoaded,
     loadedArticleIds
   } = useAnnexNavigation({
     norma,
@@ -143,31 +143,17 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Function to navigate to a loaded article or load it if not present
-  const handleArticleSelect = (articleNumber: string) => {
-    // Construct unique ID based on current context (annex)
-    // Note: This assumes selection comes from the current tree context (TreeViewPanel)
-    const targetUniqueId = currentAnnex
-      ? `all${currentAnnex}:${articleNumber}`
-      : articleNumber;
+  // Navigate to a loaded article or load it if not present.
+  // targetAnnex: explicit annex (null = dispositivo); undefined = use currentAnnex.
+  const handleLoadArticleWithNavigation = (articleNumber: string, targetAnnex?: string | null) => {
+    const annexContext = targetAnnex !== undefined ? targetAnnex : currentAnnex;
+    const uniqueId = annexContext ? `all${annexContext}:${articleNumber}` : articleNumber;
 
-    // Check if loaded (using unique ID check)
-    const isLoaded = articles.some(a => getUniqueId(a) === targetUniqueId);
-
-    if (isLoaded) {
-      setActiveTabId(targetUniqueId);
-    } else {
-      handleLoadArticle(articleNumber);
-      // We rely on useEffect to switch tab once loaded, 
-      // or we could optimistically set it but it wouldn't match any article yet.
-      // Better to let useEffect handle the switch IF we want auto-switch on load (which we do logic for).
-      // But handleLoadArticle is async in hook.
-      // If we want immediate feedback, we might need to track "pending" state.
-      // For now, rely on previous logic + effect.
-      // Wait, effect logic selects FIRST article if active is missing.
-      // If we load a specific one, we want THAT one active.
-      // NormaBlockComponent handles this. NormaCard relies on user action?
+    if (isArticleLoaded(uniqueId)) {
+      setActiveTabId(uniqueId);
+      return;
     }
+    handleLoadArticle(articleNumber, targetAnnex);
   };
 
   if (articles.length === 0) return null;
@@ -280,7 +266,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               }}
             >
               <GitBranch size={14} className="text-emerald-500" />
-              Struttura
+              {treeLoading ? 'Carico…' : 'Struttura'}
             </button>
           )}
           <button
@@ -407,7 +393,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               }}
             >
               <GitBranch size={16} className="text-emerald-500" />
-              <span>Struttura</span>
+              <span>{treeLoading ? 'Carico…' : 'Struttura'}</span>
             </button>
           )}
           <div className="w-10 h-10 flex items-center justify-center text-slate-400 dark:text-slate-500">
@@ -425,7 +411,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
         title="Struttura dell'Atto"
         loadedArticles={loadedArticleIds}
         onArticleSelect={(articleNumber, targetAnnex) => {
-          handleLoadArticle(articleNumber, targetAnnex);
+          handleLoadArticleWithNavigation(articleNumber, targetAnnex);
           setTreeVisible(false);
         }}
         annexes={treeMetadata?.annexes}
@@ -471,7 +457,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                   const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
                   setActiveTabId(uniqueId);
                 }}
-                onLoadArticle={handleLoadArticle}
+                onLoadArticle={handleLoadArticleWithNavigation}
               />
               <ArticleMinimap
                 loadedArticleIds={loadedArticleIds
@@ -479,7 +465,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                   .map(id => id.includes(':') ? id.split(':').pop()! : id)
                 }
                 activeArticleId={activeArticle?.norma_data.numero_articolo || null}
-                onArticleClick={handleArticleSelect}
+                onArticleClick={handleLoadArticleWithNavigation}
                 className="max-w-[400px]"
               />
             </div>
@@ -510,7 +496,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                   {isActive && (
                     <motion.span
                       layoutId="activeNormaTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 shadow-glow-up"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500"
                       transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                     />
                   )}
@@ -673,6 +659,18 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
         {studyModeOpen && studyModeArticle && (
           <StudyMode
             article={studyModeArticle}
+            articles={articles}
+            allArticleIds={allArticleIds}
+            normaLabel={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''}`}
+            onNavigate={(articleNumber) => {
+              const uniqueId = currentAnnex ? `all${currentAnnex}:${articleNumber}` : articleNumber;
+              const target = articles.find(a => getUniqueId(a) === uniqueId);
+              if (target) {
+                setActiveTabId(uniqueId);
+                setStudyModeArticle(target);
+              }
+            }}
+            onLoadArticle={handleLoadArticleWithNavigation}
             onClose={() => {
               setStudyModeOpen(false);
               setStudyModeArticle(null);
