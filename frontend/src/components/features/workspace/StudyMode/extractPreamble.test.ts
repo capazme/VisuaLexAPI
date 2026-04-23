@@ -27,7 +27,7 @@ describe('extractPreamble', () => {
   it('returns the full text when no preamble is present', () => {
     const raw = 'Testo che non inizia con art.';
     const r = extractPreamble(raw);
-    expect(r).toEqual({ rubric: null, body: raw, offset: 0 });
+    expect(r).toEqual({ rubric: null, body: raw, offset: 0, plainOffset: 0 });
   });
 
   it('handles articles without a rubric', () => {
@@ -43,11 +43,28 @@ describe('extractPreamble', () => {
     // body — better to keep the raw text so the article doesn't disappear.
     const raw = 'art. 42.';
     const r = extractPreamble(raw);
-    expect(r).toEqual({ rubric: null, body: raw, offset: 0 });
+    expect(r).toEqual({ rubric: null, body: raw, offset: 0, plainOffset: 0 });
   });
 
   it('returns zero offset on empty input', () => {
     const r = extractPreamble('');
-    expect(r).toEqual({ rubric: null, body: '', offset: 0 });
+    expect(r).toEqual({ rubric: null, body: '', offset: 0, plainOffset: 0 });
+  });
+
+  it('reports a plainOffset that excludes newlines consumed by the preamble', () => {
+    // Regression: shifting highlight offsets by `offset` (raw) rather than
+    // `plainOffset` skewed the stored startOffset by one per newline in
+    // the preamble, so a highlight made in Study Mode landed on the wrong
+    // span in the main article view.
+    const raw = 'art. 100.\n\n(Interesse).\n\nPer proporre una domanda.';
+    const r = extractPreamble(raw);
+    expect(r.offset).toBe(25);      // raw chars consumed (includes 4 newlines)
+    expect(r.plainOffset).toBe(21); // 25 - 4 newlines
+  });
+
+  it('plainOffset equals offset when the preamble has no newlines', () => {
+    const raw = 'Art. 2043. (Risarcimento). Qualunque fatto.';
+    const r = extractPreamble(raw);
+    expect(r.offset).toBe(r.plainOffset);
   });
 });

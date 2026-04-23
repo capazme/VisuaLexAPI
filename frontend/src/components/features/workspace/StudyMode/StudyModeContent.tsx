@@ -94,15 +94,17 @@ export function StudyModeContent({
 
   // Split off the "Art. N. (Rubrica)." preamble so the rendered body doesn't
   // duplicate what the H2 + rubric subtitle already show.
-  const { rubric, body: bodyText, offset: preambleOffset } = useMemo(
+  const { rubric, body: bodyText, plainOffset: preambleOffset } = useMemo(
     () => extractPreamble(article_text || ''),
     [article_text],
   );
 
-  // Highlights and annotations are stored document-relative (matching the
-  // main article view). Shift them into body-relative coordinates for this
-  // view, and drop anything that falls inside the hidden preamble — users
-  // never interact with that region here.
+  // Highlights and annotations are stored document-relative in *plain-text*
+  // coordinates (DOM textContent, no newlines). `preambleOffset` is also
+  // plain-text, so this shift keeps the two sides of the conversion in the
+  // same coordinate space. Using the raw `offset` here would skew every
+  // offset by one per newline inside the preamble and the highlight would
+  // land on the wrong position in the main article view.
   const bodyHighlights = useMemo<Highlight[]>(() => {
     if (preambleOffset === 0) return highlights;
     return highlights.flatMap((h) => {

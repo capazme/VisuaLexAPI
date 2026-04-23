@@ -22,8 +22,19 @@ export interface PreambleSplit {
   rubric: string | null;
   /** Article body with the preamble stripped. Equal to the input when no preamble was detected. */
   body: string;
-  /** Character count consumed by the preamble — use to shift highlight/annotation offsets. Zero when nothing was stripped. */
+  /**
+   * Raw character count consumed by the preamble. Use for `raw.slice()`
+   * operations. Equal to `body`'s starting index in `raw`.
+   */
   offset: number;
+  /**
+   * Plain-text character count of the preamble — the raw length minus
+   * every newline it contains. Use this (NOT `offset`) when shifting
+   * highlight / annotation startOffsets between body-relative and
+   * document-relative coordinates, because those offsets live in
+   * plain-text space (DOM textContent, where <br/> contributes 0 chars).
+   */
+  plainOffset: number;
 }
 
 export function extractPreamble(raw: string): PreambleSplit {
@@ -31,11 +42,14 @@ export function extractPreamble(raw: string): PreambleSplit {
   // Skip when: no match, empty match, or the preamble is the whole text
   // (we'd render nothing and the article would look broken).
   if (!match || match[0].length === 0 || match[0].length === raw.length) {
-    return { rubric: null, body: raw, offset: 0 };
+    return { rubric: null, body: raw, offset: 0, plainOffset: 0 };
   }
+  const consumed = match[0];
+  const newlines = (consumed.match(/\n/g) ?? []).length;
   return {
     rubric: match[1]?.trim() ?? null,
-    body: raw.slice(match[0].length),
-    offset: match[0].length,
+    body: raw.slice(consumed.length),
+    offset: consumed.length,
+    plainOffset: consumed.length - newlines,
   };
 }
