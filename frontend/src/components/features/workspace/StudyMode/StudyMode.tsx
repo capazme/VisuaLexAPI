@@ -519,12 +519,16 @@ export function StudyMode({
   );
 }
 
-// Helper to generate consistent norma keys
+// Helper to generate consistent norma keys. MUST mirror ArticleTabContent's
+// itemKey builder — highlights / annotations are filtered by `normaKey ===
+// itemKey` in the main view, so any divergence means entries saved from
+// Study Mode never show up back in the normal tab (and vice versa).
 function generateNormaKey(normaData: ArticleData['norma_data']): string {
   const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
   const parts = [normaData.tipo_atto];
   if (normaData.numero_atto?.trim()) parts.push(normaData.numero_atto);
   if (normaData.data?.trim()) parts.push(normaData.data);
+  if (normaData.allegato?.trim()) parts.push(`all${normaData.allegato}`);
   if (normaData.numero_articolo?.trim()) parts.push(normaData.numero_articolo);
   return parts.map(part => sanitize(part || '')).join('--');
 }

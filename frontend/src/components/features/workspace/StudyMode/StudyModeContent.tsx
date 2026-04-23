@@ -193,6 +193,14 @@ export function StudyModeContent({
   // stored offset matches what the main article view would produce for
   // the same span — otherwise the same highlight would point to
   // different places depending on where it was created.
+  //
+  // `uniqueArticleId` mirrors ArticleTabContent's builder: highlights
+  // live under `all{N}:{numero}` for annex articles so the main view's
+  // articleId filter finds entries created here.
+  const uniqueArticleId = useMemo(
+    () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
+    [norma_data.allegato, norma_data.numero_articolo],
+  );
   const handleHighlight = useCallback(
     (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
       const documentOffset = startOffset + preambleOffset;
@@ -200,10 +208,10 @@ export function StudyModeContent({
         h.text.toLowerCase() === text.toLowerCase() && h.startOffset === documentOffset
       );
       if (!alreadyHighlighted) {
-        onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color, documentOffset);
+        onAddHighlight(normaKey, uniqueArticleId, text, '', color, documentOffset);
       }
     },
-    [preambleOffset, highlights, onAddHighlight, normaKey, norma_data.numero_articolo],
+    [preambleOffset, highlights, onAddHighlight, normaKey, uniqueArticleId],
   );
 
   // Colour shortcut: 1/2/3/4 highlight the current selection when it
