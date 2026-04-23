@@ -240,12 +240,24 @@
     box-shadow: 0 0 0 2px hsl(43 96% 56% / 0.5);
   }
 
-  /* Toggle from the Highlights actions picker: keeps the highlight
-     markup intact so colors return on re-toggle, but renders the
-     <mark> element as plain text. */
+  /* Toggle from the Highlights actions picker. The highlight markup
+     uses inline `style="background-color:hsl(var(--hl-*-bg)); color:
+     hsl(var(--hl-*-fg))"`, so a class-level rule on .highlight-mark
+     loses to the inline declaration. Two layers:
+       1. Override the bg HSL variables to alpha-0 so inline
+          `hsl(var(--hl-*-bg))` resolves to transparent (no !important
+          needed — same property, narrower-scoped definition wins).
+       2. Force color back to inherit. There's no way around inline
+          `color: hsl(...)` short of rebuilding the markup, so we
+          accept a single, narrowly-scoped !important here.  */
+  .highlights-hidden {
+    --hl-yellow-bg: 0 0% 0% / 0;
+    --hl-green-bg: 0 0% 0% / 0;
+    --hl-red-bg: 0 0% 0% / 0;
+    --hl-blue-bg: 0 0% 0% / 0;
+  }
   .highlights-hidden .highlight-mark {
-    background-color: transparent;
-    color: inherit;
+    color: inherit !important;
   }
 }
 
