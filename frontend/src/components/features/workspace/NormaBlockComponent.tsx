@@ -47,6 +47,24 @@ export function NormaBlockComponent({
     normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null
   );
 
+  // Articles the user has actually opened in this block. Every chip that
+  // arrives via streaming but has never been `activeArticleId` stays
+  // visually marked as "non visualizzato" until clicked.
+  const [viewedArticleIds, setViewedArticleIds] = useState<Set<string>>(() => {
+    const first = normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null;
+    return new Set(first ? [first] : []);
+  });
+
+  useEffect(() => {
+    if (!activeArticleId) return;
+    setViewedArticleIds(prev => {
+      if (prev.has(activeArticleId)) return prev;
+      const next = new Set(prev);
+      next.add(activeArticleId);
+      return next;
+    });
+  }, [activeArticleId]);
+
   // R1 (streaming-ux): don't steal focus when new articles stream in.
   // Only (re)select the first article when the user has nothing active —
   // either on mount with an empty list that later gets populated, or if
@@ -376,6 +394,7 @@ export function NormaBlockComponent({
             {normaBlock.articles.map((article) => {
               const uniqueId = getUniqueId(article);
               const isActive = uniqueId === activeArticleId;
+              const isUnread = !isActive && !viewedArticleIds.has(uniqueId);
 
               return (
                 <div
@@ -384,10 +403,19 @@ export function NormaBlockComponent({
                     "group flex items-center gap-1.5 px-3 py-2 rounded-t-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap border-t border-x",
                     isActive
                       ? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 border-b-0 text-primary-600 dark:text-primary-400 relative -bottom-px z-10"
-                      : "bg-slate-100 dark:bg-slate-800/50 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50"
+                      : isUnread
+                        ? "bg-primary-50 dark:bg-primary-900/20 border-primary-200/60 dark:border-primary-800/40 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/30"
+                        : "bg-slate-100 dark:bg-slate-800/50 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50"
                   )}
                   onClick={() => setActiveArticleId(uniqueId)}
+                  aria-label={isUnread ? `Art. ${article.norma_data.numero_articolo} (non visualizzato)` : undefined}
                 >
+                  {isUnread && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-primary-500 dark:bg-primary-400 shrink-0"
+                      aria-hidden="true"
+                    />
+                  )}
                   <div className="flex flex-col items-start leading-tight">
                     <span>Art. {article.norma_data.numero_articolo}</span>
                     {article.norma_data.allegato && (
