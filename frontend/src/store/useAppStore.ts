@@ -204,6 +204,7 @@ interface AppState {
 
     addAnnotation: (normaKey: string, articleId: string, text: string, anchor?: { anchorText: string; startOffset: number }) => void;
     removeAnnotation: (id: string) => void;
+    updateAnnotation: (id: string, newText: string) => void;
     loadAnnotationsForArticle: (normaKey: string, articleId: string) => Promise<void>;
 
     addHighlight: (normaKey: string, articleId: string, text: string, range: string, color: Highlight['color'], startOffset?: number) => void;
@@ -1265,6 +1266,26 @@ const appStore = createStore<AppState>()(
                     console.error('Failed to sync annotation delete:', err);
                     set((state) => { state.annotations.push(previous); });
                     get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                });
+            },
+
+            updateAnnotation: (id, newText) => {
+                const previous = get().annotations.find(a => a.id === id);
+                if (!previous || previous.text === newText) return;
+                // Optimistic update first so the UI reflects the edit
+                // immediately; revert in catch if the server rejects.
+                set((state) => {
+                    const a = state.annotations.find(x => x.id === id);
+                    if (a) a.text = newText;
+                });
+                annotationService.update(id, { content: newText }).catch((err) => {
+                    if (err?.status === 404) return;
+                    console.error('Failed to sync annotation update:', err);
+                    set((state) => {
+                        const a = state.annotations.find(x => x.id === id);
+                        if (a) a.text = previous.text;
+                    });
+                    get().pushSyncError('Impossibile modificare la nota. Riprova.');
                 });
             },
 

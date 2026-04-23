@@ -18,8 +18,10 @@ import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { getPlainTextOffset, getSelectionPlainOffset } from '../../../utils/selectionOffset';
 import { ReadingToolbar } from './ReadingToolbar';
-import { NotesPanel } from './NotesPanel';
+import { NotesPeekPanel } from './NotesPeekPanel';
+import { InlineNotePopover } from './InlineNotePopover';
 import { ArticleBody } from './ArticleBody';
+import type { Annotation } from '../../../types';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -45,6 +47,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         annotations,
         addAnnotation,
         removeAnnotation,
+        updateAnnotation,
         loadAnnotationsForArticle,
         highlights,
         addHighlight,
@@ -58,6 +61,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         annotations: s.annotations,
         addAnnotation: s.addAnnotation,
         removeAnnotation: s.removeAnnotation,
+        updateAnnotation: s.updateAnnotation,
         loadAnnotationsForArticle: s.loadAnnotationsForArticle,
         highlights: s.highlights,
         addHighlight: s.addHighlight,
@@ -70,8 +74,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     })));
 
     const [showDossierModal, setShowDossierModal] = useState(false);
-    const [showNotes, setShowNotes] = useState(false);
-    const [noteText, setNoteText] = useState('');
+    const [isPeekOpen, setIsPeekOpen] = useState(false);
+    const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
+    // State (not ref) so the popover re-reads the anchor when the button
+    // actually mounts. Using ref.current in render triggers the
+    // react-hooks/refs lint and can miss the post-mount update.
+    const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
@@ -182,6 +190,27 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         return () => clearTimeout(timeout);
     }, [toastMessage]);
 
+    // Delegated click handler on the article body: tap on a wavy
+    // `.note-anchor` underline opens the compact InlineNotePopover for
+    // that single note. The full Peek panel stays for the toolbar button.
+    useEffect(() => {
+        const container = contentRef.current;
+        if (!container) return;
+        const handler = (e: MouseEvent) => {
+            const target = (e.target as HTMLElement | null)?.closest('.note-anchor') as HTMLElement | null;
+            if (!target) return;
+            const noteId = target.getAttribute('data-note-id');
+            if (!noteId) return;
+            const note = itemAnnotations.find(a => a.id === noteId);
+            if (!note) return;
+            e.preventDefault();
+            e.stopPropagation();
+            setInlineNote({ note, anchorEl: target });
+        };
+        container.addEventListener('click', handler);
+        return () => container.removeEventListener('click', handler);
+    }, [itemAnnotations]);
+
     // Capture text selection for highlighting
     useEffect(() => {
         const handleSelection = () => {
@@ -283,18 +312,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    const handleAddNote = () => {
-        if (!noteText.trim()) {
-            showToast('Inserisci una nota', 'error');
-            return;
-        }
+    const handleAddNote = (text: string) => {
+        const trimmed = text.trim();
+        if (!trimmed) return;
         const anchor = noteAnchor;
         const targetArticleId = anchor?.scopedArticleId ?? uniqueArticleId;
         const anchorPayload = anchor
             ? { anchorText: anchor.anchorText, startOffset: anchor.startOffset }
             : undefined;
-        addAnnotation(itemKey, targetArticleId, noteText, anchorPayload);
-        setNoteText('');
+        addAnnotation(itemKey, targetArticleId, trimmed, anchorPayload);
         setNoteAnchor(null);
         showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
     };
@@ -389,8 +415,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Handler for SelectionPopup note action in the article body.
     const handlePopupAddNote = (text: string, startOffset: number) => {
         setNoteAnchor({ anchorText: text, startOffset, scopedArticleId: uniqueArticleId });
-        setNoteText('');
-        setShowNotes(true);
+        setIsPeekOpen(true);
     };
 
     // Called by a markable brocardi sub-section (Ratio / Spiegazione) when
@@ -399,8 +424,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // carries the sub-section identifier.
     const handleBrocardiAddNote = (scopedArticleId: string, text: string, startOffset: number) => {
         setNoteAnchor({ anchorText: text, startOffset, scopedArticleId });
-        setNoteText('');
-        setShowNotes(true);
+        setIsPeekOpen(true);
     };
 
     // Handler for SelectionPopup copy action
@@ -550,13 +574,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 versionInfo={versionInfo}
                 url={url}
                 articleText={article_text || ''}
-                showNotes={showNotes}
+                isNotesPeekOpen={isPeekOpen}
+                notesButtonRef={setNotesButtonEl}
                 notesCount={allPanelAnnotations.length}
                 highlightsCount={allPanelHighlights.length}
                 showHighlightPicker={showHighlightPicker}
                 showMoreMenu={showMoreMenu}
                 highlightSelectionRef={highlightSelectionRef}
-                onToggleNotes={() => setShowNotes(!showNotes)}
+                onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightPicker={setShowHighlightPicker}
                 onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
@@ -573,17 +598,27 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onShowToast={showToast}
             />
 
-            {/* Notes panel (study feature) */}
-            {(showNotes || allPanelAnnotations.length > 0) && (
-                <NotesPanel
-                    annotations={allPanelAnnotations}
-                    showComposer={showNotes}
-                    noteAnchor={noteAnchor}
-                    noteText={noteText}
-                    onNoteTextChange={setNoteText}
-                    onClearAnchor={() => setNoteAnchor(null)}
-                    onSaveNote={handleAddNote}
-                    onRemoveAnnotation={removeAnnotation}
+            <NotesPeekPanel
+                isOpen={isPeekOpen}
+                anchorEl={notesButtonEl}
+                annotations={allPanelAnnotations}
+                articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
+                noteAnchor={noteAnchor}
+                onClose={() => setIsPeekOpen(false)}
+                onAddNote={handleAddNote}
+                onUpdateNote={updateAnnotation}
+                onRemoveNote={removeAnnotation}
+                onClearAnchor={() => setNoteAnchor(null)}
+                onOpenStudyMode={onOpenStudyMode}
+            />
+
+            {inlineNote && (
+                <InlineNotePopover
+                    note={inlineNote.note}
+                    anchorEl={inlineNote.anchorEl}
+                    onClose={() => setInlineNote(null)}
+                    onUpdate={updateAnnotation}
+                    onRemove={removeAnnotation}
                 />
             )}
 

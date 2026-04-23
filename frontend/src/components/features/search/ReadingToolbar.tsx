@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { RefObject, Ref } from 'react';
 import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -9,7 +9,8 @@ export interface ReadingToolbarProps {
     versionInfo: ArticleData['versionInfo'];
     url?: string;
     articleText: string;
-    showNotes: boolean;
+    isNotesPeekOpen: boolean;
+    notesButtonRef?: Ref<HTMLButtonElement | null>;
     notesCount: number;
     highlightsCount: number;
     showHighlightPicker: boolean;
@@ -37,7 +38,8 @@ export function ReadingToolbar({
     versionInfo,
     url,
     articleText: _articleText,
-    showNotes,
+    isNotesPeekOpen,
+    notesButtonRef,
     notesCount,
     highlightsCount,
     showHighlightPicker,
@@ -150,17 +152,22 @@ export function ReadingToolbar({
                     <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
                 </button>
                 <button
+                    ref={notesButtonRef}
                     onClick={onToggleNotes}
+                    aria-expanded={isNotesPeekOpen}
+                    aria-haspopup="dialog"
                     className={cn("p-1.5 rounded-md transition-colors relative",
-                        showNotes || notesCount > 0
-                            ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400"
-                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500"
+                        isNotesPeekOpen
+                            ? "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
+                            : notesCount > 0
+                                ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-amber-500"
                     )}
-                    title="Note Personali"
+                    title={isNotesPeekOpen ? "Chiudi note" : "Apri note"}
                 >
                     <StickyNote size={16} />
                     {notesCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary-500 text-white text-[9px] rounded-full flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
                             {notesCount}
                         </span>
                     )}
