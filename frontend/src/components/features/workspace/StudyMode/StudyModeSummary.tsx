@@ -140,15 +140,18 @@ export function StudyModeSummary({
 
   return (
     <div className="space-y-3">
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-1.5 sticky top-0 z-10 py-1 -my-1">
+      {/* Filters — compact row: colour dots act as single-select toggles,
+          "Solo note" is an orthogonal filter on the other end. Short
+          labels only, so everything fits on one line at 320px drawer. */}
+      <div className="flex items-center gap-1 sticky top-0 z-10 py-1 -my-1">
         <button
           type="button"
           onClick={() => setColorFilter('all')}
           className={cn(
-            'px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide rounded-md border transition-colors',
+            'px-2 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-colors',
             colorFilter === 'all' ? styles.filterActive : styles.filterIdle,
           )}
+          title="Mostra tutti i colori"
         >
           Tutti
         </button>
@@ -156,31 +159,33 @@ export function StudyModeSummary({
           <button
             key={c}
             type="button"
-            onClick={() => setColorFilter(c)}
+            onClick={() => setColorFilter(colorFilter === c ? 'all' : c)}
             className={cn(
-              'flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide rounded-md border transition-colors',
-              colorFilter === c ? styles.filterActive : styles.filterIdle,
+              'flex items-center justify-center w-7 h-7 rounded-md border transition-all',
+              colorFilter === c
+                ? 'border-slate-800 dark:border-slate-100 ring-2 ring-slate-800/20 dark:ring-slate-100/30'
+                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600',
             )}
             title={`Solo highlight ${c}`}
           >
             <span
-              className="inline-block w-3 h-3 rounded-sm ring-1 ring-black/10 dark:ring-white/20"
+              className="block w-4 h-4 rounded-sm"
               style={{ backgroundColor: getHighlightSwatch(c) }}
             />
-            {c}
           </button>
         ))}
-        <div className="w-px h-4 bg-current opacity-20 mx-1" />
+        <div className="w-px h-5 bg-current opacity-20 mx-1" />
         <button
           type="button"
           onClick={() => setNotesOnly((v) => !v)}
           className={cn(
-            'flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide rounded-md border transition-colors',
+            'flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-colors',
             notesOnly ? styles.filterActive : styles.filterIdle,
           )}
+          title="Mostra solo note"
         >
-          <StickyNote size={11} />
-          Solo note
+          <StickyNote size={10} />
+          Note
         </button>
         {(colorFilter !== 'all' || notesOnly) && (
           <button
@@ -192,7 +197,7 @@ export function StudyModeSummary({
             className={cn('ml-auto p-1 rounded-md transition-colors', styles.muted, 'hover:bg-slate-100 dark:hover:bg-slate-700')}
             title="Azzera filtri"
           >
-            <X size={14} />
+            <X size={12} />
           </button>
         )}
       </div>
@@ -216,20 +221,28 @@ export function StudyModeSummary({
           >
             <div className="flex items-start gap-2">
               {item.kind === 'highlight' ? (
-                <Highlighter size={12} className="mt-0.5 shrink-0 opacity-70" />
+                <Highlighter size={12} className="mt-1 shrink-0 opacity-60" />
               ) : (
-                <StickyNote size={12} className="mt-0.5 shrink-0 opacity-70 text-amber-500" />
+                <StickyNote size={12} className="mt-1 shrink-0 text-amber-500" />
               )}
               <div className="flex-1 min-w-0">
+                {/* The anchor/highlighted text. `line-clamp` needs a block
+                    container, so we wrap a `<span>` (which can carry an
+                    inline highlight background that hugs the text across
+                    wraps) inside a truncating `<p>`. */}
                 {item.anchorText && (
-                  <p
-                    style={item.color ? parseInlineStyle(HIGHLIGHT_STYLES[item.color]) : undefined}
-                    className={cn(
-                      'inline-block rounded px-1 text-xs leading-snug line-clamp-3',
-                      !item.color && cn('italic text-amber-700 dark:text-amber-400 px-0'),
-                    )}
-                  >
-                    {item.anchorText}
+                  <p className="text-sm leading-snug line-clamp-3">
+                    <span
+                      style={item.color ? parseInlineStyle(HIGHLIGHT_STYLES[item.color]) : undefined}
+                      className={cn(
+                        'rounded-sm break-words',
+                        item.color
+                          ? 'px-1 py-0.5 box-decoration-clone'
+                          : 'italic text-amber-700 dark:text-amber-400',
+                      )}
+                    >
+                      {item.anchorText}
+                    </span>
                   </p>
                 )}
                 {item.noteText && (
@@ -238,7 +251,7 @@ export function StudyModeSummary({
                   </p>
                 )}
                 {item.createdAt && (
-                  <p className={cn('text-[10px] mt-1.5 opacity-60', styles.muted)}>
+                  <p className={cn('text-[10px] mt-1.5 opacity-60 tabular-nums', styles.muted)}>
                     {new Date(item.createdAt).toLocaleString()}
                   </p>
                 )}
