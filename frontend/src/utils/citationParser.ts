@@ -176,14 +176,16 @@ const ABBREVIATION_MAP: Record<string, string> = {
 const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.length - a.length);
 
 /**
- * Pattern per estrarre articoli con suffissi (bis, ter, etc.)
+ * Pattern per estrarre articoli con suffissi (bis, ter, ...) o range (es. "artt. 1-10").
+ * Group 1: numero di partenza. Group 2 (opzionale): numero finale del range.
+ * Group 3 (opzionale): suffisso numerico ordinale (bis/ter/...).
  */
-const ARTICLE_PATTERN = /\b(?:art\.?|articolo)\s*(\d+)\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?\b/i;
+const ARTICLE_PATTERN = /\b(?:artt?\.?|articol[oi])\s*(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?\b/i;
 
 /**
- * Pattern per numeri di articolo standalone (senza "art")
+ * Pattern per numeri di articolo standalone (senza "art"); supporta range.
  */
-const STANDALONE_NUMBER_PATTERN = /^(\d+)\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?$/i;
+const STANDALONE_NUMBER_PATTERN = /^(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?$/i;
 
 /**
  * Pattern per numero/anno (es. "241/1990", "679/2016")
@@ -267,10 +269,19 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
  * Estrae il numero dell'articolo dall'input
  */
 function extractArticle(input: string): { article: string | undefined; remaining: string } {
-  // Prima prova con "art" o "articolo"
   const match = input.match(ARTICLE_PATTERN);
   if (match) {
-    const article = match[2] ? `${match[1]}-${match[2]}` : match[1];
+    // Match groups: [1]=start number, [2]=end number (range), [3]=ordinal suffix.
+    // Range wins over suffix (rare to combine "1-10 bis").
+    const [, start, rangeEnd, suffix] = match;
+    let article: string;
+    if (rangeEnd) {
+      article = `${start}-${rangeEnd}`;
+    } else if (suffix) {
+      article = `${start}-${suffix}`;
+    } else {
+      article = start;
+    }
     const remaining = input.replace(ARTICLE_PATTERN, ' ').replace(/\s+/g, ' ').trim();
     return { article, remaining };
   }
@@ -334,10 +345,13 @@ function extractNumberAndYear(input: string): { actNumber: string | undefined; d
 function extractStandaloneArticle(input: string, hasActType: boolean): string | undefined {
   if (!hasActType) return undefined;
 
-  // Se l'input contiene solo numeri (eventualmente con bis/ter), è probabilmente un articolo
+  // Se l'input contiene solo numeri (eventualmente range o bis/ter), è probabilmente un articolo
   const match = input.match(STANDALONE_NUMBER_PATTERN);
   if (match) {
-    return match[2] ? `${match[1]}-${match[2]}` : match[1];
+    const [, start, rangeEnd, suffix] = match;
+    if (rangeEnd) return `${start}-${rangeEnd}`;
+    if (suffix) return `${start}-${suffix}`;
+    return start;
   }
   return undefined;
 }

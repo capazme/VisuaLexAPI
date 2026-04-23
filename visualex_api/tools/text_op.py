@@ -64,14 +64,25 @@ async def parse_article_input(article_string, normurn):
                 logging.info("Successfully retrieved article list from norm")
                 logging.debug(f"All articles retrieved: {all_articles}")
 
-                # Aggiungi tutti gli articoli nel range, inclusi quelli con estensioni
+                # Aggiungi tutti gli articoli nel range, inclusi quelli con estensioni.
+                # get_tree ora ritorna una lista mista di dict (articoli, con campo
+                # "numero") e stringhe (etichette di sezioni/allegati). Estraiamo il
+                # numero dal dict quando serve; stringhe non-articolo vengono saltate.
                 for article in all_articles:
-                    article_number_match = re.match(r'^(\d+)', article)
+                    if isinstance(article, dict):
+                        article_str = article.get('numero')
+                    elif isinstance(article, str):
+                        article_str = article
+                    else:
+                        continue
+                    if not article_str:
+                        continue
+                    article_number_match = re.match(r'^(\d+)', article_str)
                     if article_number_match:
                         article_num = int(article_number_match.group(1))
                         if start <= article_num <= end:
-                            logging.debug(f"Adding article from range: {article}")
-                            articles.append(article)
+                            logging.debug(f"Adding article from range: {article_str}")
+                            articles.append(article_str)
 
             except Exception as e:
                 error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"
