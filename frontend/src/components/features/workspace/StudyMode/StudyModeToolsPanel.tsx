@@ -115,11 +115,17 @@ export function StudyModeToolsPanel({
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
+          style={{ touchAction: 'pan-y' }}
           className={cn(
             // Base styles
             "absolute z-10 flex flex-col shadow-xl",
-            // Mobile: bottom sheet style
-            "inset-x-0 bottom-0 top-auto h-[60vh] rounded-t-xl border-t",
+            // Mobile: bottom sheet style. `overscroll-contain` stops the
+            // content scroll from bubbling up to the article body (rubber
+            // banding past the top of the notes list was pulling the
+            // article under the sheet); `touch-action: pan-y` on the
+            // inline style keeps touch panning handled by the sheet
+            // itself.
+            "inset-x-0 bottom-0 top-auto h-[60vh] rounded-t-xl border-t overscroll-contain",
             // Desktop: side panel style
             "sm:left-0 sm:top-0 sm:bottom-0 sm:right-auto sm:h-auto sm:w-80 sm:rounded-none sm:border-t-0 sm:border-r",
             styles.bg,
