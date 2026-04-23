@@ -11,6 +11,7 @@ import { bookmarkService } from '../services/bookmarkService';
 import { dossierService, type DossierApi } from '../services/dossierService';
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
+import { isAuthenticated } from '../services/authService';
 import {
     annotationApiToStore,
     annotationStoreToCreate,
@@ -1262,6 +1263,10 @@ const appStore = createStore<AppState>()(
             },
 
             loadAnnotationsForArticle: async (normaKey, articleId) => {
+                // Notes sync is auth-gated. Without a token the call would
+                // always 401 and only burn rate-limit points — skip it and
+                // let the local/optimistic entries stand in.
+                if (!isAuthenticated()) return;
                 const cacheKey = `${normaKey}::${articleId}`;
                 if (get().loadedAnnotationKeys[cacheKey]) return;
                 // Mark BEFORE awaiting so concurrent mounts (StrictMode, rapid
@@ -1347,6 +1352,7 @@ const appStore = createStore<AppState>()(
             },
 
             loadHighlightsForArticle: async (normaKey, articleId) => {
+                if (!isAuthenticated()) return;
                 const cacheKey = `${normaKey}::${articleId}`;
                 if (get().loadedHighlightKeys[cacheKey]) return;
                 set((state) => { state.loadedHighlightKeys[cacheKey] = true; });
