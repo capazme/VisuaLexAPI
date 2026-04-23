@@ -142,7 +142,7 @@ interface AppState {
     // Workspace Tab Actions
     addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
     addNormaToTab: (tabId: string, norma: any, articles: ArticleData[]) => void;
-    setActiveArticleInBlock: (tabId: string, normaBlockId: string, articleId: string) => void;
+    focusArticleInTab: (tabId: string, articleId: string) => void;
     consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
     addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: any) => void;
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
@@ -597,12 +597,20 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
-            setActiveArticleInBlock: (tabId, normaBlockId, articleId) => set((state) => {
+            focusArticleInTab: (tabId, articleId) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
-                const block = tab.content.find(
-                    c => c.type === 'norma' && c.id === normaBlockId
-                ) as NormaBlock | undefined;
+                // Find the NormaBlock that actually contains this article so
+                // callers don't need to track normaBlockId themselves.
+                const block = tab.content.find(c => {
+                    if (c.type !== 'norma') return false;
+                    return c.articles.some(a => {
+                        const uid = a.norma_data.allegato
+                            ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
+                            : a.norma_data.numero_articolo;
+                        return uid === articleId;
+                    });
+                }) as NormaBlock | undefined;
                 if (!block) return;
                 block.autoFocusArticleId = articleId;
                 // Surface the tab if it was minimized/hidden so the focus signal

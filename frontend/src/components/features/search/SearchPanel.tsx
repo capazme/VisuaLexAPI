@@ -57,6 +57,7 @@ export function SearchPanel() {
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
     addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma, removeTab,
+    focusArticleInTab,
     searchTrigger, clearSearchTrigger,
     quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
@@ -70,6 +71,12 @@ export function SearchPanel() {
 
   // Track active streaming tab to avoid creating duplicates
   const streamingTabRef = useRef<{ normaKey: string; tabId: string } | null>(null);
+
+  // R2 (streaming-ux): how many articles the current search is expected to
+  // produce. When it's exactly 1, processResult auto-focuses the single
+  // result (even when merged into an existing tab via R3). Above 1 we
+  // stay out of the way per R1.
+  const expectedTotalRef = useRef<number>(0);
 
   // Abort in-flight streaming fetch when a new search starts or component unmounts
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -167,6 +174,16 @@ export function SearchPanel() {
           streamingTabRef.current = { normaKey: key, tabId: newTabId };
           setCustomTabLabel(null); // Clear after first use
         }
+
+        // R2 (streaming-ux): single-article searches auto-focus the result
+        // even when merged into a pre-existing tab (R3). For ranges we let
+        // the user stay on whatever they're reading (R1).
+        if (expectedTotalRef.current === 1 && streamingTabRef.current) {
+          const numero = result.norma_data.numero_articolo;
+          const allegato = result.norma_data.allegato;
+          const articleUniqueId = allegato ? `all${allegato}:${numero}` : numero;
+          focusArticleInTab(streamingTabRef.current.tabId, articleUniqueId);
+        }
       }
     } else {
       // Buffer results for batch processing
@@ -194,7 +211,7 @@ export function SearchPanel() {
         };
       });
     }
-  }, [workspaceTabs, addNormaToTab, addWorkspaceTab, customTabLabel]);
+  }, [workspaceTabs, addNormaToTab, addWorkspaceTab, customTabLabel, focusArticleInTab]);
 
   const handleSearch = useCallback(async (params: SearchParams) => {
     console.log('🔍 SearchPanel handleSearch called with:', params);
@@ -211,6 +228,7 @@ export function SearchPanel() {
     streamingTabRef.current = null; // Reset streaming tab tracker
 
     const expectedTotal = calculateExpectedArticles(params.article || '');
+    expectedTotalRef.current = expectedTotal;
     setLoadingProgress({ loaded: 0, total: expectedTotal });
     // Skeleton count: at least 1, at most 10, mirrors the expected article
     // count (M-4). Avoids a fixed 2-card skeleton for ranges like "1-50".
