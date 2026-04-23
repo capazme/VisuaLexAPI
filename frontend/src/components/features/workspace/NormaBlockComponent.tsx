@@ -192,7 +192,7 @@ export function NormaBlockComponent({
       )}
     >
       {/* Norma Header */}
-      <div className="norma-block-header flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-primary-50 to-white dark:from-primary-950/40 dark:to-slate-900/40 border-b border-primary-100 dark:border-primary-900/50">
+      <div className="norma-block-header flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-primary-50 to-white dark:from-primary-950/40 dark:to-slate-900/40">
         <div className="flex items-center gap-2 min-w-0">
           {/* Drag handle */}
           <div
