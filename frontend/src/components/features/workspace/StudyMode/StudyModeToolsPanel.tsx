@@ -307,16 +307,13 @@ export function StudyModeToolsPanel({
                     return (
                       <div
                         key={h.id}
-                        className={cn("group relative p-3 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700", styles.card)}
+                        className={cn("group relative p-2.5 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700", styles.card)}
                       >
-                        <div
+                        <p
                           style={colorStyle}
-                          className="inline-block px-2 py-1 rounded text-xs font-medium mb-1.5"
+                          className="inline rounded px-1 py-0.5 text-sm leading-snug break-words pr-6"
                         >
-                          {h.color.charAt(0).toUpperCase() + h.color.slice(1)}
-                        </div>
-                        <p className={cn("text-sm line-clamp-3 leading-relaxed", styles.text)}>
-                          "{h.text}"
+                          {h.text}
                         </p>
                         <button
                           onClick={() => onRemoveHighlight(h.id)}
