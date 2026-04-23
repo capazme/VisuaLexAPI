@@ -14,7 +14,7 @@ import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { formatDateItalianLong, abbreviateActType } from '../../../utils/dateUtils';
-import { getUniqueArticleId, filterLoadedIdsForAnnex } from '../../../utils/articleIds';
+import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
 interface NormaBlockComponentProps {
   tabId: string;
@@ -56,22 +56,30 @@ export function NormaBlockComponent({
   });
 
   // Single entry point for changing the focused article: updates active +
-  // viewed atomically so we never drift.
+  // viewed atomically so we never drift. The incoming uniqueId may be
+  // non-canonical (e.g. "1-bis" from the tree while the article stores
+  // "1 bis"); we canonicalize against the loaded list before writing to
+  // state so that viewedArticleIds and the chip comparisons line up.
   const focusArticle = useCallback((uniqueId: string) => {
-    setActiveArticleId(uniqueId);
-    setViewedArticleIds(prev => prev.has(uniqueId) ? prev : new Set(prev).add(uniqueId));
-  }, []);
+    const match = findArticleByNormalizedId(normaBlock.articles, uniqueId);
+    const canonical = match ? getUniqueArticleId(match) : uniqueId;
+    setActiveArticleId(canonical);
+    setViewedArticleIds(prev => prev.has(canonical) ? prev : new Set(prev).add(canonical));
+  }, [normaBlock.articles]);
 
   // R1 (streaming-ux): don't steal focus when new articles stream in.
-  // Derived during render: if the stored activeArticleId is stale (article
-  // removed) or null (empty list populated later), fall back to the first
-  // loaded article. Explicit focus changes come through autoFocusArticleId (R2).
-  const effectiveActiveId =
-    activeArticleId && normaBlock.articles.some(a => getUniqueArticleId(a) === activeArticleId)
-      ? activeArticleId
-      : normaBlock.articles[0]
-        ? getUniqueArticleId(normaBlock.articles[0])
-        : null;
+  // Resolve the active article tolerantly (see focusArticle for why), then
+  // fall back to the first loaded article when the stored id is stale or
+  // null. effectiveActiveId exposes the canonical uniqueId so strict ===
+  // comparisons below align. Explicit focus changes come through R2.
+  const resolvedActive = activeArticleId
+    ? findArticleByNormalizedId(normaBlock.articles, activeArticleId)
+    : undefined;
+  const effectiveActiveId = resolvedActive
+    ? getUniqueArticleId(resolvedActive)
+    : normaBlock.articles[0]
+      ? getUniqueArticleId(normaBlock.articles[0])
+      : null;
 
   // R2 (streaming-ux): consume one-shot focus signal from the store. Used
   // when a single-article search merges into this block — we deliberately
@@ -90,10 +98,8 @@ export function NormaBlockComponent({
     consumeAutoFocusArticle(tabId, normaBlock.id);
   }, [normaBlock.autoFocusArticleId, normaBlock.articles, normaBlock.id, tabId, consumeAutoFocusArticle, focusArticle]);
 
-  // Derive active article from effectiveActiveId (needed before hook for correct annex detection)
-  const activeArticle = normaBlock.articles.find(
-    a => getUniqueArticleId(a) === effectiveActiveId
-  );
+  // Active article: resolved tolerantly above, with fallback to first loaded.
+  const activeArticle = resolvedActive ?? normaBlock.articles[0];
 
   // Stable local reference so TypeScript can narrow the value inside the
   // button onClick closures below, and so the JSX reads cleaner.

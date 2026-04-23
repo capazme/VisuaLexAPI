@@ -1,4 +1,5 @@
 import type { ArticleData } from '../types';
+import { normalizeArticleId } from './treeUtils';
 
 /**
  * Build the per-article unique identifier used throughout the app to
@@ -24,4 +25,19 @@ export function filterLoadedIdsForAnnex(
   return loadedIds
     .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
     .map(id => id.includes(':') ? id.split(':').pop()! : id);
+}
+
+/**
+ * Look up an article by (possibly non-canonical) uniqueId, matching on the
+ * normalized form so "1-bis" / "1 bis" / "1BIS" all resolve to the same
+ * article. Needed because the tree API and the scraper can disagree on
+ * suffix formatting (dash vs space) for -bis/-ter/-quater variants.
+ */
+export function findArticleByNormalizedId(
+  articles: readonly ArticleData[],
+  id: string,
+): ArticleData | undefined {
+  if (!id) return undefined;
+  const normalized = normalizeArticleId(id);
+  return articles.find(a => normalizeArticleId(getUniqueArticleId(a)) === normalized);
 }

@@ -12,7 +12,7 @@ import { ArticleMinimap } from '../workspace/ArticleMinimap';
 import { StudyMode } from '../workspace/StudyMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
-import { getUniqueArticleId, filterLoadedIdsForAnnex } from '../../../utils/articleIds';
+import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
 interface NormaCardProps {
   norma: Norma;
@@ -42,17 +42,16 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     articles[0] ? getUniqueArticleId(articles[0]) : null
   );
 
-  // Effective tab: falls back to the first article when the stored activeTabId
-  // is stale (tab closed) or null (empty list populated later). Derived during
-  // render to avoid a cascading useEffect + setState.
-  const effectiveTabId =
-    activeTabId && articles.some(a => getUniqueArticleId(a) === activeTabId)
-      ? activeTabId
-      : articles[0]
-        ? getUniqueArticleId(articles[0])
-        : null;
-
-  const activeArticle = articles.find(a => getUniqueArticleId(a) === effectiveTabId) || null;
+  // Resolve the active article tolerantly: activeTabId may carry "1-bis"
+  // (format from the tree API) while the loaded article stores "1 bis"
+  // (or vice versa), so we match on normalized IDs. effectiveTabId is then
+  // the article's canonical uniqueId, so strict === comparisons later in
+  // the render (tab chips, motion key) all align.
+  const activeArticle = (activeTabId
+    ? findArticleByNormalizedId(articles, activeTabId) ?? null
+    : null
+  ) || articles[0] || null;
+  const effectiveTabId = activeArticle ? getUniqueArticleId(activeArticle) : null;
 
   // Use the shared annex navigation hook - pass activeArticle for correct annex detection
   const {
