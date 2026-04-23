@@ -134,6 +134,12 @@ interface AppState {
 
     // Actions
     updateSettings: (settings: Partial<AppSettings>) => void;
+    /**
+     * Partial update for the nested studyMode slice. Use this instead of
+     * `updateSettings({ studyMode: {...} })` — that would replace the
+     * whole sub-object and drop the keys not included in the patch.
+     */
+    updateStudyModeSettings: (patch: Partial<AppSettings['studyMode']>) => void;
 
     // Data Sync Actions (API)
     fetchUserData: () => Promise<void>;
@@ -252,6 +258,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     fontFamily: 'sans',
     focusMode: false,
     splitView: false,
+    studyMode: {
+        fontSize: 18,
+        lineHeight: 1.8,
+        theme: 'light',
+    },
 };
 
 // Helper to generate consistent keys for bookmarks
@@ -311,6 +322,10 @@ const appStore = createStore<AppState>()(
 
             updateSettings: (newSettings) => set((state) => {
                 state.settings = { ...state.settings, ...newSettings };
+            }),
+
+            updateStudyModeSettings: (patch) => set((state) => {
+                state.settings.studyMode = { ...state.settings.studyMode, ...patch };
             }),
 
             // Data Sync Actions
@@ -1854,6 +1869,25 @@ const appStore = createStore<AppState>()(
                 // Note: We intentionally exclude bookmarks, dossiers, annotations, highlights,
                 // quickNorms, environments - these are synced from the server
             }),
+            // Rehydrated state from older versions may not have the
+            // `studyMode` slice we just added. Splice in defaults here so
+            // components can safely read `settings.studyMode.*` without
+            // null-guarding everywhere.
+            merge: (persisted, current) => {
+                const p = (persisted ?? {}) as Partial<AppState>;
+                return {
+                    ...current,
+                    ...p,
+                    settings: {
+                        ...DEFAULT_SETTINGS,
+                        ...(p.settings ?? {}),
+                        studyMode: {
+                            ...DEFAULT_SETTINGS.studyMode,
+                            ...(p.settings?.studyMode ?? {}),
+                        },
+                    },
+                };
+            },
         }
     )
 );

@@ -95,10 +95,27 @@ export function StudyMode({
   // Generate norma label if not provided
   const normaLabel = normaLabelProp ?? `${article.norma_data.tipo_atto}${article.norma_data.numero_atto ? ` ${article.norma_data.numero_atto}` : ''}`;
 
-  // Typography state
-  const [fontSize, setFontSize] = useState(18);
-  const [lineHeight, setLineHeight] = useState(1.8);
-  const [theme, setTheme] = useState<StudyModeTheme>('light');
+  // Typography state — persisted via the studyMode slice in AppSettings,
+  // so font size / line height / theme survive reopening Study Mode and
+  // page reloads. Setters write back through the dedicated store action.
+  const studyModeSettings = useAppStore(s => s.settings.studyMode);
+  const updateStudyModeSettings = useAppStore(s => s.updateStudyModeSettings);
+  const { fontSize, lineHeight, theme } = studyModeSettings;
+  const setFontSize = useCallback(
+    (next: number | ((prev: number) => number)) => {
+      const value = typeof next === 'function' ? next(studyModeSettings.fontSize) : next;
+      updateStudyModeSettings({ fontSize: value });
+    },
+    [studyModeSettings.fontSize, updateStudyModeSettings],
+  );
+  const setLineHeight = useCallback(
+    (next: number) => updateStudyModeSettings({ lineHeight: next }),
+    [updateStudyModeSettings],
+  );
+  const setTheme = useCallback(
+    (next: StudyModeTheme) => updateStudyModeSettings({ theme: next }),
+    [updateStudyModeSettings],
+  );
 
   // Window state - detect mobile for initial fullscreen
   const [isMobile, setIsMobile] = useState(() =>

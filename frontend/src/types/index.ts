@@ -166,6 +166,17 @@ export interface AppSettings {
     fontFamily: 'sans' | 'serif' | 'mono';
     focusMode: boolean;
     splitView: boolean;
+    /**
+     * Study Mode reading preferences, persisted across sessions. Without
+     * this slice the user had to re-pick the font size, line height, and
+     * theme every time they reopened Study Mode — the values live in
+     * Zustand state that gets rehydrated by the persist middleware.
+     */
+    studyMode: {
+        fontSize: number;      // px, clamped 14–32 in the UI
+        lineHeight: number;    // unitless, clamped 1.4–2.4 in the UI
+        theme: 'light' | 'dark' | 'sepia';
+    };
 }
 
 export interface Annotation {
