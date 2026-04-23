@@ -14,6 +14,7 @@ import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { formatDateItalianLong, abbreviateActType } from '../../../utils/dateUtils';
+import { getUniqueArticleId, filterLoadedIdsForAnnex } from '../../../utils/articleIds';
 
 interface NormaBlockComponentProps {
   tabId: string;
@@ -41,15 +42,8 @@ export function NormaBlockComponent({
   })));
   const [studyModeOpen, setStudyModeOpen] = useState(false);
 
-  // Helper to get a unique identifier for an article (includes allegato to avoid collisions)
-  const getUniqueId = (article: ArticleData) => {
-    const allegato = article.norma_data.allegato;
-    const numero = article.norma_data.numero_articolo;
-    return allegato ? `all${allegato}:${numero}` : numero;
-  };
-
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
-    normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null
+    normaBlock.articles[0] ? getUniqueArticleId(normaBlock.articles[0]) : null
   );
 
   // Articles the user has actually opened in this block. Every chip that
@@ -57,7 +51,7 @@ export function NormaBlockComponent({
   // as "non visualizzato" until clicked. Maintained together with
   // activeArticleId via focusArticle() so no effect is needed.
   const [viewedArticleIds, setViewedArticleIds] = useState<Set<string>>(() => {
-    const first = normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null;
+    const first = normaBlock.articles[0] ? getUniqueArticleId(normaBlock.articles[0]) : null;
     return new Set(first ? [first] : []);
   });
 
@@ -73,10 +67,10 @@ export function NormaBlockComponent({
   // removed) or null (empty list populated later), fall back to the first
   // loaded article. Explicit focus changes come through autoFocusArticleId (R2).
   const effectiveActiveId =
-    activeArticleId && normaBlock.articles.some(a => getUniqueId(a) === activeArticleId)
+    activeArticleId && normaBlock.articles.some(a => getUniqueArticleId(a) === activeArticleId)
       ? activeArticleId
       : normaBlock.articles[0]
-        ? getUniqueId(normaBlock.articles[0])
+        ? getUniqueArticleId(normaBlock.articles[0])
         : null;
 
   // R2 (streaming-ux): consume one-shot focus signal from the store. Used
@@ -88,7 +82,7 @@ export function NormaBlockComponent({
     const target = normaBlock.autoFocusArticleId;
     if (!target) return;
 
-    const exists = normaBlock.articles.some(a => getUniqueId(a) === target);
+    const exists = normaBlock.articles.some(a => getUniqueArticleId(a) === target);
     if (exists) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot sync with external store signal
       focusArticle(target);
@@ -98,7 +92,7 @@ export function NormaBlockComponent({
 
   // Derive active article from effectiveActiveId (needed before hook for correct annex detection)
   const activeArticle = normaBlock.articles.find(
-    a => getUniqueId(a) === effectiveActiveId
+    a => getUniqueArticleId(a) === effectiveActiveId
   );
 
   // Stable local reference so TypeScript can narrow the value inside the
@@ -380,10 +374,7 @@ export function NormaBlockComponent({
               {((allArticleIds && allArticleIds.length > 1) || normaBlock.articles.length > 1) && (
                 <ArticleNavigation
                   allArticleIds={allArticleIds}
-                  loadedArticleIds={loadedArticleIds
-                    .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
-                    .map(id => id.includes(':') ? id.split(':').pop()! : id)
-                  }
+                  loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
                   activeArticleId={activeArticle?.norma_data.numero_articolo || null}
                   loadingArticleId={loadingArticle}
                   onNavigate={(number) => {
@@ -398,7 +389,7 @@ export function NormaBlockComponent({
 
           <div className="md:hidden bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
             {normaBlock.articles.map((article, idx) => {
-              const uniqueId = getUniqueId(article);
+              const uniqueId = getUniqueArticleId(article);
               return (
                 <div key={uniqueId || `idx-${idx}`} className="p-4">
                   {/* Article header with close button */}
@@ -431,7 +422,7 @@ export function NormaBlockComponent({
 
           <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 gap-2 overflow-x-auto overflow-y-hidden custom-scrollbar items-end">
             {normaBlock.articles.map((article, idx) => {
-              const uniqueId = getUniqueId(article);
+              const uniqueId = getUniqueArticleId(article);
               const isActive = uniqueId === effectiveActiveId;
               const isUnread = !isActive && !viewedArticleIds.has(uniqueId);
 

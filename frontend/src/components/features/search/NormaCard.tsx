@@ -12,6 +12,7 @@ import { ArticleMinimap } from '../workspace/ArticleMinimap';
 import { StudyMode } from '../workspace/StudyMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
+import { getUniqueArticleId, filterLoadedIdsForAnnex } from '../../../utils/articleIds';
 
 interface NormaCardProps {
   norma: Norma;
@@ -33,32 +34,25 @@ interface NormaCardProps {
   streamProgress?: { loaded: number; total?: number } | null;
 }
 
-// Helper to generate unique article ID
-const getUniqueId = (article: ArticleData) => {
-  return article.norma_data.allegato
-    ? `all${article.norma_data.allegato}:${article.norma_data.numero_articolo}`
-    : article.norma_data.numero_articolo;
-};
-
 export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId, isStreaming, streamProgress }: NormaCardProps) {
   // Local UI state - defined first so we can derive activeArticle
   const [isOpen, setIsOpen] = useState(true);
   // Initialize with unique ID of the first article
   const [activeTabId, setActiveTabId] = useState<string | null>(
-    articles[0] ? getUniqueId(articles[0]) : null
+    articles[0] ? getUniqueArticleId(articles[0]) : null
   );
 
   // Effective tab: falls back to the first article when the stored activeTabId
   // is stale (tab closed) or null (empty list populated later). Derived during
   // render to avoid a cascading useEffect + setState.
   const effectiveTabId =
-    activeTabId && articles.some(a => getUniqueId(a) === activeTabId)
+    activeTabId && articles.some(a => getUniqueArticleId(a) === activeTabId)
       ? activeTabId
       : articles[0]
-        ? getUniqueId(articles[0])
+        ? getUniqueArticleId(articles[0])
         : null;
 
-  const activeArticle = articles.find(a => getUniqueId(a) === effectiveTabId) || null;
+  const activeArticle = articles.find(a => getUniqueArticleId(a) === effectiveTabId) || null;
 
   // Use the shared annex navigation hook - pass activeArticle for correct annex detection
   const {
@@ -88,7 +82,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
   // Mobile: track which articles are expanded (using unique IDs)
   const [expandedArticles, setExpandedArticles] = useState<Set<string>>(() => {
     const first = articles[0];
-    return first ? new Set([getUniqueId(first)]) : new Set();
+    return first ? new Set([getUniqueArticleId(first)]) : new Set();
   });
 
   // Study Mode state
@@ -462,10 +456,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               {/* Navigation Bar - Filtered for current context */}
               <ArticleNavigation
                 allArticleIds={allArticleIds}
-                loadedArticleIds={loadedArticleIds
-                  .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
-                  .map(id => id.includes(':') ? id.split(':').pop()! : id)
-                }
+                loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
                 activeArticleId={activeArticle?.norma_data.numero_articolo || null}
                 loadingArticleId={loadingArticle}
                 onNavigate={(number) => {
@@ -476,10 +467,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                 onLoadArticle={handleLoadArticleWithNavigation}
               />
               <ArticleMinimap
-                loadedArticleIds={loadedArticleIds
-                  .filter(id => currentAnnex ? id.startsWith(`all${currentAnnex}:`) : !id.includes(':'))
-                  .map(id => id.includes(':') ? id.split(':').pop()! : id)
-                }
+                loadedArticleIds={filterLoadedIdsForAnnex(loadedArticleIds, currentAnnex)}
                 activeArticleId={activeArticle?.norma_data.numero_articolo || null}
                 onArticleClick={handleLoadArticleWithNavigation}
                 className="max-w-[400px]"
@@ -680,7 +668,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
             normaLabel={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''}`}
             onNavigate={(articleNumber) => {
               const uniqueId = currentAnnex ? `all${currentAnnex}:${articleNumber}` : articleNumber;
-              const target = articles.find(a => getUniqueId(a) === uniqueId);
+              const target = articles.find(a => getUniqueArticleId(a) === uniqueId);
               if (target) {
                 setActiveTabId(uniqueId);
                 setStudyModeArticle(target);

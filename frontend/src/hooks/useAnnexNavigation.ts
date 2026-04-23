@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { extractArticleIdsFromTree, normalizeArticleId } from '../utils/treeUtils';
+import { getUniqueArticleId } from '../utils/articleIds';
 import type { Norma, ArticleData, TreeMetadata } from '../types';
 
 interface UseAnnexNavigationProps {
@@ -69,15 +70,11 @@ export function useAnnexNavigation({
     ?? articles[0]?.norma_data?.allegato
     ?? null;
 
-  // Loaded article IDs (just the article numbers)
-  // Loaded article IDs (unique identifiers)
-  // We use unique IDs to distinguish between "Art 1" (Main) and "Art 1" (Annex 2)
+  // Loaded article unique identifiers — distinguishes between "Art 1"
+  // (main body) and "Art 1" (annex 2). Shared helper keeps the encoding
+  // consistent with the components consuming this hook.
   const loadedArticleIds = useMemo(
-    () => articles.map(a =>
-      a.norma_data.allegato
-        ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-        : a.norma_data.numero_articolo
-    ),
+    () => articles.map(getUniqueArticleId),
     [articles]
   );
 
