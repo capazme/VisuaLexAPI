@@ -431,6 +431,7 @@ export function StudyMode({
             lineHeight={lineHeight}
             theme={theme}
             highlights={articleHighlights}
+            annotations={articleAnnotations}
             normaKey={normaKey}
             footnotes={article.brocardi_info?.Footnotes ?? []}
             onAddHighlight={addHighlight}

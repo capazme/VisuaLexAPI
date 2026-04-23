@@ -4,6 +4,7 @@ import { Pin, PinOff, StickyNote, Highlighter, X, Send } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { Annotation, Highlight } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
+import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../../utils/highlightColors';
 
 interface StudyModeToolsPanelProps {
   visible: boolean;
@@ -24,13 +25,6 @@ interface StudyModeToolsPanelProps {
 }
 
 type Tab = 'notes' | 'highlights';
-
-const HIGHLIGHT_COLORS: Record<string, { bg: string; text: string }> = {
-  yellow: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-  green: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
-  red: { bg: 'bg-red-100', text: 'text-red-800' },
-  blue: { bg: 'bg-blue-100', text: 'text-blue-800' },
-};
 
 const THEME_PANEL_STYLES: Record<StudyModeTheme, {
   bg: string;
@@ -230,17 +224,16 @@ export function StudyModeToolsPanel({
                   </div>
                 ) : (
                   highlights.map(h => {
-                    const colorStyle = HIGHLIGHT_COLORS[h.color] || HIGHLIGHT_COLORS.yellow;
+                    const colorStyle = parseInlineStyle(HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow);
                     return (
                       <div
                         key={h.id}
                         className={cn("group relative p-3 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700", styles.card)}
                       >
-                        <div className={cn(
-                          "inline-block px-2 py-1 rounded text-xs font-medium mb-1.5",
-                          colorStyle.bg,
-                          colorStyle.text
-                        )}>
+                        <div
+                          style={colorStyle}
+                          className="inline-block px-2 py-1 rounded text-xs font-medium mb-1.5"
+                        >
                           {h.color.charAt(0).toUpperCase() + h.color.slice(1)}
                         </div>
                         <p className={cn("text-sm line-clamp-3 leading-relaxed", styles.text)}>

@@ -5,9 +5,9 @@ import { SelectionPopup } from '../../search/SelectionPopup';
 import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
 import { extractArticleRefs } from '../../../../utils/citationParser';
-import type { ArticleData, NormaVisitata, Highlight, Footnote } from '../../../../types';
+import type { ArticleData, NormaVisitata, Highlight, Annotation, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
-import { HIGHLIGHT_STYLES } from '../../../../utils/highlightColors';
+import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
 
 interface StudyModeContentProps {
   article: ArticleData;
@@ -15,9 +15,17 @@ interface StudyModeContentProps {
   lineHeight: number;
   theme: StudyModeTheme;
   highlights: Highlight[];
+  annotations: Annotation[];
   normaKey: string;
   footnotes?: Footnote[];
-  onAddHighlight: (normaKey: string, articleId: string, text: string, range: string, color: 'yellow' | 'green' | 'red' | 'blue') => void;
+  onAddHighlight: (
+    normaKey: string,
+    articleId: string,
+    text: string,
+    range: string,
+    color: 'yellow' | 'green' | 'red' | 'blue',
+    startOffset: number,
+  ) => void;
   onCrossReferenceNavigate?: (articleNumber: string, normaData: NormaVisitata) => void;
 }
 
@@ -39,6 +47,7 @@ export function StudyModeContent({
   lineHeight,
   theme,
   highlights,
+  annotations,
   normaKey,
   footnotes,
   onAddHighlight,
@@ -68,27 +77,24 @@ export function StudyModeContent({
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Process content with highlights
+  // Shared marker pipeline: pins highlights to specific occurrences via
+  // startOffset, renders note-anchor spans for annotations, and handles
+  // adjacent/nested boundaries correctly. Same hook the main article flow
+  // uses — Study Mode no longer has its own divergent renderer.
+  const markedHtml = useArticleMarkers({
+    rawText: article_text || '',
+    highlights,
+    annotations,
+  });
+
+  // Cross-references are Study-Mode-specific: simple `art. N` → button wrap.
+  // Applied after marker insertion so highlights/note anchors don't get
+  // mangled by the cross-reference regex.
   const processedContent = useMemo(() => {
-    let html = article_text?.replace(/\n/g, '<br />') || '';
-
-    // Apply highlights (longest first to avoid partial matches)
-    const sortedHighlights = [...highlights].sort((a, b) => b.text.length - a.text.length);
-    sortedHighlights.forEach(h => {
-      const escaped = h.text.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
-      html = html.replace(regex, (match) => {
-        return `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark rounded px-0.5">${match}</mark>`;
-      });
-    });
-
-    // Apply cross-references
-    html = html.replace(/art\.?\s+(\d+)/gi, (_match, p1) => {
+    return markedHtml.replace(/art\.?\s+(\d+)/gi, (_match, p1) => {
       return `<button type="button" class="cross-reference text-primary-600 dark:text-primary-400 hover:underline cursor-pointer font-medium" data-article="${p1}">art. ${p1}</button>`;
     });
-
-    return html;
-  }, [article_text, highlights]);
+  }, [markedHtml]);
 
   // Handle cross-reference clicks
   useEffect(() => {
@@ -133,13 +139,16 @@ export function StudyModeContent({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeFootnote]);
 
-  // Handle highlight from selection popup
-  const handleHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue') => {
+  // Handle highlight from selection popup. SelectionPopup supplies the
+  // plain-text startOffset of the selection — pass it through so the
+  // highlight pins to *this* occurrence (not every copy of the string)
+  // and persists server-side (highlightStoreToCreate requires offset).
+  const handleHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
     const alreadyHighlighted = highlights.some(h =>
-      h.text.toLowerCase() === text.toLowerCase()
+      h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
     );
     if (!alreadyHighlighted) {
-      onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color);
+      onAddHighlight(normaKey, norma_data.numero_articolo, text, '', color, startOffset);
     }
   };
 
