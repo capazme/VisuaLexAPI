@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pin, PinOff, StickyNote, Highlighter, X, Send } from 'lucide-react';
+import { Pin, PinOff, StickyNote, Highlighter, X, Send, ListTree } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { Annotation, Highlight } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../../utils/highlightColors';
+import { StudyModeSummary } from './StudyModeSummary';
 
 interface StudyModeToolsPanelProps {
   visible: boolean;
@@ -37,7 +38,7 @@ interface StudyModeToolsPanelProps {
   theme: StudyModeTheme;
 }
 
-type Tab = 'notes' | 'highlights';
+type Tab = 'summary' | 'notes' | 'highlights';
 
 const THEME_PANEL_STYLES: Record<StudyModeTheme, {
   bg: string;
@@ -100,10 +101,32 @@ export function StudyModeToolsPanel({
   onClearNoteAnchor,
   theme
 }: StudyModeToolsPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('notes');
+  const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [noteText, setNoteText] = useState('');
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const styles = THEME_PANEL_STYLES[theme];
+
+  // Summary → article-body navigation: find the marker in the DOM
+  // (`[data-highlight=id]` for highlights, `[data-note-id=id]` for note
+  // anchors — both emitted by useArticleMarkers) and scroll it into
+  // view with a brief flash to orient the user. Scoped to the Study
+  // Mode body element — the main article view mounts a DOM twin of
+  // the same markers behind the backdrop, and an un-scoped query
+  // would scroll that hidden copy instead.
+  const handleSummaryNavigate = (kind: 'highlight' | 'note', id: string) => {
+    const root = document.getElementById('study-mode-article-body');
+    if (!root) return;
+    const selector = kind === 'highlight'
+      ? `[data-highlight="${CSS.escape(id)}"]`
+      : `[data-note-id="${CSS.escape(id)}"]`;
+    const el = root.querySelector(selector) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ring-2', 'ring-primary-500/70', 'ring-offset-2', 'transition');
+    setTimeout(() => {
+      el.classList.remove('ring-2', 'ring-primary-500/70', 'ring-offset-2', 'transition');
+    }, 1200);
+  };
 
   // Focus note input when requested
   useEffect(() => {
@@ -172,16 +195,32 @@ export function StudyModeToolsPanel({
           {/* Tabs */}
           <div className={cn("flex border-b", styles.border)}>
             <button
+              onClick={() => setActiveTab('summary')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
+                activeTab === 'summary' ? styles.tabActive : cn(styles.tab, 'border-transparent')
+              )}
+              title="Riepilogo: note ed evidenziazioni in ordine di lettura"
+            >
+              <ListTree size={16} />
+              Riepilogo
+              {(annotations.length + highlights.length) > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.5 text-xs bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded-full">
+                  {annotations.length + highlights.length}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('notes')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 activeTab === 'notes' ? styles.tabActive : cn(styles.tab, 'border-transparent')
               )}
             >
               <StickyNote size={16} />
               Note
               {annotations.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300 rounded-full">
+                <span className="ml-0.5 px-1.5 py-0.5 text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300 rounded-full">
                   {annotations.length}
                 </span>
               )}
@@ -189,14 +228,14 @@ export function StudyModeToolsPanel({
             <button
               onClick={() => setActiveTab('highlights')}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
                 activeTab === 'highlights' ? styles.tabActive : cn(styles.tab, 'border-transparent')
               )}
             >
               <Highlighter size={16} />
-              Evidenziazioni
+              Evidenz.
               {highlights.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-full">
+                <span className="ml-0.5 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-full">
                   {highlights.length}
                 </span>
               )}
@@ -205,7 +244,14 @@ export function StudyModeToolsPanel({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-            {activeTab === 'notes' ? (
+            {activeTab === 'summary' ? (
+              <StudyModeSummary
+                highlights={highlights}
+                annotations={annotations}
+                theme={theme}
+                onNavigate={handleSummaryNavigate}
+              />
+            ) : activeTab === 'notes' ? (
               <div className="space-y-3">
                 {annotations.length === 0 ? (
                   <div className={cn("text-sm text-center py-8 flex flex-col items-center gap-2", styles.muted)}>
