@@ -52,6 +52,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         loadHighlightsForArticle,
         triggerSearch,
         addQuickNorm,
+        removeQuickNormByParams,
+        isQuickNorm,
     } = useAppStore(useShallow(s => ({
         annotations: s.annotations,
         addAnnotation: s.addAnnotation,
@@ -63,6 +65,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         loadHighlightsForArticle: s.loadHighlightsForArticle,
         triggerSearch: s.triggerSearch,
         addQuickNorm: s.addQuickNorm,
+        removeQuickNormByParams: s.removeQuickNormByParams,
+        isQuickNorm: s.isQuickNorm,
     })));
 
     const [showDossierModal, setShowDossierModal] = useState(false);
@@ -216,17 +220,26 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         setToastMessage({ text, type });
     };
 
-    const handleAddToQuickNorms = () => {
+    const quickNormParams = useMemo(() => ({
+        act_type: norma_data.tipo_atto,
+        act_number: norma_data.numero_atto || '',
+        date: norma_data.data || '',
+        article: norma_data.numero_articolo,
+        annex: norma_data.allegato,
+        version: 'vigente' as const,
+        show_brocardi_info: true,
+    }), [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato]);
+
+    const isPinnedQuick = isQuickNorm(quickNormParams);
+
+    const handleToggleQuickNorm = () => {
+        if (isPinnedQuick) {
+            removeQuickNormByParams(quickNormParams);
+            showToast('Rimosso dalle norme rapide', 'info');
+            return;
+        }
         const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
-        addQuickNorm(label, {
-            act_type: norma_data.tipo_atto,
-            act_number: norma_data.numero_atto || '',
-            date: norma_data.data || '',
-            article: norma_data.numero_articolo,
-            annex: norma_data.allegato,
-            version: 'vigente',
-            show_brocardi_info: true,
-        });
+        addQuickNorm(label, quickNormParams);
         showToast('Aggiunto alle norme rapide', 'success');
     };
 
@@ -546,7 +559,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onToggleNotes={() => setShowNotes(!showNotes)}
                 onToggleHighlightPicker={setShowHighlightPicker}
                 onToggleMoreMenu={setShowMoreMenu}
-                onAddToQuickNorms={handleAddToQuickNorms}
+                isPinnedQuick={isPinnedQuick}
+                onToggleQuickNorm={handleToggleQuickNorm}
                 onMobileCopy={handleMobileCopy}
                 onOpenStudyMode={onOpenStudyMode}
                 onOpenCopyModal={() => setShowCopyModal(true)}

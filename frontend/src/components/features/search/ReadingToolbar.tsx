@@ -14,11 +14,12 @@ export interface ReadingToolbarProps {
     highlightsCount: number;
     showHighlightPicker: boolean;
     showMoreMenu: boolean;
+    isPinnedQuick: boolean;
     highlightSelectionRef: RefObject<{ text: string; startOffset: number } | null>;
     onToggleNotes: () => void;
     onToggleHighlightPicker: (next: boolean) => void;
     onToggleMoreMenu: (next: boolean) => void;
-    onAddToQuickNorms: () => void;
+    onToggleQuickNorm: () => void;
     onMobileCopy: () => Promise<void> | void;
     onOpenStudyMode?: () => void;
     onOpenCopyModal: () => void;
@@ -41,11 +42,12 @@ export function ReadingToolbar({
     highlightsCount,
     showHighlightPicker,
     showMoreMenu,
+    isPinnedQuick,
     highlightSelectionRef,
     onToggleNotes,
     onToggleHighlightPicker,
     onToggleMoreMenu,
-    onAddToQuickNorms,
+    onToggleQuickNorm,
     onMobileCopy,
     onOpenStudyMode,
     onOpenCopyModal,
@@ -91,11 +93,17 @@ export function ReadingToolbar({
             {/* Mobile: Quick Actions + Study Mode toggle */}
             <div className="flex md:hidden items-center gap-1">
                 <button
-                    onClick={onAddToQuickNorms}
-                    className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-amber-500"
-                    title="Aggiungi a norme rapide"
+                    onClick={onToggleQuickNorm}
+                    aria-pressed={isPinnedQuick}
+                    className={cn(
+                        "p-2 lg:p-2.5 rounded-lg transition-colors",
+                        isPinnedQuick
+                            ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
+                            : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
+                    )}
+                    title={isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide"}
                 >
-                    <Zap size={20} />
+                    <Zap size={20} className={cn(isPinnedQuick && "fill-amber-500")} />
                 </button>
                 <button
                     onClick={() => { void onMobileCopy(); }}
@@ -129,11 +137,17 @@ export function ReadingToolbar({
             <div className="hidden md:flex items-center gap-1">
                 {/* Primary buttons */}
                 <button
-                    onClick={onAddToQuickNorms}
-                    className="p-1.5 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 text-slate-400 hover:text-amber-500 transition-colors"
-                    title="Aggiungi a norme rapide"
+                    onClick={onToggleQuickNorm}
+                    aria-pressed={isPinnedQuick}
+                    className={cn(
+                        "p-1.5 rounded-md transition-colors",
+                        isPinnedQuick
+                            ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
+                            : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
+                    )}
+                    title={isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide"}
                 >
-                    <Zap size={16} />
+                    <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
                 </button>
                 <button
                     onClick={onToggleNotes}
