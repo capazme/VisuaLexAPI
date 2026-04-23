@@ -1,6 +1,7 @@
 /**
  * HTML sanitization utilities using DOMPurify to prevent XSS attacks
  */
+import { memo, useMemo } from 'react';
 import DOMPurify, { type Config } from 'dompurify';
 
 /**
@@ -116,16 +117,30 @@ interface SafeHTMLProps {
   as?: 'div' | 'span' | 'p' | 'article' | 'section';
 }
 
-export function SafeHTML({ html, strict = false, className, as: Tag = 'div' }: SafeHTMLProps) {
-  const sanitized = strict ? sanitizeHTMLStrict(html) : sanitizeHTML(html);
+function SafeHTMLBase({ html, strict = false, className, as: Tag = 'div' }: SafeHTMLProps) {
+  // DOMPurify on a full article body can cost 50-200ms. Without this
+  // memo every unrelated parent re-render (e.g. a store mutation for
+  // another article) would pay that cost again even when `html` is the
+  // same string reference. The sanitize step is preserved — we just
+  // cache its result on the (html, strict) tuple.
+  const sanitized = useMemo(
+    () => (strict ? sanitizeHTMLStrict(html) : sanitizeHTML(html)),
+    [html, strict],
+  );
+  const props = { __html: sanitized };
 
   return (
     <Tag
       className={className}
-      dangerouslySetInnerHTML={{ __html: sanitized }}
+      dangerouslySetInnerHTML={props}
     />
   );
 }
+
+// React.memo skips the re-render entirely when props are shallow-equal,
+// so the sanitization (and matching DOM diff of a big innerHTML) no
+// longer fires when the parent re-renders with the same props.
+export const SafeHTML = memo(SafeHTMLBase);
 
 /**
  * Sanitize text content (strip all HTML tags)

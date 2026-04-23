@@ -2,6 +2,7 @@ import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { WorkspaceTabPanel } from './WorkspaceTabPanel';
 import type { ArticleData } from '../../../types';
 
@@ -28,7 +29,13 @@ export function WorkspaceManager({
   onViewPdf,
   onCrossReference
 }: WorkspaceManagerProps) {
-  const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs, mergeLooseArticleToNorma, moveLooseArticleToCollection } = useAppStore();
+  const { workspaceTabs, moveNormaBetweenTabs, moveLooseArticleBetweenTabs, mergeLooseArticleToNorma, moveLooseArticleToCollection } = useAppStore(useShallow(s => ({
+    workspaceTabs: s.workspaceTabs,
+    moveNormaBetweenTabs: s.moveNormaBetweenTabs,
+    moveLooseArticleBetweenTabs: s.moveLooseArticleBetweenTabs,
+    mergeLooseArticleToNorma: s.mergeLooseArticleToNorma,
+    moveLooseArticleToCollection: s.moveLooseArticleToCollection,
+  })));
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
 
   // Configure sensors for drag detection

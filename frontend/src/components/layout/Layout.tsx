@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
@@ -17,7 +18,14 @@ import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
 
 export function Layout() {
-  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore();
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
+    settings: s.settings,
+    updateSettings: s.updateSettings,
+    sidebarVisible: s.sidebarVisible,
+    toggleSidebar: s.toggleSidebar,
+    toggleSearchPanel: s.toggleSearchPanel,
+    openCommandPalette: s.openCommandPalette,
+  })));
   const { isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../../hooks/useAuth';
 import { Z_INDEX } from '../../constants/zIndex';
 
@@ -155,7 +156,10 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
 
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts }: SidebarProps) {
   const navigate = useNavigate();
-  const { openCommandPalette, quickNorms } = useAppStore();
+  const { openCommandPalette, quickNorms } = useAppStore(useShallow(s => ({
+    openCommandPalette: s.openCommandPalette,
+    quickNorms: s.quickNorms,
+  })));
   const { user, isAdmin, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen, Loader2 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useAppStore, type NormaBlock } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { ArticleNavigation } from './ArticleNavigation';
 import { TreeViewPanel } from '../search/TreeViewPanel';
@@ -33,7 +34,11 @@ export function NormaBlockComponent({
   onRemoveArticle,
   onRemoveNorma
 }: NormaBlockComponentProps) {
-  const { toggleNormaCollapse, settings, consumeAutoFocusArticle } = useAppStore();
+  const { toggleNormaCollapse, settings, consumeAutoFocusArticle } = useAppStore(useShallow(s => ({
+    toggleNormaCollapse: s.toggleNormaCollapse,
+    settings: s.settings,
+    consumeAutoFocusArticle: s.consumeAutoFocusArticle,
+  })));
   const [studyModeOpen, setStudyModeOpen] = useState(false);
 
   // Helper to get a unique identifier for an article (includes allegato to avoid collisions)
