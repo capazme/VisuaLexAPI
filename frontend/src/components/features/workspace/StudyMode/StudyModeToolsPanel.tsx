@@ -383,17 +383,17 @@ function TabButton({ active, onClick, icon, label, count, title, styles }: TabBu
   return (
     <button
       onClick={onClick}
-      title={title}
+      title={title ?? `${label}${count > 0 ? ` (${count})` : ''}`}
       aria-pressed={active}
       className={cn(
-        "flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2.5 text-sm font-medium border-b-2 transition-colors",
+        "flex-1 min-w-0 inline-flex items-center justify-center gap-1 px-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors",
         active ? styles.tabActive : cn(styles.tab, 'border-transparent'),
       )}
     >
-      {icon}
-      <span>{label}</span>
+      <span className="shrink-0">{icon}</span>
+      <span className="truncate">{label}</span>
       {count > 0 && (
-        <span className="text-[11px] tabular-nums opacity-60 ml-0.5">
+        <span className="shrink-0 text-[11px] tabular-nums opacity-60">
           {count}
         </span>
       )}
