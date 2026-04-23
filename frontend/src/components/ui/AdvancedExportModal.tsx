@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale, FileCode } from 'lucide-react';
+import { Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale, FileCode, FileType } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import type { ArticleData, MassimaStructured } from '../../types';
@@ -25,7 +26,7 @@ interface AdvancedExportModalProps {
   highlights: Array<{ id: string; text: string; color: string }>;
 }
 
-type ExportFormat = 'clipboard' | 'markdown' | 'rtf' | 'txt';
+type ExportFormat = 'clipboard' | 'markdown' | 'pdf' | 'rtf' | 'txt';
 
 export function AdvancedExportModal({
   isOpen,
@@ -333,6 +334,125 @@ export function AdvancedExportModal({
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   };
 
+  /**
+   * Client-side PDF generation via jsPDF. The backend's /export_pdf
+   * endpoint fetches Normattiva's PDF directly and has no support for
+   * user-supplied notes / highlights, so producing a "study" PDF with
+   * the reader's annotations has to happen in the browser. Keeps the
+   * layout intentionally simple (serif body, bold H2s, plain bullet
+   * lists) — the goal is a readable printable, not a typeset document.
+   */
+  const buildPdf = (): jsPDF => {
+    const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+    const margin = 48;
+    const width = doc.internal.pageSize.getWidth();
+    const height = doc.internal.pageSize.getHeight();
+    const textWidth = width - margin * 2;
+
+    let y = margin;
+    const ensureSpace = (needed: number) => {
+      if (y + needed > height - margin) {
+        doc.addPage();
+        y = margin;
+      }
+    };
+
+    const writeParagraph = (text: string, opts: { size: number; bold?: boolean; italic?: boolean; color?: [number, number, number]; gapAfter?: number } = { size: 11 }) => {
+      if (!text) return;
+      const { size, bold, italic, color, gapAfter = 8 } = opts;
+      doc.setFont('times', bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal');
+      doc.setFontSize(size);
+      doc.setTextColor(...(color ?? [30, 30, 30]));
+      const lines = doc.splitTextToSize(text, textWidth) as string[];
+      const lineHeight = size * 1.25;
+      for (const line of lines) {
+        ensureSpace(lineHeight);
+        doc.text(line, margin, y);
+        y += lineHeight;
+      }
+      y += gapAfter;
+    };
+
+    const writeHeading = (text: string) => {
+      ensureSpace(24);
+      writeParagraph(text, { size: 14, bold: true, color: [15, 23, 42], gapAfter: 6 });
+    };
+
+    // Title
+    const citation = `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`;
+    writeParagraph(`${citation} — Art. ${norma_data.numero_articolo}`, { size: 18, bold: true, color: [15, 23, 42], gapAfter: 14 });
+
+    if (isSectionEnabled('text') && article_text) {
+      writeHeading('Testo');
+      writeParagraph(plainText(article_text), { size: 11 });
+    }
+
+    if (isSectionEnabled('citation')) {
+      writeParagraph(`Tratto da: ${citation}, Art. ${norma_data.numero_articolo}`, { size: 10, italic: true, color: [82, 82, 91] });
+    }
+
+    if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
+      writeHeading('Brocardi');
+      if (Array.isArray(brocardi_info.Brocardi)) {
+        brocardi_info.Brocardi.forEach((b) => writeParagraph(`• ${plainText(b)}`, { size: 11, gapAfter: 4 }));
+        y += 4;
+      } else {
+        writeParagraph(plainText(brocardi_info.Brocardi), { size: 11 });
+      }
+    }
+
+    if (isSectionEnabled('ratio') && brocardi_info?.Ratio) {
+      writeHeading('Ratio legis');
+      writeParagraph(plainText(brocardi_info.Ratio), { size: 11 });
+    }
+
+    if (isSectionEnabled('spiegazione') && brocardi_info?.Spiegazione) {
+      writeHeading('Spiegazione');
+      writeParagraph(plainText(brocardi_info.Spiegazione), { size: 11 });
+    }
+
+    if (isSectionEnabled('massime') && selectedMassime.size > 0) {
+      writeHeading(`Massime (${selectedMassime.size})`);
+      massimeList
+        .filter((m) => selectedMassime.has(m.id))
+        .forEach((m, idx) => {
+          writeParagraph(`[${idx + 1}] ${plainText(m.text)}`, { size: 10, gapAfter: 6 });
+        });
+    }
+
+    if (isSectionEnabled('highlights') && highlights.length > 0) {
+      writeHeading('Evidenziazioni');
+      const label = (color: string) => {
+        switch (color) {
+          case 'yellow': return '[giallo]';
+          case 'green': return '[verde]';
+          case 'red': return '[rosso]';
+          case 'blue': return '[blu]';
+          default: return '[•]';
+        }
+      };
+      highlights.forEach((h) => {
+        writeParagraph(`${label(h.color)} "${h.text}"`, { size: 10, gapAfter: 4 });
+      });
+      y += 4;
+    }
+
+    if (isSectionEnabled('notes') && annotations.length > 0) {
+      writeHeading('Note');
+      annotations.forEach((n, idx) => {
+        if (n.anchorText) {
+          writeParagraph(`${idx + 1}. "${n.anchorText}"`, { size: 10, italic: true, color: [146, 102, 31], gapAfter: 2 });
+          writeParagraph(n.text, { size: 11, gapAfter: 8 });
+        } else {
+          writeParagraph(`${idx + 1}. ${n.text}`, { size: 11, gapAfter: 8 });
+        }
+      });
+    }
+
+    return doc;
+  };
+
   const handleExport = async () => {
     const content = generateExportContent();
 
@@ -354,6 +474,10 @@ export function AdvancedExportModal({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
+      onClose();
+    } else if (exportFormat === 'pdf') {
+      const doc = buildPdf();
+      doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
       onClose();
     } else if (exportFormat === 'rtf') {
       const rtfContent = generateRtfContent();
@@ -607,6 +731,18 @@ export function AdvancedExportModal({
             >
               <FileCode size={16} />
               <span className="text-sm font-medium">MD</span>
+            </button>
+            <button
+              onClick={() => setExportFormat('pdf')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+                exportFormat === 'pdf'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+              )}
+            >
+              <FileType size={16} />
+              <span className="text-sm font-medium">PDF</span>
             </button>
             <button
               onClick={() => setExportFormat('rtf')}
