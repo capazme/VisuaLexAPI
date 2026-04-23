@@ -424,29 +424,23 @@ export function NormaBlockComponent({
           </div>
 
           <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden relative">
-            {/* Loading Overlay */}
+            {/* Loading chip — non-blocking floating indicator so the
+                article the user is currently reading stays legible. */}
             <AnimatePresence>
               {loadingArticle && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute inset-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="absolute top-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 shadow-md pointer-events-none"
+                  role="status"
+                  aria-live="polite"
                 >
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="flex flex-col items-center gap-3"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                      <Loader2 size={20} className="text-primary-600 dark:text-primary-400 animate-spin" />
-                    </div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      Caricamento...
-                    </p>
-                  </motion.div>
+                  <Loader2 size={14} className="text-primary-600 dark:text-primary-400 animate-spin" />
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Caricamento…
+                  </span>
                 </motion.div>
               )}
             </AnimatePresence>
