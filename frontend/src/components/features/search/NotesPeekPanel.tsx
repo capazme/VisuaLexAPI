@@ -62,7 +62,7 @@ type BodyProps = Omit<NotesPeekPanelProps, 'anchorEl'> & {
 // ───────────────────────── DESKTOP POPOVER ─────────────────────────
 
 function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
-    const { refs, floatingStyles, context } = useFloating({
+    const { refs, floatingStyles, context, placement } = useFloating({
         open: true,
         onOpenChange: (open) => { if (!open) onClose(); },
         placement: 'bottom-end',
@@ -97,7 +97,7 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
                 <div
                     // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
                     ref={refs.setFloating}
-                    style={floatingStyles}
+                    style={{ ...floatingStyles, transformOrigin: getTransformOrigin(placement) }}
                     {...getFloatingProps()}
                     className={cn(
                         'w-[360px] flex flex-col rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
@@ -418,4 +418,24 @@ function groupByAnchor(annotations: Annotation[]): { anchoredNotes: Annotation[]
         else freeNotes.push(n);
     }
     return { anchoredNotes, freeNotes };
+}
+
+/**
+ * Translate a floating-ui placement into the CSS transform-origin that
+ * corresponds to the edge of the popover touching the reference — so
+ * the scale-in animation grows FROM the anchor instead of from the
+ * popover's geometric center (which otherwise reads as "dropping from
+ * above" because the popover's centre is far from the toolbar button).
+ */
+function getTransformOrigin(placement: string): string {
+    const [side, align] = placement.split('-') as [string, string | undefined];
+    const opposite: Record<string, string> = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
+    const main = opposite[side] ?? 'center';
+    const crossAxisIsHorizontal = side === 'top' || side === 'bottom';
+    const cross = !align
+        ? 'center'
+        : crossAxisIsHorizontal
+            ? (align === 'start' ? 'left' : 'right')
+            : (align === 'start' ? 'top' : 'bottom');
+    return crossAxisIsHorizontal ? `${cross} ${main}` : `${main} ${cross}`;
 }

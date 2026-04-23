@@ -81,12 +81,24 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
     const primary = placement.split('-')[0] as keyof typeof sideMap;
     const staticSide: 'top' | 'right' | 'bottom' | 'left' = sideMap[primary] ?? 'bottom';
 
+    // Grow the scale-in animation from the arrow tip (the edge facing the
+    // anchor) so the popover doesn't look like it falls from above.
+    const [placementSide, placementAlign] = placement.split('-');
+    const originMain = sideMap[placementSide as keyof typeof sideMap] ?? 'center';
+    const originCrossHoriz = placementSide === 'top' || placementSide === 'bottom';
+    const originCross = !placementAlign
+        ? (originCrossHoriz && arrowX != null ? `${arrowX}px` : originCrossHoriz && arrowY != null ? 'center' : 'center')
+        : originCrossHoriz
+            ? (placementAlign === 'start' ? 'left' : 'right')
+            : (placementAlign === 'start' ? 'top' : 'bottom');
+    const transformOrigin = originCrossHoriz ? `${originCross} ${originMain}` : `${originMain} ${originCross}`;
+
     return (
         <FloatingPortal>
             <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
                 <div
                     ref={refs.setFloating}
-                    style={floatingStyles}
+                    style={{ ...floatingStyles, transformOrigin }}
                     {...getFloatingProps()}
                     className={cn(
                         'w-[300px] rounded-lg shadow-xl border border-amber-200 dark:border-amber-900/40',
