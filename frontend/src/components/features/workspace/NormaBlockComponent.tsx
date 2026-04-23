@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen, Loader2 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -53,58 +53,57 @@ export function NormaBlockComponent({
   );
 
   // Articles the user has actually opened in this block. Every chip that
-  // arrives via streaming but has never been `activeArticleId` stays
-  // visually marked as "non visualizzato" until clicked.
+  // arrives via streaming but has never been focused stays visually marked
+  // as "non visualizzato" until clicked. Maintained together with
+  // activeArticleId via focusArticle() so no effect is needed.
   const [viewedArticleIds, setViewedArticleIds] = useState<Set<string>>(() => {
     const first = normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null;
     return new Set(first ? [first] : []);
   });
 
-  useEffect(() => {
-    if (!activeArticleId) return;
-    setViewedArticleIds(prev => {
-      if (prev.has(activeArticleId)) return prev;
-      const next = new Set(prev);
-      next.add(activeArticleId);
-      return next;
-    });
-  }, [activeArticleId]);
+  // Single entry point for changing the focused article: updates active +
+  // viewed atomically so we never drift.
+  const focusArticle = useCallback((uniqueId: string) => {
+    setActiveArticleId(uniqueId);
+    setViewedArticleIds(prev => prev.has(uniqueId) ? prev : new Set(prev).add(uniqueId));
+  }, []);
 
   // R1 (streaming-ux): don't steal focus when new articles stream in.
-  // Only (re)select the first article when the user has nothing active —
-  // either on mount with an empty list that later gets populated, or if
-  // the currently active article was removed. Explicit focus changes come
-  // through autoFocusArticleId (R2).
-  useEffect(() => {
-    if (normaBlock.articles.length === 0) return;
-
-    const activeExists =
-      activeArticleId !== null &&
-      normaBlock.articles.some(a => getUniqueId(a) === activeArticleId);
-
-    if (!activeExists) {
-      setActiveArticleId(getUniqueId(normaBlock.articles[0]));
-    }
-  }, [normaBlock.articles, activeArticleId]);
+  // Derived during render: if the stored activeArticleId is stale (article
+  // removed) or null (empty list populated later), fall back to the first
+  // loaded article. Explicit focus changes come through autoFocusArticleId (R2).
+  const effectiveActiveId =
+    activeArticleId && normaBlock.articles.some(a => getUniqueId(a) === activeArticleId)
+      ? activeArticleId
+      : normaBlock.articles[0]
+        ? getUniqueId(normaBlock.articles[0])
+        : null;
 
   // R2 (streaming-ux): consume one-shot focus signal from the store. Used
   // when a single-article search merges into this block — we deliberately
   // DO jump focus because that's what the user just asked for.
+  // Effect is required here because consumeAutoFocusArticle mutates external
+  // store state, which cannot happen during render.
   useEffect(() => {
     const target = normaBlock.autoFocusArticleId;
     if (!target) return;
 
     const exists = normaBlock.articles.some(a => getUniqueId(a) === target);
     if (exists) {
-      setActiveArticleId(target);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot sync with external store signal
+      focusArticle(target);
     }
     consumeAutoFocusArticle(tabId, normaBlock.id);
-  }, [normaBlock.autoFocusArticleId, normaBlock.articles, normaBlock.id, tabId, consumeAutoFocusArticle]);
+  }, [normaBlock.autoFocusArticleId, normaBlock.articles, normaBlock.id, tabId, consumeAutoFocusArticle, focusArticle]);
 
-  // Derive active article from activeArticleId (needed before hook for correct annex detection)
+  // Derive active article from effectiveActiveId (needed before hook for correct annex detection)
   const activeArticle = normaBlock.articles.find(
-    a => getUniqueId(a) === activeArticleId
+    a => getUniqueId(a) === effectiveActiveId
   );
+
+  // Stable local reference so TypeScript can narrow the value inside the
+  // button onClick closures below, and so the JSX reads cleaner.
+  const normaUrn = normaBlock.norma.urn;
 
   // Use the shared annex navigation hook - pass activeArticle for correct annex detection
   const {
@@ -172,7 +171,7 @@ export function NormaBlockComponent({
     const uniqueIdToCheck = constructUniqueId(articleNumber);
     if (isArticleLoaded(uniqueIdToCheck)) {
       // Already loaded - just navigate to it
-      setActiveArticleId(uniqueIdToCheck);
+      focusArticle(uniqueIdToCheck);
       return;
     }
     // Load the article via the hook, passing the target annex
@@ -221,8 +220,19 @@ export function NormaBlockComponent({
           )}
 
           <div
-            className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+            className="flex items-center gap-3 cursor-pointer flex-1 min-w-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            role="button"
+            tabIndex={0}
+            aria-expanded={!normaBlock.isCollapsed}
+            aria-label={`${normaBlock.norma.tipo_atto}${normaBlock.norma.numero_atto ? ` n. ${normaBlock.norma.numero_atto}` : ''} — ${normaBlock.isCollapsed ? 'espandi' : 'comprimi'}`}
             onClick={() => toggleNormaCollapse(tabId, normaBlock.id)}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleNormaCollapse(tabId, normaBlock.id);
+              }
+            }}
           >
             {normaBlock.isCollapsed ? (
               <ChevronRight size={16} className="text-primary-400 shrink-0" />
@@ -274,7 +284,7 @@ export function NormaBlockComponent({
               <BookOpen size={12} />
               <span className="hidden sm:inline">Studio</span>
             </button>
-            {normaBlock.norma.urn && (
+            {normaUrn && (
               <button
                 className="norma-structure-btn px-2 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-lg transition-colors flex items-center gap-1.5"
                 onClick={(e) => {
@@ -286,15 +296,15 @@ export function NormaBlockComponent({
                 }}
               >
                 <GitBranch size={12} />
-                <span className="hidden sm:inline">{treeLoading ? 'Carico...' : 'Struttura'}</span>
+                <span className="hidden sm:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
               </button>
             )}
-            {normaBlock.norma.urn && (
+            {normaUrn && (
               <button
                 className="px-2 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 dark:text-slate-300 dark:bg-slate-700 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-slate-600 rounded-lg transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onViewPdf(normaBlock.norma.urn);
+                  onViewPdf(normaUrn);
                 }}
               >
                 PDF
@@ -309,7 +319,7 @@ export function NormaBlockComponent({
         isOpen={treeVisible}
         onClose={() => setTreeVisible(false)}
         treeData={treeData || []}
-        urn={normaBlock.norma.urn || ''}
+        urn={normaUrn || ''}
         title="Struttura Atto"
         loadedArticles={loadedArticleIds}
         onArticleSelect={(articleNumber, targetAnnex) => {
@@ -334,7 +344,7 @@ export function NormaBlockComponent({
                   const articleId = await handleAnnexSelect(annexNumber);
                   if (articleId) {
                     const uniqueId = annexNumber ? `all${annexNumber}:${articleId}` : articleId;
-                    setActiveArticleId(uniqueId);
+                    focusArticle(uniqueId);
                   }
                   return articleId;
                 }}
@@ -378,7 +388,7 @@ export function NormaBlockComponent({
                   loadingArticleId={loadingArticle}
                   onNavigate={(number) => {
                     const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
-                    setActiveArticleId(uniqueId);
+                    focusArticle(uniqueId);
                   }}
                   onLoadArticle={handleLoadArticleWithNavigation}
                 />
@@ -422,7 +432,7 @@ export function NormaBlockComponent({
           <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 gap-2 overflow-x-auto overflow-y-hidden custom-scrollbar items-end">
             {normaBlock.articles.map((article, idx) => {
               const uniqueId = getUniqueId(article);
-              const isActive = uniqueId === activeArticleId;
+              const isActive = uniqueId === effectiveActiveId;
               const isUnread = !isActive && !viewedArticleIds.has(uniqueId);
 
               return (
@@ -434,7 +444,7 @@ export function NormaBlockComponent({
                       ? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 border-b-0 text-primary-600 dark:text-primary-400 relative -bottom-px z-10"
                       : "bg-slate-100 dark:bg-slate-800/50 border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50"
                   )}
-                  onClick={() => setActiveArticleId(uniqueId)}
+                  onClick={() => focusArticle(uniqueId)}
                   aria-label={isUnread ? `Art. ${article.norma_data.numero_articolo} (non visualizzato)` : undefined}
                 >
                   {isUnread && (
@@ -482,7 +492,7 @@ export function NormaBlockComponent({
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
                 <motion.div
-                  key={activeArticleId || 'empty'}
+                  key={effectiveActiveId || 'empty'}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -512,7 +522,7 @@ export function NormaBlockComponent({
         onClose={() => setStudyModeOpen(false)}
         article={activeArticle || normaBlock.articles[0]}
         articles={normaBlock.articles}
-        onNavigate={(articleId) => setActiveArticleId(articleId)}
+        onNavigate={(articleId) => focusArticle(articleId)}
         onCrossReferenceNavigate={onCrossReference}
         normaLabel={`${normaBlock.norma.tipo_atto}${normaBlock.norma.numero_atto ? ` n. ${normaBlock.norma.numero_atto}` : ''}`}
         allArticleIds={allArticleIds}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
@@ -48,8 +48,17 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     articles[0] ? getUniqueId(articles[0]) : null
   );
 
-  // Derive active article from activeTabId
-  const activeArticle = articles.find(a => getUniqueId(a) === activeTabId) || null;
+  // Effective tab: falls back to the first article when the stored activeTabId
+  // is stale (tab closed) or null (empty list populated later). Derived during
+  // render to avoid a cascading useEffect + setState.
+  const effectiveTabId =
+    activeTabId && articles.some(a => getUniqueId(a) === activeTabId)
+      ? activeTabId
+      : articles[0]
+        ? getUniqueId(articles[0])
+        : null;
+
+  const activeArticle = articles.find(a => getUniqueId(a) === effectiveTabId) || null;
 
   // Use the shared annex navigation hook - pass activeArticle for correct annex detection
   const {
@@ -124,23 +133,6 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     setQuickAddOpen(false);
   };
 
-  // Set first tab active when articles change if no tab is active
-  useEffect(() => {
-    if (articles.length > 0) {
-      const firstUniqueId = getUniqueId(articles[0]);
-
-      if (!activeTabId) {
-        setActiveTabId(firstUniqueId);
-      } else {
-        // Check if current active tab still exists
-        const exists = articles.some(a => getUniqueId(a) === activeTabId);
-        if (!exists) {
-          setActiveTabId(firstUniqueId);
-        }
-      }
-    }
-  }, [articles, activeTabId]);
-
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Navigate to a loaded article or load it if not present.
@@ -204,9 +196,21 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
           "border-b border-slate-200 dark:border-slate-800",
           "bg-slate-50 dark:bg-slate-900/50",
           "hover:bg-slate-100 dark:hover:bg-slate-800",
-          "transition-colors duration-200"
+          "transition-colors duration-200",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         )}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        aria-label={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''} — ${isOpen ? 'comprimi' : 'espandi'}`}
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(v => !v);
+          }
+        }}
       >
         <div className="flex items-start gap-3 mb-4">
           <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400">
@@ -286,9 +290,21 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
           "border-b border-slate-200 dark:border-slate-800",
           "bg-slate-50 dark:bg-slate-900/50",
           "hover:bg-slate-100 dark:hover:bg-slate-900/80",
-          "transition-colors duration-200"
+          "transition-colors duration-200",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
         )}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        aria-label={`${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''} — ${isOpen ? 'comprimi' : 'espandi'}`}
         onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(v => !v);
+          }
+        }}
       >
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 shadow-sm border border-primary-200/50 dark:border-primary-800/50">
@@ -477,7 +493,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               const id = article.norma_data.numero_articolo;
               const allegato = article.norma_data.allegato;
               const uniqueKey = allegato ? `all${allegato}:${id}` : id;
-              const isActive = uniqueKey === activeTabId;
+              const isActive = uniqueKey === effectiveTabId;
 
               return (
                 <div
