@@ -217,8 +217,10 @@ export function StudyModeContent({
         />
       </div>
 
-      {/* Centered Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-6 sm:py-10">
+      {/* Centered Content. Extra top padding clears the absolutely
+          positioned StudyModeHeader (~56px tall) so the article title
+          isn't tucked behind it when the scroll is at the top. */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 pt-20 sm:pt-24 pb-6 sm:pb-10">
         {/* Article Title */}
         <AnimatePresence mode="wait">
           <motion.div
