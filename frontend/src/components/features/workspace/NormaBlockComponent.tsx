@@ -390,7 +390,7 @@ export function NormaBlockComponent({
             })}
           </div>
 
-          <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 gap-2 overflow-x-auto custom-scrollbar">
+          <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 gap-2 overflow-x-auto custom-scrollbar items-end">
             {normaBlock.articles.map((article) => {
               const uniqueId = getUniqueId(article);
               const isActive = uniqueId === activeArticleId;
@@ -449,30 +449,31 @@ export function NormaBlockComponent({
                 </div>
               );
             })}
-          </div>
 
-          <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden relative">
-            {/* Loading chip — non-blocking floating indicator so the
-                article the user is currently reading stays legible. */}
+            {/* Loading chip — lives inside the tab chip row so it sits
+                above the sticky reading toolbar and doesn't get covered
+                on scroll. */}
             <AnimatePresence>
               {loadingArticle && (
                 <motion.div
-                  initial={{ opacity: 0, y: -6 }}
+                  initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
+                  exit={{ opacity: 0, y: -4 }}
                   transition={{ duration: 0.18 }}
-                  className="absolute top-3 right-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 shadow-md pointer-events-none"
+                  className="ml-auto mb-2 flex items-center gap-2 px-3 py-1 rounded-full bg-white/95 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm pointer-events-none"
                   role="status"
                   aria-live="polite"
                 >
-                  <Loader2 size={14} className="text-primary-600 dark:text-primary-400 animate-spin" />
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  <Loader2 size={12} className="text-primary-600 dark:text-primary-400 animate-spin" />
+                  <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
                     Caricamento…
                   </span>
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
 
+          <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden relative">
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
                 <motion.div
