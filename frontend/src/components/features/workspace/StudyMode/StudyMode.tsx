@@ -137,6 +137,13 @@ export function StudyMode({
   const [showToolsPanel, setShowToolsPanel] = useState(false);
   const [showBrocardi, setShowBrocardi] = useState(false);
 
+  // When the user picks "Aggiungi nota" from the in-article selection
+  // popup, we capture the selected span here and show it as a chip in
+  // the tools panel so the saved Annotation carries the anchor that
+  // lets the article body render a wavy underline over it. Cleared on
+  // save or on cancel. Mirrors ArticleTabContent's `noteAnchor` pattern.
+  const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number } | null>(null);
+
   // Store access
   const {
     annotations,
@@ -438,12 +445,14 @@ export function StudyMode({
             annotations={articleAnnotations}
             highlights={articleHighlights}
             normaKey={normaKey}
-            articleId={article.norma_data.numero_articolo}
+            articleId={article.norma_data.allegato ? `all${article.norma_data.allegato}:${article.norma_data.numero_articolo}` : article.norma_data.numero_articolo}
             onAddAnnotation={addAnnotation}
             onRemoveAnnotation={removeAnnotation}
             onRemoveHighlight={removeHighlight}
             focusNoteInput={noteInputFocused}
             onNoteInputFocused={() => setNoteInputFocused(false)}
+            noteAnchor={noteAnchor}
+            onClearNoteAnchor={() => setNoteAnchor(null)}
             theme={theme}
           />
 
@@ -458,6 +467,11 @@ export function StudyMode({
             normaKey={normaKey}
             footnotes={article.brocardi_info?.Footnotes ?? []}
             onAddHighlight={addHighlight}
+            onRequestAddNote={(anchor) => {
+              setNoteAnchor(anchor);
+              setShowToolsPanel(true);
+              setNoteInputFocused(true);
+            }}
             onCrossReferenceNavigate={onCrossReferenceNavigate}
           />
 

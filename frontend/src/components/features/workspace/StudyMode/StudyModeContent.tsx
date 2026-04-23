@@ -35,6 +35,13 @@ interface StudyModeContentProps {
     color: 'yellow' | 'green' | 'red' | 'blue',
     startOffset: number,
   ) => void;
+  /**
+   * Fired when the user picks "Aggiungi nota" from the selection popup.
+   * The anchor carries the selected text and its document-relative plain
+   * offset so the saved annotation can render a wavy underline across
+   * the same span in both Study Mode and the main article view.
+   */
+  onRequestAddNote?: (anchor: { anchorText: string; startOffset: number }) => void;
   onCrossReferenceNavigate?: (articleNumber: string, normaData: NormaVisitata) => void;
 }
 
@@ -60,6 +67,7 @@ export function StudyModeContent({
   normaKey,
   footnotes,
   onAddHighlight,
+  onRequestAddNote,
   onCrossReferenceNavigate
 }: StudyModeContentProps) {
   // `scrollRef` tracks the outer scrollable container (used for the
@@ -251,10 +259,16 @@ export function StudyModeContent({
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [handleHighlight]);
 
-  // Handle note from selection popup
-  const handleAddNote = (text: string) => {
-    // This will be handled by opening the tools panel
-    console.log('Add note for text:', text);
+  // Handle note from selection popup. Shift the body-relative startOffset
+  // back to document coords — same trick as handleHighlight — so the
+  // saved annotation's anchor resolves to the right span in the main
+  // article view too.
+  const handleAddNote = (text: string, startOffset: number) => {
+    if (!onRequestAddNote) return;
+    onRequestAddNote({
+      anchorText: text,
+      startOffset: startOffset + preambleOffset,
+    });
   };
 
   // Handle copy from selection popup

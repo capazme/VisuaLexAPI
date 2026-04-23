@@ -16,11 +16,24 @@ interface StudyModeToolsPanelProps {
   highlights: Highlight[];
   normaKey: string;
   articleId: string;
-  onAddAnnotation: (normaKey: string, articleId: string, text: string) => void;
+  onAddAnnotation: (
+    normaKey: string,
+    articleId: string,
+    text: string,
+    anchor?: { anchorText: string; startOffset: number },
+  ) => void;
   onRemoveAnnotation: (id: string) => void;
   onRemoveHighlight: (id: string) => void;
   focusNoteInput: boolean;
   onNoteInputFocused: () => void;
+  /**
+   * When the user triggered "Aggiungi nota" from the article body, this
+   * carries the selected span + its document-relative plain offset. The
+   * panel surfaces it as a chip above the textarea so the user knows
+   * the next note will be anchored, and passes it through on save.
+   */
+  noteAnchor: { anchorText: string; startOffset: number } | null;
+  onClearNoteAnchor: () => void;
   theme: StudyModeTheme;
 }
 
@@ -83,6 +96,8 @@ export function StudyModeToolsPanel({
   onRemoveHighlight,
   focusNoteInput,
   onNoteInputFocused,
+  noteAnchor,
+  onClearNoteAnchor,
   theme
 }: StudyModeToolsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('notes');
@@ -101,8 +116,14 @@ export function StudyModeToolsPanel({
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
-    onAddAnnotation(normaKey, articleId, noteText.trim());
+    onAddAnnotation(
+      normaKey,
+      articleId,
+      noteText.trim(),
+      noteAnchor ?? undefined,
+    );
     setNoteText('');
+    onClearNoteAnchor();
   };
 
   return (
@@ -262,6 +283,23 @@ export function StudyModeToolsPanel({
           {/* Add Note Input (only in notes tab) */}
           {activeTab === 'notes' && (
             <div className={cn("p-4 border-t", styles.border)}>
+              {noteAnchor && (
+                <div className={cn(
+                  "mb-2 flex items-start gap-2 px-2.5 py-1.5 rounded-md border text-xs",
+                  "bg-amber-50 border-amber-200 text-amber-900",
+                  "dark:bg-amber-900/20 dark:border-amber-900/40 dark:text-amber-200"
+                )}>
+                  <span className="font-semibold shrink-0">Ancorata a:</span>
+                  <span className="flex-1 italic line-clamp-2">"{noteAnchor.anchorText}"</span>
+                  <button
+                    onClick={onClearNoteAnchor}
+                    className="shrink-0 p-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors"
+                    title="Rimuovi ancora"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2">
                 <textarea
                   ref={noteInputRef}
@@ -272,7 +310,7 @@ export function StudyModeToolsPanel({
                       handleAddNote();
                     }
                   }}
-                  placeholder="Scrivi una nota..."
+                  placeholder={noteAnchor ? "Scrivi una nota sullo span selezionato..." : "Scrivi una nota..."}
                   className={cn(
                     "flex-1 text-sm rounded-lg border px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-shadow",
                     styles.input,
