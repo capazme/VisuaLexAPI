@@ -256,6 +256,23 @@ The store is located in `frontend/src/store/useAppStore.ts` and uses Immer for i
 
 All three (History, Bookmarks, Dossiers) support instant norm retrieval via `triggerSearch()`.
 
+### Annotations (Notes) UX
+
+Notes on articles are surfaced through a **Peek popover** (desktop) / **bottom sheet** (mobile) anchored to the StickyNote toolbar button, plus a **compact inline popover** triggered by clicking the `.note-anchor` wavy underline in the article body. The previous always-visible `NotesPanel` above the article was removed because it occupied vertical space even when not needed.
+
+Files:
+- `components/features/search/NotesPeekPanel.tsx` — toolbar-anchored popover with list + inline edit + composer + "Apri in Modalità Studio" escape hatch
+- `components/features/search/InlineNotePopover.tsx` — single-note mini popover, anchored to the wavy span, for quick-look
+- `hooks/useArticleMarkers.ts:82` — renders the wavy `<span class="note-anchor" data-note-id="…">` for each anchored annotation. Click delegation is in `ArticleTabContent` (`contentRef` listener)
+
+Store actions (`useAppStore.ts`):
+- `addAnnotation` / `removeAnnotation` / `updateAnnotation(id, newText)` — all optimistic with server sync via `annotationService`. Revert on error.
+- `updateAnnotation` powers the inline edit: click a note → textarea; blur commits, Escape cancels, Cmd/Ctrl+Enter commits explicitly. Empty trimmed input reverts to original.
+
+Note lifecycle:
+- **Anchored**: created via "Aggiungi nota" from SelectionPopup → `noteAnchor` state → Peek auto-opens with composer pre-focused. On save the backend stores `anchorText + startOffset`, which the marker pipeline uses to paint the wavy underline.
+- **Free**: just open the Peek and type. No anchor, shown in the "Libere" group.
+
 ## Important Implementation Notes
 
 ### Avoiding Code Duplication
@@ -272,6 +289,12 @@ Always check for existing utilities before implementing:
 - **Date handling** (frontend): Use `src/utils/dateUtils.ts`:
   - `parseItalianDate(dateStr)`: Parses dates keeping year as-is (no conversion to YYYY-01-01)
   - `formatDateItalianLong(date)`: Formats to Italian extended format (e.g., "7 agosto 1990")
+- **Article unique IDs** (frontend): Use `src/utils/articleIds.ts`:
+  - `getUniqueArticleId(article)`: canonical encoding `allN:num` for annex entries, plain `num` otherwise. Used across NormaCard, NormaBlockComponent, and `useAnnexNavigation`. Never reimplement the `all${allegato}:${num}` string inline.
+  - `filterLoadedIdsForAnnex(ids, annex)`: project a list of loaded uniqueIds down to plain article numbers in the current annex context (strips prefix). Replaces the previous ~4 inline copies.
+  - `findArticleByNormalizedId(articles, id)`: **tolerant** lookup — matches on `normalizeArticleId` so "1-bis" (tree API) and "1 bis" (scraper) resolve to the same article. Required because the two sources disagree on `-bis/-ter/-quater` formatting.
+- **Norma meta line** (frontend): Use `src/utils/normaMeta.ts`:
+  - `formatNormaMeta(norma, { variant, articleCount? })`: single source for the "alias vs date + number" subtitle. Variants are `'card-mobile'`, `'card-desktop'`, `'block'` — preserve the three historical phrasings ("Data:", "Edizione del", bare). Never duplicate the conditional JSX.
 
 ### Rate Limiting
 
@@ -322,6 +345,27 @@ Web scrapers depend on HTML structure of external sites (Normattiva, EUR-Lex, Br
 3. Access global state with `useAppStore()` hook
 4. Use Tailwind CSS for styling (configured with v4)
 5. Export as default for lazy loading if needed
+
+### Frontend: UI Conventions
+
+These are non-obvious conventions baked into the codebase — respect them when adding new interactive surfaces so the app stays coherent.
+
+**Destructive confirmations**
+- Never use `window.confirm` for delete/close actions. Use `components/ui/ConfirmDialog` with `variant="danger"`; message should name the scope and clarify what is NOT touched (e.g. "Gli articoli salvati nei segnalibri e dossier non saranno toccati").
+- Currently in use by: tab close (`WorkspaceTabPanel`), norma delete (`NormaBlockComponent`), loose article delete (`LooseArticleCard`).
+
+**Keyboard-accessible collapsibles**
+- Any `<div>` with `cursor-pointer` + `onClick` that toggles a section must also have: `role="button"`, `tabIndex={0}`, `aria-expanded={isOpen}`, `aria-label` (dynamic "espandi" / "comprimi"), and `onKeyDown` handling Enter / Space with `e.preventDefault()`.
+- The `onKeyDown` must short-circuit with `if (e.target !== e.currentTarget) return;` — otherwise interactive children (close buttons, etc.) re-trigger the collapse on Enter/Space.
+- Always include `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2` on the wrapper.
+
+**Popover anchoring with `@floating-ui/react`**
+- Split positioning and animation onto **two elements**: outer `<div ref={refs.setFloating} style={floatingStyles}>` keeps floating-ui's positioning transform; inner `<div className="animate-in fade-in zoom-in-95" style={{ transformOrigin }}>` owns the entry animation. If you put them on the same element the scale transform overwrites the positioning transform and the popover visibly flies from (0,0) for ~150ms.
+- Compute `transformOrigin` from `placement` (see `getTransformOrigin` in `NotesPeekPanel.tsx`) so the popover grows from the anchor edge rather than its geometric centre.
+- Anchor using a **state** (`useState<HTMLElement | null>` + callback ref) rather than a ref object: reading `ref.current` in render triggers `react-hooks/refs` lint and can miss the initial mount.
+
+**Toggle buttons (e.g. quick norm, bookmark)**
+- When the same click both adds and removes, drive the visual from an `isPressed` selector, not a fixed colour. Idle: `text-slate-400 + hover:text-{accent}`; active: `bg-{accent}-50 text-{accent}` (plus `fill-{accent}` on the icon if it has a fillable body). Toast text must match the real action ("Aggiunto" / "Rimosso"). Always set `aria-pressed`.
 
 ### Backend: Browser Operations (Playwright)
 
@@ -535,6 +579,8 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 - Text parsing: Use `text_op.py` utilities (includes date functions)
 - Tree extraction: Use `treextractor.py`
 - Date utilities: Use `text_op.py` backend or `dateUtils.ts` frontend
+- Article unique IDs: Use `articleIds.ts` (getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId)
+- Norma meta line: Use `normaMeta.ts` (formatNormaMeta)
 - Browser operations: Use `PlaywrightManager` singleton
 - Never duplicate these utilities
 
@@ -552,6 +598,11 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 - `frontend/src/types/index.ts` - Type definitions
 - `frontend/src/services/api.ts` - API client
 - `frontend/src/utils/dateUtils.ts` - Date parsing and formatting (used in NormaCard, NormaBlockComponent, NormeNavigator)
+- `frontend/src/utils/articleIds.ts` - Article uniqueId encoding + tolerant normalized lookup (used by containers + `useAnnexNavigation`)
+- `frontend/src/utils/normaMeta.ts` - Shared alias/regular meta line formatter (used by NormaCard mobile+desktop, NormaBlockComponent)
+- `frontend/src/hooks/useAnnexNavigation.ts` - Shared tree-fetch + annex switch + load-article hook for both containers
+- `frontend/src/components/features/search/NotesPeekPanel.tsx` - Toolbar-anchored notes popover (replaces the legacy inline NotesPanel)
+- `frontend/src/components/features/search/InlineNotePopover.tsx` - Click-on-wavy-underline mini popover
 
 **Backend:**
 - `backend/prisma/schema.prisma` - Database schema
@@ -599,6 +650,10 @@ npm run prisma:studio  # Prisma database GUI
 6. **CORS**: Frontend dev server proxies to Python API - check `vite.config.ts`
 7. **Annex Handling**: Codici have default annex in URN - see `create_norma_visitata_from_data()`
 8. **Selenium Removed**: All browser automation now uses Playwright. `WebDriverManager` is deprecated alias of `PlaywrightManager`.
+9. **Article ID formatting mismatch (-bis / -ter / -quater)**: the tree API and the scraper can disagree on suffix formatting (`"1-bis"` vs `"1 bis"`). A naive `===` comparison between a tree-sourced uniqueId and a loaded-article uniqueId will silently miss the match and fall back to the first article on arrow navigation. **Always** use `findArticleByNormalizedId` from `utils/articleIds.ts` for lookups that might cross this boundary, and canonicalize the matched article's uniqueId (`getUniqueArticleId(match)`) before writing it to component state.
+10. **Popover positioning vs. entry animation conflict**: `@floating-ui/react` positions its floating element with an inline `transform: translate(X,Y)`. Applying `animate-in zoom-in-95` on the **same** element overwrites that transform during the entry keyframes, so the popover visibly flies from (0,0) for ~150ms. Split the two: outer div = positioning, inner div = animation (see `NotesPeekPanel.tsx` / `InlineNotePopover.tsx`).
+11. **`set-state-in-effect` lint rule**: when React's `react-hooks/set-state-in-effect` flags a `setState(...)` call inside a `useEffect`, prefer deriving the value during render (see `effectiveTabId` / `effectiveActiveId` in the norma containers) instead of silencing. Only silence for effects that synchronise with an external signal AND mutate external state in the same transaction (the R2 autoFocus effect in `NormaBlockComponent` is the canonical example — always leave the justification in a trailing comment on the disable line).
+12. **Workspace tab pin removed**: the `WorkspaceTab.isPinned` flag and `toggleTabPin` action were removed (the only behavioural effect was "don't bring pinned tabs to front on click", which contradicted the word "pin" and never protected from close). **Do not reintroduce without a clear product reason**. `Dossier.isPinned` is unrelated and stays.
 
 ### Date System Troubleshooting
 
