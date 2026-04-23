@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Lightbulb } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
 import { SelectionPopup } from './SelectionPopup';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import type { HighlightColor } from '../../../utils/highlightColors';
 
@@ -46,13 +47,21 @@ export function MarkableBrocardiSection({
   const {
     annotations, loadAnnotationsForArticle,
     highlights, addHighlight, loadHighlightsForArticle,
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    annotations: s.annotations,
+    loadAnnotationsForArticle: s.loadAnnotationsForArticle,
+    highlights: s.highlights,
+    addHighlight: s.addHighlight,
+    loadHighlightsForArticle: s.loadHighlightsForArticle,
+  })));
 
-  const sectionHighlights = highlights.filter(
-    (h) => h.normaKey === itemKey && h.articleId === sectionArticleId,
+  const sectionHighlights = useMemo(
+    () => highlights.filter(h => h.normaKey === itemKey && h.articleId === sectionArticleId),
+    [highlights, itemKey, sectionArticleId],
   );
-  const sectionAnnotations = annotations.filter(
-    (a) => a.normaKey === itemKey && a.articleId === sectionArticleId,
+  const sectionAnnotations = useMemo(
+    () => annotations.filter(a => a.normaKey === itemKey && a.articleId === sectionArticleId),
+    [annotations, itemKey, sectionArticleId],
   );
 
   // Load persisted highlights + annotations for this section on mount

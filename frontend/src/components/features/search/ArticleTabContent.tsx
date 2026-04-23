@@ -3,6 +3,7 @@ import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { ExternalLink, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { DossierModal } from '../../ui/DossierModal';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
@@ -35,6 +36,10 @@ const DICTIONARY_TERMS: Record<string, string> = {
 
 export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
+    // Subscribe only to the store slices this component actually reads.
+    // Action references are already stable across store lifetimes; the
+    // useShallow on the whole picked object means a change to unrelated
+    // state (bookmarks, dossiers…) no longer re-renders us.
     const {
         annotations,
         addAnnotation,
@@ -46,7 +51,18 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         loadHighlightsForArticle,
         triggerSearch,
         addQuickNorm,
-    } = useAppStore();
+    } = useAppStore(useShallow(s => ({
+        annotations: s.annotations,
+        addAnnotation: s.addAnnotation,
+        removeAnnotation: s.removeAnnotation,
+        loadAnnotationsForArticle: s.loadAnnotationsForArticle,
+        highlights: s.highlights,
+        addHighlight: s.addHighlight,
+        removeHighlight: s.removeHighlight,
+        loadHighlightsForArticle: s.loadHighlightsForArticle,
+        triggerSearch: s.triggerSearch,
+        addQuickNorm: s.addQuickNorm,
+    })));
 
     const [showDossierModal, setShowDossierModal] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
@@ -76,7 +92,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { showPreview, hidePreview } = citationPreviewState;
     const isHoveringPopupRef = useRef(false);
 
-    const generateKey = () => {
+    const itemKey = useMemo(() => {
         const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
         const parts = [norma_data.tipo_atto];
         if (norma_data.numero_atto?.trim()) parts.push(norma_data.numero_atto);
@@ -84,26 +100,41 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         if (norma_data.allegato?.trim()) parts.push(`all${norma_data.allegato}`);
         if (norma_data.numero_articolo?.trim()) parts.push(norma_data.numero_articolo);
         return parts.map(part => sanitize(part || '')).join('--');
-    };
+    }, [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.allegato, norma_data.numero_articolo]);
 
-    const itemKey = generateKey();
-    const uniqueArticleId = norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo;
+    const uniqueArticleId = useMemo(
+        () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
+        [norma_data.allegato, norma_data.numero_articolo],
+    );
 
-    // Markers pipeline for the article body uses ONLY strict scope.
-    const itemAnnotations = annotations.filter(a => a.normaKey === itemKey && a.articleId === uniqueArticleId);
-    const articleHighlights = highlights.filter(h => h.normaKey === itemKey && h.articleId === uniqueArticleId);
+    // Memo the four filters: without this, the full annotations/highlights
+    // arrays being new-ref on every store mutation (even unrelated articles)
+    // would re-run the marker pipeline and force ArticleBody to re-render.
+    const itemAnnotations = useMemo(
+        () => annotations.filter(a => a.normaKey === itemKey && a.articleId === uniqueArticleId),
+        [annotations, itemKey, uniqueArticleId],
+    );
+    const articleHighlights = useMemo(
+        () => highlights.filter(h => h.normaKey === itemKey && h.articleId === uniqueArticleId),
+        [highlights, itemKey, uniqueArticleId],
+    );
 
     // Panel list (notes + highlights summary) includes brocardi sub-sections
     // so users see everything they've saved for this article in one place.
-    const subSectionPrefix = `${uniqueArticleId}/`;
-    const allPanelAnnotations = annotations.filter(a =>
-        a.normaKey === itemKey &&
-        (a.articleId === uniqueArticleId || a.articleId.startsWith(subSectionPrefix))
-    );
-    const allPanelHighlights = highlights.filter(h =>
-        h.normaKey === itemKey &&
-        (h.articleId === uniqueArticleId || h.articleId.startsWith(subSectionPrefix))
-    );
+    const allPanelAnnotations = useMemo(() => {
+        const subSectionPrefix = `${uniqueArticleId}/`;
+        return annotations.filter(a =>
+            a.normaKey === itemKey &&
+            (a.articleId === uniqueArticleId || a.articleId.startsWith(subSectionPrefix))
+        );
+    }, [annotations, itemKey, uniqueArticleId]);
+    const allPanelHighlights = useMemo(() => {
+        const subSectionPrefix = `${uniqueArticleId}/`;
+        return highlights.filter(h =>
+            h.normaKey === itemKey &&
+            (h.articleId === uniqueArticleId || h.articleId.startsWith(subSectionPrefix))
+        );
+    }, [highlights, itemKey, uniqueArticleId]);
 
     // Fetch persisted highlights + annotations from the Node backend when the
     // article first mounts (or when the user switches to a different article
