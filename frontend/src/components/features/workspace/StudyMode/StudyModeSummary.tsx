@@ -53,6 +53,8 @@ const THEME_STYLES: Record<StudyModeTheme, {
   muted: string;
   notePillActive: string;
   notePillIdle: string;
+  /** Opaque bg used by the sticky filter row so cards scrolling under it don't show through. */
+  filterBg: string;
 }> = {
   light: {
     card: 'bg-white border-slate-200/70',
@@ -61,6 +63,7 @@ const THEME_STYLES: Record<StudyModeTheme, {
     muted: 'text-slate-500',
     notePillActive: 'bg-amber-500 text-white',
     notePillIdle: 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700',
+    filterBg: 'bg-white',
   },
   dark: {
     card: 'bg-slate-800/60 border-slate-700/70',
@@ -69,6 +72,7 @@ const THEME_STYLES: Record<StudyModeTheme, {
     muted: 'text-slate-400',
     notePillActive: 'bg-amber-500 text-white',
     notePillIdle: 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200',
+    filterBg: 'bg-slate-900',
   },
   sepia: {
     card: 'bg-[#f4ecd8] border-[#d4c4a8]',
@@ -77,6 +81,7 @@ const THEME_STYLES: Record<StudyModeTheme, {
     muted: 'text-[#8b7355]',
     notePillActive: 'bg-[#5c4b37] text-[#f4ecd8]',
     notePillIdle: 'bg-[#efe5d1] text-[#8b7355] hover:bg-[#e4d4b8] hover:text-[#5c4b37]',
+    filterBg: 'bg-[#f4ecd8]',
   },
 };
 
@@ -143,8 +148,15 @@ export function StudyModeSummary({
       {/* Filter row — uniform row of round chips: 4 colour dots +
           divider + Note pill. The "all" state is implicit (no chip
           selected), so no explicit "Tutti" button. A reset X surfaces
-          on the right only when at least one filter is active. */}
-      <div className="flex items-center gap-1.5 sticky top-0 z-10 py-1 -my-1">
+          on the right only when at least one filter is active.
+          Opaque background + bottom border so cards scrolling under
+          the sticky row don't show through, and a small bottom margin
+          to keep the active outline rings from clipping the divider. */}
+      <div className={cn(
+        'sticky -top-4 z-20 -mx-4 -mt-4 px-4 pt-4 pb-2.5 flex items-center gap-2 border-b',
+        styles.filterBg,
+        'border-current/10',
+      )}>
         {HIGHLIGHT_COLORS.map((c) => {
           const active = colorFilter === c;
           return (
@@ -164,7 +176,7 @@ export function StudyModeSummary({
             />
           );
         })}
-        <div className="w-px h-4 bg-current opacity-15 mx-0.5" aria-hidden />
+        <div className="w-px h-4 bg-current opacity-15 mx-1" aria-hidden />
         <button
           type="button"
           onClick={() => setNotesOnly((v) => !v)}
