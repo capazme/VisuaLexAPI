@@ -390,7 +390,7 @@ export function NormaBlockComponent({
             })}
           </div>
 
-          <div className="norma-article-tabs hidden md:flex px-3 pt-3 border-b border-slate-200 dark:border-slate-700 gap-2 overflow-x-auto custom-scrollbar">
+          <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 gap-2 overflow-x-auto custom-scrollbar">
             {normaBlock.articles.map((article) => {
               const uniqueId = getUniqueId(article);
               const isActive = uniqueId === activeArticleId;
