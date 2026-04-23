@@ -8,6 +8,7 @@ import { StudyModeContent } from './StudyModeContent';
 import { StudyModeToolsPanel } from './StudyModeToolsPanel';
 import { StudyModeBrocardiPopover } from './StudyModeBrocardiPopover';
 import { StudyModeSettings } from './StudyModeSettings';
+import { AdvancedExportModal } from '../../../ui/AdvancedExportModal';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData, NormaVisitata, SearchParams } from '../../../../types';
 import { useTour } from '../../../../hooks/useTour';
@@ -133,6 +134,7 @@ export function StudyMode({
 
   // UI state
   const [showSettings, setShowSettings] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [noteInputFocused, setNoteInputFocused] = useState(false);
   const [showToolsPanel, setShowToolsPanel] = useState(false);
   const [showBrocardi, setShowBrocardi] = useState(false);
@@ -315,6 +317,7 @@ export function StudyMode({
     onTheme: setTheme,
     onBookmark: handleBookmark,
     onNewNote: handleNewNote,
+    onExport: () => setShowExport(true),
     onToggleFullscreen: handleToggleFullscreen
   }, { enabled: isOpen });
 
@@ -431,6 +434,7 @@ export function StudyMode({
           onToggleTools={handleToggleTools}
           showBrocardi={showBrocardi}
           onToggleBrocardi={handleToggleBrocardi}
+          onExport={() => setShowExport(true)}
         />
 
         {/* Main content area */}
@@ -526,6 +530,18 @@ export function StudyMode({
           onLineHeightChange={setLineHeight}
           theme={theme}
           onThemeChange={setTheme}
+        />
+
+        {/* Advanced export modal — opens with Cmd/Ctrl+E (handled by
+            useStudyModeShortcuts). Shares the same implementation used
+            by the main article view, so the user's notes / highlights
+            export stays consistent in format and sections. */}
+        <AdvancedExportModal
+          isOpen={showExport}
+          onClose={() => setShowExport(false)}
+          articleData={article}
+          annotations={articleAnnotations}
+          highlights={articleHighlights}
         />
       </motion.div>
     </AnimatePresence>,

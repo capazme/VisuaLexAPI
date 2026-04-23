@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale } from 'lucide-react';
+import { Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale, FileCode } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import type { ArticleData, MassimaStructured } from '../../types';
@@ -15,11 +15,17 @@ interface AdvancedExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   articleData: ArticleData;
-  annotations: Array<{ id: string; text: string; createdAt: string }>;
+  /**
+   * `anchorText` is optional — notes saved before the anchor feature
+   * don't have one. Markdown export surfaces it as a blockquote so the
+   * reader sees what the note refers to, matching the chip shown in
+   * the notes panel.
+   */
+  annotations: Array<{ id: string; text: string; createdAt: string; anchorText?: string }>;
   highlights: Array<{ id: string; text: string; color: string }>;
 }
 
-type ExportFormat = 'clipboard' | 'rtf' | 'txt';
+type ExportFormat = 'clipboard' | 'markdown' | 'rtf' | 'txt';
 
 export function AdvancedExportModal({
   isOpen,
@@ -225,6 +231,108 @@ export function AdvancedExportModal({
     return rtf;
   };
 
+  /**
+   * Markdown export: the one format that survives round-tripping
+   * through note-taking apps (Obsidian, iA Writer, Notion) without
+   * losing structure. Mirrors the sections of the plain-text export
+   * but uses proper Markdown headings and blockquotes; highlights
+   * come with an emoji cue per colour so a quick scan still
+   * distinguishes them in a mono-color reader.
+   */
+  const generateMarkdownContent = () => {
+    const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
+    const lines: string[] = [];
+
+    const citation = `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`;
+    lines.push(`# ${citation} — Art. ${norma_data.numero_articolo}`);
+    lines.push('');
+
+    if (isSectionEnabled('text') && article_text) {
+      lines.push('## Testo');
+      lines.push('');
+      // Preserve paragraph breaks; single \n inside a paragraph in MD just
+      // renders as a soft break, which is fine for article bodies.
+      lines.push(plainText(article_text));
+      lines.push('');
+    }
+
+    if (isSectionEnabled('citation')) {
+      lines.push(`> Tratto da: ${citation}, Art. ${norma_data.numero_articolo}`);
+      lines.push('');
+    }
+
+    if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
+      lines.push('## Brocardi');
+      lines.push('');
+      if (Array.isArray(brocardi_info.Brocardi)) {
+        brocardi_info.Brocardi.forEach((b) => lines.push(`- ${plainText(b)}`));
+      } else {
+        lines.push(plainText(brocardi_info.Brocardi));
+      }
+      lines.push('');
+    }
+
+    if (isSectionEnabled('ratio') && brocardi_info?.Ratio) {
+      lines.push('## Ratio legis');
+      lines.push('');
+      lines.push(plainText(brocardi_info.Ratio));
+      lines.push('');
+    }
+
+    if (isSectionEnabled('spiegazione') && brocardi_info?.Spiegazione) {
+      lines.push('## Spiegazione');
+      lines.push('');
+      lines.push(plainText(brocardi_info.Spiegazione));
+      lines.push('');
+    }
+
+    if (isSectionEnabled('massime') && selectedMassime.size > 0) {
+      lines.push(`## Massime (${selectedMassime.size})`);
+      lines.push('');
+      massimeList
+        .filter((m) => selectedMassime.has(m.id))
+        .forEach((m, idx) => {
+          lines.push(`**[${idx + 1}]** ${plainText(m.text)}`);
+          lines.push('');
+        });
+    }
+
+    if (isSectionEnabled('highlights') && highlights.length > 0) {
+      lines.push('## Evidenziazioni');
+      lines.push('');
+      const swatch = (color: string) => {
+        switch (color) {
+          case 'yellow': return '🟡';
+          case 'green': return '🟢';
+          case 'red': return '🔴';
+          case 'blue': return '🔵';
+          default: return '•';
+        }
+      };
+      highlights.forEach((h) => {
+        lines.push(`- ${swatch(h.color)} "${h.text}"`);
+      });
+      lines.push('');
+    }
+
+    if (isSectionEnabled('notes') && annotations.length > 0) {
+      lines.push('## Note');
+      lines.push('');
+      annotations.forEach((n, idx) => {
+        if (n.anchorText) {
+          lines.push(`**${idx + 1}.** > _${n.anchorText}_`);
+          lines.push('');
+          lines.push(`   ${n.text}`);
+        } else {
+          lines.push(`**${idx + 1}.** ${n.text}`);
+        }
+        lines.push('');
+      });
+    }
+
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  };
+
   const handleExport = async () => {
     const content = generateExportContent();
 
@@ -236,6 +344,17 @@ export function AdvancedExportModal({
       } catch (err) {
         console.error('Copy failed:', err);
       }
+    } else if (exportFormat === 'markdown') {
+      const mdContent = generateMarkdownContent();
+      const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.md`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      onClose();
     } else if (exportFormat === 'rtf') {
       const rtfContent = generateRtfContent();
       const blob = new Blob([rtfContent], { type: 'application/rtf' });
@@ -476,6 +595,18 @@ export function AdvancedExportModal({
             >
               <Copy size={16} />
               <span className="text-sm font-medium">Copia</span>
+            </button>
+            <button
+              onClick={() => setExportFormat('markdown')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+                exportFormat === 'markdown'
+                  ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
+                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+              )}
+            >
+              <FileCode size={16} />
+              <span className="text-sm font-medium">MD</span>
             </button>
             <button
               onClick={() => setExportFormat('rtf')}

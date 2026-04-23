@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb, Download } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
@@ -25,6 +25,7 @@ interface StudyModeHeaderProps {
   onToggleTools?: () => void;
   showBrocardi?: boolean;
   onToggleBrocardi?: () => void;
+  onExport?: () => void;
 }
 
 const THEME_HEADER_STYLES: Record<StudyModeTheme, { bg: string; border: string; button: string }> = {
@@ -65,7 +66,8 @@ export function StudyModeHeader({
   showToolsPanel,
   onToggleTools,
   showBrocardi,
-  onToggleBrocardi
+  onToggleBrocardi,
+  onExport
 }: StudyModeHeaderProps) {
   const styles = THEME_HEADER_STYLES[theme];
   const hasPrev = currentIndex > 0;
@@ -226,6 +228,16 @@ export function StudyModeHeader({
                   <Moon size={12} />
                 </button>
               </div>
+
+              {onExport && (
+                <button
+                  onClick={onExport}
+                  className={cn("p-1.5 sm:p-2 rounded-md transition-colors", styles.button)}
+                  title="Esporta (⌘E)"
+                >
+                  <Download size={14} className="sm:w-4 sm:h-4" />
+                </button>
+              )}
 
               <button
                 onClick={onToggleSettings}
