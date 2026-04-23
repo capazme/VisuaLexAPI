@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen, Loader2 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -33,7 +33,7 @@ export function NormaBlockComponent({
   onRemoveArticle,
   onRemoveNorma
 }: NormaBlockComponentProps) {
-  const { toggleNormaCollapse, settings } = useAppStore();
+  const { toggleNormaCollapse, settings, consumeAutoFocusArticle } = useAppStore();
   const [studyModeOpen, setStudyModeOpen] = useState(false);
 
   // Helper to get a unique identifier for an article (includes allegato to avoid collisions)
@@ -47,22 +47,36 @@ export function NormaBlockComponent({
     normaBlock.articles[0] ? getUniqueId(normaBlock.articles[0]) : null
   );
 
-  // Track previous article count to detect new articles
-  const prevArticleCountRef = useRef(normaBlock.articles.length);
-
-  // Auto-select new articles when they are added
+  // R1 (streaming-ux): don't steal focus when new articles stream in.
+  // Only (re)select the first article when the user has nothing active —
+  // either on mount with an empty list that later gets populated, or if
+  // the currently active article was removed. Explicit focus changes come
+  // through autoFocusArticleId (R2).
   useEffect(() => {
-    const currentCount = normaBlock.articles.length;
-    const prevCount = prevArticleCountRef.current;
+    if (normaBlock.articles.length === 0) return;
 
-    if (currentCount > prevCount && currentCount > 0) {
-      // New article(s) added - select the last one
-      const lastArticle = normaBlock.articles[currentCount - 1];
-      setActiveArticleId(getUniqueId(lastArticle));
+    const activeExists =
+      activeArticleId !== null &&
+      normaBlock.articles.some(a => getUniqueId(a) === activeArticleId);
+
+    if (!activeExists) {
+      setActiveArticleId(getUniqueId(normaBlock.articles[0]));
     }
+  }, [normaBlock.articles, activeArticleId]);
 
-    prevArticleCountRef.current = currentCount;
-  }, [normaBlock.articles]);
+  // R2 (streaming-ux): consume one-shot focus signal from the store. Used
+  // when a single-article search merges into this block — we deliberately
+  // DO jump focus because that's what the user just asked for.
+  useEffect(() => {
+    const target = normaBlock.autoFocusArticleId;
+    if (!target) return;
+
+    const exists = normaBlock.articles.some(a => getUniqueId(a) === target);
+    if (exists) {
+      setActiveArticleId(target);
+    }
+    consumeAutoFocusArticle(tabId, normaBlock.id);
+  }, [normaBlock.autoFocusArticleId, normaBlock.articles, normaBlock.id, tabId, consumeAutoFocusArticle]);
 
   // Derive active article from activeArticleId (needed before hook for correct annex detection)
   const activeArticle = normaBlock.articles.find(
