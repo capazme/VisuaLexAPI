@@ -98,25 +98,31 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
             <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
                 <div
                     ref={refs.setFloating}
-                    style={{ ...floatingStyles, transformOrigin }}
+                    style={floatingStyles}
                     {...getFloatingProps()}
-                    className={cn(
-                        'w-[300px] rounded-lg shadow-xl border border-amber-200 dark:border-amber-900/40',
-                        'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
-                        Z_INDEX.citationPreview,
-                    )}
+                    className={Z_INDEX.citationPreview}
                 >
+                    {/* Inner wrapper hosts the enter animation so its
+                        scale transform doesn't fight floating-ui's
+                        positioning transform on the outer element. */}
                     <div
-                        ref={arrowRef}
-                        style={{
-                            left: arrowX != null ? `${arrowX}px` : '',
-                            top: arrowY != null ? `${arrowY}px` : '',
-                            [staticSide]: '-5px',
-                        }}
-                        className="absolute w-2.5 h-2.5 rotate-45 bg-white dark:bg-slate-900 border-r border-b border-amber-200 dark:border-amber-900/40"
-                    />
+                        style={{ transformOrigin }}
+                        className={cn(
+                            'relative w-[300px] rounded-lg shadow-xl border border-amber-200 dark:border-amber-900/40',
+                            'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
+                        )}
+                    >
+                        <div
+                            ref={arrowRef}
+                            style={{
+                                left: arrowX != null ? `${arrowX}px` : '',
+                                top: arrowY != null ? `${arrowY}px` : '',
+                                [staticSide]: '-5px',
+                            }}
+                            className="absolute w-2.5 h-2.5 rotate-45 bg-white dark:bg-slate-900 border-r border-b border-amber-200 dark:border-amber-900/40"
+                        />
 
-                    <div className="px-3 py-2.5 flex items-start gap-2">
+                        <div className="px-3 py-2.5 flex items-start gap-2">
                         <StickyNote size={14} className="text-amber-500 shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                             {note.anchorText && (
@@ -155,6 +161,7 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
                         >
                             <Trash2 size={12} />
                         </button>
+                        </div>
                     </div>
                 </div>
             </FloatingFocusManager>

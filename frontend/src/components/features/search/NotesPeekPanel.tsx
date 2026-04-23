@@ -97,15 +97,27 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
                 <div
                     // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
                     ref={refs.setFloating}
-                    style={{ ...floatingStyles, transformOrigin: getTransformOrigin(placement) }}
+                    style={floatingStyles}
                     {...getFloatingProps()}
-                    className={cn(
-                        'w-[360px] flex flex-col rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
-                        'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
-                        Z_INDEX.citationPreview,
-                    )}
+                    className={Z_INDEX.citationPreview}
                 >
-                    <PeekBody onClose={onClose} {...rest} isDesktop />
+                    {/*
+                        Inner wrapper owns the enter animation (which itself
+                        uses `transform`). Keeping it separate from the outer
+                        element prevents the zoom-in-95 keyframes from
+                        overwriting floating-ui's positioning transform —
+                        without this split the popover visibly slides from
+                        (0,0) to its anchored position each time it opens.
+                    */}
+                    <div
+                        style={{ transformOrigin: getTransformOrigin(placement) }}
+                        className={cn(
+                            'w-[360px] flex flex-col rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
+                            'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
+                        )}
+                    >
+                        <PeekBody onClose={onClose} {...rest} isDesktop />
+                    </div>
                 </div>
             </FloatingFocusManager>
         </FloatingPortal>
