@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { NormaBlockComponent } from './NormaBlockComponent';
 import { LooseArticleCard } from './LooseArticleCard';
 import { ArticleCollectionComponent } from './ArticleCollectionComponent';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
@@ -30,6 +31,7 @@ export function WorkspaceTabPanel({
   const [showDossierMenu, setShowDossierMenu] = useState(false);
   const [newDossierName, setNewDossierName] = useState('');
   const [isCreatingDossier, setIsCreatingDossier] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const dossierMenuRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -311,6 +313,7 @@ export function WorkspaceTabPanel({
   const effectiveZIndex = Math.min(tab.zIndex, Z_INDEX_VALUES.dock - 1);
 
   return (
+    <>
     <motion.div
       drag
       dragControls={dragControls}
@@ -358,7 +361,7 @@ export function WorkspaceTabPanel({
             {/* macOS traffic lights */}
             <div className="flex items-center gap-1.5 shrink-0">
               <button
-                onClick={() => removeTab(tab.id)}
+                onClick={() => setConfirmCloseOpen(true)}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="w-3 h-3 bg-red-400 hover:bg-red-500 rounded-full transition-colors group/close flex items-center justify-center"
                 title="Chiudi"
@@ -586,5 +589,19 @@ export function WorkspaceTabPanel({
         )}
       </div>
     </motion.div>
+
+    <ConfirmDialog
+      open={confirmCloseOpen}
+      variant="danger"
+      title="Chiudere la tab?"
+      message={`Tutti i contenuti della tab${tab.label ? ` “${tab.label}”` : ''} verranno rimossi dal workspace. Gli articoli salvati nei segnalibri e dossier non saranno toccati.`}
+      confirmLabel="Chiudi tab"
+      onConfirm={() => {
+        setConfirmCloseOpen(false);
+        removeTab(tab.id);
+      }}
+      onCancel={() => setConfirmCloseOpen(false)}
+    />
+    </>
   );
 }
