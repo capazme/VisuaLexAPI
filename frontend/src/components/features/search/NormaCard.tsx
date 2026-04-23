@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
 import { cn } from '../../../lib/utils';
-import { formatDateItalianLong, abbreviateActType } from '../../../utils/dateUtils';
+import { formatNormaMeta } from '../../../utils/normaMeta';
 import { ArticleTabContent } from './ArticleTabContent';
 import { TreeViewPanel } from './TreeViewPanel';
 import { AnnexSuggestion } from './AnnexSuggestion';
@@ -223,16 +223,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-1 font-medium">
-              {norma.tipo_atto_reale ? (
-                // For aliases: show real type + date + number
-                <>
-                  {abbreviateActType(norma.tipo_atto_reale)}
-                  {norma.data && ` ${formatDateItalianLong(norma.data)}`}
-                  {norma.numero_atto && `, n. ${norma.numero_atto}`}
-                </>
-              ) : (
-                norma.data ? `Data: ${formatDateItalianLong(norma.data)}` : 'Estremi non disponibili'
-              )}
+              {formatNormaMeta(norma, { variant: 'card-mobile' })}
             </p>
             <span className="inline-block text-[10px] bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
               {articles.length} {articles.length === 1 ? 'articolo' : 'articoli'} caricati
@@ -318,16 +309,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
             </div>
             <div className="flex items-center gap-3 mt-1.5">
               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                {norma.tipo_atto_reale ? (
-                  // For aliases: show real type abbreviation + date + number
-                  <>
-                    {abbreviateActType(norma.tipo_atto_reale)}
-                    {norma.data && ` ${formatDateItalianLong(norma.data)}`}
-                    {norma.numero_atto && `, n. ${norma.numero_atto}`}
-                  </>
-                ) : (
-                  norma.data ? `Edizione del ${formatDateItalianLong(norma.data)}` : 'Data non disponibile'
-                )}
+                {formatNormaMeta(norma, { variant: 'card-desktop' })}
               </p>
               <div className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-700" />
               <span className="text-xs bg-slate-200/50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">

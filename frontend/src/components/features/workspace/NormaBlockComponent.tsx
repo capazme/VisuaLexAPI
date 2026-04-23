@@ -13,7 +13,7 @@ import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
-import { formatDateItalianLong, abbreviateActType } from '../../../utils/dateUtils';
+import { formatNormaMeta } from '../../../utils/normaMeta';
 import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
 interface NormaBlockComponentProps {
@@ -251,20 +251,10 @@ export function NormaBlockComponent({
                 {!normaBlock.norma.tipo_atto_reale && normaBlock.norma.numero_atto && ` n. ${normaBlock.norma.numero_atto}`}
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {normaBlock.norma.tipo_atto_reale ? (
-                  // For aliases: show real type abbreviation + date + number
-                  <>
-                    {abbreviateActType(normaBlock.norma.tipo_atto_reale)}
-                    {normaBlock.norma.data && ` ${formatDateItalianLong(normaBlock.norma.data)}`}
-                    {normaBlock.norma.numero_atto && `, n. ${normaBlock.norma.numero_atto}`}
-                    {` · ${normaBlock.articles.length} articoli`}
-                  </>
-                ) : (
-                  // For regular norms: just date + count
-                  <>
-                    {normaBlock.norma.data ? formatDateItalianLong(normaBlock.norma.data) : 'Estremi non disponibili'} · {normaBlock.articles.length} articoli
-                  </>
-                )}
+                {formatNormaMeta(normaBlock.norma, {
+                  variant: 'block',
+                  articleCount: normaBlock.articles.length,
+                })}
               </p>
             </div>
           </div>
