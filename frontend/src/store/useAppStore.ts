@@ -90,6 +90,16 @@ interface AppState {
     dossiers: Dossier[];
     annotations: Annotation[];
     highlights: Highlight[];
+    /**
+     * Dedup cache for per-article server loads. Keys are
+     * `${normaKey}::${articleId}`. When a key is present we skip the
+     * network fetch — the store already holds the authoritative list
+     * for that article (optimistic inserts stay in place). Reset by
+     * clearUserData on logout; lost on page reload, which is fine
+     * because the mount effects will warm it again.
+     */
+    loadedHighlightKeys: Record<string, true>;
+    loadedAnnotationKeys: Record<string, true>;
     quickNorms: QuickNorm[];
     customAliases: CustomAlias[];
     environments: Environment[];
@@ -261,6 +271,8 @@ const appStore = createStore<AppState>()(
             dossiers: [],
             annotations: [],
             highlights: [],
+            loadedHighlightKeys: {},
+            loadedAnnotationKeys: {},
             quickNorms: [],
             customAliases: [],
             environments: [],
@@ -360,6 +372,8 @@ const appStore = createStore<AppState>()(
                 state.dossiers = [];
                 state.annotations = [];
                 state.highlights = [];
+                state.loadedHighlightKeys = {};
+                state.loadedAnnotationKeys = {};
                 state.quickNorms = [];
                 state.environments = [];
                 state.isDataLoaded = false;
@@ -1248,6 +1262,8 @@ const appStore = createStore<AppState>()(
             },
 
             loadAnnotationsForArticle: async (normaKey, articleId) => {
+                const cacheKey = `${normaKey}::${articleId}`;
+                if (get().loadedAnnotationKeys[cacheKey]) return;
                 try {
                     const wireKey = buildWireNormaKey(normaKey, articleId);
                     const server = await annotationService.getByNormaKey(wireKey);
@@ -1256,6 +1272,7 @@ const appStore = createStore<AppState>()(
                         state.annotations = state.annotations
                             .filter(a => !(a.normaKey === normaKey && a.articleId === articleId))
                             .concat(mapped);
+                        state.loadedAnnotationKeys[cacheKey] = true;
                     });
                 } catch (err) {
                     console.error('Failed to load annotations for article:', err);
@@ -1321,6 +1338,8 @@ const appStore = createStore<AppState>()(
             },
 
             loadHighlightsForArticle: async (normaKey, articleId) => {
+                const cacheKey = `${normaKey}::${articleId}`;
+                if (get().loadedHighlightKeys[cacheKey]) return;
                 try {
                     const wireKey = buildWireNormaKey(normaKey, articleId);
                     const server = await highlightService.getByNormaKey(wireKey);
@@ -1329,6 +1348,7 @@ const appStore = createStore<AppState>()(
                         state.highlights = state.highlights
                             .filter(h => !(h.normaKey === normaKey && h.articleId === articleId))
                             .concat(mapped);
+                        state.loadedHighlightKeys[cacheKey] = true;
                     });
                 } catch (err) {
                     console.error('Failed to load highlights for article:', err);
