@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Highlighter, StickyNote, Filter, X } from 'lucide-react';
+import { StickyNote, Filter, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { Annotation, Highlight } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import {
   HIGHLIGHT_COLORS,
-  HIGHLIGHT_STYLES,
-  parseInlineStyle,
   getHighlightSwatch,
   type HighlightColor,
 } from '../../../../utils/highlightColors';
@@ -53,32 +51,32 @@ const THEME_STYLES: Record<StudyModeTheme, {
   cardHover: string;
   text: string;
   muted: string;
-  filterActive: string;
-  filterIdle: string;
+  notePillActive: string;
+  notePillIdle: string;
 }> = {
   light: {
-    card: 'bg-white border-slate-200 hover:border-slate-300',
-    cardHover: 'hover:bg-slate-50',
+    card: 'bg-white border-slate-200/70',
+    cardHover: 'hover:bg-slate-50 hover:border-slate-300',
     text: 'text-slate-900',
     muted: 'text-slate-500',
-    filterActive: 'bg-slate-800 text-white border-slate-800',
-    filterIdle: 'bg-white text-slate-600 border-slate-200 hover:border-slate-300',
+    notePillActive: 'bg-amber-500 text-white',
+    notePillIdle: 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700',
   },
   dark: {
-    card: 'bg-slate-800 border-slate-700 hover:border-slate-600',
-    cardHover: 'hover:bg-slate-700/50',
+    card: 'bg-slate-800/60 border-slate-700/70',
+    cardHover: 'hover:bg-slate-800 hover:border-slate-600',
     text: 'text-slate-100',
     muted: 'text-slate-400',
-    filterActive: 'bg-slate-100 text-slate-900 border-slate-100',
-    filterIdle: 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600',
+    notePillActive: 'bg-amber-500 text-white',
+    notePillIdle: 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200',
   },
   sepia: {
-    card: 'bg-[#f4ecd8] border-[#d4c4a8] hover:border-[#b8a782]',
-    cardHover: 'hover:bg-[#efe5d1]',
+    card: 'bg-[#f4ecd8] border-[#d4c4a8]',
+    cardHover: 'hover:bg-[#efe5d1] hover:border-[#b8a782]',
     text: 'text-[#5c4b37]',
     muted: 'text-[#8b7355]',
-    filterActive: 'bg-[#5c4b37] text-[#f4ecd8] border-[#5c4b37]',
-    filterIdle: 'bg-[#f4ecd8] text-[#8b7355] border-[#d4c4a8] hover:border-[#b8a782]',
+    notePillActive: 'bg-[#5c4b37] text-[#f4ecd8]',
+    notePillIdle: 'bg-[#efe5d1] text-[#8b7355] hover:bg-[#e4d4b8] hover:text-[#5c4b37]',
   },
 };
 
@@ -138,66 +136,56 @@ export function StudyModeSummary({
     );
   }
 
+  const hasActiveFilter = colorFilter !== 'all' || notesOnly;
+
   return (
-    <div className="space-y-3">
-      {/* Filters — compact row: colour dots act as single-select toggles,
-          "Solo note" is an orthogonal filter on the other end. Short
-          labels only, so everything fits on one line at 320px drawer. */}
-      <div className="flex items-center gap-1 sticky top-0 z-10 py-1 -my-1">
-        <button
-          type="button"
-          onClick={() => setColorFilter('all')}
-          className={cn(
-            'px-2 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-colors',
-            colorFilter === 'all' ? styles.filterActive : styles.filterIdle,
-          )}
-          title="Mostra tutti i colori"
-        >
-          Tutti
-        </button>
-        {HIGHLIGHT_COLORS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setColorFilter(colorFilter === c ? 'all' : c)}
-            className={cn(
-              'flex items-center justify-center w-7 h-7 rounded-md border transition-all',
-              colorFilter === c
-                ? 'border-slate-800 dark:border-slate-100 ring-2 ring-slate-800/20 dark:ring-slate-100/30'
-                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600',
-            )}
-            title={`Solo highlight ${c}`}
-          >
-            <span
-              className="block w-4 h-4 rounded-sm"
+    <div className="space-y-2.5">
+      {/* Filter row — uniform row of round chips: 4 colour dots +
+          divider + Note pill. The "all" state is implicit (no chip
+          selected), so no explicit "Tutti" button. A reset X surfaces
+          on the right only when at least one filter is active. */}
+      <div className="flex items-center gap-1.5 sticky top-0 z-10 py-1 -my-1">
+        {HIGHLIGHT_COLORS.map((c) => {
+          const active = colorFilter === c;
+          return (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColorFilter(active ? 'all' : c)}
+              aria-pressed={active}
+              className={cn(
+                'flex items-center justify-center w-5 h-5 rounded-full transition-all',
+                active
+                  ? 'outline outline-2 outline-offset-2 outline-current scale-110'
+                  : 'opacity-50 hover:opacity-100',
+              )}
               style={{ backgroundColor: getHighlightSwatch(c) }}
+              title={`Solo evidenziazioni ${c}`}
             />
-          </button>
-        ))}
-        <div className="w-px h-5 bg-current opacity-20 mx-1" />
+          );
+        })}
+        <div className="w-px h-4 bg-current opacity-15 mx-0.5" aria-hidden />
         <button
           type="button"
           onClick={() => setNotesOnly((v) => !v)}
+          aria-pressed={notesOnly}
           className={cn(
-            'flex items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-md border transition-colors',
-            notesOnly ? styles.filterActive : styles.filterIdle,
+            'inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors',
+            notesOnly ? styles.notePillActive : styles.notePillIdle,
           )}
           title="Mostra solo note"
         >
-          <StickyNote size={10} />
-          Note
+          <StickyNote size={11} />
         </button>
-        {(colorFilter !== 'all' || notesOnly) && (
+        {hasActiveFilter && (
           <button
             type="button"
-            onClick={() => {
-              setColorFilter('all');
-              setNotesOnly(false);
-            }}
-            className={cn('ml-auto p-1 rounded-md transition-colors', styles.muted, 'hover:bg-slate-100 dark:hover:bg-slate-700')}
+            onClick={() => { setColorFilter('all'); setNotesOnly(false); }}
+            className={cn('ml-auto inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors hover:bg-current/10', styles.muted)}
             title="Azzera filtri"
+            aria-label="Azzera filtri"
           >
-            <X size={12} />
+            <X size={11} />
           </button>
         )}
       </div>
@@ -214,52 +202,70 @@ export function StudyModeSummary({
             type="button"
             onClick={() => onNavigate(item.kind, item.id)}
             className={cn(
-              'w-full text-left p-3 rounded-lg border transition-colors',
+              'group w-full text-left flex items-stretch gap-2.5 rounded-lg border transition-colors overflow-hidden',
               styles.card,
               styles.cardHover,
             )}
           >
-            <div className="flex items-start gap-2">
-              {item.kind === 'highlight' ? (
-                <Highlighter size={12} className="mt-1 shrink-0 opacity-60" />
-              ) : (
-                <StickyNote size={12} className="mt-1 shrink-0 text-amber-500" />
+            {/* Coloured stripe = the highlight colour, or amber for notes.
+                Replaces the previous saturated background on the anchor
+                text, which was visually loud and duplicated the colour
+                already shown in the article body. */}
+            <div
+              className="w-1 shrink-0"
+              style={{
+                backgroundColor: item.color
+                  ? getHighlightSwatch(item.color)
+                  : item.kind === 'note'
+                    ? 'rgb(245 158 11)' /* amber-500 */
+                    : 'transparent',
+              }}
+              aria-hidden
+            />
+            <div className="flex-1 min-w-0 py-2.5 pr-3">
+              {item.anchorText && (
+                <div className="flex items-start gap-1.5">
+                  {item.kind === 'note' && (
+                    <StickyNote size={11} className="mt-1 shrink-0 text-amber-500" />
+                  )}
+                  <p className={cn(
+                    'text-sm leading-snug line-clamp-2',
+                    item.kind === 'note'
+                      ? cn('italic', styles.muted)
+                      : styles.text,
+                  )}>
+                    {item.kind === 'note' ? <>&ldquo;{item.anchorText}&rdquo;</> : item.anchorText}
+                  </p>
+                </div>
               )}
-              <div className="flex-1 min-w-0">
-                {/* The anchor/highlighted text. `line-clamp` needs a block
-                    container, so we wrap a `<span>` (which can carry an
-                    inline highlight background that hugs the text across
-                    wraps) inside a truncating `<p>`. */}
-                {item.anchorText && (
-                  <p className="text-sm leading-snug line-clamp-3">
-                    <span
-                      style={item.color ? parseInlineStyle(HIGHLIGHT_STYLES[item.color]) : undefined}
-                      className={cn(
-                        'rounded-sm break-words',
-                        item.color
-                          ? 'px-1 py-0.5 box-decoration-clone'
-                          : 'italic text-amber-700 dark:text-amber-400',
-                      )}
-                    >
-                      {item.anchorText}
-                    </span>
-                  </p>
-                )}
-                {item.noteText && (
-                  <p className={cn('text-sm mt-1.5 whitespace-pre-wrap line-clamp-3', styles.text)}>
-                    {item.noteText}
-                  </p>
-                )}
-                {item.createdAt && (
-                  <p className={cn('text-[10px] mt-1.5 opacity-60 tabular-nums', styles.muted)}>
-                    {new Date(item.createdAt).toLocaleString()}
-                  </p>
-                )}
-              </div>
+              {item.noteText && (
+                <p className={cn('text-sm whitespace-pre-wrap line-clamp-3', styles.text, item.anchorText && 'mt-1')}>
+                  {item.noteText}
+                </p>
+              )}
+              {item.createdAt && (
+                <p className={cn('text-[10px] mt-1.5 opacity-50 tabular-nums', styles.muted)}>
+                  {formatShortDate(item.createdAt)}
+                </p>
+              )}
             </div>
           </button>
         ))
       )}
     </div>
   );
+}
+
+/**
+ * Compact Italian date format for the summary card timestamp:
+ * "23 mar" for current year, "23 mar 2024" otherwise. Falls back to
+ * the raw string if parsing fails.
+ */
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString('it-IT', sameYear
+    ? { day: 'numeric', month: 'short' }
+    : { day: 'numeric', month: 'short', year: 'numeric' });
 }

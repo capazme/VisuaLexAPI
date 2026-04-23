@@ -192,54 +192,35 @@ export function StudyModeToolsPanel({
             </button>
           </div>
 
-          {/* Tabs */}
+          {/* Tabs — minimal counter as a small monospace number; the
+              active state alone uses the accent border, no per-tab
+              coloured pills. */}
           <div className={cn("flex border-b", styles.border)}>
-            <button
+            <TabButton
+              active={activeTab === 'summary'}
               onClick={() => setActiveTab('summary')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
-                activeTab === 'summary' ? styles.tabActive : cn(styles.tab, 'border-transparent')
-              )}
+              icon={<ListTree size={15} />}
+              label="Riepilogo"
+              count={annotations.length + highlights.length}
+              styles={styles}
               title="Riepilogo: note ed evidenziazioni in ordine di lettura"
-            >
-              <ListTree size={16} />
-              Riepilogo
-              {(annotations.length + highlights.length) > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 text-xs bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 rounded-full">
-                  {annotations.length + highlights.length}
-                </span>
-              )}
-            </button>
-            <button
+            />
+            <TabButton
+              active={activeTab === 'notes'}
               onClick={() => setActiveTab('notes')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
-                activeTab === 'notes' ? styles.tabActive : cn(styles.tab, 'border-transparent')
-              )}
-            >
-              <StickyNote size={16} />
-              Note
-              {annotations.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 text-xs bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300 rounded-full">
-                  {annotations.length}
-                </span>
-              )}
-            </button>
-            <button
+              icon={<StickyNote size={15} />}
+              label="Note"
+              count={annotations.length}
+              styles={styles}
+            />
+            <TabButton
+              active={activeTab === 'highlights'}
               onClick={() => setActiveTab('highlights')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors",
-                activeTab === 'highlights' ? styles.tabActive : cn(styles.tab, 'border-transparent')
-              )}
-            >
-              <Highlighter size={16} />
-              Evidenz.
-              {highlights.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-full">
-                  {highlights.length}
-                </span>
-              )}
-            </button>
+              icon={<Highlighter size={15} />}
+              label="Evidenze"
+              count={highlights.length}
+              styles={styles}
+            />
           </div>
 
           {/* Content */}
@@ -385,5 +366,37 @@ export function StudyModeToolsPanel({
         </motion.aside>
       )}
     </AnimatePresence>
+  );
+}
+
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  title?: string;
+  styles: { tab: string; tabActive: string };
+}
+
+function TabButton({ active, onClick, icon, label, count, title, styles }: TabButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={cn(
+        "flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2.5 text-sm font-medium border-b-2 transition-colors",
+        active ? styles.tabActive : cn(styles.tab, 'border-transparent'),
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+      {count > 0 && (
+        <span className="text-[11px] tabular-nums opacity-60 ml-0.5">
+          {count}
+        </span>
+      )}
+    </button>
   );
 }
