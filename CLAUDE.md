@@ -273,6 +273,16 @@ Note lifecycle:
 - **Anchored**: created via "Aggiungi nota" from SelectionPopup → `noteAnchor` state → Peek auto-opens with composer pre-focused. On save the backend stores `anchorText + startOffset`, which the marker pipeline uses to paint the wavy underline.
 - **Free**: just open the Peek and type. No anchor, shown in the "Libere" group.
 
+Export to `.txt`: a Download icon in the Peek header dumps the article's notes (anchored + free) into a UTF-8 text file. Plumbing lives in `ArticleTabContent` (`downloadTxt` + `slugify` + `articleHeader` helpers) — shared with the highlights export so a future export consumer is a one-liner.
+
+### Highlights UX
+
+Creation of new highlights happens **only** in `SelectionPopup` (the toolbar's button is *not* a second creator — that pattern was tried and rolled back). The Highlighter button in the reading toolbar opens a small **tooltip-style action bar** (`HighlightsActionsPicker.tsx`) with two icon-only buttons:
+- **Eye / EyeOff** — toggles a `.highlights-hidden` class on the article body's contentRef. CSS overrides the `--hl-*-bg` HSL variables to alpha-0 so the inline `style="background-color: hsl(var(--hl-*-bg))"` on every `<mark>` resolves to transparent (no `!important` needed for the bg). A single targeted `color: inherit !important` on `.highlight-mark` handles the fg, since `hsl(...)` cannot accept `inherit` via a variable. The markup stays intact, re-toggling restores the colors.
+- **Download** — exports the article's highlights to `.txt`, same plumbing as notes.
+
+Both actions disabled with explanatory tooltip when count is 0. Picker style mirrors `SelectionPopup`: dark slate background, ~88px wide, two icon buttons separated by a 1px slate divider, no chrome.
+
 ## Important Implementation Notes
 
 ### Avoiding Code Duplication
@@ -366,6 +376,23 @@ These are non-obvious conventions baked into the codebase — respect them when 
 
 **Toggle buttons (e.g. quick norm, bookmark)**
 - When the same click both adds and removes, drive the visual from an `isPressed` selector, not a fixed colour. Idle: `text-slate-400 + hover:text-{accent}`; active: `bg-{accent}-50 text-{accent}` (plus `fill-{accent}` on the icon if it has a fillable body). Toast text must match the real action ("Aggiunto" / "Rimosso"). Always set `aria-pressed`.
+
+**Two flavours of toolbar pop-ups**
+- *Peek* (e.g. `NotesPeekPanel`) — a panel with a header, scrollable body, composer/footer. Use when the surface lists/edits content. Width ~360px, light bg matching the page theme.
+- *Action bar* (e.g. `HighlightsActionsPicker`, `SelectionPopup`) — a thin dark slate bar with 2-4 icon-only buttons separated by 1px dividers, no chrome. Use when the surface is purely "perform action X". Width auto. Both flavours share the same outer/inner split pattern from the floating-ui rule above.
+
+**Sticky filter rows inside scrollable lists**
+- `sticky top-0` alone is not enough — the row needs an **opaque background** that matches the panel's bg, otherwise content scrolls *through* it. Theme-tokenised: register a `filterBg` colour in the panel's THEME_STYLES record.
+- Use negative-margin bleed (`-mx-N -mt-N -top-N` matching the parent's `pN`) to extend the opaque bg edge-to-edge over the panel's padding. Pair with `border-b border-current/10` so the boundary is visible while scrolling.
+- Bump `z-index` to `z-20` (above any in-flow card decoration that uses `z-10`).
+
+**Beating inline `style="..."` without `!important`**
+- When markup ships with inline styles you don't control (e.g. `useArticleMarkers` emits `<mark style="background-color:hsl(var(--hl-yellow-bg))">`), a class-level CSS rule loses specificity. Two safe escape hatches in priority order:
+  1. **Override the CSS variable** in a narrower scope (e.g. `.highlights-hidden { --hl-yellow-bg: 0 0% 0% / 0; }`) so the inline `hsl(var(--…))` resolves differently. Same property, narrower scope wins, no `!important` needed.
+  2. If the inline style references no variable (or the variable can't yield the value you need), fall back to **a single, narrowly-scoped `!important`** with a code comment justifying why every other route fails. The repo rule against `!important` has this carve-out — don't sprinkle.
+
+**Card markers vs saturated backgrounds**
+- For lists that mirror something already coloured in the article body (highlights summary, etc.), prefer a **4px coloured stripe down the leading edge** of the card over re-applying the saturated background to the text inside. The colour signal is preserved, the text stays legible against any theme, and you avoid duplicating the bg the user already sees in context.
 
 ### Backend: Browser Operations (Playwright)
 
@@ -603,6 +630,9 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 - `frontend/src/hooks/useAnnexNavigation.ts` - Shared tree-fetch + annex switch + load-article hook for both containers
 - `frontend/src/components/features/search/NotesPeekPanel.tsx` - Toolbar-anchored notes popover (replaces the legacy inline NotesPanel)
 - `frontend/src/components/features/search/InlineNotePopover.tsx` - Click-on-wavy-underline mini popover
+- `frontend/src/components/features/search/HighlightsActionsPicker.tsx` - Tooltip-style action bar (toggle visibility + export .txt) — no creator, that's `SelectionPopup`'s job
+- `frontend/src/components/features/workspace/StudyMode/StudyModeSummary.tsx` - Study Mode unified list of highlights+notes with filter row + colour stripes
+- `frontend/src/components/features/workspace/StudyMode/StudyModeToolsPanel.tsx` - Study Mode side panel hosting the tabs (Riepilogo / Note / Evidenze)
 
 **Backend:**
 - `backend/prisma/schema.prisma` - Database schema
