@@ -73,11 +73,16 @@ export function useArticleMarkers({ rawText, highlights, annotations }: UseArtic
       insertions.push({ pos: rawEnd, order: order++, isOpen: false, markup: '</span>' });
     });
 
-    // Apply latest → earliest. At same position, close tags come before
-    // open tags so nesting stays well-formed.
+    // Apply latest → earliest. Each insertion at a given position pushes
+    // whatever was already there to the right, so the LAST entry inserted
+    // at pos P ends up FIRST in the output at pos P. When two highlights
+    // share a boundary (close of H1 = open of H2 at the same pos), we
+    // want the rendered order to be `</mark><mark …>` — i.e. close first.
+    // That means close must be inserted LAST at that position, so it must
+    // appear LATER in the sorted array than open. Hence: open before close.
     insertions.sort((x, y) => {
       if (y.pos !== x.pos) return y.pos - x.pos;
-      if (x.isOpen !== y.isOpen) return x.isOpen ? 1 : -1;
+      if (x.isOpen !== y.isOpen) return x.isOpen ? -1 : 1;
       return y.order - x.order;
     });
 
