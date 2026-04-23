@@ -89,23 +89,31 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
   const [studyModeArticle, setStudyModeArticle] = useState<ArticleData | null>(null);
   const { triggerSearch } = useAppStore();
 
+  // Focus a tab by uniqueId. Keeps the mobile accordion state in sync with
+  // the desktop active tab so switching breakpoints doesn't snap back to
+  // the first article. All code paths that promote focus (arrows, cross
+  // references, annex switches, desktop tab clicks, study mode nav) must
+  // route through this — setActiveTabId alone would leave mobile out of
+  // sync, and the mobile derived state (`expandedArticles`) is also the
+  // authoritative open/closed signal for the accordion so the user can
+  // close the active article by tapping it.
+  const focusTab = (uniqueId: string) => {
+    setActiveTabId(uniqueId);
+    setExpandedArticles(prev => prev.has(uniqueId) ? prev : new Set(prev).add(uniqueId));
+  };
+
   const toggleArticleExpanded = (uniqueId: string) => {
-    const wasExpanded = expandedArticles.has(uniqueId);
-    // Opening an accordion on mobile also promotes it to the desktop-active
-    // tab, so switching breakpoints keeps the user anchored on the same
-    // article instead of snapping back to the first one.
-    if (!wasExpanded) {
-      setActiveTabId(uniqueId);
-    }
-    setExpandedArticles(prev => {
-      const next = new Set(prev);
-      if (next.has(uniqueId)) {
+    if (expandedArticles.has(uniqueId)) {
+      // Closing: only touch the expanded set, leave desktop-active alone.
+      setExpandedArticles(prev => {
+        const next = new Set(prev);
         next.delete(uniqueId);
-      } else {
-        next.add(uniqueId);
-      }
-      return next;
-    });
+        return next;
+      });
+    } else {
+      // Opening: promote to desktop-active and add to expanded.
+      focusTab(uniqueId);
+    }
   };
 
   const openStudyMode = (article: ArticleData) => {
@@ -142,7 +150,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     const uniqueId = annexContext ? `all${annexContext}:${articleNumber}` : articleNumber;
 
     if (isArticleLoaded(uniqueId)) {
-      setActiveTabId(uniqueId);
+      focusTab(uniqueId);
       return;
     }
     handleLoadArticle(articleNumber, targetAnnex);
@@ -430,7 +438,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                   const targetArticle = await handleAnnexSelect(annexNumber);
                   if (targetArticle) {
                     const uniqueId = annexNumber ? `all${annexNumber}:${targetArticle}` : targetArticle;
-                    setActiveTabId(uniqueId);
+                    focusTab(uniqueId);
                   }
                   return targetArticle;
                 }}
@@ -450,7 +458,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                 onNavigate={(number) => {
                   // Convert back to unique ID for navigation
                   const uniqueId = currentAnnex ? `all${currentAnnex}:${number}` : number;
-                  setActiveTabId(uniqueId);
+                  focusTab(uniqueId);
                 }}
                 onLoadArticle={handleLoadArticleWithNavigation}
               />
@@ -480,7 +488,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                       ? "text-primary-600 dark:text-primary-400"
                       : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   )}
-                  onClick={() => setActiveTabId(uniqueKey)}
+                  onClick={() => focusTab(uniqueKey)}
                 >
                   <span className="relative z-10 uppercase tracking-wide text-xs">Art. {id}</span>
 
@@ -521,7 +529,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               // Mobile mirror of desktop active tab: the currently active
               // article is always shown expanded, even if the user never
               // tapped it on this breakpoint.
-              const isExpanded = expandedArticles.has(uniqueKey) || uniqueKey === effectiveTabId;
+              const isExpanded = expandedArticles.has(uniqueKey);
               return (
                 <div key={uniqueKey || `idx-${idx}`} className="overflow-hidden">
                   <div
@@ -661,7 +669,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               const uniqueId = currentAnnex ? `all${currentAnnex}:${articleNumber}` : articleNumber;
               const target = articles.find(a => getUniqueArticleId(a) === uniqueId);
               if (target) {
-                setActiveTabId(uniqueId);
+                focusTab(uniqueId);
                 setStudyModeArticle(target);
               }
             }}
