@@ -90,6 +90,13 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
   const { triggerSearch } = useAppStore();
 
   const toggleArticleExpanded = (uniqueId: string) => {
+    const wasExpanded = expandedArticles.has(uniqueId);
+    // Opening an accordion on mobile also promotes it to the desktop-active
+    // tab, so switching breakpoints keeps the user anchored on the same
+    // article instead of snapping back to the first one.
+    if (!wasExpanded) {
+      setActiveTabId(uniqueId);
+    }
     setExpandedArticles(prev => {
       const next = new Set(prev);
       if (next.has(uniqueId)) {
@@ -511,7 +518,10 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
               const articleId = article.norma_data.numero_articolo;
               const allegato = article.norma_data.allegato;
               const uniqueKey = allegato ? `all${allegato}:${articleId}` : articleId;
-              const isExpanded = expandedArticles.has(uniqueKey);
+              // Mobile mirror of desktop active tab: the currently active
+              // article is always shown expanded, even if the user never
+              // tapped it on this breakpoint.
+              const isExpanded = expandedArticles.has(uniqueKey) || uniqueKey === effectiveTabId;
               return (
                 <div key={uniqueKey || `idx-${idx}`} className="overflow-hidden">
                   <div

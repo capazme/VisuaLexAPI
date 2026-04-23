@@ -9,6 +9,7 @@ import { ArticleNavigation } from './ArticleNavigation';
 import { TreeViewPanel } from '../search/TreeViewPanel';
 import { AnnexSuggestion } from '../search/AnnexSuggestion';
 import { StudyMode } from './StudyMode';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
@@ -41,6 +42,7 @@ export function NormaBlockComponent({
     consumeAutoFocusArticle: s.consumeAutoFocusArticle,
   })));
   const [studyModeOpen, setStudyModeOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
     normaBlock.articles[0] ? getUniqueArticleId(normaBlock.articles[0]) : null
@@ -208,9 +210,7 @@ export function NormaBlockComponent({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (window.confirm('Eliminare questa norma e tutti i suoi articoli?')) {
-                  onRemoveNorma();
-                }
+                setConfirmDeleteOpen(true);
               }}
               className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
               title="Elimina norma"
@@ -446,30 +446,35 @@ export function NormaBlockComponent({
                       <span className="text-[9px] opacity-60">All. {article.norma_data.allegato}</span>
                     )}
                   </div>
-                  {isActive && (
-                    <div className="flex items-center gap-0.5 ml-1">
-                      <button
-                        className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onExtractArticle(uniqueId);
-                        }}
-                        title="Estrai come articolo loose"
-                      >
-                        <ExternalLink size={10} />
-                      </button>
-                      <button
-                        className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveArticle(uniqueId);
-                        }}
-                        title="Chiudi articolo"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 ml-1 transition-opacity",
+                      isActive
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                    )}
+                  >
+                    <button
+                      className="p-0.5 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onExtractArticle(uniqueId);
+                      }}
+                      title="Estrai come articolo loose"
+                    >
+                      <ExternalLink size={10} />
+                    </button>
+                    <button
+                      className="p-0.5 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveArticle(uniqueId);
+                      }}
+                      title="Chiudi articolo"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -501,6 +506,21 @@ export function NormaBlockComponent({
             )}
           </div>
         </div>
+      )}
+
+      {onRemoveNorma && (
+        <ConfirmDialog
+          open={confirmDeleteOpen}
+          variant="danger"
+          title="Eliminare la norma?"
+          message="Tutti gli articoli caricati verranno rimossi dal workspace. Gli articoli salvati nei segnalibri e dossier non saranno toccati."
+          confirmLabel="Elimina"
+          onConfirm={() => {
+            setConfirmDeleteOpen(false);
+            onRemoveNorma();
+          }}
+          onCancel={() => setConfirmDeleteOpen(false)}
+        />
       )}
 
       {/* Study Mode Overlay */}
