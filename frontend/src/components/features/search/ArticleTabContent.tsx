@@ -302,33 +302,53 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
     };
 
+    const downloadTxt = (content: string, filenameBase: string) => {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${filenameBase}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const slugify = (s: string) =>
+        s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+    const articleSlug = () =>
+        slugify(`${norma_data.tipo_atto}-art-${norma_data.numero_articolo}`) || 'articolo';
+
+    const articleHeader = (kind: 'Evidenziazioni' | 'Note') => [
+        `${kind} — Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`,
+        `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}`,
+        `Esportato il ${new Date().toLocaleString('it-IT')}`,
+        '─'.repeat(60),
+        '',
+    ].join('\n');
+
+    const handleExportNotesTxt = () => {
+        if (allPanelAnnotations.length === 0) {
+            showToast('Nessuna nota da esportare', 'info');
+            return;
+        }
+        const body = allPanelAnnotations.map((n, i) => {
+            const lines = [`${i + 1}. ${n.text}`];
+            if (n.anchorText) lines.push(`   Ancorata a: "${n.anchorText}"`);
+            return lines.join('\n');
+        }).join('\n\n');
+        downloadTxt(articleHeader('Note') + body + '\n', `note-${articleSlug()}`);
+        showToast(`Esportate ${allPanelAnnotations.length} note`, 'success');
+    };
+
     const handleExportHighlightsTxt = () => {
         if (allPanelHighlights.length === 0) {
             showToast('Nessuna evidenziazione da esportare', 'info');
             return;
         }
-        const headerLines = [
-            `Evidenziazioni — Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`,
-            `${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}`,
-            `Esportato il ${new Date().toLocaleString('it-IT')}`,
-            '─'.repeat(60),
-            '',
-        ];
         const body = allPanelHighlights.map((h, i) => `${i + 1}. [${h.color}] ${h.text}`).join('\n\n');
-        const txt = headerLines.join('\n') + body + '\n';
-
-        const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'evidenziazioni';
-        const filenameBase = slug(`${norma_data.tipo_atto}-art-${norma_data.numero_articolo}`);
-        const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `evidenziazioni-${filenameBase}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
+        downloadTxt(articleHeader('Evidenziazioni') + body + '\n', `evidenziazioni-${articleSlug()}`);
         showToast(`Esportate ${allPanelHighlights.length} evidenziazioni`, 'success');
     };
 
@@ -562,6 +582,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onRemoveNote={removeAnnotation}
                 onClearAnchor={() => setNoteAnchor(null)}
                 onOpenStudyMode={onOpenStudyMode}
+                onExportTxt={handleExportNotesTxt}
             />
 
             <HighlightsActionsPicker

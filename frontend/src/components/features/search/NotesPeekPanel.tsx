@@ -12,7 +12,7 @@ import {
     shift,
     size,
 } from '@floating-ui/react';
-import { StickyNote, X, BookOpen, Trash2 } from 'lucide-react';
+import { StickyNote, X, BookOpen, Trash2, Download } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -29,6 +29,7 @@ export interface NotesPeekPanelProps {
     onRemoveNote: (id: string) => void;
     onClearAnchor: () => void;
     onOpenStudyMode?: () => void;
+    onExportTxt: () => void;
 }
 
 /**
@@ -172,6 +173,7 @@ function PeekBody({
     onRemoveNote,
     onClearAnchor,
     onOpenStudyMode,
+    onExportTxt,
 }: BodyProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingText, setEditingText] = useState('');
@@ -227,14 +229,30 @@ function PeekBody({
                         {annotations.length}
                     </span>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                    title="Chiudi (Esc)"
-                    aria-label="Chiudi pannello note"
-                >
-                    <X size={16} />
-                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                        onClick={onExportTxt}
+                        disabled={annotations.length === 0}
+                        className={cn(
+                            "p-1 rounded-md transition-colors",
+                            annotations.length === 0
+                                ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+                                : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200",
+                        )}
+                        title={annotations.length === 0 ? "Nessuna nota da esportare" : "Esporta in .txt"}
+                        aria-label="Esporta note in .txt"
+                    >
+                        <Download size={14} />
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                        title="Chiudi (Esc)"
+                        aria-label="Chiudi pannello note"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
             </header>
 
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
