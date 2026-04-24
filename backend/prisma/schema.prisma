@@ -37,6 +37,10 @@ model User {
   // Personal Environments (user-owned, not published)
   environments Environment[]
 
+  // Quick Norms + Custom Aliases (personal, client-created)
+  quickNorms    QuickNorm[]
+  customAliases CustomAlias[]
+
   // Shared Environments (Bulletin Board)
   sharedEnvironments       SharedEnvironment[]
   sharedEnvironmentLikes   SharedEnvironmentLike[]
@@ -284,6 +288,60 @@ enum ReportStatus {
   pending
   reviewed
   dismissed
+}
+
+// ============================================
+// QUICK NORMS (Favorites panel)
+// Lives alongside dossiers/bookmarks as a server-owned asset so the user
+// finds them across devices and survives a browser clear.
+// ============================================
+
+model QuickNorm {
+  id           String    @id @default(uuid())
+  label        String
+  searchParams Json      @map("search_params")
+  sourceUrl    String?   @map("source_url")
+  usageCount   Int       @default(0) @map("usage_count")
+  lastUsedAt   DateTime? @map("last_used_at")
+  userId       String    @map("user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("quick_norms")
+}
+
+// ============================================
+// CUSTOM ALIASES (shortcuts / references the user defines, e.g. "cc" → codice civile)
+// ============================================
+
+enum AliasType {
+  shortcut
+  reference
+}
+
+model CustomAlias {
+  id           String    @id @default(uuid())
+  trigger      String
+  aliasType    AliasType @map("alias_type")
+  expandTo     String    @map("expand_to")
+  // Reference-type aliases carry a prebuilt SearchParams object; shortcut-
+  // type aliases don't. Kept as JSON so the frontend's SearchParams shape
+  // can evolve without a migration.
+  searchParams Json?     @map("search_params")
+  description  String?
+  usageCount   Int       @default(0) @map("usage_count")
+  lastUsedAt   DateTime? @map("last_used_at")
+  userId       String    @map("user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Trigger must be unique PER USER (same trigger across users is fine).
+  @@unique([userId, trigger])
+  @@index([userId])
+  @@map("custom_aliases")
 }
 
 // ============================================

@@ -12,6 +12,8 @@ import { dossierService, type DossierApi, type DossierItemApi } from '../service
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
 import { environmentService, type EnvironmentApi, type EnvironmentCreatePayload } from '../services/environmentService';
+import { quickNormService, type QuickNormApi } from '../services/quickNormService';
+import { customAliasService, type CustomAliasApi } from '../services/customAliasService';
 import { isAuthenticated } from '../services/authService';
 import {
     annotationApiToStore,
@@ -65,6 +67,36 @@ function environmentStoreToCreatePayload(env: Environment): EnvironmentCreatePay
             annotations: env.annotations,
             highlights: env.highlights,
         },
+    };
+}
+
+// ── QuickNorm / CustomAlias wire ↔ store converters ───────────────────
+// Same pattern as environmentApiToStore: keep the serialization in one
+// place so every caller stays in sync.
+
+function quickNormApiToStore(q: QuickNormApi): QuickNorm {
+    return {
+        id: q.id,
+        label: q.label,
+        searchParams: q.searchParams,
+        sourceUrl: q.sourceUrl ?? undefined,
+        createdAt: q.createdAt,
+        usageCount: q.usageCount,
+        lastUsedAt: q.lastUsedAt ?? undefined,
+    };
+}
+
+function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
+    return {
+        id: a.id,
+        trigger: a.trigger,
+        type: a.type,
+        expandTo: a.expandTo,
+        searchParams: a.searchParams ?? undefined,
+        description: a.description ?? undefined,
+        createdAt: a.createdAt,
+        usageCount: a.usageCount,
+        lastUsedAt: a.lastUsedAt ?? undefined,
     };
 }
 
@@ -277,19 +309,23 @@ interface AppState {
     // searchTrigger and no-ops).
     drainNextSearch: () => void;
 
-    // QuickNorm Actions
-    addQuickNorm: (label: string, searchParams: SearchParams, sourceUrl?: string) => void;
-    removeQuickNorm: (id: string) => void;
-    removeQuickNormByParams: (searchParams: SearchParams) => void;
-    updateQuickNormLabel: (id: string, label: string) => void;
+    // QuickNorm Actions (server-backed). Mutators are async with the
+    // optimistic+sync pattern. selectQuickNorm stays sync because callers
+    // need the QuickNorm synchronously to trigger a search — the server
+    // `use` call is fire-and-forget on top of the local increment.
+    addQuickNorm: (label: string, searchParams: SearchParams, sourceUrl?: string) => Promise<void>;
+    removeQuickNorm: (id: string) => Promise<void>;
+    removeQuickNormByParams: (searchParams: SearchParams) => Promise<void>;
+    updateQuickNormLabel: (id: string, label: string) => Promise<void>;
     selectQuickNorm: (id: string) => QuickNorm | undefined;
     getQuickNormsSorted: () => QuickNorm[];
     isQuickNorm: (searchParams: SearchParams) => boolean;
 
-    // CustomAlias Actions
-    addCustomAlias: (alias: Omit<CustomAlias, 'id' | 'createdAt' | 'usageCount'>) => boolean;
-    updateCustomAlias: (id: string, updates: Partial<Omit<CustomAlias, 'id' | 'createdAt'>>) => void;
-    removeCustomAlias: (id: string) => void;
+    // CustomAlias Actions (server-backed). trackAliasUsage stays sync for
+    // the same reason selectQuickNorm does.
+    addCustomAlias: (alias: Omit<CustomAlias, 'id' | 'createdAt' | 'usageCount'>) => Promise<boolean>;
+    updateCustomAlias: (id: string, updates: Partial<Omit<CustomAlias, 'id' | 'createdAt'>>) => Promise<void>;
+    removeCustomAlias: (id: string) => Promise<void>;
     trackAliasUsage: (id: string) => void;
     resolveAlias: (input: string) => {
         found: boolean;
@@ -406,7 +442,7 @@ const appStore = createStore<AppState>()(
                     // CORS, backend down, 500 — all looked identical). Log the
                     // reason so devs see it in the console and the UI at least
                     // surfaces a dataError banner when both calls fail.
-                    const [bookmarksRes, dossiersRes, environmentsRes] = await Promise.all([
+                    const [bookmarksRes, dossiersRes, environmentsRes, quickNormsRes, customAliasesRes] = await Promise.all([
                         bookmarkService.getAll().catch((err) => {
                             console.error('fetchUserData: bookmarks failed:', err);
                             return [];
@@ -417,6 +453,14 @@ const appStore = createStore<AppState>()(
                         }),
                         environmentService.getAll().catch((err) => {
                             console.error('fetchUserData: environments failed:', err);
+                            return [];
+                        }),
+                        quickNormService.getAll().catch((err) => {
+                            console.error('fetchUserData: quickNorms failed:', err);
+                            return [];
+                        }),
+                        customAliasService.getAll().catch((err) => {
+                            console.error('fetchUserData: customAliases failed:', err);
                             return [];
                         }),
                         // Note: annotations and highlights are fetched per-article, not all at once
@@ -448,11 +492,15 @@ const appStore = createStore<AppState>()(
                     }));
 
                     const environments: Environment[] = environmentsRes.map(environmentApiToStore);
+                    const quickNorms: QuickNorm[] = quickNormsRes.map(quickNormApiToStore);
+                    const customAliases: CustomAlias[] = customAliasesRes.map(customAliasApiToStore);
 
                     set((state) => {
                         state.bookmarks = bookmarks;
                         state.dossiers = dossiers;
                         state.environments = environments;
+                        state.quickNorms = quickNorms;
+                        state.customAliases = customAliases;
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
                     });
@@ -1585,63 +1633,99 @@ const appStore = createStore<AppState>()(
             }),
 
             // QuickNorm Actions
-            addQuickNorm: (label, searchParams, sourceUrl) => set((state) => {
-                // Check for duplicates based on search params
-                const isDuplicate = state.quickNorms.some(
+            // Create on the server; abort quietly if it's a duplicate (same
+            // params already exist). We don't push a local placeholder before
+            // the server answers: for a single-shot "star this norm" action
+            // the user doesn't notice the ~100ms round-trip, and skipping the
+            // optimistic step means no rollback bookkeeping on failure.
+            addQuickNorm: async (label, searchParams, sourceUrl) => {
+                const isDuplicate = get().quickNorms.some(
                     qn => qn.searchParams.act_type === searchParams.act_type &&
                         qn.searchParams.article === searchParams.article &&
                         qn.searchParams.act_number === searchParams.act_number &&
                         qn.searchParams.date === searchParams.date
                 );
-
-                if (!isDuplicate) {
-                    state.quickNorms.push({
-                        id: uuidv4(),
+                if (isDuplicate) return;
+                try {
+                    const server = await quickNormService.create({
                         label,
                         searchParams,
-                        sourceUrl,
-                        createdAt: new Date().toISOString(),
-                        usageCount: 0,
-                        lastUsedAt: undefined
+                        sourceUrl: sourceUrl ?? null,
                     });
+                    const stored = quickNormApiToStore(server);
+                    set((state) => { state.quickNorms.push(stored); });
+                } catch (err) {
+                    console.error('addQuickNorm failed:', err);
                 }
-            }),
+            },
 
-            removeQuickNorm: (id) => set((state) => {
-                state.quickNorms = state.quickNorms.filter(qn => qn.id !== id);
-            }),
+            // Optimistic delete: remove locally, re-insert on failure.
+            removeQuickNorm: async (id) => {
+                const previous = get().quickNorms.find(qn => qn.id === id);
+                set((state) => {
+                    state.quickNorms = state.quickNorms.filter(qn => qn.id !== id);
+                });
+                if (!previous) return;
+                try {
+                    await quickNormService.delete(id);
+                } catch (err) {
+                    if ((err as { status?: number })?.status !== 404) {
+                        console.error('removeQuickNorm failed:', err);
+                        set((state) => { state.quickNorms.push(previous); });
+                    }
+                }
+            },
 
-            removeQuickNormByParams: (searchParams) => set((state) => {
-                state.quickNorms = state.quickNorms.filter(
-                    qn => !(qn.searchParams.act_type === searchParams.act_type &&
+            // Convenience wrapper: resolve params→id, then call removeQuickNorm
+            // so the server round-trip stays a single path.
+            removeQuickNormByParams: async (searchParams) => {
+                const match = get().quickNorms.find(
+                    qn => qn.searchParams.act_type === searchParams.act_type &&
                         qn.searchParams.article === searchParams.article &&
                         qn.searchParams.act_number === searchParams.act_number &&
-                        qn.searchParams.date === searchParams.date)
+                        qn.searchParams.date === searchParams.date
                 );
-            }),
+                if (match) await get().removeQuickNorm(match.id);
+            },
 
-            updateQuickNormLabel: (id, label) => set((state) => {
-                const qn = state.quickNorms.find(q => q.id === id);
-                if (qn) {
-                    qn.label = label;
+            // Optimistic label update: apply locally, PUT, revert on error.
+            updateQuickNormLabel: async (id, label) => {
+                const previous = get().quickNorms.find(q => q.id === id);
+                if (!previous) return;
+                set((state) => {
+                    const qn = state.quickNorms.find(q => q.id === id);
+                    if (qn) qn.label = label;
+                });
+                try {
+                    await quickNormService.update(id, { label });
+                } catch (err) {
+                    console.error('updateQuickNormLabel failed:', err);
+                    set((state) => {
+                        const qn = state.quickNorms.find(q => q.id === id);
+                        if (qn) qn.label = previous.label;
+                    });
                 }
-            }),
+            },
 
+            // Usage tracking: bump the local counter for instant UX, then
+            // fire-and-forget a POST /use so the server counter eventually
+            // matches. A failed sync is not worth surfacing to the user —
+            // the counter re-syncs on next fetchUserData.
             selectQuickNorm: (id) => {
                 const state = get();
                 const qn = state.quickNorms.find(q => q.id === id);
-                if (qn) {
-                    // Update usage stats
-                    set((state) => {
-                        const quickNorm = state.quickNorms.find(q => q.id === id);
-                        if (quickNorm) {
-                            quickNorm.usageCount += 1;
-                            quickNorm.lastUsedAt = new Date().toISOString();
-                        }
-                    });
-                    return qn;
-                }
-                return undefined;
+                if (!qn) return undefined;
+                set((s) => {
+                    const hit = s.quickNorms.find(q => q.id === id);
+                    if (hit) {
+                        hit.usageCount += 1;
+                        hit.lastUsedAt = new Date().toISOString();
+                    }
+                });
+                void quickNormService.use(id).catch((err) => {
+                    console.error('quickNorm use sync failed:', err);
+                });
+                return qn;
             },
 
             getQuickNormsSorted: () => {
@@ -1669,57 +1753,101 @@ const appStore = createStore<AppState>()(
             },
 
             // CustomAlias Actions
-            addCustomAlias: (aliasData) => {
-                const state = get();
-                const triggerLower = aliasData.trigger.toLowerCase().trim();
 
-                // Validate trigger: min 2 chars, alphanumeric + dash/underscore
+            // Client-side validation mirrors the backend regex so we don't
+            // waste a round-trip on a clearly invalid trigger. Returns false
+            // for invalid input, local duplicate, or server 409 (unique
+            // constraint). Returns true on success.
+            addCustomAlias: async (aliasData) => {
+                const triggerLower = aliasData.trigger.toLowerCase().trim();
                 if (triggerLower.length < 2 || !/^[a-zA-Z0-9\-_.]+$/.test(triggerLower)) {
                     return false;
                 }
-
-                // Check for duplicates
-                const exists = state.customAliases.some(
+                const existsLocal = get().customAliases.some(
                     a => a.trigger.toLowerCase() === triggerLower
                 );
+                if (existsLocal) return false;
 
-                if (exists) {
+                try {
+                    const server = await customAliasService.create({
+                        trigger: triggerLower,
+                        type: aliasData.type,
+                        expandTo: aliasData.expandTo,
+                        searchParams: aliasData.searchParams ?? null,
+                        description: aliasData.description ?? null,
+                    });
+                    const stored = customAliasApiToStore(server);
+                    set((state) => { state.customAliases.push(stored); });
+                    return true;
+                } catch (err) {
+                    console.error('addCustomAlias failed:', err);
                     return false;
                 }
-
-                set((draft) => {
-                    draft.customAliases.push({
-                        ...aliasData,
-                        id: uuidv4(),
-                        trigger: triggerLower,
-                        createdAt: new Date().toISOString(),
-                        usageCount: 0,
-                    });
-                });
-                return true;
             },
 
-            updateCustomAlias: (id, updates) => set((state) => {
-                const alias = state.customAliases.find(a => a.id === id);
-                if (alias) {
-                    if (updates.trigger) {
-                        updates.trigger = updates.trigger.toLowerCase().trim();
+            // Optimistic update with revert. `trigger` gets normalised to
+            // lowercase on both sides.
+            updateCustomAlias: async (id, updates) => {
+                const previous = get().customAliases.find(a => a.id === id);
+                if (!previous) return;
+                const normalized = {
+                    ...updates,
+                    ...(updates.trigger !== undefined && {
+                        trigger: updates.trigger.toLowerCase().trim(),
+                    }),
+                };
+                set((state) => {
+                    const alias = state.customAliases.find(a => a.id === id);
+                    if (alias) Object.assign(alias, normalized);
+                });
+                try {
+                    await customAliasService.update(id, {
+                        ...(normalized.trigger !== undefined && { trigger: normalized.trigger }),
+                        ...(normalized.type !== undefined && { type: normalized.type }),
+                        ...(normalized.expandTo !== undefined && { expandTo: normalized.expandTo }),
+                        ...(normalized.searchParams !== undefined && { searchParams: normalized.searchParams ?? null }),
+                        ...(normalized.description !== undefined && { description: normalized.description ?? null }),
+                    });
+                } catch (err) {
+                    console.error('updateCustomAlias failed:', err);
+                    set((state) => {
+                        const alias = state.customAliases.find(a => a.id === id);
+                        if (alias) Object.assign(alias, previous);
+                    });
+                }
+            },
+
+            // Optimistic delete with revert on non-404.
+            removeCustomAlias: async (id) => {
+                const previous = get().customAliases.find(a => a.id === id);
+                set((state) => {
+                    state.customAliases = state.customAliases.filter(a => a.id !== id);
+                });
+                if (!previous) return;
+                try {
+                    await customAliasService.delete(id);
+                } catch (err) {
+                    if ((err as { status?: number })?.status !== 404) {
+                        console.error('removeCustomAlias failed:', err);
+                        set((state) => { state.customAliases.push(previous); });
                     }
-                    Object.assign(alias, updates);
                 }
-            }),
+            },
 
-            removeCustomAlias: (id) => set((state) => {
-                state.customAliases = state.customAliases.filter(a => a.id !== id);
-            }),
-
-            trackAliasUsage: (id) => set((state) => {
-                const alias = state.customAliases.find(a => a.id === id);
-                if (alias) {
-                    alias.usageCount += 1;
-                    alias.lastUsedAt = new Date().toISOString();
-                }
-            }),
+            // Usage bump: local increment + fire-and-forget POST /use.
+            // Same rationale as selectQuickNorm.
+            trackAliasUsage: (id) => {
+                set((state) => {
+                    const alias = state.customAliases.find(a => a.id === id);
+                    if (alias) {
+                        alias.usageCount += 1;
+                        alias.lastUsedAt = new Date().toISOString();
+                    }
+                });
+                void customAliasService.use(id).catch((err) => {
+                    console.error('customAlias use sync failed:', err);
+                });
+            },
 
             resolveAlias: (input) => {
                 const state = get();
@@ -2214,14 +2342,12 @@ const appStore = createStore<AppState>()(
                 searchPanelState: state.searchPanelState,
                 workspaceTabs: state.workspaceTabs,
                 highestZIndex: state.highestZIndex,
-                // Client-only slices: persisted here because they don't have
-                // a backend and we still want them to survive a refresh.
-                customAliases: state.customAliases,
-                quickNorms: state.quickNorms,
-                // Excluded on purpose — these are server-backed and hydrated
-                // by fetchUserData. Persisting them locally would cause drift
-                // with the server (see the dossier/applyEnvironment sync fixes).
-                //   bookmarks, dossiers, environments, annotations, highlights
+                // Every user-data slice is now server-backed and hydrated by
+                // fetchUserData. Nothing user-owned survives in localStorage
+                // anymore — persisting would cause drift with the server.
+                // Excluded on purpose:
+                //   bookmarks, dossiers, environments, quickNorms,
+                //   customAliases, annotations, highlights
             }),
             // Rehydrated state from older versions may not have the
             // `studyMode` slice we just added. Splice in defaults here so

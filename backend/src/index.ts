@@ -16,6 +16,8 @@ import feedbackRoutes from './routes/feedback';
 import historyRoutes from './routes/history';
 import sharedEnvironmentRoutes from './routes/sharedEnvironments';
 import environmentRoutes from './routes/environments';
+import quickNormRoutes from './routes/quickNorms';
+import customAliasRoutes from './routes/customAliases';
 
 const app = express();
 
@@ -75,6 +77,8 @@ app.use('/api', feedbackRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api', sharedEnvironmentRoutes);
 app.use('/api', environmentRoutes);
+app.use('/api', quickNormRoutes);
+app.use('/api', customAliasRoutes);
 
 // 404 handler
 app.use((_req, res) => {

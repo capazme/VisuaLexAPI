@@ -77,7 +77,7 @@ export function AliasManager() {
         setDefaultArticle('');
     }, []);
 
-    const handleSubmit = useCallback((e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         if (!canSubmit) return;
 
@@ -85,7 +85,10 @@ export function AliasManager() {
         const autoDisplayName = displayName ||
             (actNumber && actDate ? `${actType} ${actNumber}/${actDate}` : actType);
 
-        const success = addCustomAlias({
+        // addCustomAlias is now async: it validates + POSTs and returns
+        // false on invalid trigger, local duplicate, or server 409. Only
+        // reset the form when the server has actually accepted it.
+        const success = await addCustomAlias({
             trigger,
             type: 'reference',
             expandTo: autoDisplayName,
