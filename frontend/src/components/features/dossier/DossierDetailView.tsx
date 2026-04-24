@@ -445,10 +445,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                       aria-pressed={active}
                       aria-label={`${active ? 'Rimuovi filtro' : 'Filtra per'} ${cfg.label.toLowerCase()} (${count})`}
                       className={cn(
-                        'flex items-center gap-1 px-2 py-1 rounded whitespace-nowrap transition-colors',
+                        'inline-flex items-center gap-1.5 min-h-7 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
                         cfg.bg, cfg.color,
-                        active ? 'ring-2 ring-current ring-offset-1 dark:ring-offset-slate-900' : 'opacity-90 hover:opacity-100',
+                        active
+                          ? 'font-semibold ring-1 ring-current/40 shadow-sm'
+                          : 'opacity-80 hover:opacity-100',
                       )}
                     >
                       <Icon size={12} className="flex-shrink-0" />
