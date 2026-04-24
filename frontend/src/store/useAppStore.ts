@@ -350,10 +350,21 @@ const appStore = createStore<AppState>()(
                 });
 
                 try {
-                    // Fetch all user data in parallel
+                    // Fetch all user data in parallel. The silent catch used to
+                    // swallow any error here, which made it impossible to tell
+                    // why the UI came up empty after a refresh (expired token,
+                    // CORS, backend down, 500 — all looked identical). Log the
+                    // reason so devs see it in the console and the UI at least
+                    // surfaces a dataError banner when both calls fail.
                     const [bookmarksRes, dossiersRes] = await Promise.all([
-                        bookmarkService.getAll().catch(() => []),
-                        dossierService.getAll().catch(() => []),
+                        bookmarkService.getAll().catch((err) => {
+                            console.error('fetchUserData: bookmarks failed:', err);
+                            return [];
+                        }),
+                        dossierService.getAll().catch((err) => {
+                            console.error('fetchUserData: dossiers failed:', err);
+                            return [];
+                        }),
                         // Note: annotations and highlights are fetched per-article, not all at once
                     ]);
 
