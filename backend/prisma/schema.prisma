@@ -34,6 +34,9 @@ model User {
   feedbacks     Feedback[]
   searchHistory SearchHistory[]
 
+  // Personal Environments (user-owned, not published)
+  environments Environment[]
+
   // Shared Environments (Bulletin Board)
   sharedEnvironments       SharedEnvironment[]
   sharedEnvironmentLikes   SharedEnvironmentLike[]
@@ -75,16 +78,16 @@ model Folder {
 // ============================================
 
 model Bookmark {
-  id         String   @id @default(uuid())
-  normaKey   String   @map("norma_key") // e.g., "Art. 1414 c.c."
-  normaData  Json     @map("norma_data") // Full article data from VisualEx API
-  title      String? // Optional custom title
-  notes      String? // User notes
-  tags       String[] // Array of tags
-  folderId   String?  @map("folder_id")
-  userId     String   @map("user_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  normaKey  String   @map("norma_key") // e.g., "Art. 1414 c.c."
+  normaData Json     @map("norma_data") // Full article data from VisualEx API
+  title     String? // Optional custom title
+  notes     String? // User notes
+  tags      String[] // Array of tags
+  folderId  String?  @map("folder_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -116,7 +119,7 @@ model Annotation {
   content        String
   annotationType AnnotationType @default(note) @map("annotation_type")
   textContext    String?        @map("text_context") // Surrounding text for context
-  position       Int?           // Position in article
+  position       Int? // Position in article
   bookmarkId     String?        @map("bookmark_id")
   userId         String         @map("user_id")
   createdAt      DateTime       @default(now()) @map("created_at")
@@ -186,13 +189,13 @@ enum DossierItemType {
 }
 
 model DossierItem {
-  id         String          @id @default(uuid())
-  dossierId  String          @map("dossier_id")
-  itemType   DossierItemType @map("item_type")
-  title      String
-  content    Json? // Flexible content (norm data, note text, etc.)
-  position   Int             @default(0)
-  createdAt  DateTime        @default(now()) @map("created_at")
+  id        String          @id @default(uuid())
+  dossierId String          @map("dossier_id")
+  itemType  DossierItemType @map("item_type")
+  title     String
+  content   Json? // Flexible content (norm data, note text, etc.)
+  position  Int             @default(0)
+  createdAt DateTime        @default(now()) @map("created_at")
 
   // Relationships
   dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
@@ -283,8 +286,44 @@ enum ReportStatus {
   dismissed
 }
 
+// ============================================
+// PERSONAL ENVIRONMENTS
+// A user's own workspace snapshot (dossiers + quickNorms + aliases +
+// annotations + highlights). NOT the same as SharedEnvironment, which
+// is the published/community-board entity. A user can promote a personal
+// environment to a SharedEnvironment but the two tables stay distinct.
+// ============================================
+
+model Environment {
+  id          String               @id @default(uuid())
+  name        String
+  description String?
+  author      String?
+  version     String?
+  category    EnvironmentCategory?
+  color       String? // Hex color for UI distinction
+  tags        String[]
+
+  // Full content snapshot — dossiers / quickNorms / customAliases /
+  // annotations / highlights are blobbed as JSON exactly like the
+  // SharedEnvironment.content pattern (querying individual items is
+  // not a use case; we always hydrate the whole environment).
+  content Json
+
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("environments")
+}
+
 model SharedEnvironment {
-  id          String              @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String
   description String?
 
@@ -304,9 +343,9 @@ model SharedEnvironment {
   downloadCount Int @default(0) @map("download_count")
 
   // Versioning
-  currentVersion Int      @default(1) @map("current_version")
-  isActive       Boolean  @default(true) @map("is_active")
-  replacedById   String?  @map("replaced_by_id")
+  currentVersion Int     @default(1) @map("current_version")
+  isActive       Boolean @default(true) @map("is_active")
+  replacedById   String? @map("replaced_by_id")
 
   // Ownership
   userId    String   @map("user_id")
@@ -314,7 +353,7 @@ model SharedEnvironment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  user        User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   likes       SharedEnvironmentLike[]
   reports     SharedEnvironmentReport[]
   versions    SharedEnvironmentVersion[]
@@ -373,9 +412,9 @@ enum SuggestionStatus {
 }
 
 model EnvironmentSuggestion {
-  id                  String            @id @default(uuid())
-  sharedEnvironmentId String            @map("shared_environment_id")
-  suggesterId         String            @map("suggester_id")
+  id                  String @id @default(uuid())
+  sharedEnvironmentId String @map("shared_environment_id")
+  suggesterId         String @map("suggester_id")
 
   // Suggested content (only dossiers, quickNorms, customAliases)
   content Json
@@ -407,12 +446,12 @@ model SharedEnvironmentVersion {
   sharedEnvironmentId String @map("shared_environment_id")
 
   // Version info
-  version   Int     // Sequential version number (1, 2, 3...)
-  content   Json    // Snapshot of environment content at this version
+  version   Int // Sequential version number (1, 2, 3...)
+  content   Json // Snapshot of environment content at this version
   changelog String? // Description of changes
 
   // Link to suggestion that created this version (if applicable)
-  suggestionId String?               @unique @map("suggestion_id")
+  suggestionId String?                @unique @map("suggestion_id")
   suggestion   EnvironmentSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")

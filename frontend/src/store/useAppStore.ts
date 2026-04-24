@@ -11,6 +11,7 @@ import { bookmarkService } from '../services/bookmarkService';
 import { dossierService, type DossierApi, type DossierItemApi } from '../services/dossierService';
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
+import { environmentService, type EnvironmentApi, type EnvironmentCreatePayload } from '../services/environmentService';
 import { isAuthenticated } from '../services/authService';
 import {
     annotationApiToStore,
@@ -20,6 +21,52 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
+
+// ── Environment wire ↔ store converters ───────────────────────────────
+// The server stores the per-slice content (dossiers / quickNorms / aliases /
+// annotations / highlights) inside a single opaque `content` JSON column.
+// These helpers keep the conversion in one place so every caller stays
+// consistent and avoids ad-hoc unpacking.
+
+function environmentApiToStore(e: EnvironmentApi): Environment {
+    const c = (e.content ?? {}) as Partial<Environment>;
+    return {
+        id: e.id,
+        name: e.name,
+        description: e.description ?? undefined,
+        author: e.author ?? undefined,
+        version: e.version ?? undefined,
+        category: e.category ?? undefined,
+        color: e.color ?? undefined,
+        tags: e.tags ?? [],
+        createdAt: e.created_at,
+        updatedAt: e.updated_at,
+        dossiers: c.dossiers ?? [],
+        quickNorms: c.quickNorms ?? [],
+        customAliases: c.customAliases ?? [],
+        annotations: c.annotations ?? [],
+        highlights: c.highlights ?? [],
+    };
+}
+
+function environmentStoreToCreatePayload(env: Environment): EnvironmentCreatePayload {
+    return {
+        name: env.name,
+        description: env.description ?? null,
+        author: env.author ?? null,
+        version: env.version ?? null,
+        category: env.category ?? null,
+        color: env.color ?? null,
+        tags: env.tags ?? [],
+        content: {
+            dossiers: env.dossiers,
+            quickNorms: env.quickNorms,
+            customAliases: env.customAliases,
+            annotations: env.annotations,
+            highlights: env.highlights,
+        },
+    };
+}
 
 // Content types for WorkspaceTab
 interface NormaBlock {
@@ -254,14 +301,17 @@ interface AppState {
     getCustomAliasesSorted: () => CustomAlias[];
 
     // Environment Actions
-    createEnvironment: (name: string, options?: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => string;
-    createEnvironmentWithSelection: (name: string, selection: EnvironmentSelection, options?: { description?: string; author?: string; version?: string; category?: EnvironmentCategory }) => string;
-    updateEnvironment: (id: string, updates: Partial<Omit<Environment, 'id' | 'createdAt'>>) => void;
-    deleteEnvironment: (id: string) => void;
-    importEnvironment: (env: Environment) => string;
-    importEnvironmentPartial: (envData: Partial<Environment>, selection: EnvironmentSelection, mode: 'merge' | 'replace') => void;
+    // Environment mutators are server-backed: each returns the Promise so
+    // callers can await completion before navigating / showing toasts, and
+    // can surface `null` as a failure signal (server error, not authenticated).
+    createEnvironment: (name: string, options?: { description?: string; category?: EnvironmentCategory; fromCurrent?: boolean }) => Promise<string | null>;
+    createEnvironmentWithSelection: (name: string, selection: EnvironmentSelection, options?: { description?: string; author?: string; version?: string; category?: EnvironmentCategory }) => Promise<string | null>;
+    updateEnvironment: (id: string, updates: Partial<Omit<Environment, 'id' | 'createdAt'>>) => Promise<void>;
+    deleteEnvironment: (id: string) => Promise<void>;
+    importEnvironment: (env: Environment) => Promise<string | null>;
+    importEnvironmentPartial: (envData: Partial<Environment>, selection: EnvironmentSelection, mode: 'merge' | 'replace') => Promise<void>;
     applyEnvironment: (id: string, mode: 'replace' | 'merge') => Promise<void>;
-    refreshEnvironmentFromCurrent: (id: string) => void;
+    refreshEnvironmentFromCurrent: (id: string) => Promise<void>;
     getCurrentStateAsEnvironment: (name: string) => Environment;
 }
 
@@ -356,13 +406,17 @@ const appStore = createStore<AppState>()(
                     // CORS, backend down, 500 — all looked identical). Log the
                     // reason so devs see it in the console and the UI at least
                     // surfaces a dataError banner when both calls fail.
-                    const [bookmarksRes, dossiersRes] = await Promise.all([
+                    const [bookmarksRes, dossiersRes, environmentsRes] = await Promise.all([
                         bookmarkService.getAll().catch((err) => {
                             console.error('fetchUserData: bookmarks failed:', err);
                             return [];
                         }),
                         dossierService.getAll().catch((err) => {
                             console.error('fetchUserData: dossiers failed:', err);
+                            return [];
+                        }),
+                        environmentService.getAll().catch((err) => {
+                            console.error('fetchUserData: environments failed:', err);
                             return [];
                         }),
                         // Note: annotations and highlights are fetched per-article, not all at once
@@ -393,9 +447,12 @@ const appStore = createStore<AppState>()(
                         isPinned: false,
                     }));
 
+                    const environments: Environment[] = environmentsRes.map(environmentApiToStore);
+
                     set((state) => {
                         state.bookmarks = bookmarks;
                         state.dossiers = dossiers;
+                        state.environments = environments;
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
                     });
@@ -1724,35 +1781,36 @@ const appStore = createStore<AppState>()(
             },
 
             // Environment Actions
-            createEnvironment: (name, options = {}) => {
-                const envId = uuidv4();
+            // Build a store-shape Environment from the current app state and
+            // POST it. Returns the server id so callers can navigate/select.
+            createEnvironment: async (name, options = {}) => {
                 const state = get();
-
-                set((draft) => {
-                    const newEnv: Environment = {
-                        id: envId,
-                        name,
-                        description: options.description,
-                        category: options.category,
-                        createdAt: new Date().toISOString(),
-                        // If fromCurrent, snapshot current state
-                        dossiers: options.fromCurrent ? JSON.parse(JSON.stringify(state.dossiers)) : [],
-                        quickNorms: options.fromCurrent ? JSON.parse(JSON.stringify(state.quickNorms)) : [],
-                        customAliases: options.fromCurrent ? JSON.parse(JSON.stringify(state.customAliases)) : [],
-                        annotations: options.fromCurrent ? JSON.parse(JSON.stringify(state.annotations)) : [],
-                        highlights: options.fromCurrent ? JSON.parse(JSON.stringify(state.highlights)) : [],
-                        tags: [],
-                    };
-                    draft.environments.push(newEnv);
-                });
-                return envId;
+                const draft: Environment = {
+                    id: '', // assigned by server
+                    name,
+                    description: options.description,
+                    category: options.category,
+                    createdAt: new Date().toISOString(),
+                    dossiers: options.fromCurrent ? JSON.parse(JSON.stringify(state.dossiers)) : [],
+                    quickNorms: options.fromCurrent ? JSON.parse(JSON.stringify(state.quickNorms)) : [],
+                    customAliases: options.fromCurrent ? JSON.parse(JSON.stringify(state.customAliases)) : [],
+                    annotations: options.fromCurrent ? JSON.parse(JSON.stringify(state.annotations)) : [],
+                    highlights: options.fromCurrent ? JSON.parse(JSON.stringify(state.highlights)) : [],
+                    tags: [],
+                };
+                try {
+                    const server = await environmentService.create(environmentStoreToCreatePayload(draft));
+                    const stored = environmentApiToStore(server);
+                    set((s) => { s.environments.push(stored); });
+                    return stored.id;
+                } catch (err) {
+                    console.error('createEnvironment failed:', err);
+                    return null;
+                }
             },
 
-            createEnvironmentWithSelection: (name, selection, options = {}) => {
-                const envId = uuidv4();
+            createEnvironmentWithSelection: async (name, selection, options = {}) => {
                 const state = get();
-
-                // Filter current state by selection
                 const currentAsEnv = {
                     dossiers: state.dossiers,
                     quickNorms: state.quickNorms,
@@ -1761,123 +1819,219 @@ const appStore = createStore<AppState>()(
                     highlights: state.highlights,
                 };
                 const filtered = filterEnvironmentBySelection(currentAsEnv, selection);
-
-                set((draft) => {
-                    const newEnv: Environment = {
-                        id: envId,
-                        name,
-                        description: options.description,
-                        author: options.author,
-                        version: options.version,
-                        category: options.category,
-                        createdAt: new Date().toISOString(),
-                        dossiers: JSON.parse(JSON.stringify(filtered.dossiers || [])),
-                        quickNorms: JSON.parse(JSON.stringify(filtered.quickNorms || [])),
-                        customAliases: JSON.parse(JSON.stringify(filtered.customAliases || [])),
-                        annotations: JSON.parse(JSON.stringify(filtered.annotations || [])),
-                        highlights: JSON.parse(JSON.stringify(filtered.highlights || [])),
-                        tags: [],
-                    };
-                    draft.environments.push(newEnv);
-                });
-                return envId;
-            },
-
-            updateEnvironment: (id, updates) => set((state) => {
-                const env = state.environments.find(e => e.id === id);
-                if (env) {
-                    Object.assign(env, updates, { updatedAt: new Date().toISOString() });
+                const draft: Environment = {
+                    id: '',
+                    name,
+                    description: options.description,
+                    author: options.author,
+                    version: options.version,
+                    category: options.category,
+                    createdAt: new Date().toISOString(),
+                    dossiers: JSON.parse(JSON.stringify(filtered.dossiers || [])),
+                    quickNorms: JSON.parse(JSON.stringify(filtered.quickNorms || [])),
+                    customAliases: JSON.parse(JSON.stringify(filtered.customAliases || [])),
+                    annotations: JSON.parse(JSON.stringify(filtered.annotations || [])),
+                    highlights: JSON.parse(JSON.stringify(filtered.highlights || [])),
+                    tags: [],
+                };
+                try {
+                    const server = await environmentService.create(environmentStoreToCreatePayload(draft));
+                    const stored = environmentApiToStore(server);
+                    set((s) => { s.environments.push(stored); });
+                    return stored.id;
+                } catch (err) {
+                    console.error('createEnvironmentWithSelection failed:', err);
+                    return null;
                 }
-            }),
-
-            deleteEnvironment: (id) => set((state) => {
-                state.environments = state.environments.filter(e => e.id !== id);
-            }),
-
-            importEnvironment: (env) => {
-                const newId = uuidv4();
-                set((state) => {
-                    // Deep clone and regenerate IDs to avoid conflicts
-                    const imported: Environment = {
-                        ...JSON.parse(JSON.stringify(env)),
-                        id: newId,
-                        createdAt: new Date().toISOString(),
-                        dossiers: env.dossiers.map(d => ({ ...d, id: uuidv4(), items: d.items.map(i => ({ ...i, id: uuidv4() })) })),
-                        quickNorms: env.quickNorms.map(q => ({ ...q, id: uuidv4() })),
-                        annotations: env.annotations.map(a => ({ ...a, id: uuidv4() })),
-                        highlights: env.highlights.map(h => ({ ...h, id: uuidv4() })),
-                    };
-                    state.environments.push(imported);
-                });
-                return newId;
             },
 
-            importEnvironmentPartial: (envData, selection, mode) => set((state) => {
-                // Filter environment by selection
+            // Optimistic PATCH: apply locally, then sync; revert on error.
+            updateEnvironment: async (id, updates) => {
+                const previous = get().environments.find(e => e.id === id);
+                if (!previous) return;
+                const optimistic: Environment = {
+                    ...previous,
+                    ...updates,
+                    updatedAt: new Date().toISOString(),
+                };
+                set((state) => {
+                    const env = state.environments.find(e => e.id === id);
+                    if (env) Object.assign(env, updates, { updatedAt: optimistic.updatedAt });
+                });
+                try {
+                    // Only send the fields that might have changed on the
+                    // server — content included because updates can touch the
+                    // per-slice snapshots.
+                    await environmentService.update(id, {
+                        ...(updates.name !== undefined && { name: updates.name }),
+                        ...(updates.description !== undefined && { description: updates.description ?? null }),
+                        ...(updates.author !== undefined && { author: updates.author ?? null }),
+                        ...(updates.version !== undefined && { version: updates.version ?? null }),
+                        ...(updates.category !== undefined && { category: updates.category ?? null }),
+                        ...(updates.color !== undefined && { color: updates.color ?? null }),
+                        ...(updates.tags !== undefined && { tags: updates.tags }),
+                        // If any content slice was patched, ship the new snapshot.
+                        ...((updates.dossiers !== undefined
+                          || updates.quickNorms !== undefined
+                          || updates.customAliases !== undefined
+                          || updates.annotations !== undefined
+                          || updates.highlights !== undefined) && {
+                            content: {
+                                dossiers: optimistic.dossiers,
+                                quickNorms: optimistic.quickNorms,
+                                customAliases: optimistic.customAliases,
+                                annotations: optimistic.annotations,
+                                highlights: optimistic.highlights,
+                            },
+                        }),
+                    });
+                } catch (err) {
+                    console.error('updateEnvironment failed:', err);
+                    set((state) => {
+                        const env = state.environments.find(e => e.id === id);
+                        if (env) Object.assign(env, previous);
+                    });
+                }
+            },
+
+            // Optimistic DELETE. Re-insert on failure.
+            deleteEnvironment: async (id) => {
+                const previous = get().environments.find(e => e.id === id);
+                set((state) => {
+                    state.environments = state.environments.filter(e => e.id !== id);
+                });
+                if (!previous) return;
+                try {
+                    await environmentService.delete(id);
+                } catch (err) {
+                    if ((err as { status?: number })?.status !== 404) {
+                        console.error('deleteEnvironment failed:', err);
+                        set((state) => { state.environments.push(previous); });
+                    }
+                }
+            },
+
+            // Import a full Environment payload (from file / share link /
+            // exampleEnvironments seed). Creates on the server and adopts
+            // the server id; all nested per-slice ids stay as given (an
+            // imported environment is a snapshot, not a live handle to
+            // any of the user's actual dossiers).
+            importEnvironment: async (env) => {
+                const clone: Environment = {
+                    ...JSON.parse(JSON.stringify(env)),
+                    id: '',
+                    createdAt: new Date().toISOString(),
+                };
+                try {
+                    const server = await environmentService.create(environmentStoreToCreatePayload(clone));
+                    const stored = environmentApiToStore(server);
+                    set((state) => { state.environments.push(stored); });
+                    return stored.id;
+                } catch (err) {
+                    console.error('importEnvironment failed:', err);
+                    return null;
+                }
+            },
+
+            // Apply a partial environment (user-picked subset via
+            // ImportPreviewModal). Structurally identical to applyEnvironment
+            // except the source is an arbitrary Partial<Environment> from a
+            // file/share-link instead of one already in the store.
+            // Dossiers/annotations/highlights must round-trip the backend —
+            // see gotcha #17 in CLAUDE.md.
+            importEnvironmentPartial: async (envData, selection, mode) => {
                 const filtered = filterEnvironmentBySelection(envData, selection);
 
-                // Deep clone and regenerate IDs
-                const clonedDossiers = JSON.parse(JSON.stringify(filtered.dossiers || [])).map((d: Dossier) => ({
-                    ...d,
-                    id: uuidv4(),
-                    items: d.items.map((i: any) => ({ ...i, id: uuidv4() }))
-                }));
-                const clonedQuickNorms = JSON.parse(JSON.stringify(filtered.quickNorms || [])).map((q: QuickNorm) => ({
-                    ...q,
-                    id: uuidv4(),
-                    usageCount: 0,
-                    lastUsedAt: undefined
-                }));
-                const clonedCustomAliases = JSON.parse(JSON.stringify(filtered.customAliases || [])).map((a: CustomAlias) => ({
-                    ...a,
-                    id: uuidv4(),
-                    usageCount: 0,
-                    lastUsedAt: undefined
-                }));
-                const clonedAnnotations = JSON.parse(JSON.stringify(filtered.annotations || [])).map((a: Annotation) => ({
-                    ...a,
-                    id: uuidv4()
-                }));
-                const clonedHighlights = JSON.parse(JSON.stringify(filtered.highlights || [])).map((h: Highlight) => ({
-                    ...h,
-                    id: uuidv4()
-                }));
+                // ── Dossiers (server-backed): delete existing in replace,
+                // then use importDossier (server create + items) for each.
+                if (mode === 'replace') {
+                    const existingIds = get().dossiers.map(d => d.id);
+                    await Promise.allSettled(existingIds.map(eid => dossierService.delete(eid)));
+                    set((state) => { state.dossiers = []; });
+                }
+                const existingTitles = new Set(get().dossiers.map(d => d.title.toLowerCase()));
+                const dossiersToImport = (filtered.dossiers || []).filter(d =>
+                    mode === 'replace' ? true : !existingTitles.has(d.title.toLowerCase())
+                );
+                for (const d of dossiersToImport) {
+                    await get().importDossier(d);
+                }
+
+                // ── quickNorms + customAliases (client-only).
+                set((state) => {
+                    const clonedQuickNorms = JSON.parse(JSON.stringify(filtered.quickNorms || [])).map((q: QuickNorm) => ({
+                        ...q,
+                        id: uuidv4(),
+                        usageCount: 0,
+                        lastUsedAt: undefined,
+                    }));
+                    const clonedCustomAliases = JSON.parse(JSON.stringify(filtered.customAliases || [])).map((a: CustomAlias) => ({
+                        ...a,
+                        id: uuidv4(),
+                        usageCount: 0,
+                        lastUsedAt: undefined,
+                    }));
+
+                    if (mode === 'replace') {
+                        state.quickNorms = clonedQuickNorms;
+                        state.customAliases = clonedCustomAliases;
+                    } else {
+                        const existingLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
+                        const existingTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
+                        clonedQuickNorms.forEach((q: QuickNorm) => {
+                            if (!existingLabels.has(q.label.toLowerCase())) state.quickNorms.push(q);
+                        });
+                        clonedCustomAliases.forEach((a: CustomAlias) => {
+                            if (!existingTriggers.has(a.trigger.toLowerCase())) state.customAliases.push(a);
+                        });
+                    }
+                });
+
+                // ── Annotations + highlights (server-backed): server wipe
+                // in replace, then create each via the same path used by
+                // applyEnvironment. Same deleteAll asymmetry documented there.
+                if (mode === 'replace') {
+                    try { await annotationService.deleteAll(); } catch (err) {
+                        console.error('importEnvironmentPartial: annotation deleteAll failed:', err);
+                    }
+                    set((state) => { state.annotations = []; });
+                }
+                const annResults = await Promise.allSettled(
+                    (filtered.annotations || []).map(async (a) => {
+                        const wire = annotationStoreToCreate(a);
+                        const server = await annotationService.create(wire);
+                        return annotationApiToStore(server);
+                    })
+                );
+                const syncedAnn = annResults
+                    .filter((r): r is PromiseFulfilledResult<Annotation> => r.status === 'fulfilled')
+                    .map((r) => r.value);
+                if (syncedAnn.length > 0) {
+                    set((state) => { state.annotations.push(...syncedAnn); });
+                }
 
                 if (mode === 'replace') {
-                    state.dossiers = clonedDossiers;
-                    state.quickNorms = clonedQuickNorms;
-                    state.customAliases = clonedCustomAliases;
-                    state.annotations = clonedAnnotations;
-                    state.highlights = clonedHighlights;
-                } else {
-                    // Merge mode: add new items, skip duplicates
-                    const existingDossierTitles = new Set(state.dossiers.map(d => d.title.toLowerCase()));
-                    const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
-                    const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
-
-                    clonedDossiers.forEach((d: Dossier) => {
-                        if (!existingDossierTitles.has(d.title.toLowerCase())) {
-                            state.dossiers.push(d);
-                        }
-                    });
-
-                    clonedQuickNorms.forEach((q: QuickNorm) => {
-                        if (!existingQuickNormLabels.has(q.label.toLowerCase())) {
-                            state.quickNorms.push(q);
-                        }
-                    });
-
-                    clonedCustomAliases.forEach((a: CustomAlias) => {
-                        if (!existingAliasTriggers.has(a.trigger.toLowerCase())) {
-                            state.customAliases.push(a);
-                        }
-                    });
-
-                    // For annotations and highlights, add all
-                    state.annotations.push(...clonedAnnotations);
-                    state.highlights.push(...clonedHighlights);
+                    try { await highlightService.deleteAll(); } catch (err) {
+                        console.error('importEnvironmentPartial: highlight deleteAll failed:', err);
+                    }
+                    set((state) => { state.highlights = []; });
                 }
-            }),
+                const hlResults = await Promise.allSettled(
+                    (filtered.highlights || []).map(async (h) => {
+                        const wire = highlightStoreToCreate(h);
+                        if (!wire) return null;
+                        const server = await highlightService.create(wire);
+                        return highlightApiToStore(server);
+                    })
+                );
+                const syncedHl = hlResults
+                    .filter((r): r is PromiseFulfilledResult<Highlight | null> => r.status === 'fulfilled')
+                    .map((r) => r.value)
+                    .filter((h): h is Highlight => h !== null);
+                if (syncedHl.length > 0) {
+                    set((state) => { state.highlights.push(...syncedHl); });
+                }
+            },
 
             applyEnvironment: async (id, mode) => {
                 const env = get().environments.find(e => e.id === id);
@@ -1995,17 +2149,42 @@ const appStore = createStore<AppState>()(
                 }
             },
 
-            refreshEnvironmentFromCurrent: (id) => set((state) => {
-                const env = state.environments.find(e => e.id === id);
-                if (env) {
-                    env.dossiers = JSON.parse(JSON.stringify(state.dossiers));
-                    env.quickNorms = JSON.parse(JSON.stringify(state.quickNorms));
-                    env.customAliases = JSON.parse(JSON.stringify(state.customAliases));
-                    env.annotations = JSON.parse(JSON.stringify(state.annotations));
-                    env.highlights = JSON.parse(JSON.stringify(state.highlights));
-                    env.updatedAt = new Date().toISOString();
+            // Re-snapshot an existing environment from the current app state.
+            // Optimistic: patch locally, then PUT the new content. Revert on
+            // error (keeps the store aligned with the server).
+            refreshEnvironmentFromCurrent: async (id) => {
+                const previous = get().environments.find(e => e.id === id);
+                if (!previous) return;
+                const state = get();
+                const nextContent = {
+                    dossiers: JSON.parse(JSON.stringify(state.dossiers)),
+                    quickNorms: JSON.parse(JSON.stringify(state.quickNorms)),
+                    customAliases: JSON.parse(JSON.stringify(state.customAliases)),
+                    annotations: JSON.parse(JSON.stringify(state.annotations)),
+                    highlights: JSON.parse(JSON.stringify(state.highlights)),
+                };
+                const nextUpdatedAt = new Date().toISOString();
+                set((s) => {
+                    const env = s.environments.find(e => e.id === id);
+                    if (env) {
+                        env.dossiers = nextContent.dossiers;
+                        env.quickNorms = nextContent.quickNorms;
+                        env.customAliases = nextContent.customAliases;
+                        env.annotations = nextContent.annotations;
+                        env.highlights = nextContent.highlights;
+                        env.updatedAt = nextUpdatedAt;
+                    }
+                });
+                try {
+                    await environmentService.update(id, { content: nextContent });
+                } catch (err) {
+                    console.error('refreshEnvironmentFromCurrent failed:', err);
+                    set((s) => {
+                        const env = s.environments.find(e => e.id === id);
+                        if (env) Object.assign(env, previous);
+                    });
                 }
-            }),
+            },
 
             getCurrentStateAsEnvironment: (name) => {
                 const state = get();
@@ -2024,16 +2203,25 @@ const appStore = createStore<AppState>()(
         })),
         {
             name: 'visualex-storage',
-            // Only persist UI state and settings, NOT user data (bookmarks, dossiers, etc.)
-            // User data is fetched from API and should not be persisted locally
+            // Only persist UI state and settings, NOT user data. Bookmarks,
+            // dossiers, environments, annotations, highlights are now all
+            // server-backed and hydrated by fetchUserData on login/refresh —
+            // persisting them locally would cause drift with the server.
+            // quickNorms and customAliases are intrinsically client-only
+            // (no backend route); they stay in the partialize on purpose.
             partialize: (state) => ({
                 settings: state.settings,
                 searchPanelState: state.searchPanelState,
                 workspaceTabs: state.workspaceTabs,
                 highestZIndex: state.highestZIndex,
+                // Client-only slices: persisted here because they don't have
+                // a backend and we still want them to survive a refresh.
                 customAliases: state.customAliases,
-                // Note: We intentionally exclude bookmarks, dossiers, annotations, highlights,
-                // quickNorms, environments - these are synced from the server
+                quickNorms: state.quickNorms,
+                // Excluded on purpose — these are server-backed and hydrated
+                // by fetchUserData. Persisting them locally would cause drift
+                // with the server (see the dossier/applyEnvironment sync fixes).
+                //   bookmarks, dossiers, environments, annotations, highlights
             }),
             // Rehydrated state from older versions may not have the
             // `studyMode` slice we just added. Splice in defaults here so

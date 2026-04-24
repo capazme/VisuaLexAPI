@@ -72,12 +72,16 @@ export function EnvironmentPage() {
     tryStartTour('environments');
   }, [tryStartTour]);
 
-  // Handle import from URL parameter
+  // Handle import from URL parameter. Reads `?import=` and immediately
+  // clears it in the same effect, so the set-state-in-effect disable is
+  // the same URL→state sync pattern used in DossierPage — see CLAUDE.md
+  // gotcha #11.
   useEffect(() => {
     const importData = searchParams.get('import');
     if (importData) {
       const result = parseEnvironmentFromBase64(importData);
       if (result.success) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- URL→state sync: reads `?import=` and clears it below so the effect won't re-fire
         setImportingEnv(result.data);
       } else {
         showToast(result.error || 'Errore durante l\'import', 'error');
@@ -109,12 +113,17 @@ export function EnvironmentPage() {
     e.target.value = '';
   };
 
-  const handleConfirmImport = (selection: EnvironmentSelection, mode: 'merge' | 'replace') => {
-    if (importingEnv) {
-      importEnvironmentPartial(importingEnv, selection, mode);
+  const handleConfirmImport = async (selection: EnvironmentSelection, mode: 'merge' | 'replace') => {
+    if (!importingEnv) return;
+    const snapshot = importingEnv;
+    setImportingEnv(null);
+    try {
+      await importEnvironmentPartial(snapshot, selection, mode);
       const modeText = mode === 'merge' ? 'unito' : 'importato';
-      showToast(`Ambiente "${importingEnv.name}" ${modeText} con successo`, 'success');
-      setImportingEnv(null);
+      showToast(`Ambiente "${snapshot.name}" ${modeText} con successo`, 'success');
+    } catch (err) {
+      console.error('importEnvironmentPartial failed:', err);
+      showToast(`Errore durante l'import di "${snapshot.name}"`, 'error');
     }
   };
 
@@ -154,21 +163,28 @@ export function EnvironmentPage() {
     void runApply(env, 'merge');
   };
 
-  const handleDelete = (id: string) => {
-    deleteEnvironment(id);
+  const handleDelete = async (id: string) => {
     setDeleteConfirmId(null);
+    try {
+      await deleteEnvironment(id);
+    } catch (err) {
+      console.error('deleteEnvironment failed:', err);
+      showToast('Errore durante l\'eliminazione dell\'ambiente', 'error');
+    }
   };
 
-  const handleLoadExamples = () => {
+  const handleLoadExamples = async () => {
+    // Each example maps to a createEnvironment round-trip — run them
+    // sequentially so a run stays within sensible rate-limit territory
+    // and the counter in the success toast matches what's actually on
+    // the server.
     let imported = 0;
-    exampleEnvironments.forEach((env) => {
-      // Check if an environment with same name already exists
+    for (const env of exampleEnvironments) {
       const exists = environments.some(e => e.name === env.name);
-      if (!exists) {
-        importEnvironment(env);
-        imported++;
-      }
-    });
+      if (exists) continue;
+      const newId = await importEnvironment(env);
+      if (newId) imported++;
+    }
     if (imported > 0) {
       showToast(`${imported} ambienti di esempio caricati con successo`, 'success');
     } else {
@@ -292,7 +308,15 @@ export function EnvironmentPage() {
               onEdit={() => setEditingEnv(env)}
               onExportJSON={() => handleExportJSON(env)}
               onShareLink={() => handleShareLink(env)}
-              onRefresh={() => refreshEnvironmentFromCurrent(env.id)}
+              onRefresh={async () => {
+                try {
+                  await refreshEnvironmentFromCurrent(env.id);
+                  showToast(`"${env.name}" aggiornato con lo stato corrente`, 'success');
+                } catch (err) {
+                  console.error('refreshEnvironmentFromCurrent failed:', err);
+                  showToast(`Errore durante l'aggiornamento di "${env.name}"`, 'error');
+                }
+              }}
               onDelete={() => setDeleteConfirmId(env.id)}
             />
           ))
@@ -304,14 +328,16 @@ export function EnvironmentPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         currentState={{ dossiers, quickNorms, customAliases, annotations, highlights }}
-        onCreate={(name, selection, options) => {
-          if (selection) {
-            createEnvironmentWithSelection(name, selection, options);
-          } else {
-            createEnvironment(name, { ...options, fromCurrent: false });
-          }
+        onCreate={async (name, selection, options) => {
           setIsCreateModalOpen(false);
-          showToast(`Ambiente "${name}" creato con successo`, 'success');
+          const newId = selection
+            ? await createEnvironmentWithSelection(name, selection, options)
+            : await createEnvironment(name, { ...options, fromCurrent: false });
+          if (newId) {
+            showToast(`Ambiente "${name}" creato con successo`, 'success');
+          } else {
+            showToast(`Errore durante la creazione di "${name}"`, 'error');
+          }
         }}
       />
 
@@ -320,9 +346,16 @@ export function EnvironmentPage() {
         <EditEnvironmentModal
           environment={editingEnv}
           onClose={() => setEditingEnv(null)}
-          onSave={(updates) => {
-            updateEnvironment(editingEnv.id, updates);
+          onSave={async (updates) => {
+            const envId = editingEnv.id;
+            const envName = editingEnv.name;
             setEditingEnv(null);
+            try {
+              await updateEnvironment(envId, updates);
+            } catch (err) {
+              console.error('updateEnvironment failed:', err);
+              showToast(`Errore durante l'aggiornamento di "${envName}"`, 'error');
+            }
           }}
         />
       )}

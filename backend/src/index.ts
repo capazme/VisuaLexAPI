@@ -15,6 +15,7 @@ import dossierRoutes from './routes/dossiers';
 import feedbackRoutes from './routes/feedback';
 import historyRoutes from './routes/history';
 import sharedEnvironmentRoutes from './routes/sharedEnvironments';
+import environmentRoutes from './routes/environments';
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use('/api', dossierRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api', sharedEnvironmentRoutes);
+app.use('/api', environmentRoutes);
 
 // 404 handler
 app.use((_req, res) => {
