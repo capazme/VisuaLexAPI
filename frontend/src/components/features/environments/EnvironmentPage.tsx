@@ -257,39 +257,55 @@ export function EnvironmentPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredEnvironments.length === 0 ? (
           <div className="col-span-full">
-            <EmptyState
-              variant="environment"
-              title={searchQuery || categoryFilter !== 'all' ? "Nessun risultato" : "Nessun ambiente"}
-              description={
-                searchQuery || categoryFilter !== 'all'
-                  ? "Prova a modificare i filtri di ricerca."
-                  : "Gli ambienti ti permettono di salvare e condividere configurazioni di dossier, ricerche frequenti e annotazioni."
-              }
-              action={
-                !(searchQuery || categoryFilter !== 'all') && (
-                  <>
-                    <button
-                      onClick={handleLoadExamples}
-                      className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
-                    >
-                      <Sparkles size={18} />
-                      Carica Esempi
-                    </button>
-                    <button
-                      onClick={() => setIsCreateModalOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
-                    >
-                      <Plus size={18} />
-                      Crea Ambiente
-                    </button>
-                  </>
-                )
-              }
-            />
-            {!(searchQuery || categoryFilter !== 'all') && (
-              <p className="text-xs md:text-sm text-slate-400 dark:text-slate-500 text-center -mt-4">
-                Gli esempi includono: GDPR, DORA, AI Act, Diritto dei Consumatori
-              </p>
+            {searchQuery || categoryFilter !== 'all' ? (
+              <EmptyState
+                variant="search"
+                title="Nessun risultato"
+                description={
+                  searchQuery && categoryFilter !== 'all'
+                    ? `Nessun ambiente corrisponde a "${searchQuery}" nella categoria selezionata.`
+                    : searchQuery
+                      ? `Nessun ambiente corrisponde a "${searchQuery}".`
+                      : "Nessun ambiente nella categoria selezionata."
+                }
+                action={
+                  <button
+                    onClick={() => { setSearchQuery(''); setCategoryFilter('all'); }}
+                    className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                  >
+                    Azzera filtri
+                  </button>
+                }
+              />
+            ) : (
+              <>
+                <EmptyState
+                  variant="environment"
+                  title="Nessun ambiente"
+                  description="Gli ambienti ti permettono di salvare e condividere configurazioni di dossier, ricerche frequenti e annotazioni."
+                  action={
+                    <>
+                      <button
+                        onClick={handleLoadExamples}
+                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                      >
+                        <Sparkles size={18} />
+                        Carica Esempi
+                      </button>
+                      <button
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                      >
+                        <Plus size={18} />
+                        Crea Ambiente
+                      </button>
+                    </>
+                  }
+                />
+                <p className="text-xs md:text-sm text-slate-400 dark:text-slate-500 text-center -mt-4">
+                  Gli esempi includono: GDPR, DORA, AI Act, Diritto dei Consumatori
+                </p>
+              </>
             )}
           </div>
         ) : (
