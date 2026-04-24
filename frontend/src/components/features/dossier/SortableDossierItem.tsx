@@ -84,11 +84,15 @@ export function SortableDossierItem({
         }
       }}
       className={cn(
-        'bg-white dark:bg-slate-800 p-3 md:p-4 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer',
+        'relative bg-white dark:bg-slate-800 p-3 md:p-4 pl-4 md:pl-5 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
         isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700',
       )}
     >
+      <span
+        aria-hidden
+        className={cn('absolute left-0 top-0 bottom-0 w-1 rounded-l-lg', statusConfig.stripe)}
+      />
       <div className="flex items-center gap-2 md:gap-3">
         {showCheckbox && (
           <button
@@ -137,8 +141,9 @@ export function SortableDossierItem({
               aria-label={`Stato: ${statusConfig.label}. Cambia stato`}
               className={cn(
                 'p-2 md:p-2 rounded-md transition-colors min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center',
+                'hover:bg-slate-100 dark:hover:bg-slate-700',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                statusConfig.color, statusConfig.bg,
+                statusConfig.color,
               )}
             >
               <StatusIcon size={18} />

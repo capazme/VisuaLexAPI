@@ -4,11 +4,11 @@ import type { DossierItem } from '../../../types';
 
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
 
-export const STATUS_CONFIG: Record<DossierItemStatus, { label: string; icon: LucideIcon; color: string; bg: string }> = {
-  unread: { label: 'Da leggere', icon: Circle, color: 'text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
-  reading: { label: 'In lettura', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-  important: { label: 'Importante', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
-  done: { label: 'Completato', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
+export const STATUS_CONFIG: Record<DossierItemStatus, { label: string; icon: LucideIcon; color: string; bg: string; stripe: string }> = {
+  unread: { label: 'Da leggere', icon: Circle, color: 'text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700', stripe: 'bg-slate-300 dark:bg-slate-500' },
+  reading: { label: 'In lettura', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', stripe: 'bg-blue-500' },
+  important: { label: 'Importante', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', stripe: 'bg-orange-500' },
+  done: { label: 'Completato', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30', stripe: 'bg-green-500' },
 };
 
 // Turn a stored timestamp (ISO string or epoch ms) into the Italian long format
