@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient, EnvironmentCategory, ReportReason, SuggestionStatus } from '@prisma/client';
+import { PrismaClient, EnvironmentCategory, ReportReason } from '@prisma/client';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 
@@ -37,22 +37,24 @@ const reportSchema = z.object({
 });
 
 // Suggestion schemas
+const MAX_ITEMS_PER_SUGGESTION = 100;
+const MAX_SUGGESTION_BYTES = 512 * 1024;
+
+const suggestionItemSchema = z.object({
+  itemType: z.enum(['annotation', 'highlight', 'dossier', 'quickNorm', 'alias']),
+  payload: z.unknown(),
+});
+
 const createSuggestionSchema = z.object({
-  content: z.object({
-    dossiers: z.array(z.any()),
-    quickNorms: z.array(z.any()),
-    customAliases: z.array(z.any()),
-  }),
-  message: z.string().max(500).optional(),
+  message: z.string().max(1000).optional(),
+  items: z.array(suggestionItemSchema).min(1).max(MAX_ITEMS_PER_SUGGESTION),
 });
 
-const approveSuggestionSchema = z.object({
-  changelog: z.string().max(500).optional(),
-  versionMode: z.enum(['replace', 'coexist']).default('replace'),
-  mergeMode: z.enum(['merge', 'replace']).default('merge'),
+const addSuggestionItemsSchema = z.object({
+  items: z.array(suggestionItemSchema).min(1).max(MAX_ITEMS_PER_SUGGESTION),
 });
 
-const rejectSuggestionSchema = z.object({
+const declineItemSchema = z.object({
   reviewNote: z.string().max(500).optional(),
 });
 
@@ -109,7 +111,29 @@ function formatSharedEnvironment(env: any, userId: string) {
 }
 
 // Helper: format suggestion for response
+type ItemStatusCounts = { pending: number; taken: number; declined: number };
+
+function deriveSuggestionStatus(counts: ItemStatusCounts): 'open' | 'closed' | 'revoked' {
+  const total = counts.pending + counts.taken + counts.declined;
+  if (total === 0) return 'revoked';
+  if (counts.pending > 0) return 'open';
+  return 'closed';
+}
+
 function formatSuggestion(suggestion: any, currentUserId: string) {
+  const items = (suggestion.items ?? []) as Array<{
+    id: string;
+    itemType: string;
+    payload: unknown;
+    status: 'pending' | 'taken' | 'declined';
+    reviewNote: string | null;
+    reviewedAt: Date | null;
+    createdAt: Date;
+  }>;
+
+  const counts: ItemStatusCounts = { pending: 0, taken: 0, declined: 0 };
+  for (const i of items) counts[i.status] += 1;
+
   return {
     id: suggestion.id,
     sharedEnvironmentId: suggestion.sharedEnvironmentId,
@@ -122,12 +146,20 @@ function formatSuggestion(suggestion: any, currentUserId: string) {
       id: suggestion.suggester.id,
       username: suggestion.suggester.username,
     },
-    content: suggestion.content,
     message: suggestion.message,
-    status: suggestion.status,
-    reviewedAt: suggestion.reviewedAt,
-    reviewNote: suggestion.reviewNote,
+    items: items.map(i => ({
+      id: i.id,
+      itemType: i.itemType,
+      payload: i.payload,
+      status: i.status,
+      reviewNote: i.reviewNote,
+      reviewedAt: i.reviewedAt,
+      createdAt: i.createdAt,
+    })),
+    counts,
+    aggregateStatus: deriveSuggestionStatus(counts),
     createdAt: suggestion.createdAt,
+    updatedAt: suggestion.updatedAt,
     isOwn: suggestion.suggesterId === currentUserId,
   };
 }
@@ -137,7 +169,6 @@ async function createVersionSnapshot(
   envId: string,
   content: any,
   changelog?: string,
-  suggestionId?: string
 ) {
   // Get next version number
   const latestVersion = await prisma.sharedEnvironmentVersion.findFirst({
@@ -153,25 +184,10 @@ async function createVersionSnapshot(
       version: nextVersion,
       content,
       changelog,
-      suggestionId,
     },
   });
 }
 
-// Helper: merge content arrays avoiding duplicates by ID
-function mergeContentArrays(existing: any[], incoming: any[]): any[] {
-  const existingIds = new Set(existing.map(item => item.id));
-  const merged = [...existing];
-
-  for (const item of incoming) {
-    if (!existingIds.has(item.id)) {
-      merged.push(item);
-      existingIds.add(item.id);
-    }
-  }
-
-  return merged;
-}
 
 /**
  * List shared environments with filtering and pagination
@@ -889,54 +905,47 @@ export const createSuggestion = async (req: Request, res: Response) => {
   const { id } = req.params;
   const data = createSuggestionSchema.parse(req.body);
 
-  // Check environment exists and is active
   const env = await prisma.sharedEnvironment.findFirst({
     where: { id, isActive: true },
   });
-
-  if (!env) {
-    throw new AppError(404, 'Shared environment not found or not active');
-  }
-
-  // Can't suggest to own environment
+  if (!env) throw new AppError(404, 'Shared environment not found or not active');
   if (env.userId === req.user!.id) {
     throw new AppError(400, 'You cannot suggest to your own environment');
   }
 
-  // Check if user already has a pending suggestion for this environment
-  const existingPending = await prisma.environmentSuggestion.findFirst({
+  const existingOpen = await prisma.environmentSuggestion.findFirst({
     where: {
       sharedEnvironmentId: id,
       suggesterId: req.user!.id,
-      status: 'pending',
+      items: { some: { status: 'pending' } },
     },
   });
-
-  if (existingPending) {
-    throw new AppError(400, 'You already have a pending suggestion for this environment');
+  if (existingOpen) {
+    throw new AppError(400, 'You already have an open suggestion for this environment');
   }
 
-  // Validate content size
-  const contentSize = JSON.stringify(data.content).length;
-  if (contentSize > 512 * 1024) {
-    throw new AppError(400, 'Suggestion content exceeds maximum size (512KB)');
+  const totalBytes = JSON.stringify(data.items).length;
+  if (totalBytes > MAX_SUGGESTION_BYTES) {
+    throw new AppError(400, 'Suggestion payload exceeds maximum size (512KB)');
   }
 
   const suggestion = await prisma.environmentSuggestion.create({
     data: {
       sharedEnvironmentId: id,
       suggesterId: req.user!.id,
-      content: data.content,
       message: data.message,
+      items: {
+        create: data.items.map(i => ({
+          itemType: i.itemType,
+          payload: i.payload as object,
+        })),
+      },
     },
     include: {
+      items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: {
-          id: true,
-          title: true,
-          user: { select: { id: true, username: true } },
-        },
+        select: { id: true, title: true, user: { select: { id: true, username: true } } },
       },
     },
   });
@@ -948,34 +957,25 @@ export const createSuggestion = async (req: Request, res: Response) => {
  * Get suggestions received for user's environments
  */
 export const getReceivedSuggestions = async (req: Request, res: Response) => {
-  const status = req.query.status as SuggestionStatus | undefined;
-
-  const where: any = {
-    sharedEnvironment: {
-      userId: req.user!.id,
-    },
-  };
-
-  if (status) {
-    where.status = status;
-  }
+  const statusFilter = req.query.status as 'open' | 'closed' | 'revoked' | undefined;
 
   const suggestions = await prisma.environmentSuggestion.findMany({
-    where,
+    where: { sharedEnvironment: { userId: req.user!.id } },
     include: {
+      items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: {
-          id: true,
-          title: true,
-          user: { select: { id: true, username: true } },
-        },
+        select: { id: true, title: true, user: { select: { id: true, username: true } } },
       },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json(suggestions.map(s => formatSuggestion(s, req.user!.id)));
+  let formatted = suggestions.map(s => formatSuggestion(s, req.user!.id));
+  if (statusFilter) {
+    formatted = formatted.filter(s => s.aggregateStatus === statusFilter);
+  }
+  res.json(formatted);
 };
 
 /**
@@ -983,17 +983,12 @@ export const getReceivedSuggestions = async (req: Request, res: Response) => {
  */
 export const getSentSuggestions = async (req: Request, res: Response) => {
   const suggestions = await prisma.environmentSuggestion.findMany({
-    where: {
-      suggesterId: req.user!.id,
-    },
+    where: { suggesterId: req.user!.id },
     include: {
+      items: true,
       suggester: { select: { id: true, username: true } },
       sharedEnvironment: {
-        select: {
-          id: true,
-          title: true,
-          user: { select: { id: true, username: true } },
-        },
+        select: { id: true, title: true, user: { select: { id: true, username: true } } },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -1003,151 +998,264 @@ export const getSentSuggestions = async (req: Request, res: Response) => {
 };
 
 /**
- * Get count of pending suggestions for user's environments
+ * Get count of pending suggestion items for user's environments
  */
 export const getPendingSuggestionsCount = async (req: Request, res: Response) => {
-  const count = await prisma.environmentSuggestion.count({
+  const count = await prisma.suggestionItem.count({
     where: {
-      sharedEnvironment: {
-        userId: req.user!.id,
-      },
       status: 'pending',
+      suggestion: { sharedEnvironment: { userId: req.user!.id } },
     },
   });
-
   res.json({ count });
 };
 
 /**
- * Approve a suggestion (creates new version)
+ * Take a suggestion item — lands it in the owner's private workspace
  */
-export const approveSuggestion = async (req: Request, res: Response) => {
-  const { suggestionId } = req.params;
-  const data = approveSuggestionSchema.parse(req.body);
+export const takeSuggestionItem = async (req: Request, res: Response) => {
+  const { id: suggestionId, itemId } = req.params;
 
-  // Get suggestion with environment
-  const suggestion = await prisma.environmentSuggestion.findUnique({
-    where: { id: suggestionId },
+  const item = await prisma.suggestionItem.findUnique({
+    where: { id: itemId },
     include: {
-      sharedEnvironment: {
+      suggestion: {
         include: {
-          user: { select: { id: true, username: true } },
+          sharedEnvironment: true,
+          suggester: { select: { id: true, username: true } },
         },
       },
-      suggester: { select: { id: true, username: true } },
     },
   });
 
-  if (!suggestion) {
-    throw new AppError(404, 'Suggestion not found');
+  if (!item || item.suggestion.id !== suggestionId) {
+    throw new AppError(404, 'Suggestion item not found');
+  }
+  if (item.suggestion.sharedEnvironment.userId !== req.user!.id) {
+    throw new AppError(403, 'You can only take items from suggestions to your own environments');
+  }
+  if (item.status !== 'pending') {
+    throw new AppError(409, 'Item already reviewed');
   }
 
-  // Check ownership of the environment
-  if (suggestion.sharedEnvironment.userId !== req.user!.id) {
-    throw new AppError(403, 'You can only approve suggestions for your own environments');
+  const attribution = {
+    sourceSuggestionId: item.suggestion.id,
+    originalAuthorId: item.suggestion.suggesterId,
+  };
+
+  let createdRow: unknown = null;
+  try {
+    createdRow = await prisma.$transaction(async (tx) => {
+      const payload = item.payload as any;
+      switch (item.itemType) {
+        case 'annotation':
+          return tx.annotation.create({
+            data: {
+              userId: req.user!.id,
+              normaKey: payload.articleId ?? payload.normaKey ?? '',
+              content: payload.text,
+              textContext: payload.anchorText,
+              position: payload.startOffset,
+              ...attribution,
+            },
+          });
+        case 'highlight':
+          return tx.highlight.create({
+            data: {
+              userId: req.user!.id,
+              normaKey: payload.articleId ?? payload.normaKey ?? '',
+              text: payload.anchorText ?? '',
+              color: payload.colorVar ?? 'yellow',
+              startOffset: payload.startOffset ?? 0,
+              endOffset: payload.endOffset ?? 0,
+              ...attribution,
+            },
+          });
+        case 'dossier': {
+          const entries = Array.isArray(payload.entries) ? payload.entries : [];
+          return tx.dossier.create({
+            data: {
+              userId: req.user!.id,
+              name: payload.title,
+              description: payload.description,
+              ...attribution,
+              items: {
+                create: entries.map((e: any, idx: number) => ({
+                  itemType: e.articleRef ? 'norm' : 'note',
+                  title: e.articleRef?.label ?? e.note?.slice(0, 60) ?? `Item ${idx + 1}`,
+                  content: e,
+                  position: idx,
+                })),
+              },
+            },
+            include: { items: true },
+          });
+        }
+        case 'quickNorm':
+          return tx.quickNorm.create({
+            data: {
+              userId: req.user!.id,
+              label: payload.label,
+              searchParams: payload.searchParams,
+              sourceUrl: payload.sourceUrl,
+              ...attribution,
+            },
+          });
+        case 'alias':
+          return tx.customAlias.create({
+            data: {
+              userId: req.user!.id,
+              trigger: payload.trigger,
+              aliasType: payload.aliasType,
+              expandTo: payload.expandTo,
+              searchParams: payload.searchParams,
+              description: payload.description,
+              ...attribution,
+            },
+          });
+        default:
+          throw new AppError(400, `Unsupported itemType: ${item.itemType}`);
+      }
+    });
+  } catch (err: unknown) {
+    if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: string }).code === 'P2002' &&
+      item.itemType === 'alias'
+    ) {
+      const existing = await prisma.customAlias.findFirst({
+        where: {
+          userId: req.user!.id,
+          trigger: (item.payload as any).trigger,
+        },
+      });
+      res.status(409).json({
+        error: 'alias_trigger_conflict',
+        existingAliasId: existing?.id,
+        suggestedTrigger: (item.payload as any).trigger,
+      });
+      return;
+    }
+    throw err;
   }
 
-  // Check suggestion is pending
-  if (suggestion.status !== 'pending') {
-    throw new AppError(400, 'This suggestion has already been reviewed');
-  }
-
-  const env = suggestion.sharedEnvironment;
-  const existingContent = env.content as any;
-  const suggestedContent = suggestion.content as any;
-
-  // Create version snapshot of current state
-  await createVersionSnapshot(env.id, existingContent, 'Prima del suggerimento');
-
-  // Merge or replace content
-  let newContent: any;
-  if (data.mergeMode === 'merge') {
-    newContent = {
-      ...existingContent,
-      dossiers: mergeContentArrays(existingContent.dossiers || [], suggestedContent.dossiers || []),
-      quickNorms: mergeContentArrays(existingContent.quickNorms || [], suggestedContent.quickNorms || []),
-      customAliases: mergeContentArrays(existingContent.customAliases || [], suggestedContent.customAliases || []),
-    };
-  } else {
-    newContent = {
-      ...existingContent,
-      dossiers: suggestedContent.dossiers || [],
-      quickNorms: suggestedContent.quickNorms || [],
-      customAliases: suggestedContent.customAliases || [],
-    };
-  }
-
-  // Update suggestion status
-  await prisma.environmentSuggestion.update({
-    where: { id: suggestionId },
-    data: {
-      status: 'approved',
-      reviewedAt: new Date(),
-      reviewNote: data.changelog,
-    },
+  await prisma.suggestionItem.update({
+    where: { id: itemId },
+    data: { status: 'taken', reviewedAt: new Date() },
   });
 
-  // Update environment with new content
-  const changelog = data.changelog || `Approvato suggerimento da @${suggestion.suggester.username}`;
-
-  const updatedEnv = await prisma.sharedEnvironment.update({
-    where: { id: env.id },
-    data: {
-      content: newContent,
-      currentVersion: env.currentVersion + 1,
-    },
-    include: {
-      user: { select: { id: true, username: true } },
-      likes: { where: { userId: req.user!.id }, select: { userId: true } },
-      _count: { select: { likes: true } },
-    },
-  });
-
-  // Create new version with reference to suggestion
-  await createVersionSnapshot(env.id, newContent, changelog, suggestionId);
-
-  res.json(formatSharedEnvironment(updatedEnv, req.user!.id));
+  res.json({ item: { id: itemId, status: 'taken' }, created: createdRow });
 };
 
 /**
- * Reject a suggestion
+ * Decline a suggestion item
  */
-export const rejectSuggestion = async (req: Request, res: Response) => {
-  const { suggestionId } = req.params;
-  const data = rejectSuggestionSchema.parse(req.body);
+export const declineSuggestionItem = async (req: Request, res: Response) => {
+  const { id: suggestionId, itemId } = req.params;
+  const data = declineItemSchema.parse(req.body);
 
-  // Get suggestion with environment
+  const item = await prisma.suggestionItem.findUnique({
+    where: { id: itemId },
+    include: { suggestion: { include: { sharedEnvironment: true } } },
+  });
+
+  if (!item || item.suggestion.id !== suggestionId) {
+    throw new AppError(404, 'Suggestion item not found');
+  }
+  if (item.suggestion.sharedEnvironment.userId !== req.user!.id) {
+    throw new AppError(403, 'You can only decline items from suggestions to your own environments');
+  }
+  if (item.status !== 'pending') {
+    throw new AppError(409, 'Item already reviewed');
+  }
+
+  const updated = await prisma.suggestionItem.update({
+    where: { id: itemId },
+    data: { status: 'declined', reviewNote: data.reviewNote, reviewedAt: new Date() },
+  });
+
+  res.json({
+    id: updated.id,
+    status: updated.status,
+    reviewNote: updated.reviewNote,
+    reviewedAt: updated.reviewedAt,
+  });
+};
+
+/**
+ * Revoke a suggestion item (suggester-only, pending-only)
+ */
+export const revokeSuggestionItem = async (req: Request, res: Response) => {
+  const { id: suggestionId, itemId } = req.params;
+
+  const item = await prisma.suggestionItem.findUnique({
+    where: { id: itemId },
+    include: { suggestion: true },
+  });
+
+  if (!item || item.suggestion.id !== suggestionId) {
+    throw new AppError(404, 'Suggestion item not found');
+  }
+  if (item.suggestion.suggesterId !== req.user!.id) {
+    throw new AppError(403, 'You can only revoke your own suggestion items');
+  }
+  if (item.status !== 'pending') {
+    throw new AppError(403, 'Only pending items can be revoked');
+  }
+
+  await prisma.suggestionItem.delete({ where: { id: itemId } });
+  res.status(204).send();
+};
+
+/**
+ * Add items to an existing open suggestion thread (suggester-only)
+ */
+export const addSuggestionItems = async (req: Request, res: Response) => {
+  const { id: suggestionId } = req.params;
+  const data = addSuggestionItemsSchema.parse(req.body);
+
   const suggestion = await prisma.environmentSuggestion.findUnique({
     where: { id: suggestionId },
-    include: {
-      sharedEnvironment: true,
-    },
+    include: { items: true },
   });
 
-  if (!suggestion) {
-    throw new AppError(404, 'Suggestion not found');
+  if (!suggestion) throw new AppError(404, 'Suggestion not found');
+  if (suggestion.suggesterId !== req.user!.id) {
+    throw new AppError(403, 'You can only add items to your own suggestions');
   }
 
-  // Check ownership of the environment
-  if (suggestion.sharedEnvironment.userId !== req.user!.id) {
-    throw new AppError(403, 'You can only reject suggestions for your own environments');
+  const pendingCount = suggestion.items.filter(i => i.status === 'pending').length;
+  const reviewedCount = suggestion.items.length - pendingCount;
+  if (pendingCount === 0 && reviewedCount > 0) {
+    throw new AppError(409, 'Thread is closed — create a new suggestion');
   }
 
-  // Check suggestion is pending
-  if (suggestion.status !== 'pending') {
-    throw new AppError(400, 'This suggestion has already been reviewed');
+  if (suggestion.items.length + data.items.length > MAX_ITEMS_PER_SUGGESTION) {
+    throw new AppError(400, 'Maximum items per suggestion exceeded');
   }
 
-  await prisma.environmentSuggestion.update({
+  await prisma.suggestionItem.createMany({
+    data: data.items.map(i => ({
+      suggestionId,
+      itemType: i.itemType,
+      payload: i.payload as object,
+    })),
+  });
+
+  const refreshed = await prisma.environmentSuggestion.findUnique({
     where: { id: suggestionId },
-    data: {
-      status: 'rejected',
-      reviewedAt: new Date(),
-      reviewNote: data.reviewNote,
+    include: {
+      items: true,
+      suggester: { select: { id: true, username: true } },
+      sharedEnvironment: {
+        select: { id: true, title: true, user: { select: { id: true, username: true } } },
+      },
     },
   });
 
-  res.json({ message: 'Suggestion rejected' });
+  res.status(201).json(formatSuggestion(refreshed!, req.user!.id));
 };
 
 // ============================================
@@ -1171,14 +1279,6 @@ export const getVersions = async (req: Request, res: Response) => {
 
   const versions = await prisma.sharedEnvironmentVersion.findMany({
     where: { sharedEnvironmentId: id },
-    include: {
-      suggestion: {
-        select: {
-          id: true,
-          suggester: { select: { id: true, username: true } },
-        },
-      },
-    },
     orderBy: { version: 'desc' },
   });
 
@@ -1186,10 +1286,6 @@ export const getVersions = async (req: Request, res: Response) => {
     id: v.id,
     version: v.version,
     changelog: v.changelog,
-    suggestion: v.suggestion ? {
-      id: v.suggestion.id,
-      suggester: v.suggestion.suggester,
-    } : undefined,
     createdAt: v.createdAt,
   })));
 };

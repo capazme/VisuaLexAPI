@@ -34,8 +34,12 @@ router.post('/shared-environments/:id/download', controller.recordDownload);
 router.get('/shared-environments-suggestions/received', controller.getReceivedSuggestions);
 router.get('/shared-environments-suggestions/sent', controller.getSentSuggestions);
 router.get('/shared-environments-suggestions/pending-count', controller.getPendingSuggestionsCount);
-router.post('/shared-environments-suggestions/:suggestionId/approve', controller.approveSuggestion);
-router.post('/shared-environments-suggestions/:suggestionId/reject', controller.rejectSuggestion);
+
+// Per-item lifecycle
+router.post('/shared-environments-suggestions/:id/items/:itemId/take', controller.takeSuggestionItem);
+router.post('/shared-environments-suggestions/:id/items/:itemId/decline', controller.declineSuggestionItem);
+router.delete('/shared-environments-suggestions/:id/items/:itemId', controller.revokeSuggestionItem);
+router.post('/shared-environments-suggestions/:id/items', controller.addSuggestionItems);
 
 // Suggestions (environment-specific)
 router.post('/shared-environments/:id/suggestions', controller.createSuggestion);
