@@ -86,10 +86,26 @@ export function SharedEnvironmentCard({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  const timeAgo = formatDistanceToNow(new Date(environment.createdAt), {
-    addSuffix: true,
-    locale: it,
-  });
+  // Timestamp: prefer `updatedAt` when it differs meaningfully from
+  // `createdAt` (Prisma initializes them equal; we treat a delta < 1s as
+  // "never edited"). Label uses "Aggiornato" vs "Creato" accordingly.
+  // Absolute timestamp is available on hover via `title`.
+  const createdMs = new Date(environment.createdAt).getTime();
+  const updatedMs = new Date(environment.updatedAt).getTime();
+  const wasEdited = updatedMs - createdMs >= 1000;
+  const timeSourceIso = wasEdited ? environment.updatedAt : environment.createdAt;
+  const timeSourceMs = wasEdited ? updatedMs : createdMs;
+  const timeAgoRelative = !Number.isNaN(timeSourceMs)
+    ? formatDistanceToNow(new Date(timeSourceMs), { addSuffix: true, locale: it })
+    : null;
+  const timeAgo = timeAgoRelative
+    ? wasEdited
+      ? `Aggiornato ${timeAgoRelative}`
+      : `Creato ${timeAgoRelative}`
+    : null;
+  const timeAbsolute = !Number.isNaN(timeSourceMs)
+    ? new Date(timeSourceIso).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })
+    : undefined;
 
   return (
     <div className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
@@ -298,7 +314,11 @@ export function SharedEnvironmentCard({
             <User size={12} />
             {environment.user.username}
           </span>
-          <span>{timeAgo}</span>
+          {timeAgo && (
+            <span title={timeAbsolute} className="truncate max-w-[60%] text-right">
+              {timeAgo}
+            </span>
+          )}
         </div>
 
         {/* Actions */}
