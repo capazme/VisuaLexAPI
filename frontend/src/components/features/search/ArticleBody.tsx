@@ -11,7 +11,7 @@ export interface ArticleBodyProps {
     processedContent: string;
     panelHighlights: Highlight[];
     onPopupHighlight: (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => void;
-    onPopupAddNote: (text: string, startOffset: number) => void;
+    onPopupAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onPopupCopy: (text: string) => Promise<void> | void;
     onRemoveHighlight: (id: string) => void;
 }

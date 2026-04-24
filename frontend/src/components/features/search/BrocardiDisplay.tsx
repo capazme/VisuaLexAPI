@@ -444,8 +444,10 @@ interface BrocardiDisplayProps {
    */
   itemKey?: string;
   uniqueArticleId?: string;
-  /** Called when the user picks "Aggiungi nota" inside a markable section. */
-  onRequestAddNote?: (scopedArticleId: string, text: string, startOffset: number) => void;
+  /** Called when the user picks "Aggiungi nota" inside a markable section.
+   * `rect` is the viewport-space bounding box of the selection, used by the
+   * consumer to anchor an inline composer on the span itself. */
+  onRequestAddNote?: (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
 }
 
 function BrocardiEmptyState({ link }: { link?: string | null }) {

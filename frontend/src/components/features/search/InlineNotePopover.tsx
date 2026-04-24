@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect } from 'react';
+import { useState } from 'react';
 import {
     useFloating,
     useDismiss,
@@ -37,10 +37,17 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState(note.text);
 
+    // Pass the anchor straight to useFloating via `elements.reference` so the
+    // first render already has a valid position. Using `setReference` in a
+    // useLayoutEffect instead leaves the FIRST frame with a null reference, so
+    // the floating div renders at document (0,0) — i.e. the very top of the
+    // page. On a long, scrolled article that position is above the viewport
+    // and the popover appears to "not exist".
     const { refs, floatingStyles, context, placement, middlewareData } = useFloating({
         open: true,
         onOpenChange: (open) => { if (!open) onClose(); },
         placement: 'top',
+        elements: { reference: anchorEl },
         middleware: [
             offset(10),
             flip({ fallbackPlacements: ['bottom', 'top-start', 'bottom-start'] }),
@@ -50,10 +57,6 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
         ],
         whileElementsMounted: autoUpdate,
     });
-
-    useLayoutEffect(() => {
-        refs.setReference(anchorEl);
-    }, [anchorEl, refs]);
 
     const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
     const role = useRole(context, { role: 'dialog' });

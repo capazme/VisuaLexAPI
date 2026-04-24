@@ -60,6 +60,7 @@ export function SearchPanel() {
     addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma, removeTab,
     focusArticleInTab,
     searchTrigger, clearSearchTrigger,
+    searchQueue, drainNextSearch,
     quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
@@ -99,7 +100,13 @@ export function SearchPanel() {
     isLoading: false
   });
 
-  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false) => {
+  // `tabLabel` is the per-search custom label (e.g. from a dossier). It must
+  // be threaded through as a parameter rather than read from `customTabLabel`
+  // state, otherwise a queued multi-search (see triggerMultiSearch) closes
+  // over a stale label captured when the memoized callback was created — the
+  // second search would end up landing in a default-label tab. See the drain
+  // effect below for the flow.
+  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetTabId?: string) => {
     if (result.error) {
       console.error("Backend Error for item:", result.error);
       return;
@@ -143,37 +150,57 @@ export function SearchPanel() {
       // Check if we're streaming to the same norma as before
       const isSameNorma = streamingTabRef.current && streamingTabRef.current.normaKey === key;
 
-      if (isSameNorma && streamingTabRef.current) {
+      // Direct-merge path: when the caller pre-created a tab (dossier "apri
+      // tutto") and passed its id, we bypass all label-matching logic and
+      // always merge into that tab. Also binds streamingTabRef so subsequent
+      // articles from the same norma continue writing there.
+      if (targetTabId && workspaceTabs.some((t) => t.id === targetTabId)) {
+        addNormaToTab(targetTabId, norma, [result]);
+        streamingTabRef.current = { normaKey: key, tabId: targetTabId };
+      } else if (isSameNorma && streamingTabRef.current) {
         // Add article to the tab we created for this streaming session
         addNormaToTab(streamingTabRef.current.tabId, norma, [result]);
       } else {
-        // First article of a new norma — R3 (streaming-ux): if a
-        // non-custom, non-historical tab already holds the same norma,
-        // merge into it instead of spawning a new tab. Skip the merge
-        // entirely when the current search came in with a custom label
-        // (e.g. from a dossier) — those always get their own tab.
-        const mergeTarget = !customTabLabel && !isHistorical
-          ? workspaceTabs.find(tab =>
-              !tab.labelIsCustom &&
-              tab.content.some(item =>
-                item.type === 'norma' &&
-                item.norma.tipo_atto === norma.tipo_atto &&
-                item.norma.numero_atto === norma.numero_atto &&
-                item.norma.data === norma.data &&
-                !item.articles?.some(a => a.versionInfo?.isHistorical)
-              )
+        // First article of a new norma.
+        //
+        // Custom-label search (dossier "apri tutti"): first look for an
+        // already-open custom tab with the SAME label and merge into it —
+        // this is how a multi-norm dossier collapses into a single tab.
+        // Fall back to creating a new custom tab.
+        //
+        // Non-custom search: R3 (streaming-ux) — merge into an existing
+        // non-custom, non-historical tab that already holds the same norma,
+        // otherwise create a new default-labeled tab.
+        let mergeTarget: typeof workspaceTabs[number] | undefined;
+        if (tabLabel && !isHistorical) {
+          mergeTarget = workspaceTabs.find(tab =>
+            tab.labelIsCustom &&
+            tab.label === tabLabel &&
+            !tab.content.some(item =>
+              item.type === 'norma' && item.articles?.some(a => a.versionInfo?.isHistorical)
             )
-          : undefined;
+          );
+        } else if (!tabLabel && !isHistorical) {
+          mergeTarget = workspaceTabs.find(tab =>
+            !tab.labelIsCustom &&
+            tab.content.some(item =>
+              item.type === 'norma' &&
+              item.norma.tipo_atto === norma.tipo_atto &&
+              item.norma.numero_atto === norma.numero_atto &&
+              item.norma.data === norma.data &&
+              !item.articles?.some(a => a.versionInfo?.isHistorical)
+            )
+          );
+        }
 
         if (mergeTarget) {
           addNormaToTab(mergeTarget.id, norma, [result]);
           streamingTabRef.current = { normaKey: key, tabId: mergeTarget.id };
         } else {
           const versionSuffix = isHistorical && versionDate ? ` - Ver. ${versionDate}` : '';
-          const label = customTabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
-          const newTabId = addWorkspaceTab(label, norma, [result], { isCustom: !!customTabLabel });
+          const label = tabLabel || `${norma.tipo_atto}${norma.numero_atto ? ` ${norma.numero_atto}` : ''}${versionSuffix}`;
+          const newTabId = addWorkspaceTab(label, norma, [result], { isCustom: !!tabLabel });
           streamingTabRef.current = { normaKey: key, tabId: newTabId };
-          setCustomTabLabel(null); // Clear after first use
         }
 
         // R2 (streaming-ux): single-article searches auto-focus the result
@@ -212,7 +239,7 @@ export function SearchPanel() {
         };
       });
     }
-  }, [workspaceTabs, addNormaToTab, addWorkspaceTab, customTabLabel, focusArticleInTab]);
+  }, [workspaceTabs, addNormaToTab, addWorkspaceTab, focusArticleInTab]);
 
   const handleSearch = useCallback(async (params: SearchParams) => {
     console.log('🔍 SearchPanel handleSearch called with:', params);
@@ -269,7 +296,7 @@ export function SearchPanel() {
           if (line.trim()) {
             try {
               const result = JSON.parse(line);
-              processResult(result, params.version_date, true); // isStreaming = true
+              processResult(result, params.version_date, true, params.tabLabel, params.targetTabId);
             } catch (e) {
               parseFailures += 1;
               console.error("Error parsing line", line, e);
@@ -282,7 +309,7 @@ export function SearchPanel() {
       if (buffer.trim()) {
         try {
           const result = JSON.parse(buffer);
-          processResult(result, params.version_date, true); // isStreaming = true
+          processResult(result, params.version_date, true, params.tabLabel, params.targetTabId);
         } catch (e) {
           parseFailures += 1;
           console.error("Error parsing final buffer", e);
@@ -370,18 +397,32 @@ export function SearchPanel() {
         } else {
           // R3 (streaming-ux): merge into an existing tab that holds the
           // same norma, but only if that tab is not reserved (labelIsCustom)
-          // and is not a historical view. Custom-label searches (dossiers)
-          // always spawn a new tab.
-          const existingTab = isCustomForThisGroup ? null : workspaceTabs.find(tab =>
-            !tab.labelIsCustom &&
-            tab.content.some(item =>
-              item.type === 'norma' &&
-              item.norma.tipo_atto === group.norma.tipo_atto &&
-              item.norma.numero_atto === group.norma.numero_atto &&
-              item.norma.data === group.norma.data &&
-              !item.articles?.some(a => a.versionInfo?.isHistorical)
-            )
-          );
+          // and is not a historical view.
+          //
+          // Custom-label searches (dossier "apri tutti") previously always
+          // forked a new tab, which prevented a multi-norm dossier from
+          // landing in a single tab. Now: a custom-labeled search tries to
+          // merge into an existing custom-labeled tab with the SAME LABEL —
+          // so sequential dossier searches all collapse into the dossier's
+          // one tab (see dossier `triggerMultiSearch` queue).
+          const existingTab = isCustomForThisGroup
+            ? workspaceTabs.find(tab =>
+                tab.labelIsCustom &&
+                tab.label === customTabLabel &&
+                !tab.content.some(item =>
+                  item.type === 'norma' && item.articles?.some(a => a.versionInfo?.isHistorical)
+                )
+              )
+            : workspaceTabs.find(tab =>
+                !tab.labelIsCustom &&
+                tab.content.some(item =>
+                  item.type === 'norma' &&
+                  item.norma.tipo_atto === group.norma.tipo_atto &&
+                  item.norma.numero_atto === group.norma.numero_atto &&
+                  item.norma.data === group.norma.data &&
+                  !item.articles?.some(a => a.versionInfo?.isHistorical)
+                )
+              );
 
           if (existingTab) {
             addNormaToTab(existingTab.id, group.norma, group.articles);
@@ -428,6 +469,23 @@ export function SearchPanel() {
       clearSearchTrigger();
     }
   }, [searchTrigger, handleSearch, clearSearchTrigger]);
+
+  // Drain the multi-search queue one item at a time. We only fire the next
+  // item when: nothing is loading, no trigger is pending, and the results
+  // buffer has been drained by the tab-processor effect above. That way each
+  // queued search runs end-to-end before the next starts — critical because
+  // they share the same custom label and merge into the SAME tab via
+  // `addNormaToTab`, which requires the tab to already exist when the 2nd
+  // through Nth searches resolve.
+  useEffect(() => {
+    if (searchQueue.length === 0) return;
+    if (isLoading) return;
+    if (searchTrigger) return;
+    if (Object.keys(resultsBuffer).length > 0) return;
+    // Atomic inside the store: if another drain invocation (StrictMode) already
+    // parked a searchTrigger, this one no-ops and we don't dequeue twice.
+    drainNextSearch();
+  }, [isLoading, searchTrigger, resultsBuffer, searchQueue, drainNextSearch]);
 
   // Auto-switch hook for annex detection
   const {

@@ -8,7 +8,10 @@ import { getPlainTextOffset } from '../../../utils/selectionOffset';
 interface SelectionPopupProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   onHighlight: (text: string, color: HighlightColor, startOffset: number) => void;
-  onAddNote: (text: string, startOffset: number) => void;
+  // rect is the viewport-space bounding box of the selection at the moment the
+  // action was fired; consumers can use it to anchor a tooltip composer on the
+  // span itself (the actual selection gets cleared right after).
+  onAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
   onCopy: (text: string) => void;
   onSearch?: (text: string) => void;
 }
@@ -126,7 +129,9 @@ export function SelectionPopup({
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
-        onAddNote(popup.text, popup.startOffset);
+        const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
+        const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
+        onAddNote(popup.text, popup.startOffset, { x: r.x, y: r.y, width: r.width, height: r.height });
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if ((e.key === 'c' && (e.metaKey || e.ctrlKey))) {
@@ -137,18 +142,23 @@ export function SelectionPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [popup.visible, popup.text, popup.startOffset, onHighlight, onAddNote, hidePopup]);
+  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, hidePopup]);
 
   const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search') => {
     switch (action) {
       case 'highlight':
         setShowColorPicker(true);
         break;
-      case 'note':
-        onAddNote(popup.text, popup.startOffset);
+      case 'note': {
+        // Capture the live selection rect BEFORE hiding / clearing — the
+        // composer will anchor on this rect (viewport coords).
+        const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
+        const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
+        onAddNote(popup.text, popup.startOffset, { x: r.x, y: r.y, width: r.width, height: r.height });
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;
+      }
       case 'copy':
         onCopy(popup.text);
         hidePopup();

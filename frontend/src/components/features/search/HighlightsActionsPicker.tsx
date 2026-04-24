@@ -1,4 +1,3 @@
-import { useLayoutEffect } from 'react';
 import {
     useFloating,
     useDismiss,
@@ -42,10 +41,15 @@ export function HighlightsActionsPicker({
     onToggleVisibility,
     onExportTxt,
 }: HighlightsActionsPickerProps) {
+    // Pass the anchor via `elements.reference` so the first render is already
+    // positioned correctly. See matching comment in InlineNotePopover / NotesPeekPanel:
+    // setting the reference in a useLayoutEffect would leave the initial frame
+    // at document (0,0), which on a scrolled page means "above the viewport".
     const { refs, floatingStyles, context, placement } = useFloating({
         open: isOpen,
         onOpenChange: (open) => { if (!open) onClose(); },
         placement: 'bottom-end',
+        elements: { reference: anchorEl },
         middleware: [
             offset(8),
             flip({ fallbackPlacements: ['top-end', 'bottom', 'top'] }),
@@ -53,10 +57,6 @@ export function HighlightsActionsPicker({
         ],
         whileElementsMounted: autoUpdate,
     });
-
-    useLayoutEffect(() => {
-        refs.setReference(anchorEl);
-    }, [anchorEl, refs]);
 
     const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
     const role = useRole(context, { role: 'dialog' });

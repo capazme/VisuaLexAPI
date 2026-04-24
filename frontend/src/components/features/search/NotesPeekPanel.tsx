@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     useFloating,
     useDismiss,
@@ -63,10 +63,16 @@ type BodyProps = Omit<NotesPeekPanelProps, 'anchorEl'> & {
 // ───────────────────────── DESKTOP POPOVER ─────────────────────────
 
 function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
+    // Pass the anchor through `elements.reference` so the FIRST render already
+    // has a valid position. Setting it in a useLayoutEffect leaves the initial
+    // frame with a null reference — the floating div then renders at document
+    // (0,0). On a long, scrolled article that's above the viewport, so the
+    // panel looks like it jumped to the top of the page (or disappeared).
     const { refs, floatingStyles, context, placement } = useFloating({
         open: true,
         onOpenChange: (open) => { if (!open) onClose(); },
         placement: 'bottom-end',
+        elements: { reference: anchorEl },
         middleware: [
             offset(8),
             flip({ fallbackPlacements: ['top-end', 'bottom', 'top'] }),
@@ -82,11 +88,6 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
         ],
         whileElementsMounted: autoUpdate,
     });
-
-    // Keep the external anchor element in sync with floating-ui's reference.
-    useLayoutEffect(() => {
-        refs.setReference(anchorEl);
-    }, [anchorEl, refs]);
 
     const dismiss = useDismiss(context, { outsidePress: true, escapeKey: true });
     const role = useRole(context, { role: 'dialog' });

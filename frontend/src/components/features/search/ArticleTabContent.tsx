@@ -20,6 +20,7 @@ import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
 import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
+import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import type { Annotation } from '../../../types';
 
@@ -100,6 +101,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // scopedArticleId defaults to the article body; markable brocardi
     // sections override it to target their own sub-section scope.
     const [noteAnchor, setNoteAnchor] = useState<{ anchorText: string; startOffset: number; scopedArticleId: string } | null>(null);
+    // Captured selection rect (viewport coords) used to anchor the tooltip-style
+    // composer on the selected span itself, rather than the Notes toolbar button.
+    // When null, the composer isn't open; when set, `noteAnchor` carries the
+    // corresponding anchorText / offset / scope.
+    const [composerRect, setComposerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
     const versionDateInputRef = useRef<HTMLInputElement>(null);
 
     // Citation preview hook - destructure to get stable function references
@@ -387,18 +393,29 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     // Handler for SelectionPopup note action in the article body.
-    const handlePopupAddNote = (text: string, startOffset: number) => {
+    // Shows a tooltip-style composer anchored on the selection itself; the
+    // full Peek panel stays reserved for the toolbar button (list + free compose).
+    const handlePopupAddNote = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
         setNoteAnchor({ anchorText: text, startOffset, scopedArticleId: uniqueArticleId });
-        setIsPeekOpen(true);
+        setComposerRect(rect);
     };
 
-    // Called by a markable brocardi sub-section (Ratio / Spiegazione) when
-    // the user chooses "Aggiungi nota" inside it. The anchor offset is
-    // relative to that section's own textContent, so the scopedArticleId
-    // carries the sub-section identifier.
-    const handleBrocardiAddNote = (scopedArticleId: string, text: string, startOffset: number) => {
+    // Brocardi sub-sections: same tooltip-composer flow as the article body.
+    // The anchor offset is relative to the sub-section's textContent, so the
+    // scopedArticleId carries the sub-section identifier.
+    const handleBrocardiAddNote = (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
         setNoteAnchor({ anchorText: text, startOffset, scopedArticleId });
-        setIsPeekOpen(true);
+        setComposerRect(rect);
+    };
+
+    const closeInlineComposer = () => {
+        setNoteAnchor(null);
+        setComposerRect(null);
+    };
+
+    const commitInlineNote = (text: string) => {
+        handleAddNote(text);
+        setComposerRect(null);
     };
 
     // Handler for SelectionPopup copy action
@@ -602,6 +619,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     onClose={() => setInlineNote(null)}
                     onUpdate={updateAnnotation}
                     onRemove={removeAnnotation}
+                />
+            )}
+
+            {composerRect && noteAnchor && (
+                <InlineNoteComposer
+                    anchorRect={composerRect}
+                    anchorText={noteAnchor.anchorText}
+                    onSave={commitInlineNote}
+                    onClose={closeInlineComposer}
                 />
             )}
 

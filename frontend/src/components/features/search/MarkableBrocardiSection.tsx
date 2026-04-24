@@ -22,7 +22,7 @@ interface MarkableBrocardiSectionProps {
    */
   sectionArticleId: string;
   /** Forwarded up so the parent can open its notes panel with the anchor. */
-  onRequestAddNote: (scopedArticleId: string, text: string, startOffset: number) => void;
+  onRequestAddNote: (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
 }
 
 /**
@@ -85,8 +85,8 @@ export function MarkableBrocardiSection({
     addHighlight(itemKey, sectionArticleId, text, '', color, startOffset);
   };
 
-  const handleAddNote = (text: string, startOffset: number) => {
-    onRequestAddNote(sectionArticleId, text, startOffset);
+  const handleAddNote = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
+    onRequestAddNote(sectionArticleId, text, startOffset, rect);
   };
 
   const handleCopy = async (text: string) => {
