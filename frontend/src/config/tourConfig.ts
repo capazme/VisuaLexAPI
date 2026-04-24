@@ -164,7 +164,12 @@ export const SEARCH_STEPS: DriveStep[] = [
 ];
 
 /**
- * Dossier Page Tour - Gestione raccolte (10 step)
+ * Dossier Page Tour - Gestione raccolte (8 step)
+ *
+ * Si muove solo sulla list view: gli step che toccavano dettaglio (pin,
+ * stats, items, export) puntavano a DOM id che non esistono qui e
+ * restavano orfani. L'ultimo step invita l'utente a entrare in un
+ * dossier per scoprire gestione elementi e strumenti.
  */
 export const DOSSIER_STEPS: DriveStep[] = [
     {
@@ -179,7 +184,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-create',
         popover: {
             title: 'Crea un Nuovo Dossier',
-            description: 'Clicca qui per creare un dossier. Assegna un titolo, una descrizione e dei tag per organizzarlo.',
+            description: 'Clicca qui per creare un dossier e assegnare titolo, descrizione e tag. Scorciatoia tastiera: <kbd>n</kbd>.',
             side: 'bottom',
             align: 'start',
         }
@@ -188,7 +193,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-search',
         popover: {
             title: 'Cerca nei Dossier',
-            description: 'Cerca per titolo, descrizione o contenuto. Filtra rapidamente tra i tuoi dossier.',
+            description: 'Cerca per titolo, descrizione o contenuto. Scorciatoia tastiera: <kbd>/</kbd> per mettere a fuoco il campo.',
             side: 'bottom',
             align: 'center',
         }
@@ -215,44 +220,25 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card',
         popover: {
             title: 'Card Dossier',
-            description: 'Ogni card mostra titolo, tag, numero di elementi e data. Clicca per aprire e gestire il contenuto.',
+            description: 'Ogni card mostra titolo, tag, conteggio elementi e un riepilogo colorato degli stati (importante, in lettura, ecc.). Clicca per aprire.',
             side: 'right',
             align: 'center',
         }
     },
     {
-        element: '#tour-dossier-pin',
+        element: '#tour-dossier-card-actions',
         popover: {
-            title: 'Fissa in Alto',
-            description: 'Clicca la stella per fissare i dossier importanti in cima alla lista.',
+            title: 'Azioni Rapide sulla Card',
+            description: 'L\'icona <kbd>↗</kbd> apre direttamente tutte le norme del dossier sulla Dashboard senza entrare. Il menu <kbd>⋯</kbd> gestisce rinomina, apertura e eliminazione.',
             side: 'left',
             align: 'center',
         }
     },
     {
-        element: '#tour-dossier-stats',
         popover: {
-            title: 'Statistiche Elementi',
-            description: 'Vedi quanti elementi sono: da leggere, in lettura, importanti o completati.',
-            side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-dossier-items',
-        popover: {
-            title: 'Gestione Elementi',
-            description: 'Trascina per riordinare, cambia lo stato con il menu a tendina, elimina con il cestino.',
-            side: 'top',
-            align: 'center',
-        }
-    },
-    {
-        element: '#tour-dossier-export',
-        popover: {
-            title: 'Esporta e Condividi',
-            description: 'Esporta in PDF per stampa, JSON per backup, o genera un link per condividere con colleghi.',
-            side: 'left',
+            title: 'Gestione dettagliata',
+            description: 'Entra in un dossier (clic sulla card) per riordinare gli elementi, cambiarne lo stato, selezionarne in blocco, esportare in PDF/JSON o condividere un link. Buon lavoro!',
+            side: 'over',
             align: 'center',
         }
     }

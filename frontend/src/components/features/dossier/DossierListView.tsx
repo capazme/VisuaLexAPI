@@ -400,7 +400,10 @@ export function DossierListView({ onSelect, showToast }: Props) {
                       <Star size={14} className="text-yellow-500 fill-yellow-500" aria-label="Preferito" />
                     )}
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div
+                    id={idx === 0 ? 'tour-dossier-card-actions' : undefined}
+                    className="flex items-center gap-1 flex-shrink-0"
+                  >
                     <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
                       {dossier.items.length} elementi
                     </span>
