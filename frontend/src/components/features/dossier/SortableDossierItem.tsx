@@ -21,6 +21,10 @@ interface Props {
   onRemove: () => void;
   onStatusChange: (status: DossierItemStatus) => void;
   showCheckbox: boolean;
+  // When true, drag-reorder is disabled (typically because the list is
+  // filtered — dragging against absolute indexes under a filtered view is
+  // semantically fine but visually confusing for the user).
+  dragDisabled?: boolean;
 }
 
 export function SortableDossierItem({
@@ -31,8 +35,9 @@ export function SortableDossierItem({
   onRemove,
   onStatusChange,
   showCheckbox,
+  dragDisabled,
 }: Props) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: dragDisabled });
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -106,10 +111,17 @@ export function SortableDossierItem({
           </button>
         )}
         <div
-          {...attributes}
-          {...listeners}
+          {...(dragDisabled ? {} : attributes)}
+          {...(dragDisabled ? {} : listeners)}
           onClick={(e) => e.stopPropagation()}
-          className="hidden md:block text-slate-300 dark:text-slate-600 cursor-grab hover:text-slate-500"
+          aria-hidden={dragDisabled}
+          title={dragDisabled ? 'Riordina disabilitato con filtri attivi' : undefined}
+          className={cn(
+            'hidden md:block',
+            dragDisabled
+              ? 'text-slate-200 dark:text-slate-700 cursor-not-allowed opacity-50'
+              : 'text-slate-300 dark:text-slate-600 cursor-grab hover:text-slate-500',
+          )}
         >
           <GripVertical size={20} />
         </div>

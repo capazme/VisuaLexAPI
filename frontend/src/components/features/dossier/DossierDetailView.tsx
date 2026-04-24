@@ -14,6 +14,7 @@ import {
   Star,
   X,
   ListChecks,
+  GripVertical,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
@@ -124,6 +125,8 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
     });
   }, [dossier.items, statusFilter, itemSearchQuery]);
+
+  const hasFilter = statusFilter !== null || itemSearchQuery.trim().length > 0;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -699,6 +702,13 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         </div>
       )}
 
+      {hasFilter && visibleItems.length > 1 && (
+        <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+          <GripVertical size={12} className="opacity-60" aria-hidden />
+          Riordina disabilitato con filtri attivi
+        </div>
+      )}
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={visibleItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           <div id="tour-dossier-items" className="space-y-3">
@@ -755,6 +765,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                   onRemove={() => handleRemoveSingle(item)}
                   onStatusChange={(status: DossierItemStatus) => updateDossierItemStatus(dossier.id, item.id, status)}
                   showCheckbox={showBulkActions}
+                  dragDisabled={hasFilter}
                 />
               ))
             )}
