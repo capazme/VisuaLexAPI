@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, DossierItem, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 
 // Services for API sync
@@ -130,6 +130,10 @@ interface AppState {
 
     // Search State
     searchTrigger: SearchParams | null;
+    // When populated, SearchPanel drains this queue one item at a time after
+    // each in-flight search settles. Used to open multiple norms into a single
+    // tab (all items must carry the same tabLabel) — see triggerMultiSearch.
+    searchQueue: SearchParams[];
 
     // Actions
     updateSettings: (settings: Partial<AppSettings>) => void;
@@ -197,6 +201,7 @@ interface AppState {
     toggleDossierPin: (id: string) => void;
     addToDossier: (dossierId: string, item: any, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
+    restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'reading' | 'important' | 'done') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
@@ -215,6 +220,15 @@ interface AppState {
     // Search Actions
     triggerSearch: (params: SearchParams) => void;
     clearSearchTrigger: () => void;
+    // Queue N searches that all share the same tabLabel so they merge into one
+    // workspace tab (see SearchPanel drain effect). Replaces any pending queue.
+    triggerMultiSearch: (paramsList: SearchParams[]) => void;
+    dequeueNextSearch: () => void;
+    // Atomic: if no trigger is pending and the queue is non-empty, move the
+    // first queued item to searchTrigger in a single store update. Idempotent
+    // under React StrictMode double-invoke (second call sees a non-null
+    // searchTrigger and no-ops).
+    drainNextSearch: () => void;
 
     // QuickNorm Actions
     addQuickNorm: (label: string, searchParams: SearchParams, sourceUrl?: string) => void;
@@ -306,6 +320,7 @@ const appStore = createStore<AppState>()(
 
             // Search State
             searchTrigger: null,
+            searchQueue: [],
 
             // UI State
             sidebarVisible: true,
@@ -1159,6 +1174,28 @@ const appStore = createStore<AppState>()(
                 });
             },
 
+            // Used for undo-delete: re-inserts a previously removed item back
+            // into the dossier at its original position, preserving id, status,
+            // and addedAt locally. The server gets a fresh `addItem` call
+            // (best-effort, silent on failure) so the restored item survives a
+            // reload — at the cost of a new server-side id that only matters
+            // if something external references it, which currently nothing does.
+            restoreDossierItem: (dossierId, item, atIndex) => {
+                set((state) => {
+                    const dossier = state.dossiers.find(d => d.id === dossierId);
+                    if (!dossier) return;
+                    const clamped = Math.max(0, Math.min(atIndex, dossier.items.length));
+                    dossier.items.splice(clamped, 0, item);
+                });
+                dossierService.addItem(dossierId, {
+                    itemType: item.type === 'norma' ? 'norm' : 'note',
+                    title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
+                    content: item.data,
+                }).catch(err => {
+                    console.error('Failed to restore item on server:', err);
+                });
+            },
+
             reorderDossierItems: (dossierId, fromIndex, toIndex) => {
                 const state = get();
                 const dossier = state.dossiers.find(d => d.id === dossierId);
@@ -1419,6 +1456,24 @@ const appStore = createStore<AppState>()(
 
             clearSearchTrigger: () => set((state) => {
                 state.searchTrigger = null;
+            }),
+
+            triggerMultiSearch: (paramsList) => set((state) => {
+                state.searchQueue = paramsList;
+            }),
+
+            dequeueNextSearch: () => set((state) => {
+                state.searchQueue = state.searchQueue.slice(1);
+            }),
+
+            drainNextSearch: () => set((state) => {
+                // Atomic: if a search is already pending or the queue is empty,
+                // do nothing. Otherwise pop first item off queue and park it on
+                // searchTrigger for the trigger effect to consume.
+                if (state.searchTrigger || state.searchQueue.length === 0) return;
+                const [next, ...rest] = state.searchQueue;
+                state.searchQueue = rest;
+                state.searchTrigger = next;
             }),
 
             // QuickNorm Actions

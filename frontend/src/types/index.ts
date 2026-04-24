@@ -127,6 +127,10 @@ export interface SearchParams {
     show_brocardi_info: boolean;
     annex?: string; // Optional annex number/letter (e.g., "1", "2", "A", "B")
     tabLabel?: string; // Optional custom label for the workspace tab
+    // Optional pre-existing tab id to merge into (used by dossier "apri tutto" so
+    // multiple queued searches all land in the same pre-created tab without
+    // relying on label-matching timing in processResult).
+    targetTabId?: string;
 }
 
 // Annex metadata returned by tree endpoint
