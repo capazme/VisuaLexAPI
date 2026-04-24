@@ -229,7 +229,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
-        <NavItem to="/bulletin" icon={Users} label="Bacheca" onClick={closeMobile} />
+        <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 

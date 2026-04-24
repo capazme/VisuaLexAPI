@@ -35,7 +35,7 @@ function App() {
           <Route path="dossier" element={<DossierPage />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentPage />} />
-          <Route path="bulletin" element={<BulletinBoardPage />} />
+          <Route path="forum" element={<BulletinBoardPage />} />
         </Route>
 
         {/* Admin routes */}

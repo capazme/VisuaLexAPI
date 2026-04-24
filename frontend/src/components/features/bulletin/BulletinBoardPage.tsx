@@ -322,7 +322,7 @@ export function BulletinBoardPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Users className="text-primary-600" size={28} />
-            Bacheca Ambienti
+            Forum Ambienti
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             Esplora e condividi ambienti con la community
