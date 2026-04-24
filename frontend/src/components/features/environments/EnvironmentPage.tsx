@@ -21,7 +21,6 @@ import { CreateEnvironmentModal } from './CreateEnvironmentModal';
 import { EditEnvironmentModal } from './EditEnvironmentModal';
 import { ImportPreviewModal } from './ImportPreviewModal';
 import { ApplyEnvironmentModal } from './ApplyEnvironmentModal';
-import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { EnvironmentDetailModal } from './EnvironmentDetailModal';
 
 export function EnvironmentPage() {
@@ -455,13 +454,23 @@ export function EnvironmentPage() {
       />
 
 
-      {/* Delete Confirmation */}
-      {deleteConfirmId && (
-        <DeleteConfirmModal
-          onClose={() => setDeleteConfirmId(null)}
-          onConfirm={() => handleDelete(deleteConfirmId)}
-        />
-      )}
+      {/* Delete Confirmation — shared ConfirmDialog pattern (same as the
+          replace-mode guard above). The environment is resolved from the
+          held id so the title can name it explicitly. */}
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        variant="danger"
+        title={(() => {
+          const target = environments.find((e) => e.id === deleteConfirmId);
+          return target ? `Eliminare "${target.name}"?` : 'Eliminare ambiente?';
+        })()}
+        message="Questa azione non può essere annullata."
+        confirmLabel="Elimina"
+        onConfirm={() => {
+          if (deleteConfirmId) void handleDelete(deleteConfirmId);
+        }}
+        onCancel={() => setDeleteConfirmId(null)}
+      />
 
       {/* Detail Modal */}
       {detailEnv && (
