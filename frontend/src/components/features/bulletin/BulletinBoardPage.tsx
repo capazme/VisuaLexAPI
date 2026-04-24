@@ -385,6 +385,10 @@ export function BulletinBoardPage() {
           onReport={handleReport}
           onSuggest={handleSuggest}
           onPublishClick={() => setShowPublishModal(true)}
+          onResetFilters={() => {
+            setSearchQuery('');
+            setCategory('all');
+          }}
         />
       )}
 

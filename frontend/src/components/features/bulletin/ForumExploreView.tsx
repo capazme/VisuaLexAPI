@@ -1,5 +1,6 @@
-import { Search, Share2, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock } from 'lucide-react';
+import { Search, Share2, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, X as XIcon } from 'lucide-react';
 import { SharedEnvironmentCard } from './SharedEnvironmentCard';
+import { EmptyState } from '../../ui/EmptyState';
 import type { SharedEnvironment, EnvironmentCategory } from '../../../types';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
@@ -43,6 +44,7 @@ interface ForumExploreViewProps {
   onReport: (id: string) => void;
   onSuggest: (env: SharedEnvironment) => void;
   onPublishClick: () => void;
+  onResetFilters: () => void;
 }
 
 export function ForumExploreView({
@@ -68,9 +70,11 @@ export function ForumExploreView({
   onReport,
   onSuggest,
   onPublishClick,
+  onResetFilters,
 }: ForumExploreViewProps) {
   const selectedSort = SORT_OPTIONS.find(o => o.value === sort)!;
   const selectedCategory = CATEGORY_OPTIONS.find(o => o.value === category)!;
+  const hasFilter = Boolean(searchQuery) || category !== 'all';
 
   return (
     <>
@@ -212,26 +216,43 @@ export function ForumExploreView({
           ))}
         </div>
       ) : environments.length === 0 ? (
-        <div className="text-center py-12">
-          <Users size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-            Nessun ambiente trovato
-          </h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-4">
-            {searchQuery || category !== 'all'
-              ? 'Prova a modificare i filtri di ricerca'
-              : 'Sii il primo a condividere un ambiente!'}
-          </p>
-          {!searchQuery && category === 'all' && (
-            <button
-              onClick={onPublishClick}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <Share2 size={16} />
-              Condividi un ambiente
-            </button>
-          )}
-        </div>
+        hasFilter ? (
+          <EmptyState
+            variant="search"
+            title="Nessun ambiente corrisponde ai filtri"
+            description={
+              searchQuery && category !== 'all'
+                ? `Nessun risultato per "${searchQuery}" nella categoria ${selectedCategory.label.toLowerCase()}.`
+                : searchQuery
+                ? `Nessun risultato per "${searchQuery}".`
+                : `Nessun ambiente nella categoria "${selectedCategory.label}".`
+            }
+            action={
+              <button
+                onClick={onResetFilters}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+              >
+                <XIcon size={16} />
+                Azzera filtri
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            variant="generic"
+            title="Ancora nessun ambiente nel forum"
+            description="Sii il primo a condividere un ambiente con la community."
+            action={
+              <button
+                onClick={onPublishClick}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <Share2 size={16} />
+                Condividi un ambiente
+              </button>
+            }
+          />
+        )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {environments.map((env) => (
