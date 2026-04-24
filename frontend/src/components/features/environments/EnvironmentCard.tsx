@@ -42,18 +42,19 @@ export function EnvironmentCard({
   return (
     <div
       id={isFirst ? 'tour-env-card' : undefined}
-      className="dossier-card group bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden cursor-pointer"
+      className="dossier-card group relative bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors overflow-hidden cursor-pointer"
       onClick={onViewDetail}
     >
-      {/* Category Banner */}
+      {/* Category Stripe (4px leading edge) — see dossier polish round 3 */}
       {category && (
-        <div
-          className="h-1"
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
           style={{ backgroundColor: category.color }}
         />
       )}
 
-      <div className="p-4 md:p-4">
+      <div className="p-4 pl-5 md:p-4 md:pl-5">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
