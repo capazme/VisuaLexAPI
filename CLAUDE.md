@@ -51,6 +51,15 @@ Scoped-bulk-delete endpoints (added for `applyEnvironment(replace)`):
 - `DELETE /highlights` → `highlightController.deleteAllHighlights` — same pattern for highlights.
 - Both authenticate-gated (like every annotation/highlight route) and scoped to the current user. Intended caller is `applyEnvironment(replace)` ONLY — do not wire into end-user UI without a dedicated confirm flow (the current one lives in `EnvironmentPage`, danger-variant `ConfirmDialog` spelling out the wipe).
 
+Personal-environment CRUD (added when the environments page moved off localStorage):
+- `Environment` Prisma model with top-level columns for `name/description/author/version/category/color/tags` (searchable/indexable metadata) plus a single `content` JSON blob for `dossiers/quickNorms/customAliases/annotations/highlights`. Kept intentionally separate from `SharedEnvironment` (the community-board entity); a personal env can be promoted to shared but the tables stay distinct.
+- `environmentController` + `routes/environments.ts`: GET `/environments`, GET `/environments/:id`, POST `/environments`, PUT `/environments/:id`, DELETE `/environments/:id`. Ownership enforced via `findFirst({ userId })` on every write/read. Zod validates the metadata; `content` is passed through as opaque JSON.
+
+QuickNorm + CustomAlias CRUD (added to close the last localStorage-only slices):
+- `QuickNorm` Prisma model: `label`, `searchParams` JSON, `sourceUrl`, `usageCount`, `lastUsedAt`, `userId`. `CustomAlias` model: `trigger`, `aliasType` (new `AliasType` enum: `shortcut` | `reference`), `expandTo`, `searchParams` JSON, `description`, `usageCount`, `lastUsedAt`, `userId`. Custom aliases carry `@@unique([userId, trigger])` so duplicate-prevention happens at the DB, not only in the store; controller catches Prisma P2002 and surfaces 409.
+- Routes `/quick-norms` and `/custom-aliases` (authenticate-gated) expose list / create / update / delete, PLUS a dedicated `POST /:id/use` endpoint per entity.
+- The `POST /:id/use` endpoints exist for a reason: client code bumps the local `usageCount` instantly for UX and then fires a `.use(id)` Promise that does `prisma.update({ usageCount: { increment: 1 }, lastUsedAt: now })`. This is atomic, so concurrent clicks (or rapid-fire alias resolutions) can't race the counter, and clients don't need to read-modify-write.
+
 ### Frontend Structure
 
 React SPA with component-based architecture:
@@ -222,16 +231,24 @@ The application uses async web scraping with intelligent source routing:
 
 ## Frontend State Management
 
-Uses Zustand for global state with the following stores:
+Uses Zustand for global state with the following slices:
 
-- **Search Results**: Active norm cards with article text, Brocardi info
-- **History**: Previously searched norms (server-side, fetched from `/history`)
-- **Bookmarks**: Quick-access saved articles (localStorage)
-- **Dossiers**: Research collections with multiple articles (localStorage)
-- **Workspace**: Active tabs with content
-- **Settings**: User preferences (API endpoint, theme, etc.)
+Server-backed (hydrated by `fetchUserData` on login/refresh, mutated via optimistic+sync actions):
+- **Bookmarks** — `bookmarkService`, table `bookmarks`
+- **Dossiers + items** — `dossierService`, tables `dossiers` / `dossier_items`
+- **Environments** — `environmentService`, table `environments`
+- **QuickNorms** — `quickNormService`, table `quick_norms` (usage counter via atomic `POST /:id/use`)
+- **CustomAliases** — `customAliasService`, table `custom_aliases` (unique `(userId, trigger)` at DB level, usage counter via atomic `POST /:id/use`)
+- **Annotations** — `annotationService`, table `annotations` (hydrated per-article by `loadAnnotationsForArticle`)
+- **Highlights** — `highlightService`, table `highlights` (hydrated per-article)
+- **History** — `/history` API
 
-The store is located in `frontend/src/store/useAppStore.ts` and uses Immer for immutable updates.
+UI-only (persisted in `localStorage` via Zustand `persist`, partialize list):
+- **Search Results / Workspace** — active norm cards, tabs, highest z-index
+- **Settings** — theme, API endpoint, studyMode preferences
+- **searchPanelState** — panel open/close, last parsed query
+
+The store is located in `frontend/src/store/useAppStore.ts` and uses Immer. Every user-data slice is now server-backed; the partialize intentionally keeps only UI state. See gotcha #17 for the rule every new user-owned slice must follow.
 
 ### Bookmarks vs Dossiers - Conceptual Difference
 
@@ -642,7 +659,17 @@ When working on frontend, agents can use Chrome DevTools MCP for visual verifica
 - `frontend/src/components/features/dossier/` - Dossier is split across multiple files (was a 1366-line monolith): `DossierPage.tsx` is a thin shell that routes list/detail via `?dossier=<id>`, `DossierListView.tsx` hosts the grid + card context menu + page-scoped shortcuts (`n` / `/` / `i`), `DossierDetailView.tsx` hosts the single-dossier view. Modals live one-per-file (`EditDossierModal`, `ImportDossierModal`, `MoveToDossierModal`, `TreeNavigatorModal`, `ArticleViewerModal`, `OpenOnDashboardPicker`, `AddNoteModal`). Shared helpers (`formatTimestampLong`, `STATUS_CONFIG`, `computeNormaGroups`, `computeStatusBreakdown`, `NormaGroup`) live in `dossierUtils.ts`. The item row component is `SortableDossierItem.tsx` (renders the 4px leading-edge status stripe from `STATUS_CONFIG[x].stripe`). Toolbar buttons across mobile + desktop come from `ToolbarButton.tsx` — a color-token-driven component with `pressed`/`pressedColor` for toggle behaviour (pin is the canonical toggle: `color="slateMuted" pressedColor="yellow"`). Never add new dossier features inline in `DossierPage.tsx` — it's intentionally minimal.
 
 **Backend:**
-- `backend/prisma/schema.prisma` - Database schema
+- `backend/prisma/schema.prisma` - Database schema (now includes `Environment`, `QuickNorm`, `CustomAlias`, `AliasType` enum)
+- `backend/src/controllers/environmentController.ts` - Personal environment CRUD (separate from `SharedEnvironment`)
+- `backend/src/controllers/quickNormController.ts` - QuickNorm CRUD + atomic `useQuickNorm`
+- `backend/src/controllers/customAliasController.ts` - CustomAlias CRUD + atomic `useCustomAlias`; maps Prisma P2002 to 409
+- `backend/src/routes/environments.ts`, `quickNorms.ts`, `customAliases.ts` - each mounts on `/api`, all routes authenticate-gated
+
+**Frontend services (server sync):**
+- `frontend/src/services/environmentService.ts` - `getAll / getById / create / update / delete`
+- `frontend/src/services/quickNormService.ts` - CRUD plus `use(id)` for atomic usage bump
+- `frontend/src/services/customAliasService.ts` - CRUD plus `use(id)` for atomic usage bump
+- `frontend/src/services/annotationService.ts`, `highlightService.ts` - include `deleteAll()` (used by `applyEnvironment(replace)`)
 
 ### Testing Strategy
 
@@ -695,8 +722,9 @@ npm run prisma:studio  # Prisma database GUI
 14. **StrictMode double-invoke + multi-step store actions**: React dev StrictMode double-invokes every `useEffect` on mount. If your effect issues two SEPARATE store mutations — e.g. `dequeueNextSearch()` then `triggerSearch(next)` where `next = searchQueue[0]` comes from the render closure — both invocations use the SAME closure value and execute the same side-effects in sequence (dequeue+trigger the SAME first item twice), losing subsequent queued items. **Fix**: collapse to a single atomic store action (`drainNextSearch`: one `set()` that checks preconditions, pops, and parks the trigger). The second StrictMode invocation finds the precondition already satisfied (e.g. `searchTrigger` non-null) and no-ops. This is the root cause we hit on the dossier "apri tutte le norme" flow — keep multi-step drains atomic.
 15. **Dossier "apri tutte le norme in una tab unica"**: `triggerSearch` overwrites `state.searchTrigger`, so firing N calls in a loop keeps only the last. The dossier open-all flow uses a `searchQueue` drained one item at a time via `drainNextSearch` (see #14). Each queued `SearchParams` carries two complementary fields: `tabLabel: dossier.title` (cosmetic, sets the tab's visible name) AND `targetTabId` (load-bearing, tells `processResult` to skip all merge heuristics and always call `addNormaToTab(targetTabId, ...)`). The destination tab is **pre-created** synchronously before `navigate('/')`: `addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true })` returns the id that gets threaded into every params. Without `targetTabId` the streaming merge logic in `processResult` might find a stale orphan custom-labeled tab in the persisted `workspaceTabs` and append into THAT instead — `targetTabId` is the unambiguous pointer. Single-norma opens also use this pattern for consistency.
 16. **SelectionPopup → downstream composer: capture selection rect eagerly**: when a SelectionPopup action (e.g. "Aggiungi nota") opens a composer that needs to anchor on the selected span, you MUST capture `window.getSelection().getRangeAt(0).getBoundingClientRect()` BEFORE calling `hidePopup()` / `window.getSelection().removeAllRanges()`. The selection is cleared immediately after those calls and `getSelection()` returns no range, so any later lookup gives you no rect. The rect travels as `{ x, y, width, height }` through the `onAddNote(text, startOffset, rect)` callback — see `InlineNoteComposer` which wraps it into a floating-ui `VirtualElement`.
-17. **Any "import / apply / clone" action that produces server-backed entities MUST round-trip through the backend, not the store alone**: the canonical regressions were `importDossier` (file/share-link JSON import) and `applyEnvironment` (apply an environment preset). Both used to `uuidv4()` a local id and push straight into the store. The UI looked fine until the user called `addItem` (add note, add norma) on the "ghost" dossier — the backend's `findFirst({ id, userId })` 404'd because no such record existed. Rule: if an entity has a backend service (dossiers, annotations, highlights), every creation path must go through `service.create()` before pushing into the store, populating the store with server ids. `applyEnvironment(replace)` additionally wipes server-side first: `dossierService.delete(each)` + `annotationService.deleteAll()` + `highlightService.deleteAll()`, otherwise server-side orphans come back on the next `fetchUserData`/article load. `quickNorms` and `customAliases` are intrinsically client-only (no backend route), so they stay local. The replace-mode delete is gated behind a `danger`-variant `ConfirmDialog` in `EnvironmentPage` — the merge/replace split in `ApplyEnvironmentModal` is NOT enough consent for an irreversible server wipe.
+17. **Every user-owned slice is server-backed. Every creation / update / deletion MUST round-trip the backend before (or alongside) the store.** Canonical regressions were `importDossier` (file/share-link JSON import) and `applyEnvironment` (apply an environment preset) — both pushed a local `uuidv4()` straight into the store, the UI looked fine, then the first `addItem` on the "ghost" entity 404'd because the backend `findFirst({ id, userId })` found nothing. Rule: if an entity has a backend service (bookmarks, dossiers, environments, annotations, highlights, quickNorms, customAliases), every creation path goes through `service.create()` before pushing to the store, populating the store with server ids. For mutations the established pattern is optimistic+sync (apply locally, PUT, revert on non-404 error). **There is no intrinsically "client-only" user-data slice anymore** — the partialize only keeps UI state (settings, searchPanelState, workspaceTabs, highestZIndex). `applyEnvironment(replace)` additionally wipes server-side first: `dossierService.delete(each)` + `annotationService.deleteAll()` + `highlightService.deleteAll()`, otherwise server-side orphans come back on the next `fetchUserData`/article load. The replace-mode delete is gated behind a `danger`-variant `ConfirmDialog` in `EnvironmentPage` — the merge/replace split in `ApplyEnvironmentModal` is NOT enough consent for an irreversible server wipe.
 18. **Never use silent `.catch(() => fallback)` in load paths**: `fetchUserData` hid a session-level investigation for "dossiers disappear on refresh" (turned out to be the backend tsx watcher mid-restart after a controller change) because `bookmarkService.getAll().catch(() => [])` swallowed the error and the store populated an empty array with zero diagnostic. If a fallback is needed, log first: `.catch((err) => { console.error('context: what failed:', err); return fallback; })`. Any 401/CORS/ECONNREFUSED then shows up immediately in the console instead of surfacing as an empty UI.
+19. **Atomic usage counters live in dedicated `POST /:id/use` endpoints, not in PUT patches**: `QuickNorm.usageCount` and `CustomAlias.usageCount` bump every click / alias-resolution. A read-modify-write over PUT would race under rapid fire (click twice, +1 instead of +2). Each controller exposes a `/:id/use` route that runs `prisma.update({ usageCount: { increment: 1 }, lastUsedAt: new Date() })` as a single atomic op. Client pattern: (a) bump the local counter synchronously inside `set((state) => state.X.find(...).usageCount++)` for instant UX, (b) `void service.use(id).catch(...)` fire-and-forget afterwards. A failed sync isn't worth surfacing — the next `fetchUserData` restores the server counter as source of truth. Both `selectQuickNorm` and `trackAliasUsage` follow this shape; replicate it for any new counter slice instead of inventing a PUT-based variant.
 
 ### Date System Troubleshooting
 
