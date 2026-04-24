@@ -165,6 +165,12 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
             {loading ? 'Caricamento...' : 'Cerca articoli'}
           </button>
 
+          {loading && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center animate-pulse">
+              Recupero della struttura della norma — potrebbe richiedere qualche secondo.
+            </p>
+          )}
+
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
               {error}

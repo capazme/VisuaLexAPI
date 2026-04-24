@@ -317,6 +317,14 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         urn: art.urn,
       }, 'norma');
     });
+    if (articles.length > 0) {
+      showToast(
+        articles.length === 1
+          ? '1 articolo importato nel dossier'
+          : `${articles.length} articoli importati nel dossier`,
+        'success',
+      );
+    }
   };
 
   const handleExportPdf = () => {
