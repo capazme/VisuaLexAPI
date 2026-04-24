@@ -350,7 +350,7 @@ export function EnvironmentPage() {
         open={replaceConfirm !== null}
         variant="danger"
         title={replaceConfirm ? `Sostituire tutto con "${replaceConfirm.name}"?` : ''}
-        message="I dossier attuali verranno eliminati definitivamente dal server. Questa azione non è reversibile."
+        message="Tutti i tuoi dossier, annotazioni ed evidenziazioni attuali verranno eliminati definitivamente dal server prima di applicare l'ambiente. Questa azione non è reversibile."
         confirmLabel="Sì, sostituisci"
         onConfirm={() => {
           const env = replaceConfirm;

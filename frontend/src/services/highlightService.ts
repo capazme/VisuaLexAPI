@@ -31,4 +31,12 @@ export const highlightService = {
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/highlights/${id}`);
   },
+
+  // Delete every highlight owned by the current user. Returns the count
+  // of rows deleted. Used by applyEnvironment(replace) to avoid server-side
+  // orphans after a wipe.
+  async deleteAll(): Promise<number> {
+    const response = await apiClient.delete('/highlights');
+    return response.data?.deleted ?? 0;
+  },
 };

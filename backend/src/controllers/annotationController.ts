@@ -128,6 +128,20 @@ export const updateAnnotation = async (req: Request, res: Response) => {
   res.json(annotation);
 };
 
+// Delete every annotation belonging to the current user. Used by
+// applyEnvironment(replace) to avoid server-side orphans after a wipe.
+export const deleteAllAnnotations = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+
+  const result = await prisma.annotation.deleteMany({
+    where: { userId: req.user.id },
+  });
+
+  res.json({ deleted: result.count });
+};
+
 // Delete annotation
 export const deleteAnnotation = async (req: Request, res: Response) => {
   if (!req.user) {

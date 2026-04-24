@@ -124,6 +124,20 @@ export const updateHighlight = async (req: Request, res: Response) => {
   res.json(highlight);
 };
 
+// Delete every highlight belonging to the current user. Used by
+// applyEnvironment(replace) to avoid server-side orphans after a wipe.
+export const deleteAllHighlights = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError(401, 'Not authenticated');
+  }
+
+  const result = await prisma.highlight.deleteMany({
+    where: { userId: req.user.id },
+  });
+
+  res.json({ deleted: result.count });
+};
+
 // Delete highlight
 export const deleteHighlight = async (req: Request, res: Response) => {
   if (!req.user) {

@@ -9,6 +9,7 @@ router.use(authenticate);
 
 router.post('/highlights', highlightController.createHighlight);
 router.get('/highlights', highlightController.getHighlights); // ?normaKey=...
+router.delete('/highlights', highlightController.deleteAllHighlights); // wipes every highlight owned by the current user
 router.put('/highlights/:id', highlightController.updateHighlight);
 router.delete('/highlights/:id', highlightController.deleteHighlight);
 

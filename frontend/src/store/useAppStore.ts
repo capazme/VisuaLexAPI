@@ -1930,13 +1930,16 @@ const appStore = createStore<AppState>()(
 
                 // ── Annotations: each must be POSTed so the server owns the
                 // id; otherwise a reload would drop them (loadAnnotationsForArticle
-                // reads from the server). In replace-mode we clear the local
-                // slice but DON'T delete server-side — there's no deleteAll
-                // endpoint and state.annotations only holds the subset loaded
-                // for currently-viewed articles. Old server-side ones will
-                // reappear when those articles load again; that's a known
-                // asymmetry vs the dossier path.
+                // reads from the server). In replace-mode we first wipe every
+                // annotation owned by the user server-side (deleteAll), then
+                // clear the local slice — so there's no drift between what
+                // the UI shows and what the backend will return on next load.
                 if (mode === 'replace') {
+                    try {
+                        await annotationService.deleteAll();
+                    } catch (err) {
+                        console.error('applyEnvironment(replace): annotation deleteAll failed:', err);
+                    }
                     set((state) => { state.annotations = []; });
                 }
                 const annResults = await Promise.allSettled(
@@ -1957,6 +1960,11 @@ const appStore = createStore<AppState>()(
                 // null for legacy entries without startOffset — we skip those
                 // (they can't be persisted server-side).
                 if (mode === 'replace') {
+                    try {
+                        await highlightService.deleteAll();
+                    } catch (err) {
+                        console.error('applyEnvironment(replace): highlight deleteAll failed:', err);
+                    }
                     set((state) => { state.highlights = []; });
                 }
                 const hlResults = await Promise.allSettled(

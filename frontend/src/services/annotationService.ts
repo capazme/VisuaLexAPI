@@ -35,4 +35,12 @@ export const annotationService = {
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/annotations/${id}`);
   },
+
+  // Delete every annotation owned by the current user. Returns the count
+  // of rows deleted. Used by applyEnvironment(replace) to avoid server-side
+  // orphans after a wipe.
+  async deleteAll(): Promise<number> {
+    const response = await apiClient.delete('/annotations');
+    return response.data?.deleted ?? 0;
+  },
 };
