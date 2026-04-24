@@ -174,6 +174,24 @@ export function EnvironmentCard({
           )}
         </div>
 
+        {/* Inline preview of top dossiers + quick norms */}
+        {(environment.dossiers.length > 0 || environment.quickNorms.length > 0) && (
+          <div className="mb-2 space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+            {environment.dossiers.slice(0, 3).map((d) => (
+              <div key={d.id} className="flex items-center gap-1.5 min-w-0">
+                <FolderOpen size={12} className="flex-shrink-0 text-slate-400" />
+                <span className="truncate">{d.title}</span>
+              </div>
+            ))}
+            {environment.quickNorms.slice(0, 2).map((q) => (
+              <div key={q.id} className="flex items-center gap-1.5 min-w-0">
+                <Star size={12} className="flex-shrink-0 text-amber-400" />
+                <span className="truncate">{q.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Stale/fresh signal */}
         {tsLabel && (
           <div className="flex items-center gap-1 mb-4 text-[11px] text-slate-400 dark:text-slate-500">
