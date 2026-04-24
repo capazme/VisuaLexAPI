@@ -1,4 +1,4 @@
-import { Inbox, Send, Check, X as XIcon, AlertCircle } from 'lucide-react';
+import { Inbox, Send } from 'lucide-react';
 import type { EnvironmentSuggestion } from '../../../types';
 
 interface ForumSuggestionsViewProps {
@@ -8,8 +8,8 @@ interface ForumSuggestionsViewProps {
   suggestionTab: 'received' | 'sent';
   setSuggestionTab: (tab: 'received' | 'sent') => void;
   pendingCount: number;
-  onApprove: (suggestion: EnvironmentSuggestion) => void;
-  onReject: (suggestion: EnvironmentSuggestion) => void;
+  onOpenReview: (suggestion: EnvironmentSuggestion) => void;
+  onOpenEdit: (suggestion: EnvironmentSuggestion) => void;
 }
 
 export function ForumSuggestionsView({
@@ -19,8 +19,8 @@ export function ForumSuggestionsView({
   suggestionTab,
   setSuggestionTab,
   pendingCount,
-  onApprove,
-  onReject,
+  onOpenReview,
+  onOpenEdit,
 }: ForumSuggestionsViewProps) {
   return (
     <>
@@ -85,62 +85,36 @@ export function ForumSuggestionsView({
           </div>
         ) : (
           <div className="space-y-4">
-            {receivedSuggestions.map((suggestion) => (
-              <div
-                key={suggestion.id}
-                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        suggestion.status === 'pending'
-                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                          : suggestion.status === 'approved'
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                      }`}>
-                        {suggestion.status === 'pending' ? 'In attesa' : suggestion.status === 'approved' ? 'Approvato' : 'Rifiutato'}
-                      </span>
-                      <span className="text-sm text-slate-500 dark:text-slate-400">
-                        da @{suggestion.suggester.username}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
-                      Suggerimento per "{suggestion.sharedEnvironment?.title}"
-                    </p>
-                    {suggestion.message && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                        "{suggestion.message}"
+            {receivedSuggestions.map((suggestion) => {
+              const { counts, aggregateStatus } = suggestion;
+              return (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  onClick={() => onOpenReview(suggestion)}
+                  className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <StatusBreakdownChip counts={counts} aggregate={aggregateStatus} />
+                        <span className="text-sm text-slate-500 dark:text-slate-400">
+                          da @{suggestion.suggester.username}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
+                        per "{suggestion.sharedEnvironment?.title}"
                       </p>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{suggestion.content.dossiers.length} dossier</span>
-                      <span>{suggestion.content.quickNorms.length} norme veloci</span>
-                      <span>{suggestion.content.customAliases.length} alias</span>
+                      {suggestion.message && (
+                        <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                          "{suggestion.message}"
+                        </p>
+                      )}
                     </div>
                   </div>
-                  {suggestion.status === 'pending' && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onApprove(suggestion)}
-                        className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
-                        title="Approva"
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={() => onReject(suggestion)}
-                        className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                        title="Rifiuta"
-                      >
-                        <XIcon size={18} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )
       ) : (
@@ -156,55 +130,58 @@ export function ForumSuggestionsView({
           </div>
         ) : (
           <div className="space-y-4">
-            {sentSuggestions.map((suggestion) => (
-              <div
-                key={suggestion.id}
-                className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        suggestion.status === 'pending'
-                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                          : suggestion.status === 'approved'
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                      }`}>
-                        {suggestion.status === 'pending' ? 'In attesa' : suggestion.status === 'approved' ? 'Approvato' : 'Rifiutato'}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
-                      A "{suggestion.sharedEnvironment?.title}" di @{suggestion.sharedEnvironment?.user.username}
-                    </p>
-                    {suggestion.message && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                        "{suggestion.message}"
+            {sentSuggestions.map((suggestion) => {
+              const { counts, aggregateStatus } = suggestion;
+              const canEdit = aggregateStatus === 'open' || aggregateStatus === 'revoked';
+              return (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  onClick={() => canEdit && onOpenEdit(suggestion)}
+                  disabled={!canEdit}
+                  className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 transition-colors disabled:cursor-default enabled:hover:border-primary-400 dark:enabled:hover:border-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <StatusBreakdownChip counts={counts} aggregate={aggregateStatus} />
+                      </div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
+                        a "{suggestion.sharedEnvironment?.title}" di @{suggestion.sharedEnvironment?.user.username}
                       </p>
-                    )}
-                    {suggestion.reviewNote && (
-                      <p className="text-sm text-slate-500 dark:text-slate-400 italic">
-                        Risposta: "{suggestion.reviewNote}"
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-2">
-                      <span>{suggestion.content.dossiers.length} dossier</span>
-                      <span>{suggestion.content.quickNorms.length} norme veloci</span>
-                      <span>{suggestion.content.customAliases.length} alias</span>
+                      {suggestion.message && (
+                        <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">"{suggestion.message}"</p>
+                      )}
                     </div>
                   </div>
-                  {suggestion.status === 'pending' && (
-                    <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                      <AlertCircle size={14} />
-                      In attesa
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )
       )}
     </>
   );
+}
+
+function StatusBreakdownChip({ counts, aggregate }: {
+  counts: { pending: number; taken: number; declined: number };
+  aggregate: 'open' | 'closed' | 'revoked';
+}) {
+  if (aggregate === 'revoked') {
+    return (
+      <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+        Revocato
+      </span>
+    );
+  }
+  const parts: string[] = [];
+  if (counts.pending > 0) parts.push(`${counts.pending} pending`);
+  if (counts.taken > 0) parts.push(`${counts.taken} prese`);
+  if (counts.declined > 0) parts.push(`${counts.declined} rifiutate`);
+  const classes =
+    aggregate === 'open'
+      ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400';
+  return <span className={`text-xs px-2 py-0.5 rounded-full ${classes}`}>{parts.join(' · ') || 'Nessun item'}</span>;
 }

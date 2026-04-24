@@ -5,6 +5,9 @@ import { ImportEnvironmentModal } from './ImportEnvironmentModal';
 import { ReportModal } from './ReportModal';
 import { SuggestContentModal } from './SuggestContentModal';
 import { EditSharedEnvironmentModal } from './EditSharedEnvironmentModal';
+import { SuggestionReviewDialog, type TakeResult } from './SuggestionReviewDialog';
+import { EditSuggestionDialog } from './EditSuggestionDialog';
+import { AliasConflictDialog } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
@@ -12,6 +15,7 @@ import { Toast } from '../../ui/Toast';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useTour } from '../../../hooks/useTour';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
+import { customAliasService } from '../../../services/customAliasService';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
 
 type TabType = 'explore' | 'my' | 'suggestions';
@@ -51,6 +55,9 @@ export function BulletinBoardPage() {
   const [suggestingTo, setSuggestingTo] = useState<SharedEnvironment | null>(null);
   const [editingEnv, setEditingEnv] = useState<SharedEnvironment | null>(null);
   const [deletingEnv, setDeletingEnv] = useState<SharedEnvironment | null>(null);
+  const [reviewingSuggestion, setReviewingSuggestion] = useState<EnvironmentSuggestion | null>(null);
+  const [editingSuggestion, setEditingSuggestion] = useState<EnvironmentSuggestion | null>(null);
+  const [aliasConflict, setAliasConflict] = useState<{ itemId: string; suggestedTrigger: string; existingAliasId?: string } | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -199,37 +206,64 @@ export function BulletinBoardPage() {
     }
   };
 
-  // Suggestion actions
-  const handleApproveSuggestion = async (suggestion: EnvironmentSuggestion) => {
+  // Suggestion item handlers
+  const handleTakeItem = useCallback(async (itemId: string): Promise<TakeResult> => {
+    if (!reviewingSuggestion) return { kind: 'ok' };
     try {
-      await sharedEnvironmentService.approveSuggestion(suggestion.id, {
-        versionMode: 'replace',
-        mergeMode: 'merge',
-      });
-      setReceivedSuggestions(prev =>
-        prev.map(s => s.id === suggestion.id ? { ...s, status: 'approved' } : s)
-      );
-      setPendingCount(prev => Math.max(0, prev - 1));
-      showToast('Suggerimento approvato! Nuova versione creata.', 'success');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Errore';
-      showToast(message, 'error');
+      await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, itemId);
+      await fetchSuggestions();
+      setToast({ type: 'success', message: 'Item preso.' });
+      return { kind: 'ok' };
+    } catch (err: unknown) {
+      const maybeAxios = err as { response?: { status?: number; data?: { error?: string; suggestedTrigger?: string; existingAliasId?: string } } };
+      if (maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
+        const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
+        setAliasConflict({ itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
+        return { kind: 'alias_conflict', itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId };
+      }
+      const msg = err instanceof Error ? err.message : 'Errore';
+      setToast({ type: 'error', message: msg });
+      return { kind: 'ok' };
     }
-  };
+  }, [reviewingSuggestion, fetchSuggestions]);
 
-  const handleRejectSuggestion = async (suggestion: EnvironmentSuggestion) => {
+  const handleDeclineItem = useCallback(async (itemId: string, reviewNote?: string) => {
+    if (!reviewingSuggestion) return;
     try {
-      await sharedEnvironmentService.rejectSuggestion(suggestion.id);
-      setReceivedSuggestions(prev =>
-        prev.map(s => s.id === suggestion.id ? { ...s, status: 'rejected' } : s)
-      );
-      setPendingCount(prev => Math.max(0, prev - 1));
-      showToast('Suggerimento rifiutato', 'info');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Errore';
-      showToast(message, 'error');
+      await sharedEnvironmentService.declineSuggestionItem(reviewingSuggestion.id, itemId, reviewNote);
+      await fetchSuggestions();
+      setToast({ type: 'success', message: 'Item rifiutato.' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore';
+      setToast({ type: 'error', message: msg });
     }
-  };
+  }, [reviewingSuggestion, fetchSuggestions]);
+
+  const handleRevokeItem = useCallback(async (itemId: string) => {
+    if (!editingSuggestion) return;
+    try {
+      await sharedEnvironmentService.revokeSuggestionItem(editingSuggestion.id, itemId);
+      await fetchSuggestions();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore';
+      setToast({ type: 'error', message: msg });
+    }
+  }, [editingSuggestion, fetchSuggestions]);
+
+  // Sync reviewingSuggestion with refreshed server data. reviewingSuggestion is intentionally
+  // omitted from deps: including it creates an infinite loop (effect updates it → re-triggers).
+  useEffect(() => {
+    if (!reviewingSuggestion) return;
+    const fresh = receivedSuggestions.find(s => s.id === reviewingSuggestion.id);
+    if (fresh) setReviewingSuggestion(fresh);
+  }, [receivedSuggestions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync editingSuggestion with refreshed server data — same rationale as above.
+  useEffect(() => {
+    if (!editingSuggestion) return;
+    const fresh = sentSuggestions.find(s => s.id === editingSuggestion.id);
+    if (fresh) setEditingSuggestion(fresh);
+  }, [sentSuggestions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle like
   const handleLike = async (id: string) => {
@@ -424,8 +458,8 @@ export function BulletinBoardPage() {
           suggestionTab={suggestionTab}
           setSuggestionTab={setSuggestionTab}
           pendingCount={pendingCount}
-          onApprove={handleApproveSuggestion}
-          onReject={handleRejectSuggestion}
+          onOpenReview={setReviewingSuggestion}
+          onOpenEdit={setEditingSuggestion}
         />
       )}
 
@@ -466,6 +500,55 @@ export function BulletinBoardPage() {
           environment={editingEnv}
           onClose={() => setEditingEnv(null)}
           onUpdated={handleEditComplete}
+        />
+      )}
+
+      {reviewingSuggestion && (
+        <SuggestionReviewDialog
+          suggestion={reviewingSuggestion}
+          onTake={handleTakeItem}
+          onDecline={handleDeclineItem}
+          onClose={() => setReviewingSuggestion(null)}
+        />
+      )}
+
+      {editingSuggestion && (
+        <EditSuggestionDialog
+          suggestion={editingSuggestion}
+          onRevoke={handleRevokeItem}
+          onItemsAdded={() => { void fetchSuggestions(); }}
+          onClose={() => setEditingSuggestion(null)}
+        />
+      )}
+
+      {aliasConflict && (
+        <AliasConflictDialog
+          suggestedTrigger={aliasConflict.suggestedTrigger}
+          onChoose={async (choice) => {
+            if (choice.action === 'skip') { setAliasConflict(null); return; }
+            if (!reviewingSuggestion) { setAliasConflict(null); return; }
+            try {
+              if (choice.action === 'replace') {
+                if (!aliasConflict.existingAliasId) {
+                  throw new Error('Missing existingAliasId in alias conflict body');
+                }
+                await customAliasService.delete(aliasConflict.existingAliasId);
+                await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId);
+              } else if (choice.action === 'rename') {
+                // Rename is MVP-deferred — see Task 10 Step 8 rationale.
+                // Replace + Skip cover the main flows; Rename requires a
+                // backend query-param override (Task 12 nice-to-have).
+                setToast({ type: 'info', message: 'Funzione Rinomina non ancora implementata — usa Sostituisci o Salta.' });
+              }
+              await fetchSuggestions();
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Errore';
+              setToast({ type: 'error', message: msg });
+            } finally {
+              setAliasConflict(null);
+            }
+          }}
+          onClose={() => setAliasConflict(null)}
         />
       )}
 
