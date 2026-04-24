@@ -1047,75 +1047,84 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
   try {
     createdRow = await prisma.$transaction(async (tx) => {
       const payload = item.payload as any;
-      switch (item.itemType) {
-        case 'annotation':
-          return tx.annotation.create({
-            data: {
-              userId: req.user!.id,
-              normaKey: payload.articleId ?? payload.normaKey ?? '',
-              content: payload.text,
-              textContext: payload.anchorText,
-              position: payload.startOffset,
-              ...attribution,
-            },
-          });
-        case 'highlight':
-          return tx.highlight.create({
-            data: {
-              userId: req.user!.id,
-              normaKey: payload.articleId ?? payload.normaKey ?? '',
-              text: payload.anchorText ?? '',
-              color: payload.colorVar ?? 'yellow',
-              startOffset: payload.startOffset ?? 0,
-              endOffset: payload.endOffset ?? 0,
-              ...attribution,
-            },
-          });
-        case 'dossier': {
-          const entries = Array.isArray(payload.entries) ? payload.entries : [];
-          return tx.dossier.create({
-            data: {
-              userId: req.user!.id,
-              name: payload.title,
-              description: payload.description,
-              ...attribution,
-              items: {
-                create: entries.map((e: any, idx: number) => ({
-                  itemType: e.articleRef ? 'norm' : 'note',
-                  title: e.articleRef?.label ?? e.note?.slice(0, 60) ?? `Item ${idx + 1}`,
-                  content: e,
-                  position: idx,
-                })),
+      const row = await (async () => {
+        switch (item.itemType) {
+          case 'annotation':
+            return tx.annotation.create({
+              data: {
+                userId: req.user!.id,
+                normaKey: payload.articleId ?? payload.normaKey ?? '',
+                content: payload.text,
+                textContext: payload.anchorText,
+                position: payload.startOffset,
+                ...attribution,
               },
-            },
-            include: { items: true },
-          });
+            });
+          case 'highlight':
+            return tx.highlight.create({
+              data: {
+                userId: req.user!.id,
+                normaKey: payload.articleId ?? payload.normaKey ?? '',
+                text: payload.anchorText ?? '',
+                color: payload.colorVar ?? 'yellow',
+                startOffset: payload.startOffset ?? 0,
+                endOffset: payload.endOffset ?? 0,
+                ...attribution,
+              },
+            });
+          case 'dossier': {
+            const entries = Array.isArray(payload.entries) ? payload.entries : [];
+            return tx.dossier.create({
+              data: {
+                userId: req.user!.id,
+                name: payload.title,
+                description: payload.description,
+                ...attribution,
+                items: {
+                  create: entries.map((e: any, idx: number) => ({
+                    itemType: e.articleRef ? 'norm' : 'note',
+                    title: e.articleRef?.label ?? e.note?.slice(0, 60) ?? `Item ${idx + 1}`,
+                    content: e,
+                    position: idx,
+                  })),
+                },
+              },
+              include: { items: true },
+            });
+          }
+          case 'quickNorm':
+            return tx.quickNorm.create({
+              data: {
+                userId: req.user!.id,
+                label: payload.label,
+                searchParams: payload.searchParams,
+                sourceUrl: payload.sourceUrl,
+                ...attribution,
+              },
+            });
+          case 'alias':
+            return tx.customAlias.create({
+              data: {
+                userId: req.user!.id,
+                trigger: payload.trigger,
+                aliasType: payload.aliasType,
+                expandTo: payload.expandTo,
+                searchParams: payload.searchParams,
+                description: payload.description,
+                ...attribution,
+              },
+            });
+          default:
+            throw new AppError(400, `Unsupported itemType: ${item.itemType}`);
         }
-        case 'quickNorm':
-          return tx.quickNorm.create({
-            data: {
-              userId: req.user!.id,
-              label: payload.label,
-              searchParams: payload.searchParams,
-              sourceUrl: payload.sourceUrl,
-              ...attribution,
-            },
-          });
-        case 'alias':
-          return tx.customAlias.create({
-            data: {
-              userId: req.user!.id,
-              trigger: payload.trigger,
-              aliasType: payload.aliasType,
-              expandTo: payload.expandTo,
-              searchParams: payload.searchParams,
-              description: payload.description,
-              ...attribution,
-            },
-          });
-        default:
-          throw new AppError(400, `Unsupported itemType: ${item.itemType}`);
-      }
+      })();
+
+      await tx.suggestionItem.update({
+        where: { id: itemId },
+        data: { status: 'taken', reviewedAt: new Date() },
+      });
+
+      return row;
     });
   } catch (err: unknown) {
     if (
@@ -1140,11 +1149,6 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
     }
     throw err;
   }
-
-  await prisma.suggestionItem.update({
-    where: { id: itemId },
-    data: { status: 'taken', reviewedAt: new Date() },
-  });
 
   res.json({ item: { id: itemId, status: 'taken' }, created: createdRow });
 };
