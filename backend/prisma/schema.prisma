@@ -47,6 +47,12 @@ model User {
   sharedEnvironmentReports SharedEnvironmentReport[]
   suggestionsMade          EnvironmentSuggestion[]   @relation("SuggestionsMade")
 
+  originalAuthorOfAnnotations Annotation[]  @relation("OriginalAuthorOfAnnotations")
+  originalAuthorOfHighlights  Highlight[]   @relation("OriginalAuthorOfHighlights")
+  originalAuthorOfDossiers    Dossier[]     @relation("OriginalAuthorOfDossiers")
+  originalAuthorOfQuickNorms  QuickNorm[]   @relation("OriginalAuthorOfQuickNorms")
+  originalAuthorOfAliases     CustomAlias[] @relation("OriginalAuthorOfAliases")
+
   @@map("users")
 }
 
@@ -129,9 +135,14 @@ model Annotation {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
   // Relationships
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookmark Bookmark? @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark         Bookmark?              @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedAnnotations", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfAnnotations", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([bookmarkId])
@@ -155,9 +166,14 @@ model Highlight {
   userId      String   @map("user_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
   // Relationships
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookmark Bookmark? @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark         Bookmark?              @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedHighlights", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfHighlights", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([bookmarkId])
@@ -178,9 +194,14 @@ model Dossier {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
   // Relationships
-  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items DossierItem[]
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            DossierItem[]
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("dossiers")
@@ -306,7 +327,12 @@ model QuickNorm {
   userId       String    @map("user_id")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedQuickNorms", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfQuickNorms", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@map("quick_norms")
@@ -336,7 +362,12 @@ model CustomAlias {
   userId       String    @map("user_id")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedAliases", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfAliases", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
   // Trigger must be unique PER USER (same trigger across users is fine).
   @@unique([userId, trigger])
@@ -463,10 +494,18 @@ model SharedEnvironmentReport {
 // ENVIRONMENT SUGGESTIONS & VERSIONING
 // ============================================
 
-enum SuggestionStatus {
+enum SuggestionItemType {
+  annotation
+  highlight
+  dossier
+  quickNorm
+  alias
+}
+
+enum SuggestionItemStatus {
   pending
-  approved
-  rejected
+  taken
+  declined
 }
 
 model EnvironmentSuggestion {
@@ -474,29 +513,42 @@ model EnvironmentSuggestion {
   sharedEnvironmentId String @map("shared_environment_id")
   suggesterId         String @map("suggester_id")
 
-  // Suggested content (only dossiers, quickNorms, customAliases)
-  content Json
-
-  // Optional message from suggester
-  message String?
-
-  // Review status
-  status     SuggestionStatus @default(pending)
-  reviewedAt DateTime?        @map("reviewed_at")
-  reviewNote String?          @map("review_note")
+  message String? @db.VarChar(1000)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relationships
-  sharedEnvironment SharedEnvironment         @relation(fields: [sharedEnvironmentId], references: [id], onDelete: Cascade)
-  suggester         User                      @relation("SuggestionsMade", fields: [suggesterId], references: [id], onDelete: Cascade)
-  version           SharedEnvironmentVersion?
+  sharedEnvironment SharedEnvironment @relation(fields: [sharedEnvironmentId], references: [id], onDelete: Cascade)
+  suggester         User              @relation("SuggestionsMade", fields: [suggesterId], references: [id], onDelete: Cascade)
+  items             SuggestionItem[]
+
+  // Attribution inverse relations (rows in the owner's workspace that
+  // originated here via `take`). onDelete: SetNull lives on the child side.
+  sourcedAnnotations Annotation[]  @relation("SuggestionSourcedAnnotations")
+  sourcedHighlights  Highlight[]   @relation("SuggestionSourcedHighlights")
+  sourcedDossiers    Dossier[]     @relation("SuggestionSourcedDossiers")
+  sourcedQuickNorms  QuickNorm[]   @relation("SuggestionSourcedQuickNorms")
+  sourcedAliases     CustomAlias[] @relation("SuggestionSourcedAliases")
 
   @@index([sharedEnvironmentId])
   @@index([suggesterId])
-  @@index([status])
   @@map("environment_suggestions")
+}
+
+model SuggestionItem {
+  id           String               @id @default(uuid())
+  suggestionId String               @map("suggestion_id")
+  itemType     SuggestionItemType   @map("item_type")
+  payload      Json
+  status       SuggestionItemStatus @default(pending)
+  reviewNote   String?              @map("review_note") @db.VarChar(500)
+  reviewedAt   DateTime?            @map("reviewed_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+
+  suggestion EnvironmentSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@index([suggestionId, status])
+  @@map("suggestion_items")
 }
 
 model SharedEnvironmentVersion {
@@ -507,10 +559,6 @@ model SharedEnvironmentVersion {
   version   Int // Sequential version number (1, 2, 3...)
   content   Json // Snapshot of environment content at this version
   changelog String? // Description of changes
-
-  // Link to suggestion that created this version (if applicable)
-  suggestionId String?                @unique @map("suggestion_id")
-  suggestion   EnvironmentSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now()) @map("created_at")
 
