@@ -56,6 +56,7 @@ export function EnvironmentPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour();
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -84,6 +85,48 @@ export function EnvironmentPage() {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  // Page-scoped keyboard shortcuts:
+  //  n → open new-environment modal
+  //  / → focus the filter input
+  //  i → trigger JSON file picker
+  // Ignored while typing in a form field or when any overlay is open, so
+  // they don't fire under modals where a stray keystroke would be
+  // confusing. Same pattern as DossierListView.
+  useEffect(() => {
+    const hasOverlay =
+      isCreateModalOpen ||
+      importingEnv !== null ||
+      applyModalEnv !== null ||
+      replaceConfirm !== null ||
+      editingEnv !== null ||
+      detailEnv !== null ||
+      deleteConfirmId !== null;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (hasOverlay) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+        target.isContentEditable
+      );
+      if (isTyping) return;
+
+      if (e.key === 'n') {
+        e.preventDefault();
+        setIsCreateModalOpen(true);
+      } else if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'i') {
+        e.preventDefault();
+        fileInputRef.current?.click();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isCreateModalOpen, importingEnv, applyModalEnv, replaceConfirm, editingEnv, detailEnv, deleteConfirmId]);
 
   // Filter environments
   const filteredEnvironments = environments.filter(env => {
@@ -203,6 +246,8 @@ export function EnvironmentPage() {
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
+            aria-keyshortcuts="i"
+            title="Importa (scorciatoia: i)"
             className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
           >
             <Upload size={18} />
@@ -218,6 +263,8 @@ export function EnvironmentPage() {
           <button
             id="tour-env-create"
             onClick={() => setIsCreateModalOpen(true)}
+            aria-keyshortcuts="n"
+            title="Nuovo Ambiente (scorciatoia: n)"
             className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm flex-1 sm:flex-none min-h-[44px]"
           >
             <Plus size={18} />
@@ -232,10 +279,12 @@ export function EnvironmentPage() {
           <div className="relative flex-1">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Cerca negli ambienti..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-keyshortcuts="/"
               className="w-full pl-10 pr-4 py-2.5 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px]"
             />
           </div>
