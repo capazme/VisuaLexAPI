@@ -27,6 +27,7 @@ import { exampleEnvironments } from '../../../data/exampleEnvironments';
 import { useTour } from '../../../hooks/useTour';
 import { Toast } from '../../ui/Toast';
 import { EmptyState } from '../../ui/EmptyState';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 export function EnvironmentPage() {
   const {
@@ -52,6 +53,9 @@ export function EnvironmentPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [importingEnv, setImportingEnv] = useState<Environment | null>(null);
   const [applyModalEnv, setApplyModalEnv] = useState<Environment | null>(null);
+  // Guard for replace-mode: it deletes existing dossiers server-side, which
+  // is irreversible. Held here until the user confirms in a second step.
+  const [replaceConfirm, setReplaceConfirm] = useState<Environment | null>(null);
   const [editingEnv, setEditingEnv] = useState<Environment | null>(null);
   const [detailEnv, setDetailEnv] = useState<Environment | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -128,8 +132,7 @@ export function EnvironmentPage() {
     }
   };
 
-  const handleApply = async (env: Environment, mode: 'replace' | 'merge') => {
-    setApplyModalEnv(null);
+  const runApply = async (env: Environment, mode: 'replace' | 'merge') => {
     try {
       await applyEnvironment(env.id, mode);
       const modeText = mode === 'merge' ? 'unito' : 'applicato';
@@ -138,6 +141,17 @@ export function EnvironmentPage() {
       console.error('applyEnvironment failed:', err);
       showToast(`Errore durante l'applicazione di "${env.name}"`, 'error');
     }
+  };
+
+  const handleApply = (env: Environment, mode: 'replace' | 'merge') => {
+    setApplyModalEnv(null);
+    if (mode === 'replace') {
+      // Route replace through a ConfirmDialog — the op deletes existing
+      // dossiers server-side (irreversible).
+      setReplaceConfirm(env);
+      return;
+    }
+    void runApply(env, 'merge');
   };
 
   const handleDelete = (id: string) => {
@@ -330,6 +344,22 @@ export function EnvironmentPage() {
           onApply={handleApply}
         />
       )}
+
+      {/* Replace-mode guard: delete of server-side dossiers is irreversible */}
+      <ConfirmDialog
+        open={replaceConfirm !== null}
+        variant="danger"
+        title={replaceConfirm ? `Sostituire tutto con "${replaceConfirm.name}"?` : ''}
+        message="I dossier attuali verranno eliminati definitivamente dal server. Questa azione non è reversibile."
+        confirmLabel="Sì, sostituisci"
+        onConfirm={() => {
+          const env = replaceConfirm;
+          setReplaceConfirm(null);
+          if (env) void runApply(env, 'replace');
+        }}
+        onCancel={() => setReplaceConfirm(null)}
+      />
+
 
       {/* Delete Confirmation */}
       {deleteConfirmId && (

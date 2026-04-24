@@ -1896,10 +1896,8 @@ const appStore = createStore<AppState>()(
                     await get().importDossier(d);
                 }
 
-                // ── Non-dossier assets stay local-only. They mirror the
-                // previous behaviour: quickNorms / customAliases / annotations
-                // / highlights don't share the dossier add-item failure mode
-                // we're fixing here. Tracked separately as tech debt.
+                // ── quickNorms + customAliases are client-only (no backend
+                // endpoint), so they stay in the store with local uuids.
                 set((state) => {
                     const clonedQuickNorms = JSON.parse(JSON.stringify(env.quickNorms)).map((q: QuickNorm) => ({
                         ...q,
@@ -1913,20 +1911,10 @@ const appStore = createStore<AppState>()(
                         usageCount: 0,
                         lastUsedAt: undefined,
                     }));
-                    const clonedAnnotations = JSON.parse(JSON.stringify(env.annotations)).map((a: Annotation) => ({
-                        ...a,
-                        id: uuidv4(),
-                    }));
-                    const clonedHighlights = JSON.parse(JSON.stringify(env.highlights)).map((h: Highlight) => ({
-                        ...h,
-                        id: uuidv4(),
-                    }));
 
                     if (mode === 'replace') {
                         state.quickNorms = clonedQuickNorms;
                         state.customAliases = clonedCustomAliases;
-                        state.annotations = clonedAnnotations;
-                        state.highlights = clonedHighlights;
                     } else {
                         const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
                         const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
@@ -1937,10 +1925,55 @@ const appStore = createStore<AppState>()(
                         clonedCustomAliases.forEach((a: CustomAlias) => {
                             if (!existingAliasTriggers.has(a.trigger.toLowerCase())) state.customAliases.push(a);
                         });
-                        state.annotations.push(...clonedAnnotations);
-                        state.highlights.push(...clonedHighlights);
                     }
                 });
+
+                // ── Annotations: each must be POSTed so the server owns the
+                // id; otherwise a reload would drop them (loadAnnotationsForArticle
+                // reads from the server). In replace-mode we clear the local
+                // slice but DON'T delete server-side — there's no deleteAll
+                // endpoint and state.annotations only holds the subset loaded
+                // for currently-viewed articles. Old server-side ones will
+                // reappear when those articles load again; that's a known
+                // asymmetry vs the dossier path.
+                if (mode === 'replace') {
+                    set((state) => { state.annotations = []; });
+                }
+                const annResults = await Promise.allSettled(
+                    env.annotations.map(async (a) => {
+                        const wire = annotationStoreToCreate(a);
+                        const server = await annotationService.create(wire);
+                        return annotationApiToStore(server);
+                    })
+                );
+                const syncedAnn = annResults
+                    .filter((r): r is PromiseFulfilledResult<Annotation> => r.status === 'fulfilled')
+                    .map((r) => r.value);
+                if (syncedAnn.length > 0) {
+                    set((state) => { state.annotations.push(...syncedAnn); });
+                }
+
+                // ── Highlights: same pattern. highlightStoreToCreate returns
+                // null for legacy entries without startOffset — we skip those
+                // (they can't be persisted server-side).
+                if (mode === 'replace') {
+                    set((state) => { state.highlights = []; });
+                }
+                const hlResults = await Promise.allSettled(
+                    env.highlights.map(async (h) => {
+                        const wire = highlightStoreToCreate(h);
+                        if (!wire) return null;
+                        const server = await highlightService.create(wire);
+                        return highlightApiToStore(server);
+                    })
+                );
+                const syncedHl = hlResults
+                    .filter((r): r is PromiseFulfilledResult<Highlight | null> => r.status === 'fulfilled')
+                    .map((r) => r.value)
+                    .filter((h): h is Highlight => h !== null);
+                if (syncedHl.length > 0) {
+                    set((state) => { state.highlights.push(...syncedHl); });
+                }
             },
 
             refreshEnvironmentFromCurrent: (id) => set((state) => {
