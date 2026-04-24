@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import {
   Download, Link2, Trash2, Plus, RefreshCw, FolderOpen, Star,
-  FileText, Pencil, MoreHorizontal, Replace,
+  FileText, Pencil, MoreHorizontal, Replace, Clock,
 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { it } from 'date-fns/locale';
 import type { Environment } from '../../../types';
 import {
   ENVIRONMENT_CATEGORIES,
@@ -40,6 +42,20 @@ export function EnvironmentCard({
   const stats = getEnvironmentStats(environment);
   const category = environment.category ? ENVIRONMENT_CATEGORIES[environment.category] : null;
   const canShare = canShareAsLink(environment);
+
+  // Stale/fresh signal. Prefer updatedAt when present; fall back to
+  // createdAt so cards that were never edited still show something.
+  const tsIso = environment.updatedAt || environment.createdAt;
+  const tsDate = new Date(tsIso);
+  const tsValid = !Number.isNaN(tsDate.getTime());
+  const tsRelative = tsValid
+    ? formatDistanceToNow(tsDate, { addSuffix: true, locale: it })
+    : null;
+  const tsLabel = tsRelative
+    ? environment.updatedAt
+      ? `Aggiornato ${tsRelative}`
+      : `Creato ${tsRelative}`
+    : null;
 
   return (
     <div
@@ -144,7 +160,7 @@ export function EnvironmentCard({
         )}
 
         {/* Stats */}
-        <div className="flex flex-wrap gap-2 md:gap-3 mb-4 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex flex-wrap gap-2 md:gap-3 mb-2 text-xs text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1">
             <FolderOpen size={14} /> {stats.dossiers} dossier
           </span>
@@ -157,6 +173,14 @@ export function EnvironmentCard({
             </span>
           )}
         </div>
+
+        {/* Stale/fresh signal */}
+        {tsLabel && (
+          <div className="flex items-center gap-1 mb-4 text-[11px] text-slate-400 dark:text-slate-500">
+            <Clock size={12} />
+            <span title={tsDate.toLocaleString('it-IT')}>{tsLabel}</span>
+          </div>
+        )}
 
         {/* Merge primary — happy path for "apply". Replace lives in the
             3-dot menu because it's destructive (ConfirmDialog-guarded in
