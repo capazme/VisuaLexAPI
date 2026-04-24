@@ -243,12 +243,16 @@ export function DossierListView({ onSelect, showToast }: Props) {
     }
   };
 
-  const handleConfirmJsonImport = () => {
-    if (importingDossier) {
-      const newId = importDossier(importingDossier);
-      setImportingDossier(null);
+  const handleConfirmJsonImport = async () => {
+    if (!importingDossier) return;
+    const snapshot = importingDossier;
+    setImportingDossier(null);
+    const newId = await importDossier(snapshot);
+    if (newId) {
       showToast('Dossier importato', 'success');
       onSelect(newId);
+    } else {
+      showToast('Impossibile importare il dossier: errore server', 'error');
     }
   };
 

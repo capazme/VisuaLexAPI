@@ -53,11 +53,16 @@ export function DossierPage() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const handleConfirmImport = () => {
-    if (importingDossier) {
-      const newId = importDossier(importingDossier);
-      setImportingDossier(null);
+  const handleConfirmImport = async () => {
+    if (!importingDossier) return;
+    const snapshot = importingDossier;
+    setImportingDossier(null);
+    const newId = await importDossier(snapshot);
+    if (newId) {
       setSelectedDossierId(newId);
+      showToast('Dossier importato', 'success');
+    } else {
+      showToast('Impossibile importare il dossier: errore server', 'error');
     }
   };
 

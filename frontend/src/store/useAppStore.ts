@@ -8,7 +8,7 @@ import { filterEnvironmentBySelection, type EnvironmentSelection } from '../util
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
-import { dossierService, type DossierApi } from '../services/dossierService';
+import { dossierService, type DossierApi, type DossierItemApi } from '../services/dossierService';
 import { annotationService } from '../services/annotationService';
 import { highlightService } from '../services/highlightService';
 import { isAuthenticated } from '../services/authService';
@@ -205,7 +205,7 @@ interface AppState {
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
     updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'reading' | 'important' | 'done') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
-    importDossier: (dossier: Dossier) => string; // returns new dossier ID
+    importDossier: (dossier: Dossier) => Promise<string | null>; // returns new server-side dossier ID, null on failure
 
     addAnnotation: (normaKey: string, articleId: string, text: string, anchor?: { anchorText: string; startOffset: number }) => void;
     removeAnnotation: (id: string) => void;
@@ -260,7 +260,7 @@ interface AppState {
     deleteEnvironment: (id: string) => void;
     importEnvironment: (env: Environment) => string;
     importEnvironmentPartial: (envData: Partial<Environment>, selection: EnvironmentSelection, mode: 'merge' | 'replace') => void;
-    applyEnvironment: (id: string, mode: 'replace' | 'merge') => void;
+    applyEnvironment: (id: string, mode: 'replace' | 'merge') => Promise<void>;
     refreshEnvironmentFromCurrent: (id: string) => void;
     getCurrentStateAsEnvironment: (name: string) => Environment;
 }
@@ -1243,20 +1243,60 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
-            importDossier: (dossier) => {
-                const newId = uuidv4();
-                set((state) => {
-                    state.dossiers.push({
-                        ...dossier,
-                        id: newId,
-                        createdAt: new Date().toISOString(),
-                        items: dossier.items.map(item => ({
-                            ...item,
-                            id: uuidv4() // Generate new IDs to avoid conflicts
-                        }))
+            importDossier: async (dossier) => {
+                // Persist the dossier server-side first: any `addItem` call later
+                // (add note, add norma) does `findFirst({ id, userId })` on the
+                // server and 404s if we only populated the local store. Create
+                // the shell, recreate items in parallel, then push the fully
+                // populated dossier with server ids into the store.
+                try {
+                    const created = await dossierService.create({
+                        name: dossier.title,
+                        description: dossier.description,
                     });
-                });
-                return newId;
+
+                    const itemResults = await Promise.allSettled(
+                        dossier.items.map(async (item) => {
+                            const serverItem = await dossierService.addItem(created.id, {
+                                itemType: item.type === 'norma' ? 'norm' : 'note',
+                                title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
+                                content: item.data,
+                            });
+                            return { serverItem, original: item };
+                        })
+                    );
+
+                    const items: DossierItem[] = itemResults
+                        .filter((r): r is PromiseFulfilledResult<{ serverItem: DossierItemApi; original: DossierItem }> => r.status === 'fulfilled')
+                        .map((r) => ({
+                            id: r.value.serverItem.id,
+                            type: r.value.original.type,
+                            data: r.value.original.data,
+                            addedAt: r.value.serverItem.created_at,
+                            status: r.value.original.status,
+                        }));
+
+                    const failedCount = itemResults.filter((r) => r.status === 'rejected').length;
+                    if (failedCount > 0) {
+                        console.warn(`importDossier: ${failedCount}/${dossier.items.length} items failed to sync`);
+                    }
+
+                    set((state) => {
+                        state.dossiers.push({
+                            id: created.id,
+                            title: dossier.title,
+                            description: dossier.description,
+                            createdAt: created.created_at,
+                            items,
+                            tags: dossier.tags ? [...dossier.tags] : [],
+                            isPinned: !!dossier.isPinned,
+                        });
+                    });
+                    return created.id;
+                } catch (err) {
+                    console.error('Failed to import dossier:', err);
+                    return null;
+                }
             },
 
             // ── Annotation actions: optimistic update + server sync ────────
@@ -1828,72 +1868,80 @@ const appStore = createStore<AppState>()(
                 }
             }),
 
-            applyEnvironment: (id, mode) => set((state) => {
-                const env = state.environments.find(e => e.id === id);
+            applyEnvironment: async (id, mode) => {
+                const env = get().environments.find(e => e.id === id);
                 if (!env) return;
 
-                // Deep clone environment content
-                const clonedDossiers = JSON.parse(JSON.stringify(env.dossiers)).map((d: Dossier) => ({
-                    ...d,
-                    id: uuidv4(),
-                    items: d.items.map((i: any) => ({ ...i, id: uuidv4() }))
-                }));
-                const clonedQuickNorms = JSON.parse(JSON.stringify(env.quickNorms)).map((q: QuickNorm) => ({
-                    ...q,
-                    id: uuidv4(),
-                    usageCount: 0,
-                    lastUsedAt: undefined
-                }));
-                const clonedCustomAliases = JSON.parse(JSON.stringify(env.customAliases || [])).map((a: CustomAlias) => ({
-                    ...a,
-                    id: uuidv4(),
-                    usageCount: 0,
-                    lastUsedAt: undefined
-                }));
-                const clonedAnnotations = JSON.parse(JSON.stringify(env.annotations)).map((a: Annotation) => ({
-                    ...a,
-                    id: uuidv4()
-                }));
-                const clonedHighlights = JSON.parse(JSON.stringify(env.highlights)).map((h: Highlight) => ({
-                    ...h,
-                    id: uuidv4()
-                }));
-
+                // ── Dossiers: must go through the server (same reason as
+                // importDossier — addItem later checks server ownership and
+                // would 404 on any local-only dossier). In `replace` mode we
+                // also wipe existing dossiers server-side, otherwise they'd
+                // come back on the next fetchUserData and drift with the
+                // local state.
                 if (mode === 'replace') {
-                    state.dossiers = clonedDossiers;
-                    state.quickNorms = clonedQuickNorms;
-                    state.customAliases = clonedCustomAliases;
-                    state.annotations = clonedAnnotations;
-                    state.highlights = clonedHighlights;
-                } else {
-                    // Merge mode: add new items, skip duplicates by title/label/trigger
-                    const existingDossierTitles = new Set(state.dossiers.map(d => d.title.toLowerCase()));
-                    const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
-                    const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
-
-                    clonedDossiers.forEach((d: Dossier) => {
-                        if (!existingDossierTitles.has(d.title.toLowerCase())) {
-                            state.dossiers.push(d);
-                        }
-                    });
-
-                    clonedQuickNorms.forEach((q: QuickNorm) => {
-                        if (!existingQuickNormLabels.has(q.label.toLowerCase())) {
-                            state.quickNorms.push(q);
-                        }
-                    });
-
-                    clonedCustomAliases.forEach((a: CustomAlias) => {
-                        if (!existingAliasTriggers.has(a.trigger.toLowerCase())) {
-                            state.customAliases.push(a);
-                        }
-                    });
-
-                    // For annotations and highlights, we add all (hard to detect duplicates)
-                    state.annotations.push(...clonedAnnotations);
-                    state.highlights.push(...clonedHighlights);
+                    const existingIds = get().dossiers.map(d => d.id);
+                    await Promise.allSettled(existingIds.map(eid => dossierService.delete(eid)));
+                    set((state) => { state.dossiers = []; });
                 }
-            }),
+
+                const existingTitles = new Set(get().dossiers.map(d => d.title.toLowerCase()));
+                const dossiersToImport = env.dossiers.filter(d =>
+                    mode === 'replace' ? true : !existingTitles.has(d.title.toLowerCase())
+                );
+
+                // Imports happen sequentially so that in replace-mode the
+                // order env→store matches env→UI with no flicker. Each call
+                // pushes one populated dossier into the store.
+                for (const d of dossiersToImport) {
+                    await get().importDossier(d);
+                }
+
+                // ── Non-dossier assets stay local-only. They mirror the
+                // previous behaviour: quickNorms / customAliases / annotations
+                // / highlights don't share the dossier add-item failure mode
+                // we're fixing here. Tracked separately as tech debt.
+                set((state) => {
+                    const clonedQuickNorms = JSON.parse(JSON.stringify(env.quickNorms)).map((q: QuickNorm) => ({
+                        ...q,
+                        id: uuidv4(),
+                        usageCount: 0,
+                        lastUsedAt: undefined,
+                    }));
+                    const clonedCustomAliases = JSON.parse(JSON.stringify(env.customAliases || [])).map((a: CustomAlias) => ({
+                        ...a,
+                        id: uuidv4(),
+                        usageCount: 0,
+                        lastUsedAt: undefined,
+                    }));
+                    const clonedAnnotations = JSON.parse(JSON.stringify(env.annotations)).map((a: Annotation) => ({
+                        ...a,
+                        id: uuidv4(),
+                    }));
+                    const clonedHighlights = JSON.parse(JSON.stringify(env.highlights)).map((h: Highlight) => ({
+                        ...h,
+                        id: uuidv4(),
+                    }));
+
+                    if (mode === 'replace') {
+                        state.quickNorms = clonedQuickNorms;
+                        state.customAliases = clonedCustomAliases;
+                        state.annotations = clonedAnnotations;
+                        state.highlights = clonedHighlights;
+                    } else {
+                        const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
+                        const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
+
+                        clonedQuickNorms.forEach((q: QuickNorm) => {
+                            if (!existingQuickNormLabels.has(q.label.toLowerCase())) state.quickNorms.push(q);
+                        });
+                        clonedCustomAliases.forEach((a: CustomAlias) => {
+                            if (!existingAliasTriggers.has(a.trigger.toLowerCase())) state.customAliases.push(a);
+                        });
+                        state.annotations.push(...clonedAnnotations);
+                        state.highlights.push(...clonedHighlights);
+                    }
+                });
+            },
 
             refreshEnvironmentFromCurrent: (id) => set((state) => {
                 const env = state.environments.find(e => e.id === id);

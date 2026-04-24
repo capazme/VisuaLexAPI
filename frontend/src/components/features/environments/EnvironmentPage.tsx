@@ -128,11 +128,16 @@ export function EnvironmentPage() {
     }
   };
 
-  const handleApply = (env: Environment, mode: 'replace' | 'merge') => {
-    applyEnvironment(env.id, mode);
-    const modeText = mode === 'merge' ? 'unito' : 'applicato';
-    showToast(`Ambiente "${env.name}" ${modeText} con successo`, 'success');
+  const handleApply = async (env: Environment, mode: 'replace' | 'merge') => {
     setApplyModalEnv(null);
+    try {
+      await applyEnvironment(env.id, mode);
+      const modeText = mode === 'merge' ? 'unito' : 'applicato';
+      showToast(`Ambiente "${env.name}" ${modeText} con successo`, 'success');
+    } catch (err) {
+      console.error('applyEnvironment failed:', err);
+      showToast(`Errore durante l'applicazione di "${env.name}"`, 'error');
+    }
   };
 
   const handleDelete = (id: string) => {
