@@ -204,6 +204,8 @@ export interface Annotation {
      * textContent (same semantics as Highlight.startOffset).
      */
     startOffset?: number;
+    sourceSuggestionId?: string | null;
+    originalAuthor?: OriginalAuthor | null;
 }
 
 export interface Highlight {
@@ -220,6 +222,8 @@ export interface Highlight {
      * field existed: those fall back to global-match rendering.
      */
     startOffset?: number;
+    sourceSuggestionId?: string | null;
+    originalAuthor?: OriginalAuthor | null;
 }
 
 export interface Dossier {
@@ -230,6 +234,8 @@ export interface Dossier {
     items: DossierItem[];
     tags?: string[];
     isPinned?: boolean;
+    sourceSuggestionId?: string | null;
+    originalAuthor?: OriginalAuthor | null;
 }
 
 export interface DossierItem {
@@ -257,6 +263,8 @@ export interface QuickNorm {
     createdAt: string;
     usageCount: number; // Track usage for sorting
     lastUsedAt?: string;
+    sourceSuggestionId?: string | null;
+    originalAuthor?: OriginalAuthor | null;
 }
 
 // CustomAlias - User-defined shortcuts and references
@@ -277,6 +285,8 @@ export interface CustomAlias {
     createdAt: string;
     usageCount: number;
     lastUsedAt?: string;
+    sourceSuggestionId?: string | null;
+    originalAuthor?: OriginalAuthor | null;
 }
 
 // Environment - Bundled configuration for sharing
@@ -404,12 +414,29 @@ export interface SharedEnvironmentReport {
 // ENVIRONMENT SUGGESTIONS & VERSIONING
 // ============================================
 
-export type SuggestionStatus = 'pending' | 'approved' | 'rejected';
+export type SuggestionItemType = 'annotation' | 'highlight' | 'dossier' | 'quickNorm' | 'alias';
+export type SuggestionItemStatus = 'pending' | 'taken' | 'declined';
+export type SuggestionAggregateStatus = 'open' | 'closed' | 'revoked';
 
-export interface SuggestionContent {
-    dossiers: Dossier[];
-    quickNorms: QuickNorm[];
-    customAliases: CustomAlias[];
+export interface OriginalAuthor {
+    id: string;
+    username: string;
+}
+
+export interface SuggestionItem {
+    id: string;
+    itemType: SuggestionItemType;
+    payload: unknown; // shape depends on itemType — validated by consumers
+    status: SuggestionItemStatus;
+    reviewNote?: string | null;
+    reviewedAt?: string | null;
+    createdAt: string;
+}
+
+export interface SuggestionItemCounts {
+    pending: number;
+    taken: number;
+    declined: number;
 }
 
 export interface EnvironmentSuggestion {
@@ -421,12 +448,12 @@ export interface EnvironmentSuggestion {
         user: SharedEnvironmentUser;
     };
     suggester: SharedEnvironmentUser;
-    content: SuggestionContent;
     message?: string;
-    status: SuggestionStatus;
-    reviewedAt?: string;
-    reviewNote?: string;
+    items: SuggestionItem[];
+    counts: SuggestionItemCounts;
+    aggregateStatus: SuggestionAggregateStatus;
     createdAt: string;
+    updatedAt: string;
     isOwn: boolean;
 }
 
@@ -442,14 +469,12 @@ export interface SharedEnvironmentVersion {
 }
 
 export interface CreateSuggestionPayload {
-    content: SuggestionContent;
     message?: string;
+    items: Array<{ itemType: SuggestionItemType; payload: unknown }>;
 }
 
-export interface ApproveSuggestionPayload {
-    changelog?: string;
-    versionMode: 'replace' | 'coexist';
-    mergeMode: 'merge' | 'replace';
+export interface AddSuggestionItemsPayload {
+    items: Array<{ itemType: SuggestionItemType; payload: unknown }>;
 }
 
 export interface UpdateEnvironmentWithVersionPayload {

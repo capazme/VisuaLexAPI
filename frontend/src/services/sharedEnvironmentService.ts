@@ -9,9 +9,9 @@ import type {
   SharedEnvironmentReport,
   EnvironmentSuggestion,
   SharedEnvironmentVersion,
-  SuggestionStatus,
+  SuggestionAggregateStatus,
   CreateSuggestionPayload,
-  ApproveSuggestionPayload,
+  AddSuggestionItemsPayload,
   UpdateEnvironmentWithVersionPayload,
 } from '../types';
 
@@ -176,7 +176,7 @@ export const sharedEnvironmentService = {
   /**
    * Get suggestions received for user's environments
    */
-  async getReceivedSuggestions(status?: SuggestionStatus): Promise<EnvironmentSuggestion[]> {
+  async getReceivedSuggestions(status?: SuggestionAggregateStatus): Promise<EnvironmentSuggestion[]> {
     const response = await apiClient.get('/shared-environments-suggestions/received', {
       params: status ? { status } : undefined,
     });
@@ -200,18 +200,46 @@ export const sharedEnvironmentService = {
   },
 
   /**
-   * Approve a suggestion (creates new version)
+   * Take a suggestion item (owner only). Returns { item, created } or
+   * throws 409 with { error: 'alias_trigger_conflict', ... } payload.
    */
-  async approveSuggestion(suggestionId: string, data: ApproveSuggestionPayload): Promise<SharedEnvironment> {
-    const response = await apiClient.post(`/shared-environments-suggestions/${suggestionId}/approve`, data);
+  async takeSuggestionItem(suggestionId: string, itemId: string): Promise<{
+    item: { id: string; status: 'taken' };
+    created: unknown;
+  }> {
+    const response = await apiClient.post(
+      `/shared-environments-suggestions/${suggestionId}/items/${itemId}/take`
+    );
     return response.data;
   },
 
-  /**
-   * Reject a suggestion
-   */
-  async rejectSuggestion(suggestionId: string, reviewNote?: string): Promise<void> {
-    await apiClient.post(`/shared-environments-suggestions/${suggestionId}/reject`, { reviewNote });
+  async declineSuggestionItem(
+    suggestionId: string,
+    itemId: string,
+    reviewNote?: string
+  ): Promise<{ id: string; status: 'declined'; reviewNote?: string }> {
+    const response = await apiClient.post(
+      `/shared-environments-suggestions/${suggestionId}/items/${itemId}/decline`,
+      { reviewNote }
+    );
+    return response.data;
+  },
+
+  async revokeSuggestionItem(suggestionId: string, itemId: string): Promise<void> {
+    await apiClient.delete(
+      `/shared-environments-suggestions/${suggestionId}/items/${itemId}`
+    );
+  },
+
+  async addSuggestionItems(
+    suggestionId: string,
+    data: AddSuggestionItemsPayload
+  ): Promise<EnvironmentSuggestion> {
+    const response = await apiClient.post(
+      `/shared-environments-suggestions/${suggestionId}/items`,
+      data
+    );
+    return response.data;
   },
 
   // ============================================
