@@ -1,36 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Search, Share2, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock,
-  Package, Lightbulb, Inbox, Send, Check, X as XIcon, AlertCircle,
-} from 'lucide-react';
-import { SharedEnvironmentCard } from './SharedEnvironmentCard';
+import { Search, Share2, Users, Package, Lightbulb } from 'lucide-react';
 import { PublishEnvironmentModal } from './PublishEnvironmentModal';
 import { ImportEnvironmentModal } from './ImportEnvironmentModal';
 import { ReportModal } from './ReportModal';
 import { SuggestContentModal } from './SuggestContentModal';
 import { EditSharedEnvironmentModal } from './EditSharedEnvironmentModal';
+import { ForumExploreView, type SortOption } from './ForumExploreView';
+import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
+import { ForumSuggestionsView } from './ForumSuggestionsView';
 import { Toast } from '../../ui/Toast';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
 
-type SortOption = 'newest' | 'popular' | 'mostDownloaded';
 type TabType = 'explore' | 'my' | 'suggestions';
-
-const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[] = [
-  { value: 'newest', label: 'Più recenti', icon: <Clock size={14} /> },
-  { value: 'popular', label: 'Più popolari', icon: <TrendingUp size={14} /> },
-  { value: 'mostDownloaded', label: 'Più scaricati', icon: <Users size={14} /> },
-];
-
-const CATEGORY_OPTIONS: { value: EnvironmentCategory | 'all'; label: string }[] = [
-  { value: 'all', label: 'Tutte le categorie' },
-  { value: 'compliance', label: 'Compliance' },
-  { value: 'civil', label: 'Civile' },
-  { value: 'penal', label: 'Penale' },
-  { value: 'administrative', label: 'Amministrativo' },
-  { value: 'eu', label: 'Europeo' },
-  { value: 'other', label: 'Altro' },
-];
 
 export function BulletinBoardPage() {
   // Tab state
@@ -92,8 +74,9 @@ export function BulletinBoardPage() {
         pages: response.pagination.pages,
         total: response.pagination.total,
       });
-    } catch (error: any) {
-      showToast(error.message || 'Errore nel caricamento degli ambienti', 'error');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Errore nel caricamento degli ambienti';
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -254,8 +237,9 @@ export function BulletinBoardPage() {
             : env
         )
       );
-    } catch (error: any) {
-      showToast(error.message || 'Errore nel mettere mi piace', 'error');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Errore nel mettere mi piace';
+      showToast(message, 'error');
     } finally {
       setLikingIds(prev => {
         const next = new Set(prev);
@@ -310,10 +294,6 @@ export function BulletinBoardPage() {
     e.preventDefault();
     fetchEnvironments(1);
   };
-
-  // Selected sort option
-  const selectedSort = SORT_OPTIONS.find(o => o.value === sort)!;
-  const selectedCategory = CATEGORY_OPTIONS.find(o => o.value === category)!;
 
   return (
     <div className="space-y-6">
@@ -379,456 +359,61 @@ export function BulletinBoardPage() {
         </button>
       </div>
 
-      {/* EXPLORE TAB */}
+      {/* Tab views */}
       {activeTab === 'explore' && (
-        <>
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
-        {/* Search */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca ambienti..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-        </form>
-
-        {/* Category Filter */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowCategoryDropdown(!showCategoryDropdown);
-              setShowSortDropdown(false);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors min-w-[180px]"
-          >
-            <Filter size={16} />
-            <span className="flex-1 text-left">{selectedCategory.label}</span>
-            <ChevronDown size={16} />
-          </button>
-          {showCategoryDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
-              {CATEGORY_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    setCategory(option.value);
-                    setShowCategoryDropdown(false);
-                  }}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${
-                    category === option.value
-                      ? 'text-primary-600 dark:text-primary-400 font-medium'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Sort */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowSortDropdown(!showSortDropdown);
-              setShowCategoryDropdown(false);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors min-w-[160px]"
-          >
-            {selectedSort.icon}
-            <span className="flex-1 text-left">{selectedSort.label}</span>
-            <ChevronDown size={16} />
-          </button>
-          {showSortDropdown && (
-            <div className="absolute top-full right-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
-              {SORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    setSort(option.value);
-                    setShowSortDropdown(false);
-                  }}
-                  className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${
-                    sort === option.value
-                      ? 'text-primary-600 dark:text-primary-400 font-medium'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {option.icon}
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Refresh */}
-        <button
-          onClick={() => fetchEnvironments(pagination.page)}
-          disabled={loading}
-          className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-        </button>
-      </div>
-
-      {/* Close dropdowns on outside click */}
-      {(showCategoryDropdown || showSortDropdown) && (
-        <div
-          className="fixed inset-0 z-10"
-          onClick={() => {
-            setShowCategoryDropdown(false);
-            setShowSortDropdown(false);
-          }}
+        <ForumExploreView
+          environments={environments}
+          pagination={pagination}
+          loading={loading}
+          likingIds={likingIds}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          category={category}
+          setCategory={setCategory}
+          sort={sort}
+          setSort={setSort}
+          showCategoryDropdown={showCategoryDropdown}
+          setShowCategoryDropdown={setShowCategoryDropdown}
+          showSortDropdown={showSortDropdown}
+          setShowSortDropdown={setShowSortDropdown}
+          onSearchSubmit={handleSearchSubmit}
+          onRefresh={() => fetchEnvironments(pagination.page)}
+          onPaginate={fetchEnvironments}
+          onLike={handleLike}
+          onImport={handleImportClick}
+          onReport={handleReport}
+          onSuggest={handleSuggest}
+          onPublishClick={() => setShowPublishModal(true)}
         />
       )}
 
-      {/* Results count */}
-      {!loading && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {pagination.total} {pagination.total === 1 ? 'ambiente trovato' : 'ambienti trovati'}
-        </p>
-      )}
-
-      {/* Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-pulse"
-            >
-              <div className="h-10 bg-slate-100 dark:bg-slate-700" />
-              <div className="p-4 space-y-3">
-                <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded w-3/4" />
-                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-full" />
-                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/2" />
-                <div className="flex gap-2 mt-4">
-                  <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded flex-1" />
-                  <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded flex-1" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : environments.length === 0 ? (
-        <div className="text-center py-12">
-          <Users size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-            Nessun ambiente trovato
-          </h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-4">
-            {searchQuery || category !== 'all'
-              ? 'Prova a modificare i filtri di ricerca'
-              : 'Sii il primo a condividere un ambiente!'}
-          </p>
-          {!searchQuery && category === 'all' && (
-            <button
-              onClick={() => setShowPublishModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <Share2 size={16} />
-              Condividi un ambiente
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {environments.map((env) => (
-            <SharedEnvironmentCard
-              key={env.id}
-              environment={env}
-              onLike={handleLike}
-              onImport={handleImportClick}
-              onReport={handleReport}
-              onSuggest={handleSuggest}
-              isLiking={likingIds.has(env.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {pagination.pages > 1 && (
-        <div className="flex justify-center gap-2">
-          <button
-            onClick={() => fetchEnvironments(pagination.page - 1)}
-            disabled={pagination.page <= 1 || loading}
-            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Precedente
-          </button>
-          <span className="px-4 py-2 text-slate-600 dark:text-slate-400">
-            Pagina {pagination.page} di {pagination.pages}
-          </span>
-          <button
-            onClick={() => fetchEnvironments(pagination.page + 1)}
-            disabled={pagination.page >= pagination.pages || loading}
-            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Successivo
-          </button>
-        </div>
-      )}
-        </>
-      )}
-
-      {/* MY TAB */}
       {activeTab === 'my' && (
-        <>
-          {myEnvLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-pulse"
-                >
-                  <div className="h-10 bg-slate-100 dark:bg-slate-700" />
-                  <div className="p-4 space-y-3">
-                    <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded w-3/4" />
-                    <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-full" />
-                    <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : myEnvironments.length === 0 ? (
-            <div className="text-center py-12">
-              <Package size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                Nessun ambiente pubblicato
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400 mb-4">
-                Non hai ancora condiviso nessun ambiente con la community.
-              </p>
-              <button
-                onClick={() => setShowPublishModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                <Share2 size={16} />
-                Condividi un ambiente
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {myEnvironments.length} {myEnvironments.length === 1 ? 'ambiente pubblicato' : 'ambienti pubblicati'}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {myEnvironments.map((env) => (
-                  <SharedEnvironmentCard
-                    key={env.id}
-                    environment={env}
-                    onLike={handleLike}
-                    onImport={handleImportClick}
-                    onReport={handleReport}
-                    onEdit={handleEdit}
-                    onDelete={handleDeleteClick}
-                    onWithdraw={handleWithdraw}
-                    onRepublish={handleRepublish}
-                    isLiking={likingIds.has(env.id)}
-                    showOwnerActions={true}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </>
+        <ForumMyEnvironmentsView
+          environments={myEnvironments}
+          loading={myEnvLoading}
+          likingIds={likingIds}
+          onLike={handleLike}
+          onImport={handleImportClick}
+          onReport={handleReport}
+          onEdit={handleEdit}
+          onDelete={handleDeleteClick}
+          onWithdraw={handleWithdraw}
+          onRepublish={handleRepublish}
+          onPublishClick={() => setShowPublishModal(true)}
+        />
       )}
 
-      {/* SUGGESTIONS TAB */}
       {activeTab === 'suggestions' && (
-        <>
-          {/* Sub-tabs for received/sent */}
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setSuggestionTab('received')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                suggestionTab === 'received'
-                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Inbox size={16} />
-              Ricevuti
-              {pendingCount > 0 && (
-                <span className="ml-1 px-2 py-0.5 text-xs bg-primary-600 text-white rounded-full">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setSuggestionTab('sent')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                suggestionTab === 'sent'
-                  ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <Send size={16} />
-              Inviati
-            </button>
-          </div>
-
-          {suggestionsLoading ? (
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 animate-pulse"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/3" />
-                      <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded w-2/3" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : suggestionTab === 'received' ? (
-            receivedSuggestions.length === 0 ? (
-              <div className="text-center py-12">
-                <Inbox size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                  Nessun suggerimento ricevuto
-                </h3>
-                <p className="text-slate-600 dark:text-slate-400">
-                  Quando qualcuno suggerirà contenuti per i tuoi ambienti, li vedrai qui.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {receivedSuggestions.map((suggestion) => (
-                  <div
-                    key={suggestion.id}
-                    className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                            suggestion.status === 'pending'
-                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                              : suggestion.status === 'approved'
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                          }`}>
-                            {suggestion.status === 'pending' ? 'In attesa' : suggestion.status === 'approved' ? 'Approvato' : 'Rifiutato'}
-                          </span>
-                          <span className="text-sm text-slate-500 dark:text-slate-400">
-                            da @{suggestion.suggester.username}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
-                          Suggerimento per "{suggestion.sharedEnvironment?.title}"
-                        </p>
-                        {suggestion.message && (
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                            "{suggestion.message}"
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                          <span>{suggestion.content.dossiers.length} dossier</span>
-                          <span>{suggestion.content.quickNorms.length} norme veloci</span>
-                          <span>{suggestion.content.customAliases.length} alias</span>
-                        </div>
-                      </div>
-                      {suggestion.status === 'pending' && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleApproveSuggestion(suggestion)}
-                            className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
-                            title="Approva"
-                          >
-                            <Check size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleRejectSuggestion(suggestion)}
-                            className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                            title="Rifiuta"
-                          >
-                            <XIcon size={18} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          ) : (
-            sentSuggestions.length === 0 ? (
-              <div className="text-center py-12">
-                <Send size={48} className="mx-auto text-slate-300 dark:text-slate-600 mb-4" />
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                  Nessun suggerimento inviato
-                </h3>
-                <p className="text-slate-600 dark:text-slate-400">
-                  Esplora gli ambienti della community e suggerisci contenuti!
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {sentSuggestions.map((suggestion) => (
-                  <div
-                    key={suggestion.id}
-                    className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                            suggestion.status === 'pending'
-                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                              : suggestion.status === 'approved'
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                          }`}>
-                            {suggestion.status === 'pending' ? 'In attesa' : suggestion.status === 'approved' ? 'Approvato' : 'Rifiutato'}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
-                          A "{suggestion.sharedEnvironment?.title}" di @{suggestion.sharedEnvironment?.user.username}
-                        </p>
-                        {suggestion.message && (
-                          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-                            "{suggestion.message}"
-                          </p>
-                        )}
-                        {suggestion.reviewNote && (
-                          <p className="text-sm text-slate-500 dark:text-slate-400 italic">
-                            Risposta: "{suggestion.reviewNote}"
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-2">
-                          <span>{suggestion.content.dossiers.length} dossier</span>
-                          <span>{suggestion.content.quickNorms.length} norme veloci</span>
-                          <span>{suggestion.content.customAliases.length} alias</span>
-                        </div>
-                      </div>
-                      {suggestion.status === 'pending' && (
-                        <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                          <AlertCircle size={14} />
-                          In attesa
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-        </>
+        <ForumSuggestionsView
+          receivedSuggestions={receivedSuggestions}
+          sentSuggestions={sentSuggestions}
+          loading={suggestionsLoading}
+          suggestionTab={suggestionTab}
+          setSuggestionTab={setSuggestionTab}
+          pendingCount={pendingCount}
+          onApprove={handleApproveSuggestion}
+          onReject={handleRejectSuggestion}
+        />
       )}
 
       {/* Modals */}
