@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
     useFloating,
     useDismiss,
@@ -16,6 +16,7 @@ import { StickyNote, X, BookOpen, Trash2, Download } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { AttributionChip } from '../bulletin/AttributionChip';
 
 export interface NotesPeekPanelProps {
     isOpen: boolean;
@@ -180,6 +181,13 @@ function PeekBody({
     const [editingText, setEditingText] = useState('');
     const [composerText, setComposerText] = useState('');
     const composerRef = useRef<HTMLTextAreaElement>(null);
+    const [ownerFilter, setOwnerFilter] = useState<'all' | 'own' | 'imported'>('all');
+
+    const visibleNotes = useMemo(() => {
+        if (ownerFilter === 'own') return annotations.filter((n) => !n.sourceSuggestionId);
+        if (ownerFilter === 'imported') return annotations.filter((n) => !!n.sourceSuggestionId);
+        return annotations;
+    }, [annotations, ownerFilter]);
 
     // Autofocus composer when an anchor is passed in (user arrived via
     // "Aggiungi nota" from the selection popup) — skip otherwise to
@@ -216,7 +224,9 @@ function PeekBody({
         setComposerText('');
     };
 
-    const { anchoredNotes, freeNotes } = groupByAnchor(annotations);
+    const { anchoredNotes, freeNotes } = groupByAnchor(visibleNotes);
+
+    const hasImported = annotations.some((n) => !!n.sourceSuggestionId);
 
     return (
         <>
@@ -256,10 +266,31 @@ function PeekBody({
                 </div>
             </header>
 
+            {hasImported && (
+                <div className="flex gap-1 px-3 pt-2 pb-1 border-b border-slate-100 dark:border-slate-800">
+                    {(['all', 'own', 'imported'] as const).map((key) => (
+                        <button
+                            key={key}
+                            onClick={() => setOwnerFilter(key)}
+                            className={cn(
+                                'px-2 py-1 rounded text-xs transition-colors',
+                                ownerFilter === key
+                                    ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800',
+                            )}
+                        >
+                            {key === 'all' ? 'Tutte' : key === 'own' ? 'Mie' : 'Importate'}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-                {annotations.length === 0 && (
+                {visibleNotes.length === 0 && (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
-                        Nessuna nota su questo articolo.
+                        {annotations.length === 0
+                            ? 'Nessuna nota su questo articolo.'
+                            : 'Nessuna nota corrisponde al filtro selezionato.'}
                     </p>
                 )}
 
@@ -418,13 +449,20 @@ function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEdit, onC
                     className="w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                 />
             ) : (
-                <button
-                    onClick={onStartEdit}
-                    className="w-full text-left whitespace-pre-wrap text-slate-800 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded"
-                    title="Clicca per modificare"
-                >
-                    {note.text}
-                </button>
+                <>
+                    <button
+                        onClick={onStartEdit}
+                        className="w-full text-left whitespace-pre-wrap text-slate-800 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded"
+                        title="Clicca per modificare"
+                    >
+                        {note.text}
+                    </button>
+                    {note.sourceSuggestionId && (
+                        <div className="mt-1">
+                            <AttributionChip author={note.originalAuthor} />
+                        </div>
+                    )}
+                </>
             )}
 
             <button

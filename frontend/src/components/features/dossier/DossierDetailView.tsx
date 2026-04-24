@@ -17,6 +17,7 @@ import {
   GripVertical,
   StickyNote,
 } from 'lucide-react';
+import { AttributionChip } from '../bulletin/AttributionChip';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import {
@@ -423,13 +424,16 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       <header className="mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
           <div className="flex-1">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 md:gap-3">
                 <Folder className="text-blue-500" size={24} />
                 <span className="truncate">{dossier.title}</span>
               </h2>
               {dossier.isPinned && (
                 <Star size={16} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
+              )}
+              {dossier.sourceSuggestionId && (
+                <AttributionChip author={dossier.originalAuthor} />
               )}
             </div>
             {dossier.description && (

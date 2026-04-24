@@ -17,6 +17,7 @@ import { StickyNote, Trash2 } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { AttributionChip } from '../bulletin/AttributionChip';
 
 export interface InlineNotePopoverProps {
     note: Annotation;
@@ -147,13 +148,20 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
                                     className="w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                                 />
                             ) : (
-                                <button
-                                    onClick={startEdit}
-                                    className="w-full text-left whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded"
-                                    title="Clicca per modificare"
-                                >
-                                    {note.text}
-                                </button>
+                                <>
+                                    <button
+                                        onClick={startEdit}
+                                        className="w-full text-left whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded"
+                                        title="Clicca per modificare"
+                                    >
+                                        {note.text}
+                                    </button>
+                                    {note.sourceSuggestionId && (
+                                        <div className="mt-1">
+                                            <AttributionChip author={note.originalAuthor} />
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                         <button

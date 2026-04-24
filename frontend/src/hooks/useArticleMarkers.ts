@@ -62,9 +62,12 @@ export function useArticleMarkers({ rawText, highlights, annotations }: UseArtic
       const rawEnd = plainToRaw(h.startOffset + h.text.length);
       const slice = raw.slice(rawStart, rawEnd).replace(/\n/g, '');
       if (slice.toLowerCase() !== h.text.toLowerCase()) return;
+      const hlAuthor = h.originalAuthor?.username
+        ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
+      const hlTitle = hlAuthor ? ` title="${escapeAttr(`Evidenziato da @${hlAuthor}`)}"` : '';
       insertions.push({
         pos: rawStart, order: order++, isOpen: true,
-        markup: `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">`,
+        markup: `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark"${hlTitle}>`,
       });
       insertions.push({ pos: rawEnd, order: order++, isOpen: false, markup: '</mark>' });
     });
@@ -136,8 +139,11 @@ export function useArticleMarkers({ rawText, highlights, annotations }: UseArtic
     sortedLegacy.forEach((h) => {
       const escaped = escapeRegex(h.text);
       const regex = new RegExp(`(?<!<mark[^>]*>)${escaped}(?!</mark>)`, 'gi');
+      const legacyAuthor = h.originalAuthor?.username
+        ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
+      const legacyTitle = legacyAuthor ? ` title="${escapeAttr(`Evidenziato da @${legacyAuthor}`)}"` : '';
       html = html.replace(regex, (match) =>
-        `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark">${match}</mark>`);
+        `<mark style="${HIGHLIGHT_STYLES[h.color]}" data-highlight="${h.id}" class="highlight-mark"${legacyTitle}>${match}</mark>`);
     });
 
     // \n → <br /> last, after markers are placed.

@@ -4,6 +4,7 @@ import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import type { CustomAlias } from '../../../types';
+import { AttributionChip } from '../bulletin/AttributionChip';
 
 // Available act types for aliases
 const ACT_TYPES = [
@@ -376,7 +377,7 @@ function AliasItem({
                 {alias.trigger.slice(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
                         {alias.trigger}
                     </span>
@@ -384,6 +385,9 @@ function AliasItem({
                     <span className="text-sm text-slate-700 dark:text-slate-300 truncate">
                         {alias.expandTo}
                     </span>
+                    {alias.sourceSuggestionId && (
+                        <AttributionChip author={alias.originalAuthor} className="ml-1" />
+                    )}
                 </div>
                 {alias.searchParams && (
                     <p className="text-xs text-slate-400 truncate">

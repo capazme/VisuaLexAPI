@@ -23,6 +23,7 @@ import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import type { Dossier } from '../../../types';
+import { AttributionChip } from '../bulletin/AttributionChip';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -488,9 +489,14 @@ export function DossierListView({ onSelect, showToast }: Props) {
                     </div>
                   </div>
                 </div>
-                <h3 className="font-bold text-base md:text-lg text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">
-                  {dossier.title}
-                </h3>
+                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  <h3 className="font-bold text-base md:text-lg text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-2">
+                    {dossier.title}
+                  </h3>
+                  {dossier.sourceSuggestionId && (
+                    <AttributionChip author={dossier.originalAuthor} className="ml-1" />
+                  )}
+                </div>
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 min-h-[2.5em]">
                   {dossier.description || 'Nessuna descrizione'}
                 </p>
