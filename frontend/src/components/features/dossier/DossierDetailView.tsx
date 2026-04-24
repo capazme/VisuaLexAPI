@@ -15,6 +15,7 @@ import {
   X,
   ListChecks,
   GripVertical,
+  StickyNote,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
@@ -46,6 +47,7 @@ import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { ArticleViewerModal } from './ArticleViewerModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { ToolbarButton } from './ToolbarButton';
+import { AddNoteModal } from './AddNoteModal';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -86,6 +88,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [bulkStatusMenuOpen, setBulkStatusMenuOpen] = useState(false);
   const bulkStatusMenuRef = useRef<HTMLDivElement>(null);
   const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
 
   // Close the bulk-status menu on click-outside / Escape.
   useEffect(() => {
@@ -302,6 +305,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     } catch {
       showToast('Impossibile copiare il link', 'error');
     }
+  };
+
+  const handleAddNote = (text: string) => {
+    addToDossier(dossier.id, text, 'note');
+    showToast('Nota aggiunta al dossier', 'success');
   };
 
   const handleTreeImport = (
@@ -536,6 +544,14 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
             />
             <ToolbarButton
               variant="mobile"
+              color="yellow"
+              icon={StickyNote}
+              onClick={() => setAddNoteOpen(true)}
+              title="Aggiungi nota"
+              ariaLabel="Aggiungi una nota libera al dossier"
+            />
+            <ToolbarButton
+              variant="mobile"
               color="red"
               icon={Trash2}
               onClick={() => setConfirmDeleteOpen(true)}
@@ -591,6 +607,13 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               onClick={() => setTreeNavigatorOpen(true)}
               title="Importa da norma"
               ariaLabel="Importa articoli da norma"
+            />
+            <ToolbarButton
+              color="yellow"
+              icon={StickyNote}
+              onClick={() => setAddNoteOpen(true)}
+              title="Aggiungi nota"
+              ariaLabel="Aggiungi una nota libera al dossier"
             />
             <ToolbarButton
               color="indigo"
@@ -806,6 +829,13 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
         <TreeNavigatorModal
           onClose={() => setTreeNavigatorOpen(false)}
           onImport={handleTreeImport}
+        />
+      )}
+
+      {addNoteOpen && (
+        <AddNoteModal
+          onClose={() => setAddNoteOpen(false)}
+          onSave={handleAddNote}
         />
       )}
 
