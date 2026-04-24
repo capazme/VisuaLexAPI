@@ -481,6 +481,16 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
             />
             <ToolbarButton
               variant="mobile"
+              color="slateMuted"
+              pressedColor="yellow"
+              pressed={!!dossier.isPinned}
+              icon={Star}
+              onClick={() => toggleDossierPin(dossier.id)}
+              title={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+              ariaLabel={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+            />
+            <ToolbarButton
+              variant="mobile"
               color="emerald"
               icon={Download}
               onClick={handleExportPdf}
