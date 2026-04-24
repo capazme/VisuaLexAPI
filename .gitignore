@@ -15,4 +15,5 @@ data
 .env
 .env.*
 !.env.example
+!backend/.env.test
 *.env.local
