@@ -54,6 +54,7 @@ export function EnvironmentPage() {
   const [detailEnv, setDetailEnv] = useState<Environment | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isLoadingExamples, setIsLoadingExamples] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour();
@@ -68,15 +69,13 @@ export function EnvironmentPage() {
   }, [tryStartTour]);
 
   // Handle import from URL parameter. Reads `?import=` and immediately
-  // clears it in the same effect, so the set-state-in-effect disable is
-  // the same URL→state sync pattern used in DossierPage — see CLAUDE.md
+  // clears it in the same effect — URL→state sync pattern, see CLAUDE.md
   // gotcha #11.
   useEffect(() => {
     const importData = searchParams.get('import');
     if (importData) {
       const result = parseEnvironmentFromBase64(importData);
       if (result.success) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- URL→state sync: reads `?import=` and clears it below so the effect won't re-fire
         setImportingEnv(result.data);
       } else {
         showToast(result.error || 'Errore durante l\'import', 'error');
@@ -215,17 +214,30 @@ export function EnvironmentPage() {
     // sequentially so a run stays within sensible rate-limit territory
     // and the counter in the success toast matches what's actually on
     // the server.
-    let imported = 0;
-    for (const env of exampleEnvironments) {
-      const exists = environments.some(e => e.name === env.name);
-      if (exists) continue;
-      const newId = await importEnvironment(env);
-      if (newId) imported++;
-    }
-    if (imported > 0) {
-      showToast(`${imported} ambienti di esempio caricati con successo`, 'success');
-    } else {
+    const toImport = exampleEnvironments.filter(
+      (env) => !environments.some((e) => e.name === env.name)
+    );
+    if (toImport.length === 0) {
       showToast('Tutti gli ambienti di esempio sono già presenti', 'info');
+      return;
+    }
+    setIsLoadingExamples(true);
+    showToast(`Carico ${toImport.length} ambient${toImport.length === 1 ? 'e' : 'i'} di esempio…`, 'info');
+    try {
+      let imported = 0;
+      for (const env of toImport) {
+        const newId = await importEnvironment(env);
+        if (newId) imported++;
+      }
+      const skipped = exampleEnvironments.length - toImport.length;
+      const tail = skipped > 0 ? ` (${skipped} già presenti)` : '';
+      if (imported > 0) {
+        showToast(`${imported} ambienti di esempio caricati${tail}`, 'success');
+      } else {
+        showToast(`Errore durante il caricamento degli esempi${tail}`, 'error');
+      }
+    } finally {
+      setIsLoadingExamples(false);
     }
   };
 
@@ -237,11 +249,12 @@ export function EnvironmentPage() {
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={handleLoadExamples}
-            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
+            disabled={isLoadingExamples}
+            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-wait text-slate-700 dark:text-slate-300 px-3 md:px-4 py-2.5 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors flex-1 sm:flex-none min-h-[44px]"
             title="Carica ambienti di esempio (GDPR, DORA, AI Act, Consumatori)"
           >
-            <Sparkles size={18} />
-            <span className="hidden sm:inline">Esempi</span>
+            <Sparkles size={18} className={isLoadingExamples ? 'animate-pulse' : undefined} />
+            <span className="hidden sm:inline">{isLoadingExamples ? 'Carico…' : 'Esempi'}</span>
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -335,10 +348,11 @@ export function EnvironmentPage() {
                     <>
                       <button
                         onClick={handleLoadExamples}
-                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
+                        disabled={isLoadingExamples}
+                        className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60 disabled:cursor-wait text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px]"
                       >
-                        <Sparkles size={18} />
-                        Carica Esempi
+                        <Sparkles size={18} className={isLoadingExamples ? 'animate-pulse' : undefined} />
+                        {isLoadingExamples ? 'Carico…' : 'Carica Esempi'}
                       </button>
                       <button
                         onClick={() => setIsCreateModalOpen(true)}
