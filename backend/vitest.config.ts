@@ -9,7 +9,8 @@ export default defineConfig({
     hookTimeout: 30_000,
     pool: 'forks',
     forks: {
-      singleFork: true, // sequential — tests share one Postgres DB
+      singleFork: true, // single process
     },
+    fileParallelism: false, // run test files sequentially so the shared test DB is fully isolated by beforeEach TRUNCATE
   },
 });
