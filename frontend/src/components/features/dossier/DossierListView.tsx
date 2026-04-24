@@ -50,6 +50,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
   const [openPickerGroups, setOpenPickerGroups] = useState<{ dossier: Dossier; groups: NormaGroup[] } | null>(null);
   const [importingDossier, setImportingDossier] = useState<Dossier | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!activeMenuId) return;
@@ -186,6 +187,45 @@ export function DossierListView({ onSelect, showToast }: Props) {
   // JSON file import: opens the same preview modal used by share-link imports.
   const triggerFileImport = () => fileInputRef.current?.click();
 
+  // Page-scoped keyboard shortcuts:
+  //  n → open new-dossier modal
+  //  / → focus the filter input
+  //  i → trigger JSON file picker
+  // Ignored while typing in a form field or when any overlay is open, so they
+  // don't fire under modals where a stray keystroke would be confusing.
+  useEffect(() => {
+    const hasOverlay =
+      isModalOpen ||
+      editingDossier !== null ||
+      deletingDossier !== null ||
+      importingDossier !== null ||
+      openPickerGroups !== null;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (hasOverlay) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+        target.isContentEditable
+      );
+      if (isTyping) return;
+
+      if (e.key === 'n') {
+        e.preventDefault();
+        setIsModalOpen(true);
+      } else if (e.key === '/') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'i') {
+        e.preventDefault();
+        triggerFileImport();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isModalOpen, editingDossier, deletingDossier, importingDossier, openPickerGroups]);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // reset so the same file can be picked again
@@ -220,8 +260,9 @@ export function DossierListView({ onSelect, showToast }: Props) {
           <button
             onClick={triggerFileImport}
             className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            title="Importa da file JSON"
+            title="Importa da file JSON (i)"
             aria-label="Importa dossier da file JSON"
+            aria-keyshortcuts="i"
           >
             <Upload size={18} /> Importa
           </button>
@@ -229,6 +270,8 @@ export function DossierListView({ onSelect, showToast }: Props) {
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             className="flex-1 md:flex-none dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            title="Nuovo Dossier (n)"
+            aria-keyshortcuts="n"
           >
             <FolderPlus size={20} /> Nuovo Dossier
           </button>
@@ -249,10 +292,12 @@ export function DossierListView({ onSelect, showToast }: Props) {
           <div id="tour-dossier-search" className="relative flex-1">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cerca nei dossier..."
+              placeholder="Cerca nei dossier... (/)"
+              aria-keyshortcuts="/"
               className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             />
           </div>
