@@ -298,7 +298,8 @@ export function EnvironmentPage() {
               key={env.id}
               environment={env}
               isFirst={idx === 0}
-              onApply={() => setApplyModalEnv(env)}
+              onApplyMerge={() => void runApply(env, 'merge')}
+              onApplyReplace={() => setReplaceConfirm(env)}
               onViewDetail={() => setDetailEnv(env)}
               onEdit={() => setEditingEnv(env)}
               onExportJSON={() => handleExportJSON(env)}

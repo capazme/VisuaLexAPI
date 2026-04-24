@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  Download, Link2, Trash2, Play, RefreshCw, FolderOpen, Star,
-  FileText, Pencil, MoreHorizontal,
+  Download, Link2, Trash2, Plus, RefreshCw, FolderOpen, Star,
+  FileText, Pencil, MoreHorizontal, Replace,
 } from 'lucide-react';
 import type { Environment } from '../../../types';
 import {
@@ -14,7 +14,8 @@ import {
 interface EnvironmentCardProps {
   environment: Environment;
   isFirst?: boolean;
-  onApply: () => void;
+  onApplyMerge: () => void;
+  onApplyReplace: () => void;
   onViewDetail: () => void;
   onEdit: () => void;
   onExportJSON: () => void;
@@ -26,7 +27,8 @@ interface EnvironmentCardProps {
 export function EnvironmentCard({
   environment,
   isFirst,
-  onApply,
+  onApplyMerge,
+  onApplyReplace,
   onViewDetail,
   onEdit,
   onExportJSON,
@@ -117,6 +119,12 @@ export function EnvironmentCard({
                   </button>
                   <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
                   <button
+                    onClick={() => { onApplyReplace(); setShowMenu(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-left"
+                  >
+                    <Replace size={16} /> Sostituisci tutto&hellip;
+                  </button>
+                  <button
                     onClick={() => { onDelete(); setShowMenu(false); }}
                     className="w-full flex items-center gap-2 px-3 py-3 md:py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-left"
                   >
@@ -150,14 +158,17 @@ export function EnvironmentCard({
           )}
         </div>
 
-        {/* Apply Button */}
+        {/* Merge primary — happy path for "apply". Replace lives in the
+            3-dot menu because it's destructive (ConfirmDialog-guarded in
+            the parent). */}
         <button
           id={isFirst ? 'tour-env-apply' : undefined}
-          onClick={(e) => { e.stopPropagation(); onApply(); }}
+          onClick={(e) => { e.stopPropagation(); onApplyMerge(); }}
           className="w-full flex items-center justify-center gap-2 py-2.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium min-h-[44px]"
+          title="Unisci al contenuto esistente (salta duplicati)"
         >
-          <Play size={16} />
-          Applica
+          <Plus size={16} />
+          Unisci
         </button>
       </div>
     </div>
