@@ -9,6 +9,7 @@ import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
 import { Toast } from '../../ui/Toast';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
 
@@ -456,34 +457,18 @@ export function BulletinBoardPage() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deletingEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              Elimina ambiente
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Sei sicuro di voler eliminare definitivamente "{deletingEnv.title}"?
-              Questa azione non può essere annullata.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setDeletingEnv(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                Annulla
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Elimina definitivamente
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete Confirmation — shared ConfirmDialog pattern. Deletes the
+          shared environment from the forum along with all its versions,
+          likes and comments. */}
+      <ConfirmDialog
+        open={deletingEnv !== null}
+        variant="danger"
+        title={deletingEnv ? `Eliminare "${deletingEnv.title}"?` : 'Eliminare ambiente?'}
+        message="L'ambiente e tutte le sue versioni, mi piace e segnalazioni verranno rimossi definitivamente dal forum. Questa azione non è reversibile."
+        confirmLabel="Elimina definitivamente"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeletingEnv(null)}
+      />
 
       {/* Toast */}
       {toast && (
