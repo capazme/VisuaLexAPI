@@ -56,10 +56,10 @@ export function SuggestionReviewDialog({ suggestion, onTake, onDecline, onClose 
     setBusyItemId(declineTargetId);
     try {
       await onDecline(declineTargetId, declineNote.trim() || undefined);
-      setDeclineTargetId(null);
-      setDeclineNote('');
     } finally {
       setBusyItemId(null);
+      setDeclineTargetId(null);
+      setDeclineNote('');
     }
   };
 
@@ -171,6 +171,7 @@ export function SuggestionReviewDialog({ suggestion, onTake, onDecline, onClose 
                 Puoi opzionalmente aggiungere una nota per il suggeritore (max 500 caratteri).
               </p>
               <textarea
+                aria-label="Nota per il suggeritore"
                 value={declineNote}
                 onChange={(e) => setDeclineNote(e.target.value.slice(0, 500))}
                 rows={3}
