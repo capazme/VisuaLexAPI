@@ -25,30 +25,32 @@ export function SuggestContentModal({
   onClose,
   onSuggested,
 }: SuggestContentModalProps) {
-  const { dossiers, quickNorms, customAliases } = useAppStore();
+  const { dossiers, quickNorms, customAliases, annotations, highlights } = useAppStore();
 
   const [selection, setSelection] = useState<EnvironmentSelection>(emptySelection);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Create a pseudo-environment from current user state (only content, no annotations/highlights)
+  // Create a pseudo-environment from current user state
   const currentStateEnv = useMemo<Partial<Environment>>(() => ({
     id: 'current-state',
     name: 'Il tuo stato corrente',
     dossiers,
     quickNorms,
     customAliases,
-    annotations: [], // Empty - we don't suggest annotations
-    highlights: [],  // Empty - we don't suggest highlights
+    annotations,
+    highlights,
     createdAt: new Date().toISOString(),
-  }), [dossiers, quickNorms, customAliases]);
+  }), [dossiers, quickNorms, customAliases, annotations, highlights]);
 
   const hasSelection = useMemo(() => {
     return (
       selection.dossierIds.length > 0 ||
       selection.quickNormIds.length > 0 ||
-      selection.aliasIds.length > 0
+      selection.aliasIds.length > 0 ||
+      selection.annotationIds.length > 0 ||
+      selection.highlightIds.length > 0
     );
   }, [selection]);
 
@@ -56,24 +58,71 @@ export function SuggestContentModal({
     dossiers: selection.dossierIds.length,
     quickNorms: selection.quickNormIds.length,
     aliases: selection.aliasIds.length,
+    annotations: selection.annotationIds.length,
+    highlights: selection.highlightIds.length,
   }), [selection]);
 
   const handleSubmit = async () => {
     if (!hasSelection) return;
-
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Build the content to suggest
-      const content = {
-        dossiers: dossiers.filter(d => selection.dossierIds.includes(d.id)),
-        quickNorms: quickNorms.filter(qn => selection.quickNormIds.includes(qn.id)),
-        customAliases: customAliases.filter(a => selection.aliasIds.includes(a.id)),
-      };
+      const items: Array<{ itemType: 'annotation' | 'highlight' | 'dossier' | 'quickNorm' | 'alias'; payload: unknown }> = [];
+
+      for (const id of selection.annotationIds) {
+        const a = annotations.find(x => x.id === id);
+        if (a) items.push({ itemType: 'annotation', payload: {
+          articleId: a.articleId,
+          anchorText: a.anchorText,
+          startOffset: a.startOffset,
+          text: a.text,
+        }});
+      }
+      for (const id of selection.highlightIds) {
+        const h = highlights.find(x => x.id === id);
+        if (h) items.push({ itemType: 'highlight', payload: {
+          articleId: h.articleId,
+          anchorText: h.text,
+          startOffset: h.startOffset ?? 0,
+          endOffset: (h.startOffset ?? 0) + h.text.length,
+          colorVar: h.color,
+        }});
+      }
+      for (const id of selection.dossierIds) {
+        const d = dossiers.find(x => x.id === id);
+        if (d) items.push({ itemType: 'dossier', payload: {
+          title: d.title,
+          description: d.description,
+          tags: d.tags ?? [],
+          entries: d.items.map(it => ({
+            articleRef: it.type === 'norma' ? it.data : undefined,
+            note: it.type === 'note' ? it.data : undefined,
+            status: it.status,
+          })),
+        }});
+      }
+      for (const id of selection.quickNormIds) {
+        const qn = quickNorms.find(x => x.id === id);
+        if (qn) items.push({ itemType: 'quickNorm', payload: {
+          label: qn.label,
+          searchParams: qn.searchParams,
+          sourceUrl: qn.sourceUrl,
+        }});
+      }
+      for (const id of selection.aliasIds) {
+        const a = customAliases.find(x => x.id === id);
+        if (a) items.push({ itemType: 'alias', payload: {
+          trigger: a.trigger,
+          aliasType: a.type,
+          expandTo: a.expandTo,
+          searchParams: a.searchParams,
+          description: a.description,
+        }});
+      }
 
       await sharedEnvironmentService.createSuggestion(environment.id, {
-        content,
+        items,
         message: message.trim() || undefined,
       });
 
@@ -116,8 +165,8 @@ export function SuggestContentModal({
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {/* Instructions */}
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 text-sm text-slate-600 dark:text-slate-400">
-            Seleziona gli elementi dal tuo stato corrente che vuoi suggerire. L'autore potrà
-            approvare o rifiutare il suggerimento.
+            Seleziona gli elementi dal tuo stato corrente — note, evidenze, dossier, norme veloci e alias — da suggerire all'autore.
+            L'autore potrà prendere o rifiutare ogni item singolarmente.
           </div>
 
           {/* Content Viewer with Selection */}
@@ -153,6 +202,16 @@ export function SuggestContentModal({
                   {selectedCount.aliases} alias
                 </span>
               )}
+              {selectedCount.annotations > 0 && (
+                <span className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 rounded-full">
+                  {selectedCount.annotations} note
+                </span>
+              )}
+              {selectedCount.highlights > 0 && (
+                <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">
+                  {selectedCount.highlights} evidenze
+                </span>
+              )}
             </div>
           )}
 
@@ -166,6 +225,8 @@ export function SuggestContentModal({
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Scrivi un messaggio per l'autore..."
               rows={3}
+              maxLength={1000}
+              aria-label="Messaggio opzionale per l'autore"
               className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
             />
           </div>
