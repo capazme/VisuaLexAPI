@@ -79,7 +79,7 @@ export function ForumExploreView({
   return (
     <>
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div id="tour-forum-filters" className="flex flex-col sm:flex-row gap-3">
         {/* Search */}
         <form onSubmit={onSearchSubmit} className="flex-1 relative">
           <Search
@@ -255,7 +255,7 @@ export function ForumExploreView({
         )
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {environments.map((env) => (
+          {environments.map((env, idx) => (
             <SharedEnvironmentCard
               key={env.id}
               environment={env}
@@ -264,6 +264,7 @@ export function ForumExploreView({
               onReport={onReport}
               onSuggest={onSuggest}
               isLiking={likingIds.has(env.id)}
+              isFirst={idx === 0}
             />
           ))}
         </div>

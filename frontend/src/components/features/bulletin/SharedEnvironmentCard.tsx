@@ -17,6 +17,10 @@ interface SharedEnvironmentCardProps {
   onViewVersions?: (env: SharedEnvironment) => void;
   isLiking?: boolean;
   showOwnerActions?: boolean;
+  // When true the card root + menu button carry `tour-forum-card` /
+  // `tour-forum-actions` DOM ids — only the first card in a grid should
+  // set this to avoid duplicate ids.
+  isFirst?: boolean;
 }
 
 // Category text color (used for the micro-header label).
@@ -64,6 +68,7 @@ export function SharedEnvironmentCard({
   onViewVersions,
   isLiking = false,
   showOwnerActions = false,
+  isFirst = false,
 }: SharedEnvironmentCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -108,7 +113,9 @@ export function SharedEnvironmentCard({
     : undefined;
 
   return (
-    <div className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
+    <div
+      id={isFirst ? 'tour-forum-card' : undefined}
+      className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
       isWithdrawn
         ? 'border-slate-300 dark:border-slate-600 opacity-75'
         : 'border-slate-200 dark:border-slate-700'
@@ -157,6 +164,7 @@ export function SharedEnvironmentCard({
             )}
             <div className="relative" ref={menuRef}>
               <button
+                id={isFirst ? 'tour-forum-actions' : undefined}
                 onClick={() => setShowMenu(!showMenu)}
                 className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >

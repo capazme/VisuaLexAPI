@@ -22,6 +22,7 @@ export const TOUR_KEYS = {
     dossier: 'dossier',
     history: 'history',
     environments: 'environments',
+    forum: 'forum',
     // Feature tours
     commandPalette: 'commandPalette',
     studyMode: 'studyMode',
@@ -347,6 +348,72 @@ export const ENVIRONMENTS_STEPS: DriveStep[] = [
         popover: {
             title: 'Altre azioni',
             description: 'Modifica, esporta in JSON, copia link di condivisione, aggiorna dallo stato corrente, sostituisci tutto o elimina. Il menu si apre passando col mouse sulla card.',
+            side: 'left',
+            align: 'center',
+        }
+    }
+];
+
+/**
+ * Forum Page Tour - Forum ambienti community (6 step)
+ *
+ * Introduced ex novo when the page was renamed from Bacheca to Forum.
+ * List-view-only: steps anchor on the Publish CTA, the tab nav, the
+ * explore filters, the first card, and the card's 3-dot menu. The
+ * `isFirst` prop on SharedEnvironmentCard marks the first card in the
+ * grid with `#tour-forum-card` + `#tour-forum-actions` to avoid
+ * duplicate DOM ids (same trick as `tour-env-card`).
+ */
+export const FORUM_STEPS: DriveStep[] = [
+    {
+        popover: {
+            title: 'Forum Ambienti',
+            description: 'Esplora ambienti pubblicati dalla community, condividi i tuoi e suggerisci contenuti agli altri.',
+            side: 'over',
+            align: 'center',
+        }
+    },
+    {
+        element: '#tour-forum-publish',
+        popover: {
+            title: 'Condividi un ambiente',
+            description: 'Pubblica un tuo ambiente (dossier, norme rapide, alias) rendendolo disponibile alla community.',
+            side: 'bottom',
+            align: 'end',
+        }
+    },
+    {
+        element: '#tour-forum-tabs',
+        popover: {
+            title: 'Tre sezioni',
+            description: 'Esplora la community, gestisci gli ambienti che hai pubblicato (I Miei) e rivedi i suggerimenti ricevuti o inviati.',
+            side: 'bottom',
+            align: 'center',
+        }
+    },
+    {
+        element: '#tour-forum-filters',
+        popover: {
+            title: 'Cerca e filtra',
+            description: 'Cerca per titolo o descrizione, filtra per categoria (la stripe a sinistra delle card riflette la categoria) e ordina per data, popolarità o download.',
+            side: 'bottom',
+            align: 'start',
+        }
+    },
+    {
+        element: '#tour-forum-card',
+        popover: {
+            title: 'Card Ambiente',
+            description: 'Stripe di categoria, versione, statistiche (like, download, visualizzazioni), autore e data di aggiornamento. Passa il mouse sulla data per la versione completa.',
+            side: 'right',
+            align: 'center',
+        }
+    },
+    {
+        element: '#tour-forum-actions',
+        popover: {
+            title: 'Altre azioni',
+            description: 'Dal menu ··· suggerisci contenuti all\'autore o segnala l\'ambiente. Sugli ambienti tuoi trovi modifica, versioni, ritira e elimina.',
             side: 'left',
             align: 'center',
         }
@@ -710,6 +777,7 @@ export const TOUR_STEPS_MAP: Record<TourType, DriveStep[]> = {
     dossier: DOSSIER_STEPS,
     history: HISTORY_STEPS,
     environments: ENVIRONMENTS_STEPS,
+    forum: FORUM_STEPS,
     // Feature tours
     commandPalette: COMMAND_PALETTE_STEPS,
     studyMode: STUDY_MODE_STEPS,

@@ -10,6 +10,7 @@ import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
 import { Toast } from '../../ui/Toast';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { useTour } from '../../../hooks/useTour';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
 
@@ -57,6 +58,12 @@ export function BulletinBoardPage() {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
   };
+
+  // Tour
+  const { tryStartTour } = useTour();
+  useEffect(() => {
+    tryStartTour('forum');
+  }, [tryStartTour]);
 
   // Fetch environments
   const fetchEnvironments = useCallback(async (page = 1) => {
@@ -310,6 +317,7 @@ export function BulletinBoardPage() {
           </p>
         </div>
         <button
+          id="tour-forum-publish"
           onClick={() => setShowPublishModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium shadow-sm"
         >
@@ -319,7 +327,7 @@ export function BulletinBoardPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+      <div id="tour-forum-tabs" className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
         <button
           onClick={() => setActiveTab('explore')}
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
