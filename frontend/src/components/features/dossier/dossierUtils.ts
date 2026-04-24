@@ -55,3 +55,25 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
     });
   return Array.from(groups.values());
 }
+
+// Compact per-status summary used on list cards. Returns up to `maxItems`
+// entries in priority order (important → reading → done → unread) so the
+// user sees the most actionable buckets first. `unread` is last because it
+// is the default and would otherwise crowd every card.
+export interface StatusBreakdownEntry {
+  status: DossierItemStatus;
+  count: number;
+}
+
+export function computeStatusBreakdown(items: DossierItem[], maxItems = 2): StatusBreakdownEntry[] {
+  const counts: Record<DossierItemStatus, number> = { unread: 0, reading: 0, important: 0, done: 0 };
+  items.forEach((i) => {
+    const s = (i.status as DossierItemStatus) ?? 'unread';
+    counts[s] = (counts[s] ?? 0) + 1;
+  });
+  const priority: DossierItemStatus[] = ['important', 'reading', 'done', 'unread'];
+  return priority
+    .filter((s) => counts[s] > 0)
+    .slice(0, maxItems)
+    .map((s) => ({ status: s, count: counts[s] }));
+}

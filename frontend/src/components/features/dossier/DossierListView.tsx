@@ -18,7 +18,7 @@ import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
-import { formatTimestampLong, computeNormaGroups, type NormaGroup } from './dossierUtils';
+import { formatTimestampLong, computeNormaGroups, computeStatusBreakdown, STATUS_CONFIG, type NormaGroup } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
@@ -329,6 +329,8 @@ export function DossierListView({ onSelect, showToast }: Props) {
         ) : (
           filteredDossiers.map((dossier, idx) => {
             const isMenuOpen = activeMenuId === dossier.id;
+            const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
+            const statusBreakdown = computeStatusBreakdown(dossier.items);
             return (
               <div
                 key={dossier.id}
@@ -357,6 +359,22 @@ export function DossierListView({ onSelect, showToast }: Props) {
                     <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
                       {dossier.items.length} elementi
                     </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleQuickOpen(dossier); }}
+                      disabled={!hasNormaItems}
+                      title={hasNormaItems ? 'Apri su Dashboard' : 'Nessun articolo da aprire'}
+                      aria-label={`Apri ${dossier.title} su Dashboard`}
+                      className={cn(
+                        'p-1.5 rounded text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
+                        'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+                        // Desktop: hover/focus-within reveal, mobile: always visible.
+                        'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 max-md:opacity-100',
+                        isMenuOpen && 'md:opacity-100',
+                      )}
+                    >
+                      <ExternalLink size={16} />
+                    </button>
                     <div
                       ref={isMenuOpen ? menuWrapperRef : undefined}
                       className="relative"
@@ -434,6 +452,27 @@ export function DossierListView({ onSelect, showToast }: Props) {
                     {dossier.tags.length > 3 && (
                       <span className="text-xs text-slate-400">+{dossier.tags.length - 3}</span>
                     )}
+                  </div>
+                )}
+                {statusBreakdown.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2 md:mt-3" aria-label="Riepilogo stati">
+                    {statusBreakdown.map(({ status, count }) => {
+                      const cfg = STATUS_CONFIG[status];
+                      const Icon = cfg.icon;
+                      return (
+                        <span
+                          key={status}
+                          title={`${count} ${cfg.label.toLowerCase()}`}
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
+                            cfg.bg, cfg.color,
+                          )}
+                        >
+                          <Icon size={11} className="flex-shrink-0" />
+                          {count}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
