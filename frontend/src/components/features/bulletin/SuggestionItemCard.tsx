@@ -2,6 +2,13 @@ import type { ReactNode } from 'react';
 import { Check, X as XIcon, Clock, FileText, Highlighter, Folder, Zap, Link2 } from 'lucide-react';
 import type { SuggestionItem, SuggestionItemType } from '../../../types';
 
+const HIGHLIGHT_SWATCH_BG: Record<string, string> = {
+  yellow: 'bg-yellow-300',
+  green: 'bg-green-300',
+  red: 'bg-red-300',
+  blue: 'bg-blue-300',
+};
+
 const ITEM_TYPE_META: Record<SuggestionItemType, { icon: typeof FileText; label: string; colorClass: string }> = {
   annotation: { icon: FileText, label: 'Nota', colorClass: 'text-amber-600 dark:text-amber-400' },
   highlight: { icon: Highlighter, label: 'Evidenziazione', colorClass: 'text-yellow-600 dark:text-yellow-400' },
@@ -84,14 +91,15 @@ function ItemPreview({ item }: { item: SuggestionItem }) {
       );
     }
     case 'highlight': {
-      const color = (typeof p.colorVar === 'string' ? p.colorVar : 'yellow') as string;
+      const color = typeof p.colorVar === 'string' ? p.colorVar : 'yellow';
+      const swatchBg = HIGHLIGHT_SWATCH_BG[color] ?? HIGHLIGHT_SWATCH_BG.yellow;
       const anchor = typeof p.anchorText === 'string' ? p.anchorText : '';
       const articleId = typeof p.articleId === 'string' ? p.articleId : '';
       return (
         <div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{articleId}</p>
           <div className="flex items-center gap-2">
-            <span className={`inline-block w-3 h-3 rounded-sm bg-${color}-300`} />
+            <span className={`inline-block w-3 h-3 rounded-sm ${swatchBg}`} />
             <p className="text-sm text-slate-900 dark:text-slate-100 line-clamp-2">"{anchor}"</p>
           </div>
         </div>
