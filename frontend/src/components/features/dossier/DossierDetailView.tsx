@@ -44,6 +44,7 @@ import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { ArticleViewerModal } from './ArticleViewerModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
+import { ToolbarButton } from './ToolbarButton';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -470,51 +471,121 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           </div>
 
           <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-            <button onClick={() => setEditingDossier(dossier)} className="flex-shrink-0 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title="Modifica" aria-label="Modifica dossier">
-              <Edit2 size={20} />
-            </button>
-            <button onClick={handleExportPdf} className="flex-shrink-0 dossier-export text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Esporta PDF" aria-label="Esporta PDF">
-              <Download size={20} />
-            </button>
-            <button onClick={copyShareLink} className="flex-shrink-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title="Condividi" aria-label="Condividi dossier">
-              <Share2 size={20} />
-            </button>
-            <button onClick={handleOpenAllOnDashboard} disabled={!hasNormaItems} className="flex-shrink-0 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 p-3 rounded-lg transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" title="Apri su Dashboard" aria-label="Apri tutti su Dashboard">
-              <ExternalLink size={20} />
-            </button>
-            <button onClick={() => setTreeNavigatorOpen(true)} className="flex-shrink-0 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 p-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" title="Importa da norma" aria-label="Importa articoli da norma">
-              <TreeDeciduous size={20} />
-            </button>
-            <button onClick={() => setConfirmDeleteOpen(true)} className="flex-shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-3 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" title="Elimina" aria-label="Elimina dossier">
-              <Trash2 size={20} />
-            </button>
+            <ToolbarButton
+              variant="mobile"
+              color="slate"
+              icon={Edit2}
+              onClick={() => setEditingDossier(dossier)}
+              title="Modifica"
+              ariaLabel="Modifica dossier"
+            />
+            <ToolbarButton
+              variant="mobile"
+              color="emerald"
+              icon={Download}
+              onClick={handleExportPdf}
+              title="Esporta PDF"
+              ariaLabel="Esporta PDF"
+              className="dossier-export"
+            />
+            <ToolbarButton
+              variant="mobile"
+              color="blue"
+              icon={Share2}
+              onClick={copyShareLink}
+              title="Condividi"
+              ariaLabel="Condividi dossier"
+            />
+            <ToolbarButton
+              variant="mobile"
+              color="indigo"
+              icon={ExternalLink}
+              onClick={handleOpenAllOnDashboard}
+              disabled={!hasNormaItems}
+              title="Apri su Dashboard"
+              ariaLabel="Apri tutti su Dashboard"
+            />
+            <ToolbarButton
+              variant="mobile"
+              color="green"
+              icon={TreeDeciduous}
+              onClick={() => setTreeNavigatorOpen(true)}
+              title="Importa da norma"
+              ariaLabel="Importa articoli da norma"
+            />
+            <ToolbarButton
+              variant="mobile"
+              color="red"
+              icon={Trash2}
+              onClick={() => setConfirmDeleteOpen(true)}
+              title="Elimina"
+              ariaLabel="Elimina dossier"
+            />
           </div>
 
           <div className="hidden md:flex gap-2">
-            <button onClick={() => setEditingDossier(dossier)} className="text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title="Modifica" aria-label="Modifica dossier">
-              <Edit2 size={18} />
-            </button>
-            <button id="tour-dossier-pin" onClick={() => toggleDossierPin(dossier.id)} aria-pressed={!!dossier.isPinned} className={cn('p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500', dossier.isPinned ? 'text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800')} title={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'} aria-label={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}>
-              <Star size={18} className={dossier.isPinned ? 'fill-current' : ''} />
-            </button>
-            <button id="tour-dossier-export" onClick={handleExportPdf} className="dossier-export text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" title="Esporta PDF" aria-label="Esporta PDF">
-              <Download size={18} />
-            </button>
-            <button onClick={exportDossierJSON} className="text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500" title="Esporta JSON" aria-label="Esporta JSON">
-              <FileJson size={18} />
-            </button>
-            <button onClick={copyShareLink} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title="Copia link di condivisione" aria-label="Copia link di condivisione">
-              <Share2 size={18} />
-            </button>
-            <button onClick={() => setTreeNavigatorOpen(true)} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500" title="Importa da norma" aria-label="Importa articoli da norma">
-              <TreeDeciduous size={18} />
-            </button>
-            <button onClick={handleOpenAllOnDashboard} disabled={!hasNormaItems} className="text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 p-2 rounded-md transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" title="Apri tutti su Dashboard" aria-label="Apri tutti su Dashboard">
-              <ExternalLink size={18} />
-            </button>
-            <button onClick={() => setConfirmDeleteOpen(true)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" title="Elimina Dossier" aria-label="Elimina dossier">
-              <Trash2 size={18} />
-            </button>
+            <ToolbarButton
+              color="slate"
+              icon={Edit2}
+              onClick={() => setEditingDossier(dossier)}
+              title="Modifica"
+              ariaLabel="Modifica dossier"
+            />
+            <ToolbarButton
+              id="tour-dossier-pin"
+              color="slateMuted"
+              pressedColor="yellow"
+              pressed={!!dossier.isPinned}
+              icon={Star}
+              onClick={() => toggleDossierPin(dossier.id)}
+              title={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+              ariaLabel={dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+            />
+            <ToolbarButton
+              id="tour-dossier-export"
+              color="emerald"
+              icon={Download}
+              onClick={handleExportPdf}
+              title="Esporta PDF"
+              ariaLabel="Esporta PDF"
+              className="dossier-export"
+            />
+            <ToolbarButton
+              color="purple"
+              icon={FileJson}
+              onClick={exportDossierJSON}
+              title="Esporta JSON"
+              ariaLabel="Esporta JSON"
+            />
+            <ToolbarButton
+              color="blue"
+              icon={Share2}
+              onClick={copyShareLink}
+              title="Copia link di condivisione"
+              ariaLabel="Copia link di condivisione"
+            />
+            <ToolbarButton
+              color="green"
+              icon={TreeDeciduous}
+              onClick={() => setTreeNavigatorOpen(true)}
+              title="Importa da norma"
+              ariaLabel="Importa articoli da norma"
+            />
+            <ToolbarButton
+              color="indigo"
+              icon={ExternalLink}
+              onClick={handleOpenAllOnDashboard}
+              disabled={!hasNormaItems}
+              title="Apri tutti su Dashboard"
+              ariaLabel="Apri tutti su Dashboard"
+            />
+            <ToolbarButton
+              color="red"
+              icon={Trash2}
+              onClick={() => setConfirmDeleteOpen(true)}
+              title="Elimina Dossier"
+              ariaLabel="Elimina dossier"
+            />
           </div>
         </div>
       </header>
