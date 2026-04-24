@@ -97,6 +97,7 @@ export function EnvironmentCard({
           {/* Menu */}
           <div className="relative flex-shrink-0">
             <button
+              id={isFirst ? 'tour-env-menu' : undefined}
               onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
               className="p-2 md:p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md md:opacity-0 md:group-hover:opacity-100 transition-opacity min-h-[44px] md:min-h-0 flex items-center justify-center"
               aria-label="Menu azioni"

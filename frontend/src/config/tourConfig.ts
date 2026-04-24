@@ -301,7 +301,7 @@ export const ENVIRONMENTS_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Ambienti di Lavoro',
-            description: 'Gli ambienti salvano configurazioni complete: dossier, norme rapide, annotazioni. Perfetti per passare tra progetti diversi.',
+            description: 'Gli ambienti salvano configurazioni complete: dossier, norme rapide, annotazioni. Perfetti per passare tra progetti diversi. Scorciatoie: <kbd>n</kbd> nuovo, <kbd>/</kbd> cerca, <kbd>i</kbd> importa.',
             side: 'over',
             align: 'center',
         }
@@ -310,7 +310,7 @@ export const ENVIRONMENTS_STEPS: DriveStep[] = [
         element: '#tour-env-create',
         popover: {
             title: 'Crea Ambiente',
-            description: 'Salva lo stato attuale del tuo workspace. Puoi includere dossier, norme rapide e annotazioni.',
+            description: 'Salva lo stato attuale del tuo workspace. Puoi includere dossier, norme rapide e annotazioni — con selezione granulare. Scorciatoia: <kbd>n</kbd>.',
             side: 'bottom',
             align: 'start',
         }
@@ -319,7 +319,7 @@ export const ENVIRONMENTS_STEPS: DriveStep[] = [
         element: '#tour-env-categories',
         popover: {
             title: 'Categorie',
-            description: 'Filtra per categoria: Compliance, Civile, Penale, Amministrativo, UE. Organizza gli ambienti per area.',
+            description: 'Filtra per categoria: Compliance, Civile, Penale, Amministrativo, UE. Il colore a sinistra di ogni card corrisponde alla categoria.',
             side: 'bottom',
             align: 'center',
         }
@@ -328,7 +328,7 @@ export const ENVIRONMENTS_STEPS: DriveStep[] = [
         element: '#tour-env-card',
         popover: {
             title: 'Card Ambiente',
-            description: 'Ogni card mostra nome, categoria e statistiche. Clicca per vedere i dettagli o applicare l\'ambiente.',
+            description: 'Stripe di categoria a sinistra, statistiche, primi dossier e norme in anteprima, e quando l\'hai aggiornato l\'ultima volta. Clicca per aprire il dettaglio completo.',
             side: 'right',
             align: 'center',
         }
@@ -336,17 +336,17 @@ export const ENVIRONMENTS_STEPS: DriveStep[] = [
     {
         element: '#tour-env-apply',
         popover: {
-            title: 'Applica Ambiente',
-            description: 'Carica tutte le impostazioni salvate: dossier, norme rapide, annotazioni. Puoi scegliere se sostituire o unire.',
+            title: 'Unisci rapido',
+            description: 'Un click unisce l\'ambiente al tuo stato attuale, saltando i duplicati. Per sostituire tutto (azione distruttiva) usa la voce nel menu ···.',
             side: 'left',
             align: 'center',
         }
     },
     {
-        element: '#tour-env-share',
+        element: '#tour-env-menu',
         popover: {
-            title: 'Condividi',
-            description: 'Esporta come file JSON o genera un link per condividere l\'ambiente con colleghi o tra dispositivi.',
+            title: 'Altre azioni',
+            description: 'Modifica, esporta in JSON, copia link di condivisione, aggiorna dallo stato corrente, sostituisci tutto o elimina. Il menu si apre passando col mouse sulla card.',
             side: 'left',
             align: 'center',
         }
