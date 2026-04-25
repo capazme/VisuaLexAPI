@@ -369,9 +369,10 @@ export function HistoryView() {
                     </div>
                 </div>
                 
-                {/* Timeline with grouped dates */}
-                {/* Mobile: simplified padding */}
-                <div className="max-h-[70vh] overflow-y-auto p-3 md:p-6">
+                {/* Timeline with grouped dates. No inner scroll: the page is the
+                    scroll context so the action dropdown isn't clipped. Sticky date
+                    headers attach to the next overflow ancestor. */}
+                <div className="p-3 md:p-6">
                     {loading ? (
                         <div className="p-8 text-center">
                             <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
