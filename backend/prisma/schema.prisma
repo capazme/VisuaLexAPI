@@ -22,6 +22,9 @@ model User {
   isAdmin     Boolean   @default(false) @map("is_admin")
   loginCount  Int       @default(0) @map("login_count")
   lastLoginAt DateTime? @map("last_login_at")
+  // Forum-notifications cursor: likes received with createdAt > this are "new".
+  // Suggestions use the existing pending-status count, no cursor needed.
+  notificationLastSeenAt DateTime? @map("notification_last_seen_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 

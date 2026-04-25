@@ -18,6 +18,7 @@ import sharedEnvironmentRoutes from './routes/sharedEnvironments';
 import environmentRoutes from './routes/environments';
 import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
+import notificationRoutes from './routes/notifications';
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/api', sharedEnvironmentRoutes);
 app.use('/api', environmentRoutes);
 app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
+app.use('/api', notificationRoutes);
 
 // 404 handler
 app.use((_req, res) => {
