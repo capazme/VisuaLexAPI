@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -8,6 +10,39 @@ import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
+
+// Stripe color per act_type — keyed on lowercased exact match. Codes get
+// distinct colors so the user can scan the timeline visually; everything
+// else falls back to slate. Same hex-map pattern as SharedEnvironmentCard.
+const ACT_TYPE_STRIPE: Record<string, string> = {
+    'codice civile': '#3b82f6',                // blue
+    'codice penale': '#ef4444',                // red
+    'codice di procedura civile': '#6366f1',   // indigo
+    'codice di procedura penale': '#8b5cf6',   // violet
+    'costituzione': '#f59e0b',                 // amber
+    'regolamento ue': '#0ea5e9',               // sky
+    'direttiva ue': '#06b6d4',                 // cyan
+};
+
+function stripeColor(actType: string | null | undefined): string {
+    return ACT_TYPE_STRIPE[(actType ?? '').toLowerCase()] ?? '#94a3b8';
+}
+
+// Humanized group label: today/yesterday/weekday-this-week/full-date.
+// Group key stays YYYY-MM-DD (ISO) for stable insertion order; only the
+// rendered label is humanized.
+function groupLabel(d: Date): string {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const target = new Date(d); target.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+    if (diffDays === 0) return 'Oggi';
+    if (diffDays === 1) return 'Ieri';
+    if (diffDays > 1 && diffDays < 7) {
+        const weekday = d.toLocaleDateString('it-IT', { weekday: 'long' });
+        return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    }
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+}
 
 // Converte un history item in NormaVisitata
 function historyToNormaVisitata(item: any): NormaVisitata {
@@ -245,15 +280,25 @@ export function HistoryView() {
         });
     }, [history, searchTerm]);
 
-    // Group by date
+    // Group by ISO date (stable insertion order) and derive a humanized
+    // label per group. Items without created_at fall into a "Senza data"
+    // bucket at the end.
     const groupedByDate = useMemo(() => {
-        const groups: Record<string, SearchHistoryItem[]> = {};
+        const buckets = new Map<string, { label: string; items: SearchHistoryItem[] }>();
         filteredHistory.forEach(item => {
-            const date = item.created_at ? new Date(item.created_at).toLocaleDateString('it-IT') : 'Senza data';
-            if (!groups[date]) groups[date] = [];
-            groups[date].push(item);
+            if (!item.created_at) {
+                const bucket = buckets.get('__nodate__') ?? { label: 'Senza data', items: [] };
+                bucket.items.push(item);
+                buckets.set('__nodate__', bucket);
+                return;
+            }
+            const d = new Date(item.created_at);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const bucket = buckets.get(key) ?? { label: groupLabel(d), items: [] };
+            bucket.items.push(item);
+            buckets.set(key, bucket);
         });
-        return groups;
+        return Array.from(buckets.entries()).map(([key, value]) => ({ key, ...value }));
     }, [filteredHistory]);
 
     return (
@@ -362,14 +407,14 @@ export function HistoryView() {
                         />
                     ) : (
                         <div className="space-y-6 md:space-y-8">
-                            {Object.entries(groupedByDate).map(([date, items]) => (
-                                <div key={date} className="relative">
+                            {groupedByDate.map(({ key, label, items }) => (
+                                <div key={key} className="relative">
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
                                     <div className="md:hidden flex items-center gap-2 mb-3 sticky top-0 bg-white dark:bg-slate-800 py-1 z-10">
                                         <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
                                             <Calendar size={12} className="text-blue-600 dark:text-blue-400" />
-                                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{date}</span>
+                                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{label}</span>
                                         </div>
                                         <div className="flex-1 h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent" />
                                     </div>
@@ -378,7 +423,7 @@ export function HistoryView() {
                                     <div className="hidden md:flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-slate-800 py-2 z-10">
                                         <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
                                             <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
-                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{date}</span>
+                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{label}</span>
                                         </div>
                                         <div className="flex-1 h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent" />
                                     </div>
@@ -392,11 +437,17 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "bg-white dark:bg-slate-800 p-3 rounded-lg border transition-all cursor-pointer min-h-[44px]",
+                                                        "relative bg-white dark:bg-slate-800 p-3 pl-4 rounded-lg border transition-all cursor-pointer min-h-[44px] overflow-hidden",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-blue-400"
                                                     )}
                                                 >
+                                                    {/* Act-type stripe */}
+                                                    <span
+                                                        aria-hidden
+                                                        className="absolute left-0 top-0 bottom-0 w-1"
+                                                        style={{ backgroundColor: stripeColor(item.act_type) }}
+                                                    />
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 mb-1">
@@ -412,6 +463,14 @@ export function HistoryView() {
                                                             <p className="font-semibold text-sm text-slate-900 dark:text-white capitalize truncate">
                                                                 {item.act_type}
                                                             </p>
+                                                            {item.created_at && (
+                                                                <p
+                                                                    className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"
+                                                                    title={new Date(item.created_at).toLocaleString('it-IT')}
+                                                                >
+                                                                    {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it })}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         <ArrowRight size={18} className="text-blue-500 flex-shrink-0 mt-1" />
                                                     </div>
@@ -431,11 +490,17 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "bg-white dark:bg-slate-800 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                                                        "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-all cursor-pointer overflow-hidden",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
                                                     )}
                                                 >
+                                                    {/* Act-type stripe */}
+                                                    <span
+                                                        aria-hidden
+                                                        className="absolute left-0 top-0 bottom-0 w-1"
+                                                        style={{ backgroundColor: stripeColor(item.act_type) }}
+                                                    />
                                                     <div className="flex justify-between items-start gap-4">
                                                         <div className="flex-1">
                                                             <div className="flex items-baseline gap-2 mb-2">
@@ -448,13 +513,21 @@ export function HistoryView() {
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="flex flex-wrap gap-2 text-sm text-slate-500">
+                                                            <div className="flex flex-wrap gap-2 text-sm text-slate-500 items-center">
                                                                 <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-lg text-xs font-medium">
                                                                     Art. {item.article}
                                                                 </span>
                                                                 {item.date && (
                                                                     <span className="text-slate-500 dark:text-slate-400">
                                                                         del {item.date}
+                                                                    </span>
+                                                                )}
+                                                                {item.created_at && (
+                                                                    <span
+                                                                        className="text-xs text-slate-400 dark:text-slate-500"
+                                                                        title={new Date(item.created_at).toLocaleString('it-IT')}
+                                                                    >
+                                                                        {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it })}
                                                                     </span>
                                                                 )}
                                                             </div>
