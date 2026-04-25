@@ -16,6 +16,7 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useTour } from '../../../hooks/useTour';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { customAliasService } from '../../../services/customAliasService';
+import { notificationService } from '../../../services/notificationService';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
 
 type TabType = 'explore' | 'my' | 'suggestions';
@@ -71,6 +72,12 @@ export function BulletinBoardPage() {
   useEffect(() => {
     tryStartTour('forum');
   }, [tryStartTour]);
+
+  // Mark forum-notifications as read once on mount — clears the sidebar
+  // badge for likes. Pending suggestions clear naturally on review.
+  useEffect(() => {
+    void notificationService.markRead().catch(() => {});
+  }, []);
 
   // Fetch environments
   const fetchEnvironments = useCallback(async (page = 1) => {

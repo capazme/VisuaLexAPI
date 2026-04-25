@@ -7,6 +7,7 @@ import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../../hooks/useAuth';
+import { useForumNotifications } from '../../hooks/useForumNotifications';
 import { Z_INDEX } from '../../constants/zIndex';
 
 interface SidebarProps {
@@ -24,13 +25,16 @@ interface NavItemProps {
   label: string;
   onClick?: () => void;
   id?: string;
+  badgeCount?: number;
 }
 
 // Spring config for smooth animations
 const SPRING_CONFIG = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
-function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const showBadge = (badgeCount ?? 0) > 0;
+  const badgeLabel = (badgeCount ?? 0) > 99 ? '99+' : String(badgeCount);
 
   return (
     <NavLink
@@ -72,6 +76,16 @@ function NavItem({ to, icon: Icon, label, onClick, id }: NavItemProps) {
               className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-600 rounded-r-full"
               transition={SPRING_CONFIG}
             />
+          )}
+
+          {/* Notification badge */}
+          {showBadge && (
+            <span
+              aria-label={`${badgeCount} notifiche`}
+              className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none ring-2 ring-white dark:ring-slate-900"
+            >
+              {badgeLabel}
+            </span>
           )}
 
           {/* Tooltip - hidden on mobile */}
@@ -161,6 +175,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
     quickNorms: s.quickNorms,
   })));
   const { user, isAdmin, logout } = useAuth();
+  const { count: forumNotifications } = useForumNotifications(!!user);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
@@ -229,7 +244,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <NavItem to="/" icon={Search} label="Ricerca" onClick={closeMobile} />
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
-        <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} />
+        <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 
