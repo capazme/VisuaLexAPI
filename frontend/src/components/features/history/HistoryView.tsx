@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus } from 'lucide-react';
+import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useAppStore, appStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
@@ -61,6 +62,9 @@ export function HistoryView() {
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     const [showDossierList, setShowDossierList] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+    const [createDossierFor, setCreateDossierFor] = useState<SearchHistoryItem | null>(null);
+    const [newDossierTitle, setNewDossierTitle] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
 
     const {
@@ -122,25 +126,35 @@ export function HistoryView() {
 
     const handleCreateDossierAndAdd = (e: React.MouseEvent, item: any) => {
         e.stopPropagation();
-        const title = prompt('Nome del nuovo dossier:');
-        if (title) {
-            const norma = historyToNormaVisitata(item);
-            createDossier(title);
-            // Il dossier appena creato sarà l'ultimo
-            setTimeout(() => {
-                const newDossier = appStore.getState().dossiers.slice(-1)[0];
-                if (newDossier) {
-                    addToDossier(newDossier.id, norma, 'norma');
-                    showFeedback(`Creato "${title}" e aggiunta norma`);
-                }
-            }, 0);
-        }
+        setCreateDossierFor(item);
+        setNewDossierTitle('');
         setOpenMenu(null);
         setShowDossierList(null);
     };
 
-    const handleClearHistory = async () => {
-        if (!confirm('Sei sicuro di voler svuotare la cronologia?')) return;
+    const handleConfirmCreateDossier = () => {
+        const title = newDossierTitle.trim();
+        if (!title || !createDossierFor) return;
+        const norma = historyToNormaVisitata(createDossierFor);
+        createDossier(title);
+        // Il dossier appena creato sarà l'ultimo nello store
+        setTimeout(() => {
+            const newDossier = appStore.getState().dossiers.slice(-1)[0];
+            if (newDossier) {
+                addToDossier(newDossier.id, norma, 'norma');
+                showFeedback(`Creato "${title}" e aggiunta norma`);
+            }
+        }, 0);
+        setCreateDossierFor(null);
+        setNewDossierTitle('');
+    };
+
+    const handleClearHistory = () => {
+        setClearConfirmOpen(true);
+    };
+
+    const handleConfirmClear = async () => {
+        setClearConfirmOpen(false);
         setClearing(true);
         try {
             await clearHistory();
@@ -519,6 +533,68 @@ export function HistoryView() {
                 )}>
                     <Check size={16} />
                     <span className="text-sm font-medium">{feedback.message}</span>
+                </div>
+            )}
+
+            {/* Clear-all confirmation */}
+            <ConfirmDialog
+                open={clearConfirmOpen}
+                variant="danger"
+                title="Svuotare la cronologia?"
+                message="Tutte le ricerche salvate verranno rimosse. I dossier e i segnalibri non saranno toccati."
+                confirmLabel="Svuota"
+                onConfirm={handleConfirmClear}
+                onCancel={() => setClearConfirmOpen(false)}
+            />
+
+            {/* New-dossier inline modal */}
+            {createDossierFor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-5">
+                        <div className="flex items-start justify-between mb-3">
+                            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                                Crea nuovo dossier
+                            </h3>
+                            <button
+                                onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}
+                                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded"
+                                aria-label="Chiudi"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                            La norma verrà aggiunta automaticamente al nuovo dossier.
+                        </p>
+                        <input
+                            type="text"
+                            autoFocus
+                            value={newDossierTitle}
+                            onChange={(e) => setNewDossierTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newDossierTitle.trim()) handleConfirmCreateDossier();
+                                if (e.key === 'Escape') { setCreateDossierFor(null); setNewDossierTitle(''); }
+                            }}
+                            placeholder="Nome del dossier"
+                            maxLength={120}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                        <div className="mt-4 flex justify-end gap-2">
+                            <button
+                                onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}
+                                className="px-3 py-1.5 text-sm bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+                            >
+                                Annulla
+                            </button>
+                            <button
+                                onClick={handleConfirmCreateDossier}
+                                disabled={!newDossierTitle.trim()}
+                                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Crea e aggiungi
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
