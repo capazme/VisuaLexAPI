@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -592,9 +593,15 @@ export function HistoryView() {
                                                                     <MoreVertical size={16} />
                                                                 </button>
 
-                                                                {/* Dropdown menu — position:fixed via menuPos to escape parent overflow */}
-                                                                {openMenu === item.id && menuPos && (
+                                                                {/* Dropdown menu — portaled to body so it escapes parent overflow
+                                                                    AND parent opacity (the row's group-hover wrapper has opacity-0
+                                                                    when not hovered, which would inherit through fixed children).
+                                                                    onMouseDown stopPropagation so click-outside doesn't fire when
+                                                                    the user clicks inside the portaled menu (no longer a DOM
+                                                                    descendant of menuRef). */}
+                                                                {openMenu === item.id && menuPos && createPortal(
                                                                     <div
+                                                                        onMouseDown={(e) => e.stopPropagation()}
                                                                         style={{
                                                                             position: 'fixed',
                                                                             top: menuPos.top,
@@ -669,14 +676,15 @@ export function HistoryView() {
                                                                         <button
                                                                             onClick={(e) => {
                                                                                 handleDeleteItem(e, item.id);
-                                                                                setOpenMenu(null);
+                                                                                closeMenu();
                                                                             }}
                                                                             className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                                                         >
                                                                             <Trash2 size={16} />
                                                                             <span>Rimuovi dalla cronologia</span>
                                                                         </button>
-                                                                    </div>
+                                                                    </div>,
+                                                                    document.body
                                                                 )}
                                                             </div>
 
