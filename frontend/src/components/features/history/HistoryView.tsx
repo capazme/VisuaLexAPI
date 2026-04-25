@@ -437,15 +437,15 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-3 pl-4 rounded-lg border transition-all cursor-pointer min-h-[44px] overflow-hidden",
+                                                        "relative bg-white dark:bg-slate-800 p-3 pl-4 rounded-lg border transition-all cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "active:scale-[0.98] active:border-blue-400"
                                                     )}
                                                 >
-                                                    {/* Act-type stripe */}
+                                                    {/* Act-type stripe — see desktop card for rationale */}
                                                     <span
                                                         aria-hidden
-                                                        className="absolute left-0 top-0 bottom-0 w-1"
+                                                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
                                                         style={{ backgroundColor: stripeColor(item.act_type) }}
                                                     />
                                                     <div className="flex items-start justify-between gap-2">
@@ -490,15 +490,17 @@ export function HistoryView() {
                                                 <div
                                                     onClick={() => handleItemClick(item)}
                                                     className={cn(
-                                                        "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-all cursor-pointer overflow-hidden",
+                                                        "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-all cursor-pointer",
                                                         "border-slate-200 dark:border-slate-700",
                                                         "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5"
                                                     )}
                                                 >
-                                                    {/* Act-type stripe */}
+                                                    {/* Act-type stripe — rounded-l-xl matches card corner so it doesn't
+                                                        poke past the rounded edges; we can't use overflow-hidden on the
+                                                        card because the dropdown menu lives inside it. */}
                                                     <span
                                                         aria-hidden
-                                                        className="absolute left-0 top-0 bottom-0 w-1"
+                                                        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
                                                         style={{ backgroundColor: stripeColor(item.act_type) }}
                                                     />
                                                     <div className="flex justify-between items-start gap-4">
