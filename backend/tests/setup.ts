@@ -18,6 +18,8 @@ beforeEach(async () => {
   // Truncate all tables in one statement, fastest teardown.
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "merlt_consent_audits",
+      "merlt_user_preferences",
       "suggestion_items",
       "environment_suggestions",
       "shared_environment_versions",

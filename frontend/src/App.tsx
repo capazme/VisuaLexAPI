@@ -7,6 +7,7 @@ import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { EnvironmentPage } from './components/features/environments/EnvironmentPage';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
+import { MerltWorkspacePage } from './pages/MerltWorkspacePage';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
 
@@ -36,6 +37,7 @@ function App() {
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentPage />} />
           <Route path="forum" element={<BulletinBoardPage />} />
+          <Route path="merlt" element={<MerltWorkspacePage />} />
         </Route>
 
         {/* Admin routes */}

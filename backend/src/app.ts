@@ -19,6 +19,7 @@ import environmentRoutes from './routes/environments';
 import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
+import merltRoutes from './routes/merlt';
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api', environmentRoutes);
 app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
 app.use('/api', notificationRoutes);
+app.use('/api', merltRoutes);
 
 // 404 handler
 app.use((_req, res) => {

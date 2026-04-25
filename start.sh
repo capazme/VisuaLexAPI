@@ -2,6 +2,7 @@
 
 # VisuaLex Development Startup Script
 # Starts: visualex_api (Python), backend (Node), frontend (Vite)
+# Optional: MERLT FastAPI sidecar when MERLT_ENABLED=true
 
 set -e
 
@@ -13,6 +14,13 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+MERLT_ENABLED="${MERLT_ENABLED:-false}"
+MERLT_COMPOSE_ENABLED="${MERLT_COMPOSE_ENABLED:-false}"
+MERLT_COMPOSE_FILE="${MERLT_COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.merlt.yml}"
+MERLT_ROOT="${MERLT_ROOT:-/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt}"
+MERLT_PORT="${MERLT_PORT:-8000}"
+MERLT_PYTHON="${MERLT_PYTHON:-python}"
+MERLT_PID=""
 
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}           VisuaLex Development Environment${NC}"
@@ -21,7 +29,10 @@ echo -e "${BLUE}═════════════════════�
 # Cleanup on exit
 cleanup() {
     echo -e "\n${YELLOW}Shutting down services...${NC}"
-    kill $API_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
+    kill $API_PID $BACKEND_PID $FRONTEND_PID ${MERLT_PID:-} 2>/dev/null || true
+    if [ "$MERLT_COMPOSE_ENABLED" = "true" ]; then
+        docker compose -f "$MERLT_COMPOSE_FILE" down >/dev/null 2>&1 || true
+    fi
     echo -e "${GREEN}All services stopped.${NC}"
     exit 0
 }
@@ -40,6 +51,17 @@ echo -e "\n${YELLOW}Checking ports...${NC}"
 check_port 5000 || exit 1
 check_port 3001 || exit 1
 check_port 5173 || exit 1
+if [ "$MERLT_ENABLED" = "true" ]; then
+    check_port "$MERLT_PORT" || exit 1
+    if [ ! -d "$MERLT_ROOT" ]; then
+        echo -e "${RED}MERLT_ROOT not found: $MERLT_ROOT${NC}"
+        exit 1
+    fi
+    if [ "$MERLT_COMPOSE_ENABLED" = "true" ] && [ ! -f "$MERLT_COMPOSE_FILE" ]; then
+        echo -e "${RED}MERLT_COMPOSE_FILE not found: $MERLT_COMPOSE_FILE${NC}"
+        exit 1
+    fi
+fi
 echo -e "${GREEN}All ports available${NC}"
 
 # Preflight: Python venv, required packages, Playwright browser
@@ -96,6 +118,35 @@ npm run dev &
 FRONTEND_PID=$!
 echo -e "${GREEN}Frontend started (PID: $FRONTEND_PID)${NC}"
 
+# 4. Start MERLT sidecar (optional - port 8000 by default)
+if [ "$MERLT_ENABLED" = "true" ]; then
+    if [ "$MERLT_COMPOSE_ENABLED" = "true" ]; then
+        echo -e "\n${YELLOW}[4/5] Starting MERLT dependencies...${NC}"
+        docker compose -f "$MERLT_COMPOSE_FILE" up -d
+        MERLT_DB_USER="${MERLT_POSTGRES_USER:-merlt}"
+        MERLT_DB_PASSWORD="${MERLT_POSTGRES_PASSWORD:-merlt}"
+        MERLT_DB_NAME="${MERLT_POSTGRES_DB:-merlt}"
+        MERLT_DB_PORT="${MERLT_POSTGRES_PORT:-5436}"
+        MERLT_REDIS_HOST_PORT="${MERLT_REDIS_PORT:-6381}"
+        export DATABASE_URL="${MERLT_DATABASE_URL:-postgresql://$MERLT_DB_USER:$MERLT_DB_PASSWORD@localhost:$MERLT_DB_PORT/$MERLT_DB_NAME}"
+        export ENRICHMENT_DATABASE_URL="${MERLT_ENRICHMENT_DATABASE_URL:-$DATABASE_URL}"
+        export RLCF_DATABASE_URL="${MERLT_RLCF_DATABASE_URL:-$DATABASE_URL}"
+        export RLCF_ASYNC_DATABASE_URL="${MERLT_RLCF_ASYNC_DATABASE_URL:-postgresql+asyncpg://$MERLT_DB_USER:$MERLT_DB_PASSWORD@localhost:$MERLT_DB_PORT/$MERLT_DB_NAME}"
+        export REDIS_HOST="${MERLT_REDIS_HOST:-localhost}"
+        export REDIS_PORT="$MERLT_REDIS_HOST_PORT"
+        export REDIS_URL="${MERLT_REDIS_URL:-redis://localhost:$MERLT_REDIS_HOST_PORT/0}"
+        export FALKORDB_HOST="${MERLT_FALKOR_HOST:-localhost}"
+        export FALKORDB_PORT="${MERLT_FALKOR_PORT:-6382}"
+        export QDRANT_HOST="${MERLT_QDRANT_HOST:-localhost}"
+        export QDRANT_PORT="${MERLT_QDRANT_PORT:-6343}"
+    fi
+    echo -e "\n${YELLOW}[5/5] Starting MERLT sidecar (port $MERLT_PORT)...${NC}"
+    cd "$MERLT_ROOT"
+    "$MERLT_PYTHON" -m uvicorn merlt.app:app --reload --port "$MERLT_PORT" &
+    MERLT_PID=$!
+    echo -e "${GREEN}MERLT sidecar started (PID: $MERLT_PID)${NC}"
+fi
+
 # Wait for services
 sleep 3
 
@@ -105,6 +156,9 @@ echo -e "${GREEN}Services running:${NC}"
 echo -e "  VisuaLex API:      ${BLUE}http://localhost:5000${NC}"
 echo -e "  Platform Backend:  ${BLUE}http://localhost:3001${NC}"
 echo -e "  Frontend:          ${BLUE}http://localhost:5173${NC}"
+if [ "$MERLT_ENABLED" = "true" ]; then
+    echo -e "  MERLT sidecar:     ${BLUE}http://localhost:$MERLT_PORT${NC}"
+fi
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}\n"
 

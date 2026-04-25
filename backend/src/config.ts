@@ -2,6 +2,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const readBoolean = (value: string | undefined, defaultValue = false): boolean => {
+  if (value === undefined) return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+};
+
 // Validate required environment variables
 const requiredEnvVars = ['JWT_SECRET', 'DATABASE_URL'] as const;
 
@@ -34,5 +39,18 @@ export const config = {
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379/0',
     enabled: (process.env.REDIS_ENABLED || 'false').toLowerCase() === 'true',
+  },
+
+  merlt: {
+    enabled: readBoolean(process.env.MERLT_ENABLED, false),
+    apiUrl: process.env.MERLT_API_URL || 'http://localhost:8000',
+    apiKey: process.env.MERLT_API_KEY || '',
+    timeoutMs: parseInt(process.env.MERLT_TIMEOUT_MS || '60000', 10),
+    flags: {
+      contribution: readBoolean(process.env.MERLT_CONTRIBUTION_ENABLED, false),
+      validation: readBoolean(process.env.MERLT_VALIDATION_ENABLED, false),
+      graph: readBoolean(process.env.MERLT_GRAPH_ENABLED, true),
+      ops: readBoolean(process.env.MERLT_OPS_ENABLED, false),
+    },
   },
 };

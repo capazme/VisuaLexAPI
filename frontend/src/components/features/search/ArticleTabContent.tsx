@@ -22,6 +22,8 @@ import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
+import { PluginSlot } from '../../../plugins/registry';
+import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
 import type { Annotation } from '../../../types';
 
 interface ArticleTabContentProps {
@@ -247,11 +249,21 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const handleToggleQuickNorm = () => {
         if (isPinnedQuick) {
             removeQuickNormByParams(quickNormParams);
+            publishMerltEvent({
+                interaction_type: MERLT_EVENT_TYPES.bookmarkDeleted,
+                article_urn: norma_data.urn,
+                metadata: { source: 'quick_norm', params: quickNormParams },
+            });
             showToast('Rimosso dalle norme rapide', 'info');
             return;
         }
         const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
         addQuickNorm(label, quickNormParams);
+        publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.bookmarkCreated,
+            article_urn: norma_data.urn,
+            metadata: { source: 'quick_norm', label, params: quickNormParams },
+        });
         showToast('Aggiunto alle norme rapide', 'success');
     };
 
@@ -304,6 +316,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             ? { anchorText: anchor.anchorText, startOffset: anchor.startOffset }
             : undefined;
         addAnnotation(itemKey, targetArticleId, trimmed, anchorPayload);
+        publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.textSelected,
+            article_urn: norma_data.urn,
+            metadata: {
+                source: 'annotation',
+                scoped_article_id: targetArticleId,
+                anchored: Boolean(anchor),
+                text_length: trimmed.length,
+            },
+        });
         setNoteAnchor(null);
         showToast(anchor ? 'Nota ancorata al testo' : 'Nota aggiunta', 'success');
     };
@@ -389,6 +411,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             return;
         }
         addHighlight(itemKey, uniqueArticleId, text, '', color, startOffset);
+        publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.highlightCreated,
+            article_urn: norma_data.urn,
+            metadata: {
+                color,
+                start_offset: startOffset,
+                text_length: text.length,
+            },
+        });
         showToast(`Testo evidenziato in ${color}`, 'success');
     };
 
@@ -396,6 +427,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Shows a tooltip-style composer anchored on the selection itself; the
     // full Peek panel stays reserved for the toolbar button (list + free compose).
     const handlePopupAddNote = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
+        publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.textSelected,
+            article_urn: norma_data.urn,
+            metadata: {
+                source: 'selection_note',
+                start_offset: startOffset,
+                text_length: text.length,
+            },
+        });
         setNoteAnchor({ anchorText: text, startOffset, scopedArticleId: uniqueArticleId });
         setComposerRect(rect);
     };
@@ -431,6 +471,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // Handler for opening citation in new tab
     const handleOpenCitationInTab = useCallback((citation: ParsedCitationData) => {
+        publishMerltEvent({
+            interaction_type: MERLT_EVENT_TYPES.citationDetected,
+            article_urn: norma_data.urn,
+            metadata: { citation },
+        });
         triggerSearch({
             act_type: citation.act_type,
             act_number: citation.act_number || '',
@@ -439,7 +484,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             version: 'vigente',
             show_brocardi_info: true,
         });
-    }, [triggerSearch]);
+    }, [norma_data.urn, triggerSearch]);
 
     const handleCompare = () => {
         const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
@@ -641,6 +686,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupCopy={handlePopupCopy}
                 onRemoveHighlight={removeHighlight}
             />
+
+            <PluginSlot slot="article_content_after" props={{ article: data, onToast: showToast }} />
 
             {brocardi_info !== undefined && (
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">

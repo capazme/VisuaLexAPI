@@ -36,6 +36,8 @@ model User {
   dossiers      Dossier[]
   feedbacks     Feedback[]
   searchHistory SearchHistory[]
+  merltPreference MerltUserPreference?
+  merltConsentAudits MerltConsentAudit[]
 
   // Personal Environments (user-owned, not published)
   environments Environment[]
@@ -57,6 +59,43 @@ model User {
   originalAuthorOfAliases     CustomAlias[] @relation("OriginalAuthorOfAliases")
 
   @@map("users")
+}
+
+enum MerltConsentLevel {
+  none
+  basic
+  full
+}
+
+model MerltUserPreference {
+  id                  String            @id @default(uuid())
+  userId              String            @unique @map("user_id")
+  consentLevel        MerltConsentLevel @default(none) @map("consent_level")
+  contributionEnabled Boolean           @default(false) @map("contribution_enabled")
+  validationEnabled   Boolean           @default(false) @map("validation_enabled")
+  graphEnabled        Boolean           @default(true) @map("graph_enabled")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([consentLevel])
+  @@map("merlt_user_preferences")
+}
+
+model MerltConsentAudit {
+  id            String             @id @default(uuid())
+  userId        String             @map("user_id")
+  previousLevel MerltConsentLevel? @map("previous_level")
+  nextLevel     MerltConsentLevel  @map("next_level")
+  source        String             @default("user") @db.VarChar(50)
+  reason        String?            @db.VarChar(500)
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("merlt_consent_audits")
 }
 
 // ============================================

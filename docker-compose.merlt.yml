@@ -1,0 +1,60 @@
+services:
+  merlt-postgres:
+    image: postgres:16-alpine
+    container_name: visualex-merlt-postgres
+    environment:
+      POSTGRES_DB: ${MERLT_POSTGRES_DB:-merlt}
+      POSTGRES_USER: ${MERLT_POSTGRES_USER:-merlt}
+      POSTGRES_PASSWORD: ${MERLT_POSTGRES_PASSWORD:-merlt}
+    ports:
+      - "${MERLT_POSTGRES_PORT:-5436}:5432"
+    volumes:
+      - merlt_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MERLT_POSTGRES_USER:-merlt} -d ${MERLT_POSTGRES_DB:-merlt}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  merlt-redis:
+    image: redis:7-alpine
+    container_name: visualex-merlt-redis
+    ports:
+      - "${MERLT_REDIS_PORT:-6381}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  merlt-falkordb:
+    image: falkordb/falkordb:latest
+    container_name: visualex-merlt-falkordb
+    ports:
+      - "${MERLT_FALKOR_PORT:-6382}:6379"
+    volumes:
+      - merlt_falkor_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  merlt-qdrant:
+    image: qdrant/qdrant:latest
+    container_name: visualex-merlt-qdrant
+    ports:
+      - "${MERLT_QDRANT_PORT:-6343}:6333"
+      - "${MERLT_QDRANT_GRPC_PORT:-6344}:6334"
+    volumes:
+      - merlt_qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  merlt_postgres_data:
+  merlt_falkor_data:
+  merlt_qdrant_data:
