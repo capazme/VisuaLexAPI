@@ -198,6 +198,15 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Font-size preference: scales the root font-size so every Tailwind
+     rem-based utility (text-*, spacing, button heights) scales together.
+     Set on <html> by Layout.tsx via document.documentElement. Default
+     browser is 16px = medium. */
+  html[data-font-size="small"]  { font-size: 14px; }
+  html[data-font-size="medium"] { font-size: 16px; }
+  html[data-font-size="large"]  { font-size: 18px; }
+  html[data-font-size="xlarge"] { font-size: 20px; }
+
   /* Accessibility: respect reduced motion */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
