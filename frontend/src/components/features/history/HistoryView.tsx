@@ -100,8 +100,42 @@ export function HistoryView() {
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [createDossierFor, setCreateDossierFor] = useState<SearchHistoryItem | null>(null);
     const [newDossierTitle, setNewDossierTitle] = useState('');
+    // Menu position is computed from the trigger's getBoundingClientRect on open
+    // so the dropdown can use position:fixed and escape parent overflow contexts
+    // (the page layout has overflow-hidden on <main>; absolute positioning was
+    // getting clipped by it). flip is set when there's not enough space below.
+    const [menuPos, setMenuPos] = useState<{
+        top?: number;
+        bottom?: number;
+        right: number;
+    } | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    const closeMenu = () => {
+        setOpenMenu(null);
+        setShowDossierList(null);
+        setMenuPos(null);
+    };
+
+    const handleToggleMenu = (e: React.MouseEvent, itemId: string) => {
+        e.stopPropagation();
+        if (openMenu === itemId) {
+            closeMenu();
+            return;
+        }
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const ESTIMATED_MENU_HEIGHT = 180;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const flipUp = spaceBelow < ESTIMATED_MENU_HEIGHT && rect.top > ESTIMATED_MENU_HEIGHT;
+        setMenuPos({
+            top: flipUp ? undefined : rect.bottom + 4,
+            bottom: flipUp ? window.innerHeight - rect.top + 4 : undefined,
+            right: window.innerWidth - rect.right,
+        });
+        setOpenMenu(itemId);
+        setShowDossierList(null);
+    };
 
     const {
         triggerSearch,
@@ -118,17 +152,27 @@ export function HistoryView() {
         tryStartTour('history');
     }, [tryStartTour]);
 
-    // Chiudi menu quando si clicca fuori
+    // Chiudi menu quando si clicca fuori, oppure quando l'utente scrolla
+    // (il dropdown è position:fixed con coordinate calcolate, quindi non
+    // riposiziona da solo — chiuderlo è la UX più semplice e coerente).
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setOpenMenu(null);
-                setShowDossierList(null);
+                closeMenu();
             }
         };
+        const handleScrollOrResize = () => closeMenu();
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+        if (openMenu) {
+            window.addEventListener('scroll', handleScrollOrResize, true);
+            window.addEventListener('resize', handleScrollOrResize);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScrollOrResize, true);
+            window.removeEventListener('resize', handleScrollOrResize);
+        };
+    }, [openMenu]);
 
     // Auto-hide feedback
     useEffect(() => {
@@ -541,20 +585,25 @@ export function HistoryView() {
                                                             <div className="relative" ref={openMenu === item.id ? menuRef : null}>
                                                                 <button
                                                                     id={idx === 0 ? 'tour-history-actions' : undefined}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setOpenMenu(openMenu === item.id ? null : item.id);
-                                                                        setShowDossierList(null);
-                                                                    }}
+                                                                    onClick={(e) => handleToggleMenu(e, item.id)}
                                                                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                                                                     title="Altre azioni"
                                                                 >
                                                                     <MoreVertical size={16} />
                                                                 </button>
 
-                                                                {/* Dropdown menu */}
-                                                                {openMenu === item.id && (
-                                                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50">
+                                                                {/* Dropdown menu — position:fixed via menuPos to escape parent overflow */}
+                                                                {openMenu === item.id && menuPos && (
+                                                                    <div
+                                                                        style={{
+                                                                            position: 'fixed',
+                                                                            top: menuPos.top,
+                                                                            bottom: menuPos.bottom,
+                                                                            right: menuPos.right,
+                                                                            zIndex: 50,
+                                                                        }}
+                                                                        className="w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1"
+                                                                    >
                                                                         {/* QuickNorm */}
                                                                         <button
                                                                             id={idx === 0 ? 'tour-history-quick-norm' : undefined}
