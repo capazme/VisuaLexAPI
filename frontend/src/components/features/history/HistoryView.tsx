@@ -66,6 +66,7 @@ export function HistoryView() {
     const [createDossierFor, setCreateDossierFor] = useState<SearchHistoryItem | null>(null);
     const [newDossierTitle, setNewDossierTitle] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const {
         triggerSearch,
@@ -101,6 +102,28 @@ export function HistoryView() {
             return () => clearTimeout(timer);
         }
     }, [feedback]);
+
+    // Page-scoped shortcuts: "/" focuses search, Escape clears search when
+    // focused. Skipped while any overlay is open or the user is typing in
+    // a different input/textarea (mirrors DossierListView pattern).
+    useEffect(() => {
+        const hasOverlay = clearConfirmOpen || createDossierFor !== null || openMenu !== null;
+        const handler = (e: KeyboardEvent) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            const target = e.target as HTMLElement | null;
+            const inSearchInput = target === searchInputRef.current;
+            const inOtherField = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && !inSearchInput;
+            if (e.key === '/' && !inOtherField && !inSearchInput && !hasOverlay) {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            } else if (e.key === 'Escape' && inSearchInput && searchTerm) {
+                e.preventDefault();
+                setSearchTerm('');
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [clearConfirmOpen, createDossierFor, openMenu, searchTerm]);
 
     const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
         setFeedback({ message, type });
@@ -202,14 +225,25 @@ export function HistoryView() {
             });
     }, []);
 
-    const filteredHistory = history.filter(item => {
-        const term = searchTerm.toLowerCase();
-        return (
-            item.act_type?.toLowerCase().includes(term) ||
-            item.act_number?.includes(term) ||
-            item.article?.toString().includes(term)
-        );
-    });
+    // Build a searchable haystack per item — combines all metadata + the
+    // abbreviation label (CC/CP/Cost. ecc.) so "art. 2043 cc" matches.
+    // SearchHistory has no article body, so this is the closest to "ricerca
+    // nel testo" we can do without fetching+caching norma content.
+    const filteredHistory = useMemo(() => {
+        const tokens = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return history;
+        return history.filter(item => {
+            const haystack = [
+                item.act_type ?? '',
+                item.act_number ?? '',
+                item.article?.toString() ?? '',
+                item.date ?? '',
+                item.version ?? '',
+                generateQuickNormLabel(item),
+            ].join(' ').toLowerCase();
+            return tokens.every(t => haystack.includes(t));
+        });
+    }, [history, searchTerm]);
 
     // Group by date
     const groupedByDate = useMemo(() => {
@@ -244,10 +278,13 @@ export function HistoryView() {
                     </div>
                     <div className="relative">
                         <input
+                            ref={searchInputRef}
                             type="text"
                             placeholder="Cerca..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            aria-keyshortcuts="/"
+                            title="Cerca (premi /)"
                             className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all min-h-[44px]"
                         />
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -263,10 +300,13 @@ export function HistoryView() {
                     <div className="flex items-center gap-2">
                         <div id="tour-history-search" className="relative w-full sm:w-64">
                             <input
+                                ref={searchInputRef}
                                 type="text"
                                 placeholder="Cerca nella cronologia..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                aria-keyshortcuts="/"
+                                title="Cerca (premi /)"
                                 className="w-full pl-9 pr-4 py-1.5 text-sm rounded-full bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all"
                             />
                             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -291,25 +331,33 @@ export function HistoryView() {
                         <div className="p-8 text-center">
                             <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
                         </div>
+                    ) : filteredHistory.length === 0 && history.length > 0 ? (
+                        <EmptyState
+                            variant="search"
+                            title="Nessuna corrispondenza"
+                            description={`Nessuna voce trovata per "${searchTerm}".`}
+                            action={
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
+                                >
+                                    Azzera filtro
+                                </button>
+                            }
+                        />
                     ) : filteredHistory.length === 0 ? (
                         <EmptyState
                             variant="history"
-                            title={searchTerm ? "Nessun risultato" : "Nessuna ricerca recente"}
-                            description={
-                                searchTerm
-                                    ? "Prova a modificare i termini di ricerca."
-                                    : "Le tue ricerche appariranno qui. Inizia cercando una norma per vedere la cronologia."
-                            }
+                            title="Nessuna ricerca recente"
+                            description="Le tue ricerche appariranno qui. Inizia cercando una norma per vedere la cronologia."
                             action={
-                                !searchTerm && (
-                                    <button
-                                        onClick={() => navigate('/')}
-                                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
-                                    >
-                                        <Search size={18} />
-                                        Inizia una ricerca
-                                    </button>
-                                )
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
+                                >
+                                    <Search size={18} />
+                                    Inizia una ricerca
+                                </button>
                             }
                         />
                     ) : (
