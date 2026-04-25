@@ -11,7 +11,7 @@ import { verifyToken, verifyTokenType } from '../utils/jwt';
 // --- Tier configuration ---
 const ANONYMOUS_POINTS = 100; // requests per window
 const AUTHENTICATED_POINTS = 300;
-const WRITE_POINTS = 20;
+const WRITE_POINTS = 200;
 const WINDOW_SECONDS = 60; // 1 minute
 
 function createLimiter(keyPrefix: string, points: number): RateLimiterAbstract {
