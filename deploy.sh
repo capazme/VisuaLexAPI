@@ -239,11 +239,14 @@ print_step "Building frontend..."
 npm run build
 print_success "Frontend build completed"
 
-# Step 6: TypeScript check for backend
-print_step "Checking backend TypeScript..."
+# Step 6: Compile backend TypeScript to dist/.
+# pm2 launches `node dist/index.js` (see backend/package.json `start` script),
+# so without this step the service runs against a stale dist on every deploy.
+# `tsc` performs the type-check too — it fails on any error before emitting.
+print_step "Building backend..."
 cd "$SCRIPT_DIR/backend"
-npx tsc --noEmit
-print_success "Backend TypeScript check passed"
+npm run build
+print_success "Backend build completed"
 
 # Step 7: Update version (only if build succeeded and bump requested)
 if [[ -n "$VERSION_BUMP" ]]; then
