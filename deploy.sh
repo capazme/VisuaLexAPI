@@ -213,6 +213,13 @@ cd "$SCRIPT_DIR/backend"
 npm install --silent
 print_success "Backend dependencies installed"
 
+# Step 3b: Regenerate Prisma client to match the current schema.
+# Without this, schema changes pulled from git leave node_modules/@prisma/client
+# stale and `tsc --noEmit` fails on missing models/fields.
+print_step "Regenerating Prisma client..."
+npx prisma generate > /dev/null
+print_success "Prisma client regenerated"
+
 # Step 4: Frontend dependencies
 print_step "Installing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
