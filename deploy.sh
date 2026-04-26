@@ -220,6 +220,14 @@ print_step "Regenerating Prisma client..."
 npx prisma generate > /dev/null
 print_success "Prisma client regenerated"
 
+# Step 3c: Apply pending migrations to the production database.
+# Idempotent — no-op if there are no pending migrations. Without this, a
+# schema change ships to prod with no matching DB column/table and the API
+# fails at runtime on the first query.
+print_step "Applying database migrations..."
+npx prisma migrate deploy
+print_success "Database migrations applied"
+
 # Step 4: Frontend dependencies
 print_step "Installing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
