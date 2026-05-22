@@ -1,0 +1,82 @@
+# docker-compose.dev.yml
+# Development database services only (for native Python/Node.js development)
+# For full stack deployment, use docker-compose.yml
+#
+# v2 Stack:
+# - PostgreSQL: Bridge Table + RLCF data
+# - FalkorDB: Legal knowledge graph (replaces Neo4j)
+# - Qdrant: Vector embeddings
+# - Redis: Caching layer
+#
+# NOTE: Data is persisted to ./data/ directory for visibility and easy backup
+services:
+  # PostgreSQL: Bridge Table + RLCF authority/feedback
+  postgres:
+    image: postgres:15
+    container_name: merl-t-postgres-dev
+    environment:
+      POSTGRES_DB: rlcf_dev
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5436:5432"  # Host:5436 to avoid conflict with native PostgreSQL
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d rlcf_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # v2: Neo4j replaced by FalkorDB (496x faster, Cypher compatible)
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: merl-t-falkordb-dev
+    ports:
+      - "6382:6379"  # FalkorDB protocol (Redis-compatible)
+      - "3103:3000"  # FalkorDB Browser UI
+    volumes:
+      - ./data/falkordb:/var/lib/falkordb/data  # Mount to actual FalkorDB data dir
+    environment:
+      # Persistence: save every 10 seconds if 1+ writes, AND use appendonly
+      FALKORDB_ARGS: "--save 10 1 --appendonly yes --appendfsync everysec --loglevel warning"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: ["falkordb-server", "--loadmodule", "/usr/lib/redis/modules/libgraphdb.so"]
+
+  # Redis: Caching layer
+  redis:
+    image: redis:7-alpine
+    container_name: merl-t-redis-dev
+    ports:
+      - "6381:6379"
+    volumes:
+      - ./data/redis:/data
+    command: ["redis-server", "--save", "10", "1", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant: Vector database for semantic search
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: merl-t-qdrant-dev
+    ports:
+      - "6343:6333"  # HTTP API
+      - "6344:6334"  # gRPC API
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# No more Docker volumes - all data in ./data/ directory

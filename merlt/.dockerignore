@@ -1,0 +1,69 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Secrets
+*.key
+*.pem
+*.secret
+credentials.json
+
+# Logs
+*.log
+logs/
+
+# Model weights (loaded from merlt-models)
+weights/
+*.pt
+*.pth
+*.bin
+*.onnx
+*.safetensors
+
+# Tests (not needed in production)
+tests/
+docs/
+examples/
+*.md
+!README.md
+
+# Data files
+*.csv
+*.json
+data/

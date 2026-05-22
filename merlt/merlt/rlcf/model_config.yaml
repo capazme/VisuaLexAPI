@@ -1,0 +1,67 @@
+authority_weights:
+  baseline_credentials: 0.4
+  track_record: 0.4
+  recent_performance: 0.2
+track_record:
+  update_factor: 0.05
+thresholds:
+  disagreement: 0.3
+baseline_credentials:
+  types:
+    ACADEMIC_DEGREE:
+      weight: 0.3
+      scoring_function:
+        type: map
+        values:
+          Bachelor: 1.0
+          LLM: 1.1
+          JD: 1.2
+          PhD: 1.5
+        expression: ''
+        default: 0.0
+
+# =============================================================================
+# MULTILIVELLO v2 - Authority per dominio giuridico e livello pipeline
+# =============================================================================
+multilevel_authority:
+  # Domini giuridici italiani supportati
+  legal_domains:
+    - civile           # Diritto civile (contratti, obbligazioni, famiglia)
+    - penale           # Diritto penale
+    - amministrativo   # Diritto amministrativo
+    - costituzionale   # Diritto costituzionale
+    - lavoro           # Diritto del lavoro
+    - commerciale      # Diritto commerciale/societario
+    - tributario       # Diritto tributario
+    - internazionale   # Diritto internazionale
+
+  # Livelli della pipeline multi-expert
+  pipeline_levels:
+    - retrieval        # Valutazione qualità recupero fonti
+    - reasoning        # Valutazione ragionamento expert
+    - synthesis        # Valutazione sintesi finale
+
+  # Pesi per authority combinata: A = w_g*A_general + w_d*A_domain + w_l*A_level
+  combination_weights:
+    general: 0.3       # Peso authority generale
+    domain: 0.4        # Peso authority dominio
+    level: 0.3         # Peso authority livello
+
+  # Soglie per considerare un utente "esperto" in un dominio/livello
+  expertise_thresholds:
+    domain_baseline_min: 0.6   # Authority minima per "esperto dominio"
+    level_baseline_min: 0.6    # Authority minima per "esperto livello"
+    feedback_count_min: 5      # Feedback minimi per authority affidabile
+
+  # Decay differenziato (λ factor moltiplicatori)
+  decay_factors:
+    domain_multiplier: 1.5    # Decay più rapido per dominio
+    level_multiplier: 2.0     # Decay ancora più rapido per livello
+    general_base: 0.05        # Lambda base (da track_record.update_factor)
+
+ai_model:
+  name: openai/gpt-3.5-turbo
+  temperature: 0.7
+  max_tokens: 1000
+  top_p: 0.9
+  api_key_env: OPENROUTER_API_KEY

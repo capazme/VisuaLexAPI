@@ -11,6 +11,12 @@ dist/*
 .claude
 data
 
+# MERL-T runtime dirs (codice in merlt/ è versionato; runtime no)
+merlt/uploads/
+merlt/data/
+merlt/.venv/
+merlt/merlt.egg-info/
+
 # Environment files - NEVER commit secrets
 .env
 .env.*

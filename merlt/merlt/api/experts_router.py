@@ -1,0 +1,1218 @@
+"""
+Expert System Q&A Router
+=========================
+
+FastAPI router for Expert System Q&A with multi-level feedback.
+
+Endpoints:
+- POST /experts/query: Submit query to MultiExpertOrchestrator
+- POST /experts/feedback/inline: Quick thumbs up/down
+- POST /experts/feedback/detailed: 3-dimension feedback form
+- POST /experts/feedback/source: Per-source rating
+- POST /experts/feedback/refine: Conversational follow-up
+
+Usage:
+    from merlt.api.experts_router import router as experts_router
+    app.include_router(experts_router)
+"""
+
+import json
+import structlog
+import time
+from typing import Optional, List, Dict, Any, Literal
+from datetime import datetime
+from uuid import uuid4
+
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+
+from merlt.experts.orchestrator import MultiExpertOrchestrator
+from merlt.experts.synthesizer import SynthesisMode
+from merlt.experts.models import QATrace, QAFeedback, ApiKey
+from merlt.api.auth import verify_api_key
+from merlt.api.rate_limit import check_rate_limit
+from merlt.rlcf.database import get_async_session_dep
+from merlt.rlcf.training_scheduler import get_scheduler
+from merlt.rlcf.pii_service import PIIMaskingService
+from merlt.rlcf.audit_service import AuditService
+from merlt.rlcf.multilevel_feedback import (
+    MultilevelFeedback,
+    RetrievalFeedback,
+    ReasoningFeedback,
+    SynthesisFeedback,
+    create_feedback_from_user_rating,
+)
+from merlt.rlcf.authority import update_track_record, update_authority_score
+from merlt.rlcf.database import get_async_session
+from merlt.rlcf import models as rlcf_models
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+log = structlog.get_logger()
+
+router = APIRouter(prefix="/experts", tags=["experts"])
+
+
+# ============================================================================
+# REQUEST/RESPONSE MODELS
+# ============================================================================
+
+class ExpertQueryRequest(BaseModel):
+    """Request for Expert Q&A query."""
+    query: str = Field(..., min_length=5, description="Legal query in natural language")
+    user_id: str = Field(..., description="User ID for tracking and authority")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context (entities, article_urn, etc.)")
+    max_experts: Optional[int] = Field(4, ge=1, le=4, description="Max number of experts to invoke")
+    include_trace: bool = Field(False, description="Include full pipeline trace in response")
+    consent_level: Literal["anonymous", "basic", "full"] = Field(
+        "basic",
+        description="Storage consent level: anonymous (redact query+user_id), basic (redact query), full (no redaction)"
+    )
+
+
+class SourceReference(BaseModel):
+    """Legal source reference in response."""
+    article_urn: str
+    expert: str
+    relevance: float = Field(..., ge=0.0, le=1.0)
+    excerpt: Optional[str] = None
+
+
+class ExpertQueryResponse(BaseModel):
+    """Response from Expert Q&A system."""
+    trace_id: str = Field(..., description="Unique trace ID for feedback")
+    synthesis: str = Field(..., description="Final synthesis text")
+    mode: str = Field(..., description="convergent or divergent")
+    alternatives: Optional[List[Dict[str, Any]]] = Field(None, description="Alternative interpretations (divergent mode)")
+    sources: List[SourceReference] = Field(default_factory=list, description="Legal sources cited")
+    experts_used: List[str] = Field(default_factory=list, description="Experts that analyzed the query")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    execution_time_ms: int = Field(..., description="Execution time in milliseconds")
+    pipeline_trace: Optional[Dict[str, Any]] = Field(None, description="Full pipeline trace (when include_trace=True)")
+    pipeline_metrics: Optional[Dict[str, Any]] = Field(None, description="Pipeline metrics (when include_trace=True)")
+
+
+class InlineFeedbackRequest(BaseModel):
+    """Quick thumbs feedback."""
+    trace_id: str
+    user_id: str
+    rating: int = Field(..., ge=1, le=5, description="1=thumbs down, 5=thumbs up")
+
+
+class DetailedFeedbackRequest(BaseModel):
+    """Detailed 3-dimension feedback."""
+    trace_id: str
+    user_id: str
+    retrieval_score: float = Field(..., ge=0.0, le=1.0, description="Quality of retrieved sources")
+    reasoning_score: float = Field(..., ge=0.0, le=1.0, description="Quality of reasoning")
+    synthesis_score: float = Field(..., ge=0.0, le=1.0, description="Quality of synthesis")
+    comment: Optional[str] = Field(None, description="Optional textual comment")
+    user_authority: Optional[float] = None
+
+
+class SourceFeedbackRequest(BaseModel):
+    """Per-source rating feedback."""
+    trace_id: str
+    user_id: str
+    source_id: str = Field(..., description="article URN")
+    relevance: int = Field(..., ge=1, le=5, description="1-5 stars")
+    user_authority: Optional[float] = None
+
+
+class RefineFeedbackRequest(BaseModel):
+    """Conversational refinement feedback."""
+    trace_id: str
+    user_id: str
+    follow_up_query: str = Field(..., min_length=5)
+
+
+class ExpertPreferenceFeedbackRequest(BaseModel):
+    """
+    Feedback for divergent interpretations.
+
+    When mode=divergent, user can indicate which expert
+    provided the most useful interpretation.
+    """
+    trace_id: str
+    user_id: str
+    preferred_expert: str = Field(..., description="Expert type (literal, systemic, principles, precedent)")
+    comment: Optional[str] = Field(None, description="Optional comment explaining preference")
+
+
+class RouterFeedbackRequest(BaseModel):
+    """Router feedback from high-authority users (F2)."""
+    trace_id: str
+    user_id: str
+    routing_correct: bool = Field(..., description="True if routing was appropriate")
+    suggested_weights: Optional[Dict[str, float]] = Field(
+        None, description="Suggested expert weights, e.g. {'literal': 0.4, 'systemic': 0.3}"
+    )
+    suggested_query_type: Optional[str] = Field(
+        None, description="Alternative classification for the query"
+    )
+    comment: Optional[str] = None
+    user_authority: Optional[float] = None
+
+
+class FeedbackResponse(BaseModel):
+    """Generic feedback response."""
+    success: bool
+    feedback_id: Optional[int] = None
+    message: str
+
+
+# ============================================================================
+# DEPENDENCY INJECTION
+# ============================================================================
+
+# Global orchestrator instance (initialized on startup)
+_orchestrator: Optional[MultiExpertOrchestrator] = None
+_pii_service = PIIMaskingService()
+_audit_service = AuditService()
+
+
+def get_orchestrator() -> MultiExpertOrchestrator:
+    """
+    Get MultiExpertOrchestrator instance.
+
+    This should be initialized in the app startup event.
+    For now, returns None and will be injected via dependency.
+    """
+    global _orchestrator
+    if _orchestrator is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Expert System not initialized. Call initialize_expert_system() on startup."
+        )
+    return _orchestrator
+
+
+def initialize_expert_system(orchestrator: MultiExpertOrchestrator):
+    """
+    Initialize expert system with orchestrator.
+
+    Should be called in FastAPI startup event:
+
+    @app.on_event("startup")
+    async def startup():
+        orchestrator = create_orchestrator()
+        initialize_expert_system(orchestrator)
+    """
+    global _orchestrator
+    _orchestrator = orchestrator
+    log.info("Expert System initialized")
+
+
+# ============================================================================
+# AUDIT LOGGING
+# ============================================================================
+
+async def _audit_feedback(
+    session: AsyncSession,
+    feedback: QAFeedback,
+    feedback_type: str,
+) -> None:
+    """Log feedback creation to audit trail. Non-blocking."""
+    try:
+        await _audit_service.log_event(
+            session,
+            action="CREATE",
+            actor_id=feedback.user_id,
+            resource_type="feedback",
+            resource_id=str(feedback.id),
+            details={"feedback_type": feedback_type, "trace_id": feedback.trace_id},
+        )
+    except Exception as e:
+        log.warning("Audit logging failed (non-blocking)", error=str(e))
+
+
+# ============================================================================
+# TRAINING BUFFER WIRING
+# ============================================================================
+
+def _wire_feedback_to_training(
+    trace: QATrace,
+    feedback: QAFeedback,
+    feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router"],
+) -> None:
+    """
+    Wire a feedback submission to the RLCF training buffer.
+
+    Computes reward, builds MultilevelFeedback, and pushes to scheduler.
+    Wrapped in try/except so it never breaks the feedback submission.
+    """
+    try:
+        # 1. Compute reward based on feedback type
+        if feedback_type == "inline":
+            reward = (feedback.inline_rating - 1) / 4  # 1→0, 5→1
+        elif feedback_type == "detailed":
+            reward = (
+                0.3 * feedback.retrieval_score
+                + 0.4 * feedback.reasoning_score
+                + 0.3 * feedback.synthesis_score
+            )
+        elif feedback_type == "source":
+            reward = (feedback.source_relevance - 1) / 4  # 1→0, 5→1
+        elif feedback_type == "preference":
+            reward = 0.5
+        elif feedback_type == "refine":
+            reward = 0.3
+        elif feedback_type == "router":
+            reward = 1.0 if feedback.inline_rating and feedback.inline_rating >= 4 else 0.0
+        else:
+            reward = 0.5
+
+        # 2. Reconstruct trace_data from full_trace (JSONB, already dict)
+        trace_data = trace.full_trace if trace.full_trace else {}
+
+        # 3. Build MultilevelFeedback
+        if feedback_type == "detailed":
+            ml_feedback = MultilevelFeedback(
+                query_id=trace.trace_id,
+                retrieval_feedback=RetrievalFeedback(
+                    precision=feedback.retrieval_score,
+                    ranking_quality=feedback.retrieval_score,
+                ),
+                reasoning_feedback=ReasoningFeedback(
+                    logical_coherence=feedback.reasoning_score,
+                    legal_soundness=feedback.reasoning_score,
+                ),
+                synthesis_feedback=SynthesisFeedback(
+                    clarity=feedback.synthesis_score,
+                    usefulness=feedback.synthesis_score,
+                    user_satisfaction=feedback.synthesis_score,
+                ),
+                overall_rating=reward,
+                user_id=feedback.user_id,
+            )
+        else:
+            ml_feedback = create_feedback_from_user_rating(
+                query_id=trace.trace_id,
+                user_rating=reward,
+                user_id=feedback.user_id,
+            )
+
+        # 4. Push to training buffer
+        scheduler = get_scheduler()
+        exp_id = scheduler.add_experience(
+            trace=trace_data,
+            feedback=ml_feedback,
+            reward=reward,
+            metadata={
+                "feedback_type": feedback_type,
+                "feedback_id": feedback.id,
+                "trace_id": trace.trace_id,
+            },
+        )
+
+        # 5. Log result
+        log.debug(
+            "Feedback wired to training buffer",
+            feedback_type=feedback_type,
+            reward=round(reward, 3),
+            experience_id=exp_id,
+            trace_id=trace.trace_id,
+        )
+    except Exception as e:
+        log.warning(
+            "Failed to wire feedback to training buffer (non-blocking)",
+            error=str(e),
+            feedback_type=feedback_type,
+            trace_id=trace.trace_id,
+        )
+
+
+# ============================================================================
+# AUTHORITY SCORING
+# ============================================================================
+
+async def _update_user_authority(
+    user_id: str,
+    feedback: QAFeedback,
+    feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router"],
+) -> Optional[float]:
+    """
+    Update user authority score after feedback submission.
+
+    Computes quality_score from feedback, then updates track record
+    and authority via RLCF authority module. Non-blocking.
+
+    Returns:
+        New authority score, or None if update failed.
+    """
+    try:
+        # 1. Compute quality_score based on feedback type
+        if feedback_type == "inline":
+            quality_score = (feedback.inline_rating - 1) / 4  # 1→0, 5→1
+        elif feedback_type == "detailed":
+            quality_score = (
+                (feedback.retrieval_score or 0)
+                + (feedback.reasoning_score or 0)
+                + (feedback.synthesis_score or 0)
+            ) / 3
+        elif feedback_type == "source":
+            quality_score = ((feedback.source_relevance or 1) - 1) / 4
+        elif feedback_type == "router":
+            quality_score = 1.0 if (feedback.inline_rating or 0) >= 4 else 0.0
+        else:
+            # preference, refine → neutral
+            quality_score = 0.5
+
+        # 2. Open RLCF session and update authority
+        async with get_async_session() as rlcf_session:
+            # Find or create user in RLCF models
+            result = await rlcf_session.execute(
+                select(rlcf_models.User).where(
+                    rlcf_models.User.username == user_id
+                )
+            )
+            rlcf_user = result.scalar_one_or_none()
+
+            if not rlcf_user:
+                # Cold start: baseline_credential_score=0.3 for unknown users.
+                # In production, load actual credentials from platform user profile.
+                rlcf_user = rlcf_models.User(
+                    username=user_id,
+                    authority_score=0.5,
+                    track_record_score=0.5,
+                    baseline_credential_score=0.3,
+                )
+                rlcf_session.add(rlcf_user)
+                await rlcf_session.flush()
+
+            # 3. Update track record and authority
+            await update_track_record(rlcf_session, rlcf_user.id, quality_score)
+            new_authority = await update_authority_score(
+                rlcf_session, rlcf_user.id, quality_score
+            )
+
+        log.debug(
+            "User authority updated",
+            user_id=user_id,
+            feedback_type=feedback_type,
+            quality_score=round(quality_score, 3),
+            new_authority=round(new_authority, 3),
+        )
+        return new_authority
+    except Exception as e:
+        log.warning(
+            "Authority update failed (non-blocking)",
+            error=str(e),
+            user_id=user_id,
+            feedback_type=feedback_type,
+        )
+        return None
+
+
+# ============================================================================
+# ENDPOINTS
+# ============================================================================
+
+@router.post("/query", response_model=ExpertQueryResponse)
+async def query_experts(
+    request: ExpertQueryRequest,
+    session: AsyncSession = Depends(get_async_session_dep),
+    orchestrator: MultiExpertOrchestrator = Depends(get_orchestrator),
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit),
+):
+    """
+    Submit query to MultiExpertOrchestrator and save trace.
+
+    Flow:
+    1. Run MultiExpertOrchestrator.process()
+    2. Extract sources from SynthesisResult
+    3. Save QATrace to database
+    4. Return response with trace_id
+
+    Example:
+        POST /api/experts/query
+        {
+            "query": "Cos'è la legittima difesa?",
+            "user_id": "user123"
+        }
+
+        Response:
+        {
+            "trace_id": "trace_abc123",
+            "synthesis": "La legittima difesa è...",
+            "mode": "convergent",
+            "sources": [
+                {"article_urn": "urn:...:art52", "expert": "literal", "relevance": 0.95}
+            ],
+            "experts_used": ["literal", "systemic"],
+            "confidence": 0.85,
+            "execution_time_ms": 2450
+        }
+    """
+    start_time = time.time()
+
+    log.info(
+        "Expert query received",
+        query=request.query[:50],
+        user_id=request.user_id,
+        max_experts=request.max_experts
+    )
+
+    try:
+        # Run orchestrator
+        result = await orchestrator.process(
+            query=request.query,
+            entities=request.context.get("entities") if request.context else None,
+            retrieved_chunks=request.context.get("retrieved_chunks") if request.context else None,
+            metadata={"user_id": request.user_id},
+            include_trace=request.include_trace
+        )
+
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        # Generate trace ID
+        trace_id = f"trace_{uuid4().hex[:12]}"
+
+        # Extract sources from combined_legal_basis
+        sources = []
+        for legal_source in result.combined_legal_basis:
+            sources.append(SourceReference(
+                article_urn=legal_source.source_id,  # LegalSource uses source_id, not urn
+                expert="combined",  # LegalSource doesn't track individual expert, it's combined
+                relevance=0.9,  # Default high relevance for combined sources
+                excerpt=legal_source.excerpt[:200] if legal_source.excerpt else None
+            ))
+
+        # Extract experts used from expert_contributions
+        experts_used = list(result.expert_contributions.keys())
+
+        # Extract pipeline trace from result metadata
+        pipeline_trace_data = result.metadata.get("pipeline_trace") if request.include_trace else None
+        pipeline_metrics_data = result.metadata.get("pipeline_metrics") if request.include_trace else None
+
+        # Inject trace_id into pipeline_trace for correlation
+        if pipeline_trace_data:
+            pipeline_trace_data["trace_id"] = trace_id
+
+        # Extract routing metadata for new fields
+        routing_method = None
+        query_type = None
+        if pipeline_trace_data:
+            routing_info = pipeline_trace_data.get("routing", {})
+            routing_method = routing_info.get("method")
+            query_type = routing_info.get("query_type")
+
+        # Save trace to database with new consent-aware fields
+        trace = QATrace(
+            trace_id=trace_id,
+            user_id=request.user_id,
+            query=request.query,
+            selected_experts=experts_used,
+            synthesis_mode=result.mode.value,
+            synthesis_text=result.synthesis,
+            sources=[s.model_dump() for s in sources],  # Store as JSONB
+            execution_time_ms=execution_time_ms,
+            full_trace=pipeline_trace_data,
+            # New consent-aware fields (Story 5-1)
+            consent_level=request.consent_level,
+            query_type=query_type,
+            confidence=result.confidence,
+            routing_method=routing_method,
+        )
+        session.add(trace)
+        await session.commit()
+
+        log.info(
+            "Expert query completed",
+            trace_id=trace_id,
+            mode=result.mode.value,
+            experts_count=len(experts_used),
+            sources_count=len(sources),
+            execution_time_ms=execution_time_ms,
+            has_trace=pipeline_trace_data is not None
+        )
+
+        # Return response
+        return ExpertQueryResponse(
+            trace_id=trace_id,
+            synthesis=result.synthesis,
+            mode=result.mode.value,
+            alternatives=result.alternatives if result.mode == SynthesisMode.DIVERGENT else None,
+            sources=sources,
+            experts_used=experts_used,
+            confidence=result.confidence,
+            execution_time_ms=execution_time_ms,
+            pipeline_trace=pipeline_trace_data,
+            pipeline_metrics=pipeline_metrics_data,
+        )
+
+    except Exception as e:
+        log.error("Expert query failed", error=str(e), query=request.query[:50])
+        raise HTTPException(status_code=500, detail=f"Expert query failed: {str(e)}")
+
+
+@router.post("/feedback/inline", response_model=FeedbackResponse)
+async def submit_inline_feedback(
+    request: InlineFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep)
+):
+    """
+    Submit quick thumbs up/down feedback.
+
+    Example:
+        POST /api/experts/feedback/inline
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "rating": 5  // thumbs up
+        }
+    """
+    log.info(
+        "Inline feedback received",
+        trace_id=request.trace_id,
+        user_id=request.user_id,
+        rating=request.rating
+    )
+
+    try:
+        # Verify trace exists
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        trace = result.scalar_one_or_none()
+
+        if not trace:
+            raise HTTPException(status_code=404, detail=f"Trace {request.trace_id} not found")
+
+        # Create feedback
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            inline_rating=request.rating
+        )
+        session.add(feedback)
+        await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "inline")
+        await _audit_feedback(session, feedback, "inline")
+        new_authority = await _update_user_authority(request.user_id, feedback, "inline")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        # F8 implicit: positive inline feedback boosts source affinity
+        try:
+            from merlt.rlcf.affinity_service import AffinityUpdateService
+            affinity_svc = AffinityUpdateService()
+            for expert in (trace.selected_experts or []):
+                await affinity_svc.update_implicit_from_expert_feedback(
+                    session, trace, feedback, expert
+                )
+        except Exception as e:
+            log.warning("Implicit affinity update failed (non-blocking)", error=str(e))
+
+        log.info(
+            "Inline feedback saved",
+            feedback_id=feedback.id,
+            trace_id=request.trace_id,
+            rating=request.rating
+        )
+
+        return FeedbackResponse(
+            success=True,
+            feedback_id=feedback.id,
+            message="Inline feedback saved successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to save inline feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+@router.post("/feedback/detailed", response_model=FeedbackResponse)
+async def submit_detailed_feedback(
+    request: DetailedFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep)
+):
+    """
+    Submit detailed 3-dimension feedback.
+
+    Example:
+        POST /api/experts/feedback/detailed
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "retrieval_score": 0.8,
+            "reasoning_score": 0.9,
+            "synthesis_score": 0.7,
+            "comment": "Buona risposta ma sintesi migliorabile"
+        }
+    """
+    log.info(
+        "Detailed feedback received",
+        trace_id=request.trace_id,
+        user_id=request.user_id,
+        avg_score=(request.retrieval_score + request.reasoning_score + request.synthesis_score) / 3
+    )
+
+    try:
+        # Verify trace exists
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        trace = result.scalar_one_or_none()
+
+        if not trace:
+            raise HTTPException(status_code=404, detail=f"Trace {request.trace_id} not found")
+
+        # Create feedback (mask PII in comments)
+        masked_comment = _pii_service.mask_text(request.comment) if request.comment else None
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            retrieval_score=request.retrieval_score,
+            reasoning_score=request.reasoning_score,
+            synthesis_score=request.synthesis_score,
+            detailed_comment=masked_comment,
+            user_authority=request.user_authority
+        )
+        session.add(feedback)
+        await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "detailed")
+        await _audit_feedback(session, feedback, "detailed")
+        new_authority = await _update_user_authority(request.user_id, feedback, "detailed")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        # F8 implicit: detailed feedback scores propagate to source affinity
+        try:
+            from merlt.rlcf.affinity_service import AffinityUpdateService
+            affinity_svc = AffinityUpdateService()
+            for expert in (trace.selected_experts or []):
+                await affinity_svc.update_implicit_from_expert_feedback(
+                    session, trace, feedback, expert
+                )
+        except Exception as e:
+            log.warning("Implicit affinity update failed (non-blocking)", error=str(e))
+
+        log.info(
+            "Detailed feedback saved",
+            feedback_id=feedback.id,
+            trace_id=request.trace_id,
+            retrieval=request.retrieval_score,
+            reasoning=request.reasoning_score,
+            synthesis=request.synthesis_score
+        )
+
+        return FeedbackResponse(
+            success=True,
+            feedback_id=feedback.id,
+            message="Detailed feedback saved successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to save detailed feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+@router.post("/feedback/source", response_model=FeedbackResponse)
+async def submit_source_feedback(
+    request: SourceFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep)
+):
+    """
+    Submit per-source rating feedback.
+
+    Example:
+        POST /api/experts/feedback/source
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "source_id": "urn:nir:stato:codice.civile:1942;art1453",
+            "relevance": 5  // 5 stars
+        }
+    """
+    log.info(
+        "Source feedback received",
+        trace_id=request.trace_id,
+        source_id=request.source_id,
+        relevance=request.relevance
+    )
+
+    try:
+        # Verify trace exists
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        trace = result.scalar_one_or_none()
+
+        if not trace:
+            raise HTTPException(status_code=404, detail=f"Trace {request.trace_id} not found")
+
+        # Create feedback
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            source_id=request.source_id,
+            source_relevance=request.relevance,
+            user_authority=request.user_authority
+        )
+        session.add(feedback)
+        await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "source")
+        await _audit_feedback(session, feedback, "source")
+        new_authority = await _update_user_authority(request.user_id, feedback, "source")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        # F8c: Update expert affinity
+        try:
+            from merlt.rlcf.affinity_service import AffinityUpdateService
+            affinity_svc = AffinityUpdateService()
+            await affinity_svc.update_from_source_feedback(session, trace, feedback)
+        except Exception as e:
+            log.warning("Affinity update failed (non-blocking)", error=str(e))
+
+        log.info(
+            "Source feedback saved",
+            feedback_id=feedback.id,
+            source_id=request.source_id,
+            relevance=request.relevance
+        )
+
+        return FeedbackResponse(
+            success=True,
+            feedback_id=feedback.id,
+            message="Source feedback saved successfully"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to save source feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+@router.post("/feedback/preference", response_model=FeedbackResponse)
+async def submit_expert_preference_feedback(
+    request: ExpertPreferenceFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep)
+):
+    """
+    Submit expert preference feedback for divergent interpretations.
+
+    When mode=divergent, users can indicate which expert's interpretation
+    was most useful. This feedback is used for:
+    - RLCF training
+    - Expert weight optimization
+    - Response synthesis improvement
+
+    Example:
+        POST /api/experts/feedback/preference
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "preferred_expert": "systemic",
+            "comment": "L'interpretazione sistematica e' piu' completa"
+        }
+    """
+    log.info(
+        "Expert preference feedback received",
+        trace_id=request.trace_id,
+        user_id=request.user_id,
+        preferred_expert=request.preferred_expert
+    )
+
+    try:
+        # Verify trace exists and was divergent
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        trace = result.scalar_one_or_none()
+
+        if not trace:
+            raise HTTPException(status_code=404, detail=f"Trace {request.trace_id} not found")
+
+        if trace.synthesis_mode != "divergent":
+            log.warning(
+                "Preference feedback for non-divergent trace",
+                trace_id=request.trace_id,
+                mode=trace.synthesis_mode
+            )
+            # Still accept feedback but log warning
+
+        # Validate expert type
+        valid_experts = ["literal", "systemic", "principles", "precedent"]
+        if request.preferred_expert not in valid_experts:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid expert type '{request.preferred_expert}'. Valid: {valid_experts}"
+            )
+
+        # Create feedback with expert preference (mask PII in comments)
+        masked_comment = _pii_service.mask_text(request.comment) if request.comment else None
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            preferred_expert=request.preferred_expert,
+            detailed_comment=masked_comment
+        )
+        session.add(feedback)
+        await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "preference")
+        await _audit_feedback(session, feedback, "preference")
+        new_authority = await _update_user_authority(request.user_id, feedback, "preference")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        # F8 implicit: preference feedback boosts the preferred expert's sources
+        try:
+            from merlt.rlcf.affinity_service import AffinityUpdateService
+            affinity_svc = AffinityUpdateService()
+            await affinity_svc.update_implicit_from_expert_feedback(
+                session, trace, feedback, request.preferred_expert
+            )
+        except Exception as e:
+            log.warning("Implicit affinity update failed (non-blocking)", error=str(e))
+
+        log.info(
+            "Expert preference feedback saved",
+            feedback_id=feedback.id,
+            trace_id=request.trace_id,
+            preferred_expert=request.preferred_expert
+        )
+
+        return FeedbackResponse(
+            success=True,
+            feedback_id=feedback.id,
+            message=f"Preference feedback saved: {request.preferred_expert}"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to save expert preference feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+# Configurable authority threshold for router feedback
+ROUTER_FEEDBACK_AUTHORITY_THRESHOLD = 0.7
+
+
+@router.post("/feedback/router", response_model=FeedbackResponse)
+async def submit_router_feedback(
+    request: RouterFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep)
+):
+    """
+    Submit router feedback from high-authority users (F2).
+
+    Only users with authority >= 0.7 can evaluate routing decisions.
+
+    Example:
+        POST /api/experts/feedback/router
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "routing_correct": true,
+            "comment": "Routing appropriato per la query"
+        }
+    """
+    log.info(
+        "Router feedback received",
+        trace_id=request.trace_id,
+        user_id=request.user_id,
+        routing_correct=request.routing_correct,
+    )
+
+    try:
+        # Always lookup authority from DB — never trust client-supplied value
+        # for authorization decisions (client value is only a UI cache hint)
+        authority = 0.0
+        try:
+            async with get_async_session() as rlcf_session:
+                result = await rlcf_session.execute(
+                    select(rlcf_models.User).where(
+                        rlcf_models.User.username == request.user_id
+                    )
+                )
+                rlcf_user = result.scalar_one_or_none()
+                authority = rlcf_user.authority_score if rlcf_user else 0.0
+        except Exception as e:
+            log.debug("authority_lookup_failed", error=str(e))
+            authority = 0.0
+
+        if authority < ROUTER_FEEDBACK_AUTHORITY_THRESHOLD:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Authority {authority:.2f} below threshold "
+                       f"{ROUTER_FEEDBACK_AUTHORITY_THRESHOLD}. "
+                       f"Router feedback requires high authority."
+            )
+
+        # Verify trace exists
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        trace = result.scalar_one_or_none()
+
+        if not trace:
+            raise HTTPException(status_code=404, detail=f"Trace {request.trace_id} not found")
+
+        # Build comment with routing metadata
+        comment_parts = []
+        if request.suggested_query_type:
+            comment_parts.append(f"[router][{request.suggested_query_type}]")
+        else:
+            comment_parts.append("[router][unchanged]")
+        if request.comment:
+            comment_parts.append(request.comment)
+        if request.suggested_weights:
+            comment_parts.append(f"weights={json.dumps(request.suggested_weights)}")
+
+        # Create feedback
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            inline_rating=5 if request.routing_correct else 1,
+            detailed_comment=" ".join(comment_parts),
+            user_authority=authority,
+        )
+        session.add(feedback)
+        await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "router")
+        await _audit_feedback(session, feedback, "router")
+        new_authority = await _update_user_authority(request.user_id, feedback, "router")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        log.info(
+            "Router feedback saved",
+            feedback_id=feedback.id,
+            trace_id=request.trace_id,
+            routing_correct=request.routing_correct,
+        )
+
+        return FeedbackResponse(
+            success=True,
+            feedback_id=feedback.id,
+            message=f"Router feedback saved: {'correct' if request.routing_correct else 'improvable'}"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to save router feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+@router.post("/feedback/refine", response_model=ExpertQueryResponse)
+async def submit_refine_feedback(
+    request: RefineFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep),
+    orchestrator: MultiExpertOrchestrator = Depends(get_orchestrator)
+):
+    """
+    Submit conversational refinement feedback and get new response.
+
+    This endpoint:
+    1. Saves follow-up query as feedback
+    2. Re-runs orchestrator with context from original trace
+    3. Links new trace to original via refined_trace_id
+
+    Example:
+        POST /api/experts/feedback/refine
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "follow_up_query": "Puoi spiegare meglio il requisito della proporzione?"
+        }
+
+        Returns: ExpertQueryResponse (same as /query)
+    """
+    start_time = time.time()
+
+    log.info(
+        "Refine feedback received",
+        trace_id=request.trace_id,
+        user_id=request.user_id,
+        follow_up=request.follow_up_query[:50]
+    )
+
+    try:
+        # Verify original trace exists
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        original_trace = result.scalar_one_or_none()
+
+        if not original_trace:
+            raise HTTPException(status_code=404, detail=f"Original trace {request.trace_id} not found")
+
+        # Re-run orchestrator with follow-up query
+        result = await orchestrator.process(
+            query=request.follow_up_query,
+            metadata={
+                "user_id": request.user_id,
+                "refine_from": request.trace_id,
+                "original_query": original_trace.query
+            }
+        )
+
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        # Generate new trace ID
+        new_trace_id = f"trace_{uuid4().hex[:12]}"
+
+        # Extract sources
+        sources = []
+        for legal_source in result.combined_legal_basis:
+            sources.append(SourceReference(
+                article_urn=legal_source.urn,
+                expert=legal_source.expert_type,
+                relevance=legal_source.relevance,
+                excerpt=legal_source.text_excerpt[:200] if legal_source.text_excerpt else None
+            ))
+
+        experts_used = list(result.expert_contributions.keys())
+
+        # Save new trace (inherit consent_level from original)
+        new_trace = QATrace(
+            trace_id=new_trace_id,
+            user_id=request.user_id,
+            query=request.follow_up_query,
+            selected_experts=experts_used,
+            synthesis_mode=result.mode.value,
+            synthesis_text=result.synthesis,
+            sources=[s.model_dump() for s in sources],
+            execution_time_ms=execution_time_ms,
+            consent_level=original_trace.consent_level,
+            confidence=result.confidence,
+        )
+        session.add(new_trace)
+
+        # Save refinement feedback with link to new trace
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            follow_up_query=request.follow_up_query,
+            refined_trace_id=new_trace_id
+        )
+        session.add(feedback)
+
+        await session.commit()
+
+        _wire_feedback_to_training(original_trace, feedback, "refine")
+        new_authority = await _update_user_authority(request.user_id, feedback, "refine")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        log.info(
+            "Refine feedback processed",
+            original_trace_id=request.trace_id,
+            new_trace_id=new_trace_id,
+            execution_time_ms=execution_time_ms
+        )
+
+        return ExpertQueryResponse(
+            trace_id=new_trace_id,
+            synthesis=result.synthesis,
+            mode=result.mode.value,
+            alternatives=result.alternatives if result.mode == SynthesisMode.DIVERGENT else None,
+            sources=sources,
+            experts_used=experts_used,
+            confidence=result.confidence,
+            execution_time_ms=execution_time_ms
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to process refine feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to process refinement: {str(e)}")
+
+
+@router.get("/trace/{trace_id}")
+async def get_trace(
+    trace_id: str,
+    caller_consent: Optional[str] = None,
+    session: AsyncSession = Depends(get_async_session_dep)
+):
+    """
+    Recupera il trace completo di una query precedente.
+
+    Returns the full pipeline trace JSON stored during query execution.
+    Only available for queries executed with include_trace=True.
+
+    Consent filtering is applied based on:
+    - The trace's stored consent_level
+    - The caller's consent level (caller_consent param)
+
+    The most restrictive level is applied:
+    - anonymous: user_id and query are redacted
+    - basic: query is redacted
+    - full: no redaction
+
+    Example:
+        GET /api/experts/trace/trace_abc123def456
+        GET /api/experts/trace/trace_abc123def456?caller_consent=basic
+    """
+    result = await session.execute(
+        select(QATrace).where(QATrace.trace_id == trace_id)
+    )
+    qa_trace = result.scalar_one_or_none()
+
+    if not qa_trace:
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+
+    if not qa_trace.full_trace:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pipeline trace available for {trace_id}. Was the query executed with include_trace=True?"
+        )
+
+    # Apply consent filtering
+    import copy
+    import json as _json
+    full_trace = copy.deepcopy(qa_trace.full_trace) if qa_trace.full_trace else {}
+
+    consent_levels = {"anonymous": 0, "basic": 1, "full": 2}
+    stored_level = consent_levels.get(qa_trace.consent_level, 0)
+    # None means no caller restriction; invalid value defaults to most restrictive
+    if caller_consent is None:
+        caller_level = 2
+    else:
+        caller_level = consent_levels.get(caller_consent, 0)
+    effective_level = min(stored_level, caller_level)
+
+    if effective_level < 2:  # basic or anonymous — redact query throughout
+        # Redact all occurrences of the original query text from the trace JSON
+        original_query = qa_trace.query
+        if original_query:
+            trace_str = _json.dumps(full_trace, ensure_ascii=False, default=str)
+            trace_str = trace_str.replace(original_query, "[REDACTED]")
+            full_trace = _json.loads(trace_str)
+        # Also redact well-known keys
+        for key in ("query", "query_text"):
+            if key in full_trace:
+                full_trace[key] = "[REDACTED]"
+        if isinstance(full_trace.get("input"), dict) and "query" in full_trace["input"]:
+            full_trace["input"]["query"] = "[REDACTED]"
+
+    if effective_level == 0:  # anonymous — also redact user_id
+        for key in ("user_id",):
+            if key in full_trace:
+                full_trace[key] = "[REDACTED]"
+        if isinstance(full_trace.get("input"), dict) and "user_id" in full_trace["input"]:
+            full_trace["input"]["user_id"] = "[REDACTED]"
+
+    return full_trace

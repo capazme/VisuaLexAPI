@@ -1,0 +1,95 @@
+# Pipeline Configuration
+# =====================
+#
+# Tutti i parametri sperimentabili della pipeline MERL-T.
+# Usato da scripts/show_trace.py per configurare l'esecuzione.
+#
+# Per sperimentare: copia questo file, modifica i parametri, e lancia:
+#   .venv/bin/python scripts/show_trace.py --config scripts/my_experiment.yaml "query"
+
+# --- Infrastructure ---
+infrastructure:
+  falkordb:
+    host: "localhost"
+    port: 6380
+    graph_name: "merl_t_dev"
+  qdrant:
+    host: "localhost"
+    port: 6333
+  postgres:
+    # BridgeTableConfig usa env vars con defaults:
+    # BRIDGE_DB_HOST, BRIDGE_DB_PORT, BRIDGE_DB_USER, BRIDGE_DB_PASSWORD, BRIDGE_DB_NAME
+    {}
+  retriever:
+    alpha: 0.7                          # Peso vector vs graph: 1.0 = solo vector, 0.0 = solo graph
+    collection_name: "merl_t_dev_chunks"
+    over_retrieve_factor: 3             # Fattore sovra-recupero prima del reranking
+
+# --- Routing ---
+routing:
+  # Strategia: "hybrid" (neural+LLM fallback), "llm" (solo LLM classification), "regex" (solo pattern matching)
+  strategy: "hybrid"
+
+  # Soglia per selezionare un expert (peso minimo dal router)
+  selection_threshold: 0.2
+
+  # Numero massimo di expert da attivare
+  max_experts: 4
+
+  # LLM classification (usato come fallback in hybrid, o standalone con strategy=llm)
+  llm_classification:
+    model: "google/gemini-2.0-flash-001"
+
+# --- Neural Gating ---
+neural_gating:
+  enabled: true
+  input_dim: 1024                       # Dimensione embedding E5-large
+  hidden_dim1: 512
+  hidden_dim2: 256
+  dropout: 0.1
+  confidence_threshold: 0.3             # Sotto questa soglia -> fallback a LLM classification
+  checkpoint_path: null                 # Path a checkpoint .pt (null = warm-start da prior)
+  expert_priors:                        # Prior da Art. 12 Preleggi (warm-start bias)
+    literal: 0.35
+    systemic: 0.25
+    principles: 0.20
+    precedent: 0.20
+
+# --- Expert Execution ---
+experts:
+  parallel_execution: true
+  timeout_seconds: 60.0
+  enable_circuit_breaker: true
+
+  # LLM models per expert
+  models:
+    literal:
+      model: "google/gemini-2.5-flash"
+      temperature: 0.2
+    systemic:
+      model: "google/gemini-2.5-flash"
+      temperature: 0.3
+    principles:
+      model: "google/gemini-2.5-flash"
+      temperature: 0.4
+    precedent:
+      model: "google/gemini-2.5-flash"
+      temperature: 0.3
+
+# --- Synthesis ---
+synthesis:
+  # Mode: "auto" (decide basandosi su disagreement), "convergent", "divergent"
+  mode: "auto"
+
+  # Modello per sintesi LLM
+  model: "google/gemini-2.5-flash"
+  temperature: 0.3
+
+  # Calibrazione confidenza (alpha-blending con DisagreementNet)
+  confidence:
+    alpha_min: 0.3                      # alpha = max(alpha_min, 1 - sqrt(intensity))
+    # Quando intensity=0 (nessun disaccordo), alpha=1.0 -> confidenza solo da expert
+    # Quando intensity=1 (disaccordo massimo), alpha=0.3 -> 70% peso a disagreement analysis
+
+# --- Default Query ---
+default_query: "Quali sono le conseguenze dell'inadempimento contrattuale secondo l'art. 1453 del codice civile?"

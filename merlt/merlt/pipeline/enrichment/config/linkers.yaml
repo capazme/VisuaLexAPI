@@ -1,0 +1,108 @@
+# Configurazione Linkers per Pipeline Enrichment
+# ===============================================
+# Parametri per entity linking e deduplicazione.
+
+# Configurazione Entity Linker
+entity_linker:
+  # Soglia similarità per considerare due entità come duplicati
+  similarity_threshold: 0.85
+
+  # Strategia merge per entità duplicate
+  # - "prefer_manual": preferisci definizioni da manuali
+  # - "prefer_brocardi": preferisci definizioni da Brocardi
+  # - "merge_all": combina tutte le fonti
+  # - "longest": usa la descrizione più lunga
+  merge_strategy: "merge_all"
+
+  # Priorità fonti (usato con merge_strategy)
+  source_priority:
+    - "manuale"
+    - "brocardi"
+    - "giurisprudenza"
+    - "altro"
+
+  # Cache per lookup nel grafo
+  cache:
+    enabled: true
+    ttl_seconds: 3600  # 1 ora
+    max_size: 10000
+
+# Configurazione Normalizzazione
+normalization:
+  # Rimuovi accenti
+  remove_accents: true
+
+  # Converti in lowercase
+  lowercase: true
+
+  # Sostituisci spazi con underscore (per node_id)
+  space_to_underscore: true
+
+  # Pattern da rimuovere (regex)
+  remove_patterns:
+    - "[^a-z0-9\\s]"  # Caratteri speciali
+
+  # Qualificatori da considerare varianti (non duplicati)
+  # es. "buona fede oggettiva" vs "buona fede soggettiva" sono varianti
+  variant_qualifiers:
+    - oggettiva
+    - soggettiva
+    - contrattuale
+    - extracontrattuale
+    - grave
+    - lieve
+    - assoluta
+    - relativa
+    - totale
+    - parziale
+    - originaria
+    - sopravvenuta
+    - attuale
+    - potenziale
+    - precontrattuale
+    - postcontrattuale
+
+# Configurazione Deduplicazione
+deduplication:
+  # Abilita dedup semantico (usando embeddings)
+  semantic_dedup: false  # Per ora solo normalizzazione
+
+  # Soglia coseno per dedup semantico
+  semantic_threshold: 0.90
+
+  # Numero max candidati da confrontare
+  max_candidates: 100
+
+  # Abilita dedup cross-fonte
+  cross_source: true
+
+# Query Cypher per lookup entità esistenti
+cypher_queries:
+  # Lookup concetto per nome normalizzato
+  find_concept: |
+    MATCH (c:ConcettoGiuridico)
+    WHERE c.nome_normalizzato = $nome_normalizzato
+    RETURN c.node_id as node_id, c.nome as nome, c.fonti as fonti
+    LIMIT 1
+
+  # Lookup principio per nome normalizzato
+  find_principle: |
+    MATCH (p:PrincipioGiuridico)
+    WHERE p.nome_normalizzato = $nome_normalizzato
+    RETURN p.node_id as node_id, p.nome as nome, p.fonti as fonti
+    LIMIT 1
+
+  # Lookup definizione per nome normalizzato
+  find_definition: |
+    MATCH (d:DefinizioneLegale)
+    WHERE d.nome_normalizzato = $nome_normalizzato
+    RETURN d.node_id as node_id, d.nome as nome, d.fonti as fonti
+    LIMIT 1
+
+  # Cerca entità simili (fuzzy)
+  find_similar: |
+    MATCH (e)
+    WHERE (e:ConcettoGiuridico OR e:PrincipioGiuridico OR e:DefinizioneLegale)
+      AND e.nome_normalizzato CONTAINS $partial_name
+    RETURN e.node_id as node_id, e.nome as nome, labels(e) as labels
+    LIMIT $limit

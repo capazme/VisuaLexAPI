@@ -1,0 +1,133 @@
+# Expert Configuration
+# ====================
+#
+# Configurazione per i 4 Expert basati sui canoni ermeneutici delle Preleggi.
+#
+# Mapping teorico:
+# - LiteralExpert → Art. 12, I (significato proprio delle parole)
+# - SystemicExpert → Art. 12, I (connessione) + Art. 14 (storico)
+# - PrinciplesExpert → Art. 12, II (intenzione del legislatore)
+# - PrecedentExpert → Prassi applicativa
+
+# Default model configuration
+defaults:
+  model: "google/gemini-2.5-flash"
+  temperature: 0.3
+  max_tokens: 4096
+
+# Expert-specific configurations
+experts:
+  # ============================================================================
+  # LITERAL EXPERT
+  # Art. 12, comma I: "significato proprio delle parole"
+  # ============================================================================
+  literal:
+    model: "google/gemini-2.5-flash"
+    temperature: 0.2  # Bassa: interpretazione letterale richiede precisione
+    max_tokens: 4096
+
+    # Traversal weights per graph search
+    # Privilegia relazioni che definiscono il contenuto testuale
+    traversal_weights:
+      contiene: 1.0        # Struttura interna articolo
+      disciplina: 0.95     # Relazione norma-concetto
+      definisce: 0.95      # Definizioni legali
+      rinvia: 0.90         # Riferimenti normativi interni
+      modifica: 0.85       # Versioni successive
+      abroga: 0.80         # Abrogazioni
+      cita: 0.75           # Citazioni
+      default: 0.50        # Relazioni non specificate
+
+  # ============================================================================
+  # SYSTEMIC EXPERT
+  # Art. 12, comma I: "connessione delle parole" + Art. 14 (storico)
+  # ============================================================================
+  systemic:
+    model: "google/gemini-2.5-flash"
+    temperature: 0.3
+    max_tokens: 4096
+
+    # Privilegia relazioni sistematiche e storiche
+    traversal_weights:
+      connesso_a: 1.0      # Connessioni sistematiche
+      modifica: 0.95       # Evoluzione storica (fondamentale)
+      abroga: 0.90         # Abrogazioni storiche
+      deroga: 0.90         # Deroghe
+      rinvia: 0.85         # Riferimenti incrociati
+      disciplina: 0.80     # Norme che regolano stessa materia
+      contiene: 0.75       # Struttura
+      default: 0.50
+
+  # ============================================================================
+  # PRINCIPLES EXPERT
+  # Art. 12, comma II: "intenzione del legislatore"
+  # ============================================================================
+  principles:
+    model: "google/gemini-2.5-flash"
+    temperature: 0.4  # Leggermente più alta per ragionamento teleologico
+    max_tokens: 4096
+
+    # Privilegia relazioni con principi e ratio legis
+    traversal_weights:
+      attua: 1.0           # Attuazione di principi
+      esprime: 0.95        # Espressione di principi
+      costituzionale: 0.95 # Norme costituzionali
+      comunitario: 0.90    # Norme EU
+      principio: 0.90      # Principi generali
+      finalita: 0.85       # Finalità della norma
+      ratio: 0.85          # Ratio legis
+      default: 0.50
+
+  # ============================================================================
+  # PRECEDENT EXPERT
+  # Prassi applicativa: giurisprudenza e dottrina
+  # ============================================================================
+  precedent:
+    model: "google/gemini-2.5-flash"
+    temperature: 0.3
+    max_tokens: 4096
+
+    # Privilegia relazioni con fonti giurisprudenziali
+    traversal_weights:
+      interpreta: 1.0      # Sentenze che interpretano norme
+      applica: 0.95        # Applicazione giurisprudenziale
+      cita: 0.90           # Citazioni in sentenze
+      commenta: 0.85       # Commenti dottrinali
+      conferma: 0.85       # Conferme giurisprudenziali
+      supera: 0.80         # Overruling
+      disciplina: 0.75     # Norme di riferimento
+      default: 0.50
+
+# Gating Network weights (come gli expert contribuiscono alla risposta finale)
+gating:
+  # Default weights per tipo di query
+  query_type_weights:
+    definitional:
+      literal: 0.6
+      systemic: 0.2
+      principles: 0.1
+      precedent: 0.1
+
+    interpretive:
+      literal: 0.3
+      systemic: 0.25
+      principles: 0.25
+      precedent: 0.2
+
+    procedural:
+      literal: 0.4
+      systemic: 0.2
+      principles: 0.1
+      precedent: 0.3
+
+    constitutional:
+      literal: 0.2
+      systemic: 0.2
+      principles: 0.5
+      precedent: 0.1
+
+    default:
+      literal: 0.35
+      systemic: 0.25
+      principles: 0.20
+      precedent: 0.20
