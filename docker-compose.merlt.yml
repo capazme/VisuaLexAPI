@@ -90,10 +90,29 @@ services:
       merlt-qdrant:
         condition: service_healthy
     environment:
+      # Postgres — generic DATABASE_URL + dedicated RLCF/ENRICHMENT vars
+      # MERL-T code reads ENRICHMENT_DB_* and RLCF_DATABASE_URL explicitly
+      # (defaults are localhost:5433/rlcf_dev which fail inside container network).
       DATABASE_URL: "postgresql://${MERLT_POSTGRES_USER:-merlt}:${MERLT_POSTGRES_PASSWORD:-merlt}@merlt-postgres:5432/${MERLT_POSTGRES_DB:-merlt}"
+      ENRICHMENT_DATABASE_URL: "postgresql+asyncpg://${MERLT_POSTGRES_USER:-merlt}:${MERLT_POSTGRES_PASSWORD:-merlt}@merlt-postgres:5432/${MERLT_POSTGRES_DB:-merlt}"
+      ENRICHMENT_DB_HOST: "merlt-postgres"
+      ENRICHMENT_DB_PORT: "5432"
+      ENRICHMENT_DB_NAME: "${MERLT_POSTGRES_DB:-merlt}"
+      ENRICHMENT_DB_USER: "${MERLT_POSTGRES_USER:-merlt}"
+      ENRICHMENT_DB_PASSWORD: "${MERLT_POSTGRES_PASSWORD:-merlt}"
+      RLCF_DATABASE_URL: "postgresql://${MERLT_POSTGRES_USER:-merlt}:${MERLT_POSTGRES_PASSWORD:-merlt}@merlt-postgres:5432/${MERLT_POSTGRES_DB:-merlt}"
+      RLCF_ASYNC_DATABASE_URL: "postgresql+asyncpg://${MERLT_POSTGRES_USER:-merlt}:${MERLT_POSTGRES_PASSWORD:-merlt}@merlt-postgres:5432/${MERLT_POSTGRES_DB:-merlt}"
+
+      # Redis
       REDIS_URL: "redis://merlt-redis:6379/0"
+      REDIS_HOST: "merlt-redis"
+      REDIS_PORT: "6379"
+
+      # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"
       FALKORDB_PORT: "6379"
+
+      # Qdrant
       QDRANT_HOST: "merlt-qdrant"
       QDRANT_PORT: "6333"
     ports:
