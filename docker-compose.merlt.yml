@@ -1,3 +1,23 @@
+# MERL-T sidecar — dipendenze per VisuaLex Slice 1
+#
+# Servizi:
+#   merlt-postgres   — Postgres dedicato a MERL-T (QA traces, RLCF, pending entities)
+#   merlt-redis      — Redis cache MERL-T
+#   merlt-falkordb   — Knowledge graph giuridico
+#   merlt-qdrant     — Vector store (embeddings)
+#   merlt-api        — FastAPI (profile opzionale 'api-in-docker';
+#                     default è gestito da start.sh con uvicorn locale per hot reload)
+#
+# Avvio default (dev, hot reload):
+#   docker compose -f docker-compose.merlt.yml up -d
+#   → avvia 4 dipendenze; merlt-api parte via start.sh con uvicorn locale
+#
+# Avvio production-like (API in container):
+#   docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d
+#   → avvia tutti i 5 servizi
+#
+# Env vars cambiabili: vedi backend/.env.example sezione MERLT_*
+
 services:
   merlt-postgres:
     image: postgres:16-alpine
@@ -53,6 +73,38 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  merlt-api:
+    build:
+      context: ./merlt
+      dockerfile: Dockerfile
+    container_name: visualex-merlt-api
+    profiles: ["api-in-docker"]
+    depends_on:
+      merlt-postgres:
+        condition: service_healthy
+      merlt-redis:
+        condition: service_healthy
+      merlt-falkordb:
+        condition: service_healthy
+      merlt-qdrant:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://${MERLT_POSTGRES_USER:-merlt}:${MERLT_POSTGRES_PASSWORD:-merlt}@merlt-postgres:5432/${MERLT_POSTGRES_DB:-merlt}"
+      REDIS_URL: "redis://merlt-redis:6379/0"
+      FALKORDB_HOST: "merlt-falkordb"
+      FALKORDB_PORT: "6379"
+      QDRANT_HOST: "merlt-qdrant"
+      QDRANT_PORT: "6333"
+    ports:
+      - "${MERLT_API_PORT:-8000}:8000"
+    command: ["uvicorn", "merlt.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   merlt_postgres_data:

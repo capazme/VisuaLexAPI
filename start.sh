@@ -17,8 +17,9 @@ PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 MERLT_ENABLED="${MERLT_ENABLED:-false}"
 MERLT_COMPOSE_ENABLED="${MERLT_COMPOSE_ENABLED:-false}"
 MERLT_COMPOSE_FILE="${MERLT_COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.merlt.yml}"
-MERLT_ROOT="${MERLT_ROOT:-/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt}"
+MERLT_ROOT="${MERLT_ROOT:-$PROJECT_ROOT/merlt}"
 MERLT_PORT="${MERLT_PORT:-8000}"
+MERLT_HEALTH_TIMEOUT="${MERLT_HEALTH_TIMEOUT:-60}"
 MERLT_PYTHON="${MERLT_PYTHON:-python}"
 MERLT_PID=""
 
@@ -145,6 +146,23 @@ if [ "$MERLT_ENABLED" = "true" ]; then
     "$MERLT_PYTHON" -m uvicorn merlt.app:app --reload --port "$MERLT_PORT" &
     MERLT_PID=$!
     echo -e "${GREEN}MERLT sidecar started (PID: $MERLT_PID)${NC}"
+    cd "$PROJECT_ROOT"
+
+    # Health gate: aspetta che MERL-T risponda /health prima di proseguire
+    echo -e "${YELLOW}Waiting for MERLT /health (timeout ${MERLT_HEALTH_TIMEOUT}s)...${NC}"
+    elapsed=0
+    until curl -fsS "http://localhost:$MERLT_PORT/health" >/dev/null 2>&1; do
+        if [ "$elapsed" -ge "$MERLT_HEALTH_TIMEOUT" ]; then
+            echo -e "${RED}MERLT health gate FAILED after ${MERLT_HEALTH_TIMEOUT}s${NC}"
+            echo -e "${RED}Check logs above. Continuing anyway (services may not be ready).${NC}"
+            break
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+    done
+    if [ "$elapsed" -lt "$MERLT_HEALTH_TIMEOUT" ]; then
+        echo -e "${GREEN}MERLT /health OK after ${elapsed}s${NC}"
+    fi
 fi
 
 # Wait for services
