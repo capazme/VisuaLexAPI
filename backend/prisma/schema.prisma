@@ -36,8 +36,9 @@ model User {
   dossiers      Dossier[]
   feedbacks     Feedback[]
   searchHistory SearchHistory[]
-  merltPreference MerltUserPreference?
+  merltPreference    MerltUserPreference?
   merltConsentAudits MerltConsentAudit[]
+  merltAuthorityCache MerltUserAuthorityCache?
 
   // Personal Environments (user-owned, not published)
   environments Environment[]
@@ -96,6 +97,24 @@ model MerltConsentAudit {
 
   @@index([userId, createdAt])
   @@map("merlt_consent_audits")
+}
+
+// MERL-T user authority cache (synced from MERL-T backend via HTTP).
+// Reduces network round-trips on every event: BFF reads authority
+// locally, MERL-T remains source of truth and the cache is refreshed
+// periodically or on-demand (MERLT-1.5).
+model MerltUserAuthorityCache {
+  userId             String   @id @map("user_id")
+  authorityScore     Float    @map("authority_score")
+  baselineQual       String   @db.VarChar(50) @map("baseline_qual")
+  trackRecord        Float    @default(0) @map("track_record")
+  performance        Float    @default(0)
+  totalContributions Int      @default(0) @map("total_contributions")
+  syncedAt           DateTime @default(now()) @map("synced_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("merlt_user_authority_cache")
 }
 
 // ============================================
