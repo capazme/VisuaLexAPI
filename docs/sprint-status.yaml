@@ -51,14 +51,18 @@ sprints:
     sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
     capacity_points: 30
     committed_points: 25
-    status: "not_started"
+    completed_points: 5
+    status: "in_progress"
+    started_on: "2026-05-22"
     stories:
       - story_id: "MERLT-1.0"
         title: "Runtime baseline & MERL-T copy"
         points: 5
         priority: "P0"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-22"
         depends_on: []
+        notes: "Selective copy (5.8 MB vs 2.3 GB) + 5 services in docker-compose + MERLT_API_IN_DOCKER flag + health gate. All containers healthy. 4 fixes applied during smoke: missing tiktoken (resolved via docker profile), 3 sub-packages erroneously excluded by rsync (recovered), DB env vars not passed to container (added ENRICHMENT_*+RLCF_DATABASE_URL)."
       - story_id: "MERLT-1.1"
         title: "Cleanup commit 81be277"
         points: 2
