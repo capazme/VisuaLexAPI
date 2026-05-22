@@ -19,6 +19,7 @@ import environmentRoutes from './routes/environments';
 import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
+import merltRoutes from './routes/merlt';
 
 const app = express();
 
@@ -81,8 +82,7 @@ app.use('/api', environmentRoutes);
 app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
 app.use('/api', notificationRoutes);
-// MERL-T routes removed in MERLT-1.1; will be re-introduced by MERLT-1.4/1.5
-// (routes/merlt/{consent,events,profile,health}.ts under new folder structure).
+app.use('/api', merltRoutes);
 
 // 404 handler
 app.use((_req, res) => {

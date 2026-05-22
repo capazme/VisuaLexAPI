@@ -20,6 +20,7 @@ beforeEach(async () => {
     TRUNCATE TABLE
       "merlt_consent_audits",
       "merlt_user_preferences",
+      "merlt_user_authority_cache",
       "suggestion_items",
       "environment_suggestions",
       "shared_environment_versions",
