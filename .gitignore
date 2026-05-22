@@ -9,7 +9,7 @@ download
 
 dist/*
 .claude
-data
+/data
 
 # MERL-T runtime dirs (codice in merlt/ è versionato; runtime no)
 merlt/uploads/
