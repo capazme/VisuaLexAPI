@@ -68,6 +68,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Routes
+// IMPORTANT: merltRoutes MUST be mounted BEFORE the catch-all auth routers
+// below. Those use `router.use(authenticate)` with no path prefix, so
+// Express applies authenticate to ANY /api/* request entering them.
+// Mount-order (not specificity) wins in Express; merltRoutes/{health,...}
+// must claim /api/merlt/* first.
+app.use('/api/merlt', merltRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);
@@ -82,7 +88,6 @@ app.use('/api', environmentRoutes);
 app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
 app.use('/api', notificationRoutes);
-app.use('/api', merltRoutes);
 
 // 404 handler
 app.use((_req, res) => {

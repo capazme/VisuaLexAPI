@@ -24,6 +24,7 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { PluginSlot } from '../../../plugins/registry';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
+import { useArticleViewedTracker } from '../../../features/merlt/tracking/useArticleViewedTracker';
 import type { Annotation } from '../../../types';
 
 interface ArticleTabContentProps {
@@ -97,6 +98,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // not persisted across sessions.
     const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
+
+    // MERL-T article:viewed RLCF tracker (Slice 1, MERLT-1.5).
+    // Direct hook call here is temporary — MERLT-1.6 will move this behind
+    // the plugin host so ArticleTabContent no longer imports MERL-T directly.
+    useArticleViewedTracker({
+        articleUrn: data.norma_data.urn,
+        containerRef: contentRef,
+    });
     // When the user picks "Aggiungi nota" from the selection popup the
     // selected span becomes the note's anchor. Kept in state so the panel
     // can render a chip ("Ancorata a: …") until the user submits.

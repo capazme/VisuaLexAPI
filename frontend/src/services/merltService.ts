@@ -174,6 +174,34 @@ export async function trackMerltInteraction(event: MerltInteractionEvent): Promi
     });
 }
 
+// ----------------------------------------------------------------------------
+// Slice 1 event-capture surface (MERLT-1.5+)
+//
+// These endpoints live under /api/merlt/events/* in the new BFF folder
+// structure and follow the contract documented in design doc §4.
+// Fire-and-forget on the client side; BFF logs dead-letters when MERL-T
+// is unavailable.
+// ----------------------------------------------------------------------------
+
+export interface ArticleViewedEventInput {
+    articleUrn: string;
+    normaVisitataId?: string;
+    dwellMs: number;
+    scrollMaxPct: number;
+    sessionId: string;
+}
+
+export interface ArticleViewedEventResponse {
+    trace_id: string | null;
+}
+
+/** POST /api/merlt/events/article-viewed (MERLT-1.5 vertical slice). */
+export async function sendArticleViewedEvent(
+    input: ArticleViewedEventInput
+): Promise<ArticleViewedEventResponse> {
+    return postMerlt<ArticleViewedEventResponse>('/merlt/events/article-viewed', input);
+}
+
 export async function getMerltFeedbackMappings(): Promise<Record<string, unknown>> {
     return getMerlt<Record<string, unknown>>('/merlt/feedback/mappings');
 }

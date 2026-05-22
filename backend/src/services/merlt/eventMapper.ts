@@ -26,15 +26,23 @@ export interface UserContext {
 }
 
 /**
- * Normalize URN article-id suffix to the dash-form (`art1-bis`) regardless of
- * the source spelling (`art1 bis`, `art1bis`). The MERL-T graph stores URNs in
- * the dash-form (commit 81be277 baseline + Normattiva canonical form), so we
- * unify upstream of the wire.
+ * Normalize URN article-id ordinal suffix to the dash-form (`-bis`,
+ * `-ter`, etc.) regardless of source spelling: ` bis`, `_bis`, `bis`
+ * (no separator) — and irrespective of whether the article number is
+ * preceded by `~art` (Normattiva URN format) or by `;` (compact URN).
+ *
+ * The MERL-T graph stores URNs in the dash-form (Normattiva canonical
+ * form), so we unify upstream of the wire.
+ *
+ * Examples:
+ *  urn:nir~art1 bis      → urn:nir~art1-bis
+ *  urn:nir~art1bis       → urn:nir~art1-bis
+ *  urn:nir:c.c.:1942;2043 bis → urn:nir:c.c.:1942;2043-bis
+ *  urn:foo:bis~art2      → urn:foo:bis~art2  (no leading digit, no change)
  */
 export function normalizeArticleUrn(urn: string): string {
-  // Match `~art<num>(<sep>?)(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)`
   return urn.replace(
-    /(~art\d+)[\s_]?(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)\b/gi,
+    /(\d+)[\s_]?(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)\b/gi,
     (_, head, suffix) => `${head}-${suffix.toLowerCase()}`
   );
 }

@@ -22,4 +22,4 @@ merlt/merlt.egg-info/
 .env.*
 !.env.example
 !backend/.env.test
-*.env.local
+*.env.localcoverage/
