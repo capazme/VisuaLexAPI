@@ -72,19 +72,19 @@ merlt/
    git checkout -b merlt-upstream-sync-YYYY-MM-DD
    ```
 
-2. Rsync selettivo (stesse esclusioni dell'import originale):
+2. Rsync selettivo. **IMPORTANTE**: usa pattern con `/` davanti per ancorare al root, altrimenti rsync matcha ovunque (es. `data/` matcherebbe anche `merlt/disagreement/data/` che contiene codice Python!). Fix scoperto in commit `ef2bd25` (Story MERLT-1.0):
    ```bash
    rsync -a --dry-run \
-     --exclude='data/' \
-     --exclude='.venv/' \
-     --exclude='models/' \
-     --exclude='tests/' \
-     --exclude='examples/' \
-     --exclude='exports/' \
+     --exclude='/data/' \
+     --exclude='/.venv/' \
+     --exclude='/models/' \
+     --exclude='/tests/' \
+     --exclude='/examples/' \
+     --exclude='/exports/' \
+     --exclude='/merlt.egg-info/' \
      --exclude='docs/experiments/' \
      --exclude='docs/archive/' \
      --exclude='docs/backup_*/' \
-     --exclude='merlt.egg-info/' \
      --exclude='.pytest_cache/' \
      --exclude='.ruff_cache/' \
      --exclude='.benchmarks/' \
@@ -100,6 +100,10 @@ merlt/
      ./merlt/
    ```
    (rimuovi `--dry-run` per applicare)
+
+   **Pattern senza `/` davanti** (es. `__pycache__/`, `*.pyc`) sono globali e devono restare così — vogliamo escluderli ovunque appaiano.
+
+   **Pattern con `/` davanti** sono ancorati al root della source rsync (cioè a `ALIS_CORE/merlt/`). Vanno usati per escludere SOLO il top-level e non i sub-package omonimi.
 
 3. Review del diff:
    ```bash
