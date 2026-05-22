@@ -16,6 +16,7 @@ NC='\033[0m'
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 MERLT_ENABLED="${MERLT_ENABLED:-false}"
 MERLT_COMPOSE_ENABLED="${MERLT_COMPOSE_ENABLED:-false}"
+MERLT_API_IN_DOCKER="${MERLT_API_IN_DOCKER:-false}"
 MERLT_COMPOSE_FILE="${MERLT_COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.merlt.yml}"
 MERLT_ROOT="${MERLT_ROOT:-$PROJECT_ROOT/merlt}"
 MERLT_PORT="${MERLT_PORT:-8000}"
@@ -32,7 +33,7 @@ cleanup() {
     echo -e "\n${YELLOW}Shutting down services...${NC}"
     kill $API_PID $BACKEND_PID $FRONTEND_PID ${MERLT_PID:-} 2>/dev/null || true
     if [ "$MERLT_COMPOSE_ENABLED" = "true" ]; then
-        docker compose -f "$MERLT_COMPOSE_FILE" down >/dev/null 2>&1 || true
+        docker compose -f "$MERLT_COMPOSE_FILE" --profile api-in-docker down >/dev/null 2>&1 || true
     fi
     echo -e "${GREEN}All services stopped.${NC}"
     exit 0
@@ -122,8 +123,13 @@ echo -e "${GREEN}Frontend started (PID: $FRONTEND_PID)${NC}"
 # 4. Start MERLT sidecar (optional - port 8000 by default)
 if [ "$MERLT_ENABLED" = "true" ]; then
     if [ "$MERLT_COMPOSE_ENABLED" = "true" ]; then
-        echo -e "\n${YELLOW}[4/5] Starting MERLT dependencies...${NC}"
-        docker compose -f "$MERLT_COMPOSE_FILE" up -d
+        if [ "$MERLT_API_IN_DOCKER" = "true" ]; then
+            echo -e "\n${YELLOW}[4/4] Starting MERLT stack (deps + API in Docker)...${NC}"
+            docker compose -f "$MERLT_COMPOSE_FILE" --profile api-in-docker up -d
+        else
+            echo -e "\n${YELLOW}[4/5] Starting MERLT dependencies (deps in Docker, API local)...${NC}"
+            docker compose -f "$MERLT_COMPOSE_FILE" up -d
+        fi
         MERLT_DB_USER="${MERLT_POSTGRES_USER:-merlt}"
         MERLT_DB_PASSWORD="${MERLT_POSTGRES_PASSWORD:-merlt}"
         MERLT_DB_NAME="${MERLT_POSTGRES_DB:-merlt}"
@@ -141,12 +147,19 @@ if [ "$MERLT_ENABLED" = "true" ]; then
         export QDRANT_HOST="${MERLT_QDRANT_HOST:-localhost}"
         export QDRANT_PORT="${MERLT_QDRANT_PORT:-6343}"
     fi
-    echo -e "\n${YELLOW}[5/5] Starting MERLT sidecar (port $MERLT_PORT)...${NC}"
-    cd "$MERLT_ROOT"
-    "$MERLT_PYTHON" -m uvicorn merlt.app:app --reload --port "$MERLT_PORT" &
-    MERLT_PID=$!
-    echo -e "${GREEN}MERLT sidecar started (PID: $MERLT_PID)${NC}"
-    cd "$PROJECT_ROOT"
+
+    if [ "$MERLT_API_IN_DOCKER" = "true" ]; then
+        echo -e "${BLUE}MERLT API runs in Docker container (no local uvicorn)${NC}"
+    else
+        echo -e "\n${YELLOW}[5/5] Starting MERLT sidecar locally (port $MERLT_PORT)...${NC}"
+        echo -e "${BLUE}  NOTE: requires MERL-T deps installed in MERLT_PYTHON env${NC}"
+        echo -e "${BLUE}  If ImportError: set MERLT_API_IN_DOCKER=true to use Docker container${NC}"
+        cd "$MERLT_ROOT"
+        "$MERLT_PYTHON" -m uvicorn merlt.app:app --reload --port "$MERLT_PORT" &
+        MERLT_PID=$!
+        echo -e "${GREEN}MERLT sidecar started (PID: $MERLT_PID)${NC}"
+        cd "$PROJECT_ROOT"
+    fi
 
     # Health gate: aspetta che MERL-T risponda /health prima di proseguire
     echo -e "${YELLOW}Waiting for MERLT /health (timeout ${MERLT_HEALTH_TIMEOUT}s)...${NC}"
