@@ -12,6 +12,7 @@
     "prisma:studio": "prisma studio",
     "prisma:reset": "prisma migrate reset",
     "db:seed": "tsx src/utils/seed.ts",
+    "db:reset-admin": "tsx src/utils/reset-admin-password.ts",
     "test": "dotenv -e .env.test -- vitest run",
     "test:watch": "dotenv -e .env.test -- vitest"
   },
