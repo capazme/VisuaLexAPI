@@ -51,7 +51,7 @@ sprints:
     sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
     capacity_points: 30
     committed_points: 25
-    completed_points: 10
+    completed_points: 15
     status: "in_progress"
     started_on: "2026-05-22"
     stories:
@@ -83,8 +83,10 @@ sprints:
         title: "Zod schemas + eventMapper + merltClient"
         points: 5
         priority: "P0"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-22"
         depends_on: ["MERLT-1.0", "MERLT-1.2"]
+        notes: "TDD-driven. 4 test files, 76 tests verdi, coverage 94.59% stmt / 90.9% funcs / 98.5% lines on services+schemas/merlt/. New deps: nock, @vitest/coverage-v8. URN normalization (-bis/-ter/etc.) anti-regression gotcha #9 covered."
       - story_id: "MERLT-1.4"
         title: "Consent API + consentGuard middleware"
         points: 5
