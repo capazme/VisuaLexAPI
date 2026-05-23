@@ -17,6 +17,7 @@ import { useTour } from '../../../hooks/useTour';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
+import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion } from '../../../types';
 
 type TabType = 'explore' | 'my' | 'suggestions';
@@ -219,6 +220,18 @@ export function BulletinBoardPage() {
     try {
       await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, itemId);
       await fetchSuggestions();
+      // MERLT-1.10: forum_suggestion_accepted — target = the suggester
+      // (per docs/merlt-forum-authoring-decision.md, attribution policy B).
+      // SuggestionItem.payload may carry a per-item originalAuthorId chain,
+      // but for Slice 1 the suggester is the authoritative attribution.
+      publishMerltEvent({
+        interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
+        metadata: {
+          suggestion_id: reviewingSuggestion.id,
+          shared_env_id: reviewingSuggestion.id,
+          original_author_id: reviewingSuggestion.suggester?.id ?? null,
+        },
+      });
       setToast({ type: 'success', message: 'Item preso.' });
       return { kind: 'ok' };
     } catch (err: unknown) {
@@ -239,6 +252,15 @@ export function BulletinBoardPage() {
     try {
       await sharedEnvironmentService.declineSuggestionItem(reviewingSuggestion.id, itemId, reviewNote);
       await fetchSuggestions();
+      publishMerltEvent({
+        interaction_type: MERLT_EVENT_TYPES.forumSuggestionDeclined,
+        metadata: {
+          suggestion_id: reviewingSuggestion.id,
+          shared_env_id: reviewingSuggestion.id,
+          original_author_id: reviewingSuggestion.suggester?.id ?? null,
+          reason: reviewNote ?? null,
+        },
+      });
       setToast({ type: 'success', message: 'Item rifiutato.' });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Errore';
@@ -286,6 +308,18 @@ export function BulletinBoardPage() {
             : env
         )
       );
+      // MERLT-1.10: emit forum_like only on transition to liked=true
+      // (unliking is not an authority signal).
+      if (result.liked) {
+        const env = environments.find(e => e.id === id);
+        publishMerltEvent({
+          interaction_type: MERLT_EVENT_TYPES.forumLike,
+          metadata: {
+            shared_env_id: id,
+            original_author_id: env?.user?.id ?? null,
+          },
+        });
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore nel mettere mi piace';
       showToast(message, 'error');

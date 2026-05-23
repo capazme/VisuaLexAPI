@@ -25,6 +25,11 @@ export const MERLT_EVENT_TYPES = {
     dossierItemAdded: 'dossier_item_add',
     dossierExportTraining: 'dossier_export_training',
     citationClicked: 'citation_click',
+    // MERLT-1.10: forum community signals
+    forumLike: 'forum_like',
+    forumDownload: 'forum_download',
+    forumSuggestionAccepted: 'forum_suggestion_accepted',
+    forumSuggestionDeclined: 'forum_suggestion_declined',
     issueReported: 'issue_reported',
     issueVoted: 'issue_voted',
     issueViewed: 'issue_viewed',

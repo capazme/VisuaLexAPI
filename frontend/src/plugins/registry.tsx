@@ -1,4 +1,5 @@
 import { ArticleMerltSlot } from '../features/merlt/ArticleMerltSlot';
+import { GlobalMerltSlot } from '../features/merlt/GlobalMerltSlot';
 import type { PluginSlotName, SlotComponent } from './types';
 
 /**
@@ -18,6 +19,13 @@ const slotComponents: SlotComponent<Record<string, unknown>>[] = [
         pluginId: 'visualex-merlt',
         slot: 'article_content_after',
         component: ArticleMerltSlot as unknown as React.ComponentType<Record<string, unknown>>,
+        requiredFlag: 'VITE_FEATURE_MERLT',
+    },
+    {
+        id: 'merlt-global-tracker',
+        pluginId: 'visualex-merlt',
+        slot: 'global',
+        component: GlobalMerltSlot as unknown as React.ComponentType<Record<string, unknown>>,
         requiredFlag: 'VITE_FEATURE_MERLT',
     },
 ];

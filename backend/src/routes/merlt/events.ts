@@ -7,12 +7,14 @@ import {
   highlightAnnotationRequestSchema,
   dossierBookmarkRequestSchema,
   citationClickedRequestSchema,
+  forumSignalRequestSchema,
 } from '../../schemas/merlt/events';
 import {
   toMerltArticleViewed,
   toMerltHighlightAnnotation,
   toMerltDossierBookmark,
   toMerltCitationClicked,
+  toMerltForumSignal,
 } from '../../services/merlt/eventMapper';
 import {
   createMerltClient,
@@ -267,6 +269,65 @@ router.post('/events/citation-clicked', async (req: Request, res: Response): Pro
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('citation-clicked', req.user.id, merltPayload, err);
+      res.status(503).json({ detail: 'merlt_unavailable' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * POST /api/merlt/events/forum-signal  (MERLT-1.10)
+ *
+ * Community signals from the Forum (ex Bulletin Board): like, download,
+ * suggestion accept/decline. MERL-T `type` is `forum:<action>`.
+ *
+ * `target_author_id` attribution policy (per docs/merlt-forum-authoring-decision.md):
+ *   - like / download   → originalAuthorId of the SharedEnvironment
+ *   - suggestion_*      → originalAuthorId of the SuggestionItem
+ * Both arrive via payload.originalAuthorId — the route does not decide,
+ * the call-site does.
+ */
+router.post('/events/forum-signal', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+
+  const parsed = forumSignalRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+
+  let userAuthority: number | undefined;
+  let baselineQual: string | undefined;
+  try {
+    const cached = await getOrSyncAuthority(req.user.id, client());
+    if (cached) {
+      userAuthority = cached.authorityScore;
+      baselineQual = cached.baselineQual;
+    }
+  } catch {
+    // opportunistic
+  }
+
+  const merltPayload = toMerltForumSignal(parsed.data, {
+    userId: req.user.id,
+    authorityScore: userAuthority,
+    baselineQual,
+  });
+
+  try {
+    const result = await client().sendEvent(merltPayload);
+    res.status(202).json({ received: result.received, timestamp: result.timestamp });
+  } catch (err) {
+    if (err instanceof MerltBadRequestError) {
+      res.status(err.status ?? 400).json({ detail: 'merlt_rejected', upstream: err.body });
+      return;
+    }
+    if (err instanceof MerltClientError) {
+      logDeadLetter('forum-signal', req.user.id, merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }

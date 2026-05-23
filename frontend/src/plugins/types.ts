@@ -17,7 +17,11 @@ export type PluginSlotName =
     | 'profile_tabs'
     | 'admin_dashboard'
     | 'dossier_actions'
-    | 'bulletin_community';
+    | 'bulletin_community'
+    // 'global' is mounted once in Layout — used for app-wide side-effect
+    // components (e.g. forum-signal tracker) that listen to the merltEventBus
+    // independent of any specific article or page.
+    | 'global';
 
 /**
  * A slot registration entry.

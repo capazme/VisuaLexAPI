@@ -546,6 +546,97 @@ describe('POST /api/merlt/events/citation-clicked (MERLT-1.9)', () => {
   });
 });
 
+describe('POST /api/merlt/events/forum-signal (MERLT-1.10)', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('events-forum');
+  });
+
+  it.each([
+    ['like', 'forum:like'],
+    ['download', 'forum:download'],
+    ['suggestion_accepted', 'forum:suggestion_accepted'],
+    ['suggestion_declined', 'forum:suggestion_declined'],
+  ] as const)('forwards %s action as type=%s', async (action, expectedType) => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const ev = b.events[0];
+        const d = ev.data as Record<string, unknown>;
+        return (
+          ev.type === expectedType &&
+          d.shared_env_id === '00000000-0000-0000-0000-00000000face' &&
+          d.target_author_id === '00000000-0000-0000-0000-00000000fade'
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't-forum' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/forum-signal')
+      .set(authHeader(user))
+      .send({
+        action,
+        sharedEnvId: '00000000-0000-0000-0000-00000000face',
+        originalAuthorId: '00000000-0000-0000-0000-00000000fade',
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('accepts null originalAuthorId (deleted author)', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const d = b.events[0].data as Record<string, unknown>;
+        return d.target_author_id === null;
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/forum-signal')
+      .set(authHeader(user))
+      .send({
+        action: 'like',
+        sharedEnvId: '00000000-0000-0000-0000-00000000face',
+        originalAuthorId: null,
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('rejects without consent (403)', async () => {
+    const res = await request(app)
+      .post('/api/merlt/events/forum-signal')
+      .set(authHeader(user))
+      .send({
+        action: 'like',
+        sharedEnvId: '00000000-0000-0000-0000-00000000face',
+        originalAuthorId: null,
+      });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 on invalid action', async () => {
+    await grantConsent(user, 'basic');
+    const res = await request(app)
+      .post('/api/merlt/events/forum-signal')
+      .set(authHeader(user))
+      .send({
+        action: 'comment',
+        sharedEnvId: '00000000-0000-0000-0000-00000000face',
+        originalAuthorId: null,
+      });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('GET /api/merlt/health (MERLT-1.5)', () => {
   it('returns 200 with merlt=reachable when MERL-T responds', async () => {
     nock(TEST_MERLT_BASE).get('/health').reply(200, { status: 'ok' });

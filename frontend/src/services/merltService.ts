@@ -266,6 +266,25 @@ export async function sendCitationClickedEvent(
     return postMerlt<CitationClickedEventResponse>('/merlt/events/citation-clicked', input);
 }
 
+// ----------------------------------------------------------------------------
+// MERLT-1.10 — forum signals
+// ----------------------------------------------------------------------------
+
+export interface ForumSignalEventInput {
+    action: 'like' | 'download' | 'suggestion_accepted' | 'suggestion_declined';
+    sharedEnvId: string;
+    originalAuthorId: string | null;
+}
+
+export type ForumSignalEventResponse = ArticleViewedEventResponse;
+
+/** POST /api/merlt/events/forum-signal (MERLT-1.10). */
+export async function sendForumSignalEvent(
+    input: ForumSignalEventInput
+): Promise<ForumSignalEventResponse> {
+    return postMerlt<ForumSignalEventResponse>('/merlt/events/forum-signal', input);
+}
+
 export async function getMerltFeedbackMappings(): Promise<Record<string, unknown>> {
     return getMerlt<Record<string, unknown>>('/merlt/feedback/mappings');
 }

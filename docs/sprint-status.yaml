@@ -112,7 +112,7 @@ sprints:
     sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
     capacity_points: 30
     committed_points: 17
-    completed_points: 11
+    completed_points: 14
     status: "in_progress"
     started_on: "2026-05-23"
     stories:
@@ -155,9 +155,10 @@ sprints:
         title: "Event forum (like / download / suggestion_decided)"
         points: 3
         priority: "P1"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-23"
         depends_on: ["MERLT-1.5", "MERLT-1.6"]
-        note: "NO ralph-loop: requires target_author_id decision"
+        note: "Attribution decision (option B per docs/merlt-forum-authoring-decision.md): target_author_id = suggester for suggestion_*, env owner for like/download. New plugin slot 'global' mounted in Layout for cross-route bus subscribers (useForumSignalTracker). 5 backend integration tests + 8 frontend hook tests. Emissions added to BulletinBoardPage (handleLike/handleTakeItem/handleDeclineItem) and ImportEnvironmentModal (handleImport)."
       - story_id: "MERLT-1.11"
         title: "Doc finali + smoke E2E completo"
         points: 2

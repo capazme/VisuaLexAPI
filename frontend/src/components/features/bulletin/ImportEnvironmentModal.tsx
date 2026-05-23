@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Download, FileText, Check, AlertCircle, Layers, StickyNote, Highlighter } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
+import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, Environment } from '../../../types';
 
 interface ImportEnvironmentModalProps {
@@ -44,6 +45,15 @@ export function ImportEnvironmentModal({
     try {
       // Download the content (records the download on the server)
       const response = await sharedEnvironmentService.download(sharedEnvironment.id);
+
+      // MERLT-1.10: emit forum_download (RLCF authority signal).
+      publishMerltEvent({
+        interaction_type: MERLT_EVENT_TYPES.forumDownload,
+        metadata: {
+          shared_env_id: sharedEnvironment.id,
+          original_author_id: sharedEnvironment.user?.id ?? null,
+        },
+      });
 
       // Filter content based on user choices
       const content = response.content;

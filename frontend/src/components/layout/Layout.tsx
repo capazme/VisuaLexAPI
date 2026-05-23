@@ -16,6 +16,7 @@ import { GlobalSearch } from '../features/search/GlobalSearch';
 import { CompareView } from '../features/compare/CompareView';
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
+import { PluginSlot } from '../../plugins/registry';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -222,6 +223,11 @@ export function Layout() {
 
       {/* Global Undo Toast Container */}
       <UndoToastContainer />
+
+      {/* MERL-T global plugin slot — Layout-level side-effect mounts
+          (forum-signal tracker, etc.). Renders null but keeps subscribers
+          active across all protected routes. */}
+      <PluginSlot slot="global" props={{}} />
 
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
