@@ -79,7 +79,10 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
 
   try {
     const result = await client().sendEvent(merltPayload);
-    res.status(202).json({ trace_id: result.trace_id ?? null });
+    // MERL-T's tracking endpoint returns { received, timestamp } — there is
+    // no per-event trace_id upstream (events are buffered server-side).
+    // We surface both so the client can log without inventing identifiers.
+    res.status(202).json({ received: result.received, timestamp: result.timestamp });
   } catch (err) {
     if (err instanceof MerltBadRequestError) {
       res.status(err.status ?? 400).json({ detail: 'merlt_rejected', upstream: err.body });

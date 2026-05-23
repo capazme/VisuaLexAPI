@@ -47,9 +47,14 @@ export function normalizeArticleUrn(urn: string): string {
   );
 }
 
-function baseEvent(eventType: string, user: UserContext): MerltTrackingEvent {
+/**
+ * Build the common header fields. MERL-T's tracking model wraps
+ * { type, data, timestamp }; the eventMapper produces a flat object
+ * with `type` lifted out, and merltClient.sendEvent() does the wrap.
+ */
+function baseEvent(type: string, user: UserContext): MerltTrackingEvent {
   const out: MerltTrackingEvent = {
-    event_type: eventType,
+    type,
     user_id: user.userId,
   };
   if (user.authorityScore !== undefined) out.user_authority = user.authorityScore;
@@ -63,7 +68,7 @@ export function toMerltArticleViewed(
   user: UserContext
 ): MerltTrackingEvent {
   return {
-    ...baseEvent('article_viewed', user),
+    ...baseEvent('article:viewed', user),
     article_urn: normalizeArticleUrn(payload.articleUrn),
     dwell_ms: payload.dwellMs,
     scroll_max_pct: payload.scrollMaxPct,
@@ -78,7 +83,7 @@ export function toMerltHighlightAnnotation(
   user: UserContext
 ): MerltTrackingEvent {
   return {
-    ...baseEvent(payload.kind === 'highlight' ? 'highlight' : 'annotation', user),
+    ...baseEvent(payload.kind === 'highlight' ? 'highlight:created' : 'annotation:created', user),
     entity_text: payload.anchorText,
     article_urn: normalizeArticleUrn(payload.articleUrn),
     start_offset: payload.startOffset,
@@ -93,8 +98,7 @@ export function toMerltDossierBookmark(
   user: UserContext
 ): MerltTrackingEvent {
   return {
-    ...baseEvent('saved_for_use', user),
-    save_kind: payload.kind, // discriminate dossier vs bookmark
+    ...baseEvent(payload.kind === 'dossier' ? 'dossier:item_added' : 'bookmark:added', user),
     article_urn: normalizeArticleUrn(payload.articleUrn),
     context: {
       dossier_id: payload.dossierId ?? null,
@@ -109,7 +113,7 @@ export function toMerltCitationClicked(
   user: UserContext
 ): MerltTrackingEvent {
   return {
-    ...baseEvent('citation_followed', user),
+    ...baseEvent('citation:clicked', user),
     source_urn: normalizeArticleUrn(payload.sourceArticleUrn),
     target_urn: payload.targetArticleUrn ? normalizeArticleUrn(payload.targetArticleUrn) : null,
     citation_text: payload.citationText,
@@ -122,8 +126,7 @@ export function toMerltForumSignal(
   user: UserContext
 ): MerltTrackingEvent {
   return {
-    ...baseEvent('community_signal', user),
-    action: payload.action,
+    ...baseEvent(`forum:${payload.action}`, user),
     shared_env_id: payload.sharedEnvId,
     // Slice 1 decision (open question §10.3 of design):
     // target_author_id = originalAuthorId from the SharedEnvironment item.

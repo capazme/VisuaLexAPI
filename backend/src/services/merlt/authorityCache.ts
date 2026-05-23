@@ -58,11 +58,11 @@ export async function getOrSyncAuthority(
     const profile = await client.getProfile(userId);
     const updated: CachedAuthority = {
       userId,
-      authorityScore: profile.authority_score,
-      baselineQual: profile.baseline_qualification,
-      trackRecord: profile.track_record ?? 0,
-      performance: profile.performance ?? 0,
-      totalContributions: profile.total_contributions ?? 0,
+      authorityScore: profile.authority.score,
+      baselineQual: profile.authority.tier,
+      trackRecord: profile.authority.breakdown.track_record,
+      performance: profile.authority.breakdown.level_authority,
+      totalContributions: profile.stats?.total_contributions ?? 0,
       syncedAt: new Date(),
     };
 

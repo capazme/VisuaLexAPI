@@ -45,21 +45,49 @@ export interface MerltClientConfig {
   timeoutMs: number;
 }
 
-/** MERL-T tracking event payload after eventMapper translation. */
+/**
+ * MERL-T tracking event payload after eventMapper translation.
+ * Matches the shape MERL-T's POST /api/v1/tracking/events expects:
+ *   { events: [{ type, data, timestamp }] }
+ * The flat fields from eventMapper become `data`, the `type` is lifted out,
+ * and `timestamp` is millis-since-epoch.
+ */
 export interface MerltTrackingEvent {
-  event_type: string;
+  type: string;
   user_id: string;
   user_authority?: number;
   [k: string]: unknown;
 }
 
+/**
+ * MERL-T profile response shape (from /api/v1/profile/full).
+ * Real schema, not the simplified guess of MERLT-1.3.
+ */
 export interface MerltProfileResponse {
   user_id: string;
-  authority_score: number;
-  baseline_qualification: string;
-  track_record?: number;
-  performance?: number;
-  total_contributions?: number;
+  display_name?: string | null;
+  authority: {
+    score: number;
+    tier: string;
+    breakdown: {
+      baseline: number;
+      track_record: number;
+      level_authority: number;
+    };
+    next_tier_threshold?: number;
+    progress_to_next?: number;
+  };
+  domains?: Record<string, { authority: number; contributions: number; success_rate: number }>;
+  stats?: {
+    total_contributions: number;
+    approved: number;
+    rejected: number;
+    pending: number;
+    vote_weight: number;
+  };
+  recent_activity?: unknown[];
+  joined_at?: string | null;
+  last_updated?: string | null;
   [k: string]: unknown;
 }
 
@@ -68,16 +96,36 @@ export interface MerltHealthResponse {
   [k: string]: unknown;
 }
 
+export interface MerltTrackingResponse {
+  received: number;
+  timestamp: string;
+}
+
 export class MerltClient {
   constructor(private readonly config: MerltClientConfig) {}
 
-  async sendEvent(payload: MerltTrackingEvent): Promise<{ trace_id?: string }> {
-    return this.request('POST', '/api/tracking/event', payload);
+  /**
+   * Send a single tracking event to MERL-T. Internally wraps as batch
+   * because MERL-T's endpoint is POST /api/v1/tracking/events (plural)
+   * and expects { events: [{ type, data, timestamp }] }.
+   */
+  async sendEvent(event: MerltTrackingEvent): Promise<MerltTrackingResponse> {
+    const { type, ...data } = event;
+    const batch = {
+      events: [
+        {
+          type,
+          data,
+          timestamp: Date.now(),
+        },
+      ],
+    };
+    return this.request('POST', '/api/v1/tracking/events', batch);
   }
 
   async getProfile(userId: string): Promise<MerltProfileResponse> {
     const qs = new URLSearchParams({ user_id: userId }).toString();
-    return this.request('GET', `/api/profile/full?${qs}`);
+    return this.request('GET', `/api/v1/profile/full?${qs}`);
   }
 
   async healthCheck(): Promise<MerltHealthResponse> {

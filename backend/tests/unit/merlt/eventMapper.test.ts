@@ -41,6 +41,12 @@ describe('normalizeArticleUrn', () => {
     expect(normalizeArticleUrn('urn:nir~art1 BIS')).toBe('urn:nir~art1-bis');
   });
 
+  it('handles compact URN form (`;2043 bis` → `;2043-bis`)', () => {
+    expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;2043 bis')).toBe(
+      'urn:nir:stato:codice.civile:1942;2043-bis'
+    );
+  });
+
   it('leaves plain URN without suffix untouched', () => {
     expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;2043')).toBe(
       'urn:nir:stato:codice.civile:1942;2043'
@@ -53,8 +59,8 @@ describe('normalizeArticleUrn', () => {
     );
   });
 
-  it('does NOT match `bis` outside the art-prefix context', () => {
-    expect(normalizeArticleUrn('urn:foo:bis~art2')).toBe('urn:foo:bis~art2');
+  it('does NOT match `bis` outside a digit context', () => {
+    expect(normalizeArticleUrn('urn:foo:bis-without-digit')).toBe('urn:foo:bis-without-digit');
   });
 });
 
@@ -72,7 +78,7 @@ describe('toMerltArticleViewed', () => {
     );
 
     expect(out).toEqual({
-      event_type: 'article_viewed',
+      type: 'article:viewed',
       user_id: 'u-001',
       user_authority: 0.65,
       baseline_qualification: 'avvocato',
@@ -114,7 +120,7 @@ describe('toMerltArticleViewed', () => {
 });
 
 describe('toMerltHighlightAnnotation', () => {
-  it('maps highlight kind to event_type=highlight', () => {
+  it('maps highlight kind to type=highlight:created', () => {
     const out = toMerltHighlightAnnotation(
       {
         kind: 'highlight',
@@ -125,14 +131,14 @@ describe('toMerltHighlightAnnotation', () => {
       },
       userCtx
     );
-    expect(out.event_type).toBe('highlight');
+    expect(out.type).toBe('highlight:created');
     expect(out.entity_text).toBe('la buona fede');
     expect(out.start_offset).toBe(100);
     expect(out.color).toBe('yellow');
     expect(out.note_text).toBeNull();
   });
 
-  it('maps annotation kind with noteText', () => {
+  it('maps annotation kind to type=annotation:created with noteText', () => {
     const out = toMerltHighlightAnnotation(
       {
         kind: 'annotation',
@@ -143,14 +149,14 @@ describe('toMerltHighlightAnnotation', () => {
       },
       userCtx
     );
-    expect(out.event_type).toBe('annotation');
+    expect(out.type).toBe('annotation:created');
     expect(out.note_text).toBe('Responsabilità extracontrattuale');
     expect(out.color).toBeNull();
   });
 });
 
 describe('toMerltDossierBookmark', () => {
-  it('maps dossier kind with dossierId + tags', () => {
+  it('maps dossier kind to type=dossier:item_added with dossierId + tags', () => {
     const out = toMerltDossierBookmark(
       {
         kind: 'dossier',
@@ -160,15 +166,14 @@ describe('toMerltDossierBookmark', () => {
       },
       userCtx
     );
-    expect(out.event_type).toBe('saved_for_use');
-    expect(out.save_kind).toBe('dossier');
+    expect(out.type).toBe('dossier:item_added');
     expect(out.context).toEqual({
       dossier_id: '00000000-0000-0000-0000-000000000004',
       tags: ['contratti', 'inadempimento'],
     });
   });
 
-  it('maps bookmark kind with empty defaults', () => {
+  it('maps bookmark kind to type=bookmark:added with empty defaults', () => {
     const out = toMerltDossierBookmark(
       {
         kind: 'bookmark',
@@ -176,13 +181,13 @@ describe('toMerltDossierBookmark', () => {
       },
       userCtx
     );
-    expect(out.save_kind).toBe('bookmark');
+    expect(out.type).toBe('bookmark:added');
     expect(out.context).toEqual({ dossier_id: null, tags: [] });
   });
 });
 
 describe('toMerltCitationClicked', () => {
-  it('maps source + target + text', () => {
+  it('maps source + target + text to type=citation:clicked', () => {
     const out = toMerltCitationClicked(
       {
         sourceArticleUrn: 'urn:nir~art1175',
@@ -192,7 +197,7 @@ describe('toMerltCitationClicked', () => {
       userCtx
     );
     expect(out).toMatchObject({
-      event_type: 'citation_followed',
+      type: 'citation:clicked',
       user_id: 'u-001',
       source_urn: 'urn:nir~art1175',
       target_urn: 'urn:nir~art1218',
@@ -227,23 +232,24 @@ describe('toMerltCitationClicked', () => {
 });
 
 describe('toMerltForumSignal', () => {
-  it.each(['like', 'download', 'suggestion_accepted', 'suggestion_declined'] as const)(
-    'maps %s action',
-    (action) => {
-      const out = toMerltForumSignal(
-        {
-          action,
-          sharedEnvId: '00000000-0000-0000-0000-000000000005',
-          originalAuthorId: '00000000-0000-0000-0000-000000000006',
-        },
-        userCtx
-      );
-      expect(out.event_type).toBe('community_signal');
-      expect(out.action).toBe(action);
-      expect(out.shared_env_id).toBe('00000000-0000-0000-0000-000000000005');
-      expect(out.target_author_id).toBe('00000000-0000-0000-0000-000000000006');
-    }
-  );
+  it.each([
+    ['like', 'forum:like'],
+    ['download', 'forum:download'],
+    ['suggestion_accepted', 'forum:suggestion_accepted'],
+    ['suggestion_declined', 'forum:suggestion_declined'],
+  ] as const)('maps %s action to type=%s', (action, expectedType) => {
+    const out = toMerltForumSignal(
+      {
+        action,
+        sharedEnvId: '00000000-0000-0000-0000-000000000005',
+        originalAuthorId: '00000000-0000-0000-0000-000000000006',
+      },
+      userCtx
+    );
+    expect(out.type).toBe(expectedType);
+    expect(out.shared_env_id).toBe('00000000-0000-0000-0000-000000000005');
+    expect(out.target_author_id).toBe('00000000-0000-0000-0000-000000000006');
+  });
 
   it('preserves null originalAuthorId (deleted author)', () => {
     const out = toMerltForumSignal(

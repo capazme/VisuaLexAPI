@@ -28,31 +28,58 @@ afterAll(() => {
 });
 
 describe('MerltClient.sendEvent', () => {
-  it('returns trace_id on 200', async () => {
+  it('returns { received, timestamp } on 200 and posts to /api/v1/tracking/events', async () => {
     nock(BASE)
-      .post('/api/tracking/event', (body: unknown) => {
-        const obj = body as Record<string, unknown>;
-        return obj.event_type === 'article_viewed' && obj.user_id === 'u1';
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        return (
+          Array.isArray(b.events) &&
+          b.events.length === 1 &&
+          b.events[0].type === 'article:viewed' &&
+          (b.events[0].data as Record<string, unknown>).user_id === 'u1' &&
+          typeof b.events[0].timestamp === 'number'
+        );
       })
-      .reply(200, { trace_id: 'trace-abc' });
+      .reply(200, { received: 1, timestamp: '2026-05-23T00:00:00Z' });
 
-    const result = await client.sendEvent({ event_type: 'article_viewed', user_id: 'u1' });
-    expect(result).toEqual({ trace_id: 'trace-abc' });
+    const result = await client.sendEvent({ type: 'article:viewed', user_id: 'u1' });
+    expect(result).toEqual({ received: 1, timestamp: '2026-05-23T00:00:00Z' });
+  });
+
+  it('wraps a single event into the batch { events: [...] } shape', async () => {
+    nock(BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const d = b.events[0].data as Record<string, unknown>;
+        return (
+          b.events[0].type === 'highlight:created' &&
+          d.user_id === 'u1' &&
+          d.article_urn === 'urn:test' &&
+          // ensure `type` is NOT duplicated inside data
+          d.type === undefined
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    await client.sendEvent({
+      type: 'highlight:created',
+      user_id: 'u1',
+      article_urn: 'urn:test',
+    });
   });
 
   it('throws MerltServerError on 500', async () => {
-    nock(BASE).post('/api/tracking/event').reply(500, 'Internal Server Error');
-
+    nock(BASE).post('/api/v1/tracking/events').reply(500, 'Internal Server Error');
     await expect(
-      client.sendEvent({ event_type: 'x', user_id: 'u1' })
+      client.sendEvent({ type: 'x', user_id: 'u1' })
     ).rejects.toBeInstanceOf(MerltServerError);
   });
 
   it('throws MerltServerError on 502/503/504', async () => {
     for (const status of [502, 503, 504]) {
-      nock(BASE).post('/api/tracking/event').reply(status, 'gateway error');
+      nock(BASE).post('/api/v1/tracking/events').reply(status, 'gateway error');
       const err = await client
-        .sendEvent({ event_type: 'x', user_id: 'u1' })
+        .sendEvent({ type: 'x', user_id: 'u1' })
         .catch((e) => e as MerltClientError);
       expect(err).toBeInstanceOf(MerltServerError);
       expect(err.status).toBe(status);
@@ -60,10 +87,10 @@ describe('MerltClient.sendEvent', () => {
   });
 
   it('throws MerltBadRequestError on 400 with JSON body', async () => {
-    nock(BASE).post('/api/tracking/event').reply(400, { detail: 'bad payload' });
+    nock(BASE).post('/api/v1/tracking/events').reply(400, { detail: 'bad payload' });
 
     const err = (await client
-      .sendEvent({ event_type: 'x', user_id: 'u1' })
+      .sendEvent({ type: 'x', user_id: 'u1' })
       .catch((e) => e)) as MerltBadRequestError;
     expect(err).toBeInstanceOf(MerltBadRequestError);
     expect(err.status).toBe(400);
@@ -71,10 +98,10 @@ describe('MerltClient.sendEvent', () => {
   });
 
   it('throws MerltBadRequestError on 401', async () => {
-    nock(BASE).post('/api/tracking/event').reply(401, { detail: 'unauthorized' });
+    nock(BASE).post('/api/v1/tracking/events').reply(401, { detail: 'unauthorized' });
 
     const err = (await client
-      .sendEvent({ event_type: 'x', user_id: 'u1' })
+      .sendEvent({ type: 'x', user_id: 'u1' })
       .catch((e) => e)) as MerltBadRequestError;
     expect(err.status).toBe(401);
   });
@@ -86,78 +113,71 @@ describe('MerltClient.sendEvent', () => {
       timeoutMs: 1000,
     });
     nock(BASE, { reqheaders: { authorization: 'Bearer secret-key' } })
-      .post('/api/tracking/event')
-      .reply(200, { trace_id: 't' });
+      .post('/api/v1/tracking/events')
+      .reply(200, { received: 1, timestamp: 't' });
 
     await expect(
-      authedClient.sendEvent({ event_type: 'x', user_id: 'u1' })
-    ).resolves.toEqual({ trace_id: 't' });
+      authedClient.sendEvent({ type: 'x', user_id: 'u1' })
+    ).resolves.toEqual({ received: 1, timestamp: 't' });
   });
 
   it('does NOT set Authorization header when apiKey is missing', async () => {
-    // nock matches request without Authorization
-    nock(BASE, {
-      badheaders: ['authorization'],
-    })
-      .post('/api/tracking/event')
-      .reply(200, { trace_id: 't' });
+    nock(BASE, { badheaders: ['authorization'] })
+      .post('/api/v1/tracking/events')
+      .reply(200, { received: 1, timestamp: 't' });
 
     await expect(
-      client.sendEvent({ event_type: 'x', user_id: 'u1' })
-    ).resolves.toEqual({ trace_id: 't' });
-  });
-
-  it('serializes JSON body with snake_case fields', async () => {
-    nock(BASE)
-      .post('/api/tracking/event', (body) => {
-        const obj = body as Record<string, unknown>;
-        return (
-          obj.event_type === 'article_viewed' &&
-          obj.user_id === 'u1' &&
-          obj.dwell_ms === 5000 &&
-          obj.scroll_max_pct === 75
-        );
-      })
-      .reply(200, { trace_id: 't' });
-
-    await client.sendEvent({
-      event_type: 'article_viewed',
-      user_id: 'u1',
-      dwell_ms: 5000,
-      scroll_max_pct: 75,
-    });
+      client.sendEvent({ type: 'x', user_id: 'u1' })
+    ).resolves.toEqual({ received: 1, timestamp: 't' });
   });
 });
 
 describe('MerltClient.getProfile', () => {
-  it('returns parsed profile', async () => {
+  const sampleProfile = {
+    user_id: 'u42',
+    display_name: 'u42',
+    authority: {
+      score: 0.65,
+      tier: 'avvocato',
+      breakdown: {
+        baseline: 0.3,
+        track_record: 0.5,
+        level_authority: 0.5,
+      },
+      next_tier_threshold: 0.6,
+      progress_to_next: 80,
+    },
+    domains: {},
+    stats: {
+      total_contributions: 12,
+      approved: 10,
+      rejected: 1,
+      pending: 1,
+      vote_weight: 0.65,
+    },
+    recent_activity: [],
+    joined_at: null,
+    last_updated: null,
+  };
+
+  it('returns parsed profile from /api/v1/profile/full', async () => {
     nock(BASE)
-      .get('/api/profile/full')
+      .get('/api/v1/profile/full')
       .query({ user_id: 'u42' })
-      .reply(200, {
-        user_id: 'u42',
-        authority_score: 0.65,
-        baseline_qualification: 'avvocato',
-        track_record: 0.8,
-        performance: 0.5,
-        total_contributions: 12,
-      });
+      .reply(200, sampleProfile);
 
     const profile = await client.getProfile('u42');
     expect(profile.user_id).toBe('u42');
-    expect(profile.authority_score).toBeCloseTo(0.65);
-    expect(profile.baseline_qualification).toBe('avvocato');
+    expect(profile.authority.score).toBeCloseTo(0.65);
+    expect(profile.authority.tier).toBe('avvocato');
+    expect(profile.stats?.total_contributions).toBe(12);
   });
 
   it('escapes special characters in user_id', async () => {
     nock(BASE)
-      .get('/api/profile/full')
+      .get('/api/v1/profile/full')
       .query({ user_id: 'u/with+special chars' })
-      .reply(200, {
-        user_id: 'u/with+special chars',
-        authority_score: 0.1,
-        baseline_qualification: 'studente',
-      });
+      .reply(200, { ...sampleProfile, user_id: 'u/with+special chars' });
 
     await expect(client.getProfile('u/with+special chars')).resolves.toBeTruthy();
   });
@@ -186,7 +206,6 @@ describe('MerltClient timeout', () => {
 
   it('throws MerltTimeoutError on network errors', async () => {
     nock(BASE).get('/health').replyWithError({ message: 'ECONNREFUSED', code: 'ECONNREFUSED' });
-
     await expect(client.healthCheck()).rejects.toBeInstanceOf(MerltTimeoutError);
   });
 });
@@ -208,7 +227,6 @@ describe('createMerltClient', () => {
 
   it('falls back to localhost:8000 / no auth / 5000ms by default', () => {
     const c = createMerltClient({} as NodeJS.ProcessEnv);
-    // Smoke: factory returns an instance (no throw)
     expect(c).toBeInstanceOf(MerltClient);
   });
 });
