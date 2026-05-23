@@ -1,6 +1,8 @@
 import type { RefObject } from 'react';
 import { useArticleViewedTracker } from './tracking/useArticleViewedTracker';
 import { useHighlightAnnotationTracker } from './tracking/useHighlightAnnotationTracker';
+import { useDossierBookmarkTracker } from './tracking/useDossierBookmarkTracker';
+import { useCitationTracker } from './tracking/useCitationTracker';
 
 /**
  * MERL-T slot mounted in `article_content_after` (see plugins/registry).
@@ -36,6 +38,12 @@ export function ArticleMerltSlot({
     // highlight/annotation events to the BFF. Singleton — the hook itself
     // guards against duplicate subscriptions via React's effect cleanup.
     useHighlightAnnotationTracker();
+
+    // MERLT-1.8: dossier-add + bookmark-add events.
+    useDossierBookmarkTracker();
+
+    // MERLT-1.9: citation:clicked events from the in-article citation linker.
+    useCitationTracker();
 
     return null;
 }

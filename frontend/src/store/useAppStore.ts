@@ -15,6 +15,7 @@ import { environmentService, type EnvironmentApi, type EnvironmentCreatePayload 
 import { quickNormService, type QuickNormApi } from '../services/quickNormService';
 import { customAliasService, type CustomAliasApi } from '../services/customAliasService';
 import { isAuthenticated } from '../services/authService';
+import { publishMerltEvent, MERLT_EVENT_TYPES } from '../features/merlt/merltEventBus';
 import {
     annotationApiToStore,
     annotationStoreToCreate,
@@ -1074,6 +1075,16 @@ const appStore = createStore<AppState>()(
                     }
                 });
 
+                // MERLT-1.8: emit bookmark_add event so useDossierBookmarkTracker
+                // forwards it to /api/merlt/events/dossier-bookmark.
+                if (norma.urn) {
+                    publishMerltEvent({
+                        interaction_type: MERLT_EVENT_TYPES.bookmarkCreated,
+                        article_urn: norma.urn,
+                        metadata: { source: 'bookmark', tags },
+                    });
+                }
+
                 // API call in background
                 bookmarkService.create({
                     norma_key: key,
@@ -1235,6 +1246,19 @@ const appStore = createStore<AppState>()(
                         });
                     }
                 });
+
+                // MERLT-1.8: emit dossier_item_add when a norma is filed into
+                // a dossier. Notes have no article_urn and are skipped here.
+                if (type === 'norma') {
+                    const urn = (itemData as NormaVisitata).urn;
+                    if (urn) {
+                        publishMerltEvent({
+                            interaction_type: MERLT_EVENT_TYPES.dossierItemAdded,
+                            article_urn: urn,
+                            metadata: { dossier_id: dossierId },
+                        });
+                    }
+                }
 
                 // API call
                 dossierService.addItem(dossierId, {

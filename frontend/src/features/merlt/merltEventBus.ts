@@ -19,7 +19,12 @@ export const MERLT_EVENT_TYPES = {
     resultClicked: 'first_result_click',
     bookmarkCreated: 'bookmark_add',
     bookmarkDeleted: 'bookmark_delete',
+    // MERLT-1.8: fired by useAppStore.addToDossier when a norma is pushed
+    // into a dossier. Distinct from bookmarkCreated because the dossier
+    // context (id, tags) is structurally different from a flat bookmark.
+    dossierItemAdded: 'dossier_item_add',
     dossierExportTraining: 'dossier_export_training',
+    citationClicked: 'citation_click',
     issueReported: 'issue_reported',
     issueVoted: 'issue_voted',
     issueViewed: 'issue_viewed',

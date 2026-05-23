@@ -475,10 +475,23 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // Handler for opening citation in new tab
     const handleOpenCitationInTab = useCallback((citation: ParsedCitationData) => {
+        // MERLT-1.9: emit citation_click for the bus tracker. The target URN
+        // is null at click time (resolution happens later via triggerSearch);
+        // the BFF accepts null target and forwards it as such.
+        const citationText = [
+            citation.act_type,
+            citation.act_number ? `n. ${citation.act_number}` : null,
+            citation.article ? `art. ${citation.article}` : null,
+        ].filter(Boolean).join(' ');
         publishMerltEvent({
-            interaction_type: MERLT_EVENT_TYPES.citationDetected,
+            interaction_type: MERLT_EVENT_TYPES.citationClicked,
             article_urn: norma_data.urn,
-            metadata: { citation },
+            metadata: {
+                source_urn: norma_data.urn,
+                target_urn: null,
+                citation_text: citationText,
+                citation,
+            },
         });
         triggerSearch({
             act_type: citation.act_type,

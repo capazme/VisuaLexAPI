@@ -112,7 +112,7 @@ sprints:
     sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
     capacity_points: 30
     committed_points: 17
-    completed_points: 6
+    completed_points: 11
     status: "in_progress"
     started_on: "2026-05-23"
     stories:
@@ -137,16 +137,20 @@ sprints:
         title: "Event dossier + bookmark"
         points: 3
         priority: "P1"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-23"
         depends_on: ["MERLT-1.5", "MERLT-1.6"]
         driver: "ralph-loop"
+        notes: "Backend POST /events/dossier-bookmark with kind discriminator. Frontend useDossierBookmarkTracker subscribes to bus. Store emissions added in addBookmark (bookmark_add) and addToDossier (dossier_item_add). 4 backend integration tests + 5 frontend hook tests verdi."
       - story_id: "MERLT-1.9"
         title: "Event citation:clicked"
         points: 2
         priority: "P1"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-23"
         depends_on: ["MERLT-1.5", "MERLT-1.6"]
         driver: "ralph-loop"
+        notes: "Backend POST /events/citation-clicked. Frontend useCitationTracker subscribes to bus (new event type citationClicked, distinct from existing citationDetected). ArticleTabContent.handleOpenCitationInTab changed to emit citationClicked with source_urn + target_urn (null at click time) + citation_text. 4 backend integration tests + 6 frontend hook tests verdi."
       - story_id: "MERLT-1.10"
         title: "Event forum (like / download / suggestion_decided)"
         points: 3

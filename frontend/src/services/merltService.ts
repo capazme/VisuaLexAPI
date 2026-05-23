@@ -227,6 +227,45 @@ export async function sendHighlightAnnotationEvent(
     );
 }
 
+// ----------------------------------------------------------------------------
+// MERLT-1.8 — dossier + bookmark event capture
+// ----------------------------------------------------------------------------
+
+export interface DossierBookmarkEventInput {
+    kind: 'dossier' | 'bookmark';
+    articleUrn: string;
+    dossierId?: string;
+    tags?: string[];
+}
+
+export type DossierBookmarkEventResponse = ArticleViewedEventResponse;
+
+/** POST /api/merlt/events/dossier-bookmark (MERLT-1.8). */
+export async function sendDossierBookmarkEvent(
+    input: DossierBookmarkEventInput
+): Promise<DossierBookmarkEventResponse> {
+    return postMerlt<DossierBookmarkEventResponse>('/merlt/events/dossier-bookmark', input);
+}
+
+// ----------------------------------------------------------------------------
+// MERLT-1.9 — citation:clicked event capture
+// ----------------------------------------------------------------------------
+
+export interface CitationClickedEventInput {
+    sourceArticleUrn: string;
+    targetArticleUrn: string | null;
+    citationText: string;
+}
+
+export type CitationClickedEventResponse = ArticleViewedEventResponse;
+
+/** POST /api/merlt/events/citation-clicked (MERLT-1.9). */
+export async function sendCitationClickedEvent(
+    input: CitationClickedEventInput
+): Promise<CitationClickedEventResponse> {
+    return postMerlt<CitationClickedEventResponse>('/merlt/events/citation-clicked', input);
+}
+
 export async function getMerltFeedbackMappings(): Promise<Record<string, unknown>> {
     return getMerlt<Record<string, unknown>>('/merlt/feedback/mappings');
 }

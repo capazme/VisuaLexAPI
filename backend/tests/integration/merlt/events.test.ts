@@ -374,6 +374,178 @@ describe('POST /api/merlt/events/highlight-annotation (MERLT-1.7)', () => {
   });
 });
 
+describe('POST /api/merlt/events/dossier-bookmark (MERLT-1.8)', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('events-dossier');
+  });
+
+  it('forwards bookmark kind as type=bookmark:added', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const ev = b.events[0];
+        const d = ev.data as Record<string, unknown>;
+        const ctx = d.context as Record<string, unknown>;
+        return (
+          ev.type === 'bookmark:added' &&
+          d.article_urn === 'urn:nir:stato:codice.civile:1942;2043' &&
+          ctx.dossier_id === null
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/dossier-bookmark')
+      .set(authHeader(user))
+      .send({
+        kind: 'bookmark',
+        articleUrn: 'urn:nir:stato:codice.civile:1942;2043',
+        tags: ['responsabilità'],
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('forwards dossier kind with dossierId as type=dossier:item_added', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const ev = b.events[0];
+        const d = ev.data as Record<string, unknown>;
+        const ctx = d.context as Record<string, unknown>;
+        return (
+          ev.type === 'dossier:item_added' &&
+          ctx.dossier_id === '00000000-0000-0000-0000-000000000aaa'
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/dossier-bookmark')
+      .set(authHeader(user))
+      .send({
+        kind: 'dossier',
+        articleUrn: 'urn:nir:stato:codice.civile:1942;1218',
+        dossierId: '00000000-0000-0000-0000-000000000aaa',
+        tags: ['contratti'],
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('rejects without consent (403)', async () => {
+    const res = await request(app)
+      .post('/api/merlt/events/dossier-bookmark')
+      .set(authHeader(user))
+      .send({ kind: 'bookmark', articleUrn: 'urn:test' });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 on invalid kind', async () => {
+    await grantConsent(user, 'basic');
+    const res = await request(app)
+      .post('/api/merlt/events/dossier-bookmark')
+      .set(authHeader(user))
+      .send({ kind: 'folder', articleUrn: 'urn:test' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/merlt/events/citation-clicked (MERLT-1.9)', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('events-citation');
+  });
+
+  it('forwards source + target + citation text as type=citation:clicked', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const ev = b.events[0];
+        const d = ev.data as Record<string, unknown>;
+        return (
+          ev.type === 'citation:clicked' &&
+          d.source_urn === 'urn:nir:stato:codice.civile:1942;1175' &&
+          d.target_urn === 'urn:nir:stato:codice.civile:1942;1218' &&
+          d.citation_text === 'art. 1218 c.c.'
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/citation-clicked')
+      .set(authHeader(user))
+      .send({
+        sourceArticleUrn: 'urn:nir:stato:codice.civile:1942;1175',
+        targetArticleUrn: 'urn:nir:stato:codice.civile:1942;1218',
+        citationText: 'art. 1218 c.c.',
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('accepts null target (unresolved citation)', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const d = b.events[0].data as Record<string, unknown>;
+        return d.target_urn === null;
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/citation-clicked')
+      .set(authHeader(user))
+      .send({
+        sourceArticleUrn: 'urn:nir:stato:codice.civile:1942;1175',
+        targetArticleUrn: null,
+        citationText: 'vedi precedente articolo',
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('rejects without consent (403)', async () => {
+    const res = await request(app)
+      .post('/api/merlt/events/citation-clicked')
+      .set(authHeader(user))
+      .send({
+        sourceArticleUrn: 'urn:test',
+        targetArticleUrn: null,
+        citationText: 'x',
+      });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 on empty citation text', async () => {
+    await grantConsent(user, 'basic');
+    const res = await request(app)
+      .post('/api/merlt/events/citation-clicked')
+      .set(authHeader(user))
+      .send({
+        sourceArticleUrn: 'urn:test',
+        targetArticleUrn: null,
+        citationText: '',
+      });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('GET /api/merlt/health (MERLT-1.5)', () => {
   it('returns 200 with merlt=reachable when MERL-T responds', async () => {
     nock(TEST_MERLT_BASE).get('/health').reply(200, { status: 'ok' });
