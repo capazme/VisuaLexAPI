@@ -249,6 +249,131 @@ describe('POST /api/merlt/events/article-viewed (MERLT-1.5)', () => {
   });
 });
 
+describe('POST /api/merlt/events/highlight-annotation (MERLT-1.7)', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('events-bob');
+  });
+
+  it('accepts a highlight payload and forwards as type=highlight:created', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const ev = b.events[0];
+        const d = ev.data as Record<string, unknown>;
+        return (
+          ev.type === 'highlight:created' &&
+          d.user_id === user.id &&
+          d.entity_text === 'la buona fede' &&
+          d.color === 'yellow' &&
+          d.start_offset === 42
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't-hl' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/highlight-annotation')
+      .set(authHeader(user))
+      .send({
+        kind: 'highlight',
+        anchorText: 'la buona fede',
+        startOffset: 42,
+        articleUrn: 'urn:nir:stato:codice.civile:1942;1175',
+        color: 'yellow',
+      });
+
+    expect(res.status).toBe(202);
+    expect(res.body.received).toBe(1);
+  });
+
+  it('accepts an annotation payload and forwards as type=annotation:created', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const ev = b.events[0];
+        const d = ev.data as Record<string, unknown>;
+        return (
+          ev.type === 'annotation:created' &&
+          d.note_text === 'Responsabilità extracontrattuale' &&
+          d.color === null
+        );
+      })
+      .reply(200, { received: 1, timestamp: 't-an' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/highlight-annotation')
+      .set(authHeader(user))
+      .send({
+        kind: 'annotation',
+        anchorText: 'art. 2043',
+        startOffset: 0,
+        articleUrn: 'urn:nir:stato:codice.civile:1942;2043',
+        noteText: 'Responsabilità extracontrattuale',
+      });
+
+    expect(res.status).toBe(202);
+  });
+
+  it('rejects without consent (403 consent_required)', async () => {
+    const res = await request(app)
+      .post('/api/merlt/events/highlight-annotation')
+      .set(authHeader(user))
+      .send({
+        kind: 'highlight',
+        anchorText: 'x',
+        startOffset: 0,
+        articleUrn: 'urn:test',
+      });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 on invalid kind', async () => {
+    await grantConsent(user, 'basic');
+    const res = await request(app)
+      .post('/api/merlt/events/highlight-annotation')
+      .set(authHeader(user))
+      .send({
+        kind: 'comment',
+        anchorText: 'x',
+        startOffset: 0,
+        articleUrn: 'urn:test',
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toBe('invalid_body');
+  });
+
+  it('normalizes -bis suffix on articleUrn', async () => {
+    await grantConsent(user, 'basic');
+    nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/tracking/events', (body: unknown) => {
+        const b = body as { events: Array<Record<string, unknown>> };
+        const d = b.events[0].data as Record<string, unknown>;
+        return d.article_urn === 'urn:nir:stato:codice.civile:1942;2043-bis';
+      })
+      .reply(200, { received: 1, timestamp: 't' });
+
+    const res = await request(app)
+      .post('/api/merlt/events/highlight-annotation')
+      .set(authHeader(user))
+      .send({
+        kind: 'highlight',
+        anchorText: 'x',
+        startOffset: 0,
+        articleUrn: 'urn:nir:stato:codice.civile:1942;2043 bis',
+      });
+    expect(res.status).toBe(202);
+  });
+});
+
 describe('GET /api/merlt/health (MERLT-1.5)', () => {
   it('returns 200 with merlt=reachable when MERL-T responds', async () => {
     nock(TEST_MERLT_BASE).get('/health').reply(200, { status: 'ok' });

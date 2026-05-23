@@ -202,6 +202,31 @@ export async function sendArticleViewedEvent(
     return postMerlt<ArticleViewedEventResponse>('/merlt/events/article-viewed', input);
 }
 
+// ----------------------------------------------------------------------------
+// MERLT-1.7 — highlight + annotation event capture
+// ----------------------------------------------------------------------------
+
+export interface HighlightAnnotationEventInput {
+    kind: 'highlight' | 'annotation';
+    anchorText: string;
+    startOffset: number;
+    articleUrn: string;
+    color?: string;
+    noteText?: string;
+}
+
+export type HighlightAnnotationEventResponse = ArticleViewedEventResponse;
+
+/** POST /api/merlt/events/highlight-annotation (MERLT-1.7). */
+export async function sendHighlightAnnotationEvent(
+    input: HighlightAnnotationEventInput
+): Promise<HighlightAnnotationEventResponse> {
+    return postMerlt<HighlightAnnotationEventResponse>(
+        '/merlt/events/highlight-annotation',
+        input
+    );
+}
+
 export async function getMerltFeedbackMappings(): Promise<Record<string, unknown>> {
     return getMerlt<Record<string, unknown>>('/merlt/feedback/mappings');
 }

@@ -2,8 +2,14 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { authenticate } from '../../middleware/auth';
 import { consentGuard } from '../../services/merlt/consentGuard';
-import { articleViewedRequestSchema } from '../../schemas/merlt/events';
-import { toMerltArticleViewed } from '../../services/merlt/eventMapper';
+import {
+  articleViewedRequestSchema,
+  highlightAnnotationRequestSchema,
+} from '../../schemas/merlt/events';
+import {
+  toMerltArticleViewed,
+  toMerltHighlightAnnotation,
+} from '../../services/merlt/eventMapper';
 import {
   createMerltClient,
   MerltClient,
@@ -90,6 +96,63 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
     }
     if (err instanceof MerltClientError) {
       logDeadLetter('article-viewed', req.user.id, merltPayload, err);
+      res.status(503).json({ detail: 'merlt_unavailable' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * POST /api/merlt/events/highlight-annotation  (MERLT-1.7)
+ *
+ * Single endpoint for both highlight and annotation creations — the
+ * `kind` discriminator in the body decides the MERL-T `type` field
+ * (`highlight:created` vs `annotation:created`).
+ *
+ * Flow identical to article-viewed: authenticate → consentGuard → Zod →
+ * authorityCache (best-effort) → eventMapper → merltClient.sendEvent.
+ */
+router.post('/events/highlight-annotation', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+
+  const parsed = highlightAnnotationRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+
+  let userAuthority: number | undefined;
+  let baselineQual: string | undefined;
+  try {
+    const cached = await getOrSyncAuthority(req.user.id, client());
+    if (cached) {
+      userAuthority = cached.authorityScore;
+      baselineQual = cached.baselineQual;
+    }
+  } catch {
+    // opportunistic enrichment only
+  }
+
+  const merltPayload = toMerltHighlightAnnotation(parsed.data, {
+    userId: req.user.id,
+    authorityScore: userAuthority,
+    baselineQual,
+  });
+
+  try {
+    const result = await client().sendEvent(merltPayload);
+    res.status(202).json({ received: result.received, timestamp: result.timestamp });
+  } catch (err) {
+    if (err instanceof MerltBadRequestError) {
+      res.status(err.status ?? 400).json({ detail: 'merlt_rejected', upstream: err.body });
+      return;
+    }
+    if (err instanceof MerltClientError) {
+      logDeadLetter('highlight-annotation', req.user.id, merltPayload, err);
       res.status(503).json({ detail: 'merlt_unavailable' });
       return;
     }

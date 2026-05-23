@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import { useArticleViewedTracker } from './tracking/useArticleViewedTracker';
+import { useHighlightAnnotationTracker } from './tracking/useHighlightAnnotationTracker';
 
 /**
  * MERL-T slot mounted in `article_content_after` (see plugins/registry).
@@ -30,6 +31,11 @@ export function ArticleMerltSlot({
         normaVisitataId,
         containerRef,
     });
+
+    // MERLT-1.7: subscribes to the merltEventBus and forwards
+    // highlight/annotation events to the BFF. Singleton — the hook itself
+    // guards against duplicate subscriptions via React's effect cleanup.
+    useHighlightAnnotationTracker();
 
     return null;
 }

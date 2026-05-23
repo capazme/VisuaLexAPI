@@ -317,12 +317,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             : undefined;
         addAnnotation(itemKey, targetArticleId, trimmed, anchorPayload);
         publishMerltEvent({
-            interaction_type: MERLT_EVENT_TYPES.textSelected,
+            interaction_type: MERLT_EVENT_TYPES.annotationCreated,
             article_urn: norma_data.urn,
             metadata: {
                 source: 'annotation',
                 scoped_article_id: targetArticleId,
                 anchored: Boolean(anchor),
+                anchor_text: anchor?.anchorText ?? '',
+                start_offset: anchor?.startOffset ?? 0,
+                note_text: trimmed,
                 text_length: trimmed.length,
             },
         });
@@ -415,6 +418,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             interaction_type: MERLT_EVENT_TYPES.highlightCreated,
             article_urn: norma_data.urn,
             metadata: {
+                anchor_text: text,
                 color,
                 start_offset: startOffset,
                 text_length: text.length,

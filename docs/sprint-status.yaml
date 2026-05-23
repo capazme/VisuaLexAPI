@@ -112,7 +112,7 @@ sprints:
     sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
     capacity_points: 30
     committed_points: 17
-    completed_points: 3
+    completed_points: 6
     status: "in_progress"
     started_on: "2026-05-23"
     stories:
@@ -128,9 +128,11 @@ sprints:
         title: "Event highlight + annotation"
         points: 3
         priority: "P1"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-23"
         depends_on: ["MERLT-1.5", "MERLT-1.6"]
         driver: "ralph-loop"
+        notes: "Backend: POST /api/merlt/events/highlight-annotation with kind discriminator. Frontend: useHighlightAnnotationTracker subscribes to existing merltEventBus (no changes to call-sites), maps legacy events to BFF payload. ArticleTabContent extended metadata with anchor_text + note_text. New MERLT_EVENT_TYPES.annotationCreated distinguishes save-note from generic text-selection. 5 backend integration tests + 7 frontend hook tests verdi. 128 backend tests / 43 frontend tests total."
       - story_id: "MERLT-1.8"
         title: "Event dossier + bookmark"
         points: 3
