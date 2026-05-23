@@ -60,6 +60,50 @@ QuickNorm + CustomAlias CRUD (added to close the last localStorage-only slices):
 - Routes `/quick-norms` and `/custom-aliases` (authenticate-gated) expose list / create / update / delete, PLUS a dedicated `POST /:id/use` endpoint per entity.
 - The `POST /:id/use` endpoints exist for a reason: client code bumps the local `usageCount` instantly for UX and then fires a `.use(id)` Promise that does `prisma.update({ usageCount: { increment: 1 }, lastUsedAt: now })`. This is atomic, so concurrent clicks (or rapid-fire alias resolutions) can't race the counter, and clients don't need to read-modify-write.
 
+### MERL-T Integration (Slice 1, branch `visualex-merlt-main`)
+
+Slice 1 wires 5 user-action signals from VisuaLex into MERL-T's RLCF tracking buffer. Implementation lives across both backends and the frontend; the design doc is `docs/superpowers/specs/2026-05-22-merlt-integration-slice1-design.md`, the smoke checklist is `docs/merlt-smoke-checklist.md`, and the forum attribution decision is `docs/merlt-forum-authoring-decision.md`.
+
+**Runtime topology.** MERL-T is a separate FastAPI sidecar (Python, port 8000) defined in `docker-compose.merlt.yml` with 5 services: `merlt-api` + `merlt-postgres` + `merlt-redis` + `merlt-falkordb` + `merlt-qdrant`. Source lives in `VisuaLexAPI/merlt/` (selective copy of `ALIS_CORE/merlt` — see `docs/merlt-upstream-sync.md`). Two env flags control startup: `MERLT_ENABLED` gates the whole stack in `start.sh`, `MERLT_API_IN_DOCKER` switches between `--profile api-in-docker` (full container) and local uvicorn. The compose-network host names matter: BFF talks to `merlt-postgres:5432` and `merlt-api:8000` from inside Docker, and `localhost:5436` / `localhost:8000` from the host. `RLCF_DATABASE_URL`, `ENRICHMENT_DB_*`, `REDIS_URL`, `FALKORDB_HOST`, `QDRANT_HOST` are explicit env vars on the merlt-api service — MERL-T code has hardcoded defaults pointing at `localhost:5433/rlcf_dev` which break inside the container network.
+
+**BFF (Node, port 3001).** All MERL-T traffic flows through `/api/merlt/*` — frontend never calls `:8000` directly. Routes:
+- `routes/merlt/index.ts` — mount point, **must be registered BEFORE the catch-all auth routers** (folders/bookmarks/etc. use `router.use(authenticate)` with no path prefix, so Express would 401 anything reaching them first; `app.ts` puts `app.use('/api/merlt', merltRoutes)` at line ~71 before the auth-only routers).
+- `routes/merlt/consent.ts` — GET/POST/DELETE `/consent` with Prisma transaction (upsert preference + append audit) and the `MerltConsentLevel` enum (none|basic|full); the `preferencesForLevel()` helper in `schemas/merlt/consent.ts` is the single source of truth for the 3 toggles (contribution / validation / graph).
+- `routes/merlt/events.ts` — 5 event endpoints (`article-viewed`, `highlight-annotation`, `dossier-bookmark`, `citation-clicked`, `forum-signal`). Each chain: `authenticate → consentGuard → Zod → authorityCache (best-effort) → eventMapper → merltClient.sendEvent → 202 { received, timestamp }`. The `_resetMerltClientForTests` export wipes the singleton client when integration tests swap `MERLT_API_URL`.
+- `routes/merlt/health.ts` — GET `/health`, no auth; proxies MERL-T `:8000/health` and surfaces upstream dependency status.
+- `routes/merlt/profile.ts` — GET `/profile` reads `MerltUserAuthorityCache` and falls back to cache-only on MERL-T outage (503 only on cache miss + outage).
+- `services/merlt/merltClient.ts` — typed HTTP client over native `fetch` + `AbortController`. Hits `/api/v1/tracking/events` (plural, batch-wrapped) and `/api/v1/profile/full` — both prefixes are mandatory. Typed error hierarchy: `MerltTimeoutError` / `MerltServerError` / `MerltBadRequestError` so the route can map 503/passthrough/dead-letter correctly.
+- `services/merlt/eventMapper.ts` — 5 `toMerlt*` functions. Each lifts `type` out, puts the rest into `data`, and merltClient wraps as `{events: [{type, data, timestamp}]}` before POSTing. `normalizeArticleUrn()` collapses `art1 bis` / `art1bis` / `art1_bis` / `art1BIS` to the canonical `art1-bis` form (gotcha #9 anti-regression).
+- `services/merlt/authorityCache.ts` — 1h TTL, falls back to stale cache when MERL-T is unreachable; returns null only when cache is missing AND sync fails.
+- `services/merlt/deadLetterLog.ts` — NDJSON in `backend/logs/merlt-dead-letter.jsonl` when MERL-T is down; skipped in `NODE_ENV=test` unless `MERLT_DEAD_LETTER_LOG_IN_TESTS=1`.
+- Prisma models (in main `schema.prisma`): `MerltUserPreference` (consent level + 3 toggles, enum-backed — kept from commit `81be277`), `MerltConsentAudit` (full transition trail with ip/userAgent), `MerltUserAuthorityCache` (added MERLT-1.2 — separated from the PRD-doc's two-bool model in favour of the existing enum design).
+
+**Frontend (`/frontend`).** Plugin host pattern — `ArticleTabContent` does NOT import MERL-T directly:
+- `plugins/registry.tsx` + `plugins/types.ts` — typed slot registry. `requiredFlag: 'VITE_FEATURE_MERLT'` gate, default ON (explicit `false`/`0`/`""` to disable). Two slots in use: `article_content_after` (mounts `ArticleMerltSlot` from `ArticleTabContent`) and `global` (mounts `GlobalMerltSlot` from `Layout`, survives route changes).
+- `features/merlt/ArticleMerltSlot.tsx` — null-renderer, hosts the 4 article-scoped tracker hooks: `useArticleViewedTracker`, `useHighlightAnnotationTracker`, `useDossierBookmarkTracker`, `useCitationTracker`. The legacy commit-`81be277` Q&A UI is gone (Slice 3 reintroduces it).
+- `features/merlt/GlobalMerltSlot.tsx` — null-renderer, hosts `useForumSignalTracker` (forum is outside any article view, needs Layout-level mount).
+- `features/merlt/merltEventBus.ts` — pub/sub between call-sites and the trackers. `MERLT_EVENT_TYPES` includes `articleViewed, highlightCreated, annotationCreated, bookmarkCreated, dossierItemAdded, citationClicked, forumLike/Download/SuggestionAccepted/SuggestionDeclined`. The legacy `trackMerltInteraction()` call inside `publishMerltEvent` still hits a 404 endpoint — its catch swallows the warn; new BFF endpoints are reached via the subscriber hooks instead.
+- `features/merlt/tracking/useArticleViewedTracker.ts` — IntersectionObserver-based dwell tracker (≥3s OR scroll ≥30%). Fire-and-forget on unmount/visibility-change.
+- `features/merlt/tracking/use{HighlightAnnotation,DossierBookmark,Citation,ForumSignal}Tracker.ts` — bus subscribers that filter on `interaction_type`, map metadata → BFF payload, fire-and-forget.
+- `features/merlt/consent/{ConsentContext,ConsentDialog,useConsent}.ts` — minimal consent UI (`docs/superpowers/specs/...` describes the full design; Slice 1 ships the read-side, the visible dialog flow is at Slice 3 polish).
+- `services/merltService.ts` — typed BFF clients: `sendArticleViewedEvent`, `sendHighlightAnnotationEvent`, `sendDossierBookmarkEvent`, `sendCitationClickedEvent`, `sendForumSignalEvent`. Same shape (`{ received, timestamp }` response) for all.
+- Emission call-sites (kept thin — tracker hooks do the BFF talk):
+  - `useAppStore.addBookmark` → `bookmark_add`
+  - `useAppStore.addToDossier` (type='norma' + urn) → `dossier_item_add`
+  - `ArticleTabContent.handlePopupHighlight` → `highlight_create` (with `anchor_text` in metadata)
+  - `ArticleTabContent.handleAddNote` → `annotation_create` (with `note_text + anchor_text`)
+  - `ArticleTabContent.handleOpenCitationInTab` → `citation_click` (with `source_urn + target_urn + citation_text`)
+  - `BulletinBoardPage.{handleLike, handleTakeItem, handleDeclineItem}` → forum signals
+  - `ImportEnvironmentModal.handleImport` → `forum_download`
+
+**Testing.** 143 backend tests (vitest + supertest, real Postgres test DB, nock for MERL-T mock). 63 frontend tests (vitest + jsdom, hook tests + plugin registry). Integration test setup: `backend/tests/setup.ts` TRUNCATEs MERL-T tables (`merlt_consent_audits`, `merlt_user_preferences`, `merlt_user_authority_cache`) between tests. Smoke E2E in `docs/merlt-smoke-checklist.md`.
+
+**Critical gotchas:**
+1. **Express mount order** beats prefix specificity. `merltRoutes` must be `app.use('/api/merlt', merltRoutes)` BEFORE the catch-all-auth routers; otherwise GET `/api/merlt/health` returns 401 from `folders.ts`'s authenticate middleware.
+2. **`rsync --exclude` pattern without leading `/`** matches anywhere in the tree, not just root. The initial MERL-T copy excluded `models/` and `data/` and silently dropped `merlt/merlt/models/` (BridgeMapping) + `merlt/merlt/api/models/` + `merlt/merlt/disagreement/data/`. Always use `--exclude='/models/'` for top-level-only exclusion.
+3. **MERL-T's tracking is in-memory** (`merlt/api/tracking_router.py:6` says "future: PostgreSQL"). The 202 + `received:1` response is the only confirmation; no `qa_traces` or `tracking_events` table exists in MERL-T Postgres for Slice 1 to query against. Future MERL-T iterations will add persistence.
+4. **MERL-T endpoint paths use `/api/v1/` prefix** (per `merlt/app.py:175-194`), with `/health` as the only root-level route. The initial Story 1.5 client hit `/api/tracking/event` (singular, no prefix) → 404 in production but green tests with nock mocking the wrong URL. MERLT-1.5.1 fixed this; same pitfall applies if extending the client.
+
 ### Frontend Structure
 
 React SPA with component-based architecture:

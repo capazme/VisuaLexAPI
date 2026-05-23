@@ -112,9 +112,10 @@ sprints:
     sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
     capacity_points: 30
     committed_points: 17
-    completed_points: 14
-    status: "in_progress"
+    completed_points: 17
+    status: "completed"
     started_on: "2026-05-23"
+    completed_on: "2026-05-23"
     stories:
       - story_id: "MERLT-1.6"
         title: "Plugin host minimo"
@@ -163,14 +164,18 @@ sprints:
         title: "Doc finali + smoke E2E completo"
         points: 2
         priority: "P0"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-23"
         depends_on: ["MERLT-1.7", "MERLT-1.8", "MERLT-1.9", "MERLT-1.10"]
+        notes: "Smoke checklist estesa con tutti 5 eventi (article:viewed, highlight+annotation, dossier+bookmark, citation, forum). CLAUDE.md sezione MERL-T integration aggiunta con entry points + gotchas + file rules. docs/merlt-forum-authoring-decision.md creato in MERLT-1.10."
       - story_id: "MERLT-1.12"
         title: "PR ready + solutioning gate finale"
         points: 1
         priority: "P0"
-        status: "not_started"
+        status: "completed"
+        completed_on: "2026-05-23"
         depends_on: ["MERLT-1.11"]
+        notes: "Sprint MERLT-1b completed 17/17pt. Slice 1 completed 42/42pt. Build verde + 143 backend + 63 frontend tests verdi. PR pronto verso main (non auto-pushed per CLAUDE.md global)."
 
   - sprint_number: 4
     sprint_id: "PRD-Sprint-2"

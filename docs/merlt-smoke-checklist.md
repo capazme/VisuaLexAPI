@@ -127,25 +127,70 @@ Riimposta a `true` e riavvia.
 
 ## Story MERLT-1.7 — highlight + annotation
 
-*(da compilare quando Story 1.7 è chiusa)*
+### Highlight
+1. Apri un articolo (consent attivo).
+2. Seleziona del testo nel body → SelectionPopup compare → click "Evidenzia".
+3. Scegli un colore (es. yellow). Toast "Testo evidenziato in yellow".
+4. In DevTools → Network: `POST /api/merlt/events/highlight-annotation` con status `202` e body `{"received":1,"timestamp":"..."}`.
+5. Request payload `kind:"highlight"`, `anchorText:"..."` (il testo selezionato), `color:"yellow"`, `articleUrn:"..."`.
+
+### Annotation
+1. Stessa selezione + click "Aggiungi nota" da SelectionPopup.
+2. Scrivi nota nel composer, conferma. Toast "Nota ancorata al testo".
+3. Network: `POST /api/merlt/events/highlight-annotation` con `kind:"annotation"`, `noteText:"...testo nota...", anchorText:"...testo selezionato..."`.
+
+### Consent OFF
+- `DELETE /api/merlt/consent`. Ripeti highlight/annotation → nessuna chiamata `/events/highlight-annotation` (il subscriber gate-checks).
 
 ---
 
 ## Story MERLT-1.8 — dossier + bookmark
 
-*(da compilare quando Story 1.8 è chiusa)*
+### Bookmark
+1. Apri articolo → click sull'icona bookmark (o quick norm pin nella toolbar).
+2. Toast "Aggiunto ai segnalibri" (o "Aggiunto alle norme rapide").
+3. Network: `POST /api/merlt/events/dossier-bookmark` 202, `kind:"bookmark"`, `articleUrn:"..."`.
+
+### Dossier add
+1. Apri sidebar Dossier → seleziona un dossier esistente (o creane uno).
+2. Apri articolo → menu → "Aggiungi a dossier" → scegli dossier.
+3. Toast "Aggiunto al dossier".
+4. Network: `POST /api/merlt/events/dossier-bookmark` 202, `kind:"dossier"`, `dossierId:"<uuid>"`.
+
+### Negative case
+- Aggiungere una **nota** a dossier (type='note') NON deve emettere — solo le norme con URN sono tracciate.
 
 ---
 
 ## Story MERLT-1.9 — citation:clicked
 
-*(da compilare quando Story 1.9 è chiusa)*
+1. Apri un articolo che contiene citazioni (es. art. che riferisce ad altri articoli — c.c. art. 1175 cita 1218).
+2. Il citation linker ha sottolineato i riferimenti. Cliccaci sopra → click handler `handleOpenCitationInTab`.
+3. Network: `POST /api/merlt/events/citation-clicked` 202, `sourceArticleUrn:"..."`, `targetArticleUrn:null` (resolution avviene dopo via triggerSearch), `citationText:"art. 1218 c.c."` (o equivalente).
+4. La tab successiva aprirà l'articolo target tramite il normale flow `triggerSearch`.
 
 ---
 
 ## Story MERLT-1.10 — forum signals
 
-*(da compilare quando Story 1.10 è chiusa)*
+### Like
+1. Vai a Forum → tab Esplora.
+2. Click cuore su un SharedEnvironment qualunque. Il count aumenta.
+3. Network: `POST /api/merlt/events/forum-signal` 202, `action:"like"`, `sharedEnvId:"<uuid>"`, `originalAuthorId:"<env.user.id>"`.
+4. **Caveat**: unliking (cuore già attivo) NON emette evento — il subscriber gate filtra solo `liked=true`.
+
+### Download (import)
+1. Click "Importa" su un SharedEnvironment (richiede consent + scelta del subset di dossier/quick-norms).
+2. Network: `POST /api/merlt/events/forum-signal` 202, `action:"download"`, `originalAuthorId:"<env.user.id>"`.
+
+### Suggestion accept / decline
+1. Vai a Forum → tab Suggerimenti → ricevuti.
+2. Apri una suggestion che ti è stata mandata → SuggestionReviewDialog.
+3. **Take** un item → toast "Item preso" → Network: `POST /api/merlt/events/forum-signal` 202, `action:"suggestion_accepted"`, `originalAuthorId:"<suggester.id>"` (NB: chi ha proposto, non chi ospita l'env — vedi `docs/merlt-forum-authoring-decision.md`).
+4. **Decline** un item → toast "Item rifiutato" → idem con `action:"suggestion_declined"`.
+
+### Cross-route verification
+- I forum events partono dal global plugin slot (`Layout`-level), non dal article slot. Test: vai su Forum SENZA aver mai aperto un articolo → like → l'evento parte comunque. Storia 1.10 ha pensato a questa edge case.
 
 ---
 
