@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GraphExplorerPage } from '../GraphExplorerPage';
 import type { ArticleGraphState } from '../../shared/useArticleGraph';
@@ -15,6 +15,15 @@ vi.mock('../../shared/CytoscapeView', () => ({
 }));
 vi.mock('../../featureFlag', () => ({
   isMerltGraphEnabled: () => isEnabledMock(),
+}));
+
+const triggerIngestionMock = vi.fn();
+const useIngestionJobMock = vi.fn();
+vi.mock('../../shared/graphApi', () => ({
+  triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
+}));
+vi.mock('../../shared/useIngestionJob', () => ({
+  useIngestionJob: (...a: unknown[]) => useIngestionJobMock(...a),
 }));
 
 function setGraph(state: ArticleGraphState): void {
@@ -33,6 +42,10 @@ beforeEach(() => {
   useArticleGraphMock.mockReset();
   isEnabledMock.mockReset();
   isEnabledMock.mockReturnValue(true);
+  triggerIngestionMock.mockReset();
+  triggerIngestionMock.mockResolvedValue({ jobId: 'job-1', status: 'pending' });
+  useIngestionJobMock.mockReset();
+  useIngestionJobMock.mockReturnValue({ status: null, error: null, nodesCreated: null });
   setGraph({ status: 'idle' });
 });
 
@@ -86,6 +99,22 @@ describe('GraphExplorerPage', () => {
     for (const call of useArticleGraphMock.mock.calls) {
       expect(call).toEqual(['urn:test', 2]);
     }
+  });
+
+  it('triggers ingestion and shows a building banner when the subgraph is empty', async () => {
+    setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
+    renderAt('/grafo?urn=urn%3Anew');
+
+    await waitFor(() => expect(triggerIngestionMock).toHaveBeenCalledWith('urn:new'));
+    expect(screen.getByText(/indicizzazione in corso/i)).toBeInTheDocument();
+  });
+
+  it('shows "non indicizzabile" with retry when ingestion finished but graph is still empty', () => {
+    useIngestionJobMock.mockReturnValue({ status: 'completed', error: null, nodesCreated: 0 });
+    setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
+    renderAt('/grafo?urn=urn%3Anew');
+    expect(screen.getByText(/non indicizzabile/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
   });
 
   it('renders the graph canvas on success', async () => {

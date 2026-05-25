@@ -1,10 +1,13 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, Network } from 'lucide-react';
+import { AlertCircle, Loader2, Network } from 'lucide-react';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useArticleGraph } from '../shared/useArticleGraph';
+import { useIngestionJob } from '../shared/useIngestionJob';
+import { triggerIngestion } from '../shared/graphApi';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
 import type { GraphLayoutName } from '../shared/CytoscapeView';
+import { Toast } from '../../../../components/ui/Toast';
 import { GraphSearchBox } from './GraphSearchBox';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
@@ -42,6 +45,40 @@ export function GraphExplorerPage(): React.ReactElement {
   const graph = useArticleGraph(enabled ? urn : null, depth);
   const { entries, push } = useBreadcrumbHistory();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Lazy ingestion: a urn that resolves to an empty subgraph isn't in the graph
+  // yet — enqueue an ingestion job, poll it, then refetch when it completes.
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useIngestionJob(jobId);
+  const triggeredRef = useRef(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  useEffect(() => {
+    triggeredRef.current = false;
+    setJobId(null);
+  }, [urn]);
+
+  useEffect(() => {
+    if (graph.status !== 'success' || graph.data.nodes.length > 0) return;
+    if (triggeredRef.current || !urn) return;
+    triggeredRef.current = true;
+    triggerIngestion(urn)
+      .then((r) => setJobId(r.jobId))
+      .catch(() => {
+        /* opportunistic — empty state will show "non indicizzabile" */
+      });
+    // Keyed on status (data is undefined outside success; read at fire time;
+    // triggeredRef guards re-entry).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph.status, urn]);
+
+  useEffect(() => {
+    if (job.status === 'completed') {
+      setToast({ message: 'Grafo aggiornato', type: 'success' });
+      graph.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.status]);
 
   const nodes = graph.status === 'success' ? graph.data.nodes : [];
   const edges = graph.status === 'success' ? graph.data.edges : [];
@@ -108,7 +145,24 @@ export function GraphExplorerPage(): React.ReactElement {
           ) : graph.status === 'error' ? (
             <ErrorState />
           ) : graph.data.nodes.length === 0 ? (
-            <CenteredText text="Nessun nodo per questo elemento." />
+            job.status === 'failed' || job.status === 'timeout' || job.status === 'completed' ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+                <AlertCircle className="h-8 w-8 text-amber-500" />
+                <p className="text-slate-500 dark:text-slate-400">Articolo non indicizzabile nel grafo.</p>
+                <button
+                  type="button"
+                  onClick={graph.refetch}
+                  className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  Riprova
+                </button>
+              </div>
+            ) : (
+              <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                <p className="text-slate-500 dark:text-slate-400">Indicizzazione in corso…</p>
+              </div>
+            )
           ) : (
             <Suspense fallback={<CanvasSkeleton />}>
               <CytoscapeView
@@ -138,6 +192,15 @@ export function GraphExplorerPage(): React.ReactElement {
           </aside>
         )}
       </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          isVisible
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
