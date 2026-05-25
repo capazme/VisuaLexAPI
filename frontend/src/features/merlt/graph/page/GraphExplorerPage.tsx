@@ -55,9 +55,19 @@ export function GraphExplorerPage(): React.ReactElement {
   const triggeredRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
+  // Filtering / legend state (client-side, no refetch — hides via G6 visibility).
+  const [hiddenNodeTypes, setHiddenNodeTypes] = useState<ReadonlySet<string>>(new Set());
+  const [hiddenEdgeTypes, setHiddenEdgeTypes] = useState<ReadonlySet<string>>(new Set());
+  const [highlightType, setHighlightType] = useState<string | null>(null);
+
+  // Reset per-graph state when the CENTER (urn) changes — not on depth/layout —
+  // so filters/highlight don't bleed across different entities.
   useEffect(() => {
     triggeredRef.current = false;
     setJobId(null);
+    setHiddenNodeTypes(new Set());
+    setHiddenEdgeTypes(new Set());
+    setHighlightType(null);
   }, [urn]);
 
   useEffect(() => {
@@ -94,11 +104,6 @@ export function GraphExplorerPage(): React.ReactElement {
   const edges = graph.status === 'success' ? graph.data.edges : [];
   const nodesById = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
-
-  // Filtering / legend state (client-side, no refetch — hides via G6 visibility).
-  const [hiddenNodeTypes, setHiddenNodeTypes] = useState<ReadonlySet<string>>(new Set());
-  const [hiddenEdgeTypes, setHiddenEdgeTypes] = useState<ReadonlySet<string>>(new Set());
-  const [highlightType, setHighlightType] = useState<string | null>(null);
 
   const typeCounts = useMemo(
     () => (graph.status === 'success' ? computeTypeCounts(graph.elements) : { nodes: [], edges: [] }),
