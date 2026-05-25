@@ -125,6 +125,30 @@ async def lifespan(app: FastAPI):
             log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
             log.warning("Expert System endpoints will return 503 errors")
 
+        # Seed loader (Slice 2a, MERLT-2a.1) — idempotent, non-fatal.
+        # Loads the Libro IV CC graph (~27.7k nodes) from merlt/data/seeds/
+        # on first boot; subsequent boots short-circuit on the >100-nodes check.
+        if os.getenv("MERLT_SKIP_SEED", "").lower() != "true":
+            try:
+                from merlt.scripts.load_seed_libro_iv import load_seed_libro_iv_from_env
+                seed_result = await load_seed_libro_iv_from_env()
+                if seed_result.skipped:
+                    log.info("✅ Seed loader skipped",
+                             reason=seed_result.reason,
+                             nodes_before=seed_result.integrity.get("nodes_before"))
+                else:
+                    log.info("✅ Seed loader completed",
+                             nodes=seed_result.nodes_merged,
+                             edges=seed_result.edges_merged,
+                             embeddings=seed_result.embeddings_generated,
+                             bridge_rows=seed_result.bridge_restored_rows,
+                             integrity=seed_result.integrity)
+            except Exception as e:
+                # NON-fatal: MERL-T stays usable for Q&A without the seed.
+                # The user can run `python -m merlt.scripts.load_seed_libro_iv` later.
+                log.error("Seed loader failed", error=str(e), exc_info=True)
+                log.warning("Graph features may be limited until seed is loaded manually")
+
         log.info("=" * 60)
         log.info("MERL-T API Ready")
         log.info("=" * 60)

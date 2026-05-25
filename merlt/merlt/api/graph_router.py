@@ -17,8 +17,14 @@ Integrazione:
 - Supporta frontend VisuaLex per interactive sources
 """
 
+import asyncio
 import hashlib
+import os
 import structlog
+from redis import Redis
+from rq import Queue, Retry
+from rq.job import Job
+from rq.exceptions import NoSuchJobError
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, Dict, Any, List
 from sqlalchemy import select, or_
@@ -937,6 +943,107 @@ class SubgraphResponse(BaseModel):
     metadata: SubgraphMetadata
 
 
+# ====================================================
+# LAZY ARTICLE INGESTION (Slice 2a)
+# ====================================================
+
+
+class IngestArticleOptions(BaseModel):
+    force_refresh: bool = Field(False, description="Re-ingest anche se l'articolo è già nel grafo")
+    bff_job_id: Optional[str] = Field(None, description="ID del job lato BFF (MerltIngestionJob) per il callback")
+
+
+class IngestArticleRequest(BaseModel):
+    urn: str = Field(..., description="URN dell'articolo da ingerire (es. .../art2043)")
+    options: Optional[IngestArticleOptions] = Field(None, description="Opzioni di ingestion")
+
+
+class IngestArticleResponse(BaseModel):
+    task_id: str = Field(..., description="ID del job RQ accodato")
+    status: str = Field(..., description="'queued' se nuovo job, 'already_queued' se idempotency hit")
+    urn: str = Field(..., description="URN normalizzato")
+
+
+_RQ_QUEUE_NAME = "merlt_ingest"
+
+_rq_connection: Optional[Redis] = None
+
+
+def _get_rq_queue() -> Queue:
+    global _rq_connection
+    if _rq_connection is None:
+        _rq_connection = Redis.from_url(
+            os.getenv("RQ_REDIS_URL", "redis://localhost:6379/1")
+        )
+    return Queue(_RQ_QUEUE_NAME, connection=_rq_connection)
+
+
+@router.post("/ingest-article", response_model=IngestArticleResponse, status_code=202)
+async def ingest_article(
+    request: IngestArticleRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+) -> IngestArticleResponse:
+    """
+    Accoda un job di ingestion per un articolo non ancora presente nel grafo.
+
+    Idempotente sull'URN: il job usa un `job_id` derivato da sha256(urn) per
+    evitare problemi con caratteri speciali dell'URN come chiave Redis. RQ
+    sovrascrive i job con lo stesso id invece di deduplicarli, quindi
+    l'idempotenza è gestita con un pre-check esplicito: se esiste già un job
+    attivo per l'URN non se ne accoda un altro. Con `force_refresh=True` il
+    pre-check viene bypassato e una re-ingestion viene sempre accodata.
+    """
+    urn = request.urn
+    bff_job_id = request.options.bff_job_id if request.options else None
+    force_refresh = request.options.force_refresh if request.options else False
+    job_id = "ingest:" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
+
+    log.info("Enqueuing article ingestion job", urn=urn, bff_job_id=bff_job_id)
+
+    try:
+        queue = await asyncio.to_thread(_get_rq_queue)
+    except Exception as e:
+        log.error(f"Failed to connect to RQ job queue: {e}", urn=urn, exc_info=True)
+        raise HTTPException(status_code=503, detail="Job queue non disponibile")
+
+    # Idempotency: explicit pre-check (RQ enqueue overwrites, doesn't dedupe)
+    def _existing_active_job():
+        try:
+            job = Job.fetch(job_id, connection=queue.connection)
+        except NoSuchJobError:
+            return None
+        except Exception as e:
+            log.warning("Job.fetch failed, treating as absent", job_id=job_id, exc=str(e))
+            return None
+        return job if job.get_status(refresh=True) in ("queued", "started", "deferred", "scheduled") else None
+
+    existing = None
+    if not force_refresh:
+        existing = await asyncio.to_thread(_existing_active_job)
+
+    if existing is not None:
+        log.info("Ingestion job already active, idempotency hit", urn=urn, task_id=job_id)
+        return IngestArticleResponse(task_id=job_id, status="already_queued", urn=urn)
+
+    try:
+        job = await asyncio.to_thread(
+            lambda: queue.enqueue(
+                "merlt.worker.tasks.ingest_article",
+                urn,
+                bff_job_id,
+                job_id=job_id,
+                job_timeout=600,
+                retry=Retry(max=3, interval=[10, 30, 60]),
+            )
+        )
+    except Exception as e:
+        log.error(f"Failed to enqueue ingestion job: {e}", urn=urn, exc_info=True)
+        raise HTTPException(status_code=503, detail="Job queue non disponibile")
+
+    log.info("Ingestion job queued", urn=urn, task_id=job.id)
+    return IngestArticleResponse(task_id=job.id, status="queued", urn=urn)
+
+
 @router.get("/overview", response_model=SubgraphResponse)
 async def get_graph_overview(
     max_nodes: int = 50,
@@ -1851,4 +1958,8 @@ __all__ = [
     "GraphSearchRequest",
     "GraphSearchResponse",
     "GraphSearchFilters",
+    "ingest_article",
+    "IngestArticleRequest",
+    "IngestArticleResponse",
+    "IngestArticleOptions",
 ]

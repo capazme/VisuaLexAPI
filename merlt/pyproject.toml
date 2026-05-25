@@ -68,6 +68,9 @@ dependencies = [
     # Cache / Rate limiting
     "redis>=5.0.0",
 
+    # Background job queue (lazy graph ingestion)
+    "rq>=2.0.0",
+
     # JWT verification
     "PyJWT>=2.8.0",
 

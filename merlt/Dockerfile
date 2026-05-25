@@ -38,8 +38,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install runtime dependencies
+# postgresql-client provides `psql` used by the Slice 2a seed loader to restore
+# the bridge_table dump (merlt.scripts.load_seed_libro_iv).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
