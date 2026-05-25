@@ -31,25 +31,38 @@ export interface GraphCanvasProps {
 function layoutConfig(name: GraphLayoutName): LayoutOptions {
   switch (name) {
     case 'dagre':
-      return { type: 'antv-dagre', rankdir: 'TB', nodesep: 25, ranksep: 55 };
+      return { type: 'antv-dagre', rankdir: 'TB', nodesep: 28, ranksep: 60 };
     case 'breadthfirst':
-      return { type: 'antv-dagre', rankdir: 'LR', nodesep: 20, ranksep: 60 };
+      return { type: 'antv-dagre', rankdir: 'LR', nodesep: 22, ranksep: 65 };
     case 'concentric':
-      return { type: 'concentric', nodeSize: 32 };
+      return { type: 'concentric', nodeSize: 34 };
     case 'circle':
       return { type: 'circular' };
     case 'cose-bilkent':
     default:
+      // d3-force tuned to spread nodes and prevent overlap (collide ≈ node size
+      // + label room); gentle settling so it doesn't jitter forever.
       return {
         type: 'd3-force',
-        link: { distance: 90 },
-        collide: { radius: 30 },
-        manyBody: { strength: -180 },
-      };
+        link: { distance: 130, strength: 0.4 },
+        collide: { radius: 44, strength: 0.9 },
+        manyBody: { strength: -320 },
+        center: {},
+        alphaDecay: 0.028,
+      } as LayoutOptions;
   }
 }
 
-const SELECTED_STATE_STYLE = { lineWidth: 3, stroke: '#0f172a', halo: true };
+// Node/edge state styles driven by click-select + hover-activate.
+const NODE_STATE = {
+  selected: { lineWidth: 3, stroke: '#0f172a', fillOpacity: 0.32 },
+  active: { lineWidth: 3, fillOpacity: 0.3 },
+  inactive: { opacity: 0.18 },
+};
+const EDGE_STATE = {
+  active: { strokeOpacity: 1, lineWidth: 2.5, labelOpacity: 1 },
+  inactive: { strokeOpacity: 0.06, labelOpacity: 0 },
+};
 
 export default function GraphCanvas({
   nodes,
@@ -77,11 +90,20 @@ export default function GraphCanvas({
       container: containerRef.current,
       autoResize: true,
       autoFit: 'view',
+      padding: 24,
       data: { nodes, edges },
-      node: { style: nodeStyleMapper, state: { selected: SELECTED_STATE_STYLE } },
-      edge: { type: 'line', style: edgeStyleMapper },
+      node: { style: nodeStyleMapper, state: NODE_STATE },
+      edge: { type: 'quadratic', style: edgeStyleMapper, state: EDGE_STATE },
       layout: layoutConfig(layout),
-      behaviors: ['zoom-canvas', 'drag-canvas', 'drag-element', 'click-select'],
+      behaviors: [
+        'zoom-canvas',
+        'drag-canvas',
+        'drag-element',
+        'click-select',
+        // Hover a node → highlight it + its 1-degree neighbourhood, fade the rest
+        // (and reveal the relation labels of the active edges).
+        { type: 'hover-activate', degree: 1, state: 'active', inactiveState: 'inactive' },
+      ],
     });
     graphRef.current = graph;
 

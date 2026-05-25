@@ -89,16 +89,26 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
   const data = (datum.data ?? {}) as { type?: string; label?: string };
   const color = (data.type && NODE_TYPE_STYLE[data.type]?.color) || DEFAULT_NODE_COLOR;
   return {
+    // Soft tinted fill + saturated border in the type hue → readable, not garish.
     fill: color,
-    stroke: '#1e293b',
-    lineWidth: 1,
-    size: 26,
+    fillOpacity: 0.18,
+    stroke: color,
+    lineWidth: 1.75,
+    size: 30,
+    radius: 6,
     labelText: data.label ?? '',
     labelFill: '#0f172a',
     labelFontSize: 10,
+    labelFontWeight: 500,
     labelPlacement: 'bottom',
-    labelMaxWidth: 120,
+    labelMaxWidth: 130,
     labelWordWrap: true,
+    labelMaxLines: 2,
+    labelBackground: true,
+    labelBackgroundFill: '#ffffff',
+    labelBackgroundOpacity: 0.72,
+    labelBackgroundRadius: 3,
+    labelPadding: [1, 3],
   };
 }
 
@@ -109,14 +119,20 @@ export function edgeStyleMapper(datum: EdgeData): Record<string, unknown> {
   const color = spec?.color ?? DEFAULT_EDGE_COLOR;
   return {
     stroke: color,
-    lineWidth: 1.5,
+    strokeOpacity: 0.5,
+    lineWidth: 1.25,
     lineDash: spec?.dash ? [4, 4] : undefined,
     endArrow: true,
+    endArrowSize: 6,
+    // Relation labels hidden until hover (hover-activate flips labelOpacity) to
+    // keep dense graphs clean; text stays set for tooltips/accessibility.
     labelText: data.label ?? '',
-    labelFontSize: 8,
-    labelFill: '#64748b',
+    labelOpacity: 0,
+    labelFontSize: 9,
+    labelFill: '#475569',
     labelBackground: true,
     labelBackgroundFill: '#ffffff',
-    labelBackgroundOpacity: 0.7,
+    labelBackgroundOpacity: 0.85,
+    labelBackgroundRadius: 2,
   };
 }
