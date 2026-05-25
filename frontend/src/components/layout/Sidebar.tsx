@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, Bot } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, Bot, Network } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '../../hooks/useAuth';
@@ -246,6 +247,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
         <NavItem to="/merlt" icon={Bot} label="MERLT" onClick={closeMobile} />
+        {isMerltGraphEnabled() && (
+          <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />
+        )}
         <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
       </nav>
 
