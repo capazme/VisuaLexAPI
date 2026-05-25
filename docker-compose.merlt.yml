@@ -196,6 +196,14 @@ services:
       # Parity with merlt-api; ingest scrapes live but keep the data mount available.
       - ./merlt/data:/app/data:ro
     command: ["rq", "worker", "merlt_ingest", "--url", "redis://merlt-redis:6379/1"]
+    # Override the API image's HTTP healthcheck (curl :8000) — the worker is not
+    # an HTTP server. Liveness here = it can reach its RQ Redis (DB 1).
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,redis; redis.from_url(os.environ['RQ_REDIS_URL']).ping()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   merlt_postgres_data:
