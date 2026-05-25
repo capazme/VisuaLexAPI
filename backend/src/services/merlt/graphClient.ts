@@ -49,6 +49,17 @@ export interface IngestArticleResponse {
   urn: string;
 }
 
+/**
+ * The knowledge graph seeds Normattiva URNs WITHOUT the version marker
+ * (`!vig=…` / `!orig=…`), but VisuaLex's `norma_data.urn` carries it. Strip
+ * everything from the first `!` so graph lookups match the seeded node ids.
+ * `!` is the NIR version/annex separator, never part of the article id.
+ */
+export function normalizeGraphUrn(urn: string): string {
+  const bang = urn.indexOf('!');
+  return bang === -1 ? urn : urn.slice(0, bang);
+}
+
 export class GraphClient {
   constructor(private readonly config: GraphClientConfig) {}
 
@@ -57,7 +68,7 @@ export class GraphClient {
    * Query param is `article_urn` (NOT `urn`).
    */
   async checkArticle(urn: string): Promise<CheckArticleResponse> {
-    const qs = new URLSearchParams({ article_urn: urn }).toString();
+    const qs = new URLSearchParams({ article_urn: normalizeGraphUrn(urn) }).toString();
     return this.request('GET', `/api/v1/graph/check-article?${qs}`);
   }
 
@@ -67,7 +78,7 @@ export class GraphClient {
    */
   async getSubgraph(urn: string, depth = 2, maxNodes = 500): Promise<SubgraphResponse> {
     const qs = new URLSearchParams({
-      root_urn: urn,
+      root_urn: normalizeGraphUrn(urn),
       depth: String(depth),
       max_nodes: String(maxNodes),
     }).toString();
@@ -80,7 +91,7 @@ export class GraphClient {
    */
   async ingestArticle(urn: string, bffJobId: string): Promise<IngestArticleResponse> {
     return this.request('POST', '/api/v1/graph/ingest-article', {
-      urn,
+      urn: normalizeGraphUrn(urn),
       options: { bff_job_id: bffJobId },
     });
   }

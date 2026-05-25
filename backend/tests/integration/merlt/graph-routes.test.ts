@@ -161,6 +161,30 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     expect(seen.depth).toBe('3');
   });
 
+  it('strips the !vig= version suffix from the urn before querying MERL-T', async () => {
+    await grantConsent(user, 'basic');
+    const rawUrn =
+      'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=';
+    const normalized =
+      'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043';
+
+    let seenRoot: unknown;
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/subgraph')
+      .query((q) => {
+        seenRoot = q.root_urn;
+        return true;
+      })
+      .reply(200, mockSubgraph(normalized));
+
+    const res = await request(app)
+      .get(`/api/merlt/graph/article/${encodeURIComponent(rawUrn)}`)
+      .set(authHeader(user));
+
+    expect(res.status).toBe(200);
+    expect(seenRoot).toBe(normalized);
+  });
+
   it('returns 503 merlt_unavailable when MERL-T is down', async () => {
     await grantConsent(user, 'basic');
     const urn = 'urn:nir:stato:codice.civile:1942;2043';
