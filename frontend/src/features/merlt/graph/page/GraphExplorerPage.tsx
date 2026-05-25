@@ -4,9 +4,12 @@ import { AlertCircle, Network } from 'lucide-react';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useArticleGraph } from '../shared/useArticleGraph';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
+import type { GraphLayoutName } from '../shared/CytoscapeView';
 import { GraphSearchBox } from './GraphSearchBox';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
+import { DepthSelector } from './DepthSelector';
+import { LAYOUT_OPTIONS } from './graphLayouts';
 import { useBreadcrumbHistory } from './useBreadcrumbHistory';
 
 const CytoscapeView = lazy(() => import('../shared/CytoscapeView'));
@@ -15,6 +18,11 @@ function clampDepth(raw: string | null): number {
   const n = raw ? Number.parseInt(raw, 10) : NaN;
   if (Number.isNaN(n)) return 2;
   return Math.min(3, Math.max(1, n));
+}
+
+function parseLayout(raw: string | null): GraphLayoutName {
+  const allowed = LAYOUT_OPTIONS.map((o) => o.value);
+  return allowed.includes(raw as GraphLayoutName) ? (raw as GraphLayoutName) : 'cose-bilkent';
 }
 
 /**
@@ -29,6 +37,7 @@ export function GraphExplorerPage(): React.ReactElement {
   const enabled = isMerltGraphEnabled();
   const urn = searchParams.get('urn');
   const depth = clampDepth(searchParams.get('depth'));
+  const layout = parseLayout(searchParams.get('layout'));
   // Hooks must run unconditionally; pass null urn when disabled so no fetch fires.
   const graph = useArticleGraph(enabled ? urn : null, depth);
   const { entries, push } = useBreadcrumbHistory();
@@ -44,7 +53,16 @@ export function GraphExplorerPage(): React.ReactElement {
   const goToCenter = (target: string, label: string): void => {
     push({ urn: target, label });
     setSelectedNodeId(null);
-    setSearchParams({ urn: target, depth: String(depth) });
+    setSearchParams({ urn: target, depth: String(depth), layout });
+  };
+
+  // Depth changes refetch (depth is a useArticleGraph dep); layout changes only
+  // re-run the client-side layout. Both round-trip the URL for shareable deeplinks.
+  const setDepth = (d: number): void => {
+    if (urn) setSearchParams({ urn, depth: String(d), layout });
+  };
+  const setLayout = (l: GraphLayoutName): void => {
+    if (urn) setSearchParams({ urn, depth: String(depth), layout: l });
   };
 
   const handleSelect = (item: GraphSearchItem): void => {
@@ -74,6 +92,9 @@ export function GraphExplorerPage(): React.ReactElement {
         <div className="flex-1 sm:max-w-md">
           <GraphSearchBox onSelect={handleSelect} />
         </div>
+        {urn && (
+          <DepthSelector depth={depth} layout={layout} onDepthChange={setDepth} onLayoutChange={setLayout} />
+        )}
       </header>
 
       <BreadcrumbHistory entries={entries} onNavigate={(u) => goToCenter(u, labelFor(u, entries))} />
@@ -93,7 +114,7 @@ export function GraphExplorerPage(): React.ReactElement {
               <CytoscapeView
                 nodes={graph.elements.nodes}
                 edges={graph.elements.edges}
-                layout="cose-bilkent"
+                layout={layout}
                 height="100%"
                 onNodeClick={setSelectedNodeId}
                 onNodeDblClick={(id) => {

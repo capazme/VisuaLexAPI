@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GraphExplorerPage } from '../GraphExplorerPage';
 import type { ArticleGraphState } from '../../shared/useArticleGraph';
@@ -54,6 +54,38 @@ describe('GraphExplorerPage', () => {
     renderAt('/grafo?urn=urn%3Atest&depth=3');
     expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3);
     expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  it('shows the depth selector with the URL depth active and refetches on change', () => {
+    setGraph({
+      status: 'success',
+      data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
+      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+    });
+    renderAt('/grafo?urn=urn%3Atest&depth=1');
+
+    expect(screen.getByRole('button', { name: '1' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    // URL depth → 3 → useArticleGraph re-invoked with the new depth (refetch).
+    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3);
+  });
+
+  it('changing layout does not change the urn/depth passed to useArticleGraph (no refetch)', () => {
+    setGraph({
+      status: 'success',
+      data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
+      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+    });
+    renderAt('/grafo?urn=urn%3Atest&depth=2');
+
+    fireEvent.change(screen.getByRole('combobox', { name: /layout/i }), {
+      target: { value: 'dagre' },
+    });
+    // Every call keeps depth=2 — layout never reaches the fetch hook.
+    for (const call of useArticleGraphMock.mock.calls) {
+      expect(call).toEqual(['urn:test', 2]);
+    }
   });
 
   it('renders the graph canvas on success', async () => {
