@@ -1,10 +1,13 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, Network } from 'lucide-react';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useArticleGraph } from '../shared/useArticleGraph';
-import type { GraphSearchItem } from '../shared/types';
+import type { GraphNode, GraphSearchItem } from '../shared/types';
 import { GraphSearchBox } from './GraphSearchBox';
+import { BreadcrumbHistory } from './BreadcrumbHistory';
+import { NodeDetailsDrawer } from './NodeDetailsDrawer';
+import { useBreadcrumbHistory } from './useBreadcrumbHistory';
 
 const CytoscapeView = lazy(() => import('../shared/CytoscapeView'));
 
@@ -28,10 +31,28 @@ export function GraphExplorerPage(): React.ReactElement {
   const depth = clampDepth(searchParams.get('depth'));
   // Hooks must run unconditionally; pass null urn when disabled so no fetch fires.
   const graph = useArticleGraph(enabled ? urn : null, depth);
+  const { entries, push } = useBreadcrumbHistory();
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  const nodes = graph.status === 'success' ? graph.data.nodes : [];
+  const edges = graph.status === 'success' ? graph.data.edges : [];
+  const nodesById = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
+  const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
+
+  // Single navigation entry point: records the breadcrumb, resets selection,
+  // and drives the fetch via the URL (so refresh/deeplink reproduce the state).
+  const goToCenter = (target: string, label: string): void => {
+    push({ urn: target, label });
+    setSelectedNodeId(null);
+    setSearchParams({ urn: target, depth: String(depth) });
+  };
 
   const handleSelect = (item: GraphSearchItem): void => {
-    const target = item.urn ?? item.id;
-    setSearchParams({ urn: target, depth: String(depth) });
+    goToCenter(item.urn ?? item.id, item.nome ?? item.id);
+  };
+
+  const handleRecenter = (node: GraphNode): void => {
+    goToCenter(node.urn ?? node.id, node.label);
   };
 
   if (!enabled) {
@@ -55,6 +76,8 @@ export function GraphExplorerPage(): React.ReactElement {
         </div>
       </header>
 
+      <BreadcrumbHistory entries={entries} onNavigate={(u) => goToCenter(u, labelFor(u, entries))} />
+
       <div className="flex min-h-0 flex-1">
         <main className="relative min-h-0 flex-1">
           {!urn ? (
@@ -72,16 +95,35 @@ export function GraphExplorerPage(): React.ReactElement {
                 edges={graph.elements.edges}
                 layout="cose-bilkent"
                 height="100%"
+                onNodeClick={setSelectedNodeId}
+                onNodeDblClick={(id) => {
+                  const n = nodesById.get(id);
+                  if (n) handleRecenter(n);
+                }}
               />
             </Suspense>
           )}
         </main>
 
-        {/* Right column reserved for NodeDetailsDrawer (MERLT-2a.10). */}
-        <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 dark:border-slate-800 lg:block" />
+        {selectedNode && (
+          <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 dark:border-slate-800 lg:block">
+            <NodeDetailsDrawer
+              node={selectedNode}
+              edges={edges}
+              nodesById={nodesById}
+              onRecenter={handleRecenter}
+              onClose={() => setSelectedNodeId(null)}
+            />
+          </aside>
+        )}
       </div>
     </div>
   );
+}
+
+/** Best-known label for a breadcrumb urn (falls back to the urn itself). */
+function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>['entries']): string {
+  return entries.find((e) => e.urn === urn)?.label ?? urn;
 }
 
 function EmptyState(): React.ReactElement {
