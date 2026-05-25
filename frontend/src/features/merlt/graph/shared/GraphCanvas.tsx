@@ -8,8 +8,12 @@ import { nodeStyleMapper, edgeStyleMapper } from './graphStyles';
  *
  * Default export so consumers can code-split it via
  * `React.lazy(() => import('.../GraphCanvas'))` — @antv/g6 is heavy and must not
- * land in the main bundle. Same prop contract as the previous Cytoscape view,
- * so the side rail / page didn't change shape.
+ * land in the main bundle.
+ *
+ * Filtering (hiddenNodeTypes/hiddenEdgeTypes) and legend highlight
+ * (highlightNodeType) are applied imperatively via setElementVisibility /
+ * setElementState WITHOUT re-running the layout, so the user's mental map of
+ * the graph is preserved while exploring.
  */
 
 export type GraphLayoutName =
@@ -24,6 +28,12 @@ export interface GraphCanvasProps {
   edges: EdgeData[];
   layout?: GraphLayoutName;
   height?: number | string;
+  /** Hide all nodes of these semantic types (and their dangling edges). */
+  hiddenNodeTypes?: ReadonlySet<string>;
+  /** Hide all edges of these relation types. */
+  hiddenEdgeTypes?: ReadonlySet<string>;
+  /** Emphasize nodes of this type (legend hover); fade the rest. null = clear. */
+  highlightNodeType?: string | null;
   onNodeClick?: (nodeId: string) => void;
   onNodeDblClick?: (nodeId: string) => void;
 }
@@ -40,8 +50,6 @@ function layoutConfig(name: GraphLayoutName): LayoutOptions {
       return { type: 'circular' };
     case 'cose-bilkent':
     default:
-      // d3-force tuned to spread nodes and prevent overlap (collide ≈ node size
-      // + label room); gentle settling so it doesn't jitter forever.
       return {
         type: 'd3-force',
         link: { distance: 130, strength: 0.4 },
@@ -53,7 +61,6 @@ function layoutConfig(name: GraphLayoutName): LayoutOptions {
   }
 }
 
-// Node/edge state styles driven by click-select + hover-activate.
 const NODE_STATE = {
   selected: { lineWidth: 3, stroke: '#0f172a', fillOpacity: 0.32 },
   active: { lineWidth: 3, fillOpacity: 0.3 },
@@ -64,16 +71,69 @@ const EDGE_STATE = {
   inactive: { strokeOpacity: 0.06, labelOpacity: 0 },
 };
 
+function dataSignature(nodes: NodeData[], edges: EdgeData[]): string {
+  return `${nodes.map((n) => n.id).join(',')}|${edges.map((e) => e.id).join(',')}`;
+}
+
+type Visibility = 'visible' | 'hidden';
+
+function buildVisibilityMap(
+  nodes: NodeData[],
+  edges: EdgeData[],
+  hiddenNodeTypes?: ReadonlySet<string>,
+  hiddenEdgeTypes?: ReadonlySet<string>
+): Record<string, Visibility> {
+  const hiddenNodeIds = new Set<string>();
+  const map: Record<string, Visibility> = {};
+  for (const n of nodes) {
+    const t = n.data?.type as string | undefined;
+    const hidden = !!(t && hiddenNodeTypes?.has(t));
+    if (hidden && n.id != null) hiddenNodeIds.add(String(n.id));
+    if (n.id != null) map[String(n.id)] = hidden ? 'hidden' : 'visible';
+  }
+  for (const e of edges) {
+    const t = e.data?.type as string | undefined;
+    const hidden =
+      !!(t && hiddenEdgeTypes?.has(t)) ||
+      (e.source != null && hiddenNodeIds.has(String(e.source))) ||
+      (e.target != null && hiddenNodeIds.has(String(e.target)));
+    if (e.id != null) map[String(e.id)] = hidden ? 'hidden' : 'visible';
+  }
+  return map;
+}
+
+function buildHighlightState(
+  nodes: NodeData[],
+  edges: EdgeData[],
+  type: string | null | undefined
+): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const n of nodes) {
+    if (n.id == null) continue;
+    if (!type) map[String(n.id)] = [];
+    else map[String(n.id)] = n.data?.type === type ? ['active'] : ['inactive'];
+  }
+  for (const e of edges) {
+    if (e.id == null) continue;
+    map[String(e.id)] = type ? ['inactive'] : [];
+  }
+  return map;
+}
+
 export default function GraphCanvas({
   nodes,
   edges,
   layout = 'cose-bilkent',
   height = 300,
+  hiddenNodeTypes,
+  hiddenEdgeTypes,
+  highlightNodeType,
   onNodeClick,
   onNodeDblClick,
 }: GraphCanvasProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
+  const dataSigRef = useRef<string>('');
 
   // Keep handlers in refs so the once-attached listeners never go stale.
   const clickRef = useRef(onNodeClick);
@@ -83,7 +143,8 @@ export default function GraphCanvas({
     dblRef.current = onNodeDblClick;
   }, [onNodeClick, onNodeDblClick]);
 
-  // Create the graph once. Data/layout changes are handled by the effects below.
+  // Create the graph once. Data/filter/layout changes are applied by the
+  // sibling effects below (G6 is an external system synced imperatively).
   useEffect(() => {
     if (!containerRef.current) return;
     const graph = new Graph({
@@ -100,12 +161,11 @@ export default function GraphCanvas({
         'drag-canvas',
         'drag-element',
         'click-select',
-        // Hover a node → highlight it + its 1-degree neighbourhood, fade the rest
-        // (and reveal the relation labels of the active edges).
         { type: 'hover-activate', degree: 1, state: 'active', inactiveState: 'inactive' },
       ],
     });
     graphRef.current = graph;
+    dataSigRef.current = dataSignature(nodes, edges);
 
     graph.on('node:click', (e) => {
       const id = (e as unknown as { target?: { id?: string } }).target?.id;
@@ -122,18 +182,39 @@ export default function GraphCanvas({
       graph.destroy();
       graphRef.current = null;
     };
-    // Create-once: subsequent nodes/edges/layout changes are applied by the
-    // sibling effects below (G6 graph is an external system synced imperatively).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-feed data when nodes/edges change.
+  // Data OR filter change. Relayout only when the node/edge set actually changed;
+  // a filter-only change just toggles visibility (preserves positions).
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
-    g.setData({ nodes, edges });
-    void g.render();
-  }, [nodes, edges]);
+    const sig = dataSignature(nodes, edges);
+    const visibility = buildVisibilityMap(nodes, edges, hiddenNodeTypes, hiddenEdgeTypes);
+    if (sig !== dataSigRef.current) {
+      dataSigRef.current = sig;
+      g.setData({ nodes, edges });
+      void g.render().then(() => g.setElementVisibility(visibility)).catch(() => {});
+    } else {
+      try {
+        void g.setElementVisibility(visibility);
+      } catch {
+        /* elements not ready yet (initial frame) — visibility re-applies on next change */
+      }
+    }
+  }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes]);
+
+  // Legend hover → emphasize nodes of a type, fade the rest (no relayout).
+  useEffect(() => {
+    const g = graphRef.current;
+    if (!g) return;
+    try {
+      void g.setElementState(buildHighlightState(nodes, edges, highlightNodeType));
+    } catch {
+      /* ignore until rendered */
+    }
+  }, [highlightNodeType, nodes, edges]);
 
   // Re-run layout when the layout changes (no data refetch).
   useEffect(() => {

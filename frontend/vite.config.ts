@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Pre-bundle the heavy graph lib at server start so the lazy GraphCanvas import
+  // never triggers a mid-session re-optimize (the "504 Outdated Optimize Dep").
+  optimizeDeps: {
+    include: ['@antv/g6'],
+  },
   server: {
     proxy: {
       // Python API routes (port 5000)

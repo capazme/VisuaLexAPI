@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, Loader2, Network } from 'lucide-react';
 import { isMerltGraphEnabled } from '../featureFlag';
@@ -8,10 +8,12 @@ import { triggerIngestion } from '../shared/graphApi';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
 import type { GraphLayoutName } from '../shared/GraphCanvas';
 import { Toast } from '../../../../components/ui/Toast';
+import { computeTypeCounts } from '../shared/graphFilters';
 import { GraphSearchBox } from './GraphSearchBox';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
 import { DepthSelector } from './DepthSelector';
+import { GraphFilterPanel } from './GraphFilterPanel';
 import { LAYOUT_OPTIONS } from './graphLayouts';
 import { useBreadcrumbHistory } from './useBreadcrumbHistory';
 
@@ -93,6 +95,23 @@ export function GraphExplorerPage(): React.ReactElement {
   const nodesById = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
 
+  // Filtering / legend state (client-side, no refetch — hides via G6 visibility).
+  const [hiddenNodeTypes, setHiddenNodeTypes] = useState<ReadonlySet<string>>(new Set());
+  const [hiddenEdgeTypes, setHiddenEdgeTypes] = useState<ReadonlySet<string>>(new Set());
+  const [highlightType, setHighlightType] = useState<string | null>(null);
+
+  const typeCounts = useMemo(
+    () => (graph.status === 'success' ? computeTypeCounts(graph.elements) : { nodes: [], edges: [] }),
+    [graph]
+  );
+
+  const toggleHidden = (set: ReadonlySet<string>, type: string): Set<string> => {
+    const next = new Set(set);
+    if (next.has(type)) next.delete(type);
+    else next.add(type);
+    return next;
+  };
+
   // Single navigation entry point: records the breadcrumb, resets selection,
   // and drives the fetch via the URL (so refresh/deeplink reproduce the state).
   const goToCenter = (target: string, label: string): void => {
@@ -173,11 +192,29 @@ export function GraphExplorerPage(): React.ReactElement {
             )
           ) : (
             <Suspense fallback={<CanvasSkeleton />}>
+              <GraphFilterPanel
+                nodeTypes={typeCounts.nodes}
+                edgeTypes={typeCounts.edges}
+                hiddenNodeTypes={hiddenNodeTypes}
+                hiddenEdgeTypes={hiddenEdgeTypes}
+                onToggleNodeType={(t) => setHiddenNodeTypes((s) => toggleHidden(s, t))}
+                onToggleEdgeType={(t) => setHiddenEdgeTypes((s) => toggleHidden(s, t))}
+                onSetAllNodes={(hidden) =>
+                  setHiddenNodeTypes(hidden ? new Set(typeCounts.nodes.map((n) => n.type)) : new Set())
+                }
+                onSetAllEdges={(hidden) =>
+                  setHiddenEdgeTypes(hidden ? new Set(typeCounts.edges.map((e) => e.type)) : new Set())
+                }
+                onHoverType={setHighlightType}
+              />
               <GraphCanvas
                 nodes={graph.elements.nodes}
                 edges={graph.elements.edges}
                 layout={layout}
                 height="100%"
+                hiddenNodeTypes={hiddenNodeTypes}
+                hiddenEdgeTypes={hiddenEdgeTypes}
+                highlightNodeType={highlightType}
                 onNodeClick={setSelectedNodeId}
                 onNodeDblClick={(id) => {
                   const n = nodesById.get(id);
