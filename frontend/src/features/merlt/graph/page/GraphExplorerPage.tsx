@@ -223,19 +223,18 @@ export function GraphExplorerPage(): React.ReactElement {
               />
             </Suspense>
           )}
+          {selectedNode && (
+            <div className="absolute bottom-3 right-3 top-3 z-20 flex w-[360px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+              <NodeDetailsDrawer
+                node={selectedNode}
+                edges={edges}
+                nodesById={nodesById}
+                onRecenter={handleRecenter}
+                onClose={() => setSelectedNodeId(null)}
+              />
+            </div>
+          )}
         </main>
-
-        {selectedNode && (
-          <aside className="hidden w-[300px] shrink-0 border-l border-slate-200 dark:border-slate-800 lg:block">
-            <NodeDetailsDrawer
-              node={selectedNode}
-              edges={edges}
-              nodesById={nodesById}
-              onRecenter={handleRecenter}
-              onClose={() => setSelectedNodeId(null)}
-            />
-          </aside>
-        )}
       </div>
 
       {toast && (

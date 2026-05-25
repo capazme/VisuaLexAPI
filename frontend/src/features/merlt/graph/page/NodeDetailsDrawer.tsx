@@ -1,4 +1,5 @@
 import { X, Crosshair } from 'lucide-react';
+import { NODE_TYPE_STYLE } from '../shared/graphStyles';
 import type { GraphNode, GraphEdge } from '../shared/types';
 
 export interface NodeDetailsDrawerProps {
@@ -9,26 +10,34 @@ export interface NodeDetailsDrawerProps {
   onClose: () => void;
 }
 
-// Property keys worth surfacing, in display order. Anything else is ignored to
-// keep the drawer readable (the full blob lives in the graph, not the UI).
-const SHOWN_PROPS: Array<{ key: string; label: string; truncate?: number }> = [
+// Prominent properties shown first, in this order, with friendly labels.
+const PRIMARY_PROPS: Array<{ key: string; label: string; long?: boolean }> = [
   { key: 'rubrica', label: 'Rubrica' },
   { key: 'fonte', label: 'Fonte' },
-  { key: 'testo_vigente', label: 'Testo', truncate: 240 },
-  { key: 'descrizione', label: 'Descrizione', truncate: 240 },
-  { key: 'massima_text', label: 'Massima', truncate: 240 },
+  { key: 'testo_vigente', label: 'Testo vigente', long: true },
+  { key: 'testo', label: 'Testo', long: true },
+  { key: 'descrizione', label: 'Descrizione', long: true },
+  { key: 'massima_text', label: 'Massima', long: true },
+  { key: 'spiegazione', label: 'Spiegazione', long: true },
+  { key: 'ratio', label: 'Ratio', long: true },
 ];
+const PRIMARY_KEYS = new Set(PRIMARY_PROPS.map((p) => p.key));
 
 function asText(value: unknown): string | null {
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') return value.trim() || null;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   return null;
 }
 
+function humanize(key: string): string {
+  const s = key.replace(/[_-]+/g, ' ').trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /**
- * Right-hand drawer with the selected node's metadata and its in/out relations.
- * "Centra qui" re-centers the explorer on this node (click-to-recenter is the
- * double-click path; this is the explicit button equivalent).
+ * Right-hand details panel for the selected node: full metadata + in/out
+ * relations (each clickable to re-center on the connected node). "Centra qui"
+ * re-centers on this node. Rendered inside a floating container by the page.
  */
 export function NodeDetailsDrawer({
   node,
@@ -39,16 +48,29 @@ export function NodeDetailsDrawer({
 }: NodeDetailsDrawerProps): React.ReactElement | null {
   if (!node) return null;
 
+  const props = node.properties ?? {};
   const outgoing = edges.filter((e) => e.source === node.id);
   const incoming = edges.filter((e) => e.target === node.id);
-  const props = node.properties ?? {};
+  const typeColor = NODE_TYPE_STYLE[node.type]?.color ?? '#94a3b8';
+
+  // Remaining primitive properties not already shown prominently.
+  const extraProps = Object.entries(props)
+    .filter(([k]) => !PRIMARY_KEYS.has(k))
+    .map(([k, v]) => [k, asText(v)] as const)
+    .filter((entry): entry is [string, string] => entry[1] !== null);
 
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-start justify-between gap-2 border-b border-slate-200 p-3 dark:border-slate-700">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{node.label}</h2>
-          <span className="mt-0.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+          <h2 className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
+            {node.label}
+          </h2>
+          <span
+            className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+            style={{ backgroundColor: `${typeColor}22` }}
+          >
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: typeColor }} />
             {node.type}
           </span>
         </div>
@@ -56,34 +78,64 @@ export function NodeDetailsDrawer({
           type="button"
           aria-label="Chiudi"
           onClick={onClose}
-          className="rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
+          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
         >
           <X className="h-4 w-4" />
         </button>
       </header>
 
-      <div className="flex-1 space-y-4 overflow-auto p-3 text-sm">
+      <div className="flex-1 space-y-4 overflow-y-auto p-3 text-sm">
         {node.urn && (
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">URN</p>
+          <Field label="URN">
             <p className="break-all font-mono text-xs text-slate-600 dark:text-slate-300">{node.urn}</p>
-          </div>
+          </Field>
         )}
 
-        {SHOWN_PROPS.map(({ key, label, truncate }) => {
+        {PRIMARY_PROPS.map(({ key, label, long }) => {
           const text = asText(props[key]);
           if (!text) return null;
-          const shown = truncate && text.length > truncate ? `${text.slice(0, truncate)}…` : text;
           return (
-            <div key={key}>
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
-              <p className="text-slate-700 dark:text-slate-200">{shown}</p>
-            </div>
+            <Field key={key} label={label}>
+              <p
+                className={
+                  long
+                    ? 'whitespace-pre-wrap text-slate-700 dark:text-slate-200'
+                    : 'text-slate-700 dark:text-slate-200'
+                }
+              >
+                {text}
+              </p>
+            </Field>
           );
         })}
 
-        <RelationGroup title="Relazioni in uscita" edges={outgoing} dir="out" nodesById={nodesById} />
-        <RelationGroup title="Relazioni in entrata" edges={incoming} dir="in" nodesById={nodesById} />
+        {extraProps.length > 0 && (
+          <Field label="Altre proprietà">
+            <dl className="space-y-1">
+              {extraProps.map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <dt className="shrink-0 text-xs text-slate-400">{humanize(k)}</dt>
+                  <dd className="break-words text-xs text-slate-600 dark:text-slate-300">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </Field>
+        )}
+
+        <RelationGroup
+          title={`Relazioni in uscita (${outgoing.length})`}
+          edges={outgoing}
+          dir="out"
+          nodesById={nodesById}
+          onRecenter={onRecenter}
+        />
+        <RelationGroup
+          title={`Relazioni in entrata (${incoming.length})`}
+          edges={incoming}
+          dir="in"
+          nodesById={nodesById}
+          onRecenter={onRecenter}
+        />
       </div>
 
       <footer className="border-t border-slate-200 p-3 dark:border-slate-700">
@@ -100,29 +152,47 @@ export function NodeDetailsDrawer({
   );
 }
 
+function Field({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
+  return (
+    <div>
+      <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      {children}
+    </div>
+  );
+}
+
 function RelationGroup({
   title,
   edges,
   dir,
   nodesById,
+  onRecenter,
 }: {
   title: string;
   edges: GraphEdge[];
   dir: 'in' | 'out';
   nodesById: Map<string, GraphNode>;
+  onRecenter: (node: GraphNode) => void;
 }): React.ReactElement | null {
   if (edges.length === 0) return null;
   return (
     <div>
       <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">{title}</p>
-      <ul className="space-y-1">
+      <ul className="space-y-0.5">
         {edges.map((e) => {
           const otherId = dir === 'out' ? e.target : e.source;
           const other = nodesById.get(otherId);
           return (
-            <li key={e.id ?? `${e.source}-${e.type}-${e.target}`} className="flex items-center justify-between gap-2">
-              <span className="truncate text-slate-700 dark:text-slate-200">{other?.label ?? otherId}</span>
-              <span className="shrink-0 text-[10px] text-slate-400">{e.type}</span>
+            <li key={e.id ?? `${e.source}-${e.type}-${e.target}`}>
+              <button
+                type="button"
+                disabled={!other}
+                onClick={() => other && onRecenter(other)}
+                className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-slate-800"
+              >
+                <span className="truncate text-slate-700 dark:text-slate-200">{other?.label ?? otherId}</span>
+                <span className="shrink-0 text-[10px] text-slate-400">{e.type}</span>
+              </button>
             </li>
           );
         })}
