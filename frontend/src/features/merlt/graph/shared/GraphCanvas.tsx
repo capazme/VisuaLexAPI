@@ -164,7 +164,11 @@ export default function GraphCanvas({
         'drag-canvas',
         'drag-element',
         'click-select',
-        { type: 'hover-activate', degree: 1, state: 'active', inactiveState: 'inactive' },
+        // Hover emphasizes the node + its 1-degree neighbourhood (and reveals
+        // their relation labels). It does NOT fade the rest — an aggressive
+        // `inactiveState` left elements stuck transparent after a click. The
+        // dim-others focus is reserved for the explicit legend hover.
+        { type: 'hover-activate', degree: 1, state: 'active' },
       ],
     });
     graphRef.current = graph;
