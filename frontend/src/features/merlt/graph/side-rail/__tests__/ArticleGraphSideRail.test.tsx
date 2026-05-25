@@ -20,7 +20,7 @@ vi.mock('../../shared/useIngestionJob', () => ({
 vi.mock('../../shared/graphApi', () => ({
   triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
 }));
-vi.mock('../../shared/CytoscapeView', () => ({
+vi.mock('../../shared/GraphCanvas', () => ({
   default: () => <div data-testid="cytoscape" />,
 }));
 vi.mock('react-router-dom', () => ({
@@ -68,7 +68,7 @@ describe('ArticleGraphSideRail', () => {
     setGraph({
       status: 'success',
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: URN }], edges: [] },
-      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+      elements: { nodes: [{ id: 'a' }], edges: [] },
     });
     render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
     expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('ArticleGraphSideRail', () => {
     setGraph({
       status: 'success',
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: URN }], edges: [] },
-      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+      elements: { nodes: [{ id: 'a' }], edges: [] },
     });
     render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
     fireEvent.click(screen.getByRole('button', { name: /esplora nel grafo/i }));

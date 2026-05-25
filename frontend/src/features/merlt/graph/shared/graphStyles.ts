@@ -1,58 +1,61 @@
-import type { StylesheetJsonBlock, Css } from 'cytoscape';
-
-type Stylesheet = StylesheetJsonBlock;
+import type { NodeData, EdgeData } from '@antv/g6';
 
 /**
- * Cytoscape stylesheet for the MERL-T legal knowledge graph.
+ * G6 v5 styling for the MERL-T legal knowledge graph.
  *
- * The graph carries ~20 node labels and 15 relation types (see the EXP-014
- * Libro IV seed). Each node type gets a colour + shape so the user can read the
- * graph at a glance; each relation type gets an edge colour + line style. Any
- * type not in the maps falls back to the base `node` / `edge` style, so the
- * view never renders a type-less node as invisible.
+ * ~20 node labels + 15 relation types. Each node type gets a colour + a G6
+ * built-in shape; each relation type an edge colour + line style. Anything not
+ * in the maps falls back to a neutral default so nothing renders invisible.
  *
- * Colours are picked for hue separation rather than theme tokens because
- * cytoscape renders to canvas (CSS variables are not resolvable there).
+ * Colours are hand-picked for hue separation (canvas render — no CSS vars).
  */
+
+export type G6NodeShape =
+  | 'circle'
+  | 'rect'
+  | 'ellipse'
+  | 'diamond'
+  | 'triangle'
+  | 'star'
+  | 'hexagon';
 
 export interface NodeTypeStyle {
   color: string;
-  shape: Css.NodeShape;
+  g6Type: G6NodeShape;
 }
 
 export interface EdgeTypeStyle {
   color: string;
-  lineStyle?: Css.LineStyle;
+  dash?: boolean;
 }
 
-// Grouped by family so related labels share a hue neighbourhood.
 export const NODE_TYPE_STYLE: Record<string, NodeTypeStyle> = {
   // Normative sources — blues
-  Norma: { color: '#2563eb', shape: 'round-rectangle' },
-  Comma: { color: '#3b82f6', shape: 'round-rectangle' },
-  Lettera: { color: '#60a5fa', shape: 'round-rectangle' },
+  Norma: { color: '#2563eb', g6Type: 'rect' },
+  Comma: { color: '#3b82f6', g6Type: 'rect' },
+  Lettera: { color: '#60a5fa', g6Type: 'rect' },
   // Concepts & principles — purples
-  ConcettoGiuridico: { color: '#7c3aed', shape: 'ellipse' },
-  DefinizioneLegale: { color: '#8b5cf6', shape: 'ellipse' },
-  PrincipioGiuridico: { color: '#a855f7', shape: 'star' },
+  ConcettoGiuridico: { color: '#7c3aed', g6Type: 'circle' },
+  DefinizioneLegale: { color: '#8b5cf6', g6Type: 'circle' },
+  PrincipioGiuridico: { color: '#a855f7', g6Type: 'star' },
   // Doctrine & case law — ambers
-  Dottrina: { color: '#d97706', shape: 'diamond' },
-  AttoGiudiziario: { color: '#b45309', shape: 'diamond' },
-  Caso: { color: '#f59e0b', shape: 'diamond' },
+  Dottrina: { color: '#d97706', g6Type: 'diamond' },
+  AttoGiudiziario: { color: '#b45309', g6Type: 'diamond' },
+  Caso: { color: '#f59e0b', g6Type: 'diamond' },
   // Facts, acts, effects — greens/teals
-  FattoGiuridico: { color: '#059669', shape: 'hexagon' },
-  AttoGiuridicoEntita: { color: '#10b981', shape: 'hexagon' },
-  EffettoGiuridico: { color: '#14b8a6', shape: 'tag' },
+  FattoGiuridico: { color: '#059669', g6Type: 'hexagon' },
+  AttoGiuridicoEntita: { color: '#10b981', g6Type: 'hexagon' },
+  EffettoGiuridico: { color: '#14b8a6', g6Type: 'ellipse' },
   // Subjects & roles — pinks
-  SoggettoGiuridico: { color: '#db2777', shape: 'ellipse' },
-  Ruolo: { color: '#ec4899', shape: 'ellipse' },
-  // Modalities, exceptions, procedures, remedies — slates/oranges
-  ModalitaGiuridica: { color: '#475569', shape: 'barrel' },
-  Eccezione: { color: '#ef4444', shape: 'triangle' },
-  Procedura: { color: '#0ea5e9', shape: 'barrel' },
-  Rimedio: { color: '#22c55e', shape: 'barrel' },
-  Clausola: { color: '#6366f1', shape: 'round-rectangle' },
-  Termine: { color: '#64748b', shape: 'barrel' },
+  SoggettoGiuridico: { color: '#db2777', g6Type: 'circle' },
+  Ruolo: { color: '#ec4899', g6Type: 'circle' },
+  // Modalities, exceptions, procedures, remedies
+  ModalitaGiuridica: { color: '#475569', g6Type: 'rect' },
+  Eccezione: { color: '#ef4444', g6Type: 'triangle' },
+  Procedura: { color: '#0ea5e9', g6Type: 'rect' },
+  Rimedio: { color: '#22c55e', g6Type: 'rect' },
+  Clausola: { color: '#6366f1', g6Type: 'rect' },
+  Termine: { color: '#64748b', g6Type: 'rect' },
 };
 
 export const EDGE_TYPE_STYLE: Record<string, EdgeTypeStyle> = {
@@ -61,72 +64,59 @@ export const EDGE_TYPE_STYLE: Record<string, EdgeTypeStyle> = {
   APPLICA_A: { color: '#0ea5e9' },
   contiene: { color: '#94a3b8' },
   IMPONE: { color: '#dc2626' },
-  commenta: { color: '#d97706', lineStyle: 'dashed' },
+  commenta: { color: '#d97706', dash: true },
   ESPRIME_PRINCIPIO: { color: '#a855f7' },
   ATTRIBUISCE_RESPONSABILITA: { color: '#db2777' },
   PREVEDE: { color: '#059669' },
   DEFINISCE: { color: '#8b5cf6' },
   STABILISCE_TERMINE: { color: '#64748b' },
   PREVEDE_SANZIONE: { color: '#ef4444' },
-  modifica: { color: '#f59e0b', lineStyle: 'dashed' },
-  abroga: { color: '#b91c1c', lineStyle: 'dotted' },
-  inserisce: { color: '#16a34a', lineStyle: 'dashed' },
+  modifica: { color: '#f59e0b', dash: true },
+  abroga: { color: '#b91c1c', dash: true },
+  inserisce: { color: '#16a34a', dash: true },
 };
 
-/** Build the full cytoscape stylesheet: base styles + per-type overrides. */
-export function buildGraphStylesheet(): Stylesheet[] {
-  const base: Stylesheet[] = [
-    {
-      selector: 'node',
-      style: {
-        label: 'data(label)',
-        'background-color': '#94a3b8',
-        shape: 'ellipse',
-        width: 28,
-        height: 28,
-        'font-size': 9,
-        color: '#0f172a',
-        'text-valign': 'bottom',
-        'text-halign': 'center',
-        'text-margin-y': 3,
-        'text-wrap': 'wrap',
-        'text-max-width': '90px',
-        'border-width': 1,
-        'border-color': '#475569',
-      },
-    },
-    {
-      selector: 'edge',
-      style: {
-        width: 1.5,
-        'line-color': '#cbd5e1',
-        'target-arrow-color': '#cbd5e1',
-        'target-arrow-shape': 'triangle',
-        'curve-style': 'bezier',
-        'font-size': 7,
-        color: '#64748b',
-        'text-rotation': 'autorotate',
-      },
-    },
-    {
-      selector: 'node:selected',
-      style: { 'border-width': 3, 'border-color': '#0f172a' },
-    },
-  ];
+const DEFAULT_NODE_COLOR = '#94a3b8';
+const DEFAULT_EDGE_COLOR = '#cbd5e1';
 
-  const nodeStyles: Stylesheet[] = Object.entries(NODE_TYPE_STYLE).map(([type, s]) => ({
-    selector: `node[type="${type}"]`,
-    style: { 'background-color': s.color, shape: s.shape },
-  }));
+/** Render shape for a semantic node type (fallback: circle). */
+export function nodeG6Type(semanticType: string | undefined): G6NodeShape {
+  return (semanticType && NODE_TYPE_STYLE[semanticType]?.g6Type) || 'circle';
+}
 
-  const edgeStyles: Stylesheet[] = Object.entries(EDGE_TYPE_STYLE).map(([type, s]) => ({
-    selector: `edge[type="${type}"]`,
-    style: {
-      'line-color': s.color,
-      'target-arrow-color': s.color,
-      'line-style': s.lineStyle ?? 'solid',
-    },
-  }));
+/** G6 node style mapper — reads the semantic type/label from `datum.data`. */
+export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
+  const data = (datum.data ?? {}) as { type?: string; label?: string };
+  const color = (data.type && NODE_TYPE_STYLE[data.type]?.color) || DEFAULT_NODE_COLOR;
+  return {
+    fill: color,
+    stroke: '#1e293b',
+    lineWidth: 1,
+    size: 26,
+    labelText: data.label ?? '',
+    labelFill: '#0f172a',
+    labelFontSize: 10,
+    labelPlacement: 'bottom',
+    labelMaxWidth: 120,
+    labelWordWrap: true,
+  };
+}
 
-  return [...base, ...nodeStyles, ...edgeStyles];
+/** G6 edge style mapper — reads the relation type/label from `datum.data`. */
+export function edgeStyleMapper(datum: EdgeData): Record<string, unknown> {
+  const data = (datum.data ?? {}) as { type?: string; label?: string };
+  const spec = data.type ? EDGE_TYPE_STYLE[data.type] : undefined;
+  const color = spec?.color ?? DEFAULT_EDGE_COLOR;
+  return {
+    stroke: color,
+    lineWidth: 1.5,
+    lineDash: spec?.dash ? [4, 4] : undefined,
+    endArrow: true,
+    labelText: data.label ?? '',
+    labelFontSize: 8,
+    labelFill: '#64748b',
+    labelBackground: true,
+    labelBackgroundFill: '#ffffff',
+    labelBackgroundOpacity: 0.7,
+  };
 }

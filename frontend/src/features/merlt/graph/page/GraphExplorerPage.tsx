@@ -6,7 +6,7 @@ import { useArticleGraph } from '../shared/useArticleGraph';
 import { useIngestionJob } from '../shared/useIngestionJob';
 import { triggerIngestion } from '../shared/graphApi';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
-import type { GraphLayoutName } from '../shared/CytoscapeView';
+import type { GraphLayoutName } from '../shared/GraphCanvas';
 import { Toast } from '../../../../components/ui/Toast';
 import { GraphSearchBox } from './GraphSearchBox';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
@@ -15,7 +15,7 @@ import { DepthSelector } from './DepthSelector';
 import { LAYOUT_OPTIONS } from './graphLayouts';
 import { useBreadcrumbHistory } from './useBreadcrumbHistory';
 
-const CytoscapeView = lazy(() => import('../shared/CytoscapeView'));
+const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
 
 function clampDepth(raw: string | null): number {
   const n = raw ? Number.parseInt(raw, 10) : NaN;
@@ -173,7 +173,7 @@ export function GraphExplorerPage(): React.ReactElement {
             )
           ) : (
             <Suspense fallback={<CanvasSkeleton />}>
-              <CytoscapeView
+              <GraphCanvas
                 nodes={graph.elements.nodes}
                 edges={graph.elements.edges}
                 layout={layout}

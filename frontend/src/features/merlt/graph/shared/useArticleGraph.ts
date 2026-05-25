@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchArticleGraph } from './graphApi';
-import { transformSubgraphResponse, type CytoscapeElements } from './graphTransform';
+import { transformSubgraphResponse, type GraphElements } from './graphTransform';
 import type { SubgraphResponse } from './types';
 
 export type ArticleGraphState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'success'; data: SubgraphResponse; elements: CytoscapeElements }
+  | { status: 'success'; data: SubgraphResponse; elements: GraphElements }
   | { status: 'error'; error: Error };
 
 export type UseArticleGraphResult = ArticleGraphState & { refetch: () => void };

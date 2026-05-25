@@ -6,7 +6,7 @@ import { useIngestionJob } from '../shared/useIngestionJob';
 import { triggerIngestion } from '../shared/graphApi';
 import { CollapseToggle } from './CollapseToggle';
 
-const CytoscapeView = lazy(() => import('../shared/CytoscapeView'));
+const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
 
 export interface ArticleGraphSideRailProps {
   articleUrn: string | undefined;
@@ -163,7 +163,7 @@ function RailBody({
     <div className="flex h-full flex-col">
       <div className="flex-1">
         <Suspense fallback={<Skeleton label="Caricamento vista…" />}>
-          <CytoscapeView
+          <GraphCanvas
             nodes={graph.elements.nodes}
             edges={graph.elements.edges}
             layout="cose-bilkent"

@@ -6,8 +6,8 @@ function resp(partial: Partial<SubgraphResponse>): SubgraphResponse {
   return { nodes: [], edges: [], ...partial };
 }
 
-describe('transformSubgraphResponse', () => {
-  it('maps nodes to cytoscape node elements carrying id/label/type/urn', () => {
+describe('transformSubgraphResponse (G6 GraphData)', () => {
+  it('maps nodes to G6 node items carrying id + data{label,type,urn}', () => {
     const out = transformSubgraphResponse(
       resp({
         nodes: [
@@ -17,8 +17,8 @@ describe('transformSubgraphResponse', () => {
     );
 
     expect(out.nodes).toHaveLength(1);
+    expect(out.nodes[0].id).toBe('norma:2043');
     expect(out.nodes[0].data).toMatchObject({
-      id: 'norma:2043',
       label: 'Art. 2043 c.c.',
       type: 'Norma',
       urn: 'urn:...;2043',
@@ -26,7 +26,7 @@ describe('transformSubgraphResponse', () => {
     expect(out.edges).toHaveLength(0);
   });
 
-  it('maps edges to cytoscape edge elements with source/target/type/label', () => {
+  it('maps edges to G6 edge items with id/source/target + data{label,type}', () => {
     const out = transformSubgraphResponse(
       resp({
         nodes: [
@@ -38,16 +38,11 @@ describe('transformSubgraphResponse', () => {
     );
 
     expect(out.edges).toHaveLength(1);
-    expect(out.edges[0].data).toMatchObject({
-      id: 'e1',
-      source: 'a',
-      target: 'b',
-      type: 'ESPRIME_PRINCIPIO',
-      label: 'ESPRIME_PRINCIPIO',
-    });
+    expect(out.edges[0]).toMatchObject({ id: 'e1', source: 'a', target: 'b' });
+    expect(out.edges[0].data).toMatchObject({ type: 'ESPRIME_PRINCIPIO', label: 'ESPRIME_PRINCIPIO' });
   });
 
-  it('drops edges whose source or target node is absent (cytoscape rejects dangling edges)', () => {
+  it('drops edges whose source or target node is absent', () => {
     const out = transformSubgraphResponse(
       resp({
         nodes: [{ id: 'a', type: 'Norma', label: 'A' }],
@@ -59,7 +54,7 @@ describe('transformSubgraphResponse', () => {
       })
     );
 
-    expect(out.edges.map((e) => e.data.id)).toEqual(['e-ok']);
+    expect(out.edges.map((e) => e.id)).toEqual(['e-ok']);
   });
 
   it('de-duplicates nodes sharing the same id', () => {
@@ -82,13 +77,12 @@ describe('transformSubgraphResponse', () => {
           { id: 'a', type: 'Norma', label: 'A' },
           { id: 'b', type: 'Norma', label: 'B' },
         ],
-        // id intentionally missing to exercise the fallback
-        edges: [{ source: 'a', target: 'b', type: 'DISCIPLINA' }],
+        edges: [{ source: 'a', target: 'b', type: 'DISCIPLINA' } as never],
       })
     );
 
     expect(out.edges).toHaveLength(1);
-    expect(out.edges[0].data.id).toBe('a-DISCIPLINA-b');
+    expect(out.edges[0].id).toBe('a-DISCIPLINA-b');
   });
 
   it('returns empty arrays for an empty response', () => {

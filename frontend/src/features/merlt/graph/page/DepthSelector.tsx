@@ -1,4 +1,4 @@
-import type { GraphLayoutName } from '../shared/CytoscapeView';
+import type { GraphLayoutName } from '../shared/GraphCanvas';
 import { LAYOUT_OPTIONS } from './graphLayouts';
 
 export interface DepthSelectorProps {

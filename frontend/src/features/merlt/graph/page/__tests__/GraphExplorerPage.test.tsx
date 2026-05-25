@@ -10,7 +10,7 @@ const isEnabledMock = vi.fn();
 vi.mock('../../shared/useArticleGraph', () => ({
   useArticleGraph: (...a: unknown[]) => useArticleGraphMock(...a),
 }));
-vi.mock('../../shared/CytoscapeView', () => ({
+vi.mock('../../shared/GraphCanvas', () => ({
   default: () => <div data-testid="cytoscape" />,
 }));
 vi.mock('../../featureFlag', () => ({
@@ -74,7 +74,7 @@ describe('GraphExplorerPage', () => {
     setGraph({
       status: 'success',
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
-      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+      elements: { nodes: [{ id: 'a' }], edges: [] },
     });
     renderAt('/grafo?urn=urn%3Atest&depth=1');
 
@@ -89,7 +89,7 @@ describe('GraphExplorerPage', () => {
     setGraph({
       status: 'success',
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
-      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+      elements: { nodes: [{ id: 'a' }], edges: [] },
     });
     renderAt('/grafo?urn=urn%3Atest&depth=2');
 
@@ -122,7 +122,7 @@ describe('GraphExplorerPage', () => {
     setGraph({
       status: 'success',
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
-      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+      elements: { nodes: [{ id: 'a' }], edges: [] },
     });
     renderAt('/grafo?urn=urn%3Atest');
     // Breadcrumb nav present with the deeplinked urn as the (only) crumb.
@@ -150,7 +150,7 @@ describe('GraphExplorerPage', () => {
     setGraph({
       status: 'success',
       data: { nodes: [{ id: 'a', type: 'Norma', label: 'A' }], edges: [] },
-      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+      elements: { nodes: [{ id: 'a' }], edges: [] },
     });
     renderAt('/grafo?urn=urn:test');
     expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();

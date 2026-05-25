@@ -1,9 +1,9 @@
-export { default as CytoscapeView } from './CytoscapeView';
-export type { CytoscapeViewProps, GraphLayoutName } from './CytoscapeView';
-export { buildGraphStylesheet, NODE_TYPE_STYLE, EDGE_TYPE_STYLE } from './graphStyles';
-export type { NodeTypeStyle, EdgeTypeStyle } from './graphStyles';
+export { default as GraphCanvas } from './GraphCanvas';
+export type { GraphCanvasProps, GraphLayoutName } from './GraphCanvas';
+export { NODE_TYPE_STYLE, EDGE_TYPE_STYLE, nodeG6Type, nodeStyleMapper, edgeStyleMapper } from './graphStyles';
+export type { NodeTypeStyle, EdgeTypeStyle, G6NodeShape } from './graphStyles';
 export { transformSubgraphResponse } from './graphTransform';
-export type { CytoscapeElements } from './graphTransform';
+export type { GraphElements } from './graphTransform';
 export { useArticleGraph } from './useArticleGraph';
 export type { ArticleGraphState, UseArticleGraphResult } from './useArticleGraph';
 export { useIngestionJob } from './useIngestionJob';

@@ -43,7 +43,7 @@ describe('useArticleGraph', () => {
     expect(result.current.data).toEqual(SAMPLE);
     // Dangling edge dropped by the transform.
     expect(result.current.elements.nodes).toHaveLength(2);
-    expect(result.current.elements.edges.map((e) => e.data.id)).toEqual(['e-ok']);
+    expect(result.current.elements.edges.map((e) => e.id)).toEqual(['e-ok']);
   });
 
   it('passes the depth argument through to the API', async () => {
