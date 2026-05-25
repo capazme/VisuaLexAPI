@@ -9,6 +9,7 @@ import {
   createGraphClient,
   GraphClient,
 } from '../../services/merlt/graphClient';
+import { ensureIngestionJob } from '../../services/merlt/lazyIngest';
 import { MerltClientError } from '../../services/merlt/merltClient';
 
 /**
@@ -96,40 +97,17 @@ router.post('/graph/ingest', authenticate, consentGuard, async (req: Request, re
 
   const { urn } = parsed.data;
 
-  // Best-effort idempotency: one in-flight job per URN. This findFirst+create is
-  // NOT transactionally guarded, so two simultaneous requests could both miss the
-  // existing row and create two job rows. That race is benign: RQ dedupes downstream
-  // via a deterministic job_id = sha256(urn), so only one ingestion actually runs.
-  const existing = await prisma.merltIngestionJob.findFirst({
-    where: { articleUrn: urn, status: { in: ['pending', 'running'] } },
-  });
-  if (existing) {
-    res.status(200).json({ jobId: existing.id, status: existing.status });
-    return;
-  }
+  // Idempotency + best-effort enqueue live in the shared ensureIngestionJob
+  // helper (also used by the lazy trigger in events.ts). created=false means an
+  // in-flight job for this URN already existed → 200 instead of 202.
+  const { jobId, status, created } = await ensureIngestionJob(
+    prisma,
+    graphClient(),
+    urn,
+    req.user.id
+  );
 
-  const job = await prisma.merltIngestionJob.create({
-    data: { articleUrn: urn, userId: req.user.id, status: 'pending' },
-  });
-
-  // Best-effort enqueue: failure must not lose the BFF job record.
-  try {
-    const enqueued = await graphClient().ingestArticle(urn, job.id);
-    if (enqueued?.task_id) {
-      await prisma.merltIngestionJob.update({
-        where: { id: job.id },
-        data: { taskId: enqueued.task_id },
-      });
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error(
-      `merlt graph ingest: failed to enqueue MERL-T job for urn=${urn} jobId=${job.id}:`,
-      err instanceof Error ? err.message : String(err)
-    );
-  }
-
-  res.status(202).json({ jobId: job.id, status: 'pending' });
+  res.status(created ? 202 : 200).json({ jobId, status });
 });
 
 /**

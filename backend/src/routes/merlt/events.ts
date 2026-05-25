@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../../middleware/auth';
 import { consentGuard } from '../../services/merlt/consentGuard';
 import {
@@ -24,8 +25,11 @@ import {
 } from '../../services/merlt/merltClient';
 import { getOrSyncAuthority } from '../../services/merlt/authorityCache';
 import { logDeadLetter } from '../../services/merlt/deadLetterLog';
+import { createGraphClient, GraphClient } from '../../services/merlt/graphClient';
+import { ensureIngestionJob } from '../../services/merlt/lazyIngest';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // Singleton client: reuse the HTTP connection pool across requests.
 let cachedClient: MerltClient | null = null;
@@ -36,6 +40,18 @@ function client(): MerltClient {
 /** Test hook: clear the cached client (e.g. when MERLT_API_URL changes). */
 export function _resetMerltClientForTests(): void {
   cachedClient = null;
+}
+
+// Singleton graph client for the MERLT-2a.5 lazy ingestion trigger. Separate
+// from the graph router's client (module-private there) on purpose.
+let cachedGraphClient: GraphClient | null = null;
+function graphClient(): GraphClient {
+  if (!cachedGraphClient) cachedGraphClient = createGraphClient();
+  return cachedGraphClient;
+}
+/** Test hook: clear the cached graph client (e.g. when MERLT_API_URL changes). */
+export function _resetEventsGraphClientForTests(): void {
+  cachedGraphClient = null;
 }
 
 router.use(authenticate);
@@ -89,12 +105,9 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
     baselineQual,
   });
 
+  let result: { received: number; timestamp: string };
   try {
-    const result = await client().sendEvent(merltPayload);
-    // MERL-T's tracking endpoint returns { received, timestamp } — there is
-    // no per-event trace_id upstream (events are buffered server-side).
-    // We surface both so the client can log without inventing identifiers.
-    res.status(202).json({ received: result.received, timestamp: result.timestamp });
+    result = await client().sendEvent(merltPayload);
   } catch (err) {
     if (err instanceof MerltBadRequestError) {
       res.status(err.status ?? 400).json({ detail: 'merlt_rejected', upstream: err.body });
@@ -107,6 +120,35 @@ router.post('/events/article-viewed', async (req: Request, res: Response): Promi
     }
     throw err;
   }
+
+  // MERLT-2a.5: opportunistic lazy graph ingestion. If the article is not yet
+  // in the knowledge graph, enqueue an ingestion job. This is best-effort: a
+  // graph-check/enqueue failure must NEVER fail the (P0) tracking event, so it
+  // is fully isolated in a try/catch that dead-letters and moves on.
+  let ingestionJob: { jobId: string; status: string } | undefined;
+  try {
+    const check = await graphClient().checkArticle(parsed.data.articleUrn);
+    if (!check.exists) {
+      const ensured = await ensureIngestionJob(
+        prisma,
+        graphClient(),
+        parsed.data.articleUrn,
+        req.user.id
+      );
+      ingestionJob = { jobId: ensured.jobId, status: ensured.status };
+    }
+  } catch (err) {
+    logDeadLetter('graph-lazy-trigger', req.user.id, { articleUrn: parsed.data.articleUrn }, err);
+  }
+
+  // MERL-T's tracking endpoint returns { received, timestamp } — there is
+  // no per-event trace_id upstream (events are buffered server-side).
+  // We surface both so the client can log without inventing identifiers.
+  res.status(202).json({
+    received: result.received,
+    timestamp: result.timestamp,
+    ...(ingestionJob ? { ingestionJob } : {}),
+  });
 });
 
 /**
