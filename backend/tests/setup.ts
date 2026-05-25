@@ -4,7 +4,25 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// SAFETY GUARD: this setup resets the database (drops everything). If vitest is
+// run WITHOUT the `dotenv -e .env.test` wrapper (i.e. `npx vitest` instead of
+// `npm test`), Prisma loads `.env` and DATABASE_URL points at the DEV database
+// (visualex_platform) — the reset then wipes dev data. Refuse to run unless the
+// target DB name clearly looks like a test database.
+function assertTestDatabase(): void {
+  const url = process.env.DATABASE_URL ?? '';
+  const dbName = url.split('/').pop()?.split('?')[0] ?? '';
+  if (!/test/i.test(dbName)) {
+    throw new Error(
+      `Refusing to run tests: DATABASE_URL points at "${dbName || '(unset)'}", ` +
+        `which does not look like a test database. Run tests via "npm test" ` +
+        `(which loads .env.test) — never "npx vitest" directly.`
+    );
+  }
+}
+
 beforeAll(() => {
+  assertTestDatabase();
   // Pass process.env explicitly so the child process uses the test DATABASE_URL
   // (dotenv-cli sets it in process.env before vitest starts, but execSync forks
   // a new shell that would otherwise fall back to loading .env instead of .env.test).
