@@ -39,6 +39,7 @@ model User {
   merltPreference    MerltUserPreference?
   merltConsentAudits MerltConsentAudit[]
   merltAuthorityCache MerltUserAuthorityCache?
+  merltIngestionJobs  MerltIngestionJob[]
 
   // Personal Environments (user-owned, not published)
   environments Environment[]
@@ -115,6 +116,42 @@ model MerltUserAuthorityCache {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("merlt_user_authority_cache")
+}
+
+enum MerltJobStatus {
+  pending
+  running
+  completed
+  failed
+  timeout
+}
+
+// MERL-T lazy article-ingestion job (Slice 2a).
+// The BFF creates a row, then asks MERL-T to enqueue an RQ task threading the
+// job id through. The worker calls back POST /api/merlt/internal/job-callback
+// (internalAuth-gated) to flip the status. The (article_urn, status) index is a
+// LOOKUP PERFORMANCE HINT for the in-flight-job check — it does NOT enforce
+// uniqueness. True single-execution idempotency is guaranteed DOWNSTREAM by RQ:
+// the MERL-T enqueue uses a deterministic job_id = sha256(urn), so even if two
+// BFF job rows are created in a race, only one ingestion actually runs.
+model MerltIngestionJob {
+  id            String         @id @default(uuid())
+  articleUrn    String         @map("article_urn")
+  userId        String         @map("user_id")
+  status        MerltJobStatus @default(pending)
+  taskId        String?        @map("task_id")
+  nodesCreated  Int?           @map("nodes_created")
+  edgesCreated  Int?           @map("edges_created")
+  errorMessage  String?        @map("error_message")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  startedAt     DateTime?      @map("started_at")
+  completedAt   DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([articleUrn, status])
+  @@index([userId])
+  @@map("merlt_ingestion_jobs")
 }
 
 // ============================================

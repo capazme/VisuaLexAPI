@@ -1,0 +1,207 @@
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { authenticate } from '../../middleware/auth';
+import { internalAuth } from '../../middleware/internalAuth';
+import { consentGuard } from '../../services/merlt/consentGuard';
+import { ingestRequestSchema, jobCallbackSchema } from '../../schemas/merlt/graph';
+import {
+  createGraphClient,
+  GraphClient,
+} from '../../services/merlt/graphClient';
+import { MerltClientError } from '../../services/merlt/merltClient';
+
+/**
+ * MERL-T graph layer BFF routes (Slice 2a).
+ *
+ * Mounted at /api/merlt (see routes/merlt/index.ts). We do NOT apply
+ * `router.use(authenticate)` globally here: the worker callback route must
+ * skip JWT and use the shared-secret internalAuth instead. Middleware is
+ * therefore applied per-route.
+ *
+ *  - GET  /graph/article/:urn          authenticate
+ *  - POST /graph/ingest                authenticate + consentGuard
+ *  - GET  /graph/jobs/:jobId/status    authenticate
+ *  - POST /internal/job-callback       internalAuth
+ */
+
+const router = Router();
+const prisma = new PrismaClient();
+
+// Singleton graph client: reuse the HTTP connection pool across requests.
+let cachedGraphClient: GraphClient | null = null;
+function graphClient(): GraphClient {
+  if (!cachedGraphClient) cachedGraphClient = createGraphClient();
+  return cachedGraphClient;
+}
+/** Test hook: clear the cached client (e.g. when MERLT_API_URL changes). */
+export function _resetGraphClientForTests(): void {
+  cachedGraphClient = null;
+}
+
+/**
+ * GET /api/merlt/graph/article/:urn
+ *
+ * Returns the subgraph around the article URN. The :urn param is
+ * URL-encoded by the client (URNs contain ':' and ';') — decode it.
+ * On MERL-T outage/timeout → 503 merlt_unavailable.
+ *
+ * Intentionally `authenticate`-only, NOT consent-gated: reading the graph is a
+ * passive lookup, not a contribution flow, so no consentGuard. Contrast with
+ * POST /graph/ingest below, which IS consent-gated because it feeds MERL-T.
+ * Do not "fix" this by adding a gate here.
+ */
+router.get('/graph/article/:urn', authenticate, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+
+  const urn = decodeURIComponent(req.params.urn);
+
+  try {
+    const subgraph = await graphClient().getSubgraph(urn);
+    res.status(200).json(subgraph);
+  } catch (err) {
+    if (err instanceof MerltClientError) {
+      res.status(503).json({ detail: 'merlt_unavailable' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * POST /api/merlt/graph/ingest
+ *
+ * Body: { urn }
+ *
+ * Idempotent on (articleUrn, status in {pending,running}): if a job is already
+ * in flight for the URN, return it with 200. Otherwise create a pending job,
+ * best-effort ask MERL-T to enqueue (threading job.id as bff_job_id), and
+ * return 202. If the MERL-T enqueue throws, we STILL return the job — the
+ * worker may pick it up later, and we don't want to lose the BFF-side record.
+ */
+router.post('/graph/ingest', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+
+  const parsed = ingestRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+
+  const { urn } = parsed.data;
+
+  // Best-effort idempotency: one in-flight job per URN. This findFirst+create is
+  // NOT transactionally guarded, so two simultaneous requests could both miss the
+  // existing row and create two job rows. That race is benign: RQ dedupes downstream
+  // via a deterministic job_id = sha256(urn), so only one ingestion actually runs.
+  const existing = await prisma.merltIngestionJob.findFirst({
+    where: { articleUrn: urn, status: { in: ['pending', 'running'] } },
+  });
+  if (existing) {
+    res.status(200).json({ jobId: existing.id, status: existing.status });
+    return;
+  }
+
+  const job = await prisma.merltIngestionJob.create({
+    data: { articleUrn: urn, userId: req.user.id, status: 'pending' },
+  });
+
+  // Best-effort enqueue: failure must not lose the BFF job record.
+  try {
+    const enqueued = await graphClient().ingestArticle(urn, job.id);
+    if (enqueued?.task_id) {
+      await prisma.merltIngestionJob.update({
+        where: { id: job.id },
+        data: { taskId: enqueued.task_id },
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `merlt graph ingest: failed to enqueue MERL-T job for urn=${urn} jobId=${job.id}:`,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+
+  res.status(202).json({ jobId: job.id, status: 'pending' });
+});
+
+/**
+ * GET /api/merlt/graph/jobs/:jobId/status
+ *
+ * Returns the current status of a user-owned ingestion job. 404 if the job
+ * does not exist or belongs to another user.
+ */
+router.get('/graph/jobs/:jobId/status', authenticate, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+
+  const job = await prisma.merltIngestionJob.findFirst({
+    where: { id: req.params.jobId, userId: req.user.id },
+  });
+  if (!job) {
+    res.status(404).json({ detail: 'job_not_found' });
+    return;
+  }
+
+  res.status(200).json({
+    jobId: job.id,
+    status: job.status,
+    nodesCreated: job.nodesCreated,
+    edgesCreated: job.edgesCreated,
+    error: job.errorMessage,
+  });
+});
+
+/**
+ * POST /api/merlt/internal/job-callback
+ *
+ * Called by the RQ worker (internalAuth, NOT JWT) when an ingestion job
+ * reaches a terminal/transitional state. Body is camelCase:
+ *   { bffJobId, status, nodesCreated?, edgesCreated?, error? }
+ *
+ * Terminal statuses (completed/failed/timeout) set completedAt; running sets
+ * startedAt. 404 if the referenced job id does not exist.
+ */
+router.post('/internal/job-callback', internalAuth, async (req: Request, res: Response): Promise<void> => {
+  const parsed = jobCallbackSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+
+  const { bffJobId, status, nodesCreated, edgesCreated, error } = parsed.data;
+
+  const job = await prisma.merltIngestionJob.findUnique({ where: { id: bffJobId } });
+  if (!job) {
+    res.status(404).json({ detail: 'job_not_found' });
+    return;
+  }
+
+  const isTerminal = ['completed', 'failed', 'timeout'].includes(status);
+  await prisma.merltIngestionJob.update({
+    where: { id: bffJobId },
+    data: {
+      status,
+      nodesCreated: nodesCreated ?? undefined,
+      edgesCreated: edgesCreated ?? undefined,
+      errorMessage: error ?? undefined,
+      // A `running` callback marks the worker actually started; terminal callbacks
+      // stamp completion. This also closes the previously-dead startedAt column.
+      startedAt: status === 'running' ? new Date() : undefined,
+      completedAt: isTerminal ? new Date() : undefined,
+    },
+  });
+
+  res.status(200).json({ updated: true });
+});
+
+export default router;
