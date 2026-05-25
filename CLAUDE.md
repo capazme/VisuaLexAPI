@@ -129,6 +129,7 @@ Slice 2a brings the legal knowledge graph (FalkorDB) to the frontend **read-only
 3. **react-cytoscapejs `cy` callback fires once** (componentDidMount), not per render — but keep tap handlers in refs anyway and scope `cy.removeListener('tap','node')` to nodes.
 4. **The BFF `/graph/article/:urn` returns the subgraph verbatim, no 404 for "not indexed"** — an empty `nodes` array IS the "not in graph" signal that triggers lazy ingestion (both side rail and page). `checkArticle.exists` is the explicit probe used by the `article:viewed` trigger.
 5. **`MERLT_INTERNAL_SECRET`** (shared worker↔BFF secret) is in `backend/.env.example`. `VITE_FEATURE_MERLT_GRAPH` (default ON) gates the whole graph UI — `false` hides the Sidebar entry, the side rail slot, and renders `/grafo` as "non disponibile".
+6. **URN version-marker mismatch (the `!vig=` trap).** The graph seeds Normattiva URNs WITHOUT the version marker (`...~art2043`), but VisuaLex's `norma_data.urn` carries it (`...~art2043!vig=`). Passed verbatim, `check-article`/`subgraph` return `exists:false`/empty → the side rail and `/grafo` spin forever on lazy ingestion. `graphClient.normalizeGraphUrn()` strips everything from the first `!` (the NIR version/annex separator) before every MERL-T graph call. Don't bypass it when adding new urn-keyed graph calls.
 
 ### Frontend Structure
 
