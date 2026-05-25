@@ -134,6 +134,9 @@ export default function GraphCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
   const dataSigRef = useRef<string>('');
+  // Latest render() promise — all imperative ops (visibility/state) chain on it
+  // so they never run before the in-flight render resolves (G6 requirement).
+  const renderRef = useRef<Promise<unknown>>(Promise.resolve());
 
   // Keep handlers in refs so the once-attached listeners never go stale.
   const clickRef = useRef(onNodeClick);
@@ -176,7 +179,7 @@ export default function GraphCanvas({
       if (id) dblRef.current?.(id);
     });
 
-    void graph.render();
+    renderRef.current = graph.render();
 
     return () => {
       graph.destroy();
@@ -195,25 +198,20 @@ export default function GraphCanvas({
     if (sig !== dataSigRef.current) {
       dataSigRef.current = sig;
       g.setData({ nodes, edges });
-      void g.render().then(() => g.setElementVisibility(visibility)).catch(() => {});
-    } else {
-      try {
-        void g.setElementVisibility(visibility);
-      } catch {
-        /* elements not ready yet (initial frame) — visibility re-applies on next change */
-      }
+      renderRef.current = g.render();
     }
+    // Apply visibility after the latest render resolves (covers both the data
+    // path's fresh render and a filter-only change racing the initial render).
+    void renderRef.current.then(() => g.setElementVisibility(visibility)).catch(() => {});
   }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes]);
 
   // Legend hover → emphasize nodes of a type, fade the rest (no relayout).
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
-    try {
-      void g.setElementState(buildHighlightState(nodes, edges, highlightNodeType));
-    } catch {
-      /* ignore until rendered */
-    }
+    void renderRef.current
+      .then(() => g.setElementState(buildHighlightState(nodes, edges, highlightNodeType)))
+      .catch(() => {});
   }, [highlightNodeType, nodes, edges]);
 
   // Re-run layout when the layout changes (no data refetch).
