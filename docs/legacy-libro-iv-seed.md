@@ -83,6 +83,15 @@ The container default `dir` is `/var/lib/falkordb/data` (NOT `/data`) and
    strips the `+asyncpg` before handing the DSN to the `psql` subprocess.
 5. `bridge-table-data.sql` is data-only; pair it with `bridge-table-schema.sql`
    (`CREATE TABLE IF NOT EXISTS` + `DO $$ EXCEPTION` blocks) as a pre-step.
+6. **The `ADD CONSTRAINT` DO-blocks must catch `duplicate_table`, not just
+   `duplicate_object`.** Re-adding a UNIQUE constraint whose backing index
+   already exists raises `relation "…_key" already exists` (`42P07`,
+   `duplicate_table`), NOT `42710` (`duplicate_object`). If only the latter is
+   caught, a seed re-run (e.g. after `docker compose up --build`) fails with
+   `psql exit 3` → `SeedLoadError`. The loader's global skip (`graph >100 nodes
+   → skip all`) normally avoids re-running the restore, but a full
+   `--force-recreate` that recreates FalkorDB alongside the api can race the
+   node-count check, so the DDL must be genuinely idempotent regardless.
 
 ## Extending to other Libri (III, V, …)
 
