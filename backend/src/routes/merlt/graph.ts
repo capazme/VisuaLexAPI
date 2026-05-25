@@ -29,6 +29,13 @@ import { MerltClientError } from '../../services/merlt/merltClient';
 const router = Router();
 const prisma = new PrismaClient();
 
+/** Parse a query param to an int, falling back to `def`, clamped to [min,max]. */
+function clampInt(raw: unknown, def: number, min: number, max: number): number {
+  const n = typeof raw === 'string' ? Number.parseInt(raw, 10) : NaN;
+  if (Number.isNaN(n)) return def;
+  return Math.min(max, Math.max(min, n));
+}
+
 // Singleton graph client: reuse the HTTP connection pool across requests.
 let cachedGraphClient: GraphClient | null = null;
 function graphClient(): GraphClient {
@@ -59,9 +66,12 @@ router.get('/graph/article/:urn', authenticate, async (req: Request, res: Respon
   }
 
   const urn = decodeURIComponent(req.params.urn);
+  // depth ∈ [1,3] (side rail wants 1, page allows up to 3), limit ∈ [1,500].
+  const depth = clampInt(req.query.depth, 2, 1, 3);
+  const limit = clampInt(req.query.limit, 500, 1, 500);
 
   try {
-    const subgraph = await graphClient().getSubgraph(urn);
+    const subgraph = await graphClient().getSubgraph(urn, depth, limit);
     res.status(200).json(subgraph);
   } catch (err) {
     if (err instanceof MerltClientError) {

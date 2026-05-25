@@ -15,8 +15,12 @@ import { render, cleanup } from '@testing-library/react';
 vi.mock('../../features/merlt/ArticleMerltSlot', () => ({
   ArticleMerltSlot: () => null,
 }));
+vi.mock('../../features/merlt/graph/side-rail/ArticleGraphSideRail', () => ({
+  ArticleGraphSideRail: () => null,
+}));
 
-import { getSlotComponents, PluginSlot } from '../registry';
+import { getSlotComponents } from '../registry';
+import { PluginSlot } from '../PluginSlot';
 
 beforeEach(() => {
   vi.unstubAllEnvs();
@@ -59,6 +63,18 @@ describe('getSlotComponents', () => {
     expect(getSlotComponents('graph_view')).toEqual([]);
     expect(getSlotComponents('profile_tabs')).toEqual([]);
     expect(getSlotComponents('admin_dashboard')).toEqual([]);
+  });
+
+  it('registers the graph side rail on article_sidebar gated by VITE_FEATURE_MERLT_GRAPH', () => {
+    const components = getSlotComponents('article_sidebar');
+    expect(components).toHaveLength(1);
+    expect(components[0].id).toBe('merlt-article-graph-side-rail');
+    expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT_GRAPH');
+  });
+
+  it('excludes the side rail when VITE_FEATURE_MERLT_GRAPH=false', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
+    expect(getSlotComponents('article_sidebar')).toHaveLength(0);
   });
 });
 

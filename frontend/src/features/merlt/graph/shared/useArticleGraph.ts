@@ -20,7 +20,8 @@ export type UseArticleGraphResult = ArticleGraphState & { refetch: () => void };
  */
 export function useArticleGraph(
   articleUrn: string | null | undefined,
-  depth = 2
+  depth = 2,
+  limit?: number
 ): UseArticleGraphResult {
   const [state, setState] = useState<ArticleGraphState>(
     articleUrn ? { status: 'loading' } : { status: 'idle' }
@@ -33,9 +34,14 @@ export function useArticleGraph(
   // Reset to loading/idle when the inputs change — during render, not in the
   // effect, so we never setState synchronously inside useEffect (react-hooks
   // rule, gotcha #11). The effect below only does async setState.
-  const [tracked, setTracked] = useState({ articleUrn, depth, nonce });
-  if (tracked.articleUrn !== articleUrn || tracked.depth !== depth || tracked.nonce !== nonce) {
-    setTracked({ articleUrn, depth, nonce });
+  const [tracked, setTracked] = useState({ articleUrn, depth, limit, nonce });
+  if (
+    tracked.articleUrn !== articleUrn ||
+    tracked.depth !== depth ||
+    tracked.limit !== limit ||
+    tracked.nonce !== nonce
+  ) {
+    setTracked({ articleUrn, depth, limit, nonce });
     setState(articleUrn ? { status: 'loading' } : { status: 'idle' });
   }
 
@@ -44,7 +50,7 @@ export function useArticleGraph(
 
     let cancelled = false;
 
-    fetchArticleGraph(articleUrn, depth)
+    fetchArticleGraph(articleUrn, depth, limit)
       .then((data) => {
         if (cancelled) return;
         setState({ status: 'success', data, elements: transformSubgraphResponse(data) });
@@ -57,7 +63,7 @@ export function useArticleGraph(
     return () => {
       cancelled = true;
     };
-  }, [articleUrn, depth, nonce]);
+  }, [articleUrn, depth, limit, nonce]);
 
   return { ...state, refetch };
 }

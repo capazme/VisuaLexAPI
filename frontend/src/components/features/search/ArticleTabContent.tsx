@@ -22,7 +22,7 @@ import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
-import { PluginSlot } from '../../../plugins/registry';
+import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
 import type { Annotation } from '../../../types';
 
@@ -710,6 +710,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     articleUrn: data.norma_data.urn,
                     containerRef: contentRef,
                 }}
+            />
+
+            <PluginSlot
+                slot="article_sidebar"
+                props={{ articleUrn: data.norma_data.urn }}
             />
 
             {brocardi_info !== undefined && (

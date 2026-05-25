@@ -78,6 +78,89 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     expect(res.body.nodes[0].urn).toBe(urn);
   });
 
+  it('forwards depth and limit query params to MERL-T (clamped)', async () => {
+    await grantConsent(user, 'basic');
+    const urn = 'urn:nir:stato:codice.civile:1942;2043';
+
+    let seen: Record<string, unknown> = {};
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/subgraph')
+      .query((q) => {
+        seen = q;
+        return q.root_urn === urn;
+      })
+      .reply(200, mockSubgraph(urn));
+
+    const res = await request(app)
+      .get(`/api/merlt/graph/article/${encodeURIComponent(urn)}?depth=1&limit=25`)
+      .set(authHeader(user));
+
+    expect(res.status).toBe(200);
+    expect(seen.depth).toBe('1');
+    expect(seen.max_nodes).toBe('25');
+  });
+
+  it('defaults to depth=2 max_nodes=500 when no params are given', async () => {
+    await grantConsent(user, 'basic');
+    const urn = 'urn:nir:stato:codice.civile:1942;2043';
+
+    let seen: Record<string, unknown> = {};
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/subgraph')
+      .query((q) => {
+        seen = q;
+        return q.root_urn === urn;
+      })
+      .reply(200, mockSubgraph(urn));
+
+    await request(app)
+      .get(`/api/merlt/graph/article/${encodeURIComponent(urn)}`)
+      .set(authHeader(user));
+
+    expect(seen.depth).toBe('2');
+    expect(seen.max_nodes).toBe('500');
+  });
+
+  it('clamps depth below range up to the lower bound (1)', async () => {
+    await grantConsent(user, 'basic');
+    const urn = 'urn:nir:stato:codice.civile:1942;2043';
+
+    let seen: Record<string, unknown> = {};
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/subgraph')
+      .query((q) => {
+        seen = q;
+        return q.root_urn === urn;
+      })
+      .reply(200, mockSubgraph(urn));
+
+    await request(app)
+      .get(`/api/merlt/graph/article/${encodeURIComponent(urn)}?depth=0`)
+      .set(authHeader(user));
+
+    expect(seen.depth).toBe('1');
+  });
+
+  it('clamps an out-of-range depth to the 1..3 window', async () => {
+    await grantConsent(user, 'basic');
+    const urn = 'urn:nir:stato:codice.civile:1942;2043';
+
+    let seen: Record<string, unknown> = {};
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/subgraph')
+      .query((q) => {
+        seen = q;
+        return q.root_urn === urn;
+      })
+      .reply(200, mockSubgraph(urn));
+
+    await request(app)
+      .get(`/api/merlt/graph/article/${encodeURIComponent(urn)}?depth=99`)
+      .set(authHeader(user));
+
+    expect(seen.depth).toBe('3');
+  });
+
   it('returns 503 merlt_unavailable when MERL-T is down', async () => {
     await grantConsent(user, 'basic');
     const urn = 'urn:nir:stato:codice.civile:1942;2043';

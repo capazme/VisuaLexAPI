@@ -16,7 +16,7 @@ import { GlobalSearch } from '../features/search/GlobalSearch';
 import { CompareView } from '../features/compare/CompareView';
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
-import { PluginSlot } from '../../plugins/registry';
+import { PluginSlot } from '../../plugins/PluginSlot';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({

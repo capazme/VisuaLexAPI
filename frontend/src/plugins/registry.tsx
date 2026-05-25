@@ -1,5 +1,6 @@
 import { ArticleMerltSlot } from '../features/merlt/ArticleMerltSlot';
 import { GlobalMerltSlot } from '../features/merlt/GlobalMerltSlot';
+import { ArticleGraphSideRail } from '../features/merlt/graph/side-rail/ArticleGraphSideRail';
 import type { PluginSlotName, SlotComponent } from './types';
 
 /**
@@ -28,6 +29,13 @@ const slotComponents: SlotComponent<Record<string, unknown>>[] = [
         component: GlobalMerltSlot as unknown as React.ComponentType<Record<string, unknown>>,
         requiredFlag: 'VITE_FEATURE_MERLT',
     },
+    {
+        id: 'merlt-article-graph-side-rail',
+        pluginId: 'visualex-merlt',
+        slot: 'article_sidebar',
+        component: ArticleGraphSideRail as unknown as React.ComponentType<Record<string, unknown>>,
+        requiredFlag: 'VITE_FEATURE_MERLT_GRAPH',
+    },
 ];
 
 /**
@@ -49,26 +57,6 @@ export function getSlotComponents(slot: PluginSlotName): SlotComponent<Record<st
     );
 }
 
-/**
- * PluginSlot renders every component registered for the given slot.
- * Components receive `props` verbatim. If no plugin matches (or the
- * feature flag is off), the slot collapses to null.
- */
-export function PluginSlot<P extends Record<string, unknown>>({
-    slot,
-    props,
-}: {
-    slot: PluginSlotName;
-    props: P;
-}) {
-    const components = getSlotComponents(slot);
-    if (components.length === 0) return null;
-
-    return (
-        <>
-            {components.map(({ id, component: Component }) => (
-                <Component key={id} {...(props as Record<string, unknown>)} />
-            ))}
-        </>
-    );
-}
+// PluginSlot lives in ./PluginSlot.tsx — keeping it out of this module lets the
+// registry export only data/functions (React Fast Refresh boundary). Re-export
+// removed on purpose: import PluginSlot from './PluginSlot' directly.

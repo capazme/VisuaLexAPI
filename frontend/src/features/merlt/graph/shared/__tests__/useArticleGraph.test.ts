@@ -48,8 +48,8 @@ describe('useArticleGraph', () => {
 
   it('passes the depth argument through to the API', async () => {
     fetchArticleGraphMock.mockResolvedValue(SAMPLE);
-    renderHook(() => useArticleGraph('urn:a', 3));
-    await waitFor(() => expect(fetchArticleGraphMock).toHaveBeenCalledWith('urn:a', 3));
+    renderHook(() => useArticleGraph('urn:a', 3, 25));
+    await waitFor(() => expect(fetchArticleGraphMock).toHaveBeenCalledWith('urn:a', 3, 25));
   });
 
   it('transitions loading → error when the fetch rejects', async () => {

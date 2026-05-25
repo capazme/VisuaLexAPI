@@ -1,0 +1,206 @@
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { useArticleGraph } from '../shared/useArticleGraph';
+import { useIngestionJob } from '../shared/useIngestionJob';
+import { triggerIngestion } from '../shared/graphApi';
+import { CollapseToggle } from './CollapseToggle';
+
+const CytoscapeView = lazy(() => import('../shared/CytoscapeView'));
+
+export interface ArticleGraphSideRailProps {
+  articleUrn: string | undefined;
+  /** Start expanded (desktop / tests). Defaults to collapsed (mobile-safe). */
+  defaultOpen?: boolean;
+}
+
+// Side rail shows the immediate concept neighbourhood: depth 1, capped small.
+const SIDE_RAIL_DEPTH = 1;
+const SIDE_RAIL_LIMIT = 25;
+
+/**
+ * Collapsible right-edge rail showing the article's concept neighbourhood.
+ * Mounted via the `article_sidebar` plugin slot. When the article is not yet in
+ * the graph (empty subgraph) it transparently triggers lazy ingestion and polls
+ * until the graph is ready, then refetches.
+ */
+export function ArticleGraphSideRail({
+  articleUrn,
+  defaultOpen = false,
+}: ArticleGraphSideRailProps): React.ReactElement | null {
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  // Only fetch while the rail is open AND we have a urn.
+  const activeUrn = isOpen && articleUrn ? articleUrn : null;
+  const graph = useArticleGraph(activeUrn, SIDE_RAIL_DEPTH, SIDE_RAIL_LIMIT);
+
+  const [jobId, setJobId] = useState<string | null>(null);
+  const job = useIngestionJob(jobId);
+
+  // Trigger ingestion once when the subgraph comes back empty. Reset keyed on
+  // activeUrn (NOT articleUrn) so closing + reopening the rail on the same
+  // article re-arms the trigger instead of getting stuck on a stale ref.
+  const triggeredRef = useRef(false);
+  useEffect(() => {
+    triggeredRef.current = false;
+    setJobId(null);
+  }, [activeUrn]);
+
+  useEffect(() => {
+    if (graph.status !== 'success' || graph.data.nodes.length > 0) return;
+    if (triggeredRef.current || !articleUrn) return;
+    triggeredRef.current = true;
+    triggerIngestion(articleUrn)
+      .then((r) => setJobId(r.jobId))
+      .catch(() => {
+        /* opportunistic — the empty state will show "not indexable" */
+      });
+    // Keyed on status, not graph.data: data is undefined outside 'success' (so it
+    // can't go in deps), it's read at fire time, and triggeredRef guards re-entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph.status, articleUrn]);
+
+  // Reload the graph when the ingestion job finishes.
+  useEffect(() => {
+    if (job.status === 'completed') graph.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.status]);
+
+  if (!articleUrn) return null;
+
+  if (!isOpen) {
+    return (
+      <div className="fixed right-0 top-1/2 z-30 -translate-y-1/2">
+        <CollapseToggle isOpen={false} onToggle={() => setIsOpen(true)} />
+      </div>
+    );
+  }
+
+  return (
+    <aside
+      className="fixed right-0 top-1/2 z-30 flex h-[70vh] max-h-[560px] w-[320px] -translate-y-1/2 flex-col rounded-l-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+      aria-label="Grafo dell'articolo"
+    >
+      <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Grafo dell&apos;articolo
+        </h3>
+        <CollapseToggle isOpen onToggle={() => setIsOpen(false)} />
+      </header>
+
+      <div className="relative flex-1 overflow-hidden">
+        <RailBody
+          graph={graph}
+          job={job}
+          articleUrn={articleUrn}
+          onNavigateExplore={() =>
+            navigate(`/grafo?urn=${encodeURIComponent(articleUrn)}&depth=2`)
+          }
+          onNodeNavigate={(urn) => navigate(`/grafo?urn=${encodeURIComponent(urn)}&depth=2`)}
+        />
+      </div>
+    </aside>
+  );
+}
+
+interface RailBodyProps {
+  graph: ReturnType<typeof useArticleGraph>;
+  job: ReturnType<typeof useIngestionJob>;
+  articleUrn: string;
+  onNavigateExplore: () => void;
+  onNodeNavigate: (urn: string) => void;
+}
+
+function RailBody({
+  graph,
+  job,
+  onNavigateExplore,
+  onNodeNavigate,
+}: RailBodyProps): React.ReactElement {
+  if (graph.status === 'loading' || graph.status === 'idle') {
+    return <Skeleton label="Caricamento grafo…" />;
+  }
+
+  if (graph.status === 'error') {
+    return (
+      <Centered>
+        <AlertCircle className="h-6 w-6 text-red-500" />
+        <p className="text-sm text-slate-600 dark:text-slate-300">Errore nel caricamento del grafo.</p>
+        <button
+          type="button"
+          onClick={graph.refetch}
+          className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+        >
+          Riprova
+        </button>
+      </Centered>
+    );
+  }
+
+  // success
+  if (graph.data.nodes.length === 0) {
+    // A completed job that still yields no nodes means the article isn't
+    // indexable — otherwise we'd spin on "indicizzando…" forever.
+    const failed =
+      job.status === 'failed' || job.status === 'timeout' || job.status === 'completed';
+    if (failed) {
+      return (
+        <Centered>
+          <AlertCircle className="h-6 w-6 text-amber-500" />
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Articolo non indicizzabile nel grafo.
+          </p>
+        </Centered>
+      );
+    }
+    return <Skeleton label="Sto indicizzando l'articolo nel grafo…" building />;
+  }
+
+  const nodeUrnById = new Map(graph.data.nodes.map((n) => [n.id, n.urn ?? null]));
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex-1">
+        <Suspense fallback={<Skeleton label="Caricamento vista…" />}>
+          <CytoscapeView
+            nodes={graph.elements.nodes}
+            edges={graph.elements.edges}
+            layout="cose-bilkent"
+            height="100%"
+            onNodeClick={(id) => {
+              const urn = nodeUrnById.get(id);
+              if (urn) onNodeNavigate(urn);
+            }}
+          />
+        </Suspense>
+      </div>
+      <div className="border-t border-slate-200 p-2 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={onNavigateExplore}
+          className="w-full rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+        >
+          Esplora nel grafo
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Skeleton({ label, building }: { label: string; building?: boolean }): React.ReactElement {
+  return (
+    <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-4">
+      {building ? (
+        <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+      ) : (
+        <div className="h-24 w-full animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+      )}
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400">{label}</p>
+    </div>
+  );
+}
+
+function Centered({ children }: { children: React.ReactNode }): React.ReactElement {
+  return <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">{children}</div>;
+}

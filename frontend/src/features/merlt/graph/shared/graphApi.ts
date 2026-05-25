@@ -8,8 +8,14 @@ import type { SubgraphResponse, JobStatusResponse } from './types';
  */
 
 /** GET /api/merlt/graph/article/:urn — subgraph for visualization. */
-export function fetchArticleGraph(urn: string, depth = 2): Promise<SubgraphResponse> {
-  return getMerlt<SubgraphResponse>(`/merlt/graph/article/${encodeURIComponent(urn)}`, { depth });
+export function fetchArticleGraph(
+  urn: string,
+  depth = 2,
+  limit?: number
+): Promise<SubgraphResponse> {
+  const params: Record<string, number> = { depth };
+  if (limit !== undefined) params.limit = limit;
+  return getMerlt<SubgraphResponse>(`/merlt/graph/article/${encodeURIComponent(urn)}`, params);
 }
 
 /** POST /api/merlt/graph/ingest — enqueue a lazy ingestion job. */
