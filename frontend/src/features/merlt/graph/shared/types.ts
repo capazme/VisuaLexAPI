@@ -31,6 +31,14 @@ export interface SubgraphResponse {
   metadata?: Record<string, unknown>;
 }
 
+/** BFF GET /api/merlt/graph/search item (proxied from MERL-T entity search). */
+export interface GraphSearchItem {
+  id: string;
+  nome?: string;
+  tipo?: string;
+  urn?: string;
+}
+
 /** BFF GET /api/merlt/graph/jobs/:jobId/status response shape. */
 export type IngestionJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'timeout';
 

@@ -184,6 +184,64 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
   });
 });
 
+describe('GET /api/merlt/graph/search (MERLT-2a.9)', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('graph-search');
+  });
+
+  it('returns MERL-T entity search results', async () => {
+    await grantConsent(user, 'basic');
+    const results = [
+      { id: 'norma:2043', nome: 'Art. 2043 c.c.', tipo: 'Norma', urn: 'urn:nir:...;2043' },
+      { id: 'concetto:colpa', nome: 'Colpa', tipo: 'ConcettoGiuridico' },
+    ];
+
+    let seen: Record<string, unknown> = {};
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/entities/search')
+      .query((q) => {
+        seen = q;
+        return true;
+      })
+      .reply(200, results);
+
+    const res = await request(app)
+      .get('/api/merlt/graph/search?q=2043&limit=5')
+      .set(authHeader(user));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(seen.q).toBe('2043');
+    expect(seen.limit).toBe('5');
+  });
+
+  it('returns 400 when q is missing or blank', async () => {
+    const res = await request(app)
+      .get('/api/merlt/graph/search?q=%20')
+      .set(authHeader(user));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 503 when MERL-T is down', async () => {
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/entities/search')
+      .query(true)
+      .replyWithError({ code: 'ECONNREFUSED', message: 'down' });
+
+    const res = await request(app)
+      .get('/api/merlt/graph/search?q=colpa')
+      .set(authHeader(user));
+    expect(res.status).toBe(503);
+  });
+
+  it('rejects unauthenticated requests with 401', async () => {
+    const res = await request(app).get('/api/merlt/graph/search?q=x');
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('POST /api/merlt/graph/ingest (MERLT-2a.4)', () => {
   let user: TestUser;
 

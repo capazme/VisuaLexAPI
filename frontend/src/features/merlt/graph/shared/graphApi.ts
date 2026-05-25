@@ -1,5 +1,5 @@
 import { getMerlt, postMerlt } from '../../../../services/merltService';
-import type { SubgraphResponse, JobStatusResponse } from './types';
+import type { SubgraphResponse, JobStatusResponse, GraphSearchItem } from './types';
 
 /**
  * Thin typed clients for the Slice 2a BFF graph endpoints. The hooks call these
@@ -26,4 +26,9 @@ export function triggerIngestion(urn: string): Promise<{ jobId: string; status: 
 /** GET /api/merlt/graph/jobs/:jobId/status — poll an ingestion job. */
 export function fetchJobStatus(jobId: string): Promise<JobStatusResponse> {
   return getMerlt<JobStatusResponse>(`/merlt/graph/jobs/${encodeURIComponent(jobId)}/status`);
+}
+
+/** GET /api/merlt/graph/search — entity autocomplete for the explorer. */
+export function searchGraph(q: string, limit = 10): Promise<GraphSearchItem[]> {
+  return getMerlt<GraphSearchItem[]>('/merlt/graph/search', { q, limit });
 }

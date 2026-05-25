@@ -83,6 +83,37 @@ router.get('/graph/article/:urn', authenticate, async (req: Request, res: Respon
 });
 
 /**
+ * GET /api/merlt/graph/search?q=&limit=
+ *
+ * Proxy to MERL-T entity search for the explorer autocomplete. authenticate-only
+ * (a read lookup, like /graph/article/:urn — not consent-gated). 400 on blank q.
+ */
+router.get('/graph/search', authenticate, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (!q) {
+    res.status(400).json({ detail: 'q is required' });
+    return;
+  }
+  const limit = clampInt(req.query.limit, 10, 1, 50);
+
+  try {
+    const results = await graphClient().searchEntities(q, limit);
+    res.status(200).json(results);
+  } catch (err) {
+    if (err instanceof MerltClientError) {
+      res.status(503).json({ detail: 'merlt_unavailable' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
  * POST /api/merlt/graph/ingest
  *
  * Body: { urn }

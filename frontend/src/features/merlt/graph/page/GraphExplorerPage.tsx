@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, Network } from 'lucide-react';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useArticleGraph } from '../shared/useArticleGraph';
+import type { GraphSearchItem } from '../shared/types';
+import { GraphSearchBox } from './GraphSearchBox';
 
 const CytoscapeView = lazy(() => import('../shared/CytoscapeView'));
 
@@ -20,12 +22,17 @@ function clampDepth(raw: string | null): number {
  * (2a.10) mount into the reserved regions later.
  */
 export function GraphExplorerPage(): React.ReactElement {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const enabled = isMerltGraphEnabled();
   const urn = searchParams.get('urn');
   const depth = clampDepth(searchParams.get('depth'));
   // Hooks must run unconditionally; pass null urn when disabled so no fetch fires.
   const graph = useArticleGraph(enabled ? urn : null, depth);
+
+  const handleSelect = (item: GraphSearchItem): void => {
+    const target = item.urn ?? item.id;
+    setSearchParams({ urn: target, depth: String(depth) });
+  };
 
   if (!enabled) {
     return (
@@ -38,9 +45,14 @@ export function GraphExplorerPage(): React.ReactElement {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
-      <header className="flex items-center gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-        <Network className="h-5 w-5 text-primary-600" />
-        <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Grafo giuridico</h1>
+      <header className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2">
+          <Network className="h-5 w-5 text-primary-600" />
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Grafo giuridico</h1>
+        </div>
+        <div className="flex-1 sm:max-w-md">
+          <GraphSearchBox onSelect={handleSelect} />
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
