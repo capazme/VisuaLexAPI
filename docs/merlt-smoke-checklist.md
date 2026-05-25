@@ -194,6 +194,35 @@ Riimposta a `true` e riavvia.
 
 ---
 
+# MERL-T Slice 2a — Graph Smoke E2E
+
+**Scope:** grafo read-only su due superfici (side rail + pagina `/grafo`) + lazy ingestion.
+**Prereq:** flag `VITE_FEATURE_MERLT_GRAPH` non a `false`; MERL-T sidecar UP; seed Libro IV caricato.
+
+### Boot + seed
+1. `MERLT_ENABLED=true ... ./start.sh`. Nel log del container `visualex-merlt-api` compare il seed loader: `... nodes loaded` (~27.7k) entro ~6 min al PRIMO boot, <5s ai successivi (skip idempotente). Se `MERLT_SKIP_EMBEDDINGS=true` (default dev) il retrieval semantico è assente ma il grafo c'è.
+
+### Side rail (in articolo)
+2. Apri **art. 2043 c.c.** (Ricerca → fetch). A destra compare la linguetta verticale "Grafo". Click → il pannello si espande (~320px) e mostra l'ego-network depth-1 con ≥10 nodi (Cytoscape).
+3. Apri **art. 73 c.p.** (verosimilmente fuori seed). Il side rail mostra lo skeleton "Sto indicizzando l'articolo nel grafo…" + spinner; dopo ~30-60s (worker RQ) il grafo si popola. Se l'articolo non è indicizzabile → "Articolo non indicizzabile".
+4. Click su un nodo **Norma** nel side rail → naviga a `/grafo?urn=…&depth=2`. Click "Esplora nel grafo" → idem sull'articolo corrente.
+5. Flag off: con `VITE_FEATURE_MERLT_GRAPH=false`, il side rail NON si registra (nessuna linguetta) e la voce Sidebar "Grafo" è nascosta.
+
+### Pagina `/grafo`
+6. Click "Grafo" in Sidebar → pagina full-canvas, stato vuoto con search box centrale + tagline "…per iniziare".
+7. Digita "2043" nella search box → dopo ~300ms compare l'autocomplete (label + tipo). Frecce su/giù + Invio, oppure click → il grafo si carica centrato su quell'URN.
+8. Click su un nodo **Concetto** → si apre il NodeDetailsDrawer a destra (URN/proprietà + relazioni in/out). Doppio click sul nodo (o "Centra qui") → diventa il nuovo centro; la BreadcrumbHistory in alto mostra **2 voci**. Click sulla prima breadcrumb → torna al centro precedente.
+9. Cambia **profondità** 2→3 → il grafo si ricarica con più nodi (refetch). Cambia **layout** (Forza/Gerarchico/Ad albero) → ridisegno immediato SENZA refetch.
+10. L'URL contiene `?urn=…&depth=3&layout=…`. **Refresh** della pagina → stesso stato ricaricato (deeplink shareable).
+11. Cerca un URN non ancora nel grafo → parte l'ingestion: banner "Indicizzazione in corso…" + spinner; a fine job toast "Grafo aggiornato" e il grafo si popola. Se resta vuoto → "Articolo non indicizzabile" + "Riprova".
+
+### Note di verifica rete (DevTools)
+- Side rail / pagina: `GET /api/merlt/graph/article/<urn-encoded>?depth=&limit=` → 200 con `{nodes,edges,metadata}` (o 503 se MERL-T down).
+- Autocomplete: `GET /api/merlt/graph/search?q=&limit=` → 200 array entità.
+- Ingestion: `POST /api/merlt/graph/ingest {urn}` → 202 `{jobId}`; polling `GET /api/merlt/graph/jobs/:jobId/status` ogni 2s fino a `completed`.
+
+---
+
 ## Troubleshooting comune
 
 | Sintomo | Cause probabile | Fix |

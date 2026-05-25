@@ -46,6 +46,7 @@ beforeEach(() => {
   triggerIngestionMock.mockResolvedValue({ jobId: 'job-1', status: 'pending' });
   useIngestionJobMock.mockReset();
   useIngestionJobMock.mockReturnValue({ status: null, error: null, nodesCreated: null });
+  sessionStorage.clear(); // breadcrumb history is sessionStorage-backed
   setGraph({ status: 'idle' });
 });
 
@@ -115,6 +116,34 @@ describe('GraphExplorerPage', () => {
     renderAt('/grafo?urn=urn%3Anew');
     expect(screen.getByText(/non indicizzabile/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
+  });
+
+  it('seeds the breadcrumb on a direct deeplink (no prior interaction)', () => {
+    setGraph({
+      status: 'success',
+      data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: 'urn:test' }], edges: [] },
+      elements: { nodes: [{ data: { id: 'a' } }], edges: [] },
+    });
+    renderAt('/grafo?urn=urn%3Atest');
+    // Breadcrumb nav present with the deeplinked urn as the (only) crumb.
+    expect(screen.getByRole('navigation', { name: /cronologia grafo/i })).toBeInTheDocument();
+  });
+
+  it('clicking "Riprova" refetches but does NOT re-trigger ingestion', () => {
+    const refetch = vi.fn();
+    useArticleGraphMock.mockReturnValue({
+      status: 'success',
+      data: { nodes: [], edges: [] },
+      elements: { nodes: [], edges: [] },
+      refetch,
+    });
+    useIngestionJobMock.mockReturnValue({ status: 'completed', error: null, nodesCreated: 0 });
+    renderAt('/grafo?urn=urn%3Anew');
+
+    triggerIngestionMock.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
+    expect(refetch).toHaveBeenCalled();
+    expect(triggerIngestionMock).not.toHaveBeenCalled();
   });
 
   it('renders the graph canvas on success', async () => {

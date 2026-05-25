@@ -80,6 +80,14 @@ export function GraphExplorerPage(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.status]);
 
+  // Seed the breadcrumb on any urn change — including a direct deeplink, where
+  // goToCenter never runs. push() dedupes the current urn, so this is a no-op
+  // right after an in-page navigation already pushed a richer label.
+  useEffect(() => {
+    if (urn) push({ urn, label: labelFor(urn, entries) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urn]);
+
   const nodes = graph.status === 'success' ? graph.data.nodes : [];
   const edges = graph.status === 'success' ? graph.data.edges : [];
   const nodesById = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
