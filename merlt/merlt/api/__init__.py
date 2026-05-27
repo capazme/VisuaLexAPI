@@ -46,7 +46,11 @@ from merlt.api.feedback_api import router as feedback_router
 from merlt.api.auth_api import router as auth_router
 from merlt.api.experts_router import router as experts_router
 from merlt.api.enrichment_router import router as enrichment_router
-from merlt.api.document_router import router as document_router, amendments_router
+from merlt.api.document_router import (
+    router as document_router,
+    amendments_router,
+    candidates_router,
+)
 from merlt.api.graph_router import router as graph_router
 from merlt.api.pipeline_router import router as pipeline_router
 from merlt.api.training_router import router as training_router
@@ -78,6 +82,7 @@ __all__ = [
     "enrichment_router",
     "document_router",
     "amendments_router",
+    "candidates_router",
     "graph_router",
     "pipeline_router",
     "training_router",

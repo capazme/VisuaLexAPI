@@ -43,6 +43,7 @@ from merlt.api import (
     enrichment_router,
     document_router,
     amendments_router,
+    candidates_router,
     graph_router,
     pipeline_router,
     training_router,
@@ -203,6 +204,7 @@ app.include_router(experts_router, prefix="/api/v1", tags=["experts"])
 app.include_router(enrichment_router, prefix="/api/v1", tags=["enrichment"])
 app.include_router(document_router, prefix="/api/v1", tags=["documents"])
 app.include_router(amendments_router, prefix="/api/v1", tags=["amendments"])
+app.include_router(candidates_router, prefix="/api/v1", tags=["extraction-candidates"])
 app.include_router(graph_router, prefix="/api/v1", tags=["graph"])
 app.include_router(pipeline_router, prefix="/api/v1", tags=["pipeline"])
 app.include_router(training_router, prefix="/api/v1", tags=["training"])

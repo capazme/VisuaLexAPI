@@ -266,6 +266,53 @@ class RelationVote(Base):
 
 
 # ====================================================
+# 4b. EXTRACTION CANDIDATES (staging — Slice 2c)
+# ====================================================
+class ExtractionCandidate(Base):
+    """
+    Ephemeral staging row for a candidate extracted from a user document
+    (Slice 2c — "Apprendi dai miei appunti").
+
+    The async worker writes candidates here (NOT into pending_*), keeping the
+    raw verbatim excerpt out of the shared proposal pipeline. The user reviews
+    each candidate and, on promotion, the BFF creates a fresh PendingEntity /
+    PendingRelation from the *reformulated* text. Rows are purged after
+    promotion or once `expires_at` passes (the server does not host personal
+    graphs — resource cost).
+    """
+
+    __tablename__ = "extraction_candidates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(
+        Integer, ForeignKey("user_documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    contributor_id = Column(String(100), nullable=False, index=True)
+    candidate_type = Column(String(20), nullable=False)  # 'entity' | 'relation'
+
+    # Entity fields
+    entity_text = Column(Text)
+    entity_type = Column(String(50))
+
+    # Relation fields
+    relation_type = Column(String(100))
+    source_node_urn = Column(String(300))
+    target_entity_id = Column(String(100))
+
+    # Common
+    article_urn = Column(String(300))
+    descrizione = Column(Text)  # LLM-suggested description (the user reformulates this)
+    verbatim_excerpt = Column(Text)  # raw context — never copied into pending_*
+    llm_confidence = Column(Float)
+    llm_model = Column(String(100))
+    potential_duplicate_of = Column(String(100))
+
+    status = Column(String(20), default="draft", index=True)  # draft | promoted | expired
+    created_at = Column(DateTime, default=func.now())
+    expires_at = Column(DateTime, index=True)
+
+
+# ====================================================
 # 5. USER DOCUMENTS
 # ====================================================
 class UserDocument(Base):

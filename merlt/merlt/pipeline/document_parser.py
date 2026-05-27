@@ -36,8 +36,10 @@ Usage:
         print(f"Extracted {result.entities_count} entities")
 """
 
+import os
 import re
 import structlog
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
@@ -45,11 +47,16 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Staging candidates are ephemeral (Slice 2c #3): purged after promotion or TTL.
+STAGING_TTL_HOURS = int(os.getenv("MERLT_STAGING_TTL_HOURS", "48"))
+
 from merlt.storage.enrichment.models import (
     PendingEntity,
     PendingRelation,
     PendingAmendment,
+    ExtractionCandidate,
 )
+from merlt.storage.enrichment import EntityDeduplicator
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 from merlt.pipeline.multivigenza import parse_estremi, parse_disposizione
 
@@ -108,6 +115,8 @@ class DocumentParserService:
         extract_amendments: bool,
         user_id: str,
         session: AsyncSession,
+        persist_target: str = "pending",
+        document_id: Optional[int] = None,
     ) -> ParseResult:
         """
         Parse document to extract entities and amendments.
@@ -155,6 +164,8 @@ class DocumentParserService:
                 legal_domain=legal_domain,
                 user_id=user_id,
                 session=session,
+                persist_target=persist_target,
+                document_id=document_id,
             )
             result.entities_count = entities_count
 
@@ -314,9 +325,16 @@ class DocumentParserService:
         legal_domain: Optional[str],
         user_id: str,
         session: AsyncSession,
+        persist_target: str = "pending",
+        document_id: Optional[int] = None,
     ) -> int:
         """
         Extract entities from text chunks using LLM.
+
+        persist_target:
+          - "pending"  → create PendingEntity (canonical RLCF queue, legacy path)
+          - "staging"  → create ExtractionCandidate (Slice 2c review buffer; the
+            raw verbatim never enters pending_*).
 
         Uses the same LLM extractors as enrichment pipeline:
         - ConceptExtractor for concepts
@@ -386,27 +404,59 @@ class DocumentParserService:
                             else str(entity_data.tipo)
                         )
 
-                        # Create PendingEntity
                         entity_id = f"{tipo_str}:{uuid4().hex[:8]}"
+                        snippet = chunk[:500] if len(chunk) > 500 else chunk
 
-                        pending_entity = PendingEntity(
-                            entity_id=entity_id,
-                            article_urn="user_document",
-                            source_type="user_document",
-                            entity_type=tipo_str,
-                            entity_text=entity_data.nome,
-                            descrizione=entity_data.descrizione or "",
-                            ambito=legal_domain or "",
-                            fonte="llm_extraction",
-                            llm_confidence=entity_data.confidence or 0.8,
-                            llm_model="google/gemini-2.5-flash",
-                            llm_reasoning=chunk[:500] if len(chunk) > 500 else chunk,  # Context snippet
-                            contributed_by=user_id,
-                            contributor_authority=0.5,
-                            validation_status="pending",
-                        )
+                        if persist_target == "staging":
+                            # Slice 2c: land in the review buffer, NOT pending_*.
+                            # The verbatim snippet stays here; promotion creates a
+                            # fresh PendingEntity from the user's reformulated text.
+                            # #4 dedup: flag a likely existing canonical node so the
+                            # review UI can warn before promotion.
+                            potential_dup = None
+                            try:
+                                dres = await EntityDeduplicator(session).find_duplicates(
+                                    entity_data.nome, tipo_str
+                                )
+                                if dres.best_match:
+                                    potential_dup = dres.best_match.entity_id
+                            except Exception as dup_exc:  # dedup is best-effort
+                                log.warning("dedup check failed", entity=entity_data.nome, exc=str(dup_exc))
+                            row = ExtractionCandidate(
+                                document_id=document_id,
+                                contributor_id=user_id,
+                                candidate_type="entity",
+                                entity_text=entity_data.nome,
+                                entity_type=tipo_str,
+                                article_urn="user_document",
+                                descrizione=entity_data.descrizione or "",
+                                verbatim_excerpt=snippet,
+                                llm_confidence=entity_data.confidence or 0.8,
+                                llm_model="google/gemini-2.5-flash",
+                                potential_duplicate_of=potential_dup,
+                                status="draft",
+                                # #3: ephemeral — purged after this TTL if not promoted.
+                                expires_at=datetime.now() + timedelta(hours=STAGING_TTL_HOURS),
+                            )
+                        else:
+                            row = PendingEntity(
+                                entity_id=entity_id,
+                                article_urn="user_document",
+                                source_type="user_document",
+                                entity_type=tipo_str,
+                                entity_text=entity_data.nome,
+                                descrizione=entity_data.descrizione or "",
+                                ambito=legal_domain or "",
+                                fonte="llm_extraction",
+                                llm_confidence=entity_data.confidence or 0.8,
+                                llm_model="google/gemini-2.5-flash",
+                                llm_reasoning=snippet,  # Context snippet
+                                contributed_by=user_id,
+                                contributor_authority=0.5,
+                                validation_status="pending",
+                            )
 
-                        session.add(pending_entity)
+                        session.add(row)
                         entities_count += 1
 
                         log.debug(

@@ -21,6 +21,7 @@ Integration:
 - Uses LLM for entity/relation extraction from docs
 """
 
+import asyncio
 import os
 import hashlib
 import structlog
@@ -39,7 +40,8 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from merlt.api.auth import verify_api_key, require_role
@@ -49,6 +51,7 @@ from merlt.storage.enrichment import (
     UserDocument,
     PendingAmendment,
 )
+from merlt.storage.enrichment.models import ExtractionCandidate
 from merlt.api.models.document_models import (
     AmendmentSubmissionRequest,
     AmendmentSubmissionResponse,
@@ -536,9 +539,175 @@ async def list_pending_amendments(
 
 
 # ====================================================
+# EXTRACTION → STAGING (Slice 2c — "Apprendi dai miei appunti")
+# ====================================================
+candidates_router = APIRouter(prefix="/candidates", tags=["extraction-candidates"])
+
+_EXTRACT_QUEUE_NAME = "merlt_extract"
+_extract_rq_connection = None
+
+
+def _get_extract_queue():
+    """RQ queue for async document extraction (separate from the ingest queue)."""
+    from redis import Redis
+    from rq import Queue
+
+    global _extract_rq_connection
+    if _extract_rq_connection is None:
+        _extract_rq_connection = Redis.from_url(os.getenv("RQ_REDIS_URL", "redis://localhost:6379/1"))
+    return Queue(_EXTRACT_QUEUE_NAME, connection=_extract_rq_connection)
+
+
+class ExtractAsyncRequestOptions(BaseModel):
+    bff_job_id: Optional[str] = Field(None, description="BFF MerltExtractionJob id for the callback")
+
+
+class ExtractAsyncRequest(BaseModel):
+    user_id: str = Field(..., description="VisuaLex user id (string)")
+    options: Optional[ExtractAsyncRequestOptions] = None
+
+
+class ExtractAsyncResponse(BaseModel):
+    task_id: str
+
+
+class ExtractionCandidateOut(BaseModel):
+    id: int
+    candidate_type: str
+    entity_text: Optional[str] = None
+    entity_type: Optional[str] = None
+    relation_type: Optional[str] = None
+    source_node_urn: Optional[str] = None
+    target_entity_id: Optional[str] = None
+    article_urn: Optional[str] = None
+    descrizione: Optional[str] = None
+    verbatim_excerpt: Optional[str] = None
+    llm_confidence: Optional[float] = None
+    potential_duplicate_of: Optional[str] = None
+    status: Optional[str] = None
+
+
+class ListCandidatesResponse(BaseModel):
+    candidates: List[ExtractionCandidateOut]
+
+
+def _candidate_to_out(c: ExtractionCandidate) -> ExtractionCandidateOut:
+    return ExtractionCandidateOut(
+        id=c.id,
+        candidate_type=c.candidate_type,
+        entity_text=c.entity_text,
+        entity_type=c.entity_type,
+        relation_type=c.relation_type,
+        source_node_urn=c.source_node_urn,
+        target_entity_id=c.target_entity_id,
+        article_urn=c.article_urn,
+        descrizione=c.descrizione,
+        verbatim_excerpt=c.verbatim_excerpt,
+        llm_confidence=c.llm_confidence,
+        potential_duplicate_of=c.potential_duplicate_of,
+        status=c.status,
+    )
+
+
+@router.post("/{document_id}/extract-async", response_model=ExtractAsyncResponse, status_code=202)
+async def extract_document_async(
+    document_id: int,
+    request: ExtractAsyncRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+) -> ExtractAsyncResponse:
+    """Enqueue async extraction of a document into the staging buffer (Slice 2c)."""
+    bff_job_id = request.options.bff_job_id if request.options else None
+    # RQ job ids allow only [A-Za-z0-9_-] — no ':' separator here.
+    job_id = "extract-" + hashlib.sha256(str(document_id).encode("utf-8")).hexdigest()[:40]
+    try:
+        queue = await asyncio.to_thread(_get_extract_queue)
+        await asyncio.to_thread(
+            lambda: queue.enqueue(
+                "merlt.worker.extraction_tasks.extract_to_staging",
+                document_id,
+                request.user_id,
+                bff_job_id,
+                job_id=job_id,
+            )
+        )
+    except Exception as e:
+        log.error("Failed to enqueue extraction", document_id=document_id, exc_info=True)
+        raise HTTPException(status_code=503, detail=f"Job queue non disponibile: {e}")
+    return ExtractAsyncResponse(task_id=job_id)
+
+
+@router.get("/{document_id}/candidates", response_model=ListCandidatesResponse)
+async def list_document_candidates(
+    document_id: int,
+    contributor_id: str,
+    session: AsyncSession = Depends(get_db_session_dependency),
+    api_key: ApiKey = Depends(verify_api_key),
+) -> ListCandidatesResponse:
+    """List draft candidates for a document, scoped to the contributor (no IDOR).
+
+    #3: lazy purge — drop promoted + expired candidates on every access so the
+    ephemeral staging buffer self-cleans without a separate scheduler.
+    """
+    await session.execute(
+        delete(ExtractionCandidate).where(
+            (ExtractionCandidate.status == "promoted")
+            | (ExtractionCandidate.expires_at < datetime.now())
+        )
+    )
+    await session.commit()
+
+    stmt = (
+        select(ExtractionCandidate)
+        .where(
+            ExtractionCandidate.document_id == document_id,
+            ExtractionCandidate.contributor_id == contributor_id,
+            ExtractionCandidate.status == "draft",
+        )
+        .order_by(ExtractionCandidate.id)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return ListCandidatesResponse(candidates=[_candidate_to_out(c) for c in rows])
+
+
+@candidates_router.get("/{candidate_id}", response_model=ExtractionCandidateOut)
+async def get_candidate(
+    candidate_id: int,
+    session: AsyncSession = Depends(get_db_session_dependency),
+    api_key: ApiKey = Depends(verify_api_key),
+) -> ExtractionCandidateOut:
+    candidate = (
+        await session.execute(
+            select(ExtractionCandidate).where(ExtractionCandidate.id == candidate_id)
+        )
+    ).scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return _candidate_to_out(candidate)
+
+
+@candidates_router.post("/{candidate_id}/mark-promoted")
+async def mark_candidate_promoted(
+    candidate_id: int,
+    session: AsyncSession = Depends(get_db_session_dependency),
+    api_key: ApiKey = Depends(verify_api_key),
+) -> JSONResponse:
+    candidate = (
+        await session.execute(
+            select(ExtractionCandidate).where(ExtractionCandidate.id == candidate_id)
+        )
+    ).scalar_one_or_none()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    candidate.status = "promoted"
+    await session.commit()
+    return JSONResponse({"ok": True})
+
+
+# ====================================================
 # EXPORTS
 # ====================================================
 __all__ = [
     "router",
     "amendments_router",
+    "candidates_router",
 ]
