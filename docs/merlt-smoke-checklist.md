@@ -223,6 +223,60 @@ Riimposta a `true` e riavvia.
 
 ---
 
+# MERL-T Slice 2b — Hub & Consent Smoke
+
+Prerequisito: backend (3001) + MERL-T (8000) attivi, utente loggato. `VITE_FEATURE_MERLT` ON.
+
+## Consenso (server SoT)
+- [ ] Nuovo utente (nessuna preferenza): vai su `/merlt` → header mostra "Consenso: Nessuno".
+- [ ] Apri il dialog ("Gestisci") → scegli **Base** → Salva. DevTools: `POST /api/merlt/consent {level:'basic'}` → 200 con `{level, graphEnabled:true, ...}`. L'header passa a "Base".
+- [ ] Ricarica la pagina → il livello resta "Base" (hydrate da `GET /api/merlt/consent`, non da localStorage).
+- [ ] Porta a **Completo** → la card Consenso mostra contribuzione/validazione attive.
+- [ ] Revoca (dialog → Nessuno / Salva) → `POST {level:'none'}` → header "Nessuno"; localStorage `visualex.merlt.consent` rimosso.
+
+## Banner first-run
+- [ ] Con consenso = Nessuno, leggi un articolo (≥3s o scroll ≥30%) → compare il banner non bloccante.
+- [ ] "Non ora" → sparisce e non riappare nella sessione (anche dopo altri eventi).
+- [ ] Verifica che eventi passivi (solo scroll senza dwell, selezione testo) NON facciano comparire il banner da soli.
+
+## Hub + gating
+- [ ] Card Profilo/Authority: `GET /api/merlt/profile` → 200 mostra authority/contributi; se MERL-T down → stato degradato "Dati di authority non disponibili".
+- [ ] Card Grafo presente solo se consenso ≥ Base (graphReadable); link → `/grafo`.
+- [ ] Card **Ops** visibile SOLO con utente admin (`admin@visualex.it`).
+- [ ] `VITE_FEATURE_MERLT=false` → `/merlt` mostra "MERL-T non è disponibile".
+
+## Tracker gating (regressione)
+- [ ] Con consenso Nessuno: leggere un articolo NON produce `POST /api/merlt/events/article-viewed` (0 chiamate). Con Base/Completo → la produce.
+
+---
+
+# MERL-T Slice 2c — "Apprendi dai miei appunti" + Validazione Smoke
+
+Prereq: stack Docker MERL-T attivo (`docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d`), BFF Node (3001), consenso **Completo**, e una chiave LLM configurata in MERL-T per l'estrazione reale.
+
+## Contribuzione (upload → estrazione → revisione → promozione)
+- [ ] `/merlt/contribuisci` con consenso < Completo → messaggio "serve consenso Completo".
+- [ ] Carica un `.txt`/`.pdf`/`.docx` (≤50MB) → `POST /api/merlt/contrib/documents` 201 `{documentId}`.
+- [ ] Parte l'estrazione async → spinner "Estrazione in corso" → polling `/contrib/jobs/:id/status` fino a `completed`.
+- [ ] Compaiono i candidati (`/contrib/documents/:id/candidates`). Verifica: hint dedup se `potential_duplicate_of` valorizzato (#4); confidenza LLM mostrata.
+- [ ] Promuovi un candidato: il pulsante è disabilitato finché non compili **Norma di riferimento** (#6) + **Fonte** + **riformulazione ≠ verbatim** + **attestazione**. → `POST /contrib/candidates/:id/promote` 200 `{pendingId}`; 422 se il gate fallisce.
+- [ ] **#3 purge**: dopo la promozione/scadenza, ricaricando i candidati le righe promosse/scadute non ricompaiono; il file caricato è rimosso da `UPLOAD_DIR` dopo l'estrazione.
+
+## Validazione community (#8)
+- [ ] `/merlt/valida` con consenso < Completo → messaggio consenso.
+- [ ] Con Completo: lista entità/relazioni pending (`GET /api/merlt/validate/pending`).
+- [ ] Vota 👍/👎 su un item → `POST /api/merlt/validate/{entity|relation}` 200, l'item sparisce dalla lista.
+
+## Snapshot locale (#7, su `/grafo`)
+- [ ] Apri uno slice, "Esporta slice" → scarica un `.json`.
+- [ ] "Carica slice" + seleziona il file → banner "Slice locale (sola lettura)" + render nel canvas; "Chiudi" torna alla vista normale.
+
+### Note rete
+- `POST /api/merlt/contrib/documents/:id/extract` → 202 `{jobId}`; worker su coda `merlt_extract`.
+- Callback worker→BFF: `POST /api/merlt/internal/extraction-callback` con `X-Internal-Secret`.
+
+---
+
 ## Troubleshooting comune
 
 | Sintomo | Cause probabile | Fix |
@@ -231,4 +285,4 @@ Riimposta a `true` e riavvia.
 | MERL-T `ImportError: No module named 'merlt.models'` | sub-package escluso da rsync | Vedi commit `ef2bd25` + `docs/merlt-upstream-sync.md` |
 | MERL-T 503 al startup container | env vars `ENRICHMENT_DB_*` / `RLCF_DATABASE_URL` mancanti | Vedi commit `1fdb3d5` |
 | Health gate timeout in start.sh | MERL-T tarda al primo boot (~30-60s per migrations + model load) | Aumenta `MERLT_HEALTH_TIMEOUT=120` |
-| Frontend mostra 404 su `/api/merlt/features` | endpoint legacy non ancora reimplementato | Out of scope Slice 1 — sarà coperto in Slice 2 |
+| Frontend chiama `/api/merlt/features` | dipendenza legacy | RISOLTO in Slice 2b: il gating è derivato client-side (`useMerltFeatures`), l'endpoint non esiste più |

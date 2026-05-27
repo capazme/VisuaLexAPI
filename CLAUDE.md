@@ -131,6 +131,57 @@ Slice 2a brings the legal knowledge graph (FalkorDB) to the frontend **read-only
 5. **`MERLT_INTERNAL_SECRET`** (shared worker↔BFF secret) is in `backend/.env.example`. `VITE_FEATURE_MERLT_GRAPH` (default ON) gates the whole graph UI — `false` hides the Sidebar entry, the side rail slot, and renders `/grafo` as "non disponibile".
 6. **URN version-marker mismatch (the `!vig=` trap).** The graph seeds Normattiva URNs WITHOUT the version marker (`...~art2043`), but VisuaLex's `norma_data.urn` carries it (`...~art2043!vig=`). Passed verbatim, `check-article`/`subgraph` return `exists:false`/empty → the side rail and `/grafo` spin forever on lazy ingestion. `graphClient.normalizeGraphUrn()` strips everything from the first `!` (the NIR version/annex separator) before every MERL-T graph call. Don't bypass it when adding new urn-keyed graph calls.
 
+### MERL-T Integration (Slice 2b — Hub & Consent, branch `visualex-merlt-main`)
+
+Slice 2b turns `/merlt` from a dead developer UI (5 JSON tabs calling unmounted endpoints) into a user-facing **hub**, and fixes the fragmented consent. Design: `docs/superpowers/specs/2026-05-26-merlt-slice2b-hub-consent-design.md`; sprint plan: `docs/sprint-plan-merlt-slice2b-2026-05-26.md`.
+
+**Consent = server SoT, client = synced cache.** The Prisma `MerltUserPreference` + BFF `GET/POST/DELETE /api/merlt/consent` (body `{ level, reason? }`) is authoritative; the server `consentGuard` is the hard gate (defence in depth). Frontend:
+- `features/merlt/consent/context.ts` — the React `ConsentContext` object + `ConsentContextValue` type, kept in a non-component file (react-refresh/only-export-components boundary, same split as graph's `PluginSlot`).
+- `features/merlt/consent/ConsentContext.tsx` — `ConsentProvider` (mounted in `App.tsx` wrapping the authenticated `Layout`). Hydrates via `GET /consent` on mount (inline `.then/.catch`, never a synchronous in-effect setState), exposes `setConsent`/`revokeConsent`/`refresh`, and writes the level to `localStorage` (now a **boot cache only** — server wins on reconcile). `inFlightRef` prevents overlapping fetches.
+- `features/merlt/consent/useConsent.ts` — consumer hook (throws outside provider). Exposes `level`, `canTrack`, `status`.
+- `features/merlt/merltConsent.ts` — repurposed as the boot cache (NOT SoT).
+- The 5 Slice 1 trackers now gate on `useConsent().canTrack` instead of `hasMerltConsent()` localStorage. Bus-subscribers hold the live value in a `canTrackRef` updated in a `useEffect` (NOT during render — react-hooks/refs). `useArticleViewedTracker` keeps `canTrack` OUT of its main effect deps and gates the cleanup-path emission on `canTrackRef.current`, because the effect cleanup runs BEFORE the ref-sync effect — including `canTrack` in deps would emit a stale `true` on revoke (gotcha below).
+
+**Feature gating is derived client-side — there is no `GET /api/merlt/features`** (it was never implemented; the dependency is removed). `features/merlt/useMerltFeatures.ts` combines `isMerltEnabled()` (flag `VITE_FEATURE_MERLT`) + `isMerltGraphEnabled()` + `useConsent().level` + `useAuth().isAdmin` into `{ merltEnabled, graphEnabled, consentLevel, canTrack, canContribute, canValidate, graphReadable, opsVisible }`. `canContribute/canValidate = level==='full'`; `opsVisible = isAdmin`.
+
+**Consent UI.** `ConsentDialog.tsx` (3 levels none/basic/full with privacy-first copy, granular capability preview) and `ConsentBanner.tsx` (non-blocking first-run prompt). The banner mounts on the `global` plugin slot (via `GlobalMerltSlot`) and triggers only on the **real RLCF bus events** (`TRACKED_EVENT_TYPES` set), not passive ones like `scroll`/`text_selection`. `pages/MerltHubPage.tsx` is the dashboard (replaces the deleted `MerltWorkspacePage`): consent/profile/graph cards + "in arrivo" placeholders + an admin-only ops card.
+
+**BFF.** `middleware/merlt/requireAdmin.ts` (after `authenticate`, 403 `admin_required` if `!req.user.isAdmin`) — scaffold for the Phase-4 ops routes; today the consent route was already correct (the bug was the old client `PUT { consentLevel }`).
+
+**Slice 2b gotchas:**
+1. **Consent revoke + tracker cleanup ordering.** React runs an effect's cleanup BEFORE the ref-sync effect on a re-render, so a `canTrack`-in-deps tracker would fire its cleanup-path emission with the stale `true`. Keep `canTrack` out of the main effect deps and gate on a separately-synced `canTrackRef.current`, which is correct at unmount/article-change.
+2. **The consent route is correct; the client was the bug.** Use `setMerltConsent(level, reason?)` (POST) / `revokeMerltConsent` (DELETE) — never reintroduce a PUT or `{ consentLevel }`.
+3. **`MerltEventResponse` is `{ received, timestamp }`**, NOT `{ trace_id }` — the BFF `/events/*` 202 shape. `ArticleViewedEventResponse` additionally carries optional `ingestionJob` (Slice 2a lazy trigger).
+
+### MERL-T Integration (Slice 2c — "Apprendi dai miei appunti", branch `visualex-merlt-main`)
+
+Upload study notes → async LLM extraction → per-item review → promotion to RLCF `pending_*`. Design: `docs/superpowers/specs/2026-05-26-merlt-slice2c-learn-from-notes-design.md`; sprint plan: `docs/sprint-plan-merlt-slice2c-2026-05-26.md`. Depends on Slice 2b consent (`full`).
+
+**Load-bearing model (resource cost, not privacy):** the server hosts ONLY the central graph + RLCF proposals — no per-user graphs. Extracted candidates live in an **ephemeral** MERL-T `extraction_candidates` staging table (purged after promotion / TTL); the verbatim NEVER enters `pending_*`. The user's "personal slice" is a **local snapshot** (download/reload, `snapshotIO.ts`). Promotion creates fresh `pending_*` rows from the **reformulated** text.
+
+**BFF (`/api/merlt/contrib/*`)** — done & tested (205 BE tests):
+- `services/merlt/contribClient.ts` — mirror of graphClient; `uploadDocument` (multipart→MERL-T `/documents/upload`), `extractAsync`, `listCandidates`, `getCandidate`, `proposeEntity/Relation`, `markPromoted`.
+- `services/merlt/promotionGate.ts` — **copyright gate** (`fonte` non-empty AND text ≠ verbatim AND `attested`). Enforced server-side, not just UI.
+- `services/merlt/contributionGuard.ts` — requires consent level `full` (stricter than `consentGuard`).
+- `routes/merlt/contrib.ts` — `POST /contrib/documents` (multer, validates PDF/TXT/DOCX ≤50MB before forward), `/documents/:id/extract` (creates `MerltExtractionJob`, enqueues), `/documents/:id/candidates` (IDOR-scoped), `/jobs/:jobId/status` (owner-scoped), `/candidates/:id/promote` (gate→propose→markPromoted), `/internal/extraction-callback` (internalAuth). Registered in `routes/merlt/index.ts` BEFORE the catch-all auth routers.
+- Prisma `MerltExtractionJob` (`@@map merlt_extraction_jobs`, reuses `MerltJobStatus`).
+
+**Frontend (`features/merlt/contrib/`)** — done & tested (190 FE tests): `UploadDropzone`, `useExtractionJob` (2s poll, mirrors `useIngestionJob`), `CandidateCard` (gate UI: promote disabled until fonte+reformulation+attestation), `CandidateReviewList`, `snapshotIO` (local export/import), `ContribPage` (orchestrator; route `/merlt/contribuisci`, lazy). Hub "Contributi" card links here when `canContribute`.
+
+**MERL-T side (Python, vendored `merlt/`)** — DEPLOYED to the live stack (`ExtractionCandidate` model + migration `005`, `document_parser.py` `persist_target="staging"` branch, `worker/extraction_tasks.py` `extract_to_staging`, `document_router.py` extract-async/candidates + `candidates_router`). Gap-closure additions (also live): **#3** the parser sets `expires_at` (env `MERLT_STAGING_TTL_HOURS`=48), the worker deletes the uploaded file post-extraction, and `list_document_candidates` lazy-purges promoted+expired rows; **#4** the parser staging branch runs `EntityDeduplicator.find_duplicates` (best-effort) to set `potential_duplicate_of`.
+
+**Validation (Slice 2c #8) — vote on the community's pending proposals.** BFF `routes/merlt/validate.ts` (`GET /validate/pending`, `POST /validate/entity|relation`, gated by `validationGuard` = full consent) + contribClient `getPending/validateEntity/validateRelation` (votes carry `user_id`=VisuaLex id; `VoteType` = approve|reject|edit). FE `features/merlt/validate/` (`validateApi` + `ValidationPage`), route `/merlt/valida`, hub card. The local-snapshot affordance (#7) lives on `/grafo` (`graph/shared/snapshotIO.ts` + Esporta/Carica slice in `GraphExplorerPage`), NOT in contrib.
+
+**Deferred by decision: relation EXTRACTION from free-text notes (#5).** MERL-T has no free-text relation extractor (`MechanisticExtractor` is Brocardi-structured-data only; the LLM extractors cover concept/principle/definition entities). The relation *path* (staging schema, `CandidateCard`, `proposeRelation`) is complete — only producing relation candidates from notes is absent (a new research-grade LLM extractor). Entities-first is the MVP.
+
+**Slice 2c gotchas:**
+1. **MERL-T `parse_document` was SYNC + wrote straight to `pending_*`.** Slice 2c adds the async staging path (`persist_target`); the legacy sync path is unchanged. The personal staging level did not exist before.
+2. **`user_id` is a varchar(100) string everywhere toward MERL-T** (the VisuaLex user id), never an FK.
+3. **Copyright gate lives in `promotionGate.ts` and is re-checked server-side against the AUTHORITATIVE verbatim** fetched from MERL-T (`getCandidate`) — the client cannot supply the verbatim.
+4. **RQ job ids cannot contain `:`** (this RQ version validates `[A-Za-z0-9_-]`). The extraction job id is `"extract-"+sha256(docId)` (dash, not colon). The graph `"ingest:"` prefix predates this RQ and would break the same way if re-enqueued.
+5. **`merlt-api` must define `RQ_REDIS_URL`**, not just the worker — the api is what ENQUEUES (extract-async / ingest-article). Without it the api defaults to `localhost:6379` inside the container and enqueue fails (`Connection refused`). Added to `docker-compose.merlt.yml` api env.
+6. **The RQ worker has NO FastAPI lifespan**, so `init_db()` (enrichment Postgres engine) is never auto-called — any worker task that opens `get_db_session()` must `await init_db()` first (idempotent: guarded on `_engine is not None`). The graph ingest task sidesteps this by using FalkorDB only. MERL-T code in `merlt/` is **baked into the image at build** (only `data/` is volume-mounted) → code changes need a `docker compose --profile api-in-docker build` + recreate; the staging table auto-creates at api boot via lifespan `create_tables()`.
+
 ### Frontend Structure
 
 React SPA with component-based architecture:

@@ -26,3 +26,6 @@ merlt/merlt.egg-info/
 
 # Test coverage output
 coverage/
+
+# Brainstorming visual companion workspace
+.superpowers/

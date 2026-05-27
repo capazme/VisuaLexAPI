@@ -140,3 +140,16 @@ merlt/
 - Il `docker-compose.dev.yml` interno a `merlt/` è MERL-T standalone (per dev MERL-T isolato). Il nostro flusso VisuaLex usa **`docker-compose.merlt.yml` nella root del repo** (4 servizi sidecar + merlt-api opzionale via profile).
 - `start_dev.sh` interno a `merlt/` analogamente NON viene usato — il nostro `start.sh` root invoca uvicorn direttamente.
 - Se `ALIS_CORE/merlt` viene cancellato/spostato, NULLA cambia in VisuaLex: `merlt/` è autocontenuto. Per ricostruire `data/` serve documentazione separata (riferirsi a `merlt/docs/`).
+
+## Divergenze locali da ri-applicare in upstream (Slice 2c — staging "Apprendi dai miei appunti")
+
+Queste modifiche al `merlt/` vendorizzato **sono già deployate sullo stack live locale** (rebuild `visualex-merlt-api`+`worker`; tabella creata al boot via lifespan `create_tables()`, niente Alembic manuale necessario sul live ma la migrazione 005 resta per parità/prod) e vanno portate in upstream `ALIS_CORE/merlt`:
+- `merlt/storage/enrichment/models.py` — nuovo modello `ExtractionCandidate` (tabella `extraction_candidates`).
+- `alembic/versions/005_add_extraction_candidates.py` — migrazione (down_revision `004_add_weight_versions_table`).
+- `merlt/pipeline/document_parser.py` — param `persist_target` ("pending" | "staging") + `document_id`; branch che scrive `ExtractionCandidate` invece di `PendingEntity`.
+- `merlt/worker/extraction_tasks.py` — task RQ `extract_to_staging` (coda `merlt_extract`, callback BFF `/api/merlt/internal/extraction-callback`, env `BFF_EXTRACTION_CALLBACK_URL`).
+- `merlt/api/document_router.py` — endpoint `POST /documents/{id}/extract-async`, `GET /documents/{id}/candidates`, + nuovo `candidates_router` (`GET /candidates/{id}`, `POST /candidates/{id}/mark-promoted`). Wired in `merlt/api/__init__.py` + `merlt/app.py`.
+- `docker-compose.merlt.yml` — 3 fix scoperti durante lo smoke live: (a) `merlt-api` env `RQ_REDIS_URL: redis://merlt-redis:6379/1` (l'api accoda, non solo il worker); (b) worker `command` → `rq worker merlt_ingest merlt_extract`; (c) worker env `BFF_EXTRACTION_CALLBACK_URL`. Inoltre: RQ job_id non può contenere `:` (usato `extract-`+sha256), e il worker chiama `init_db()` (niente lifespan).
+- Deploy fatto: `docker compose -f docker-compose.merlt.yml --profile api-in-docker build merlt-api merlt-worker && up -d`. Verifica: 4 endpoint in OpenAPI, `extract-async` 202 + worker processa `merlt_extract`, pytest `tests/pipeline/test_extraction_staging.py` 2 passed (in-container). E2E positivo completo (PDF reale→LLM→promote) richiede BFF Node up + chiave LLM.
+- Gap-closure (deployata): `document_parser.py` ora setta `expires_at` (env `MERLT_STAGING_TTL_HOURS`) e chiama `EntityDeduplicator.find_duplicates` (best-effort) per `potential_duplicate_of`; `worker/extraction_tasks.py` cancella il file caricato a estrazione completata; `document_router.list_document_candidates` fa lazy-purge di promoted+expired. Nessun nuovo file MERL-T (modifiche ai 3 già elencati).
+- #5 (estrazione relazioni da testo libero) NON implementato per scelta: manca un estrattore di relazioni su testo libero in MERL-T (il `MechanisticExtractor` è solo per dati Brocardi strutturati). Solo entità.
