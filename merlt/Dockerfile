@@ -56,6 +56,10 @@ COPY pyproject.toml README.md ./
 # Install the package itself
 RUN pip install -e . --no-deps
 
+# Pre-create the uploads dir so a mounted named volume (Slice 2c shared uploads)
+# inherits appuser ownership instead of being created root-owned at mount time.
+RUN mkdir -p /app/uploads/user_documents
+
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app

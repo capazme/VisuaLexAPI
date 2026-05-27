@@ -137,6 +137,9 @@ services:
     volumes:
       # Seeds + dumps for the Slice 2a boot loader. Read-only, host filesystem.
       - ./merlt/data:/app/data:ro
+      # Shared uploads dir: the api receives the file, the worker reads it for
+      # extraction (Slice 2c) — must be the same volume across both services.
+      - merlt_uploads:/app/uploads
     ports:
       - "${MERLT_API_PORT:-8000}:8000"
     command: ["uvicorn", "merlt.app:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -206,6 +209,9 @@ services:
     volumes:
       # Parity with merlt-api; ingest scrapes live but keep the data mount available.
       - ./merlt/data:/app/data:ro
+      # Shared uploads dir: the api receives the file, the worker reads it for
+      # extraction (Slice 2c) — must be the same volume across both services.
+      - merlt_uploads:/app/uploads
     # Slice 2c: also consume the merlt_extract queue (extract_to_staging task).
     command: ["rq", "worker", "merlt_ingest", "merlt_extract", "--url", "redis://merlt-redis:6379/1"]
     # Override the API image's HTTP healthcheck (curl :8000) — the worker is not
@@ -221,3 +227,4 @@ volumes:
   merlt_postgres_data:
   merlt_falkor_data:
   merlt_qdrant_data:
+  merlt_uploads:
