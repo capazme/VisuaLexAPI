@@ -2,6 +2,8 @@ import { Router } from 'express';
 import consentRouter from './consent';
 import eventsRouter from './events';
 import graphRouter from './graph';
+import contribRouter from './contrib';
+import validateRouter from './validate';
 import healthRouter from './health';
 import profileRouter from './profile';
 
@@ -32,6 +34,8 @@ const router = Router();
 // Mounted at /api/merlt in app.ts — no extra prefix here.
 router.use('/', healthRouter);
 router.use('/', graphRouter);
+router.use('/', contribRouter);
+router.use('/', validateRouter);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);

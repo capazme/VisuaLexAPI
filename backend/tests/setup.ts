@@ -37,6 +37,7 @@ beforeEach(async () => {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
       "merlt_ingestion_jobs",
+      "merlt_extraction_jobs",
       "merlt_consent_audits",
       "merlt_user_preferences",
       "merlt_user_authority_cache",

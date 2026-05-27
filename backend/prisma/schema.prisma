@@ -40,6 +40,7 @@ model User {
   merltConsentAudits MerltConsentAudit[]
   merltAuthorityCache MerltUserAuthorityCache?
   merltIngestionJobs  MerltIngestionJob[]
+  merltExtractionJobs MerltExtractionJob[]
 
   // Personal Environments (user-owned, not published)
   environments Environment[]
@@ -152,6 +153,30 @@ model MerltIngestionJob {
   @@index([articleUrn, status])
   @@index([userId])
   @@map("merlt_ingestion_jobs")
+}
+
+// MERL-T document-extraction job (Slice 2c — "Apprendi dai miei appunti").
+// The BFF creates a row, asks MERL-T to enqueue an async extract-to-staging
+// task on the RQ worker (threading this id through), and the worker calls back
+// POST /api/merlt/internal/job-callback to flip the status. Mirrors
+// MerltIngestionJob; reuses the MerltJobStatus enum (value `completed`).
+model MerltExtractionJob {
+  id                String         @id @default(uuid())
+  documentId        String         @map("document_id")
+  userId            String         @map("user_id")
+  status            MerltJobStatus @default(pending)
+  taskId            String?        @map("task_id")
+  candidatesCreated Int?           @map("candidates_created")
+  errorMessage      String?        @map("error_message")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  startedAt         DateTime?      @map("started_at")
+  completedAt       DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, status])
+  @@index([userId])
+  @@map("merlt_extraction_jobs")
 }
 
 // ============================================
