@@ -107,6 +107,10 @@ services:
       REDIS_URL: "redis://merlt-redis:6379/0"
       REDIS_HOST: "merlt-redis"
       REDIS_PORT: "6379"
+      # RQ job queue (DB 1) — the api ENQUEUES extraction/ingestion jobs, so it
+      # needs the queue Redis too (not just the worker). Without this the api
+      # defaults to localhost:6379 and enqueue fails inside the container.
+      RQ_REDIS_URL: "redis://merlt-redis:6379/1"
 
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"
@@ -187,6 +191,8 @@ services:
       # BFF callback for job status (MerltIngestionJob). host.docker.internal lets
       # the container reach the Node BFF running on the host.
       BFF_CALLBACK_URL: "${MERLT_BFF_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/job-callback}"
+      # Slice 2c: separate callback for document-extraction jobs (MerltExtractionJob).
+      BFF_EXTRACTION_CALLBACK_URL: "${MERLT_BFF_EXTRACTION_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/extraction-callback}"
       MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:-dev-internal-secret}"
 
       # The worker must NOT run the seed loader — only the api seeds at boot.
@@ -195,7 +201,8 @@ services:
     volumes:
       # Parity with merlt-api; ingest scrapes live but keep the data mount available.
       - ./merlt/data:/app/data:ro
-    command: ["rq", "worker", "merlt_ingest", "--url", "redis://merlt-redis:6379/1"]
+    # Slice 2c: also consume the merlt_extract queue (extract_to_staging task).
+    command: ["rq", "worker", "merlt_ingest", "merlt_extract", "--url", "redis://merlt-redis:6379/1"]
     # Override the API image's HTTP healthcheck (curl :8000) — the worker is not
     # an HTTP server. Liveness here = it can reach its RQ Redis (DB 1).
     healthcheck:
