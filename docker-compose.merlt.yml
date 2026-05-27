@@ -131,6 +131,9 @@ services:
       MERLT_SKIP_SEED: "${MERLT_SKIP_SEED:-false}"
       MERLT_SKIP_EMBEDDINGS: "${MERLT_SKIP_EMBEDDINGS:-true}"
       FALKORDB_GRAPH_NAME: "${MERLT_GRAPH_NAME:-merl_t_legal}"
+      # LLM (OpenRouter) — required for live entity extraction from user notes.
+      # Set OPENROUTER_API_KEY in the repo-root .env or your shell before `up`.
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
     volumes:
       # Seeds + dumps for the Slice 2a boot loader. Read-only, host filesystem.
       - ./merlt/data:/app/data:ro
@@ -194,6 +197,8 @@ services:
       # Slice 2c: separate callback for document-extraction jobs (MerltExtractionJob).
       BFF_EXTRACTION_CALLBACK_URL: "${MERLT_BFF_EXTRACTION_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/extraction-callback}"
       MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:-dev-internal-secret}"
+      # LLM (OpenRouter) — the worker runs the extraction, so it needs the key.
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
 
       # The worker must NOT run the seed loader — only the api seeds at boot.
       MERLT_SKIP_SEED: "true"
