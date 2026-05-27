@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
     sendHighlightAnnotationEvent,
     type HighlightAnnotationEventInput,
 } from '../../../services/merltService';
 import { subscribeMerltEvents, MERLT_EVENT_TYPES } from '../merltEventBus';
-import { hasMerltConsent } from '../merltConsent';
+import { useConsent } from '../consent/useConsent';
 
 /**
  * Hook that listens on the legacy merltEventBus and forwards
@@ -53,11 +53,17 @@ function mapAnnotation(articleUrn: string, metadata: Metadata): HighlightAnnotat
 }
 
 export function useHighlightAnnotationTracker(disabled = false): void {
+    const { canTrack } = useConsent();
+    const canTrackRef = useRef(canTrack);
+    useEffect(() => {
+        canTrackRef.current = canTrack;
+    }, [canTrack]);
+
     useEffect(() => {
         if (disabled) return;
 
         const unsubscribe = subscribeMerltEvents((event) => {
-            if (!hasMerltConsent()) return;
+            if (!canTrackRef.current) return;
             if (!event.article_urn) return;
 
             const meta = (event.metadata ?? {}) as Metadata;
@@ -72,7 +78,6 @@ export function useHighlightAnnotationTracker(disabled = false): void {
             if (!payload || !payload.anchorText) return;
 
             void sendHighlightAnnotationEvent(payload).catch((err) => {
-                // eslint-disable-next-line no-console
                 console.warn('[merlt] highlight-annotation emit failed:', err);
             });
         });

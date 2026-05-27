@@ -6,33 +6,6 @@ const MERLT_LONG_RUNNING_TIMEOUT_MS = 120000;
 
 type JsonRecord = Record<string, unknown>;
 
-export type MerltFeatureKey =
-    | 'merlt'
-    | 'merlt_contribution'
-    | 'merlt_validation'
-    | 'merlt_graph'
-    | 'merlt_ops';
-
-export interface MerltFeatureState {
-    enabled: boolean;
-    consent_required: boolean;
-    consent_level: 'none' | 'basic' | 'full';
-    features: Record<MerltFeatureKey, boolean>;
-    slots: string[];
-    user: {
-        id: string;
-        isAdmin: boolean;
-    };
-}
-
-export interface MerltConsentState {
-    consentLevel: 'none' | 'basic' | 'full';
-    contributionEnabled: boolean;
-    validationEnabled: boolean;
-    graphEnabled: boolean;
-    updatedAt?: string;
-}
-
 export interface MerltSourceReference {
     article_urn: string;
     expert: string;
@@ -107,22 +80,56 @@ export async function getMerlt<T>(url: string, params?: JsonRecord, timeout = ME
     return response.data;
 }
 
-export async function getMerltFeatures(): Promise<MerltFeatureState> {
-    return getMerlt<MerltFeatureState>('/merlt/features');
+// ----------------------------------------------------------------------------
+// Consent contract (Slice 2b) — single source of truth is the BFF.
+// Shape mirrors backend ConsentResponse ({ level, reason? } in, full state out).
+// Replaces the broken PUT + { consentLevel } path.
+// ----------------------------------------------------------------------------
+
+export interface MerltConsentResponse {
+    level: 'none' | 'basic' | 'full';
+    contributionEnabled: boolean;
+    validationEnabled: boolean;
+    graphEnabled: boolean;
+    updatedAt: string | null;
+    lastAuditAt: string | null;
 }
 
-export async function getMerltConsent(): Promise<MerltConsentState> {
-    return getMerlt<MerltConsentState>('/merlt/consent');
+/** GET /api/merlt/consent — current consent state from the server (SoT). */
+export async function fetchMerltConsent(): Promise<MerltConsentResponse> {
+    return getMerlt<MerltConsentResponse>('/merlt/consent');
 }
 
-export async function updateMerltConsent(input: {
-    consentLevel: 'none' | 'basic' | 'full';
-    contributionEnabled?: boolean;
-    validationEnabled?: boolean;
-    graphEnabled?: boolean;
-    reason?: string;
-}): Promise<MerltConsentState & { features: MerltFeatureState }> {
-    return putMerlt<MerltConsentState & { features: MerltFeatureState }>('/merlt/consent', input);
+/** Authority profile as returned by the BFF GET /api/merlt/profile route. */
+export interface MerltProfile {
+    userId: string;
+    authorityScore: number;
+    baselineQual: string;
+    trackRecord: number;
+    performance: number;
+    totalContributions: number;
+    syncedAt: string;
+}
+
+/** GET /api/merlt/profile — cached authority profile (503 when unavailable). */
+export async function fetchMerltProfile(): Promise<MerltProfile> {
+    return getMerlt<MerltProfile>('/merlt/profile');
+}
+
+/** POST /api/merlt/consent — set or upgrade the consent level. */
+export async function setMerltConsent(
+    level: 'none' | 'basic' | 'full',
+    reason?: string,
+): Promise<MerltConsentResponse> {
+    return postMerlt<MerltConsentResponse>('/merlt/consent', { level, reason });
+}
+
+/** DELETE /api/merlt/consent — revoke (server forces level to 'none'). */
+export async function revokeMerltConsent(reason?: string): Promise<MerltConsentResponse> {
+    const response = await apiClient.delete<MerltConsentResponse>('/merlt/consent', {
+        data: { reason },
+    });
+    return response.data;
 }
 
 export async function askMerlt({ query, article, includeTrace = true, mode = 'convergent', maxExperts }: AskMerltInput): Promise<MerltQueryResponse> {
@@ -191,8 +198,15 @@ export interface ArticleViewedEventInput {
     sessionId: string;
 }
 
-export interface ArticleViewedEventResponse {
-    trace_id: string | null;
+/** Shared 202 shape returned by every BFF /api/merlt/events/* endpoint. */
+export interface MerltEventResponse {
+    received: number;
+    timestamp: string;
+}
+
+export interface ArticleViewedEventResponse extends MerltEventResponse {
+    /** Present when article:viewed triggered a lazy graph-ingestion job (Slice 2a). */
+    ingestionJob?: { jobId: string; status: string };
 }
 
 /** POST /api/merlt/events/article-viewed (MERLT-1.5 vertical slice). */
@@ -215,7 +229,7 @@ export interface HighlightAnnotationEventInput {
     noteText?: string;
 }
 
-export type HighlightAnnotationEventResponse = ArticleViewedEventResponse;
+export type HighlightAnnotationEventResponse = MerltEventResponse;
 
 /** POST /api/merlt/events/highlight-annotation (MERLT-1.7). */
 export async function sendHighlightAnnotationEvent(
@@ -238,7 +252,7 @@ export interface DossierBookmarkEventInput {
     tags?: string[];
 }
 
-export type DossierBookmarkEventResponse = ArticleViewedEventResponse;
+export type DossierBookmarkEventResponse = MerltEventResponse;
 
 /** POST /api/merlt/events/dossier-bookmark (MERLT-1.8). */
 export async function sendDossierBookmarkEvent(
@@ -257,7 +271,7 @@ export interface CitationClickedEventInput {
     citationText: string;
 }
 
-export type CitationClickedEventResponse = ArticleViewedEventResponse;
+export type CitationClickedEventResponse = MerltEventResponse;
 
 /** POST /api/merlt/events/citation-clicked (MERLT-1.9). */
 export async function sendCitationClickedEvent(
@@ -276,7 +290,7 @@ export interface ForumSignalEventInput {
     originalAuthorId: string | null;
 }
 
-export type ForumSignalEventResponse = ArticleViewedEventResponse;
+export type ForumSignalEventResponse = MerltEventResponse;
 
 /** POST /api/merlt/events/forum-signal (MERLT-1.10). */
 export async function sendForumSignalEvent(

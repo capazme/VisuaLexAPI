@@ -11,8 +11,8 @@ vi.mock('../../../../services/merltService', () => ({
   sendArticleViewedEvent: (...args: unknown[]) => sendEventMock(...args),
 }));
 
-vi.mock('../../merltConsent', () => ({
-  hasMerltConsent: () => hasConsentMock(),
+vi.mock('../../consent/useConsent', () => ({
+  useConsent: () => ({ canTrack: hasConsentMock() }),
 }));
 
 // ---- IntersectionObserver mock ----
@@ -171,6 +171,40 @@ describe('useArticleViewedTracker', () => {
     act(() => triggerVisible(true));
     unmount();
     expect(sendEventMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT emit if consent is revoked mid-read (before unmount)', () => {
+    const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(container, 'clientHeight', { value: 200, configurable: true });
+    Object.defineProperty(container, 'scrollTop', { value: 0, writable: true, configurable: true });
+    document.body.appendChild(container);
+    const ref = { current: container as HTMLElement | null };
+
+    const { rerender, unmount } = renderHook(() =>
+      useArticleViewedTracker({
+        articleUrn: 'urn:nir~art2043',
+        containerRef: ref,
+        sessionId: '11111111-1111-1111-1111-111111111111',
+      }),
+    );
+
+    // Meet the dwell threshold while consent is still granted.
+    perfSpy.mockReturnValue(0);
+    act(() => triggerVisible(true));
+    perfSpy.mockReturnValue(4000);
+    act(() => triggerVisible(false));
+
+    // Revoke consent and re-render so the ref-sync effect flips the live value.
+    hasConsentMock.mockReturnValue(false);
+    act(() => rerender());
+
+    unmount();
+    document.body.removeChild(container);
+
+    expect(sendEventMock).not.toHaveBeenCalled();
+    perfSpy.mockRestore();
   });
 
   it('does NOT emit when disabled=true', () => {

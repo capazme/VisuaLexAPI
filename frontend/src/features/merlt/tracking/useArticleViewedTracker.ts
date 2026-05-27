@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { sendArticleViewedEvent } from '../../../services/merltService';
-import { hasMerltConsent } from '../merltConsent';
+import { useConsent } from '../consent/useConsent';
 
 /**
  * Hook that emits an `article:viewed` event to the BFF when the article
@@ -43,6 +43,7 @@ export function useArticleViewedTracker({
   sessionId,
   disabled = false,
 }: UseArticleViewedTrackerOptions): void {
+  const { canTrack } = useConsent();
   const stateRef = useRef({
     dwellMs: 0,
     scrollMaxPct: 0,
@@ -57,9 +58,16 @@ export function useArticleViewedTracker({
     if (sessionId) stateRef.current.sessionId = sessionId;
   }, [sessionId]);
 
+  // Keep the latest consent value reachable from the cleanup-path emission,
+  // so revoking consent mid-read suppresses the event instead of dead-lettering.
+  const canTrackRef = useRef(canTrack);
+  useEffect(() => {
+    canTrackRef.current = canTrack;
+  }, [canTrack]);
+
   useEffect(() => {
     if (disabled || !articleUrn || !containerRef.current) return;
-    if (!hasMerltConsent()) return;
+    if (!canTrackRef.current) return;
 
     const el = containerRef.current;
     const state = stateRef.current;
@@ -68,9 +76,10 @@ export function useArticleViewedTracker({
     state.emitted = false;
 
     // ---- IntersectionObserver: track viewport visibility (≥50% visible) ----
-    let visibilityTimer: number | null = null;
+    let lastEntry: IntersectionObserverEntry | undefined;
     const observer = new IntersectionObserver(
       ([entry]) => {
+        lastEntry = entry;
         if (entry.isIntersecting) {
           if (!state.isVisible) {
             state.isVisible = true;
@@ -101,17 +110,15 @@ export function useArticleViewedTracker({
       if (document.hidden && state.isVisible) {
         state.dwellMs += performance.now() - state.lastVisibleAt;
         state.isVisible = false;
-      } else if (!document.hidden && entry?.isIntersecting) {
+      } else if (!document.hidden && lastEntry?.isIntersecting) {
         state.isVisible = true;
         state.lastVisibleAt = performance.now();
       }
     };
-    let entry: IntersectionObserverEntry | undefined;
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     // ---- Cleanup → emit event if threshold met ----
     return () => {
-      if (visibilityTimer) clearTimeout(visibilityTimer);
       observer.disconnect();
       el.removeEventListener('scroll', onScroll);
       document.removeEventListener('visibilitychange', onVisibilityChange);
@@ -124,6 +131,9 @@ export function useArticleViewedTracker({
       const meetsDwell = state.dwellMs >= DWELL_THRESHOLD_MS;
       const meetsScroll = state.scrollMaxPct >= SCROLL_THRESHOLD_PCT;
       if (state.emitted) return;
+      // Consent may have been revoked mid-read (effect re-ran with canTrack
+      // false → this cleanup): honour the live value, don't dead-letter a 403.
+      if (!canTrackRef.current) return;
       if (!(meetsDwell || meetsScroll)) return;
 
       state.emitted = true;
@@ -135,9 +145,12 @@ export function useArticleViewedTracker({
         sessionId: state.sessionId,
       }).catch((err) => {
         // Fire-and-forget: BFF dead-letter handles persistence
-        // eslint-disable-next-line no-console
         console.warn('[merlt] article:viewed emit failed:', err);
       });
     };
+    // canTrack is intentionally NOT a dependency: re-running on revoke would
+    // fire this cleanup while the ref still held the stale (true) value (effect
+    // cleanup runs before the ref-sync effect). Gating on canTrackRef.current
+    // (synced separately) makes unmount/article-change honour the live value.
   }, [articleUrn, normaVisitataId, containerRef, disabled]);
 }

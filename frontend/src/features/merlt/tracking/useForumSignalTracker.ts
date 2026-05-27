@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
     sendForumSignalEvent,
     type ForumSignalEventInput,
 } from '../../../services/merltService';
 import { subscribeMerltEvents, MERLT_EVENT_TYPES } from '../merltEventBus';
-import { hasMerltConsent } from '../merltConsent';
+import { useConsent } from '../consent/useConsent';
 
 /**
  * Hook (MERLT-1.10): subscribes to merltEventBus and forwards forum
@@ -37,11 +37,17 @@ const FORUM_EVENT_TO_ACTION: Record<string, ForumSignalEventInput['action']> = {
 };
 
 export function useForumSignalTracker(disabled = false): void {
+    const { canTrack } = useConsent();
+    const canTrackRef = useRef(canTrack);
+    useEffect(() => {
+        canTrackRef.current = canTrack;
+    }, [canTrack]);
+
     useEffect(() => {
         if (disabled) return;
 
         const unsubscribe = subscribeMerltEvents((event) => {
-            if (!hasMerltConsent()) return;
+            if (!canTrackRef.current) return;
 
             const action = FORUM_EVENT_TO_ACTION[event.interaction_type];
             if (!action) return;
@@ -60,7 +66,6 @@ export function useForumSignalTracker(disabled = false): void {
             };
 
             void sendForumSignalEvent(payload).catch((err) => {
-                // eslint-disable-next-line no-console
                 console.warn('[merlt] forum-signal emit failed:', err);
             });
         });

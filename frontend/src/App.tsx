@@ -7,14 +7,21 @@ import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { EnvironmentPage } from './components/features/environments/EnvironmentPage';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
-import { MerltWorkspacePage } from './pages/MerltWorkspacePage';
+import { MerltHubPage } from './pages/MerltHubPage';
 import { GraphExplorerPage } from './features/merlt/graph/page/GraphExplorerPage';
+import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
 
 // Lazy load admin page
 import { lazy, Suspense } from 'react';
 const AdminPage = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
+const ContribPage = lazy(() =>
+  import('./features/merlt/contrib/ContribPage').then(m => ({ default: m.ContribPage })),
+);
+const ValidationPage = lazy(() =>
+  import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
+);
 
 function App() {
   return (
@@ -29,7 +36,9 @@ function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <Layout />
+              <ConsentProvider>
+                <Layout />
+              </ConsentProvider>
             </ProtectedRoute>
           }
         >
@@ -38,7 +47,23 @@ function App() {
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentPage />} />
           <Route path="forum" element={<BulletinBoardPage />} />
-          <Route path="merlt" element={<MerltWorkspacePage />} />
+          <Route path="merlt" element={<MerltHubPage />} />
+          <Route
+            path="merlt/contribuisci"
+            element={
+              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                <ContribPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="merlt/valida"
+            element={
+              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                <ValidationPage />
+              </Suspense>
+            }
+          />
           <Route path="grafo" element={<GraphExplorerPage />} />
         </Route>
 

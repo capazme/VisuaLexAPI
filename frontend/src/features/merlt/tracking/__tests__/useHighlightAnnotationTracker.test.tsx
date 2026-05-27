@@ -10,8 +10,8 @@ vi.mock('../../../../services/merltService', () => ({
   sendHighlightAnnotationEvent: (...args: unknown[]) => sendEventMock(...args),
 }));
 
-vi.mock('../../merltConsent', () => ({
-  hasMerltConsent: () => hasConsentMock(),
+vi.mock('../../consent/useConsent', () => ({
+  useConsent: () => ({ canTrack: hasConsentMock() }),
 }));
 
 // Import the bus *after* mocks so the real publish/subscribe wiring is used

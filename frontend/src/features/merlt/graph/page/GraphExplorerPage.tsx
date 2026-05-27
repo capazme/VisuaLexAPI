@@ -1,8 +1,16 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, Loader2, Network } from 'lucide-react';
+import { AlertCircle, Download, Loader2, Network, Upload, X } from 'lucide-react';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useArticleGraph } from '../shared/useArticleGraph';
+import type { GraphElements } from '../shared/graphTransform';
+import {
+  buildSnapshot,
+  parseSnapshot,
+  downloadSnapshot,
+  SnapshotParseError,
+  type GraphSliceSnapshot,
+} from '../shared/snapshotIO';
 import { useIngestionJob } from '../shared/useIngestionJob';
 import { triggerIngestion } from '../shared/graphApi';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
@@ -59,6 +67,9 @@ export function GraphExplorerPage(): React.ReactElement {
   const [hiddenNodeTypes, setHiddenNodeTypes] = useState<ReadonlySet<string>>(new Set());
   const [hiddenEdgeTypes, setHiddenEdgeTypes] = useState<ReadonlySet<string>>(new Set());
   const [highlightType, setHighlightType] = useState<string | null>(null);
+  // #7: local graph-slice snapshot (the server does not host personal graphs).
+  const [importedSlice, setImportedSlice] = useState<GraphSliceSnapshot | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Reset per-graph state when the CENTER (urn) changes — not on depth/layout —
   // so filters/highlight don't bleed across different entities.
@@ -110,6 +121,11 @@ export function GraphExplorerPage(): React.ReactElement {
     [graph]
   );
 
+  const importedElements = useMemo(
+    () => (importedSlice ? sliceToElements(importedSlice) : null),
+    [importedSlice]
+  );
+
   const toggleHidden = (set: ReadonlySet<string>, type: string): Set<string> => {
     const next = new Set(set);
     if (next.has(type)) next.delete(type);
@@ -142,6 +158,36 @@ export function GraphExplorerPage(): React.ReactElement {
     goToCenter(node.urn ?? node.id, node.label);
   };
 
+  // #7: export the current subgraph to a local JSON the user keeps off-server.
+  const handleExportSlice = (): void => {
+    if (graph.status !== 'success') return;
+    const snap = buildSnapshot(
+      graph.data.nodes.map((n) => ({ id: n.id, label: n.label, type: n.type, urn: n.urn })),
+      graph.data.edges.map((e) => ({
+        id: e.id ?? `${e.source}-${e.type}-${e.target}`,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+      })),
+      urn ?? undefined,
+    );
+    downloadSnapshot(snap, `merlt-slice-${Date.now()}.json`);
+  };
+
+  const handleImportFile = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    try {
+      const snap = parseSnapshot(await file.text());
+      setImportedSlice(snap);
+      setSelectedNodeId(null);
+    } catch (err) {
+      setToast({
+        message: err instanceof SnapshotParseError ? err.message : 'Slice non valido.',
+        type: 'info',
+      });
+    }
+  };
+
   if (!enabled) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -164,13 +210,70 @@ export function GraphExplorerPage(): React.ReactElement {
         {urn && (
           <DepthSelector depth={depth} layout={layout} onDepthChange={setDepth} onLayoutChange={setLayout} />
         )}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleExportSlice}
+            disabled={graph.status !== 'success' || nodes.length === 0}
+            title="Esporta lo slice corrente come file locale"
+            className="flex items-center gap-1 rounded border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            <Download size={14} /> Esporta slice
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Carica e visualizza uno slice salvato localmente"
+            className="flex items-center gap-1 rounded border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            <Upload size={14} /> Carica slice
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            aria-label="Carica slice"
+            onChange={(e) => {
+              void handleImportFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </div>
       </header>
 
       <BreadcrumbHistory entries={entries} onNavigate={(u) => goToCenter(u, labelFor(u, entries))} />
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-h-0 flex-1">
-          {!urn ? (
+          {importedElements ? (
+            <div className="relative h-full">
+              <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 shadow dark:bg-amber-950/40 dark:text-amber-300">
+                Slice locale (sola lettura)
+                <button
+                  type="button"
+                  onClick={() => setImportedSlice(null)}
+                  className="flex items-center gap-0.5 rounded px-1 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                  aria-label="Chiudi slice locale"
+                >
+                  <X size={12} /> Chiudi
+                </button>
+              </div>
+              <Suspense fallback={<CanvasSkeleton />}>
+                <GraphCanvas
+                  nodes={importedElements.nodes}
+                  edges={importedElements.edges}
+                  layout={layout}
+                  height="100%"
+                  hiddenNodeTypes={new Set()}
+                  hiddenEdgeTypes={new Set()}
+                  highlightNodeType={null}
+                  onNodeClick={() => {}}
+                  onNodeDblClick={() => {}}
+                />
+              </Suspense>
+            </div>
+          ) : !urn ? (
             <EmptyState />
           ) : graph.status === 'loading' || graph.status === 'idle' ? (
             <CanvasSkeleton />
@@ -257,6 +360,22 @@ export function GraphExplorerPage(): React.ReactElement {
 /** Best-known label for a breadcrumb urn (falls back to the urn itself). */
 function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>['entries']): string {
   return entries.find((e) => e.urn === urn)?.label ?? urn;
+}
+
+/** Map a local snapshot to the cytoscape-ready element shape (#7 read-only view). */
+function sliceToElements(snap: GraphSliceSnapshot): GraphElements {
+  return {
+    nodes: snap.nodes.map((n) => ({
+      id: n.id,
+      data: { label: n.label ?? n.id, type: n.type ?? 'Nodo', urn: n.urn ?? undefined },
+    })),
+    edges: snap.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      data: { label: e.type ?? '', type: e.type ?? '' },
+    })),
+  };
 }
 
 function EmptyState(): React.ReactElement {

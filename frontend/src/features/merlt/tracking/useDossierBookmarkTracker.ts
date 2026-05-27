@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
     sendDossierBookmarkEvent,
     type DossierBookmarkEventInput,
 } from '../../../services/merltService';
 import { subscribeMerltEvents, MERLT_EVENT_TYPES } from '../merltEventBus';
-import { hasMerltConsent } from '../merltConsent';
+import { useConsent } from '../consent/useConsent';
 
 /**
  * Hook (MERLT-1.8): subscribes to the merltEventBus and forwards
@@ -28,11 +28,17 @@ interface Metadata {
 }
 
 export function useDossierBookmarkTracker(disabled = false): void {
+    const { canTrack } = useConsent();
+    const canTrackRef = useRef(canTrack);
+    useEffect(() => {
+        canTrackRef.current = canTrack;
+    }, [canTrack]);
+
     useEffect(() => {
         if (disabled) return;
 
         const unsubscribe = subscribeMerltEvents((event) => {
-            if (!hasMerltConsent()) return;
+            if (!canTrackRef.current) return;
             if (!event.article_urn) return;
 
             const meta = (event.metadata ?? {}) as Metadata;
@@ -56,7 +62,6 @@ export function useDossierBookmarkTracker(disabled = false): void {
             if (!payload) return;
 
             void sendDossierBookmarkEvent(payload).catch((err) => {
-                // eslint-disable-next-line no-console
                 console.warn('[merlt] dossier-bookmark emit failed:', err);
             });
         });

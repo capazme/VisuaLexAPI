@@ -1,0 +1,85 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
+
+// ---- mocks (hoisted) ----
+const useConsentMock = vi.fn();
+const useAuthMock = vi.fn();
+const isMerltEnabledMock = vi.fn();
+const isMerltGraphEnabledMock = vi.fn();
+
+vi.mock('../consent/useConsent', () => ({ useConsent: () => useConsentMock() }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => useAuthMock() }));
+vi.mock('../featureFlag', () => ({ isMerltEnabled: () => isMerltEnabledMock() }));
+vi.mock('../graph/featureFlag', () => ({ isMerltGraphEnabled: () => isMerltGraphEnabledMock() }));
+
+import { useMerltFeatures } from '../useMerltFeatures';
+
+beforeEach(() => {
+  useConsentMock.mockReturnValue({ level: 'none', canTrack: false, status: 'ready' });
+  useAuthMock.mockReturnValue({ isAdmin: false });
+  isMerltEnabledMock.mockReturnValue(true);
+  isMerltGraphEnabledMock.mockReturnValue(true);
+});
+
+describe('useMerltFeatures (client-side derivation)', () => {
+  it('full consent + admin → everything on', () => {
+    useConsentMock.mockReturnValue({ level: 'full', canTrack: true, status: 'ready' });
+    useAuthMock.mockReturnValue({ isAdmin: true });
+    const { result } = renderHook(() => useMerltFeatures());
+    expect(result.current).toMatchObject({
+      merltEnabled: true,
+      graphEnabled: true,
+      consentLevel: 'full',
+      canTrack: true,
+      canContribute: true,
+      canValidate: true,
+      graphReadable: true,
+      opsVisible: true,
+    });
+  });
+
+  it('none consent → contribute/validate/graphReadable/canTrack all false', () => {
+    const { result } = renderHook(() => useMerltFeatures());
+    expect(result.current.canContribute).toBe(false);
+    expect(result.current.canValidate).toBe(false);
+    expect(result.current.graphReadable).toBe(false);
+    expect(result.current.canTrack).toBe(false);
+    expect(result.current.opsVisible).toBe(false);
+  });
+
+  it('basic consent → graph readable + canTrack, but no contribution', () => {
+    useConsentMock.mockReturnValue({ level: 'basic', canTrack: true, status: 'ready' });
+    const { result } = renderHook(() => useMerltFeatures());
+    expect(result.current.graphReadable).toBe(true);
+    expect(result.current.canTrack).toBe(true);
+    expect(result.current.canContribute).toBe(false);
+  });
+
+  it('opsVisible follows isAdmin regardless of consent', () => {
+    useAuthMock.mockReturnValue({ isAdmin: true });
+    const { result } = renderHook(() => useMerltFeatures());
+    expect(result.current.opsVisible).toBe(true);
+  });
+
+  it('feature flag off → all capabilities gated off', () => {
+    isMerltEnabledMock.mockReturnValue(false);
+    useConsentMock.mockReturnValue({ level: 'full', canTrack: true, status: 'ready' });
+    useAuthMock.mockReturnValue({ isAdmin: true });
+    const { result } = renderHook(() => useMerltFeatures());
+    expect(result.current.merltEnabled).toBe(false);
+    expect(result.current.graphEnabled).toBe(false);
+    expect(result.current.canContribute).toBe(false);
+    expect(result.current.graphReadable).toBe(false);
+    expect(result.current.opsVisible).toBe(false);
+    expect(result.current.canTrack).toBe(false);
+  });
+
+  it('graph flag off → graph capabilities off but contribution stays', () => {
+    isMerltGraphEnabledMock.mockReturnValue(false);
+    useConsentMock.mockReturnValue({ level: 'full', canTrack: true, status: 'ready' });
+    const { result } = renderHook(() => useMerltFeatures());
+    expect(result.current.graphEnabled).toBe(false);
+    expect(result.current.graphReadable).toBe(false);
+    expect(result.current.canContribute).toBe(true);
+  });
+});

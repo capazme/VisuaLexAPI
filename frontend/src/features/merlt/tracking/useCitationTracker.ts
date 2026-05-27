@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import {
     sendCitationClickedEvent,
     type CitationClickedEventInput,
 } from '../../../services/merltService';
 import { subscribeMerltEvents, MERLT_EVENT_TYPES } from '../merltEventBus';
-import { hasMerltConsent } from '../merltConsent';
+import { useConsent } from '../consent/useConsent';
 
 /**
  * Hook (MERLT-1.9): subscribes to the merltEventBus and forwards
@@ -30,11 +30,17 @@ interface Metadata {
 }
 
 export function useCitationTracker(disabled = false): void {
+    const { canTrack } = useConsent();
+    const canTrackRef = useRef(canTrack);
+    useEffect(() => {
+        canTrackRef.current = canTrack;
+    }, [canTrack]);
+
     useEffect(() => {
         if (disabled) return;
 
         const unsubscribe = subscribeMerltEvents((event) => {
-            if (!hasMerltConsent()) return;
+            if (!canTrackRef.current) return;
             if (event.interaction_type !== MERLT_EVENT_TYPES.citationClicked) return;
 
             const meta = (event.metadata ?? {}) as Metadata;
@@ -57,7 +63,6 @@ export function useCitationTracker(disabled = false): void {
             };
 
             void sendCitationClickedEvent(payload).catch((err) => {
-                // eslint-disable-next-line no-console
                 console.warn('[merlt] citation-clicked emit failed:', err);
             });
         });

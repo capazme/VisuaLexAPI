@@ -1,62 +1,44 @@
-import { useEffect, useState } from 'react';
-import { getMerltFeatures, updateMerltConsent, type MerltFeatureState } from '../../services/merltService';
-import { getMerltConsentLevel, setMerltConsentLevel, type MerltConsentLevel } from './merltConsent';
+import { useConsent } from './consent/useConsent';
+import { useAuth } from '../../hooks/useAuth';
+import { isMerltEnabled } from './featureFlag';
+import { isMerltGraphEnabled } from './graph/featureFlag';
+import type { MerltConsentLevel } from './merltConsent';
 
-export function useMerltFeatures() {
-    const [features, setFeatures] = useState<MerltFeatureState | null>(null);
-    const [consentLevel, setConsentLevelState] = useState<MerltConsentLevel>(() => getMerltConsentLevel());
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+/**
+ * Client-side derivation of "what MERL-T capabilities are available" (Slice 2b).
+ *
+ * Replaces the old hook that called the never-implemented GET /merlt/features.
+ * All inputs already exist on the client: build-time flags, the consent level
+ * (from ConsentContext — the server-synced SoT), and isAdmin (from useAuth).
+ */
+export interface MerltFeatures {
+  merltEnabled: boolean;
+  graphEnabled: boolean;
+  consentLevel: MerltConsentLevel;
+  status: 'loading' | 'ready' | 'error';
+  canTrack: boolean;
+  canContribute: boolean;
+  canValidate: boolean;
+  graphReadable: boolean;
+  opsVisible: boolean;
+}
 
-    useEffect(() => {
-        let cancelled = false;
+export function useMerltFeatures(): MerltFeatures {
+  const { level, canTrack, status } = useConsent();
+  const { isAdmin } = useAuth();
 
-        async function loadFeatures() {
-            try {
-                setIsLoading(true);
-                setError(null);
-                const next = await getMerltFeatures();
-                if (!cancelled) {
-                    setFeatures(next);
-                    setMerltConsentLevel(next.consent_level);
-                    setConsentLevelState(next.consent_level);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setError(err instanceof Error ? err.message : 'Impossibile caricare le feature MERLT');
-                }
-            } finally {
-                if (!cancelled) setIsLoading(false);
-            }
-        }
+  const merltEnabled = isMerltEnabled();
+  const graphEnabled = merltEnabled && isMerltGraphEnabled();
 
-        void loadFeatures();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const updateConsent = async (level: MerltConsentLevel) => {
-        const updated = await updateMerltConsent({
-            consentLevel: level,
-            contributionEnabled: level === 'full',
-            validationEnabled: level === 'full',
-            graphEnabled: level !== 'none',
-        });
-        setMerltConsentLevel(updated.consentLevel);
-        setConsentLevelState(updated.consentLevel);
-        setFeatures(updated.features);
-    };
-
-    return {
-        features,
-        consentLevel,
-        isLoading,
-        error,
-        hasConsent: consentLevel !== 'none',
-        isBackendEnabled: Boolean(features?.enabled),
-        isEnabled: Boolean(features?.enabled && features.features.merlt),
-        updateConsent,
-    };
+  return {
+    merltEnabled,
+    graphEnabled,
+    consentLevel: level,
+    status,
+    canTrack: merltEnabled && canTrack,
+    canContribute: merltEnabled && level === 'full',
+    canValidate: merltEnabled && level === 'full',
+    graphReadable: graphEnabled && level !== 'none',
+    opsVisible: merltEnabled && isAdmin,
+  };
 }

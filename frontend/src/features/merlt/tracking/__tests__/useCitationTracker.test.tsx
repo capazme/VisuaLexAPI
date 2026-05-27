@@ -10,8 +10,8 @@ vi.mock('../../../../services/merltService', async () => ({
   trackMerltInteraction: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../merltConsent', () => ({
-  hasMerltConsent: () => hasConsentMock(),
+vi.mock('../../consent/useConsent', () => ({
+  useConsent: () => ({ canTrack: hasConsentMock() }),
 }));
 
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../merltEventBus';
