@@ -62,9 +62,9 @@ QuickNorm + CustomAlias CRUD (added to close the last localStorage-only slices):
 
 ### MERL-T Integration (Slice 1, branch `visualex-merlt-main`)
 
-Slice 1 wires 5 user-action signals from VisuaLex into MERL-T's RLCF tracking buffer. Implementation lives across both backends and the frontend; the design doc is `docs/superpowers/specs/2026-05-22-merlt-integration-slice1-design.md`, the smoke checklist is `docs/merlt-smoke-checklist.md`, and the forum attribution decision is `docs/merlt-forum-authoring-decision.md`.
+Slice 1 wires 5 user-action signals from VisuaLex into MERL-T's RLCF tracking buffer. Implementation lives across both backends and the frontend; the design doc is `docs/merlt/slices/slice1/design.md`, the smoke checklist is `docs/merlt/smoke-checklist.md`, and the forum attribution decision is `docs/merlt/decisions/forum-authoring.md`.
 
-**Runtime topology.** MERL-T is a separate FastAPI sidecar (Python, port 8000) defined in `docker-compose.merlt.yml` with 5 services: `merlt-api` + `merlt-postgres` + `merlt-redis` + `merlt-falkordb` + `merlt-qdrant`. Source lives in `VisuaLexAPI/merlt/` (selective copy of `ALIS_CORE/merlt` — see `docs/merlt-upstream-sync.md`). Two env flags control startup: `MERLT_ENABLED` gates the whole stack in `start.sh`, `MERLT_API_IN_DOCKER` switches between `--profile api-in-docker` (full container) and local uvicorn. The compose-network host names matter: BFF talks to `merlt-postgres:5432` and `merlt-api:8000` from inside Docker, and `localhost:5436` / `localhost:8000` from the host. `RLCF_DATABASE_URL`, `ENRICHMENT_DB_*`, `REDIS_URL`, `FALKORDB_HOST`, `QDRANT_HOST` are explicit env vars on the merlt-api service — MERL-T code has hardcoded defaults pointing at `localhost:5433/rlcf_dev` which break inside the container network.
+**Runtime topology.** MERL-T is a separate FastAPI sidecar (Python, port 8000) defined in `docker-compose.merlt.yml` with 5 services: `merlt-api` + `merlt-postgres` + `merlt-redis` + `merlt-falkordb` + `merlt-qdrant`. Source lives in `VisuaLexAPI/merlt/` (selective copy of `ALIS_CORE/merlt` — see `docs/merlt/upstream-sync.md`). Two env flags control startup: `MERLT_ENABLED` gates the whole stack in `start.sh`, `MERLT_API_IN_DOCKER` switches between `--profile api-in-docker` (full container) and local uvicorn. The compose-network host names matter: BFF talks to `merlt-postgres:5432` and `merlt-api:8000` from inside Docker, and `localhost:5436` / `localhost:8000` from the host. `RLCF_DATABASE_URL`, `ENRICHMENT_DB_*`, `REDIS_URL`, `FALKORDB_HOST`, `QDRANT_HOST` are explicit env vars on the merlt-api service — MERL-T code has hardcoded defaults pointing at `localhost:5433/rlcf_dev` which break inside the container network.
 
 **BFF (Node, port 3001).** All MERL-T traffic flows through `/api/merlt/*` — frontend never calls `:8000` directly. Routes:
 - `routes/merlt/index.ts` — mount point, **must be registered BEFORE the catch-all auth routers** (folders/bookmarks/etc. use `router.use(authenticate)` with no path prefix, so Express would 401 anything reaching them first; `app.ts` puts `app.use('/api/merlt', merltRoutes)` at line ~71 before the auth-only routers).
@@ -96,17 +96,17 @@ Slice 1 wires 5 user-action signals from VisuaLex into MERL-T's RLCF tracking bu
   - `BulletinBoardPage.{handleLike, handleTakeItem, handleDeclineItem}` → forum signals
   - `ImportEnvironmentModal.handleImport` → `forum_download`
 
-**Testing.** 143 backend tests (vitest + supertest, real Postgres test DB, nock for MERL-T mock). 63 frontend tests (vitest + jsdom, hook tests + plugin registry). Integration test setup: `backend/tests/setup.ts` TRUNCATEs MERL-T tables (`merlt_consent_audits`, `merlt_user_preferences`, `merlt_user_authority_cache`) between tests. Smoke E2E in `docs/merlt-smoke-checklist.md`.
+**Testing.** 143 backend tests (vitest + supertest, real Postgres test DB, nock for MERL-T mock). 63 frontend tests (vitest + jsdom, hook tests + plugin registry). Integration test setup: `backend/tests/setup.ts` TRUNCATEs MERL-T tables (`merlt_consent_audits`, `merlt_user_preferences`, `merlt_user_authority_cache`) between tests. Smoke E2E in `docs/merlt/smoke-checklist.md`.
 
 **Critical gotchas:**
 1. **Express mount order** beats prefix specificity. `merltRoutes` must be `app.use('/api/merlt', merltRoutes)` BEFORE the catch-all-auth routers; otherwise GET `/api/merlt/health` returns 401 from `folders.ts`'s authenticate middleware.
 2. **`rsync --exclude` pattern without leading `/`** matches anywhere in the tree, not just root. The initial MERL-T copy excluded `models/` and `data/` and silently dropped `merlt/merlt/models/` (BridgeMapping) + `merlt/merlt/api/models/` + `merlt/merlt/disagreement/data/`. Always use `--exclude='/models/'` for top-level-only exclusion.
-3. **MERL-T's tracking is in-memory** (`merlt/api/tracking_router.py:6` says "future: PostgreSQL"). The 202 + `received:1` response is the only confirmation; no `qa_traces` or `tracking_events` table exists in MERL-T Postgres for Slice 1 to query against. Future MERL-T iterations will add persistence.
+3. **MERL-T tracking — NOW PERSISTED (updated).** Slice 1 originally sent events to an in-memory buffer (`merlt/api/tracking_router.py`) with no table; the RLCF loop closure (A1) added a `tracking_events` table, so events now survive a container restart. The 202 `{ received }` is still the BFF-side confirmation. See the "RLCF loop closure & next phases" section below.
 4. **MERL-T endpoint paths use `/api/v1/` prefix** (per `merlt/app.py:175-194`), with `/health` as the only root-level route. The initial Story 1.5 client hit `/api/tracking/event` (singular, no prefix) → 404 in production but green tests with nock mocking the wrong URL. MERLT-1.5.1 fixed this; same pitfall applies if extending the client.
 
 ### MERL-T Integration (Slice 2a — Graph read-only, branch `visualex-merlt-main`)
 
-Slice 2a brings the legal knowledge graph (FalkorDB) to the frontend **read-only**, from a pre-loaded Libro IV CC seed (27.7k nodes), with automatic lazy ingestion for articles not yet indexed. Two surfaces: a collapsible **side rail** inside `ArticleTabContent` and a dedicated **`/grafo` explorer page**. Sprint plan: `docs/sprint-plan-merlt-slice2a-2026-05-23.md`; seed how-to: `docs/legacy-libro-iv-seed.md`; smoke: `docs/merlt-smoke-checklist.md` (Slice 2a section).
+Slice 2a brings the legal knowledge graph (FalkorDB) to the frontend **read-only**, from a pre-loaded Libro IV CC seed (27.7k nodes), with automatic lazy ingestion for articles not yet indexed. Two surfaces: a collapsible **side rail** inside `ArticleTabContent` and a dedicated **`/grafo` explorer page**. Sprint plan: `docs/merlt/slices/slice2a/sprint-plan.md`; seed how-to: `docs/merlt/seed-libro-iv.md`; smoke: `docs/merlt/smoke-checklist.md` (Slice 2a section).
 
 **Seed + worker (MERL-T, Python).** `merlt/merlt/scripts/load_seed_libro_iv.py` runs in the FastAPI lifespan, idempotent (skip if graph >100 nodes), loads `merlt/data/seeds/libro-iv-cc-graph.json` via MERGE on `URN`/`node_id`. Embeddings skipped by default in dev (`MERLT_SKIP_EMBEDDINGS=true` — the e5-large model is ~2s/text on docker CPU). Lazy ingestion runs on an **RQ** worker (NOT arq — arq's redis pin conflicts with falkordb's; see `legacy_libro_iv_recovery` memory), container `merlt-worker`. Endpoints added to `graph_router.py`: `POST /api/v1/graph/ingest-article` (enqueue, job_id = `ingest:`+sha256(urn) for idempotency) + the worker callbacks the **BFF** (not MERL-T) at `/api/merlt/internal/job-callback`.
 
@@ -133,7 +133,7 @@ Slice 2a brings the legal knowledge graph (FalkorDB) to the frontend **read-only
 
 ### MERL-T Integration (Slice 2b — Hub & Consent, branch `visualex-merlt-main`)
 
-Slice 2b turns `/merlt` from a dead developer UI (5 JSON tabs calling unmounted endpoints) into a user-facing **hub**, and fixes the fragmented consent. Design: `docs/superpowers/specs/2026-05-26-merlt-slice2b-hub-consent-design.md`; sprint plan: `docs/sprint-plan-merlt-slice2b-2026-05-26.md`.
+Slice 2b turns `/merlt` from a dead developer UI (5 JSON tabs calling unmounted endpoints) into a user-facing **hub**, and fixes the fragmented consent. Design: `docs/merlt/slices/slice2b/design.md`; sprint plan: `docs/merlt/slices/slice2b/sprint-plan.md`.
 
 **Consent = server SoT, client = synced cache.** The Prisma `MerltUserPreference` + BFF `GET/POST/DELETE /api/merlt/consent` (body `{ level, reason? }`) is authoritative; the server `consentGuard` is the hard gate (defence in depth). Frontend:
 - `features/merlt/consent/context.ts` — the React `ConsentContext` object + `ConsentContextValue` type, kept in a non-component file (react-refresh/only-export-components boundary, same split as graph's `PluginSlot`).
@@ -155,7 +155,7 @@ Slice 2b turns `/merlt` from a dead developer UI (5 JSON tabs calling unmounted 
 
 ### MERL-T Integration (Slice 2c — "Apprendi dai miei appunti", branch `visualex-merlt-main`)
 
-Upload study notes → async LLM extraction → per-item review → promotion to RLCF `pending_*`. Design: `docs/superpowers/specs/2026-05-26-merlt-slice2c-learn-from-notes-design.md`; sprint plan: `docs/sprint-plan-merlt-slice2c-2026-05-26.md`. Depends on Slice 2b consent (`full`).
+Upload study notes → async LLM extraction → per-item review → promotion to RLCF `pending_*`. Design: `docs/merlt/slices/slice2c/design.md`; sprint plan: `docs/merlt/slices/slice2c/sprint-plan.md`. Depends on Slice 2b consent (`full`).
 
 **Load-bearing model (resource cost, not privacy):** the server hosts ONLY the central graph + RLCF proposals — no per-user graphs. Extracted candidates live in an **ephemeral** MERL-T `extraction_candidates` staging table (purged after promotion / TTL); the verbatim NEVER enters `pending_*`. The user's "personal slice" is a **local snapshot** (download/reload, `snapshotIO.ts`). Promotion creates fresh `pending_*` rows from the **reformulated** text.
 
@@ -181,6 +181,26 @@ Upload study notes → async LLM extraction → per-item review → promotion to
 4. **RQ job ids cannot contain `:`** (this RQ version validates `[A-Za-z0-9_-]`). The extraction job id is `"extract-"+sha256(docId)` (dash, not colon). The graph `"ingest:"` prefix predates this RQ and would break the same way if re-enqueued.
 5. **`merlt-api` must define `RQ_REDIS_URL`**, not just the worker — the api is what ENQUEUES (extract-async / ingest-article). Without it the api defaults to `localhost:6379` inside the container and enqueue fails (`Connection refused`). Added to `docker-compose.merlt.yml` api env.
 6. **The RQ worker has NO FastAPI lifespan**, so `init_db()` (enrichment Postgres engine) is never auto-called — any worker task that opens `get_db_session()` must `await init_db()` first (idempotent: guarded on `_engine is not None`). The graph ingest task sidesteps this by using FalkorDB only. MERL-T code in `merlt/` is **baked into the image at build** (only `data/` is volume-mounted) → code changes need a `docker compose --profile api-in-docker build` + recreate; the staging table auto-creates at api boot via lifespan `create_tables()`.
+
+### MERL-T Integration (RLCF loop closure & next phases, branch `visualex-merlt-main`)
+
+**Read `docs/merlt/system-map.md` first** — it's the canonical map (implemented vs. target, the two loops, the open reconciliations). Docs index: `docs/README.md`. All MERL-T docs now live under `docs/merlt/` (overviews + `slices/<slice>/{design,sprint-plan}.md` + `decisions/`).
+
+**"RLCF" is TWO loops sharing authority + consensus** — don't conflate them:
+- **Loop α — graph enrichment / co-authorship.** contribute/notes → LLM extract (ephemeral `extraction_candidates` staging) → reformulate behind the copyright gate → `pending_entity`/`pending_relation` → authority-weighted vote → **net_score ±2.0 → PostgreSQL trigger sets `consensus_reached`** → write node/edge to FalkorDB → navigable on `/grafo`. **Closed E2E (2026-05-28)**, plan `docs/merlt/slices/rlcf-loop/sprint-plan.md`.
+- **Loop β — reasoning / answer quality.** query → gating → experts + traversal → synthesis → multilevel feedback → REINFORCE on gating/traversal weights. **Built in the vendored library, NOT wired into VisuaLex** (the Q&A UI was removed → Slice 3) and carrying known pipeline bugs.
+
+**Loop-closure facts (these SUPERSEDE earlier Slice-1 notes):**
+- Consensus runs on **PostgreSQL triggers** (`merlt/storage/enrichment/consensus_triggers.py`, idempotent, hooked to the FastAPI lifespan). **`create_tables()` creates tables, not triggers** — the missing trigger install was the real reason votes never promoted (it was NOT "aggregation never invoked").
+- **Tracking is now persisted** (`tracking_events` table, A1) — supersedes Slice 1 gotcha #3.
+- **Training is manual, admin-only:** BFF `POST /api/merlt/ops/training/start` (`requireAdmin`) → MERL-T `/api/v1/rlcf/training/start`. No auto-training at boot.
+- **B1 added free-text relation extraction** from notes (the Slice 2c "deferred #5" is now done).
+- **Durability:** Python changes are baked at build → `docker compose -f docker-compose.merlt.yml --profile api-in-docker build` + recreate **both** `merlt-api` and `merlt-worker`; tables/triggers auto-create at boot via lifespan.
+
+**Next phases (entry points):**
+1. **Co-authorship UX — Loop α, phases 3–7 (immediate direction).** Brief + philosophy: `docs/merlt/coauth-ux-prompt.md`. Hard rule: *provenance & deliberation in legal lexicon, never gamification/scores* (no gold rings, progress bars, or point counters). Reuse `AttributionChip` (`components/features/bulletin/`), the dossier 4px status stripe (`STATUS_CONFIG` in `dossierUtils.ts`), and `<details>`. Surfaces to touch: `NodeDetailsDrawer` (provenance "Proposto da @X · su fonte · accolto il…"), `ValidationPage` (vote framed as *adesione/dissenso*; consensus shown as a discreet status stripe, never a progress bar), `MyContributionsCard` (track a proposal's fate). Always brainstorm → spec → plan before building.
+2. **Slice 3 — Q&A / reasoning (Loop β).** **Blocked on pipeline fixes first:** per `ALIS_CORE/merlt/docs/architecture/PIPELINE_ANALYSIS.md` the 4 experts receive identical retrieval, `GraphSearchTool` is broken (`.execute_query` vs `.query`), and source grounding is ~20%. Sanitize the retrieval pipeline before exposing Q&A. The legacy Q&A UI lived at commit `81be277`.
+3. **Open reconciliations** (system-map §8): consent enum mapping (`none/basic/full` ↔ upstream `Basic/Learning/Research`); canonical authority weights (`0.4/0.4/0.2` vs `0.3/0.5/0.2`); authority calibration (random-noise inflation in EXP-023) and temporal decay (`λ=0.95`) not yet implemented.
 
 ### Frontend Structure
 

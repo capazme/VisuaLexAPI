@@ -19,7 +19,7 @@ Lo Slice 1 attua l'integrazione VisuaLex ↔ MERL-T ↔ RLCF chiudendo il loop d
 **Cosa NON viene fatto in Slice 1**: knowledge graph visualization (Slice 2), Q&A multi-expert UI (Slice 3), admin/training ops (Slice 4+).
 
 **Reference docs**:
-- Design: `docs/superpowers/specs/2026-05-22-merlt-integration-slice1-design.md`
+- Design: `./design.md`
 - Execution plan: `~/.claude/plans/cozy-stargazing-parnas.md`
 - Reference ALIS_CORE: `/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt/docs/PIANO_DEFINITIVO_INTEGRAZIONE.md`
 

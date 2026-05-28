@@ -2,6 +2,10 @@
 
 Questo documento mappa le superfici VisuaLex verso il sidecar MERLT. Il browser parla solo con il BFF Node (`/api/merlt/*`); il BFF autentica l'utente VisuaLex, inoltra `Authorization`, aggiunge `X-User-ID` e usa `X-API-Key` quando configurata.
 
+> ⚠️ **La colonna «Stato» qui sotto è il contratto _inteso_ (upstream), non lo stato reale del BFF.** Gran parte di queste route **non è montata oggi** — in particolare `/features`, tutto `/experts/*` e `/feedback/*`, l'intero `/enrichment/*` (la validazione vive sotto `/validate/*`, il check articolo sotto `/graph/*`), e quasi tutto `/ops/*`. Fonte di verità: i router in `backend/src/routes/merlt/` e la §7 di [system-map.md](./system-map.md).
+>
+> **Montato oggi sul BFF** (`routes/merlt/index.ts`): `consent` · `events/*` (5 eventi) · `health` · `profile` · `graph/*` (`article/:urn`, `ingest`, `jobs/:id/status`, `search`, `internal/job-callback`) · `contrib/*` (`documents`, `documents/:id/extract`, `documents/:id/candidates`, `jobs/:id/status`, `candidates/:id/promote`, `me/jobs`, `internal/extraction-callback`) · `validate/*` (`pending`, `entity`, `relation`) · `ops/training/start`.
+
 | Area | Endpoint VisuaLex | Endpoint MERLT | Auth | Payload | Consumer UI | Stato |
 | --- | --- | --- | --- | --- | --- | --- |
 | Feature flags | `GET /api/merlt/features` | Locale BFF | JWT | none | Plugin loader, consent flow | Implementato |

@@ -1,6 +1,6 @@
 # Sprint Plan: MERL-T Slice 2c — "Apprendi dai miei appunti"
 
-**Branch:** `visualex-merlt-main` · **Design:** `docs/superpowers/specs/2026-05-26-merlt-slice2c-learn-from-notes-design.md`
+**Branch:** `visualex-merlt-main` · **Design:** `./design.md`
 **Dipende da:** Slice 2a (grafo + worker), Slice 2b (consenso `full` + hub).
 **Obiettivo:** upload appunti → estrazione LLM async → revisione per-item → promozione RLCF (`pending_*`) verso il grafo centrale; più snapshot personale locale.
 

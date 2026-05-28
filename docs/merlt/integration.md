@@ -2,6 +2,8 @@
 
 VisuaLex integra MERLT come sidecar FastAPI, ma il browser parla solo con il BFF Node su `/api/merlt/*`. Il modulo non e piu una slice "query + feedback": espone feature flags, consenso utente, article slot, MERLT workspace, enrichment, validation, graph, profile/authority, document training e ops.
 
+> ⚠️ **Doc parzialmente storico (pre-Slice 1→2c).** Questo runbook descrive una superficie *intesa* più ampia di quella montata oggi: in particolare **non** esiste `GET /api/merlt/features` (i flag sono derivati lato client da `useMerltFeatures`) e la **Q&A multi-expert** (`/api/merlt/experts/*`) **non è montata** (rinviata a Slice 3). Stato reale → **[README.md](../README.md)** + **[system-map.md](./system-map.md)**; route effettive → `backend/src/routes/merlt/`.
+
 ## Local Stack
 
 Run the normal VisuaLex stack:
@@ -15,7 +17,7 @@ Run VisuaLex with MERLT enabled:
 ```bash
 MERLT_ENABLED=true \
 MERLT_COMPOSE_ENABLED=true \
-MERLT_ROOT=/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt \
+MERLT_ROOT="$(pwd)/merlt" \
 MERLT_PORT=8000 \
 MERLT_PYTHON=python \
 ./start.sh
@@ -45,7 +47,7 @@ MERLT_OPS_ENABLED=true
 
 ## Feature Flags E Superfici UI
 
-`GET /api/merlt/features` restituisce:
+I flag sono **derivati lato client** (`frontend/src/features/merlt/useMerltFeatures.ts`); **non** esiste un endpoint `/api/merlt/features`. I gate logici:
 
 - `merlt`: abilita il modulo base.
 - `merlt_contribution`: abilita proposte entita/relazioni e training export.
@@ -60,7 +62,7 @@ Superfici implementate:
 - EventBus frontend per segnali RLCF impliciti, attivo solo dopo consenso utente locale.
 - Consenso MERLT persistito lato backend/DB con audit trail minimo.
 
-Il gateway injecta `user_id`, inoltra il bearer token e invia `X-API-Key` quando configurata. La matrice completa endpoint-per-endpoint vive in [`docs/merlt_contract_matrix.md`](./merlt_contract_matrix.md).
+Il gateway injecta `user_id`, inoltra il bearer token e invia `X-API-Key` quando configurata. La matrice completa endpoint-per-endpoint vive in [`contract-matrix.md`](./contract-matrix.md).
 
 ## Verification
 
@@ -74,24 +76,16 @@ curl http://localhost:8000/health
 Authenticated checks require a VisuaLex access token:
 
 ```bash
-curl http://localhost:3001/api/merlt/health \
+# Health del modulo MERL-T (montato, no-auth lato BFF)
+curl http://localhost:3001/api/merlt/health
+
+# Consenso utente (montato)
+curl http://localhost:3001/api/merlt/consent \
   -H "Authorization: Bearer $VISUALEX_ACCESS_TOKEN"
 
-curl http://localhost:3001/api/merlt/health/deep \
+# Ricerca nel grafo (montato)
+curl "http://localhost:3001/api/merlt/graph/search?q=responsabilità" \
   -H "Authorization: Bearer $VISUALEX_ACCESS_TOKEN"
-
-curl -X POST http://localhost:3001/api/merlt/experts/query \
-  -H "Authorization: Bearer $VISUALEX_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Analizza questa norma con il sistema multi-expert MERL-T.",
-    "articleText": "Testo articolo...",
-    "normaData": {
-      "tipo_atto": "codice civile",
-      "numero_articolo": "2043",
-      "urn": "urn:nir:stato:codice.civile:1942-03-16;262:art2043"
-    }
-  }'
 ```
 
 Per verificare le superfici UI:

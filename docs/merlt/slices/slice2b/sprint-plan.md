@@ -1,6 +1,6 @@
 # Sprint Plan: MERL-T Slice 2b — Hub & Consent
 
-**Branch:** `visualex-merlt-main` · **Design:** `docs/superpowers/specs/2026-05-26-merlt-slice2b-hub-consent-design.md`
+**Branch:** `visualex-merlt-main` · **Design:** `./design.md`
 **Obiettivo:** chiudere i 3 bug bloccanti (features fantasma, consenso frammentato, contratto rotto) e costruire l'hub user-facing + il consenso server-SoT. Prerequisito di Slice 2c.
 
 ## Executive Summary

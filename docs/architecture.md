@@ -145,6 +145,30 @@ Retrieves and processes legal texts from external sources.
 
 ---
 
+## MERL-T Sidecar (Optional Subsystem)
+
+When `MERLT_ENABLED=true`, VisuaLex runs an additional **MERL-T** stack (`docker-compose.merlt.yml`) — a legal knowledge-graph + RLCF subsystem whose Python is source-vendored in `merlt/` (a selective copy of upstream `ALIS_CORE/merlt`).
+
+```mermaid
+graph LR
+    FE[Frontend] -->|/api/merlt/*| BFF[Node BFF :3001]
+    BFF -->|proxy| API[merlt-api :8000]
+    API --> PG[(merlt-postgres)]
+    API --> FK[(FalkorDB)]
+    API --> QD[(Qdrant)]
+    API --> RD[(Redis)]
+    WK[merlt-worker RQ] --> FK
+    WK --> PG
+```
+
+- **Boundary rule:** the browser never calls `:8000` directly — all MERL-T traffic is proxied by the Node BFF under `/api/merlt/*`.
+- **Services:** `merlt-api` (FastAPI :8000), `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`, `merlt-worker` (RQ).
+- **Status:** the community **graph-enrichment loop** (contribute → vote → consensus → graph) is integrated and closed end-to-end; the **Q&A / reasoning** surface is upstream-only (Slice 3).
+
+For the full picture (the two RLCF loops, existing vs. target, the integration contract) see **[MERL-T × RLCF System Map](merlt/system-map.md)** and the **[docs index](README.md)**.
+
+---
+
 ## Database Schema
 
 ```mermaid
@@ -439,6 +463,8 @@ cd backend && npm run build   # Compiles to dist/
 
 ## Related Documentation
 
+- [Documentation Index](README.md) — full docs map
+- [MERL-T × RLCF System Map](merlt/system-map.md) — the MERL-T subsystem (existing vs. target)
 - [Python API Setup](backend/python_api_setup.md)
 - [Python API Reference](backend/python_api_reference.md)
 - [Node.js Backend](backend/node_backend.md)

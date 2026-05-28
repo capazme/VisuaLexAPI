@@ -23,7 +23,7 @@ La visualizzazione vive su **due superfici complementari**:
 **Cosa NON viene fatto in Slice 2a**: editing del grafo (Slice 2b "Laboratorio RLCF"), Devil's Advocate sul grafo (Slice 2c), Q&A multi-expert (Slice 3).
 
 **Reference docs**:
-- Design: `docs/superpowers/specs/2026-05-23-merlt-slice2a-graph-lazy-ingestion-design.md`
+- Design: `./design.md`
 - Seed recovery: `merlt/data/seeds/` + memoria `legacy_libro_iv_recovery`
 - Predecessor: Slice 1 (chiusa il 2026-05-22, commit b6ec77f su `visualex-merlt-main`)
 
