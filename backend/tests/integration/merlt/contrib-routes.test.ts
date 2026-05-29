@@ -228,7 +228,8 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
       .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: 'raw verbatim text' });
     nock(TEST_MERLT_BASE)
       .post('/api/v1/enrichment/propose-entity', (b) => (b as { contributed_by: string }).contributed_by === user.id)
-      .reply(200, { pending_id: 'pe-99', entity_id: 'ent-1' });
+      // Real MERL-T shape: id is nested under pending_entity (EntityProposalResponse).
+      .reply(200, { success: true, pending_entity: { id: 'pe-99', nome: 'X', tipo: 'concetto' }, message: 'ok' });
     nock(TEST_MERLT_BASE).post('/api/v1/candidates/7/mark-promoted').reply(200, { ok: true });
 
     const res = await request(app)
@@ -238,6 +239,28 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.pendingId).toBe('pe-99');
+  });
+
+  it('does not mark a candidate promoted when MERL-T defers on a duplicate', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/candidates/7')
+      .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: 'raw verbatim text' });
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/enrichment/propose-entity')
+      // Dedup-defer: no pending_entity, just the duplicate warning.
+      .reply(200, { success: false, has_duplicates: true, duplicate_action_required: true, duplicates: [] });
+    // Deliberately NO mark-promoted interceptor: the route must NOT call it when
+    // no pending id came back (nock would throw on an unexpected request).
+
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send(entityBody);
+
+    expect(res.status).toBe(200);
+    expect(res.body.pendingId).toBeNull();
+    expect(res.body.duplicateActionRequired).toBe(true);
   });
 
   it('403s without full consent', async () => {

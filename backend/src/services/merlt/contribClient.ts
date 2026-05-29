@@ -72,9 +72,15 @@ export interface ProposeRelationPayload {
 }
 
 export interface ProposeResponse {
-  pending_id: string;
-  entity_id?: string;
-  relation_id?: string;
+  success?: boolean;
+  message?: string;
+  /** Entity proposals nest the new pending id under `pending_entity.id`. */
+  pending_entity?: { id: string } | null;
+  /** Relation proposals return a top-level `relation_id`. */
+  relation_id?: string | null;
+  /** Set when MERL-T defers on a possible duplicate (no pending_* row created). */
+  has_duplicates?: boolean;
+  duplicate_action_required?: boolean;
 }
 
 export type MerltVote = 'approve' | 'reject' | 'edit';

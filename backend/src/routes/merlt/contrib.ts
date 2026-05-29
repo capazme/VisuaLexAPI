@@ -304,9 +304,21 @@ router.post(
               source_document_id: candidate.id,
             });
 
-      await contribClient().markPromoted(candidateId);
+      // Entity proposals nest the id under `pending_entity`; relations return a
+      // top-level `relation_id` (two distinct MERL-T response shapes).
+      const pendingId = proposal.pending_entity?.id ?? proposal.relation_id ?? null;
+      // Only mark the candidate promoted if a pending_* row was actually created.
+      // When MERL-T defers on a possible duplicate it returns no id; marking it
+      // promoted then would silently drop the contribution (no proposal exists).
+      if (pendingId) {
+        await contribClient().markPromoted(candidateId);
+      }
 
-      res.status(200).json({ pendingId: proposal.pending_id });
+      res.status(200).json({
+        pendingId,
+        hasDuplicates: proposal.has_duplicates ?? false,
+        duplicateActionRequired: proposal.duplicate_action_required ?? false,
+      });
     } catch (err) {
       if (err instanceof MerltClientError) {
         res.status(503).json({ detail: 'merlt_unavailable' });
