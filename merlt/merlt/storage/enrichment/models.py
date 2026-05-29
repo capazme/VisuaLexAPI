@@ -41,6 +41,7 @@ from sqlalchemy import (
     ARRAY,
     Date,
     BigInteger,
+    JSON,
 )
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
@@ -310,6 +311,33 @@ class ExtractionCandidate(Base):
     status = Column(String(20), default="draft", index=True)  # draft | promoted | expired
     created_at = Column(DateTime, default=func.now())
     expires_at = Column(DateTime, index=True)
+
+
+# ====================================================
+# 4c. TRACKING EVENTS (RLCF signal persistence — loop-closure A1)
+# ====================================================
+class TrackingEventRecord(Base):
+    """
+    Persisted RLCF interaction signal from the frontend (Slice 1 events:
+    article-viewed, highlight/annotation, dossier-bookmark, citation, forum).
+
+    Previously these lived only in an in-memory ring buffer that evaporated on
+    every API restart, making the whole Slice-1 capture cosmetic. They now land
+    here durably so the feedback loop has a real input substrate to build on.
+    No PII beyond the opaque VisuaLex user id (varchar string, never an FK).
+    """
+
+    __tablename__ = "tracking_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_type = Column(String(100), nullable=False, index=True)
+    user_id = Column(String(100), index=True)  # opaque VisuaLex id, extracted from payload
+    payload = Column(JSON, default=dict)
+    client_ts = Column(BigInteger)  # unix ms from the client
+    created_at = Column(DateTime, default=func.now(), index=True)
+
+    def __repr__(self):
+        return f"<TrackingEventRecord(type={self.event_type}, user={self.user_id})>"
 
 
 # ====================================================

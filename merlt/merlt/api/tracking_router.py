@@ -2,8 +2,11 @@
 MERL-T Research Tracking Router
 ================================
 
-Receives anonymized interaction events from the frontend for research analytics.
-Events are stored in-memory (future: PostgreSQL) and can be exported for analysis.
+Receives anonymized RLCF interaction events from the frontend (Slice 1 signals).
+Events are persisted to PostgreSQL (`tracking_events`) so they survive restarts
+and give the feedback loop a durable input substrate. If the DB is unavailable
+the endpoint falls back to a bounded in-memory buffer (best-effort, never fails
+the fire-and-forget event).
 
 Endpoints:
 - POST /tracking/events - Receive batch of tracking events
@@ -18,6 +21,8 @@ from pydantic import BaseModel, Field
 
 from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey
+from merlt.storage.enrichment.database import get_db_session
+from merlt.storage.enrichment.models import TrackingEventRecord
 
 log = structlog.get_logger()
 
@@ -44,11 +49,55 @@ class TrackingResponse(BaseModel):
 
 
 # =============================================================================
-# In-memory store (replace with DB in production)
+# Persistence helpers
 # =============================================================================
 
+# Bounded fallback buffer used only when the DB is unreachable.
 _event_buffer: List[Dict[str, Any]] = []
 _MAX_BUFFER = 10000
+
+
+def build_tracking_records(events: List[TrackingEvent]) -> List[TrackingEventRecord]:
+    """Map incoming events to ORM rows, lifting an opaque user_id out of the payload."""
+    records: List[TrackingEventRecord] = []
+    for event in events:
+        user_id = None
+        if isinstance(event.data, dict):
+            raw_uid = event.data.get("user_id")
+            if raw_uid is not None:
+                user_id = str(raw_uid)
+        records.append(
+            TrackingEventRecord(
+                event_type=event.type,
+                user_id=user_id,
+                payload=event.data,
+                client_ts=event.timestamp,
+            )
+        )
+    return records
+
+
+async def persist_tracking_events(session, events: List[TrackingEvent]) -> int:
+    """Add tracking rows to the session. Returns the number of rows staged."""
+    records = build_tracking_records(events)
+    for record in records:
+        session.add(record)
+    return len(records)
+
+
+def _buffer_fallback(events: List[TrackingEvent]) -> None:
+    global _event_buffer
+    for event in events:
+        _event_buffer.append(
+            {
+                "type": event.type,
+                "data": event.data,
+                "client_ts": event.timestamp,
+                "server_ts": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    if len(_event_buffer) > _MAX_BUFFER:
+        _event_buffer = _event_buffer[-_MAX_BUFFER:]
 
 
 # =============================================================================
@@ -63,25 +112,21 @@ async def receive_tracking_events(
     """
     Receive a batch of anonymized tracking events from the frontend.
 
-    Events are buffered in memory. No PII is stored.
+    Persisted to PostgreSQL; on DB failure, buffered in memory (best-effort).
     """
-    global _event_buffer
-
-    for event in batch.events:
-        _event_buffer.append({
-            "type": event.type,
-            "data": event.data,
-            "client_ts": event.timestamp,
-            "server_ts": datetime.now(timezone.utc).isoformat(),
-        })
-
-    # Trim buffer if too large
-    if len(_event_buffer) > _MAX_BUFFER:
-        _event_buffer = _event_buffer[-_MAX_BUFFER:]
+    persisted = False
+    try:
+        async with get_db_session() as session:
+            await persist_tracking_events(session, batch.events)
+        persisted = True
+    except Exception as e:
+        log.error("Tracking persist failed, falling back to buffer", error=str(e))
+        _buffer_fallback(batch.events)
 
     log.debug(
         "Tracking events received",
         count=len(batch.events),
+        persisted=persisted,
         buffer_size=len(_event_buffer),
     )
 
@@ -91,4 +136,4 @@ async def receive_tracking_events(
     )
 
 
-__all__ = ["router"]
+__all__ = ["router", "build_tracking_records", "persist_tracking_events"]
