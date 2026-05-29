@@ -53,6 +53,9 @@ export interface ProposeEntityPayload {
   descrizione: string;
   fonte: string;
   contributed_by: string;
+  // MERL-T's Pydantic model requires `user_id` (the same VisuaLex id we already
+  // send as `contributed_by`); omitting it returns 422 → BFF surfaces 503.
+  user_id: string;
   source_document_id?: number;
 }
 
@@ -64,6 +67,7 @@ export interface ProposeRelationPayload {
   descrizione: string;
   fonte: string;
   contributed_by: string;
+  user_id: string;
   source_document_id?: number;
 }
 

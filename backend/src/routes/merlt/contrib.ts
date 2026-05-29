@@ -204,6 +204,38 @@ router.get(
 );
 
 /**
+ * GET /api/merlt/contrib/me/jobs
+ * The current user's recent extraction jobs — gives the hub a "I miei contributi"
+ * surface so a refresh doesn't lose the in-progress flow (ContribPage state is
+ * in-memory and was throwing context away on every reload). Owner-scoped.
+ */
+router.get(
+  '/contrib/me/jobs',
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const jobs = await prisma.merltExtractionJob.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        documentId: true,
+        status: true,
+        candidatesCreated: true,
+        errorMessage: true,
+        createdAt: true,
+        completedAt: true,
+      },
+    });
+    res.status(200).json({ jobs });
+  },
+);
+
+/**
  * POST /api/merlt/contrib/candidates/:id/promote
  * Server-side copyright gate (fonte + reformulation + attestation), then create
  * the canonical RLCF proposal. The authoritative verbatim is fetched from
@@ -249,12 +281,15 @@ router.post(
       const proposal =
         body.candidateType === 'entity'
           ? await contribClient().proposeEntity({
-              article_urn: body.articleUrn,
+              // Stand-alone proposals fall back to the staging placeholder so
+              // free-text notes without a clear norma still create a proposal.
+              article_urn: body.articleUrn?.trim() || 'user_document',
               nome: body.nome,
               tipo: body.tipo,
               descrizione: body.descrizione,
               fonte: body.fonte.slice(0, 50) || fonte,
               contributed_by: req.user.id,
+              user_id: req.user.id,
               source_document_id: candidate.id,
             })
           : await contribClient().proposeRelation({
@@ -265,6 +300,7 @@ router.post(
               descrizione: body.descrizione,
               fonte: body.fonte.slice(0, 50) || fonte,
               contributed_by: req.user.id,
+              user_id: req.user.id,
               source_document_id: candidate.id,
             });
 

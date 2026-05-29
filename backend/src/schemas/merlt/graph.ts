@@ -26,9 +26,13 @@ export type IngestRequest = z.infer<typeof ingestRequestSchema>;
 export const jobCallbackSchema = z.object({
   bffJobId: z.string().min(1),
   status: z.enum(['running', 'completed', 'failed', 'timeout']),
-  nodesCreated: z.number().int().nonnegative().optional(),
-  edgesCreated: z.number().int().nonnegative().optional(),
-  error: z.string().optional(),
+  nodesCreated: z.number().int().nonnegative().nullish(),
+  edgesCreated: z.number().int().nonnegative().nullish(),
+  // `.nullish()` (= optional + nullable) — the worker `_callback_bff` serializes
+  // missing fields to JSON `null`, not undefined; with `.optional()` the Zod
+  // parse rejects with "Expected string, received null" and the worker swallows
+  // it silently (httpx no raise_for_status), leaving the row stuck `pending`.
+  error: z.string().nullish(),
 });
 export type JobCallback = z.infer<typeof jobCallbackSchema>;
 

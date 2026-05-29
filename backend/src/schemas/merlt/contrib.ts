@@ -6,7 +6,10 @@ import { z } from 'zod';
 export const promoteRequestSchema = z.discriminatedUnion('candidateType', [
   z.object({
     candidateType: z.literal('entity'),
-    articleUrn: z.string().min(1),
+    // Optional for free-text notes that don't link to a specific norma; the
+    // BFF route falls back to the `user_document` placeholder so the proposal
+    // is created stand-alone (community can later attach a real URN).
+    articleUrn: z.string().min(1).optional(),
     nome: z.string().min(1),
     tipo: z.string().min(1),
     /** The user's reformulated description (gated against the verbatim). */
