@@ -1,38 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeGraphUrn } from '../../../src/services/merlt/graphClient';
 
-describe('normalizeGraphUrn — VisuaLex urn → seed-canonical NIR', () => {
-  it('strips the URL wrapper VisuaLex stores around the urn:nir form', () => {
-    expect(
-      normalizeGraphUrn(
-        'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1',
-      ),
-    ).toBe('urn:nir:stato:costituzione~art1');
+// The seed AND VisuaLex key Norma nodes by the FULL Normattiva URL form, and
+// MERL-T matches on exact URN/node_id equality. normalizeGraphUrn must drop
+// ONLY the NIR version marker (from the first "!") and PRESERVE the URL wrapper
+// — stripping the wrapper makes every seeded article unmatchable.
+describe('normalizeGraphUrn — strip only the version marker, keep the seed key form', () => {
+  const FULL =
+    'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043';
+
+  it('leaves the full Normattiva URL form unchanged (the seed/VisuaLex key)', () => {
+    expect(normalizeGraphUrn(FULL)).toBe(FULL);
   });
 
-  it('strips the version marker (!vig= / !orig=)', () => {
+  it('strips the version marker (!vig=) but keeps the URL wrapper', () => {
+    expect(normalizeGraphUrn(`${FULL}!vig=`)).toBe(FULL);
+  });
+
+  it('strips the version marker on a bare NIR urn too', () => {
     expect(normalizeGraphUrn('urn:nir:stato:codice.civile:1942~art2043!vig=')).toBe(
       'urn:nir:stato:codice.civile:1942~art2043',
     );
   });
 
-  it('strips BOTH URL wrapper AND version marker together (the real VisuaLex shape)', () => {
-    expect(
-      normalizeGraphUrn(
-        'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1!vig=',
-      ),
-    ).toBe('urn:nir:stato:costituzione~art1');
-  });
-
-  it('leaves a bare canonical NIR urn unchanged', () => {
+  it('leaves a marker-less urn unchanged (bare or wrapped)', () => {
     const bare = 'urn:nir:stato:codice.civile:1942~art2043';
     expect(normalizeGraphUrn(bare)).toBe(bare);
-  });
-
-  it('does not chop a urn that starts at index 0 (no wrapper)', () => {
-    // `urn:nir:` is at index 0 → urnStart > 0 is false → no slice.
-    expect(normalizeGraphUrn('urn:nir:stato:costituzione~art2')).toBe(
-      'urn:nir:stato:costituzione~art2',
-    );
   });
 });

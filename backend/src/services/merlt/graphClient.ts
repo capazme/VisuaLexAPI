@@ -52,23 +52,19 @@ export interface IngestArticleResponse {
 /**
  * Normalize a VisuaLex URN to the canonical bare NIR form the graph indexes.
  *
- * Two transforms — VisuaLex stores articles in BOTH richer forms than the seed:
- *   1. URL-wrapped: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:…"
- *      → MERL-T worker's `_urn_to_ingest_params` parser can't extract the
- *      article from a URL; strip everything before "urn:nir:".
- *   2. Version-suffixed: "…~art2043!vig=" / "…!orig=…"
- *      → the seed indexes bare-article URNs only; strip from the first "!".
- *
- * Together they take the VisuaLex
- *   "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1!vig="
- * to the seed-matching
- *   "urn:nir:stato:costituzione~art1".
+ * Strips ONLY the NIR version/annex marker — everything from the first "!"
+ * (e.g. "!vig=" / "!orig=..."). The seed AND VisuaLex both key Norma nodes by
+ * the full Normattiva URL form
+ *   "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:...~art2043"
+ * and MERL-T matches on EXACT URN/node_id equality, so the URL wrapper MUST be
+ * preserved: stripping it to the bare "urn:nir:..." form makes every seeded
+ * article unmatchable (exists:false -> empty subgraph -> infinite lazy-ingest).
+ * The seed carries no version marker, so dropping it is all that is needed
+ * (the worker's parse_urn reads the article from the full URL just fine).
  */
 export function normalizeGraphUrn(urn: string): string {
-  const urnStart = urn.indexOf('urn:nir:');
-  const stripped = urnStart > 0 ? urn.slice(urnStart) : urn;
-  const bang = stripped.indexOf('!');
-  return bang === -1 ? stripped : stripped.slice(0, bang);
+  const bang = urn.indexOf('!');
+  return bang === -1 ? urn : urn.slice(0, bang);
 }
 
 export class GraphClient {

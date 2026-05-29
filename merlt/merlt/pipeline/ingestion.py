@@ -37,20 +37,22 @@ log = structlog.get_logger()
 
 
 def _canonical_urn(urn: str) -> str:
-    """Strip URL wrapper + version marker so graph nodes match the seed format.
+    """Strip only the NIR version/annex marker so graph nodes match the seed.
 
-    VisuaLex's URNs come as
-        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1!vig="
-    while the Libro IV seed (and the BFF `normalizeGraphUrn` used at read time)
-    expect the bare canonical NIR form:
-        "urn:nir:stato:costituzione~art1"
+    The Libro IV seed and VisuaLex both key Norma nodes by the FULL Normattiva
+    URL form
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:...~art2043"
+    and MERL-T matches on exact URN/node_id equality, so the URL wrapper MUST be
+    preserved. VisuaLex appends a version marker on some norme
+    ("...~art2043!vig="); the seed carries none, so dropping everything from the
+    first "!" is all that is needed (the BFF `normalizeGraphUrn` at read time
+    does the same). Stripping the wrapper to the bare "urn:nir:..." form would
+    make seeded nodes unreachable and re-trigger the infinite lazy-ingest loop.
     """
     if not urn:
         return urn
-    start = urn.find("urn:nir:")
-    stripped = urn[start:] if start > 0 else urn
-    bang = stripped.find("!")
-    return stripped[:bang] if bang != -1 else stripped
+    bang = urn.find("!")
+    return urn[:bang] if bang != -1 else urn
 
 
 def _extract_number_from_urn(urn: str, level: str) -> Optional[int]:
