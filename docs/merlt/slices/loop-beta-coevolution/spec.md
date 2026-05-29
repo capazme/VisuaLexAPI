@@ -9,6 +9,19 @@ collection name fixed; embeddings backfill for the seed in progress
 
 ---
 
+> ⚠️ **CODE-VERIFIED CORRECTIONS — read `sprint-plan.md` first.** A 5-lens code-grounded review
+> (2026-05-29) found several claims below contradicted by the real tree. Where this spec and
+> `sprint-plan.md` differ, **the sprint-plan wins.** Headline fixes: (B1) `get_policy_manager()` does
+> NOT hardcode Redis — it's a filesystem `PolicyManager`; the only `localhost:6380` is FalkorDB;
+> traversal weights are inert because the boot retriever is wired `policy_manager=None` + no `.pt`.
+> (B2) Bug 4 = the `ExecutionTrace` is never serialized (orchestrator persists only
+> `pipeline_trace.to_dict()`), not a key rename. (B4) no per-expert tool assignment exists. (B5)
+> registering tools is inert unless `use_react=True` (default False). (B6) MCP tools return markdown,
+> not structured data. (B7/B8) provisional FalkorDB nodes need a NEW low-trust writer; the lazy-ingest
+> worker is Normattiva-norm-article-only. (M1) scoring is additive `α·sim+(1-α)·graph`. (M3) REUSE the
+> existing `ExternalSourceTool`/`LiveEnrichmentService`/`ArticleFetchTool`. Full delta + tasks:
+> **`sprint-plan.md`**.
+
 ## 0. The principle (one sentence)
 
 **Every reasoning act is also an enrichment act.** The experts reason over the curated graph AND
