@@ -117,6 +117,7 @@ class DocumentParserService:
         session: AsyncSession,
         persist_target: str = "pending",
         document_id: Optional[int] = None,
+        extract_relations: bool = False,
     ) -> ParseResult:
         """
         Parse document to extract entities and amendments.
@@ -168,6 +169,17 @@ class DocumentParserService:
                 document_id=document_id,
             )
             result.entities_count = entities_count
+
+        # Step 3b: Extract relations (loop-closure B1, if requested)
+        if extract_relations and self.llm_service:
+            result.relations_count = await self._extract_relations_from_chunks(
+                chunks=chunks,
+                legal_domain=legal_domain,
+                user_id=user_id,
+                session=session,
+                persist_target=persist_target,
+                document_id=document_id,
+            )
 
         # Step 4: Extract amendments (if requested)
         if extract_amendments:
@@ -479,6 +491,102 @@ class DocumentParserService:
             log.warning("⚠️  No entities extracted from document")
 
         return entities_count
+
+    async def _extract_relations_from_chunks(
+        self,
+        chunks: List[str],
+        legal_domain: Optional[str],
+        user_id: str,
+        session: AsyncSession,
+        persist_target: str = "pending",
+        document_id: Optional[int] = None,
+    ) -> int:
+        """
+        Extract semantic relations from text chunks using the LLM (loop-closure B1).
+
+        persist_target:
+          - "staging" → ExtractionCandidate(candidate_type="relation") — the
+            review buffer; verbatim stays here, never in pending_*.
+          - "pending" → PendingRelation (legacy RLCF queue).
+
+        This closes the gap noted in the design: notes could yield entities but
+        never relations. Endpoints (source/target) are stored as the concept
+        names the LLM found; promotion resolves them to graph nodes.
+        """
+        if not self.llm_service:
+            log.warning("LLM service not available, skipping relation extraction")
+            return 0
+
+        from merlt.pipeline.enrichment.extractors.relation import RelationExtractor
+        from merlt.pipeline.enrichment.models import EnrichmentContent
+
+        extractor = RelationExtractor(self.llm_service)
+        relations_count = 0
+
+        for chunk_idx, chunk in enumerate(chunks):
+            if not chunk.strip():
+                continue
+
+            content = EnrichmentContent(
+                id=f"user_doc:relchunk{chunk_idx}:{uuid4().hex[:8]}",
+                text=chunk,
+                source="user_document",
+                content_type="documento",
+                article_refs=[],
+            )
+
+            try:
+                relations = await extractor.extract(content)
+            except Exception as e:
+                log.error(f"Relation extraction error in chunk {chunk_idx}: {e}", exc_info=True)
+                continue
+
+            snippet = chunk[:500] if len(chunk) > 500 else chunk
+
+            for rel in relations:
+                if persist_target == "staging":
+                    row = ExtractionCandidate(
+                        document_id=document_id,
+                        contributor_id=user_id,
+                        candidate_type="relation",
+                        relation_type=rel.relation_type,
+                        source_node_urn=rel.source,
+                        target_entity_id=rel.target,
+                        article_urn="user_document",
+                        descrizione=rel.descrizione or "",
+                        verbatim_excerpt=snippet,
+                        llm_confidence=rel.confidence,
+                        llm_model="google/gemini-2.5-flash",
+                        status="draft",
+                        expires_at=datetime.now() + timedelta(hours=STAGING_TTL_HOURS),
+                    )
+                else:
+                    row = PendingRelation(
+                        relation_id=f"{rel.relation_type}:{uuid4().hex[:8]}",
+                        article_urn="user_document",
+                        source_type="user_document",
+                        relation_type=rel.relation_type,
+                        source_node_urn=rel.source,
+                        target_entity_id=rel.target,
+                        relation_description=rel.descrizione or "",
+                        certezza=rel.confidence,
+                        fonte="llm_extraction",
+                        llm_confidence=rel.confidence,
+                        llm_model="google/gemini-2.5-flash",
+                        contributed_by=user_id,
+                        contributor_authority=0.5,
+                        validation_status="pending",
+                    )
+
+                session.add(row)
+                relations_count += 1
+
+        if relations_count > 0:
+            log.info(f"✅ Extracted {relations_count} relations - added to session")
+        else:
+            log.warning("⚠️  No relations extracted from document")
+
+        return relations_count
 
     async def _extract_amendments_from_text(
         self,
