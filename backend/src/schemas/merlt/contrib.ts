@@ -51,7 +51,11 @@ export type ValidateRelationRequest = z.infer<typeof validateRelationRequestSche
 export const extractionCallbackSchema = z.object({
   bffJobId: z.string().min(1),
   status: z.enum(['running', 'completed', 'failed', 'timeout']),
-  candidatesCreated: z.number().int().nonnegative().optional(),
-  error: z.string().optional(),
+  // .nullish() (not .optional()): the worker serializes absent fields as
+  // explicit `null` (candidatesCreated/error), which .optional() rejects → the
+  // completion callback 400s and the job is stuck 'pending' forever. Same fix
+  // as the graph job-callback schema.
+  candidatesCreated: z.number().int().nonnegative().nullish(),
+  error: z.string().nullish(),
 });
 export type ExtractionCallback = z.infer<typeof extractionCallbackSchema>;

@@ -273,4 +273,24 @@ describe('POST /api/merlt/internal/extraction-callback', () => {
     expect(updated?.candidatesCreated).toBe(3);
     expect(updated?.completedAt).not.toBeNull();
   });
+
+  it('accepts the worker payload with explicit null fields (regression: job stuck pending)', async () => {
+    // The worker serializes absent fields as explicit null (candidatesCreated/error).
+    // The schema must use .nullish() (not .optional()) or the completion callback
+    // 400s and the job is stuck 'pending' forever — extraction never shows as done.
+    const owner = await createTestUser('contrib-nullcb');
+    const job = await prisma.merltExtractionJob.create({
+      data: { documentId: '99', userId: owner.id, status: 'pending' },
+    });
+
+    const res = await request(app)
+      .post('/api/merlt/internal/extraction-callback')
+      .set('X-Internal-Secret', INTERNAL_SECRET)
+      .send({ bffJobId: job.id, status: 'completed', candidatesCreated: null, error: null });
+    expect(res.status).toBe(200);
+
+    const updated = await prisma.merltExtractionJob.findUnique({ where: { id: job.id } });
+    expect(updated?.status).toBe('completed');
+    expect(updated?.completedAt).not.toBeNull();
+  });
 });
