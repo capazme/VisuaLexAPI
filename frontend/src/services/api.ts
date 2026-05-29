@@ -8,13 +8,17 @@ import { isAccessTokenExpired } from './authService';
 // API base URL - uses relative path to leverage Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-// Create axios instance with default config
+// Create axios instance with default config.
+//
+// NOTE: do NOT set a default `Content-Type` here. Axios 1.x already
+// auto-detects per request (plain objects → application/json, FormData →
+// multipart/form-data with the browser-generated boundary, URLSearchParams →
+// x-www-form-urlencoded). A hardcoded default wins over `postForm()` and the
+// FormData auto-detection on some builds, leaving the browser unable to send
+// the body (surfaces as ERR_TIMED_OUT on uploads).
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000, // 30 seconds
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 /**
