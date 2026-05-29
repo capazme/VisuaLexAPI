@@ -91,6 +91,17 @@ async def lifespan(app: FastAPI):
         # Initialize enrichment database
         await init_db(echo=False)  # Set echo=True for SQL logging in dev
         await create_tables()
+        # create_tables() only emits Base.metadata (tables) — the RLCF consensus
+        # PL/pgSQL triggers (vote → net_score → consensus_reached → promotion) live
+        # in migrations and must be (re)installed idempotently on every boot, else
+        # votes never reach consensus and graph promotion never fires.
+        try:
+            from merlt.storage.enrichment.consensus_triggers import ensure_consensus_triggers
+            await ensure_consensus_triggers()
+            log.info("✅ Consensus triggers ensured")
+        except Exception as e:
+            log.error("Failed to install consensus triggers", error=str(e), exc_info=True)
+            log.warning("Community votes will NOT reach consensus until triggers are installed")
         log.info("✅ Enrichment database initialized")
 
         # Initialize Expert System (MultiExpertOrchestrator)
