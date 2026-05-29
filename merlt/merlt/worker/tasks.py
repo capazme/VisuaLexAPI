@@ -8,6 +8,7 @@ async ingestion pipeline and reports the outcome back to the BFF.
 import asyncio
 import importlib.util
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -66,10 +67,27 @@ def _resolve_codice_name(parsed) -> Optional[str]:
     return None
 
 
+_TILDE_ART_RE = re.compile(r"~art([^~!?&]+)")
+
+
 def _urn_to_ingest_params(urn: str) -> tuple[str, str]:
     """Map a Normattiva URN to (tipo_atto, articolo) for kg.ingest_norm."""
     parsed = parse_urn(urn)
     articolo = parsed.article
+    act_type_clean = parsed.act_type or ""
+
+    # Fallback for date-less URNs (e.g. "urn:nir:stato:costituzione~art1"):
+    # `parse_urn` expects "act_type:date~art<N>" and, without the `:date`
+    # delimiter, folds "~art1" inside act_type leaving article=None. We
+    # recover the article via regex and trim the tilde-tail off act_type.
+    if not articolo:
+        m = _TILDE_ART_RE.search(urn)
+        if m:
+            articolo = m.group(1)
+            tilde = act_type_clean.find("~art")
+            if tilde > 0:
+                act_type_clean = act_type_clean[:tilde]
+
     if not articolo:
         raise ValueError(f"URN privo di articolo, impossibile ingerire: {urn}")
 
@@ -77,7 +95,7 @@ def _urn_to_ingest_params(urn: str) -> tuple[str, str]:
     if codice:
         tipo_atto = codice
     else:
-        tipo_atto = (parsed.act_type or "").lower().replace(".", " ").strip()
+        tipo_atto = act_type_clean.lower().replace(".", " ").strip()
     if not tipo_atto:
         raise ValueError(f"URN privo di tipo atto, impossibile ingerire: {urn}")
 
@@ -107,15 +125,57 @@ async def _callback_bff(
         "error": error,
     }
     secret = os.getenv("MERLT_INTERNAL_SECRET", "")
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(url, json=payload, headers={"X-Internal-Secret": secret})
-    except Exception as e:
-        log.error("BFF callback failed", bff_job_id=bff_job_id, status=status, exc=str(e))
+    headers = {"X-Internal-Secret": secret}
+    # Retry with backoff: previously a single httpx error left rows stuck in
+    # 'pending' forever (the BFF watchdog now cleans up the long-tail, but
+    # retries keep the happy path snappy when the BFF restarts mid-ingest).
+    import asyncio as _asyncio
+    delays = [1, 3, 8]
+    last_exc: Optional[str] = None
+    for attempt, delay in enumerate(delays, start=1):
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+            log.info(
+                "BFF ingestion callback ok",
+                bff_job_id=bff_job_id,
+                status=status,
+                attempt=attempt,
+                http_status=resp.status_code,
+            )
+            return
+        except Exception as e:
+            last_exc = f"{type(e).__name__}: {e}"
+            log.warning(
+                "BFF ingestion callback attempt failed, will retry",
+                bff_job_id=bff_job_id,
+                status=status,
+                attempt=attempt,
+                exc=last_exc,
+            )
+            if attempt < len(delays):
+                await _asyncio.sleep(delay)
+    log.error(
+        "BFF ingestion callback FAILED after retries",
+        bff_job_id=bff_job_id,
+        status=status,
+        attempts=len(delays),
+        last_exc=last_exc,
+    )
 
 
 async def _run_ingest(urn: str, bff_job_id: Optional[str]) -> dict:
-    tipo_atto, articolo = _urn_to_ingest_params(urn)
+    # URN parsing must happen INSIDE error-callback scope: a malformed URN
+    # raised here used to escape without notifying the BFF, leaving the
+    # MerltIngestionJob row stuck in `pending` forever (idempotency check
+    # would then block all future enqueues for the same URN).
+    try:
+        tipo_atto, articolo = _urn_to_ingest_params(urn)
+    except Exception as e:
+        log.error("URN parsing failed for ingestion", urn=urn, exc=str(e))
+        await _callback_bff(bff_job_id, "failed", error=f"urn_parse_error: {e}")
+        raise
     log.info("Starting article ingestion", urn=urn, tipo_atto=tipo_atto, articolo=articolo, bff_job_id=bff_job_id)
 
     kg = LegalKnowledgeGraph(merlt_config_from_env())

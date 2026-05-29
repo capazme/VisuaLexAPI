@@ -31,7 +31,9 @@ gr = importlib.import_module("merlt.api.graph_router")
 
 
 def _expected_job_id(urn: str) -> str:
-    return "ingest:" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
+    # RQ >= 2.0 rejects ":" in job ids (validates [A-Za-z0-9_-]); the enqueue
+    # contract uses a "ingest-" prefix (dash), matching graph_router.
+    return "ingest-" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
 
 
 @pytest.mark.asyncio

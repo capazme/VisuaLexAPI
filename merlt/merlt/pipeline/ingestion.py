@@ -36,6 +36,23 @@ from merlt.clients import NormTree, get_article_position
 log = structlog.get_logger()
 
 
+def _canonical_urn(urn: str) -> str:
+    """Strip URL wrapper + version marker so graph nodes match the seed format.
+
+    VisuaLex's URNs come as
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1!vig="
+    while the Libro IV seed (and the BFF `normalizeGraphUrn` used at read time)
+    expect the bare canonical NIR form:
+        "urn:nir:stato:costituzione~art1"
+    """
+    if not urn:
+        return urn
+    start = urn.find("urn:nir:")
+    stripped = urn[start:] if start > 0 else urn
+    bang = stripped.find("!")
+    return stripped[:bang] if bang != -1 else stripped
+
+
 def _extract_number_from_urn(urn: str, level: str) -> Optional[int]:
     """
     Estrae il numero dal suffisso dell'URN per un dato livello gerarchico.
@@ -207,10 +224,16 @@ class IngestionPipelineV2:
 
         meta = article.metadata
 
-        # Get URNs from existing urngenerator
-        article_urn = meta.to_urn()
+        # Get URNs from existing urngenerator, then CANONICALIZE for the graph:
+        # VisuaLex's `meta.to_urn()` returns the URL-wrapped form
+        # ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:…!vig="), but the
+        # Libro IV seed (and the BFF `normalizeGraphUrn` used by check-article
+        # / subgraph) index the bare canonical NIR form. Without this strip the
+        # nodes are unreachable from the read path → 0-records → infinite
+        # lazy-ingest loop. The full URL stays in `article.url` for display.
+        article_urn = _canonical_urn(meta.to_urn())
         article_url = article.url
-        codice_urn = meta.to_codice_urn()
+        codice_urn = _canonical_urn(meta.to_codice_urn())
 
         log.info(f"Ingesting article: {article_urn}")
 
@@ -662,9 +685,13 @@ class IngestionPipelineV2:
     ) -> None:
         """Create Norma node for articolo with full 21 properties."""
         meta = article.metadata
-        
-        # Estrai metadati ricchi se presenti
-        norma_meta = article.metadata.get("norma_metadata", {}) if article.metadata else {}
+
+        # Estrai metadati ricchi se presenti.
+        # `article.metadata` può essere il NormaMetadata dataclass (caso comune
+        # via VisuaLex) o un dict legacy con chiave nested 'norma_metadata'.
+        # Il dataclass NON ha .get() → trattalo come fonte vuota; i campi `meta.*`
+        # dataclass coprono comunque autorità/data/titolo nei fallback sotto.
+        norma_meta = article.metadata if isinstance(article.metadata, dict) else {}
         autorita = norma_meta.get("autorita") or ("Regio Decreto" if "regio" in result.article_urn.lower() else "Parlamento")
         data_pubb = norma_meta.get("data") or meta.data
         titolo_atto = norma_meta.get("titolo") or meta.to_estremi()

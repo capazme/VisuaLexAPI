@@ -996,7 +996,10 @@ async def ingest_article(
     urn = request.urn
     bff_job_id = request.options.bff_job_id if request.options else None
     force_refresh = request.options.force_refresh if request.options else False
-    job_id = "ingest:" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
+    # Job ID uses a dash separator (NOT colon) — RQ ≥ 2.0 validates [A-Za-z0-9_-]
+    # via `validate_job_id` (rq/job.py:85). Same fix already applied to the
+    # extraction job id (CLAUDE.md Slice 2c gotcha #4).
+    job_id = "ingest-" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
 
     log.info("Enqueuing article ingestion job", urn=urn, bff_job_id=bff_job_id)
 
