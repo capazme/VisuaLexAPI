@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useMerltFeatures } from '../useMerltFeatures';
@@ -17,7 +17,17 @@ import type { ExtractionCandidate } from './types';
  */
 export function ContribPage() {
   const { canContribute, merltEnabled } = useMerltFeatures();
+  const [searchParams] = useSearchParams();
 
+  // `?documentId=N` deeplink — the hub's "I miei contributi" list links here
+  // for completed jobs so a refresh / fresh navigation doesn't lose context
+  // (state used to live only in useState; closing the tab wiped everything).
+  // Derived during render via a prev-input tracker (set-state-in-effect rule).
+  const urlDocId = searchParams.get('documentId');
+  const seedDocId = urlDocId ? Number.parseInt(urlDocId, 10) : null;
+  const validSeed = seedDocId != null && !Number.isNaN(seedDocId) ? seedDocId : null;
+
+  const [seedSync, setSeedSync] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState<number | null>(null);
@@ -25,12 +35,24 @@ export function ContribPage() {
   const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
   const [candidatesError, setCandidatesError] = useState(false);
   const [promotedIds, setPromotedIds] = useState<Set<number>>(new Set());
+  if (validSeed !== seedSync) {
+    setSeedSync(validSeed);
+    setDocumentId(validSeed);
+    setJobId(null);
+    setCandidates(null);
+    setCandidatesError(false);
+    setPromotedIds(new Set());
+  }
 
   const job = useExtractionJob(jobId);
 
-  // Fetch candidates once the extraction completes. setState only in callbacks.
+  // Fetch candidates once the extraction completes OR we are seeding from URL
+  // (no jobId, just a documentId — its job is already done elsewhere).
   useEffect(() => {
-    if (job.status !== 'completed' || documentId == null) return;
+    const completed = job.status === 'completed';
+    const urlSeed = jobId === null && documentId != null;
+    if (!completed && !urlSeed) return;
+    if (documentId == null) return;
     let cancelled = false;
     fetchContribCandidates(documentId)
       .then((r) => {
@@ -42,7 +64,7 @@ export function ContribPage() {
     return () => {
       cancelled = true;
     };
-  }, [job.status, documentId]);
+  }, [job.status, documentId, jobId]);
 
   const handleFile = async (file: File): Promise<void> => {
     setUploading(true);
@@ -136,7 +158,7 @@ export function ContribPage() {
         </div>
       )}
 
-      {job.status === 'completed' && (
+      {(job.status === 'completed' || (jobId === null && documentId != null)) && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-900 dark:text-white">Candidati estratti</h2>

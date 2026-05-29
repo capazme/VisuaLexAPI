@@ -20,6 +20,7 @@ import { computeTypeCounts } from '../shared/graphFilters';
 import { GraphSearchBox } from './GraphSearchBox';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
+import { EdgeDetailsDrawer } from './EdgeDetailsDrawer';
 import { DepthSelector } from './DepthSelector';
 import { GraphFilterPanel } from './GraphFilterPanel';
 import { LAYOUT_OPTIONS } from './graphLayouts';
@@ -55,6 +56,16 @@ export function GraphExplorerPage(): React.ReactElement {
   const graph = useArticleGraph(enabled ? urn : null, depth);
   const { entries, push } = useBreadcrumbHistory();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // Mutually exclusive with node selection — opening one closes the other.
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const selectNode = (id: string | null): void => {
+    setSelectedNodeId(id);
+    if (id) setSelectedEdgeId(null);
+  };
+  const selectEdge = (id: string | null): void => {
+    setSelectedEdgeId(id);
+    if (id) setSelectedNodeId(null);
+  };
 
   // Lazy ingestion: a urn that resolves to an empty subgraph isn't in the graph
   // yet — enqueue an ingestion job, poll it, then refetch when it completes.
@@ -114,7 +125,11 @@ export function GraphExplorerPage(): React.ReactElement {
   const nodes = graph.status === 'success' ? graph.data.nodes : [];
   const edges = graph.status === 'success' ? graph.data.edges : [];
   const nodesById = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
+  const edgesById = new Map(
+    edges.filter((e): e is typeof e & { id: string } => Boolean(e.id)).map((e) => [e.id, e]),
+  );
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
+  const selectedEdge = selectedEdgeId ? edgesById.get(selectedEdgeId) ?? null : null;
 
   const typeCounts = useMemo(
     () => (graph.status === 'success' ? computeTypeCounts(graph.elements) : { nodes: [], edges: [] }),
@@ -323,11 +338,12 @@ export function GraphExplorerPage(): React.ReactElement {
                 hiddenNodeTypes={hiddenNodeTypes}
                 hiddenEdgeTypes={hiddenEdgeTypes}
                 highlightNodeType={highlightType}
-                onNodeClick={setSelectedNodeId}
+                onNodeClick={selectNode}
                 onNodeDblClick={(id) => {
                   const n = nodesById.get(id);
                   if (n) handleRecenter(n);
                 }}
+                onEdgeClick={selectEdge}
               />
             </Suspense>
           )}
@@ -337,8 +353,23 @@ export function GraphExplorerPage(): React.ReactElement {
                 node={selectedNode}
                 edges={edges}
                 nodesById={nodesById}
-                onRecenter={handleRecenter}
-                onClose={() => setSelectedNodeId(null)}
+                onRecenter={(n) => {
+                  handleRecenter(n);
+                }}
+                onClose={() => selectNode(null)}
+              />
+            </div>
+          )}
+          {selectedEdge && (
+            <div className="absolute bottom-3 right-3 top-3 z-20 flex w-[360px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+              <EdgeDetailsDrawer
+                edge={selectedEdge}
+                nodesById={nodesById}
+                onRecenter={(n) => {
+                  selectEdge(null);
+                  handleRecenter(n);
+                }}
+                onClose={() => selectEdge(null)}
               />
             </div>
           )}

@@ -72,19 +72,45 @@ describe('CandidateCard', () => {
     await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(7));
   });
 
-  it('keeps promote disabled until a reference norma (article URN) is given', () => {
-    // No default article URN from context → user must supply one (#6).
+  it('allows promoting an entity WITHOUT a reference norma (stand-alone, BFF fallback)', () => {
+    // Entities extracted from free-text notes often have no specific norma to
+    // link to. The BFF falls back to the `user_document` placeholder; the user
+    // can leave the optional URN field empty. Only fonte+reformulation+attest.
     render(<CandidateCard candidate={candidate} articleUrn="" onPromoted={() => {}} />);
     fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
     fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
       target: { value: 'La risoluzione estingue il contratto.' },
     });
     fireEvent.click(screen.getByRole('checkbox'));
-    expect(promoteBtn()).toBeDisabled(); // article still missing
+    expect(promoteBtn()).toBeEnabled(); // article URN no longer required for entities
+  });
 
+  it('still requires the article URN for RELATIONS — picked via NL → URN picker', async () => {
+    const relation = { ...candidate, candidate_type: 'relation' as const };
+    // Picker hits /api/parse_query; intercept and return a recognized URN.
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        recognized: true,
+        urn: 'urn:nir:stato:codice.civile:1942;262~art1453',
+        display: 'Art. 1453 — codice civile',
+      }),
+    }) as unknown as typeof fetch;
+    render(<CandidateCard candidate={relation} articleUrn="" onPromoted={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+    fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+      target: { value: 'La risoluzione estingue il contratto.' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(promoteBtn()).toBeDisabled(); // no norma yet
+
+    // The picker's input — power-user URN paste path short-circuits the
+    // network call by recognizing the "urn:" prefix synchronously.
     fireEvent.change(screen.getByLabelText(/norma di riferimento/i), {
       target: { value: 'urn:nir:stato:codice.civile:1942;262~art1453' },
     });
+    const apply = await screen.findByTestId('norma-picker-apply');
+    fireEvent.click(apply);
     expect(promoteBtn()).toBeEnabled();
   });
 

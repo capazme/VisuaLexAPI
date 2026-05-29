@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AlertTriangle, Check } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { promoteCandidate } from './contribApi';
+import { NormaPicker } from './NormaPicker';
 import type { ExtractionCandidate, PromoteCandidatePayload } from './types';
 
 /**
@@ -26,9 +27,15 @@ const PLACEHOLDER_URN = 'user_document';
 export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onPromoted }: CandidateCardProps) {
   const verbatim = candidate.verbatim_excerpt ?? '';
   const [descrizione, setDescrizione] = useState(candidate.descrizione ?? '');
-  const [fonte, setFonte] = useState('');
-  // #6: the user associates the real norma the proposal attaches to. Defaults to
-  // the page context; the parser's "user_document" placeholder never promotes.
+  // Pre-filled with a sensible default so the user doesn't have to type
+  // anything for the common case of notes-derived candidates. The user can
+  // override with a real source (book, page) before promoting.
+  const [fonte, setFonte] = useState('Appunti personali');
+  // Optional: if the user wants to bind the proposal to a specific norma, they
+  // can paste a URN here. Defaults to the candidate's own context (often the
+  // `user_document` placeholder) and the BFF replaces a blank with that
+  // placeholder server-side. The proposal still goes through validation; the
+  // community can re-link it to a real article later.
   const initialUrn =
     candidate.article_urn && candidate.article_urn !== PLACEHOLDER_URN
       ? candidate.article_urn
@@ -40,9 +47,16 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
   const [done, setDone] = useState(false);
 
   const reformulated = normalize(descrizione).length > 0 && normalize(descrizione) !== normalize(verbatim);
+  // For entities the article URN is optional (BFF fallback). For relations it
+  // still carries semantic weight (source endpoint), so we keep requiring it.
+  const articleRequired = candidate.candidate_type === 'relation';
   const hasArticle = articleUrn.trim().length > 0 && articleUrn.trim() !== PLACEHOLDER_URN;
   const canPromote =
-    fonte.trim().length > 0 && attested && reformulated && hasArticle && !submitting;
+    fonte.trim().length > 0 &&
+    attested &&
+    reformulated &&
+    (!articleRequired || hasArticle) &&
+    !submitting;
 
   const handlePromote = async () => {
     setSubmitting(true);
@@ -137,19 +151,24 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
 
       <div className="mt-3 flex flex-col gap-2">
         <input
-          aria-label="Norma di riferimento"
-          placeholder="Norma di riferimento (URN, es. urn:nir:stato:codice.civile:1942;262~art1453)"
-          value={articleUrn}
-          onChange={(e) => setArticleUrn(e.target.value)}
-          className="w-full rounded-lg border border-slate-300 p-2 text-sm dark:border-slate-700 dark:bg-slate-950"
-        />
-        <input
           aria-label="Fonte"
           placeholder="Fonte (es. Torrente, Manuale di diritto privato, p. 120)"
           value={fonte}
           onChange={(e) => setFonte(e.target.value)}
           className="w-full rounded-lg border border-slate-300 p-2 text-sm dark:border-slate-700 dark:bg-slate-950"
         />
+        {articleRequired ? (
+          <NormaPicker value={articleUrn} onChange={setArticleUrn} />
+        ) : (
+          <details className="rounded-lg border border-slate-200 dark:border-slate-800">
+            <summary className="cursor-pointer px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+              Lega a una norma specifica (opzionale)
+            </summary>
+            <div className="m-2">
+              <NormaPicker value={articleUrn} onChange={setArticleUrn} />
+            </div>
+          </details>
+        )}
         <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} />
           Dichiaro che il testo è una mia riformulazione originale, non una copia letterale.
