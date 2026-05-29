@@ -4,6 +4,7 @@ import eventsRouter from './events';
 import graphRouter from './graph';
 import contribRouter from './contrib';
 import validateRouter from './validate';
+import opsRouter from './ops';
 import healthRouter from './health';
 import profileRouter from './profile';
 
@@ -36,6 +37,7 @@ router.use('/', healthRouter);
 router.use('/', graphRouter);
 router.use('/', contribRouter);
 router.use('/', validateRouter);
+router.use('/', opsRouter);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);

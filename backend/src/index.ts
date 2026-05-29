@@ -1,5 +1,19 @@
+import { PrismaClient } from '@prisma/client';
 import { config } from './config';
 import app from './app';
+import { scheduleStuckJobSweeper } from './services/merlt/jobWatchdog';
+
+// MERL-T job watchdog: callbacks worker→BFF have retry+backoff, but if they
+// ever fail past that, this catches the stragglers (transitions pending/running
+// rows older than 10min → 'timeout' so the polling UI unblocks). Skipped in
+// tests (where the harness reset is sufficient).
+if (config.nodeEnv !== 'test') {
+  const watchdogPrisma = new PrismaClient();
+  scheduleStuckJobSweeper(watchdogPrisma, {
+    intervalMs: 5 * 60 * 1000,
+    staleAfterMs: 10 * 60 * 1000,
+  });
+}
 
 app.listen(config.port, () => {
   console.log(`
