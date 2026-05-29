@@ -137,8 +137,13 @@ async def lifespan(app: FastAPI):
             # FALKORDB_HOST/PORT/GRAPH_NAME from env (merlt-falkordb:6379, merl_t_legal)
             # — the same env-aware path graph_router and the seed loader use.
             # IMPORTANT: do NOT route this through LegalKnowledgeGraph/MerltConfig —
-            # MerltConfig hardcodes localhost:6380 and get_policy_manager() hardcodes a
-            # Redis at localhost:6380, both unreachable inside the container network.
+            # MerltConfig hardcodes the FalkorDB endpoint to localhost:6380
+            # (legal_knowledge_graph.py), unreachable inside the container network; its
+            # FalkorDB driver does a sentinel `INFO server` on connect and ConnectionErrors.
+            # (NB: get_policy_manager() is NOT the culprit — it has no Redis; it loads a
+            # filesystem PolicyManager checkpoint. policy_manager stays None here only
+            # because learnable traversal weights are Phase-E work, see the co-evolution
+            # sprint-plan; wiring a real PolicyManager is task E.1.)
             tools = []
             graph_client = FalkorDBClient()
             await graph_client.connect()
