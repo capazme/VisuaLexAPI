@@ -103,12 +103,38 @@ Verificato LIVE: `GET /api/merlt/graph/article/<art2043>` → **26 nodi / 25 arc
   in dev (non-bloccante, non in produzione). Screenshot in `backend/logs/` (gitignored), inviati.
   CLAUDE.md aggiornato con anti-regressione URN (gotcha #6). Memoria aggiornata.
 
+## Verifica LIVE dell'intero percorso utente Loop α (RLCF) — tutto E2E
+Eseguito contro lo stack reale via BFF (utente con consenso `full`):
+1. Consenso none→full (persistito) ✅
+2. Lettura grafo art. 2043 seedato (26 nodi) ✅
+3. Upload nota .txt ✅
+4. Estrazione LLM async → **16 candidati** (7 entità + 9 relazioni, B1 attivo) ✅
+5. Promozione candidato col **copyright gate** (fonte+riformulazione+attestazione) → `pending_entity` ✅
+6. Coda di validazione mostra le proposte (`/validate/pending`) ✅
+7. **Voto `approve`** → net_score 0→0.5 via trigger PG, consenso non ancora raggiunto (0.5<2.0) ✅
+   (Il tratto consenso→scrittura grafo era già provato: nodo `id=20` "Risoluzione del contratto…"
+   approved/net_score=2/consensus_reached=t dalla chiusura loop precedente.)
+
+## 🐞 TRE bug reali trovati esercitando il sistema live (tutti fixati+testati+committati)
+1. **Grafo seedato invisibile** — `normalizeGraphUrn`/`_canonical_urn` strippavano il wrapper URL →
+   ogni articolo Libro IV `exists:false` → `/grafo` vuoto + lazy-ingest infinito. Fix: strip solo `!vig=`.
+2. **Job estrazione bloccato su `pending`** — il callback di completamento worker→BFF dava 400 perché
+   lo schema usava `.optional()` invece di `.nullish()` (il worker manda `error:null`). UI "in corso"
+   all'infinito. Fix: `.nullish()`.
+3. **Promote ritornava `{}` + bug latente dedup** — il BFF leggeva `pending_id` inesistente (lo shape
+   reale è `pending_entity.id` per entità / `relation_id` per relazioni); inoltre marcava il candidato
+   "promosso" anche quando MERL-T differiva per duplicato (contributo perso). Fix + test col mock reale.
+
 ## STATO FINALE (per il risveglio)
-✅ Piattaforma **funzionante e verificata end-to-end**: stack sano, 453 test verdi, build+lint
-puliti, integrazione live BFF→MERL-T provata (smoke 9/9), E2E browser ok, immagine durevole.
-✅ Tutto il lavoro **committato in locale** (17 commit Conventional su `visualex-merlt-main`),
+✅ Piattaforma **funzionante e verificata end-to-end**: stack sano, **227 test BE + 197 FE + 30 merlt
+verdi** (454 totali), build+lint puliti, integrazione live BFF→MERL-T provata (smoke 9/9 + intero
+Loop α + E2E browser), immagine merlt ricostruita/durevole.
+✅ Tutto il lavoro **committato in locale** (~20 commit Conventional su `visualex-merlt-main`),
 **nessun push / PR** (regola del branch).
-🐞 Risolto un bug reale che rendeva invisibile tutto il grafo seedato (URN over-normalizzato).
-🧹 Cruft dev: utente `e2e-overnight@test.local` (attivato a mano per l'E2E) — eliminabile.
-➡️ Frontiera non iniziata (richiede tue scelte UX): provenienza co-autorialità nel
-NodeDetailsDrawer + fix pipeline Loop β prima del Q&A (Slice 3). Vedi `system-map.md`.
+🧹 Cruft dev (eliminabile): utente `e2e-overnight@test.local`, doc/candidati di prova in MERL-T
+(2 `pending_entity` reali ora in coda di validazione: "Interesse negativo", "Responsabilità
+precontrattuale" — innocui, anzi utili come demo), screenshot in `backend/logs/` (gitignored).
+➡️ Frontiera NON iniziata di proposito (richiede tue scelte UX / è bloccata): provenienza
+co-autorialità nel `NodeDetailsDrawer` (brainstorm→spec→plan prima) + fix pipeline Loop β
+(`GraphSearchTool .execute_query`→`.query`, retrieval per-esperto, grounding) prima del Q&A (Slice 3).
+Vedi `system-map.md` §5/§8. Lascio a te la decisione su quale frontiera aprire.
