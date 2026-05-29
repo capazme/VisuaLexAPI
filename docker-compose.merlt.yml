@@ -50,6 +50,10 @@ services:
   merlt-falkordb:
     image: falkordb/falkordb:latest
     container_name: visualex-merlt-falkordb
+    # Auto-recover from a crash (it segfaulted (exit 139) once under heavy load
+    # and did NOT restart on its own). Data lives on the merlt_falkor_data volume,
+    # so a restart reloads the 27.7k-node graph intact.
+    restart: unless-stopped
     ports:
       - "${MERLT_FALKOR_PORT:-6382}:6379"
     volumes:
