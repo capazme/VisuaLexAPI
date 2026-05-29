@@ -138,3 +138,39 @@ precontrattuale" — innocui, anzi utili come demo), screenshot in `backend/logs
 co-autorialità nel `NodeDetailsDrawer` (brainstorm→spec→plan prima) + fix pipeline Loop β
 (`GraphSearchTool .execute_query`→`.query`, retrieval per-esperto, grounding) prima del Q&A (Slice 3).
 Vedi `system-map.md` §5/§8. Lascio a te la decisione su quale frontiera aprire.
+
+---
+
+## Loop β (ragionamento / Q&A) — Fase 1 in corso (29 Mag, scelta utente: fix-first + full RLCF-β)
+
+**Indagine multi-agente (workflow):** la verità code-grounded ha ribaltato la diagnosi.
+Il Loop β è tutto presente e servito, ma girava con **`tools=[]`** al boot → gli esperti
+rispondevano dalla memoria dell'LLM, zero retrieval, fonti vuote. I bug del vecchio
+PIPELINE_ANALYSIS erano già risolti o irrilevanti; il blocco vero era il wiring al boot.
+
+**Fatto + committato (verificato live):**
+1. `fix(merlt)`: rate-limiter tollera richieste keyless — il Q&A 500-ava all'entry-point
+   (`api_key=None` → AttributeError). Ora risponde.
+2. `feat(merlt)`: **Bug 1 — wire dei tool di retrieval al boot** (`app.py`). Costruisco
+   `GraphSearchTool` da un `FalkorDBClient()` env-aware + `SemanticSearchTool` best-effort.
+   NON passo per `LegalKnowledgeGraph`/`MerltConfig` (hardcodano `localhost:6380`) né per
+   `get_policy_manager()` (Redis hardcoded). Collection Qdrant puntata su `<graph>_chunks`.
+   **Verificato: gli esperti recuperano ~100 nodi grafo per art 2043 (erano 0).**
+3. `feat(merlt)`: script `backfill_embeddings.py` + **lanciato nel worker** — embedda i
+   ~17.254 nodi testuali del seed in Qdrant (~2-3h CPU). Porta online il recupero semantico
+   + il testo delle norme automaticamente.
+
+**Stato:** cancello aperto (retrieval vivo). Embeddings in popolamento (~2-3h). Le `sources`
+nella risposta sono ancora vuote: vanno fatte emergere — ma il backfill potrebbe risolverlo
+da solo (gli esperti citeranno i chunk semantici col testo). **Da verificare a embeddings
+pronti**, poi eventuale surfacing su `experts/base.py`/synthesizer (file CRITICI, con cautela).
+
+**Coda Fase 1:** verifica grounding post-embeddings → surfacing sources (se serve) → Bug 2
+(URN per-codice, basso valore finché il grafo è solo Libro IV CC) → Bug 3 (detector
+deterministico) → Bug 5 (confidence ancorata al grounding).
+**Poi Fase 2** (BFF `/api/merlt/experts/query` + UI Q&A — fix-first: solo a grounding reale).
+**Poi Fase 3** (loop training: Bug 4 trace-shape + gating, `rlcf/authority.py` OFF-LIMITS).
+
+**Durabilità:** immagine `merlt-api` ricostruita coi fix; il worker ha il backfill via
+docker-cp (effimero — ri-bakeare al checkpoint Fase 1). Commit Loop β: `5182b7f`, `24d49ac`,
++ backfill.
