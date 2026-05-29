@@ -4,23 +4,34 @@ import { apiClient } from '../../../services/api';
 
 export type MerltVote = 'approve' | 'reject';
 
+// The MERL-T `/enrichment/pending/list` response uses the short `id` /
+// `nome` keys (not `entity_id` / `entity_text` like the DB model). The BFF
+// passes the body through verbatim, so the FE types must match the API shape.
 export interface PendingEntityItem {
-  entity_id: string;
-  entity_text?: string;
+  id: string;
+  nome?: string;
+  tipo?: string;
   descrizione?: string;
-  article_urn?: string;
+  articoli_correlati?: string[];
+  ambito?: string;
+  fonte?: string;
   votes_count?: number;
-  net_score?: number;
+  approval_score?: number;
+  rejection_score?: number;
+  contributor_authority?: number;
+  contributed_by?: string;
   [k: string]: unknown;
 }
 
 export interface PendingRelationItem {
-  relation_id: string;
-  relation_description?: string;
-  relation_type?: string;
-  source_node_urn?: string;
+  id: string;
+  tipo_relazione?: string;
+  source_urn?: string;
   target_entity_id?: string;
+  descrizione?: string;
   votes_count?: number;
+  approval_score?: number;
+  rejection_score?: number;
   [k: string]: unknown;
 }
 

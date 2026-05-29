@@ -106,10 +106,10 @@ export function ValidationPage() {
             title="Entità proposte"
             testId="pending-entities"
             items={queue.data.pending_entities
-              .filter((e) => !resolved.has(e.entity_id))
+              .filter((e) => !resolved.has(e.id))
               .map((e) => ({
-                id: e.entity_id,
-                title: e.entity_text ?? e.entity_id,
+                id: e.id,
+                title: e.nome ?? e.id,
                 body: e.descrizione,
                 votes: e.votes_count,
               }))}
@@ -119,11 +119,11 @@ export function ValidationPage() {
             title="Relazioni proposte"
             testId="pending-relations"
             items={queue.data.pending_relations
-              .filter((r) => !resolved.has(r.relation_id))
+              .filter((r) => !resolved.has(r.id))
               .map((r) => ({
-                id: r.relation_id,
-                title: r.relation_type ?? r.relation_id,
-                body: r.relation_description,
+                id: r.id,
+                title: r.tipo_relazione ?? r.id,
+                body: r.descrizione,
                 votes: r.votes_count,
               }))}
             onVote={(id, v) => void handleRelationVote(id, v)}

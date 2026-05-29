@@ -30,7 +30,7 @@ beforeEach(() => {
   voteRelationMock.mockReset().mockResolvedValue(undefined);
   fetchPending.mockReset().mockResolvedValue({
     pending_entities: [
-      { entity_id: 'e1', entity_text: 'Buona fede', descrizione: 'principio', votes_count: 0 },
+      { id: 'e1', nome: 'Buona fede', descrizione: 'principio', votes_count: 0 },
     ],
     pending_relations: [],
     total_entities: 1,
