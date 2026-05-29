@@ -10,6 +10,9 @@ export default defineConfig({
     include: ['@antv/g6'],
   },
   server: {
+    // Hosts allowed to reach the dev server (ngrok tunnels are blocked otherwise).
+    // A leading dot allows all subdomains, handy since ngrok-free URLs rotate.
+    allowedHosts: ['*.ngrok-free.app', '.ngrok-free.app'],
     proxy: {
       // Python API routes (port 5000)
       '/fetch_norma_data': 'http://localhost:5000',
@@ -21,8 +24,18 @@ export default defineConfig({
       '/export_pdf': 'http://localhost:5000',
       '/version': 'http://localhost:5000',
       '/health': 'http://localhost:5000',
-      // Node.js backend routes (port 3001)
-      '/api': 'http://localhost:3001',
+      '/parse_query': 'http://localhost:5000',
+      // Node.js backend routes (port 3001).
+      // Use the verbose form for explicit options — the shorthand
+      // ('/api': 'http://...') has known issues proxying multipart bodies on
+      // some http-proxy-middleware versions (browser hangs with ERR_TIMED_OUT
+      // while curl directly to :3001 succeeds). `changeOrigin` rewrites the
+      // Host header to the target so the BFF sees a clean request.
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: true,
+      },
     }
   }
 })

@@ -61,7 +61,7 @@ class NormaController:
         self.app = Quart(__name__)
         
         # Configure CORS
-        allowed_origins = settings.get_list("allowed_origins", ["http://localhost:3001"])
+        allowed_origins = settings.get_list("allowed_origins", ["http://localhost:3001", "http://localhost:5173", "https://*.ngrok-free.app"])
         self.app = cors(self.app, allow_origin=allowed_origins)
         
         # Secret key for sessions

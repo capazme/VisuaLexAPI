@@ -116,6 +116,14 @@ services:
       FALKORDB_HOST: "merlt-falkordb"
       FALKORDB_PORT: "6379"
 
+      # VisuaLex Python API on the HOST (worker scrapes Normattiva through it).
+      # `host.docker.internal` is the host loopback gateway from inside the
+      # container; the Python API listens on 5000 (NOT the legacy 5100 default
+      # baked into `visualex_client.VISUALEX_API_URL`). Without this override
+      # the worker hits the container's own 5100 → ConnectionError → silent
+      # 0-nodes "success".
+      VISUALEX_API_URL: "http://host.docker.internal:5000"
+
       # Qdrant
       QDRANT_HOST: "merlt-qdrant"
       QDRANT_PORT: "6333"
@@ -185,6 +193,14 @@ services:
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"
       FALKORDB_PORT: "6379"
+
+      # VisuaLex Python API on the HOST (worker scrapes Normattiva through it).
+      # `host.docker.internal` is the host loopback gateway from inside the
+      # container; the Python API listens on 5000 (NOT the legacy 5100 default
+      # baked into `visualex_client.VISUALEX_API_URL`). Without this override
+      # the worker hits the container's own 5100 → ConnectionError → silent
+      # 0-nodes "success".
+      VISUALEX_API_URL: "http://host.docker.internal:5000"
       FALKORDB_GRAPH_NAME: "${MERLT_GRAPH_NAME:-merl_t_legal}"
 
       # Qdrant
