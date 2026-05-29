@@ -104,12 +104,21 @@ async def lifespan(app: FastAPI):
             log.warning("Community votes will NOT reach consensus until triggers are installed")
         log.info("✅ Enrichment database initialized")
 
-        # Initialize Expert System (MultiExpertOrchestrator)
+        # Initialize Expert System (MultiExpertOrchestrator) WITH retrieval tools.
+        # Loop β Bug 1: the experts MUST be wired with SemanticSearchTool +
+        # GraphSearchTool, otherwise every analyze() silently skips retrieval and the
+        # answer comes from the LLM's parametric memory with ZERO grounding (empty
+        # `sources`). LegalKnowledgeGraph.connect() builds FalkorDB + Qdrant + bridge +
+        # embeddings, and _init_orchestrator() assembles the retrieval-backed
+        # orchestrator (synthesizer + ai_service + tools) — the single canonical
+        # wiring path. (Previously app.py built the orchestrator inline with tools=[].)
         try:
             from merlt.rlcf.ai_service import OpenRouterService
             from merlt.experts.synthesizer import AdaptiveSynthesizer, SynthesisConfig
             from merlt.experts.orchestrator import MultiExpertOrchestrator, OrchestratorConfig
             from merlt.api.experts_router import initialize_expert_system
+            from merlt.storage import FalkorDBClient
+            from merlt.tools import GraphSearchTool
 
             ai_service = OpenRouterService()
             synthesizer = AdaptiveSynthesizer(
@@ -121,9 +130,59 @@ async def lifespan(app: FastAPI):
                 ),
                 ai_service=ai_service,
             )
+
+            # Loop β Bug 1: wire retrieval tools so the experts GROUND their answers in
+            # the legal knowledge graph instead of the LLM's parametric memory (which
+            # produced empty `sources`). FalkorDBClient() with no args reads
+            # FALKORDB_HOST/PORT/GRAPH_NAME from env (merlt-falkordb:6379, merl_t_legal)
+            # — the same env-aware path graph_router and the seed loader use.
+            # IMPORTANT: do NOT route this through LegalKnowledgeGraph/MerltConfig —
+            # MerltConfig hardcodes localhost:6380 and get_policy_manager() hardcodes a
+            # Redis at localhost:6380, both unreachable inside the container network.
+            tools = []
+            graph_client = FalkorDBClient()
+            await graph_client.connect()
+            tools.append(GraphSearchTool(graph_db=graph_client))
+
+            # Best-effort semantic retrieval over Qdrant. Skipped (graph grounding still
+            # works) if Qdrant/embeddings are unavailable or the collection is empty.
+            try:
+                from qdrant_client import QdrantClient
+                from merlt.storage import GraphAwareRetriever, RetrieverConfig
+                from merlt.storage.vectors.embeddings import EmbeddingService
+                from merlt.tools import SemanticSearchTool
+
+                qdrant = QdrantClient(
+                    host=os.getenv("QDRANT_HOST", "localhost"),
+                    port=int(os.getenv("QDRANT_PORT", "6333")),
+                )
+                embeddings = EmbeddingService.get_instance(
+                    model_name=os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
+                )
+                # RetrieverConfig defaults the Qdrant collection to "merl_t_dev_chunks";
+                # the live collection is "<graph>_chunks" (merl_t_legal_chunks). Point it
+                # at the right one (env override wins) or semantic search 404s the
+                # collection. NB: the seed was loaded with MERLT_SKIP_EMBEDDINGS=true, so
+                # this collection is near-empty until embeddings are generated — graph
+                # retrieval is the primary grounding source for now.
+                _collection = os.getenv("QDRANT_COLLECTION") or (
+                    os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal") + "_chunks"
+                )
+                retriever = GraphAwareRetriever(
+                    vector_db=qdrant,
+                    graph_db=graph_client,
+                    bridge_table=None,
+                    config=RetrieverConfig(collection_name=_collection),
+                    policy_manager=None,
+                )
+                tools.append(SemanticSearchTool(retriever=retriever, embeddings=embeddings))
+                log.info("Semantic retrieval tool wired")
+            except Exception as e:
+                log.warning("Semantic retrieval unavailable; graph grounding only", error=str(e))
+
             orchestrator = MultiExpertOrchestrator(
                 synthesizer=synthesizer,
-                tools=[],
+                tools=tools,
                 ai_service=ai_service,
                 config=OrchestratorConfig(
                     max_experts=4,
@@ -132,7 +191,7 @@ async def lifespan(app: FastAPI):
                 ),
             )
             initialize_expert_system(orchestrator)
-            log.info("✅ Expert System initialized")
+            log.info("✅ Expert System initialized with retrieval", tools=len(tools))
         except Exception as e:
             log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
             log.warning("Expert System endpoints will return 503 errors")
