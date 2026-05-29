@@ -174,13 +174,6 @@ export async function getMerltStatus(): Promise<MerltStatusResponse> {
     return getMerlt<MerltStatusResponse>('/merlt/rlcf/status');
 }
 
-export async function trackMerltInteraction(event: MerltInteractionEvent): Promise<Record<string, unknown>> {
-    return postMerlt<Record<string, unknown>>('/merlt/feedback/interaction', {
-        ...event,
-        timestamp: event.timestamp ?? new Date().toISOString(),
-    });
-}
-
 // ----------------------------------------------------------------------------
 // Slice 1 event-capture surface (MERLT-1.5+)
 //

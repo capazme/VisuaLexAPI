@@ -1,5 +1,4 @@
-import { trackMerltInteraction, type MerltInteractionEvent } from '../../services/merltService';
-import { hasMerltConsent } from './merltConsent';
+import type { MerltInteractionEvent } from '../../services/merltService';
 
 type MerltEventListener = (event: MerltInteractionEvent) => void;
 
@@ -40,12 +39,10 @@ export function subscribeMerltEvents(listener: MerltEventListener): () => void {
     return () => listeners.delete(listener);
 }
 
+// Pure pub/sub: subscribers (the Slice 1 tracker hooks) own the BFF talk and
+// gate on the live consent value (useConsent().canTrack). The old direct
+// trackMerltInteraction() call here hit /merlt/feedback/interaction — a route
+// that was never implemented in the BFF, so it 404'd on every published event.
 export function publishMerltEvent(event: MerltInteractionEvent): void {
     listeners.forEach(listener => listener(event));
-
-    if (!hasMerltConsent()) return;
-
-    void trackMerltInteraction(event).catch(error => {
-        console.warn('MERLT interaction tracking failed', error);
-    });
 }
