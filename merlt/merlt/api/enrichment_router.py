@@ -89,7 +89,10 @@ from merlt.storage.enrichment import (
 )
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.entity_writer import EntityGraphWriter
-from merlt.rlcf.domain_authority import get_user_authority_for_vote
+from merlt.rlcf.domain_authority import (
+    get_user_authority_for_vote,
+    recalculate_authorities_after_consensus,
+)
 from merlt.rlcf.edit_merge import process_entity_consensus, process_relation_consensus
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 
@@ -1270,6 +1273,23 @@ async def validate_entity(
             except Exception as e:
                 log.error(f"Failed to process entity consensus: {e}", exc_info=True)
                 # Don't fail the vote, just log error
+
+    # Authority feedback (loop-closure A4): once consensus is reached, recompute
+    # the domain authority of everyone who voted on this entity (plus the
+    # contributor). Voters who aligned with the consensus gain accuracy; those
+    # who voted against it lose it — so good calls earn more weight on the next
+    # vote. Best-effort: never fail the vote on a recalc error.
+    if entity.consensus_reached:
+        try:
+            voter_ids_stmt = select(EntityVote.user_id).where(EntityVote.entity_id == entity_id)
+            affected = {row[0] for row in (await session.execute(voter_ids_stmt)).all()}
+            if entity.contributed_by:
+                affected.add(entity.contributed_by)
+            await recalculate_authorities_after_consensus(
+                session, list(affected), entity.ambito or "generale"
+            )
+        except Exception as e:
+            log.error("Authority recalc after consensus failed", entity_id=entity_id, error=str(e))
 
     # Map status back to ValidationStatus enum
     status_map = {
