@@ -101,12 +101,19 @@ async def check_rate_limit(
     Returns 429 Too Many Requests when limit exceeded.
     Graceful degradation: allows request if Redis is unavailable.
     """
-    tier = api_key.rate_limit_tier or "standard"
+    # verify_api_key is OPTIONAL auth: keyless requests (dev, or BFF-proxied
+    # internal calls that carry their own JWT/secret) resolve api_key to None.
+    # Don't dereference None — treat as the standard tier and skip per-key
+    # counting below (Redis counting needs api_key.key_id; the BFF already
+    # rate-limits upstream). Previously this raised AttributeError → 500 on every
+    # keyless call, which made /api/v1/experts/query unusable.
+    tier = (api_key.rate_limit_tier if api_key is not None else None) or "standard"
     limit = RATE_LIMIT_QUOTAS.get(tier, RATE_LIMIT_QUOTAS["standard"])
 
     redis = await _get_redis()
-    if redis is None:
-        # Graceful degradation: set headers with unknown remaining
+    if redis is None or api_key is None:
+        # Graceful degradation (Redis unavailable, or keyless request with no
+        # key_id to count against): set headers and allow.
         response.headers["X-RateLimit-Limit"] = str(limit)
         response.headers["X-RateLimit-Remaining"] = str(limit)
         response.headers["X-RateLimit-Used"] = "0"
