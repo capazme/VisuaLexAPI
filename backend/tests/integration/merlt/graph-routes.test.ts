@@ -161,12 +161,15 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     expect(seen.depth).toBe('3');
   });
 
-  it('strips the !vig= version suffix from the urn before querying MERL-T', async () => {
+  it('strips BOTH the URL wrapper AND the !vig= version suffix before querying MERL-T', async () => {
+    // MERL-T's worker `_urn_to_ingest_params` can't parse URL-wrapped urns and
+    // the seed indexes bare canonical NIR. `normalizeGraphUrn` therefore strips
+    // (a) anything before `urn:nir:` and (b) anything from the first `!`.
     await grantConsent(user, 'basic');
     const rawUrn =
       'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=';
     const normalized =
-      'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043';
+      'urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043';
 
     let seenRoot: unknown;
     nock(TEST_MERLT_BASE)

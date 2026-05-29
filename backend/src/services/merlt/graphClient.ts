@@ -50,14 +50,25 @@ export interface IngestArticleResponse {
 }
 
 /**
- * The knowledge graph seeds Normattiva URNs WITHOUT the version marker
- * (`!vig=…` / `!orig=…`), but VisuaLex's `norma_data.urn` carries it. Strip
- * everything from the first `!` so graph lookups match the seeded node ids.
- * `!` is the NIR version/annex separator, never part of the article id.
+ * Normalize a VisuaLex URN to the canonical bare NIR form the graph indexes.
+ *
+ * Two transforms — VisuaLex stores articles in BOTH richer forms than the seed:
+ *   1. URL-wrapped: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:…"
+ *      → MERL-T worker's `_urn_to_ingest_params` parser can't extract the
+ *      article from a URL; strip everything before "urn:nir:".
+ *   2. Version-suffixed: "…~art2043!vig=" / "…!orig=…"
+ *      → the seed indexes bare-article URNs only; strip from the first "!".
+ *
+ * Together they take the VisuaLex
+ *   "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1!vig="
+ * to the seed-matching
+ *   "urn:nir:stato:costituzione~art1".
  */
 export function normalizeGraphUrn(urn: string): string {
-  const bang = urn.indexOf('!');
-  return bang === -1 ? urn : urn.slice(0, bang);
+  const urnStart = urn.indexOf('urn:nir:');
+  const stripped = urnStart > 0 ? urn.slice(urnStart) : urn;
+  const bang = stripped.indexOf('!');
+  return bang === -1 ? stripped : stripped.slice(0, bang);
 }
 
 export class GraphClient {
