@@ -28,6 +28,8 @@ from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
 from visualex_api.tools.map import NORMATTIVA_URN_CODICI, extract_codice_details
+from visualex_api.tools.nl_parser import parse_nl_query
+from visualex_api.tools.alias_resolver import resolve_alias
 
 # Configurazione del logging
 logging.basicConfig(
@@ -293,6 +295,13 @@ class NormaController:
     def setup_routes(self):
         self.app.add_url_rule('/', view_func=self.home)
         self.app.add_url_rule('/fetch_norma_data', view_func=self.fetch_norma_data, methods=['POST'])
+        # NL → struct + URN canonical. Used by the "Norma di riferimento" picker
+        # in the MERL-T contribution flow (FE side) so users can type
+        # "art 1453 cc" instead of pasting a NIR URN by hand. Path lives at the
+        # root (NOT under /api/) so the Vite proxy can route it to the Python
+        # server alongside the other /fetch_*, /health, /version endpoints —
+        # /api/* is reserved for the Node BFF.
+        self.app.add_url_rule('/parse_query', view_func=self.parse_query, methods=['POST'])
         self.app.add_url_rule('/fetch_article_text', view_func=self.fetch_article_text, methods=['POST'])
         self.app.add_url_rule('/stream_article_text', view_func=self.stream_article_text, methods=['POST'])
         self.app.add_url_rule('/fetch_brocardi_info', view_func=self.fetch_brocardi_info, methods=['POST'])
@@ -506,6 +515,67 @@ class NormaController:
         except Exception as e:
             log.error("Error in fetch_norma_data", error=str(e))
             return jsonify({'error': str(e)}), 500
+
+    async def parse_query(self):
+        """Parse a natural language query into structured API params + URN.
+
+        Used by the MERL-T contribution picker so the user can type
+        "art 1453 cc" instead of a NIR URN. Mirrors the parser in
+        `visualex_api/app.py` but additionally builds the canonical URN via the
+        same pipeline as `fetch_norma_data`, so the FE gets a ready-to-paste
+        URN string without a second round-trip.
+
+        Returns:
+            { recognized: bool, parsed?: {...api params}, urn?: str,
+              display?: str, source?: 'alias' | 'nl_parser' }
+        """
+        try:
+            data = await request.get_json() or {}
+            query = (data.get("query") or data.get("q") or "").strip()
+            if not query:
+                return jsonify({"error": "Missing required field: query"}), 400
+
+            # 1. Preset alias first ("gdpr" → Regolamento UE 2016/679, ecc.).
+            parsed_params = resolve_alias(query)
+            source = "alias" if parsed_params else None
+
+            # 2. Fall back to the NL parser ("art 1453 cc", "art 3 cost", ...).
+            if not parsed_params:
+                parsed = parse_nl_query(query)
+                if parsed is None:
+                    return jsonify({"parsed": None, "recognized": False})
+                parsed_params = parsed.to_api_params()
+                source = "nl_parser"
+
+            # 3. Best-effort URN: build a NormaVisitata with the same pipeline
+            # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
+            # generated (e.g. missing pieces, scraper hiccup) we still return
+            # the parsed params so the FE can prompt for the missing field.
+            urn = None
+            display = None
+            try:
+                normavisitate = await self.create_norma_visitata_from_data(parsed_params)
+                if normavisitate:
+                    nv = normavisitate[0]
+                    urn = getattr(nv, "urn", None)
+                    article = parsed_params.get("article")
+                    act = parsed_params.get("act_type")
+                    display = (
+                        f"Art. {article} — {act}" if article and act else act or query
+                    )
+            except Exception as e:
+                log.warning("parse_query URN build failed", error=str(e))
+
+            return jsonify({
+                "recognized": True,
+                "parsed": parsed_params,
+                "urn": urn,
+                "display": display,
+                "source": source,
+            })
+        except Exception as e:
+            log.error("Error in parse_query", error=str(e))
+            return jsonify({"error": str(e)}), 500
 
     async def fetch_article_text(self):
         try:
