@@ -386,6 +386,49 @@ class EntityProposalResponse(BaseModel):
 
 
 # =============================================================================
+# CONFIRM SOURCE (Loop β — Phase D.1: provisional live node → pending_*)
+# =============================================================================
+
+class ConfirmSourceRequest(BaseModel):
+    """
+    Request per "confermare" una fonte recuperata live (Loop β, task D.1).
+
+    L'utente attesta che un nodo provvisorio ``live_unconfirmed`` (sedimentato
+    in fase C dalle retrieval live di mcp-legal-it) è reale e pertinente.
+    Modalità one-click: il server deriva etichetta/tipo/excerpt dal nodo; i
+    campi sotto sono override opzionali. Il verbatim integrale NON entra mai in
+    ``pending_*`` (copyright gate Slice 2c): la ``descrizione`` è un excerpt di
+    lunghezza-citazione + URL fonte.
+    """
+    node_id: str = Field(..., description="node_id del nodo provvisorio LiveSource (live:<hash>)")
+    user_id: str = Field(..., description="VisuaLex user id che attesta la fonte")
+
+    # Override opzionali (one-click ⇒ derivati dal nodo se assenti)
+    entity_text: Optional[str] = Field(None, description="Etichetta leggibile; default derivata dal nodo")
+    entity_type: Optional[str] = Field(None, description="Tipo entità; default derivato dal label di dominio del nodo")
+    ambito: str = Field(default="generale", description="Ambito giuridico")
+
+    skip_duplicate_check: bool = Field(
+        False,
+        description="Se True, salta il check duplicati lato pending_entities",
+    )
+
+
+class ConfirmSourceResponse(BaseModel):
+    """Response dopo la conferma di una fonte live."""
+    success: bool = True
+    node_id: str = Field(..., description="node_id del nodo provvisorio confermato")
+    promoted_as: str = Field(
+        ...,
+        description="'pending_entity' (fonte interpretativa) | 'lazy_ingest' (articolo di norma)",
+    )
+    entity_id: Optional[str] = Field(None, description="entity_id del pending_entity creato (se interpretativa)")
+    article_urn: Optional[str] = Field(None, description="URN/URL canonico della fonte")
+    ingest_job_id: Optional[str] = Field(None, description="ID job RQ lazy-ingest (se articolo di norma)")
+    message: str = "Fonte confermata"
+
+
+# =============================================================================
 # RELATION PROPOSAL
 # =============================================================================
 

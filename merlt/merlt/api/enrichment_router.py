@@ -16,6 +16,7 @@ Endpoint:
 """
 
 import asyncio
+import hashlib
 import os
 import structlog
 from collections import defaultdict
@@ -30,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
 from merlt.api.models.enrichment_models import (
+    ConfirmSourceRequest,
+    ConfirmSourceResponse,
     EntityProposalRequest,
     EntityProposalResponse,
     EntityValidationRequest,
@@ -2043,6 +2046,292 @@ async def propose_entity(
         duplicates=found_duplicates,
         duplicate_action_required=False,  # Non-blocking, just info
     )
+
+
+# =============================================================================
+# CONFIRM SOURCE (Loop β — Phase D.1: provisional live node → pending_*)
+# =============================================================================
+
+# Copyright gate (Slice 2c): the verbatim live text NEVER enters pending_*.
+# One-click vouch (Loop β decision 1) stores only a citation-length excerpt.
+CONFIRM_EXCERPT_MAX_CHARS = 280
+
+# Secondary FalkorDB label of the provisional LiveSource → pending entity_type.
+# 'Norma' is handled separately (routed to lazy-ingest, decision 3).
+_LIVE_LABEL_TO_ENTITY_TYPE = {
+    "AttoGiudiziario": "precedente",
+    "Dottrina": "dottrina",
+    "LiveSource": "concetto",
+}
+
+# Allow-list for entity_type. SECURITY: entity_type is later interpolated as a
+# FalkorDB label (`CREATE (e:Entity:{label})`, entity_writer.py) — FalkorDB
+# cannot parameterize labels — so a raw client-supplied string would be a
+# label-injection vector. Every value must be a known EntityType; anything else
+# falls back to 'concetto'.
+_VALID_ENTITY_TYPES = {e.value for e in EntityType}
+
+# Sentinel stamped on a provisional Norma node once routed to lazy-ingest, so a
+# re-confirm is idempotent (the guard below short-circuits instead of enqueuing
+# a second ingest job). Chosen to never collide with a real `{type}:{uuid}`
+# pending entity_id.
+_NORMA_INGEST_SENTINEL = "__lazy_ingest__"
+
+
+def _citation_excerpt(text: str, source_url: str = "") -> str:
+    """Build a citation-length excerpt (NOT the verbatim) + source URL.
+
+    Copyright gate (decision 1): a short snippet is a defensible citation; the
+    full verbatim markdown is not, so we truncate hard at
+    ``CONFIRM_EXCERPT_MAX_CHARS`` and never store more than that here.
+    """
+    cleaned = " ".join((text or "").split())
+    # Drop a leading markdown header marker if the source begins with one.
+    cleaned = cleaned.lstrip("#").strip()
+    if len(cleaned) > CONFIRM_EXCERPT_MAX_CHARS:
+        cleaned = cleaned[:CONFIRM_EXCERPT_MAX_CHARS].rstrip() + "…"
+    if source_url:
+        return f"{cleaned}\n\nFonte: {source_url}" if cleaned else f"Fonte: {source_url}"
+    return cleaned
+
+
+def _derive_source_label(text: str, source_url: str, source_tool: str) -> str:
+    """Derive a human-readable label for the confirmed source (one-click path)."""
+    first_line = ""
+    for line in (text or "").splitlines():
+        stripped = line.lstrip("#").strip()
+        if stripped:
+            first_line = stripped
+            break
+    if first_line:
+        return first_line[:120].rstrip()
+    if source_url:
+        return source_url[:120]
+    return f"Fonte {source_tool or 'live'}"
+
+
+async def _lookup_provisional_node(falkordb: FalkorDBClient, node_id: str) -> Optional[dict]:
+    """Load a provisional LiveSource node by node_id (None if absent)."""
+    rows = await falkordb.query(
+        """
+        MATCH (n:LiveSource {node_id: $node_id})
+        RETURN n.node_id AS node_id, n.text AS text, n.source_url AS source_url,
+               n.source_tool AS source_tool, n.provenance AS provenance,
+               n.trust AS trust, n.pending_entity_id AS pending_entity_id,
+               labels(n) AS labels
+        LIMIT 1
+        """,
+        {"node_id": node_id},
+    )
+    return rows[0] if rows else None
+
+
+async def _stamp_confirmed_live_node(
+    falkordb: FalkorDBClient,
+    *,
+    node_id: str,
+    user_id: str,
+    pending_entity_id: str,
+    timestamp: str,
+    provenance: str = "live_confirmed",
+    trust: float = 0.7,
+) -> None:
+    """Attribute + bump a provisional node on confirmation (upgrade-only)."""
+    await falkordb.query(
+        """
+        MATCH (n:LiveSource {node_id: $node_id})
+        SET n.confirmed_by = $user_id,
+            n.confirmed_at = $timestamp,
+            n.pending_entity_id = CASE
+                WHEN $pending_entity_id <> '' THEN $pending_entity_id
+                ELSE n.pending_entity_id END,
+            n.provenance = CASE
+                WHEN coalesce(n.trust, 0.0) >= $trust THEN n.provenance ELSE $provenance END,
+            n.trust = CASE
+                WHEN coalesce(n.trust, 0.0) >= $trust THEN n.trust ELSE $trust END,
+            n.updated_at = $timestamp
+        RETURN n.node_id AS node_id
+        """,
+        {
+            "node_id": node_id,
+            "user_id": user_id,
+            "pending_entity_id": pending_entity_id or "",
+            "provenance": provenance,
+            "trust": trust,
+            "timestamp": timestamp,
+        },
+    )
+
+
+async def _enqueue_norm_lazy_ingest(urn: str) -> Optional[str]:
+    """Enqueue the existing lazy-ingest worker for a norm article URN.
+
+    Reuses graph_router's RQ queue + job-id convention (idempotent on the URN).
+    Best-effort: returns None (and the confirm still succeeds, node stamped) if
+    the queue is unavailable, rather than failing the whole confirmation.
+    """
+    try:
+        from merlt.api.graph_router import _get_rq_queue
+
+        job_id = "ingest-" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
+        queue = _get_rq_queue()
+        await asyncio.to_thread(
+            lambda: queue.enqueue(
+                "merlt.worker.tasks.ingest_article",
+                urn,
+                None,  # bff_job_id: internal confirm, no BFF job to callback
+                job_id=job_id,
+                job_timeout=600,
+            )
+        )
+        return job_id
+    except Exception as e:  # noqa: BLE001 - queue down must not fail the confirm
+        log.warning("confirm_source: lazy-ingest enqueue failed (non-fatal)", urn=urn, error=str(e))
+        return None
+
+
+@router.post(
+    "/confirm-source",
+    response_model=ConfirmSourceResponse,
+    summary="Conferma una fonte recuperata live (provisional → pending_*)",
+)
+async def confirm_source(
+    request: ConfirmSourceRequest,
+    session: AsyncSession = Depends(get_db_session_dependency),
+    api_key: ApiKey = Depends(verify_api_key),
+) -> ConfirmSourceResponse:
+    """
+    Promuove un nodo provvisorio ``live_unconfirmed`` (Loop β, task D.1).
+
+    Flusso:
+      1. Lookup del nodo ``LiveSource`` su FalkorDB (404 se assente).
+      2. Idempotenza: se già confermato, ritorna il pending_entity esistente.
+      3. Branch per dominio (decision 3):
+         - ``Norma`` (+URN) → instrada al worker lazy-ingest (nodo Norma
+           autoritativo, niente voto community). Bump trust + ``confirmed_by``.
+         - massime/dottrina/altro → crea un ``pending_entity`` attribuito a
+           ``user_id`` (riusa le rotaie Loop α: voto → trigger → graph-write).
+           ``descrizione`` = excerpt di lunghezza-citazione (copyright gate).
+      4. Stampa ``pending_entity_id`` sul nodo LiveSource per il back-link CITA
+         creato a graph-write (task D.2, ``EntityGraphWriter``).
+    """
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    log.info("API: confirm_source", node_id=request.node_id, user_id=request.user_id)
+
+    falkordb = FalkorDBClient()
+    await falkordb.connect()
+    try:
+        node = await _lookup_provisional_node(falkordb, request.node_id)
+        if not node:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Provisional source node {request.node_id} not found",
+            )
+
+        # Idempotency: already confirmed → return the existing promotion without
+        # creating a duplicate pending row / re-enqueuing a second ingest job.
+        existing_pending = node.get("pending_entity_id")
+        if existing_pending == _NORMA_INGEST_SENTINEL:
+            return ConfirmSourceResponse(
+                node_id=request.node_id,
+                promoted_as="lazy_ingest",
+                article_urn=node.get("source_url") or request.node_id,
+                message="Articolo di norma già instradato all'ingestione",
+            )
+        if existing_pending:
+            return ConfirmSourceResponse(
+                node_id=request.node_id,
+                promoted_as="pending_entity",
+                entity_id=existing_pending,
+                article_urn=node.get("source_url") or request.node_id,
+                message="Fonte già confermata in precedenza",
+            )
+
+        labels = node.get("labels") or []
+        domain_label = next((lbl for lbl in labels if lbl != "LiveSource"), "LiveSource")
+        source_url = (node.get("source_url") or "").strip()
+        text = node.get("text") or ""
+        source_tool = node.get("source_tool") or ""
+
+        # --- Branch: norm article → lazy-ingest (decision 3) -----------------
+        if domain_label == "Norma" and source_url:
+            job_id = await _enqueue_norm_lazy_ingest(source_url)
+            await _stamp_confirmed_live_node(
+                falkordb,
+                node_id=request.node_id,
+                user_id=request.user_id,
+                pending_entity_id=_NORMA_INGEST_SENTINEL,
+                timestamp=timestamp,
+            )
+            return ConfirmSourceResponse(
+                node_id=request.node_id,
+                promoted_as="lazy_ingest",
+                article_urn=source_url,
+                ingest_job_id=job_id,
+                message="Articolo di norma instradato all'ingestione autoritativa",
+            )
+
+        # --- Branch: interpretive source → pending_entity --------------------
+        entity_type = request.entity_type or _LIVE_LABEL_TO_ENTITY_TYPE.get(domain_label, "concetto")
+        # SECURITY: entity_type becomes a FalkorDB label downstream — reject any
+        # value outside the EntityType allow-list (label-injection guard).
+        if entity_type not in _VALID_ENTITY_TYPES:
+            log.warning("confirm_source: invalid entity_type, defaulting to concetto", got=entity_type)
+            entity_type = "concetto"
+        entity_text = request.entity_text or _derive_source_label(text, source_url, source_tool)
+        descrizione = _citation_excerpt(text, source_url)
+        article_urn = source_url or request.node_id
+
+        voter_authority = await get_user_authority_for_vote(
+            session, request.user_id, request.ambito or "generale"
+        )
+
+        entity_id = f"{entity_type}:{uuid4().hex[:8]}"
+        pending_entity = PendingEntity(
+            entity_id=entity_id,
+            article_urn=article_urn,
+            source_type="live_confirmed",
+            entity_type=entity_type,
+            entity_text=entity_text,
+            descrizione=descrizione,
+            ambito=request.ambito,
+            fonte="community",
+            validation_status="pending",
+            contributed_by=request.user_id,
+            contributor_authority=voter_authority,
+            potential_duplicate_of=request.node_id,  # back-ref to the live node
+        )
+        session.add(pending_entity)
+        await session.commit()
+
+        # Stamp the provisional node so the graph-write CITA link (D.2) can find
+        # it once the pending entity clears consensus.
+        await _stamp_confirmed_live_node(
+            falkordb,
+            node_id=request.node_id,
+            user_id=request.user_id,
+            pending_entity_id=entity_id,
+            timestamp=timestamp,
+        )
+
+        log.info(
+            "Live source confirmed → pending_entity",
+            node_id=request.node_id,
+            entity_id=entity_id,
+            entity_type=entity_type,
+            user_id=request.user_id,
+        )
+
+        return ConfirmSourceResponse(
+            node_id=request.node_id,
+            promoted_as="pending_entity",
+            entity_id=entity_id,
+            article_urn=article_urn,
+            message="Fonte confermata e proposta per la validazione community",
+        )
+    finally:
+        await falkordb.close()
 
 
 # =============================================================================

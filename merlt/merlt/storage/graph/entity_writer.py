@@ -136,6 +136,7 @@ class EntityGraphWriter:
             if duplicate_id:
                 log.info("Layer 1: Mechanical duplicate found", existing_id=duplicate_id)
                 await self._enrich_existing_entity(duplicate_id, entity)
+                await self._link_provisional_source(entity.entity_id, duplicate_id)
                 return WriteResult(
                     success=True,
                     node_id=duplicate_id,
@@ -150,6 +151,7 @@ class EntityGraphWriter:
                 if duplicate:
                     log.info("Layer 2: LLM semantic duplicate found", existing_id=duplicate["existing_id"], similarity=duplicate["similarity"])
                     await self._enrich_existing_entity(duplicate["existing_id"], entity)
+                    await self._link_provisional_source(entity.entity_id, duplicate["existing_id"])
                     return WriteResult(
                         success=True,
                         node_id=duplicate["existing_id"],
@@ -165,6 +167,13 @@ class EntityGraphWriter:
 
         # Create relation to article
         await self._create_entity_relation(entity, node_id)
+
+        # Loop β D.2: if this approved entity originated from a confirmed live
+        # source (Phase D.1 confirm-source stamped `pending_entity_id` on the
+        # provisional LiveSource node), link the two with a CITA edge so the
+        # provenance trail "questo claim nasce da questa fonte live" stays
+        # navigable on /grafo. No-op for entities not born of a live source.
+        await self._link_provisional_source(entity.entity_id, node_id)
 
         log.info("Entity written to graph", node_id=node_id, action="created")
 
@@ -489,6 +498,59 @@ class EntityGraphWriter:
 
         await self.falkordb.query(query, params)
         log.debug("Created entity relation", relation=relation_type, article=entity.article_urn, entity=node_id)
+
+    async def _link_provisional_source(self, pending_entity_id: str, entity_node_id: str) -> None:
+        """
+        Link an approved Entity to the provisional LiveSource it was born from.
+
+        Loop β, Phase D (decision: keep the source node distinct, link via CITA):
+        Phase D.1 `confirm-source` stamps `pending_entity_id` on the provisional
+        ``LiveSource`` node (the live-retrieved document the user vouched for).
+        When that pending entity later clears community consensus and is written
+        here, we MERGE a ``(:Entity)-[:CITA]->(:LiveSource)`` edge so the
+        provenance — "questo claim deriva da questa fonte recuperata live" —
+        remains visible and navigable, and lift the source to
+        ``community_validated`` / trust 1.0 (upgrade-only, never a downgrade).
+
+        Entities NOT born of a confirmed source have no matching LiveSource, so
+        the MATCH yields nothing and the call is a harmless no-op. Fully
+        failure-isolated: an error here never fails the entity write — the link
+        is provenance enrichment, not a correctness requirement.
+        """
+        query = """
+        MATCH (ls:LiveSource {pending_entity_id: $eid})
+        MATCH (e:Entity {id: $nid})
+        MERGE (e)-[r:CITA]->(ls)
+        ON CREATE SET
+            r.fonte = 'community_validation',
+            r.provenance = 'community_validated',
+            r.created_at = $timestamp
+        SET ls.provenance = 'community_validated',
+            ls.trust = CASE WHEN coalesce(ls.trust, 0.0) >= 1.0 THEN ls.trust ELSE 1.0 END,
+            ls.updated_at = $timestamp
+        RETURN e.id AS id
+        """
+        try:
+            result = await self.falkordb.query(
+                query,
+                {
+                    "eid": pending_entity_id,
+                    "nid": entity_node_id,
+                    "timestamp": self._timestamp or datetime.now(timezone.utc).isoformat(),
+                },
+            )
+            if result:
+                log.info(
+                    "Linked approved entity to its provisional live source",
+                    pending_entity_id=pending_entity_id,
+                    entity_node_id=entity_node_id,
+                )
+        except Exception as e:  # noqa: BLE001 - provenance link is best-effort
+            log.warning(
+                "Failed to link provisional source (non-fatal)",
+                pending_entity_id=pending_entity_id,
+                error=str(e),
+            )
 
 
 # ====================================================
