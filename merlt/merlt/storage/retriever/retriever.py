@@ -329,6 +329,8 @@ class GraphAwareRetriever:
             return self.config.default_graph_score
 
         if not context_nodes or not chunk_nodes:
+            # Genuinely isolated: no chunk or context node to anchor on.
+            # Trust-neutral — there is no graph evidence to scale.
             return self.config.default_graph_score
 
         max_score = 0.0
@@ -351,7 +353,96 @@ class GraphAwareRetriever:
                     )
                     max_score = max(max_score, path_score)
 
-        return max_score if max_score > 0 else self.config.default_graph_score
+        # Provenance-aware trust (M1, Loop β B.3): scale the graph-score term
+        # by the trust of the chunk nodes that produced it. The semantic
+        # similarity term is NEVER touched here — this keeps the additive
+        # combination `final_score = α·sim + (1-α)·graph_score` intact while
+        # ensuring a `live_unconfirmed` (low-trust) node ranks strictly below
+        # an equivalent `seed`/`community_validated` (trust=1.0) node.
+        # Default trust is 1.0 when the property is absent, so seed/legacy
+        # nodes are unaffected until the provenance backfill (B.2) runs.
+        trust_factor = await self._compute_trust_factor(chunk_nodes)
+
+        if max_score > 0:
+            return max_score * trust_factor
+
+        # Isolated node (no path) but it DOES exist in the graph: apply trust
+        # to the default so a low-trust isolated node still ranks below a
+        # high-trust isolated one.
+        return self.config.default_graph_score * trust_factor
+
+    async def _compute_trust_factor(self, chunk_nodes: List[str]) -> float:
+        """
+        Compute a provenance-aware trust factor for a set of chunk nodes (M1).
+
+        Trust ∈ [0, 1] is read from the FalkorDB node `trust` property
+        (added on the write surfaces by B.1; backfilled to 1.0 for seed nodes
+        by B.2). When the property is absent — legacy/seed nodes before the
+        backfill — trust defaults to 1.0 so scoring is unchanged.
+
+        The factor is folded into the GRAPH-SCORE term only via:
+
+            trust_factor = 0.5 + 0.5 * trust
+
+        which maps trust ∈ [0, 1] onto a [0.5, 1.0] multiplier. A
+        `live_unconfirmed` node (trust ≈ 0.6 → factor 0.8) therefore scores
+        strictly below an equivalent `seed`/`community_validated` node
+        (trust = 1.0 → factor 1.0), without ever zeroing out a provisional
+        node (a flagged-but-still-returned source — B.3 acceptance).
+
+        We use the MAX trust across the chunk nodes: a chunk linked to at
+        least one high-trust node should not be penalised for also touching a
+        provisional one. Best-effort — any read error defaults to 1.0 so the
+        hot path never fails on a missing/unavailable property.
+        """
+        max_trust = 0.0
+        found_any = False
+
+        for node_urn in chunk_nodes:
+            if not node_urn:
+                continue
+            trust = await self._get_node_trust(node_urn)
+            if trust is not None:
+                found_any = True
+                max_trust = max(max_trust, trust)
+
+        # No readable trust on any node → neutral (treat as fully trusted).
+        if not found_any:
+            return 1.0
+
+        # Clamp into [0, 1] defensively, then map to the [0.5, 1.0] multiplier.
+        max_trust = max(0.0, min(1.0, max_trust))
+        return 0.5 + 0.5 * max_trust
+
+    async def _get_node_trust(self, node_urn: str) -> Optional[float]:
+        """
+        Read the `trust` property of a graph node by its URN/node_id.
+
+        Returns the trust as a float, 1.0 when the node exists but carries no
+        `trust` property (seed/legacy nodes pre-backfill), or None when the
+        node cannot be read at all (so the caller can distinguish "no signal"
+        from "trusted"). Best-effort: never raises on the hot path.
+        """
+        try:
+            cypher = (
+                "MATCH (n) WHERE n.URN = $urn OR n.node_id = $urn "
+                "RETURN n.trust AS trust LIMIT 1"
+            )
+            results = await self.graph_db.query(cypher, {"urn": node_urn})
+
+            if not results:
+                return None
+
+            trust = results[0].get("trust")
+            if trust is None:
+                # Node exists but has no trust property → seed/legacy default.
+                return 1.0
+
+            return float(trust)
+
+        except Exception as e:  # noqa: BLE001 - best-effort, must not break retrieval
+            log.debug(f"Could not read trust for node {node_urn}: {e}")
+            return None
 
     async def _find_shortest_path(
         self,

@@ -36,6 +36,18 @@ from merlt.clients import NormTree, get_article_position
 log = structlog.get_logger()
 
 
+# Provenance / trust for nodes written by this pipeline (task B.1).
+# This pipeline is the lazy-ingest path: it auto-scrapes a Normattiva article
+# (+ Brocardi enrichment) on demand, with NO community validation. Such nodes
+# are trustworthy (authoritative sources) but below community-validated ones,
+# so they get a mid-high `trust` of 0.6 and `provenance='lazy_ingest'`. Every
+# node MERGE stamps these with `coalesce(...)` so a pre-existing higher-trust
+# node (e.g. a seed or community_validated node touched again by lazy ingest)
+# is NEVER downgraded.
+LAZY_INGEST_PROVENANCE = "lazy_ingest"
+LAZY_INGEST_TRUST = 0.6
+
+
 def _canonical_urn(urn: str) -> str:
     """Strip only the NIR version/annex marker so graph nodes match the seed.
 
@@ -475,6 +487,8 @@ class IngestionPipelineV2:
                 codice.ambito_territoriale = 'nazionale',
                 codice.fonte = 'VisualexAPI',
                 codice.created_at = $timestamp
+            SET codice.provenance = coalesce(codice.provenance, $provenance),
+                codice.trust = coalesce(codice.trust, $trust)
             """,
             {
                 "urn": codice_urn,
@@ -482,6 +496,8 @@ class IngestionPipelineV2:
                 "titolo": meta.tipo_atto.title(),
                 "autorita": "Regio Decreto" if "regio" in codice_urn.lower() else "Parlamento",
                 "data": meta.data,
+                "provenance": LAZY_INGEST_PROVENANCE,
+                "trust": LAZY_INGEST_TRUST,
                 "timestamp": self._timestamp,
             }
         )
@@ -535,8 +551,10 @@ class IngestionPipelineV2:
                     libro.fonte = 'Brocardi',
                     libro.created_at = $timestamp,
                     libro.updated_at = $timestamp
+                SET libro.provenance = coalesce(libro.provenance, $provenance),
+                    libro.trust = coalesce(libro.trust, $trust)
                 """,
-                {"urn": hierarchy.libro, "tipo_doc": tipo_doc, "numero": libro_numero, "titolo": libro_title or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.libro, "tipo_doc": tipo_doc, "numero": libro_numero, "titolo": libro_title or "", "provenance": LAZY_INGEST_PROVENANCE, "trust": LAZY_INGEST_TRUST, "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma({tipo_doc}):{hierarchy.libro}")
 
@@ -568,8 +586,10 @@ class IngestionPipelineV2:
                     titolo.fonte = 'Brocardi',
                     titolo.created_at = $timestamp,
                     titolo.updated_at = $timestamp
+                SET titolo.provenance = coalesce(titolo.provenance, $provenance),
+                    titolo.trust = coalesce(titolo.trust, $trust)
                 """,
-                {"urn": hierarchy.titolo, "numero": titolo_numero, "titolo": titles['titolo'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.titolo, "numero": titolo_numero, "titolo": titles['titolo'] or "", "provenance": LAZY_INGEST_PROVENANCE, "trust": LAZY_INGEST_TRUST, "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(titolo):{hierarchy.titolo}")
 
@@ -601,8 +621,10 @@ class IngestionPipelineV2:
                     capo.fonte = 'Brocardi',
                     capo.created_at = $timestamp,
                     capo.updated_at = $timestamp
+                SET capo.provenance = coalesce(capo.provenance, $provenance),
+                    capo.trust = coalesce(capo.trust, $trust)
                 """,
-                {"urn": hierarchy.capo, "numero": capo_numero, "titolo": titles['capo'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.capo, "numero": capo_numero, "titolo": titles['capo'] or "", "provenance": LAZY_INGEST_PROVENANCE, "trust": LAZY_INGEST_TRUST, "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(capo):{hierarchy.capo}")
 
@@ -634,8 +656,10 @@ class IngestionPipelineV2:
                     sezione.fonte = 'Brocardi',
                     sezione.created_at = $timestamp,
                     sezione.updated_at = $timestamp
+                SET sezione.provenance = coalesce(sezione.provenance, $provenance),
+                    sezione.trust = coalesce(sezione.trust, $trust)
                 """,
-                {"urn": hierarchy.sezione, "numero": sezione_numero, "titolo": titles['sezione'] or "", "timestamp": self._timestamp}
+                {"urn": hierarchy.sezione, "numero": sezione_numero, "titolo": titles['sezione'] or "", "provenance": LAZY_INGEST_PROVENANCE, "trust": LAZY_INGEST_TRUST, "timestamp": self._timestamp}
             )
             result.nodes_created.append(f"Norma(sezione):{hierarchy.sezione}")
 
@@ -738,6 +762,8 @@ class IngestionPipelineV2:
                 art.is_stub = null,
                 art.stub_source = null,
                 art.updated_at = $timestamp
+            SET art.provenance = coalesce(art.provenance, $provenance),
+                art.trust = coalesce(art.trust, $trust)
             """,
             {
                 "urn": result.article_urn,
@@ -749,6 +775,8 @@ class IngestionPipelineV2:
                 "titolo_atto": titolo_atto,
                 "autorita": autorita,
                 "data": data_pubb,
+                "provenance": LAZY_INGEST_PROVENANCE,
+                "trust": LAZY_INGEST_TRUST,
                 "timestamp": self._timestamp,
             }
         )
@@ -807,12 +835,16 @@ class IngestionPipelineV2:
                     c.testo = $testo,
                     c.token_count = $tokens,
                     c.created_at = $timestamp
+                SET c.provenance = coalesce(c.provenance, $provenance),
+                    c.trust = coalesce(c.trust, $trust)
                 """,
                 {
                     "urn": comma_urn,
                     "numero": comma.numero,
                     "testo": comma.testo,
                     "tokens": comma.token_count,
+                    "provenance": LAZY_INGEST_PROVENANCE,
+                    "trust": LAZY_INGEST_TRUST,
                     "timestamp": self._timestamp,
                 }
             )
@@ -843,12 +875,16 @@ class IngestionPipelineV2:
                         l.testo = $testo,
                         l.token_count = $tokens,
                         l.created_at = $timestamp
+                    SET l.provenance = coalesce(l.provenance, $provenance),
+                        l.trust = coalesce(l.trust, $trust)
                     """,
                     {
                         "urn": lettera_urn,
                         "lettera": lettera.lettera,
                         "testo": lettera.testo,
                         "tokens": lettera.token_count,
+                        "provenance": LAZY_INGEST_PROVENANCE,
+                        "trust": LAZY_INGEST_TRUST,
                         "timestamp": self._timestamp,
                     }
                 )
@@ -895,11 +931,15 @@ class IngestionPipelineV2:
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
                     d.created_at = $timestamp
+                SET d.provenance = coalesce(d.provenance, $provenance),
+                    d.trust = coalesce(d.trust, $trust)
                 """,
                 {
                     "id": dottrina_id,
                     "titolo": f"Ratio {estremi}",
                     "descrizione": brocardi["Ratio"],
+                    "provenance": LAZY_INGEST_PROVENANCE,
+                    "trust": LAZY_INGEST_TRUST,
                     "timestamp": self._timestamp,
                 }
             )
@@ -931,11 +971,15 @@ class IngestionPipelineV2:
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
                     d.created_at = $timestamp
+                SET d.provenance = coalesce(d.provenance, $provenance),
+                    d.trust = coalesce(d.trust, $trust)
                 """,
                 {
                     "id": dottrina_id,
                     "titolo": f"Spiegazione {estremi}",
                     "descrizione": brocardi["Spiegazione"],
+                    "provenance": LAZY_INGEST_PROVENANCE,
+                    "trust": LAZY_INGEST_TRUST,
                     "timestamp": self._timestamp,
                 }
             )
@@ -1008,6 +1052,8 @@ class IngestionPipelineV2:
                     d.anno = $anno,
                     d.confidence = 0.95,
                     d.created_at = $timestamp
+                SET d.provenance = coalesce(d.provenance, $provenance),
+                    d.trust = coalesce(d.trust, $trust)
                 """,
                 {
                     "id": dottrina_id,
@@ -1015,6 +1061,8 @@ class IngestionPipelineV2:
                     "descrizione": rel.get("testo", ""),
                     "autore": rel.get("autore", "Meuccio Ruini"),
                     "anno": rel.get("anno", 1947),
+                    "provenance": LAZY_INGEST_PROVENANCE,
+                    "trust": LAZY_INGEST_TRUST,
                     "timestamp": self._timestamp,
                 }
             )
@@ -1062,6 +1110,8 @@ class IngestionPipelineV2:
                         d.anno = $anno,
                         d.confidence = 0.9,
                         d.created_at = $timestamp
+                    SET d.provenance = coalesce(d.provenance, $provenance),
+                        d.trust = coalesce(d.trust, $trust)
                     """,
                     {
                         "id": dottrina_id,
@@ -1070,6 +1120,8 @@ class IngestionPipelineV2:
                         "sottotipo": sottotipo,
                         "autore": rel.get("autore", ""),
                         "anno": rel.get("anno"),
+                        "provenance": LAZY_INGEST_PROVENANCE,
+                        "trust": LAZY_INGEST_TRUST,
                         "timestamp": self._timestamp,
                     }
                 )
@@ -1195,6 +1247,8 @@ class IngestionPipelineV2:
                 a.fonte = 'Brocardi.it',
                 a.confidence = 0.9,
                 a.created_at = $timestamp
+            SET a.provenance = coalesce(a.provenance, $provenance),
+                a.trust = coalesce(a.trust, $trust)
             """,
             {
                 "id": atto_id,
@@ -1203,6 +1257,8 @@ class IngestionPipelineV2:
                 "numero": numero_sentenza,
                 "anno": anno,
                 "massima": estratto,
+                "provenance": LAZY_INGEST_PROVENANCE,
+                "trust": LAZY_INGEST_TRUST,
                 "timestamp": self._timestamp,
             }
         )

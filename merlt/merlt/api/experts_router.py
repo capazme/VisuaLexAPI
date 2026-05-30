@@ -76,6 +76,12 @@ class SourceReference(BaseModel):
     expert: str
     relevance: float = Field(..., ge=0.0, le=1.0)
     excerpt: Optional[str] = None
+    # Loop β M6: surface per-source provenance (e.g. 'seed',
+    # 'community_validated', 'live_unconfirmed') and the FalkorDB trust score
+    # so the FE can flag provisional sources. Both optional/additive — null
+    # when the underlying LegalSource carries no provenance signal.
+    provenance: Optional[str] = None
+    trust: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
 class ExpertQueryResponse(BaseModel):
@@ -90,6 +96,74 @@ class ExpertQueryResponse(BaseModel):
     execution_time_ms: int = Field(..., description="Execution time in milliseconds")
     pipeline_trace: Optional[Dict[str, Any]] = Field(None, description="Full pipeline trace (when include_trace=True)")
     pipeline_metrics: Optional[Dict[str, Any]] = Field(None, description="Pipeline metrics (when include_trace=True)")
+
+
+def _to_source_reference(legal_source: Any) -> SourceReference:
+    """
+    Map a `LegalSource` (experts/base.py) onto the API `SourceReference`,
+    surfacing real relevance + provenance instead of hardcoded constants (M6).
+
+    Field access is defensive (`getattr` with fallbacks) because:
+      * the historical `LegalSource` dataclass exposes `source_id` / `excerpt`
+        / `relevance_score`, while some result paths historically referenced
+        `urn` / `text_excerpt` / `expert_type` — `getattr` tolerates both
+        without an AttributeError on either path;
+      * `provenance` / `expert` are NOT yet first-class fields on the
+        `LegalSource` dataclass (it lives in experts/base.py, a CRITICAL
+        interface this task is not permitted to change). We read them
+        opportunistically: if a future/sibling change threads provenance onto
+        LegalSource — the A.3 chunk dicts already carry a `provenance` key
+        ('live_unconfirmed' for live sources) — it will surface automatically;
+        until then provenance stays None and `expert` falls back to
+        'combined'. See the limitation note in the deliverable.
+    """
+    # --- article URN ---------------------------------------------------------
+    article_urn = (
+        getattr(legal_source, "source_id", None)
+        or getattr(legal_source, "urn", None)
+        or ""
+    )
+
+    # --- contributing expert -------------------------------------------------
+    # KNOWN LIMITATION (M6.3): the combined LegalSource does not reliably track
+    # which expert produced it; default to 'combined' unless the source carries
+    # an explicit `expert_type`.
+    expert = getattr(legal_source, "expert_type", None) or "combined"
+
+    # --- relevance -----------------------------------------------------------
+    # M6.3: prefer the LegalSource's real normalized score over the old
+    # hardcoded 0.9. `LegalSource.relevance` is a free-text rationale (str),
+    # NOT a number — only `relevance_score` is numeric — so we read that.
+    relevance = getattr(legal_source, "relevance_score", None)
+    if not isinstance(relevance, (int, float)):
+        # Some paths expose a numeric `relevance`; accept it only if numeric.
+        candidate = getattr(legal_source, "relevance", None)
+        relevance = candidate if isinstance(candidate, (int, float)) else 0.9
+    relevance = max(0.0, min(1.0, float(relevance)))
+
+    # --- excerpt -------------------------------------------------------------
+    excerpt_raw = (
+        getattr(legal_source, "excerpt", None)
+        or getattr(legal_source, "text_excerpt", None)
+    )
+    excerpt = excerpt_raw[:200] if excerpt_raw else None
+
+    # --- provenance / trust (M6.2) ------------------------------------------
+    provenance = getattr(legal_source, "provenance", None)
+    trust = getattr(legal_source, "trust", None)
+    if not isinstance(trust, (int, float)):
+        trust = None
+    else:
+        trust = max(0.0, min(1.0, float(trust)))
+
+    return SourceReference(
+        article_urn=article_urn,
+        expert=expert,
+        relevance=relevance,
+        excerpt=excerpt,
+        provenance=provenance,
+        trust=trust,
+    )
 
 
 class InlineFeedbackRequest(BaseModel):
@@ -475,14 +549,7 @@ async def query_experts(
         trace_id = f"trace_{uuid4().hex[:12]}"
 
         # Extract sources from combined_legal_basis
-        sources = []
-        for legal_source in result.combined_legal_basis:
-            sources.append(SourceReference(
-                article_urn=legal_source.source_id,  # LegalSource uses source_id, not urn
-                expert="combined",  # LegalSource doesn't track individual expert, it's combined
-                relevance=0.9,  # Default high relevance for combined sources
-                excerpt=legal_source.excerpt[:200] if legal_source.excerpt else None
-            ))
+        sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
 
         # Extract experts used from expert_contributions
         experts_used = list(result.expert_contributions.keys())
@@ -1090,15 +1157,8 @@ async def submit_refine_feedback(
         # Generate new trace ID
         new_trace_id = f"trace_{uuid4().hex[:12]}"
 
-        # Extract sources
-        sources = []
-        for legal_source in result.combined_legal_basis:
-            sources.append(SourceReference(
-                article_urn=legal_source.urn,
-                expert=legal_source.expert_type,
-                relevance=legal_source.relevance,
-                excerpt=legal_source.text_excerpt[:200] if legal_source.text_excerpt else None
-            ))
+        # Extract sources (same LegalSource shape as the main query path)
+        sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
 
         experts_used = list(result.expert_contributions.keys())
 

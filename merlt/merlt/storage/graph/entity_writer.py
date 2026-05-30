@@ -322,6 +322,14 @@ class EntityGraphWriter:
         # Entity type for label (capitalize first letter)
         entity_label = entity.entity_type.capitalize()
 
+        # Provenance / trust (Loop β, task B.1): entities written here have
+        # already cleared community consensus, so they carry the highest trust.
+        # `provenance` distinguishes them from `lazy_ingest` (auto-scraped) and
+        # `seed` (Libro IV snapshot) nodes; `trust` (0..1) feeds the
+        # provenance-aware traversal scoring (task B.3).
+        provenance = "community_validated"
+        trust = 1.0
+
         # Cypher query with parameterized label (workaround: use format)
         # FalkorDB doesn't support parameterized labels, must use string format
         query = f"""
@@ -332,6 +340,8 @@ class EntityGraphWriter:
             descrizione: $descrizione,
             ambito: $ambito,
             community_validated: true,
+            provenance: $provenance,
+            trust: $trust,
             approval_score: $approval_score,
             votes_count: $votes_count,
             sources: [$source],
@@ -349,6 +359,8 @@ class EntityGraphWriter:
             "tipo": entity.entity_type,
             "descrizione": entity.descrizione or "",
             "ambito": entity.ambito or "",
+            "provenance": provenance,
+            "trust": trust,
             "approval_score": entity.approval_score or 0.0,
             "votes_count": entity.votes_count or 0,
             "source": entity.article_urn,
@@ -380,6 +392,10 @@ class EntityGraphWriter:
         - Change id or nome
         - Overwrite existing data
         """
+        # An enrichment coming from the consensus-approved path lifts the node to
+        # `community_validated` / trust 1.0 — but only as an upgrade: a node that
+        # is already at trust 1.0 (or higher, defensively) is left untouched so we
+        # never downgrade provenance/trust (task B.1).
         query = """
         MATCH (e:Entity {id: $id})
         SET e.sources = CASE
@@ -391,6 +407,14 @@ class EntityGraphWriter:
                 ELSE e.approval_score
             END,
             e.votes_count = e.votes_count + $new_votes,
+            e.provenance = CASE
+                WHEN coalesce(e.trust, 0.0) >= $trust THEN e.provenance
+                ELSE $provenance
+            END,
+            e.trust = CASE
+                WHEN coalesce(e.trust, 0.0) >= $trust THEN e.trust
+                ELSE $trust
+            END,
             e.updated_at = $timestamp
         RETURN e.id AS id
         """
@@ -400,6 +424,8 @@ class EntityGraphWriter:
             "source": entity.article_urn,
             "new_score": entity.approval_score or 0.0,
             "new_votes": entity.votes_count or 0,
+            "provenance": "community_validated",
+            "trust": 1.0,
             "timestamp": self._timestamp,
         }
 
@@ -433,16 +459,22 @@ class EntityGraphWriter:
 
         relation_type = relation_mapping.get(entity.entity_type, "DISCIPLINA")
 
-        # Create relation (create Norma node if it doesn't exist)
+        # Create relation (create Norma node if it doesn't exist).
+        # Stamp provenance/trust on the (possibly stub) Norma node with coalesce
+        # so an existing seed/community node is never downgraded; the relation
+        # itself also carries `provenance` (best-effort, task B.1).
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
         ON CREATE SET art.created_at = $timestamp
+        SET art.provenance = coalesce(art.provenance, $provenance),
+            art.trust = coalesce(art.trust, $trust)
         WITH art
         MATCH (e:Entity {{id: $entity_id}})
         MERGE (art)-[r:{relation_type}]->(e)
         ON CREATE SET
             r.certezza = 1.0,
             r.fonte = 'community_validation',
+            r.provenance = $provenance,
             r.created_at = $timestamp
         RETURN r
         """
@@ -450,6 +482,8 @@ class EntityGraphWriter:
         params = {
             "article_urn": entity.article_urn,
             "entity_id": node_id,
+            "provenance": "community_validated",
+            "trust": 1.0,
             "timestamp": self._timestamp,
         }
 
