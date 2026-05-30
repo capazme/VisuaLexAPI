@@ -81,6 +81,12 @@ class TraversalTrainingService:
         4. Return samples (query_embedding, relation_type, reward)
         """
         period_start = since or (datetime.now(UTC) - timedelta(days=30))
+        # qa_feedback.created_at is TIMESTAMP WITHOUT TIME ZONE — comparing it
+        # against a tz-aware datetime makes asyncpg raise DataError ("can't
+        # subtract offset-naive and offset-aware"), which silently killed ALL
+        # traversal training (the caller swallows the exception). Strip tzinfo.
+        if period_start.tzinfo is not None:
+            period_start = period_start.replace(tzinfo=None)
 
         # Get source feedback with their traces
         query = (

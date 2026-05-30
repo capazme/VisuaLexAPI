@@ -243,14 +243,23 @@ async def lifespan(app: FastAPI):
             hybrid_router = None
             try:
                 gating_mlp = ExpertGatingMLP(GatingConfig())
+                # Loop β E.2 (closed-loop): load the TRAINED gating checkpoint so
+                # runtime routing reflects what REINFORCE learned — not just the
+                # warm-start prior. The scheduler writes gating_policy_latest.pt
+                # (model_state_dict format) to the durable merlt_checkpoints volume;
+                # HybridExpertRouter.__init__ loads it when the path exists and sets
+                # loaded_from_checkpoint. Warm-start fallback when no checkpoint yet.
+                _gating_ckpt = Path("checkpoints/gating_policy_latest.pt")
                 hybrid_router = HybridExpertRouter(
                     neural_gating=gating_mlp,
                     embedding_service=orchestrator_embeddings,
                     confidence_threshold=float(
                         os.getenv("MERLT_GATING_CONFIDENCE_THRESHOLD", "0.0")
                     ),
+                    checkpoint_path=_gating_ckpt,
                 )
-                log.info("✅ Neural gating router wired (warm-start)",
+                log.info("✅ Neural gating router wired",
+                         source="trained-checkpoint" if getattr(hybrid_router, "loaded_from_checkpoint", False) else "warm-start",
                          confidence_threshold=hybrid_router.confidence_threshold)
             except Exception as gate_err:
                 log.warning("Neural gating unavailable; falling back to LLM routing",
