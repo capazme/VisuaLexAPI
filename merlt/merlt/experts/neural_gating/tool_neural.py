@@ -142,14 +142,27 @@ class ToolGatingMLP(nn.Module):
                 self.train()
 
     def get_tool_priors(self) -> Dict[str, float]:
-        """Per-tool base call-probability from the warm-start/trained bias.
+        """Per-tool base call-probability surfaced as the tool's learned weight.
 
-        Mirrors ``ExpertGatingMLP.get_expert_priors`` — the query-independent
-        component, surfaced as the tool's learned weight in WeightStore / API.
+        Runs a forward pass on a NEUTRAL (zero) query embedding so the value
+        reflects the trained *gate* (encoder+gate layers), not only the static
+        ``tool_bias``. This matters because — unlike ``ExpertGatingMLP`` where the
+        warm-start lives in ``expert_bias`` — the tool policy's learned signal is
+        mostly query-conditioned in the gate, so the bias alone barely moves with
+        training. The zero-input forward is a representative query-independent
+        probe of P(call) per tool.
         """
-        with torch.no_grad():
-            priors = torch.sigmoid(self.tool_bias).cpu().numpy()
-            return {name: float(round(p, 4)) for name, p in zip(TOOL_VOCAB, priors)}
+        was_training = self.training
+        self.eval()
+        try:
+            with torch.no_grad():
+                neutral = torch.zeros(1, self.config.input_dim, device=self.device)
+                probs, _ = self.forward(neutral)
+                probs_np = probs.squeeze(0).cpu().numpy()
+                return {name: float(round(p, 4)) for name, p in zip(TOOL_VOCAB, probs_np)}
+        finally:
+            if was_training:
+                self.train()
 
 
 __all__ = [

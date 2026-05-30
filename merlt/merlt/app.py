@@ -275,8 +275,10 @@ async def lifespan(app: FastAPI):
                 try:
                     from merlt.rlcf.policy_manager import get_policy_manager
                     tool_policy = get_policy_manager().get_tool_policy()
-                except Exception:
+                except Exception as load_err:
+                    log.warning("Tool policy checkpoint load failed", error=str(load_err))
                     tool_policy = None
+                _tg_source = "trained-checkpoint" if tool_policy is not None else "warm-start"
                 if tool_policy is None:
                     tool_policy = ToolGatingMLP(ToolGatingConfig())
                 tool_selector = ToolSelector(
@@ -285,8 +287,8 @@ async def lifespan(app: FastAPI):
                     enabled=_tg_enabled,
                     ab_ratio=_tg_ratio,
                 )
-                log.info("✅ Tool-gating policy wired (warm-start)",
-                         enabled=_tg_enabled, ab_ratio=_tg_ratio)
+                log.info("✅ Tool-gating policy wired",
+                         source=_tg_source, enabled=_tg_enabled, ab_ratio=_tg_ratio)
             except Exception as tg_err:
                 log.warning("Tool-gating unavailable; experts call all live tools (A.3)",
                             error=str(tg_err))

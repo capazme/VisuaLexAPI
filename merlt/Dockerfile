@@ -69,6 +69,11 @@ RUN useradd --create-home --shell /bin/bash appuser && \
 # "Permission denied: /home/appuser/.cache/huggingface/hub" at boot.
 RUN mkdir -p /home/appuser/.cache/huggingface && \
     chown -R appuser:appuser /home/appuser/.cache
+# Loop β E.2/E.3: pre-create the RLCF checkpoint dir owned by appuser so the
+# mounted named volume (merlt_checkpoints, policy .pt files) initializes with
+# appuser ownership — otherwise saving a trained policy hits "Permission denied".
+RUN mkdir -p /app/checkpoints && \
+    chown -R appuser:appuser /app/checkpoints
 USER appuser
 
 # Expose API port

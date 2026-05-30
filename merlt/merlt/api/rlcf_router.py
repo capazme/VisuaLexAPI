@@ -32,7 +32,7 @@ Example:
 
 import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import structlog
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
@@ -93,6 +93,7 @@ class PolicyWeightsStatus(BaseModel):
     """Pesi correnti delle policy."""
     gating: Dict[str, float] = Field(default_factory=dict)
     traversal: Dict[str, float] = Field(default_factory=dict)
+    tool_gating: Dict[str, float] = Field(default_factory=dict)  # Loop β E.3
     timestamp: Optional[str] = None
 
 
@@ -183,6 +184,11 @@ async def _get_policy_weights() -> PolicyWeightsStatus:
                 for name, lw in config.gating.expert_priors.items():
                     key = short.get(name, name.lower().replace("expert", ""))
                     gating[key] = round(float(getattr(lw, "default", 0.25)), 4)
+                # Loop β E.3: surface per-tool learned call-probabilities.
+                tool_gating = {}
+                if getattr(config, "tool_gating", None) and config.tool_gating.tool_priors:
+                    for tname, tlw in config.tool_gating.tool_priors.items():
+                        tool_gating[tname] = round(float(getattr(tlw, "default", 0.0)), 4)
                 if gating:
                     return PolicyWeightsStatus(
                         gating=gating,
@@ -191,6 +197,7 @@ async def _get_policy_weights() -> PolicyWeightsStatus:
                             "avg_width": 2.0,
                             "exploration_rate": 0.2,
                         },
+                        tool_gating=tool_gating,
                         timestamp=getattr(config, "updated_at", None) or datetime.now().isoformat(),
                     )
     except Exception as e:
@@ -526,6 +533,51 @@ async def get_policy_weights(
         }
     """
     return await _get_policy_weights()
+
+
+@router.get("/tool-gating/ab-report")
+async def get_tool_gating_ab_report(
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
+) -> Dict[str, Any]:
+    """Loop β E.3: A/B report comparing the tool-gating treatment vs control arms.
+
+    Aggregates persisted Q&A traces (tagged with ``tool_gating_arm``) joined with
+    their inline feedback, per arm: trace count, avg rating (1-5), avg tools
+    actually called, and avg productive tools. Lets you measure whether pruning
+    (treatment) helps vs firing all tools (control).
+    """
+    from sqlalchemy import text
+
+    query = text("""
+        SELECT
+          t.full_trace->'execution_trace'->'metadata'->>'tool_gating_arm' AS arm,
+          count(DISTINCT t.trace_id) AS traces,
+          avg(f.inline_rating) AS avg_rating,
+          avg((SELECT count(*) FROM jsonb_array_elements(t.full_trace->'execution_trace'->'actions') a
+               WHERE a->>'action_type'='tool_use' AND (a->'metadata'->>'called')='true')) AS avg_tools_called,
+          avg((SELECT count(*) FROM jsonb_array_elements(t.full_trace->'execution_trace'->'actions') a
+               WHERE a->>'action_type'='tool_use' AND (a->'metadata'->>'produced_source')='true')) AS avg_tools_productive
+        FROM qa_traces t
+        LEFT JOIN qa_feedback f ON f.trace_id = t.trace_id
+        WHERE t.full_trace->'execution_trace'->'metadata'->>'tool_gating_arm' IS NOT NULL
+        GROUP BY 1
+    """)
+    try:
+        result = await session.execute(query)
+        arms = {}
+        for row in result.mappings():
+            arm = row["arm"]
+            arms[arm] = {
+                "traces": int(row["traces"] or 0),
+                "avg_rating": round(float(row["avg_rating"]), 3) if row["avg_rating"] is not None else None,
+                "avg_tools_called": round(float(row["avg_tools_called"]), 2) if row["avg_tools_called"] is not None else None,
+                "avg_tools_productive": round(float(row["avg_tools_productive"]), 2) if row["avg_tools_productive"] is not None else None,
+            }
+        return {"arms": arms}
+    except Exception as e:
+        log.error("ab-report query failed", error=str(e))
+        return {"arms": {}, "error": str(e)}
 
 
 @router.get("/policies/history", response_model=PolicyWeightsHistory)
