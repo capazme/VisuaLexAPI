@@ -97,10 +97,11 @@ services:
     ports:
       - "${MCP_LEGAL_IT_PORT:-8011}:8011"
     healthcheck:
-      # The MCP endpoint requires the Accept/MCP-Session handshake for a 200, so a
-      # bare GET returns 4xx — that still proves the HTTP server is up and routing
-      # /mcp. `--fail` is intentionally omitted so a 4xx counts as healthy.
-      test: ["CMD-SHELL", "curl -sS -o /dev/null http://localhost:8011/mcp"]
+      # The mcp-legal-it image (python:3.12-slim) has NO curl, and /mcp needs the MCP
+      # Accept/session handshake for a 200 (a bare GET is 4xx). Use a python TCP-connect
+      # probe: port 8011 open ⇒ the FastMCP HTTP server is up and routing. python3 is
+      # always present in the image.
+      test: ["CMD-SHELL", "python3 -c \"import socket; socket.create_connection(('localhost',8011),2).close()\""]
       interval: 15s
       timeout: 5s
       retries: 5
