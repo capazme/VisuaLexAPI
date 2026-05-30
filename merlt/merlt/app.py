@@ -119,6 +119,12 @@ async def lifespan(app: FastAPI):
             from merlt.api.experts_router import initialize_expert_system
             from merlt.storage import FalkorDBClient
             from merlt.tools import GraphSearchTool
+            from merlt.rlcf.policy_manager import get_policy_manager
+            from merlt.experts.neural_gating import (
+                ExpertGatingMLP,
+                GatingConfig,
+                HybridExpertRouter,
+            )
 
             ai_service = OpenRouterService()
             synthesizer = AdaptiveSynthesizer(
@@ -141,9 +147,9 @@ async def lifespan(app: FastAPI):
             # (legal_knowledge_graph.py), unreachable inside the container network; its
             # FalkorDB driver does a sentinel `INFO server` on connect and ConnectionErrors.
             # (NB: get_policy_manager() is NOT the culprit — it has no Redis; it loads a
-            # filesystem PolicyManager checkpoint. policy_manager stays None here only
-            # because learnable traversal weights are Phase-E work, see the co-evolution
-            # sprint-plan; wiring a real PolicyManager is task E.1.)
+            # filesystem PolicyManager checkpoint (DEFAULT_TRAVERSAL_WEIGHTS until a .pt
+            # exists). Loop β E.1 NOW wires it into the GraphAwareRetriever below, so
+            # graph-traversal weights become RLCF-tunable — see the co-evolution sprint-plan.)
             tools = []
             graph_client = FalkorDBClient()
             await graph_client.connect()
@@ -167,28 +173,79 @@ async def lifespan(app: FastAPI):
                 # RetrieverConfig defaults the Qdrant collection to "merl_t_dev_chunks";
                 # the live collection is "<graph>_chunks" (merl_t_legal_chunks). Point it
                 # at the right one (env override wins) or semantic search 404s the
-                # collection. NB: the seed was loaded with MERLT_SKIP_EMBEDDINGS=true, so
-                # this collection is near-empty until embeddings are generated — graph
-                # retrieval is the primary grounding source for now.
+                # collection. NB: MERLT_SKIP_EMBEDDINGS=true only skips embedding the seed
+                # AT LOAD TIME — the seed chunks were backfilled separately (Qdrant
+                # merl_t_legal_chunks ≈ 17.2k points), so semantic retrieval IS live and
+                # is a primary grounding source alongside the graph.
                 _collection = os.getenv("QDRANT_COLLECTION") or (
                     os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal") + "_chunks"
                 )
+                # Loop β E.1: the learnable traversal PolicyManager (filesystem
+                # checkpoint singleton, no Redis). Wired into the retriever so
+                # graph-traversal relation weights are RLCF-tunable (REINFORCE in
+                # Phase E updates them). Falls back to DEFAULT_TRAVERSAL_WEIGHTS
+                # until a checkpoints/traversal_policy_latest.pt exists.
+                traversal_policy_manager = get_policy_manager()
                 retriever = GraphAwareRetriever(
                     vector_db=qdrant,
                     graph_db=graph_client,
                     bridge_table=None,
                     config=RetrieverConfig(collection_name=_collection),
-                    policy_manager=None,
+                    policy_manager=traversal_policy_manager,
                 )
                 tools.append(SemanticSearchTool(retriever=retriever, embeddings=embeddings))
                 log.info("Semantic retrieval tool wired")
+
+                # Loop β prereq (0.0): WARM the e5-large model at boot. It loads
+                # lazily on first use (~86s cold / ~7s warm for 1.2GB), and each
+                # expert is wrapped in asyncio.wait_for(timeout=60s) — so a cold load
+                # on the first /experts/query times out ALL experts and returns
+                # sources=0. Boot has no per-request timeout, so paying the load here
+                # (in a thread, non-blocking to the loop) makes the first user query
+                # fast. Persisted across rebuilds by the merlt_hf_cache volume.
+                if os.getenv("MERLT_SKIP_EMBED_WARMUP", "").lower() != "true":
+                    try:
+                        await embeddings.encode_query_async("warmup")
+                        log.info("✅ Embedding model warmed at boot",
+                                 model=embeddings.model_name, device=embeddings.device)
+                    except Exception as warm_err:
+                        log.warning("Embedding warmup failed; first query may be slow",
+                                    error=str(warm_err))
             except Exception as e:
                 log.warning("Semantic retrieval unavailable; graph grounding only", error=str(e))
+
+            # Loop β E.1/0.3: wire neural gating so the router emits LEARNABLE
+            # expert_selection Actions (carrying query_embedding + log_prob) into
+            # the ExecutionTrace — without these, REINFORCE (Phase E) trains on
+            # nothing. HybridExpertRouter warm-starts WITHOUT a checkpoint and
+            # falls back to the LLM router below confidence_threshold. The default
+            # threshold is 0.0 (neural routing always used) so the co-evolution
+            # loop is fully exercised and the gating weights are tuned from
+            # feedback; raise MERLT_GATING_CONFIDENCE_THRESHOLD to gate it.
+            from merlt.storage.vectors.embeddings import EmbeddingService
+            orchestrator_embeddings = EmbeddingService.get_instance()
+            hybrid_router = None
+            try:
+                gating_mlp = ExpertGatingMLP(GatingConfig())
+                hybrid_router = HybridExpertRouter(
+                    neural_gating=gating_mlp,
+                    embedding_service=orchestrator_embeddings,
+                    confidence_threshold=float(
+                        os.getenv("MERLT_GATING_CONFIDENCE_THRESHOLD", "0.0")
+                    ),
+                )
+                log.info("✅ Neural gating router wired (warm-start)",
+                         confidence_threshold=hybrid_router.confidence_threshold)
+            except Exception as gate_err:
+                log.warning("Neural gating unavailable; falling back to LLM routing",
+                            error=str(gate_err))
 
             orchestrator = MultiExpertOrchestrator(
                 synthesizer=synthesizer,
                 tools=tools,
                 ai_service=ai_service,
+                hybrid_router=hybrid_router,
+                embedding_service=orchestrator_embeddings,
                 config=OrchestratorConfig(
                     max_experts=4,
                     timeout_seconds=60,
@@ -196,7 +253,9 @@ async def lifespan(app: FastAPI):
                 ),
             )
             initialize_expert_system(orchestrator)
-            log.info("✅ Expert System initialized with retrieval", tools=len(tools))
+            log.info("✅ Expert System initialized with retrieval",
+                     tools=len(tools),
+                     routing="neural" if hybrid_router else "llm")
         except Exception as e:
             log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
             log.warning("Expert System endpoints will return 503 errors")

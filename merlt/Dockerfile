@@ -63,6 +63,12 @@ RUN mkdir -p /app/uploads/user_documents
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app
+# Loop β prereq (0.0): pre-create the HuggingFace cache dir owned by appuser so
+# the mounted named volume (merlt_hf_cache, e5-large weights) initializes with
+# appuser ownership instead of root — otherwise the warmup/encode hits
+# "Permission denied: /home/appuser/.cache/huggingface/hub" at boot.
+RUN mkdir -p /home/appuser/.cache/huggingface && \
+    chown -R appuser:appuser /home/appuser/.cache
 USER appuser
 
 # Expose API port

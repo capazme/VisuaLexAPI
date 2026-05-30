@@ -78,6 +78,34 @@ services:
       timeout: 5s
       retries: 5
 
+  # Loop β (A.1) — mcp-legal-it as an HTTP MCP sidecar. Vendored as a git
+  # submodule at vendor/mcp-legal-it. The upstream Dockerfile defaults to
+  # MCP_PORT=8000, which collides with merlt-api → override to 8011 here.
+  # The FastMCP server serves Streamable HTTP at the MCP_PATH (/mcp).
+  mcp-legal-it:
+    build:
+      context: ./vendor/mcp-legal-it
+      dockerfile: Dockerfile
+    container_name: visualex-mcp-legal-it
+    profiles: ["api-in-docker"]
+    environment:
+      MCP_TRANSPORT: "http"
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8011"
+      MCP_PATH: "/mcp"
+      LEGAL_PROFILE: "full"
+    ports:
+      - "${MCP_LEGAL_IT_PORT:-8011}:8011"
+    healthcheck:
+      # The MCP endpoint requires the Accept/MCP-Session handshake for a 200, so a
+      # bare GET returns 4xx — that still proves the HTTP server is up and routing
+      # /mcp. `--fail` is intentionally omitted so a 4xx counts as healthy.
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://localhost:8011/mcp"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   merlt-api:
     build:
       context: ./merlt
@@ -93,6 +121,8 @@ services:
         condition: service_healthy
       merlt-qdrant:
         condition: service_healthy
+      mcp-legal-it:
+        condition: service_started
     environment:
       # Postgres — generic DATABASE_URL + dedicated RLCF/ENRICHMENT vars
       # MERL-T code reads ENRICHMENT_DB_* and RLCF_DATABASE_URL explicitly
@@ -132,6 +162,11 @@ services:
       QDRANT_HOST: "merlt-qdrant"
       QDRANT_PORT: "6333"
 
+      # Loop β (A.1/A.2) — mcp-legal-it HTTP MCP endpoint. The experts reach it
+      # through McpLegalToolAdapter (FastMCP client). Service-name DNS on the
+      # compose network; the Streamable HTTP transport is served at /mcp.
+      MCP_LEGAL_IT_URL: "http://mcp-legal-it:8011/mcp"
+
       # Slice 2a — Seed loader (Libro IV CC). MERLT_DATA_DIR points at the
       # mounted data/ directory; MERLT_SKIP_SEED=true disables boot loading.
       # MERLT_SKIP_EMBEDDINGS=true (DEFAULT) skips the slow embedding step:
@@ -152,6 +187,10 @@ services:
       # Shared uploads dir: the api receives the file, the worker reads it for
       # extraction (Slice 2c) — must be the same volume across both services.
       - merlt_uploads:/app/uploads
+      # Loop β prereq (0.0): persist the HuggingFace cache (e5-large, ~1.2GB) so
+      # rebuilds/recreates don't re-download it and re-pay the ~86s cold load.
+      # Container runs as `appuser` → cache lives at /home/appuser/.cache/huggingface.
+      - merlt_hf_cache:/home/appuser/.cache/huggingface
     ports:
       - "${MERLT_API_PORT:-8000}:8000"
     command: ["uvicorn", "merlt.app:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -232,6 +271,9 @@ services:
       # Shared uploads dir: the api receives the file, the worker reads it for
       # extraction (Slice 2c) — must be the same volume across both services.
       - merlt_uploads:/app/uploads
+      # Loop β prereq (0.0): share the same HF cache as merlt-api — the worker
+      # embeds chunks during ingestion, so it needs the e5-large weights too.
+      - merlt_hf_cache:/home/appuser/.cache/huggingface
     # Slice 2c: also consume the merlt_extract queue (extract_to_staging task).
     command: ["rq", "worker", "merlt_ingest", "merlt_extract", "--url", "redis://merlt-redis:6379/1"]
     # Override the API image's HTTP healthcheck (curl :8000) — the worker is not
@@ -248,3 +290,4 @@ volumes:
   merlt_falkor_data:
   merlt_qdrant_data:
   merlt_uploads:
+  merlt_hf_cache:

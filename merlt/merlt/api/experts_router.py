@@ -262,8 +262,13 @@ def _wire_feedback_to_training(
         else:
             reward = 0.5
 
-        # 2. Reconstruct trace_data from full_trace (JSONB, already dict)
-        trace_data = trace.full_trace if trace.full_trace else {}
+        # 2. Reconstruct the RLCF ExecutionTrace from storage (Loop β Bug-4 0.3).
+        # full_trace nests the execution_trace (query_id + Actions carrying
+        # query_embedding/log_prob) under 'execution_trace'. Older rows stored
+        # only the flat pipeline trace (no actions) → fall back to it so legacy
+        # feedback still no-ops gracefully instead of erroring.
+        _stored_trace = trace.full_trace if trace.full_trace else {}
+        trace_data = _stored_trace.get("execution_trace") or _stored_trace
 
         # 3. Build MultilevelFeedback
         if feedback_type == "detailed":
@@ -485,10 +490,23 @@ async def query_experts(
         # Extract pipeline trace from result metadata
         pipeline_trace_data = result.metadata.get("pipeline_trace") if request.include_trace else None
         pipeline_metrics_data = result.metadata.get("pipeline_metrics") if request.include_trace else None
+        # Loop β Bug-4 0.3: the orchestrator always attaches the ExecutionTrace
+        # (query_id + RLCF actions w/ query_embedding) to metadata, regardless of
+        # include_trace. Persist it (nested in full_trace) so feedback can feed
+        # REINFORCE; it is stripped from the client-facing trace GET path.
+        execution_trace_data = result.metadata.get("execution_trace")
 
         # Inject trace_id into pipeline_trace for correlation
         if pipeline_trace_data:
             pipeline_trace_data["trace_id"] = trace_id
+
+        # Stored full_trace = pipeline trace (when requested) + nested RLCF
+        # execution_trace (always, when present). dict() copy keeps the response's
+        # pipeline_trace_data clean of the nested embedding payload.
+        full_trace_data = dict(pipeline_trace_data) if pipeline_trace_data else {}
+        if execution_trace_data:
+            full_trace_data["execution_trace"] = execution_trace_data
+        full_trace_data = full_trace_data or None
 
         # Extract routing metadata for new fields
         routing_method = None
@@ -508,7 +526,7 @@ async def query_experts(
             synthesis_text=result.synthesis,
             sources=[s.model_dump() for s in sources],  # Store as JSONB
             execution_time_ms=execution_time_ms,
-            full_trace=pipeline_trace_data,
+            full_trace=full_trace_data,
             # New consent-aware fields (Story 5-1)
             consent_level=request.consent_level,
             query_type=query_type,
@@ -1184,6 +1202,17 @@ async def get_trace(
     import copy
     import json as _json
     full_trace = copy.deepcopy(qa_trace.full_trace) if qa_trace.full_trace else {}
+
+    # Loop β Bug-4 0.3: the nested RLCF execution_trace (query_id + actions +
+    # query_embedding) is server-internal — it feeds REINFORCE and must never be
+    # returned to clients (leaks the embedding, bloats the payload). Strip it. If
+    # nothing else remains, the query ran without include_trace=True.
+    full_trace.pop("execution_trace", None)
+    if not full_trace:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pipeline trace available for {trace_id}. Was the query executed with include_trace=True?"
+        )
 
     consent_levels = {"anonymous": 0, "basic": 1, "full": 2}
     stored_level = consent_levels.get(qa_trace.consent_level, 0)

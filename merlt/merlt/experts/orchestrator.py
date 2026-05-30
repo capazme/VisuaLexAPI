@@ -654,6 +654,14 @@ class MultiExpertOrchestrator:
             "execution_time_ms": execution_time_ms
         }
 
+        # Loop β Bug-4 fix (0.3): persist the full ExecutionTrace (query_id + the
+        # RLCF Actions that carry query_embedding/log_prob) into the result
+        # metadata, so the API layer can store it and feed REINFORCE WITHOUT
+        # needing return_trace=True. Previously only pipeline_trace.to_dict() was
+        # persisted (key 'trace_id', zero actions) → ExecutionTrace.from_dict
+        # KeyError'd / trained on nothing (num_actions=0). Always attached.
+        synthesis_result.metadata["execution_trace"] = trace.to_dict()
+
         log.info(
             f"Query processed",
             trace_id=trace_id,
