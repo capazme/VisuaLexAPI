@@ -170,6 +170,9 @@ class MultiExpertOrchestrator:
         self.config = config or OrchestratorConfig()
         self.gating_policy = gating_policy
         self.embedding_service = embedding_service
+        # Loop β C.2: strong refs to in-flight sedimentation tasks so fire-and-forget
+        # background writes aren't garbage-collected before they complete.
+        self._sediment_tasks: set = set()
 
         # Router: preferisce HybridExpertRouter se disponibile
         self.hybrid_router = hybrid_router
@@ -238,6 +241,28 @@ class MultiExpertOrchestrator:
                 tools=expert_tools,
                 ai_service=self.ai_service
             )
+
+    async def _sediment_live_sources(self, live_sources: List[Dict[str, Any]]) -> None:
+        """Loop β C.2: write the query's live mcp-legal-it retrievals into the graph
+        as provisional ``live_unconfirmed`` nodes (+ Qdrant chunks), so re-asking
+        hits the graph instead of re-scraping.
+
+        Runs as a fire-and-forget background task AFTER the answer is returned —
+        fully failure-isolated, so a graph/Qdrant/MCP problem never affects the
+        user-facing response. The writer is idempotent (MERGE on a deterministic
+        node id), so repeated sedimentation of the same source is a no-op.
+        """
+        try:
+            from merlt.pipeline.provisional_writer import write_provisional_sources
+            written = await write_provisional_sources(
+                live_sources,
+                graph_client=None,  # writer self-builds an env-aware FalkorDBClient
+                embeddings=self.embedding_service,
+            )
+            log.info("live sources sedimented into graph",
+                     requested=len(live_sources), written=len(written))
+        except Exception as exc:
+            log.warning("live-source sedimentation failed (non-fatal)", error=str(exc))
 
     async def _apply_gating_policy(
         self,
@@ -688,6 +713,33 @@ class MultiExpertOrchestrator:
         # persisted (key 'trace_id', zero actions) → ExecutionTrace.from_dict
         # KeyError'd / trained on nothing (num_actions=0). Always attached.
         synthesis_result.metadata["execution_trace"] = trace.to_dict()
+
+        # Loop β C.2: sediment this query's LIVE retrievals into the graph —
+        # provisional, NON-BLOCKING, failure-isolated. Collect the live_unconfirmed
+        # sources the experts that RAN pulled from mcp-legal-it (A.3), dedup, and
+        # fire a background task: the answer returns immediately, and re-asking the
+        # same question later hits the now-sedimented graph node (no 2nd live scrape).
+        try:
+            ran_types = {r.expert_type for r in responses}
+            seen_live: set = set()
+            live_sources: List[Dict[str, Any]] = []
+            for et in ran_types:
+                expert = self._experts.get(et)
+                for src in (getattr(expert, "_live_sources_retrieved", None) or []):
+                    key = (src.get("source_id"), (src.get("text") or "")[:64])
+                    if key in seen_live:
+                        continue
+                    seen_live.add(key)
+                    live_sources.append(src)
+            if live_sources:
+                _task = asyncio.create_task(self._sediment_live_sources(live_sources))
+                self._sediment_tasks.add(_task)
+                _task.add_done_callback(self._sediment_tasks.discard)
+                log.info("scheduled live-source sedimentation",
+                         count=len(live_sources), trace_id=trace_id)
+        except Exception as sed_err:
+            log.warning("failed to schedule live-source sedimentation (non-fatal)",
+                        error=str(sed_err))
 
         log.info(
             f"Query processed",

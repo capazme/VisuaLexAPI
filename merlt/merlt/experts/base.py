@@ -640,6 +640,9 @@ CHECKLIST:
             })
             log.info("live legal source retrieved",
                      tool=tool_name, expert=self.expert_type, chars=len(markdown))
+        # Loop β C.2: expose this query's live sources to the orchestrator's
+        # post-synthesis sedimentation hook (provisional graph write + Qdrant embed).
+        self._live_sources_retrieved = live_sources
         return live_sources
 
     def get_tools_schema(self) -> List[Dict[str, Any]]:
@@ -669,6 +672,12 @@ CHECKLIST:
                 "query_text": context.query_text[:200] if context.query_text else ""
             }
         )
+
+        # Loop β C.2: reset the per-query live-source buffer. _retrieve_live_legal_sources
+        # fills it; the orchestrator collects it post-synthesis to sediment provisional
+        # nodes. Reset here (analyze() start) so a non-retrieving query never carries a
+        # previous run's live sources on this long-lived expert instance.
+        self._live_sources_retrieved: List[Dict[str, Any]] = []
 
         log.debug(
             "ExecutionTrace initialized",
