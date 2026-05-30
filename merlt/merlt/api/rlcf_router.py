@@ -140,31 +140,61 @@ def _get_scheduler():
         return None
 
 
-def _get_policy_weights() -> PolicyWeightsStatus:
+async def _get_policy_weights() -> PolicyWeightsStatus:
     """
-    Ottiene pesi policy reali dal sistema RLCF.
+    Ottiene i pesi policy reali dal sistema RLCF.
 
-    Tenta di caricare da:
-    1. Policy in memoria nel trainer
-    2. Ultimo checkpoint salvato
-    3. Default se non disponibile
+    Legge l'ultima versione ATTIVA dei pesi dal ``WeightStore`` — la stessa store
+    in cui il ``TrainingScheduler`` persiste i gating priors allenati via
+    ``_persist_weight_config`` (``experiment_id='rlcf_training'``). Fallback ai
+    default uniformi se nessuna versione è ancora stata salvata.
+
+    Loop β E.2 fix: il percorso precedente chiamava
+    ``RLCFPersistence().load_latest_checkpoint()`` — un metodo INESISTENTE — per
+    cui l'endpoint cadeva sempre nell'except e restituiva i default, senza MAI
+    riflettere il training. Ora legge dallo store che il training scrive davvero.
     """
     try:
-        from merlt.rlcf.policy_gradient import GatingPolicy
-        from merlt.rlcf.persistence import RLCFPersistence
+        import os
+        from merlt.weights.store import WeightStore
 
-        # Try to load from latest checkpoint
-        persistence = RLCFPersistence()
-        checkpoint = persistence.load_latest_checkpoint()
-
-        if checkpoint and checkpoint.gating_weights:
-            return PolicyWeightsStatus(
-                gating=checkpoint.gating_weights,
-                traversal=checkpoint.traversal_params or {},
-                timestamp=checkpoint.created_at.isoformat() if checkpoint.created_at else datetime.now().isoformat()
+        db_url = os.environ.get("RLCF_DATABASE_URL")
+        if db_url:
+            store = WeightStore(database_url=db_url)
+            # experiment_id deve combaciare con quello che il TrainingScheduler usa
+            # per persistere i pesi: leggilo dallo scheduler vivo (evita un
+            # mismatch silenzioso se è stato configurato un experiment_id non
+            # di default), col fallback al default di SchedulerConfig.
+            scheduler = _get_scheduler()
+            experiment_id = (
+                getattr(scheduler.config, "experiment_id", "rlcf_training")
+                if scheduler is not None
+                else "rlcf_training"
             )
+            config = await store.get_weights(experiment_id=experiment_id)
+            if config and config.gating and config.gating.expert_priors:
+                short = {
+                    "LiteralExpert": "literal",
+                    "SystemicExpert": "systemic",
+                    "PrinciplesExpert": "principles",
+                    "PrecedentExpert": "precedent",
+                }
+                gating = {}
+                for name, lw in config.gating.expert_priors.items():
+                    key = short.get(name, name.lower().replace("expert", ""))
+                    gating[key] = round(float(getattr(lw, "default", 0.25)), 4)
+                if gating:
+                    return PolicyWeightsStatus(
+                        gating=gating,
+                        traversal={
+                            "avg_depth": 2.0,
+                            "avg_width": 2.0,
+                            "exploration_rate": 0.2,
+                        },
+                        timestamp=getattr(config, "updated_at", None) or datetime.now().isoformat(),
+                    )
     except Exception as e:
-        log.debug("Could not load policy weights from checkpoint", error=str(e))
+        log.debug("Could not load policy weights from weight store", error=str(e))
 
     # Return default weights if nothing available
     return PolicyWeightsStatus(
@@ -495,7 +525,7 @@ async def get_policy_weights(
           "traversal": {"avg_depth": 3.2, "avg_width": 2.8, ...}
         }
     """
-    return _get_policy_weights()
+    return await _get_policy_weights()
 
 
 @router.get("/policies/history", response_model=PolicyWeightsHistory)
@@ -636,7 +666,7 @@ async def training_stream(websocket: WebSocket):
         if scheduler:
             status = scheduler.get_status()
             buffer_stats = scheduler.get_buffer_stats()
-            policy_weights = _get_policy_weights()
+            policy_weights = await _get_policy_weights()
 
             await websocket.send_json({
                 "event": "initial_state",
