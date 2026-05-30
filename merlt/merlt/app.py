@@ -256,12 +256,38 @@ async def lifespan(app: FastAPI):
                 log.warning("Neural gating unavailable; falling back to LLM routing",
                             error=str(gate_err))
 
+            # Loop β E.3: tool-gating policy (warm-start). Decides which live
+            # mcp-legal-it tools each expert calls; learns from feedback via
+            # REINFORCE. MERLT_TOOL_GATING_ENABLED master switch (default on);
+            # MERLT_TOOL_GATING_AB_RATIO is the treatment(prune)/control split
+            # (default 0.7 = exploit 70% / explore 30%). Failure-isolated.
+            tool_selector = None
+            try:
+                from merlt.experts.neural_gating.tool_neural import ToolGatingMLP, ToolGatingConfig
+                from merlt.experts.neural_gating.tool_selector import ToolSelector
+
+                _tg_enabled = os.getenv("MERLT_TOOL_GATING_ENABLED", "true").lower() not in ("false", "0", "")
+                _tg_ratio = float(os.getenv("MERLT_TOOL_GATING_AB_RATIO", "0.7"))
+                tool_policy = ToolGatingMLP(ToolGatingConfig())
+                tool_selector = ToolSelector(
+                    policy=tool_policy,
+                    expert_tool_map=MultiExpertOrchestrator.EXPERT_MCP_TOOLS,
+                    enabled=_tg_enabled,
+                    ab_ratio=_tg_ratio,
+                )
+                log.info("✅ Tool-gating policy wired (warm-start)",
+                         enabled=_tg_enabled, ab_ratio=_tg_ratio)
+            except Exception as tg_err:
+                log.warning("Tool-gating unavailable; experts call all live tools (A.3)",
+                            error=str(tg_err))
+
             orchestrator = MultiExpertOrchestrator(
                 synthesizer=synthesizer,
                 tools=tools,
                 ai_service=ai_service,
                 hybrid_router=hybrid_router,
                 embedding_service=orchestrator_embeddings,
+                tool_selector=tool_selector,
                 config=OrchestratorConfig(
                     max_experts=4,
                     timeout_seconds=60,

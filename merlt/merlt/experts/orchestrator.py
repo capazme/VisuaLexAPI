@@ -149,7 +149,8 @@ class MultiExpertOrchestrator:
         router: Optional[ExpertRouter] = None,
         hybrid_router: Optional["HybridExpertRouter"] = None,
         gating_policy: Optional[Any] = None,
-        embedding_service: Optional[Any] = None
+        embedding_service: Optional[Any] = None,
+        tool_selector: Optional[Any] = None
     ):
         """
         Inizializza l'orchestratore.
@@ -170,6 +171,9 @@ class MultiExpertOrchestrator:
         self.config = config or OrchestratorConfig()
         self.gating_policy = gating_policy
         self.embedding_service = embedding_service
+        # Loop β E.3: optional tool-gating policy (ToolSelector). When None the
+        # experts call all curated live tools (A.3 behavior, unchanged).
+        self.tool_selector = tool_selector
         # Loop β C.2: strong refs to in-flight sedimentation tasks so fire-and-forget
         # background writes aren't garbage-collected before they complete.
         self._sediment_tasks: set = set()
@@ -263,6 +267,71 @@ class MultiExpertOrchestrator:
                      requested=len(live_sources), written=len(written))
         except Exception as exc:
             log.warning("live-source sedimentation failed (non-fatal)", error=str(exc))
+
+    # ------------------------------------------------------------------
+    # Loop β E.3 — tool-gating policy hooks (failure-isolated, additive)
+    # ------------------------------------------------------------------
+    def _resolve_query_embedding(self, trace: "ExecutionTrace") -> Optional[List[float]]:
+        """Pull the query embedding from the trace's RLCF actions (set by the
+        routing stage). Returns None when no neural routing ran (no embedding)."""
+        try:
+            for action in trace.actions:
+                emb = action.metadata.get("query_embedding")
+                if emb:
+                    return emb
+        except Exception:
+            pass
+        return None
+
+    def _apply_tool_gating(
+        self,
+        context: "ExpertContext",
+        trace: "ExecutionTrace",
+        selected_experts: List[Any],
+    ) -> None:
+        """Run the tool-gating policy, emit ``tool_use`` actions, and (treatment
+        arm) write the pruned per-expert selection into the shared context so
+        ``base.py`` calls only the chosen tools. No-op when the selector is
+        absent/disabled or no query embedding is available."""
+        if self.tool_selector is None:
+            return
+        try:
+            query_embedding = self._resolve_query_embedding(trace)
+            expert_types = [e[0] for e in selected_experts]
+            selection = self.tool_selector.select_and_trace(
+                query_embedding=query_embedding,
+                expert_types=expert_types,
+                query_id=trace.query_id,
+                trace=trace,
+            )
+            if selection:
+                # ExpertContext.entities defaults to {} (never None).
+                context.entities["selected_live_tools"] = selection
+        except Exception as exc:  # noqa: BLE001 - never break the answer path
+            log.warning("tool-gating apply failed (fallback to all tools)", error=str(exc))
+
+    def _annotate_tool_use_outcomes(self, trace: "ExecutionTrace", responses: List[Any]) -> None:
+        """Mark each ``tool_use`` action with the observed outcome — did that
+        (expert, tool) actually return a live source — so the tool-policy trainer
+        can credit productive tools (Loop β E.3 signal a). Must run before the
+        trace is serialized. Failure-isolated."""
+        try:
+            ran_types = {r.expert_type for r in responses}
+            productive: set = set()
+            for et in ran_types:
+                expert = self._experts.get(et)
+                for src in (getattr(expert, "_live_sources_retrieved", None) or []):
+                    tool_name = src.get("tool_name")
+                    if tool_name:
+                        productive.add((et, tool_name))
+            for action in trace.actions:
+                if action.action_type != "tool_use":
+                    continue
+                et = action.metadata.get("expert_type")
+                tool_name = action.parameters.get("tool_name")
+                action.metadata["produced_source"] = (et, tool_name) in productive
+        except Exception as exc:  # noqa: BLE001
+            log.debug("tool_use outcome annotation skipped", error=str(exc))
 
     async def _apply_gating_policy(
         self,
@@ -595,6 +664,12 @@ class MultiExpertOrchestrator:
 
         log.info(f"Selected experts", experts=[e[0] for e in selected_experts])
 
+        # Loop β E.3: tool-gating policy — decide which live tools each selected
+        # expert will call (treatment arm prunes; control fires all), emit
+        # `tool_use` actions for REINFORCE, and write the pruned selection into the
+        # shared context BEFORE dispatch. Failure-isolated; no-op when disabled.
+        self._apply_tool_gating(context, trace, selected_experts)
+
         # Step 5: Esegui Expert (con tracing)
         expert_t0 = time.perf_counter()
         if self.config.parallel_execution:
@@ -712,6 +787,10 @@ class MultiExpertOrchestrator:
         # needing return_trace=True. Previously only pipeline_trace.to_dict() was
         # persisted (key 'trace_id', zero actions) → ExecutionTrace.from_dict
         # KeyError'd / trained on nothing (num_actions=0). Always attached.
+        # Loop β E.3: BEFORE serializing, annotate each `tool_use` action with the
+        # observed outcome (did that tool actually return a live source) so the
+        # tool-policy trainer can credit productive tools — must run before to_dict().
+        self._annotate_tool_use_outcomes(trace, responses)
         synthesis_result.metadata["execution_trace"] = trace.to_dict()
 
         # Loop β C.2: sediment this query's LIVE retrievals into the graph —

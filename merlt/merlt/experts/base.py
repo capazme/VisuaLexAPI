@@ -598,7 +598,13 @@ CHECKLIST:
         """
         live_sources: List[Dict[str, Any]] = []
         norm_ref = context.norm_references[0] if context.norm_references else None
-        for tool_name in self.LIVE_LEGAL_TOOLS:
+        # Loop β E.3: honor an optional per-expert tool selection produced by the
+        # tool-gating policy (orchestrator-side). Falls back to ALL curated tools
+        # when absent (control arm, flag off, or policy unavailable) → unchanged
+        # A.3 behavior. Additive read only; no signature change.
+        _selected = (context.entities.get("selected_live_tools") or {}).get(self.expert_type)
+        _tool_names = _selected if _selected is not None else self.LIVE_LEGAL_TOOLS
+        for tool_name in _tool_names:
             tool = self._tool_registry.get(tool_name)
             if tool is None:
                 continue
