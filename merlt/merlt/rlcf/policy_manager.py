@@ -167,6 +167,9 @@ class PolicyManager:
         self._gating_policy: Optional["ExpertGatingMLP"] = None
         self._traversal_loaded = False
         self._gating_loaded = False
+        # Loop β E.3: tool-gating policy (lazy-loaded).
+        self._tool_policy: Optional[Any] = None
+        self._tool_loaded = False
         self._load_lock = threading.Lock()
 
         # Device detection
@@ -698,6 +701,61 @@ class PolicyManager:
         with self._load_lock:
             self._traversal_policy = None
             self._traversal_loaded = False
+
+    # ------------------------------------------------------------------
+    # Loop β E.3 — tool-gating policy (mirror of the traversal methods)
+    # ------------------------------------------------------------------
+    def _load_tool_policy(self):
+        """Load ToolGatingMLP from checkpoint (lazy, thread-safe). None if absent."""
+        if self._tool_loaded:
+            return self._tool_policy
+        with self._load_lock:
+            if self._tool_loaded:
+                return self._tool_policy
+            checkpoint_path = self.config.checkpoint_dir / "tool_policy_latest.pt"
+            if not checkpoint_path.exists():
+                log.info(f"No ToolGatingMLP checkpoint at {checkpoint_path}, using warm-start")
+                self._tool_loaded = True
+                return None
+            try:
+                from merlt.experts.neural_gating.tool_neural import ToolGatingMLP, ToolGatingConfig
+                import torch
+
+                device = self._detect_device()
+                checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+                policy = ToolGatingMLP(ToolGatingConfig(input_dim=checkpoint.get("input_dim", 1024)))
+                policy = policy.to(device)
+                policy.load_state_dict(checkpoint["model_state_dict"])
+                policy.requires_grad_(False)
+                policy.eval()
+                self._tool_policy = policy
+                self._tool_loaded = True
+                log.info(f"ToolGatingMLP loaded from {checkpoint_path}")
+                return policy
+            except Exception as e:
+                log.warning(f"Failed to load ToolGatingMLP: {e}")
+                self._tool_loaded = True
+                return None
+
+    def get_tool_policy(self):
+        """Ottieni ToolGatingMLP (lazy load). None se nessun checkpoint."""
+        return self._load_tool_policy()
+
+    def save_tool_policy(self, policy, name: str = "latest"):
+        """Salva ToolGatingMLP su checkpoint (formato inference: model_state_dict)."""
+        import torch
+
+        checkpoint_path = self.config.checkpoint_dir / f"tool_policy_{name}.pt"
+        self.config.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint = {
+            "input_dim": getattr(getattr(policy, "config", None), "input_dim", 1024),
+            "model_state_dict": policy.state_dict(),
+        }
+        torch.save(checkpoint, checkpoint_path)
+        log.info(f"ToolGatingMLP saved to {checkpoint_path}")
+        with self._load_lock:
+            self._tool_policy = None
+            self._tool_loaded = False
 
     def save_gating_policy(self, policy, name: str = "latest"):
         """

@@ -268,7 +268,17 @@ async def lifespan(app: FastAPI):
 
                 _tg_enabled = os.getenv("MERLT_TOOL_GATING_ENABLED", "true").lower() not in ("false", "0", "")
                 _tg_ratio = float(os.getenv("MERLT_TOOL_GATING_AB_RATIO", "0.7"))
-                tool_policy = ToolGatingMLP(ToolGatingConfig())
+                # Load the trained tool policy from checkpoint so pruning reflects
+                # learning (the scheduler writes tool_policy_latest.pt); warm-start
+                # fresh on first boot / no checkpoint.
+                tool_policy = None
+                try:
+                    from merlt.rlcf.policy_manager import get_policy_manager
+                    tool_policy = get_policy_manager().get_tool_policy()
+                except Exception:
+                    tool_policy = None
+                if tool_policy is None:
+                    tool_policy = ToolGatingMLP(ToolGatingConfig())
                 tool_selector = ToolSelector(
                     policy=tool_policy,
                     expert_tool_map=MultiExpertOrchestrator.EXPERT_MCP_TOOLS,

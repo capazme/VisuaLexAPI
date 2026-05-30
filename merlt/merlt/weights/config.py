@@ -24,6 +24,7 @@ class WeightCategory(str, Enum):
     EXPERT_TRAVERSAL = "expert_traversal"
     RLCF = "rlcf"
     GATING = "gating"
+    TOOL_GATING = "tool_gating"  # Loop β E.3: per-tool call-probability policy
 
 
 class WeightBounds(BaseModel):
@@ -172,6 +173,18 @@ class GatingWeights(BaseModel):
     )
 
 
+class ToolGatingWeights(BaseModel):
+    """
+    Pesi per la tool-gating policy (Loop β E.3).
+
+    ``tool_priors`` mappa ``tool_name -> LearnableWeight`` dove ``default`` è la
+    probabilità base P(call) appresa per quel tool live (mcp-legal-it). Parallelo
+    a ``GatingWeights.expert_priors``, ma a livello di strumento invece che di
+    esperto.
+    """
+    tool_priors: Dict[str, LearnableWeight] = Field(default_factory=dict)
+
+
 class WeightConfig(BaseModel):
     """
     Configurazione completa dei pesi del sistema.
@@ -188,6 +201,7 @@ class WeightConfig(BaseModel):
     expert_traversal: Dict[str, ExpertTraversalWeights] = Field(default_factory=dict)
     rlcf: RLCFAuthorityWeights = Field(default_factory=RLCFAuthorityWeights)
     gating: GatingWeights = Field(default_factory=GatingWeights)
+    tool_gating: Optional[ToolGatingWeights] = Field(default=None)  # Loop β E.3
 
     # Metadata
     experiment_id: Optional[str] = Field(default=None, description="ID esperimento A/B")

@@ -35,6 +35,7 @@ from merlt.weights.config import (
     LearnableWeight,
     RLCFAuthorityWeights,
     GatingWeights,
+    ToolGatingWeights,
 )
 
 log = structlog.get_logger()
@@ -209,6 +210,17 @@ class WeightStore:
             query_type_modifiers=gating_data.get("query_type_modifiers", {})
         )
 
+        # Parse tool-gating weights (Loop β E.3) — optional.
+        tg_data = yaml_data.get("tool_gating") or {}
+        tool_gating = None
+        if tg_data.get("tool_priors"):
+            tool_gating = ToolGatingWeights(
+                tool_priors={
+                    t: self._parse_learnable_weight(wi)
+                    for t, wi in tg_data["tool_priors"].items()
+                }
+            )
+
         return WeightConfig(
             version=yaml_data.get("version", "2.0"),
             schema_version=yaml_data.get("schema_version", "1.0"),
@@ -216,6 +228,7 @@ class WeightStore:
             expert_traversal=expert_traversal,
             rlcf=rlcf,
             gating=gating,
+            tool_gating=tool_gating,
             created_at=datetime.now().isoformat(),
         )
 
@@ -313,6 +326,11 @@ class WeightStore:
         if config.gating:
             result["gating"] = {
                 "expert_priors": {k: _lw_to_dict(v) for k, v in config.gating.expert_priors.items()},
+            }
+
+        if config.tool_gating:
+            result["tool_gating"] = {
+                "tool_priors": {k: _lw_to_dict(v) for k, v in config.tool_gating.tool_priors.items()},
             }
 
         return result

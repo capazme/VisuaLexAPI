@@ -947,3 +947,162 @@ def create_traversal_policy(
         log.info(f"Loaded traversal policy from {checkpoint_path}")
 
     return policy, trainer
+
+
+# =============================================================================
+# Loop β E.3 — Tool-Gating Policy Trainer (multi-label REINFORCE)
+# =============================================================================
+
+class ToolPolicyTrainer:
+    """REINFORCE trainer for the multi-label ``ToolGatingMLP``.
+
+    Mirrors ``PolicyGradientTrainer`` but consumes ``tool_use`` actions
+    (independent Bernoulli call decisions) instead of ``expert_selection``. For
+    each action the per-tool log-prob of the action ACTUALLY taken is recomputed
+    from a live forward pass (so gradients flow): ``log σ(logit)`` if the tool was
+    called, ``log(1-σ(logit))`` if it was pruned.
+
+    The advantage combines the global return ``(reward - baseline)`` with a
+    **productivity shaping** term (signal a): a called tool that returned a
+    source gets ``+β``, a called-but-unproductive tool ``-β`` — so the policy
+    learns to call productive tools and stop calling barren ones, on top of the
+    answer-quality signal. A pruned tool in a *bad* answer gets a negative
+    advantage on ``log(1-p)`` → P(call)↑, i.e. it learns it should have been
+    called (reinforced strongly by the control arm, where everything fires).
+    """
+
+    SHAPING_BETA = 0.3
+
+    def __init__(self, policy, config: Optional["TrainerConfig"] = None, optimizer: Optional[Any] = None):
+        torch, _, optim, _ = _get_torch()
+        self.policy = policy
+        self.config = config or TrainerConfig()
+        self.optimizer = optimizer or optim.Adam(policy.parameters(), lr=self.config.learning_rate)
+        self.baseline = 0.0
+        self.num_updates = 0
+        from merlt.experts.neural_gating.tool_neural import TOOL_VOCAB
+        self._tool_index = {t: i for i, t in enumerate(TOOL_VOCAB)}
+        log.info("ToolPolicyTrainer initialized", learning_rate=self.config.learning_rate)
+
+    def compute_reward(self, feedback: Any) -> float:
+        return feedback.overall_score()
+
+    def _empty_metrics(self, reward: float, returns: float) -> Dict[str, float]:
+        return {
+            "loss": 0.0, "reward": reward, "baseline": self.baseline,
+            "returns": returns, "num_actions": 0, "num_updates": self.num_updates,
+            "grad_norm": 0.0,
+        }
+
+    def update_from_feedback(self, trace: Any, feedback: Any) -> Dict[str, float]:
+        torch, _, _, _ = _get_torch()
+
+        # Flush any stale gradients up-front so an early-return (no actions / no
+        # embedding) can never leave gradients lingering before the next step.
+        self.optimizer.zero_grad()
+
+        reward = self.compute_reward(feedback)
+        trace.set_reward(reward)
+        returns = reward - self.baseline
+        self.baseline = (
+            self.config.baseline_decay * self.baseline
+            + (1 - self.config.baseline_decay) * reward
+        )
+
+        tool_actions = [
+            a for a in trace.actions
+            if a.action_type == "tool_use" and a.metadata.get("source") == "tool_policy"
+        ]
+        if not tool_actions:
+            return self._empty_metrics(reward, returns)
+
+        emb_list = trace.metadata.get("query_embedding")
+        if emb_list is None:
+            for a in trace.actions:
+                emb = a.metadata.get("query_embedding")
+                if emb:
+                    emb_list = emb
+                    break
+        if emb_list is None:
+            return self._empty_metrics(reward, returns)
+
+        query_embedding = torch.tensor(
+            emb_list, dtype=torch.float32, device=self.policy.device
+        ).unsqueeze(0)
+
+        self.policy.train()
+        probs, _ = self.policy.forward(query_embedding)  # (1, num_tools)
+        probs = probs.squeeze(0)
+
+        terms = []
+        for a in tool_actions:
+            idx = self._tool_index.get(a.parameters.get("tool_name"))
+            if idx is None:
+                continue
+            called = bool(a.metadata.get("called"))
+            produced = bool(a.metadata.get("produced_source"))
+            p = probs[idx].clamp(1e-8, 1.0 - 1e-8)
+            log_p = torch.log(p) if called else torch.log(1.0 - p)
+            shaping = (self.SHAPING_BETA if produced else -self.SHAPING_BETA) if called else 0.0
+            advantage = returns + shaping
+            terms.append(-advantage * log_p)
+
+        if not terms:
+            return self._empty_metrics(reward, returns)
+
+        loss = torch.stack(terms).sum()
+        loss.backward()
+        if getattr(self.config, "clip_grad_norm", None):
+            torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.config.clip_grad_norm)
+        self.optimizer.step()
+        self.num_updates += 1
+
+        metrics = {
+            "loss": float(loss.item()),
+            "reward": reward,
+            "baseline": self.baseline,
+            "returns": returns,
+            "num_actions": len(terms),
+            "num_updates": self.num_updates,
+            "grad_norm": self._compute_grad_norm(),
+        }
+        log.info("Tool policy updated with real backpropagation",
+                 query_id=getattr(trace, "query_id", None), **metrics)
+        return metrics
+
+    def _compute_grad_norm(self) -> float:
+        total_norm = 0.0
+        for param in self.policy.parameters():
+            if param.grad is not None:
+                total_norm += param.grad.data.norm(2).item() ** 2
+        return total_norm ** 0.5
+
+    def save_checkpoint(self, path: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        torch, _, _, _ = _get_torch()
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        checkpoint = {
+            "model_state_dict": {k: v.cpu() for k, v in self.policy.state_dict().items()},
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "baseline": self.baseline,
+            "num_updates": self.num_updates,
+            "policy_config": {
+                "input_dim": getattr(getattr(self.policy, "config", None), "input_dim", 1024),
+            },
+            "timestamp": datetime.now().isoformat(),
+            "metadata": metadata or {},
+        }
+        torch.save(checkpoint, path)
+        log.info("Tool checkpoint saved", path=path, num_updates=self.num_updates)
+
+    def load_checkpoint(self, path: str) -> Dict[str, Any]:
+        torch, _, _, _ = _get_torch()
+        device = getattr(self.policy, "device", "cpu")
+        checkpoint = torch.load(path, map_location=device, weights_only=False)
+        self.policy.load_state_dict(checkpoint["model_state_dict"])
+        try:
+            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        except Exception as e:  # noqa: BLE001
+            log.warning("Tool optimizer state not restored", error=str(e))
+        self.baseline = checkpoint.get("baseline", 0.0)
+        self.num_updates = checkpoint.get("num_updates", 0)
+        return checkpoint.get("metadata", {})

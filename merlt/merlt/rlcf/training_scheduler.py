@@ -474,6 +474,15 @@ class TrainingScheduler:
             # Load from checkpoint or create fresh policy
             policy, trainer, loaded_from_checkpoint = self._get_or_create_policy()
 
+            # Loop β E.3: tool-gating policy trained in the SAME pass (optional,
+            # failure-isolated so it never breaks expert-gating training).
+            tool_policy = tool_trainer = None
+            try:
+                tool_policy, tool_trainer, _ = self._get_or_create_tool_policy()
+            except Exception as e:
+                log.warning("Tool policy unavailable for this epoch", error=str(e))
+            tool_samples_processed = 0
+
             total_loss = 0.0
             total_reward = 0.0
             samples_processed = 0
@@ -511,6 +520,17 @@ class TrainingScheduler:
                         # Update policy
                         trace.set_reward(exp.reward)
                         metrics = trainer.update_from_feedback(trace, feedback)
+
+                        # Loop β E.3: train the tool-gating policy on the SAME
+                        # experience (independent of the gating update). Isolated:
+                        # a tool-training error never aborts the gating sample.
+                        if tool_trainer is not None:
+                            try:
+                                tm = tool_trainer.update_from_feedback(trace, feedback)
+                                if tm.get("num_actions", 0) > 0:
+                                    tool_samples_processed += 1
+                            except Exception as te:  # noqa: BLE001
+                                log.debug("tool policy update skipped", error=str(te))
 
                         # Weight loss by importance sampling
                         weighted_loss = metrics.get("loss", 0.0) * weights[i]
@@ -551,6 +571,13 @@ class TrainingScheduler:
             if self.config.auto_save_checkpoint and samples_processed > 0:
                 checkpoint_version = self._save_checkpoint(policy, trainer)
 
+            # Loop β E.3: persist the tool-gating policy too.
+            if (self.config.auto_save_checkpoint and tool_trainer is not None
+                    and tool_samples_processed > 0):
+                self._save_tool_checkpoint(tool_policy, tool_trainer)
+                log.info("Tool policy trained", tool_samples=tool_samples_processed,
+                         num_updates=tool_trainer.num_updates)
+
             # Auto-save buffer to disk
             if self.config.buffer_persistence_path:
                 self._try_save_buffer()
@@ -585,6 +612,7 @@ class TrainingScheduler:
                 checkpoint_version=checkpoint_version,
                 samples_processed=samples_processed,
                 traversal_weights=traversal_weights,
+                tool_policy=tool_policy,
             )
 
             result = TrainingResult(
@@ -808,6 +836,58 @@ class TrainingScheduler:
         log.info("No checkpoint found, using fresh ExpertGatingMLP")
         return policy, trainer, False
 
+    def _get_or_create_tool_policy(self) -> Tuple[Any, Any, bool]:
+        """Loop β E.3: load ToolGatingMLP from checkpoint, else create fresh.
+
+        Returns (policy, trainer, loaded_from_checkpoint). Mirrors
+        _get_or_create_policy but for the tool-gating REINFORCE policy.
+        """
+        from .policy_gradient import ToolPolicyTrainer
+        from merlt.experts.neural_gating.tool_neural import ToolGatingMLP, ToolGatingConfig
+
+        checkpoint_dir = Path(self.config.checkpoint_dir)
+        trainer_path = checkpoint_dir / "tool_trainer_latest.pt"
+
+        policy = ToolGatingMLP(ToolGatingConfig(input_dim=1024))
+        trainer = ToolPolicyTrainer(policy)
+
+        if trainer_path.exists():
+            try:
+                trainer.load_checkpoint(str(trainer_path))
+                log.info("ToolGatingMLP loaded from checkpoint",
+                         path=str(trainer_path), num_updates=trainer.num_updates)
+                return policy, trainer, True
+            except Exception as e:
+                log.warning("Tool checkpoint load failed, using fresh policy",
+                            path=str(trainer_path), error=str(e))
+
+        log.info("No tool checkpoint found, using fresh ToolGatingMLP")
+        return policy, trainer, False
+
+    def _save_tool_checkpoint(self, policy: Any, trainer: Any) -> None:
+        """Save the tool-gating policy (trainer-format latest + versioned +
+        inference-format for PolicyManager). Mirrors _save_checkpoint."""
+        checkpoint_dir = Path(self.config.checkpoint_dir)
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            version_tag = datetime.now(UTC).replace(tzinfo=None).strftime("%Y%m%d_%H%M%S")
+            trainer.save_checkpoint(str(checkpoint_dir / f"tool_{version_tag}.pt"))
+            trainer.save_checkpoint(str(checkpoint_dir / "tool_trainer_latest.pt"))
+            log.info("Tool checkpoint saved", version=version_tag)
+        except Exception as e:  # noqa: BLE001
+            log.warning("Tool trainer checkpoint save failed", error=str(e))
+        # The inference-format checkpoint is what the orchestrator loads at boot
+        # (tool_policy_latest.pt). If it fails, the boot WARM-STARTS fresh and
+        # discards trained pruning — surface it at error level (don't bury it in
+        # the trainer-checkpoint catch above).
+        try:
+            from .policy_manager import PolicyManager, PolicyConfig
+            pm = PolicyManager(config=PolicyConfig(checkpoint_dir=checkpoint_dir))
+            pm.save_tool_policy(policy, name="latest")
+        except Exception as e:  # noqa: BLE001
+            log.error("Tool inference checkpoint save failed — boot will warm-start fresh",
+                      error=str(e))
+
     def _save_checkpoint(self, policy: Any, trainer: Any) -> Optional[str]:
         """
         Save versioned checkpoint AND latest alias.
@@ -855,6 +935,7 @@ class TrainingScheduler:
         self,
         policy: Any,
         traversal_weights: Optional[Dict[str, Dict[str, float]]] = None,
+        tool_policy: Any = None,
     ) -> "WeightConfig":
         """
         Extract current weight configuration from trained policy state.
@@ -862,6 +943,7 @@ class TrainingScheduler:
         Builds a WeightConfig from:
         - GatingPolicy softmax output (expert priors)
         - Traversal relation weights (if available)
+        - Tool-gating per-tool call-probabilities (Loop β E.3, if available)
         - Default values for retrieval and RLCF (updated separately by WeightLearner)
         """
         from merlt.weights.config import (
@@ -869,6 +951,7 @@ class TrainingScheduler:
             GatingWeights,
             ExpertTraversalWeights,
             LearnableWeight,
+            ToolGatingWeights,
         )
 
         # Extract expert priors from policy (ExpertGatingMLP or GatingPolicy)
@@ -932,9 +1015,24 @@ class TrainingScheduler:
                     )
                 expert_traversal[pascal_name] = ExpertTraversalWeights(weights=lw_map)
 
+        # Tool-gating per-tool call-probabilities (Loop β E.3).
+        tool_gating = None
+        if tool_policy is not None:
+            try:
+                priors = tool_policy.get_tool_priors()  # {tool: P(call)}
+                tool_gating = ToolGatingWeights(
+                    tool_priors={
+                        t: LearnableWeight(default=round(float(p), 4), bounds=(0.0, 1.0), learnable=True)
+                        for t, p in priors.items()
+                    }
+                )
+            except Exception as e:
+                log.debug("extract_tool_weights_skipped", error=str(e))
+
         return WeightConfig(
             gating=GatingWeights(expert_priors=expert_priors),
             expert_traversal=expert_traversal,
+            tool_gating=tool_gating,
         )
 
     async def _persist_weight_config(
@@ -943,6 +1041,7 @@ class TrainingScheduler:
         checkpoint_version: Optional[str],
         samples_processed: int,
         traversal_weights: Optional[Dict[str, Dict[str, float]]] = None,
+        tool_policy: Any = None,
     ) -> Optional[str]:
         """
         Persist current weight configuration to database via WeightStore.
@@ -960,7 +1059,7 @@ class TrainingScheduler:
         try:
             from merlt.weights.store import WeightStore
 
-            config = self._extract_weight_config(policy, traversal_weights)
+            config = self._extract_weight_config(policy, traversal_weights, tool_policy=tool_policy)
             store = WeightStore(database_url=db_url)
 
             version_id = await store.save_weights(
