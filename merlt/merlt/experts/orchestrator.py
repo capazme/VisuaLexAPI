@@ -197,6 +197,24 @@ class MultiExpertOrchestrator:
             synthesis_mode=self.synthesizer.config.mode.value
         )
 
+    # Loop β A.3 (B4): per-expert mcp-legal-it tool map, split by hermeneutic
+    # canon (art. 12 preleggi). Core retrieval tools (semantic_search,
+    # graph_search) and any other shared tool go to EVERY expert unchanged; only
+    # the curated live legal tools are restricted per canon — precedent gets case
+    # law (its unique value), principles gets doctrine, literal/systemic get norm
+    # text. Tools not listed here (e.g. the ~180 calculators) reach no expert.
+    EXPERT_MCP_TOOLS: Dict[str, set] = {
+        "literal": {"cite_law", "fetch_law_article"},
+        "systemic": {"cite_law"},
+        "principles": {"cerca_brocardi", "cite_law"},
+        "precedent": {
+            "cerca_giurisprudenza",
+            "cerca_giurisprudenza_cgue",
+            "giurisprudenza_su_norma",
+            "leggi_sentenza",
+        },
+    }
+
     def _init_experts(self):
         """Inizializza tutti gli Expert con tool instances separate.
 
@@ -204,9 +222,18 @@ class MultiExpertOrchestrator:
         collect_and_reset_traces() returns only that expert's traces.
         The clones share backend references (retriever, graph_db, etc.)
         but accumulate traces independently.
+
+        Loop β A.3 (B4): the curated live mcp-legal-it tools are filtered per
+        expert via EXPERT_MCP_TOOLS; all other tools are attached to every expert
+        (backward-compatible when no MCP tools are present).
         """
+        all_mcp = set().union(*self.EXPERT_MCP_TOOLS.values())
         for expert_type, expert_class in self.EXPERT_CLASSES.items():
-            expert_tools = [t.clone() for t in self.tools]
+            allowed_mcp = self.EXPERT_MCP_TOOLS.get(expert_type, set())
+            expert_tools = [
+                t.clone() for t in self.tools
+                if t.name not in all_mcp or t.name in allowed_mcp
+            ]
             self._experts[expert_type] = expert_class(
                 tools=expert_tools,
                 ai_service=self.ai_service

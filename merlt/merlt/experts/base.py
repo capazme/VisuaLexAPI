@@ -568,6 +568,80 @@ CHECKLIST:
         """
         return await self._tool_registry.execute(tool_name, **kwargs)
 
+    # Loop β A.3: curated mcp-legal-it tools an expert may invoke for LIVE
+    # grounding (jurisprudence + doctrine + norm text). The ~180 calculator tools
+    # are intentionally excluded — only these carry citable legal sources. Which
+    # of these is actually registered for THIS expert is decided by the per-expert
+    # map in MultiExpertOrchestrator._init_experts (B4).
+    LIVE_LEGAL_TOOLS = (
+        "cerca_giurisprudenza",
+        "cerca_giurisprudenza_cgue",
+        "giurisprudenza_su_norma",
+        "leggi_sentenza",
+        "cerca_brocardi",
+        "cite_law",
+        "fetch_law_article",
+    )
+
+    async def _retrieve_live_legal_sources(
+        self, context: "ExpertContext"
+    ) -> List[Dict[str, Any]]:
+        """Loop β A.3 — best-effort LIVE retrieval from the mcp-legal-it tools
+        registered for this expert.
+
+        Deterministic (NOT ReAct, so it stays well under the 60s expert timeout):
+        each registered live tool is called ONCE with args derived from the query
+        and norm references. Fully failure-isolated — a missing tool, a parameter
+        validation error, or an unreachable MCP server is swallowed and skipped.
+        Results are appended as provisional ``live_unconfirmed`` sources (Phase C
+        sediments the confirmed ones into the graph).
+        """
+        live_sources: List[Dict[str, Any]] = []
+        norm_ref = context.norm_references[0] if context.norm_references else None
+        for tool_name in self.LIVE_LEGAL_TOOLS:
+            tool = self._tool_registry.get(tool_name)
+            if tool is None:
+                continue
+            try:
+                param_names = {p.name for p in (tool.parameters or [])}
+            except Exception:
+                param_names = set()
+            kwargs: Dict[str, Any] = {}
+            if "query" in param_names:
+                kwargs["query"] = context.query_text
+            if "reference" in param_names:
+                kwargs["reference"] = norm_ref or context.query_text
+            if "riferimento" in param_names:
+                kwargs["riferimento"] = norm_ref or context.query_text
+            for cap in ("max_risultati", "max_results"):
+                if cap in param_names:
+                    kwargs[cap] = 3
+            try:
+                result = await tool(**kwargs)
+            except Exception as exc:
+                log.warning("live legal tool call failed",
+                            tool=tool_name, expert=self.expert_type, error=str(exc))
+                continue
+            if not getattr(result, "success", False):
+                continue
+            data = result.data
+            markdown = data if isinstance(data, str) else (
+                data.get("text") if isinstance(data, dict) else None
+            )
+            if not markdown:
+                continue
+            live_sources.append({
+                "text": markdown,
+                "source_id": f"mcp-legal-it:{tool_name}",
+                "source": "mcp-legal-it",
+                "tool_name": tool_name,
+                "provenance": "live_unconfirmed",
+                "expert_type": self.expert_type,
+            })
+            log.info("live legal source retrieved",
+                     tool=tool_name, expert=self.expert_type, chars=len(markdown))
+        return live_sources
+
     def get_tools_schema(self) -> List[Dict[str, Any]]:
         """
         Ottiene schema JSON di tutti i tools.

@@ -319,6 +319,9 @@ class LiteralExpert(BaseExpert, ReActMixin):
             from_graph=len(sources) - len(semantic_results) - len(context.retrieved_chunks)
         )
 
+        # Loop β A.3: augment with live norm text from mcp-legal-it (failure-isolated)
+        sources.extend(await self._retrieve_live_legal_sources(context))
+
         return sources
 
     async def _analyze_with_llm(self, context: ExpertContext) -> ExpertResponse:

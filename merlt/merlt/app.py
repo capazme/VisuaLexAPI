@@ -214,6 +214,22 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 log.warning("Semantic retrieval unavailable; graph grounding only", error=str(e))
 
+            # Loop β A.3: wire the CURATED live mcp-legal-it tools (jurisprudence,
+            # doctrine, norm text) into the shared tool list. Only the names in the
+            # orchestrator's per-expert map are added — never the ~180 calculator
+            # tools — and _init_experts then splits them by canon. Failure-isolated:
+            # if the MCP sidecar is down the experts still run on graph+semantic.
+            try:
+                from merlt.tools.mcp_legal_adapter import build_mcp_legal_tools
+                _curated = set().union(*MultiExpertOrchestrator.EXPERT_MCP_TOOLS.values())
+                mcp_tools = [t for t in await build_mcp_legal_tools() if t.name in _curated]
+                tools.extend(mcp_tools)
+                log.info("Live mcp-legal-it tools wired",
+                         count=len(mcp_tools), names=[t.name for t in mcp_tools])
+            except Exception as mcp_err:
+                log.warning("mcp-legal-it tools unavailable; experts run without live legal tools",
+                            error=str(mcp_err))
+
             # Loop β E.1/0.3: wire neural gating so the router emits LEARNABLE
             # expert_selection Actions (carrying query_embedding + log_prob) into
             # the ExecutionTrace — without these, REINFORCE (Phase E) trains on

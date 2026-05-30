@@ -299,6 +299,10 @@ class PrecedentExpert(BaseExpert, ReActMixin):
             extracted_urns=len(self._extracted_urns)
         )
 
+        # Loop β A.3: augment with LIVE case law (Cassazione + CGUE) from
+        # mcp-legal-it — the precedent canon's primary value-add (failure-isolated).
+        sources.extend(await self._retrieve_live_legal_sources(context))
+
         return sources
 
     async def _search_jurisprudence(self, context: ExpertContext) -> List[Dict[str, Any]]:
