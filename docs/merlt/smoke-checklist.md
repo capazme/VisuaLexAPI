@@ -267,6 +267,22 @@ Prereq: stack Docker MERL-T attivo (`docker compose -f docker-compose.merlt.yml 
 - [ ] Con Completo: lista entità/relazioni pending (`GET /api/merlt/validate/pending`).
 - [ ] Vota 👍/👎 su un item → `POST /api/merlt/validate/{entity|relation}` 200, l'item sparisce dalla lista.
 
+## Q&A esperti — Loop β Fase F (`/merlt/chiedi`)
+- [ ] Con consenso < Completo (o flag off) → CTA "serve consenso Completo" + link a `/merlt`.
+- [ ] Hub: card "Q&A esperti" mostra "Apri" (non più "In arrivo") quando consenso Completo.
+- [ ] Con Completo: poni una domanda (es. «art. 1453 c.c. risoluzione per inadempimento») → sintesi fondata.
+- [ ] La risposta mostra una **confidenza** non fissa a 0.9 e i **canoni interpellati**.
+- [ ] Pannello "Come ci sono arrivato" → **Fonti consultate** con URN leggibile, badge provenance (fondativa/validata/provvisoria) e affidabilità; il link apre `/grafo?urn=`.
+- [ ] 👍/👎 globale → `POST /api/merlt/experts/feedback/inline` 200; lo stato resta evidenziato.
+- [ ] "Approfondisci" → nuovo turno in coda via `POST /api/merlt/experts/refine`.
+- [ ] Su una fonte **provvisoria** (`live_unconfirmed`): "Ricorda nel grafo" → `POST /api/merlt/experts/confirm-source` → stato "Ricordata"; il nodo poi compare in `/grafo`.
+- [ ] Feedback per-fonte (pertinente/non) → `POST .../feedback/source`; valutazione dettagliata 3-layer → `POST .../feedback/detailed`.
+- [ ] Modalità "Tesi a confronto" (divergente, quando il disaccordo è alto): tesi per-canone + "Mi convince" → `POST .../feedback/preference`.
+
+### Note rete (Fase F)
+- Tutte le rotte sotto `authenticate + contributionGuard` (consenso Completo); 503 `merlt_unavailable` se MERL-T è giù, 4xx passthrough.
+- Timeout client lungo: `MERLT_EXPERTS_TIMEOUT_MS` (default 120s) — la query multi-expert può richiedere decine di secondi.
+
 ## Snapshot locale (#7, su `/grafo`)
 - [ ] Apri uno slice, "Esporta slice" → scarica un `.json`.
 - [ ] "Carica slice" + seleziona il file → banner "Slice locale (sola lettura)" + render nel canvas; "Chiudi" torna alla vista normale.

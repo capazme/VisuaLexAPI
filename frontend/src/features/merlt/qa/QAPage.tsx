@@ -1,0 +1,98 @@
+import { Link } from 'react-router-dom';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { Button } from '../../../components/ui/Button';
+import { useMerltFeatures } from '../useMerltFeatures';
+import { useQaThread } from './useQaThread';
+import { QaComposer } from './QaComposer';
+import { QaTurn } from './QaTurn';
+
+const EXAMPLES = [
+  'Requisiti della risoluzione per inadempimento (art. 1453 c.c.)',
+  'Differenza tra caparra confirmatoria e penitenziale',
+  'Quando l’inadempimento è di «non scarsa importanza» (art. 1455 c.c.)?',
+];
+
+/**
+ * Q&A page over the MERL-T multi-expert engine (Loop β F.2). Full-consent gated
+ * (defence-in-depth: the BFF also enforces contributionGuard). Conversational
+ * thread; all setState lives in handlers/callbacks.
+ */
+export function QAPage() {
+  const { merltEnabled, canContribute } = useMerltFeatures();
+  const { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm } = useQaThread();
+
+  if (!merltEnabled) {
+    return <p className="text-slate-600 dark:text-slate-300">MERL-T non è disponibile.</p>;
+  }
+  if (!canContribute) {
+    return (
+      <div className="space-y-3">
+        <p className="text-slate-600 dark:text-slate-300">
+          Per interrogare gli esperti MERL-T serve il consenso <strong>Completo</strong>.
+        </p>
+        <Link to="/merlt">
+          <Button variant="secondary" size="sm">Vai alle impostazioni MERL-T</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const busy = turns.some((t) => t.state.status === 'loading');
+
+  return (
+    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <header>
+        <Link to="/merlt" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+          <ArrowLeft size={14} /> MERL-T
+        </Link>
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
+          <MessageSquare className="text-primary-500" /> Chiedi a MERL-T
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+          Poni una domanda giuridica: gli esperti (i canoni ermeneutici dell’art. 12 preleggi)
+          la analizzano e ne sintetizzano una risposta fondata, con le fonti consultate e la loro
+          provenienza sempre visibili.
+        </p>
+      </header>
+
+      <QaComposer onSubmit={(q, mode) => void ask(q, mode)} disabled={busy} />
+
+      {turns.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
+          <p className="mb-2 text-sm text-slate-500">Per iniziare, prova una di queste domande:</p>
+          <ul className="space-y-1">
+            {EXAMPLES.map((ex) => (
+              <li key={ex}>
+                <button
+                  type="button"
+                  onClick={() => void ask(ex, 'convergent')}
+                  className="text-left text-sm text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  {ex}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {turns.map((turn) => {
+            const traceId = turn.state.status === 'success' ? turn.state.answer.trace_id : '';
+            return (
+              <QaTurn
+                key={turn.id}
+                turn={turn}
+                onRate={(rating) => rate(turn.id, traceId, rating)}
+                onRefine={(followUp) => void refine(traceId, followUp)}
+                onConfirm={(s) => void confirm(turn.id, s)}
+                onRateSource={(sourceId, relevant) => rateSrc(traceId, sourceId, relevant)}
+                onPrefer={(expert) => prefer(traceId, expert)}
+                onDetailed={(scores) => detailed(traceId, scores)}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

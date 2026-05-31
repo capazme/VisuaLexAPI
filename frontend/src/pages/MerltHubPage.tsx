@@ -220,11 +220,21 @@ export function MerltHubPage() {
 
         <HubCard testId="hub-card-qa" icon={MessageSquare} title="Q&A esperti">
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Domande giuridiche al sistema multi-expert.
+            Domande giuridiche al sistema multi-expert, con fonti e provenienza sempre visibili.
           </p>
-          <p className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            In arrivo
-          </p>
+          <div className="mt-3">
+            {features.canContribute ? (
+              <Link to="/merlt/chiedi">
+                <Button variant="primary" size="sm">
+                  Apri
+                </Button>
+              </Link>
+            ) : (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Richiede consenso <strong>Completo</strong>.
+              </p>
+            )}
+          </div>
         </HubCard>
 
         {features.opsVisible && (
