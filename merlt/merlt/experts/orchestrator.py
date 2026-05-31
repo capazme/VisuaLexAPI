@@ -181,6 +181,7 @@ class MultiExpertOrchestrator:
         # Loop β C.2: strong refs to in-flight sedimentation tasks so fire-and-forget
         # background writes aren't garbage-collected before they complete.
         self._sediment_tasks: set = set()
+        self._ner_mining_tasks: set = set()
 
         # Router: preferisce HybridExpertRouter se disponibile
         self.hybrid_router = hybrid_router
@@ -271,6 +272,65 @@ class MultiExpertOrchestrator:
                      requested=len(live_sources), written=len(written))
         except Exception as exc:
             log.warning("live-source sedimentation failed (non-fatal)", error=str(exc))
+
+    async def _mine_ner_confirmations(
+        self, user_id: str, legal_references: List[Dict[str, Any]]
+    ) -> None:
+        """Loop β #2 (surface=search_mining): a successful query whose references
+        grounded to a canonical URN seeds low-weight ``confirmation`` rows in the
+        ``ner_feedback`` RLCF store, bootstrapping the learned-NER training set.
+
+        Fire-and-forget, fully failure-isolated, and idempotent per (user_id, urn)
+        via a deterministic feedback_id so repeated searches never flood the table.
+        Privacy: only the grounded reference + canonical URN are stored — never
+        the raw query text."""
+        grounded = [r for r in (legal_references or []) if r.get("urn")]
+        if not grounded:
+            return
+        try:
+            import hashlib
+            from datetime import datetime as _dt
+            from sqlalchemy import select, func as safunc
+            from merlt.storage.enrichment.database import get_db_session
+            from merlt.storage.enrichment.models import NERFeedback, UserDomainAuthority
+
+            async with get_db_session() as session:
+                value = (await session.execute(
+                    select(safunc.max(UserDomainAuthority.domain_authority)).where(
+                        UserDomainAuthority.user_id == user_id
+                    )
+                )).scalar()
+                authority = float(value) if value is not None else 0.5
+                # Same [0.5, 2.0] mapping as ner_router.compute_sample_weight.
+                weight = max(0.5, min(2.0, authority * 2.0))
+                recorded = 0
+                for ref in grounded:
+                    urn = ref["urn"]
+                    fid = "ner-mining-" + hashlib.sha256(
+                        f"{user_id}|{urn}".encode("utf-8")
+                    ).hexdigest()[:32]
+                    exists = (await session.execute(
+                        select(NERFeedback.id).where(NERFeedback.feedback_id == fid)
+                    )).first()
+                    if exists:
+                        continue
+                    session.add(NERFeedback(
+                        feedback_id=fid,
+                        source_surface="search_mining",
+                        user_id=user_id,
+                        article_urn=urn,
+                        selected_text=ref.get("display"),
+                        feedback_type="confirmation",
+                        original_parsed=ref,
+                        user_authority=authority,
+                        sample_weight=weight,
+                        created_at=_dt.utcnow(),
+                    ))
+                    recorded += 1
+            log.info("ner search-mining confirmations recorded",
+                     recorded=recorded, candidates=len(grounded), user_id=user_id)
+        except Exception as exc:
+            log.warning("ner search-mining failed (non-fatal)", error=str(exc))
 
     # ------------------------------------------------------------------
     # Loop β E.3 — tool-gating policy hooks (failure-isolated, additive)
@@ -538,6 +598,17 @@ class MultiExpertOrchestrator:
             merged_entities["legal_concepts"] = query_analysis.legal_concepts
         if query_analysis.article_numbers:
             merged_entities["article_numbers"] = query_analysis.article_numbers
+
+        # Loop β #2 (surface=search_mining): seed low-weight confirmations for
+        # references that grounded to a canonical URN — bootstraps the learned
+        # NER training set. Full-consent only, fire-and-forget, failure-isolated.
+        _ner_meta = metadata or {}
+        if _ner_meta.get("user_id") and _ner_meta.get("consent_level") == "full" and legal_references:
+            _ner_task = asyncio.create_task(
+                self._mine_ner_confirmations(_ner_meta["user_id"], legal_references)
+            )
+            self._ner_mining_tasks.add(_ner_task)
+            _ner_task.add_done_callback(self._ner_mining_tasks.discard)
 
         context = ExpertContext(
             query_text=query,

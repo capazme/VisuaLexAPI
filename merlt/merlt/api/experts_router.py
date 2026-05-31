@@ -652,7 +652,7 @@ async def query_experts(
             query=request.query,
             entities=request.context.get("entities") if request.context else None,
             retrieved_chunks=request.context.get("retrieved_chunks") if request.context else None,
-            metadata={"user_id": request.user_id},
+            metadata={"user_id": request.user_id, "consent_level": request.consent_level},
             include_trace=request.include_trace
         )
 
