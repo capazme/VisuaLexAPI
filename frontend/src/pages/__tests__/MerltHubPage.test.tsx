@@ -18,6 +18,9 @@ vi.mock('../../features/merlt/consent/ConsentDialog', () => ({
 }));
 vi.mock('../../services/merltService', () => ({
   fetchMerltProfile: (...a: unknown[]) => fetchProfile(...a),
+  // NerOpsCard (mounted in the opsVisible ops card) reads stats via getMerlt.
+  getMerlt: () => Promise.resolve({ total: 0, untrained: 0, by_type: {}, by_surface: {} }),
+  postMerlt: () => Promise.resolve({ task_id: 't', status: 'queued' }),
 }));
 
 import { MerltHubPage } from '../MerltHubPage';
