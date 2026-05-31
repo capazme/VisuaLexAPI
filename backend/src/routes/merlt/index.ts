@@ -5,6 +5,7 @@ import graphRouter from './graph';
 import contribRouter from './contrib';
 import validateRouter from './validate';
 import opsRouter from './ops';
+import expertsRouter from './experts';
 import healthRouter from './health';
 import profileRouter from './profile';
 
@@ -38,6 +39,9 @@ router.use('/', graphRouter);
 router.use('/', contribRouter);
 router.use('/', validateRouter);
 router.use('/', opsRouter);
+// Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the
+// catch-all auth routers (gotcha #1).
+router.use('/', expertsRouter);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);
