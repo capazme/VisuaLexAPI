@@ -3,8 +3,9 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, DossierItem, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
+import { getErrorMessage } from '../utils/errors';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -105,7 +106,7 @@ function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
 interface NormaBlock {
     type: 'norma';
     id: string;
-    norma: any;
+    norma: Norma;
     articles: ArticleData[];
     isCollapsed: boolean;
     /**
@@ -122,12 +123,12 @@ interface LooseArticle {
     type: 'loose-article';
     id: string;
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 interface CollectionArticle {
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 interface ArticleCollection {
@@ -241,11 +242,11 @@ interface AppState {
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
     // Workspace Tab Actions
-    addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
-    addNormaToTab: (tabId: string, norma: any, articles: ArticleData[]) => void;
+    addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
+    addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
     consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
-    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: any) => void;
+    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: Norma) => void;
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
     removeTab: (id: string) => void;
     bringTabToFront: (id: string) => void;
@@ -265,7 +266,7 @@ interface AppState {
     // Collection Actions
     createCollection: (tabId: string, label?: string) => string;
     renameCollection: (tabId: string, collectionId: string, newLabel: string) => void;
-    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: any) => void;
+    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: Norma) => void;
     removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
     toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
     moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
@@ -279,7 +280,7 @@ interface AppState {
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
-    addToDossier: (dossierId: string, item: any, type: 'norma' | 'note') => void;
+    addToDossier: (dossierId: string, item: DossierNormaData | string, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
@@ -468,7 +469,7 @@ const appStore = createStore<AppState>()(
                     ]);
 
                     // Transform API bookmarks to local format
-                    const bookmarks: Bookmark[] = bookmarksRes.map((b: any) => ({
+                    const bookmarks: Bookmark[] = bookmarksRes.map((b) => ({
                         id: b.id,
                         normaKey: b.normaKey,
                         normaData: b.normaData,
@@ -482,12 +483,21 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map(item => ({
-                            id: item.id,
-                            type: item.item_type === 'norm' ? 'norma' : 'note',
-                            data: item.content,
-                            addedAt: item.created_at,
-                        })),
+                        items: d.items.map((item): DossierItem =>
+                            item.item_type === 'norm'
+                                ? {
+                                    id: item.id,
+                                    type: 'norma',
+                                    data: item.content as DossierNormaData,
+                                    addedAt: item.created_at,
+                                }
+                                : {
+                                    id: item.id,
+                                    type: 'note',
+                                    data: item.content as string,
+                                    addedAt: item.created_at,
+                                }
+                        ),
                         tags: [],
                         isPinned: false,
                     }));
@@ -505,11 +515,11 @@ const appStore = createStore<AppState>()(
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
                     });
-                } catch (error: any) {
+                } catch (error) {
                     console.error('Failed to fetch user data:', error);
                     set((state) => {
                         state.isLoadingData = false;
-                        state.dataError = error.message || 'Failed to load user data';
+                        state.dataError = getErrorMessage(error) || 'Failed to load user data';
                     });
                 }
             },
@@ -2399,10 +2409,11 @@ const appStore = createStore<AppState>()(
 export function useAppStore(): AppState;
 export function useAppStore<T>(selector: (state: AppState) => T): T;
 export function useAppStore<T>(selector?: (state: AppState) => T) {
-    if (selector) {
-        return useStore(appStore, selector);
-    }
-    return useStore(appStore);
+    // Call useStore unconditionally (rules-of-hooks). The no-selector overload
+    // subscribes to the whole state via an identity selector — behaviourally
+    // identical to useStore(appStore) since immer returns a new state ref on
+    // every update.
+    return useStore(appStore, selector ?? ((state) => state as unknown as T));
 }
 
 // Export store for direct access (e.g., appStore.getState())

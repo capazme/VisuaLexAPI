@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as authService from '../services/authService';
 import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
+import { getErrorMessage } from '../utils/errors';
 
 interface AuthState {
   user: UserResponse | null;
@@ -45,11 +46,11 @@ export function useAuth() {
         if (!store.isDataLoaded && !store.isLoadingData) {
           store.fetchUserData();
         }
-      } catch (error: any) {
+      } catch (error) {
         setState({
           user: null,
           loading: false,
-          error: error.message || 'Failed to load user',
+          error: getErrorMessage(error) || 'Failed to load user',
           isAuthenticated: false,
         });
       }
@@ -79,11 +80,11 @@ export function useAuth() {
       });
 
       return currentUser;
-    } catch (error: any) {
+    } catch (error) {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error.message || 'Registration failed',
+        error: getErrorMessage(error) || 'Registration failed',
       }));
       throw error;
     }
@@ -110,11 +111,11 @@ export function useAuth() {
       appStore.getState().fetchUserData();
 
       return user;
-    } catch (error: any) {
+    } catch (error) {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error.message || 'Login failed',
+        error: getErrorMessage(error) || 'Login failed',
       }));
       throw error;
     }
@@ -155,11 +156,11 @@ export function useAuth() {
         }));
 
         return updatedUser;
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Password change failed',
+          error: getErrorMessage(error) || 'Password change failed',
         }));
         throw error;
       }

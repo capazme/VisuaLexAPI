@@ -291,7 +291,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             await navigator.clipboard.writeText(textToCopy);
             showToast('Contenuto copiato negli appunti', 'success');
-        } catch (err) {
+        } catch {
             showToast('Errore durante la copia', 'error');
         }
     };
@@ -399,7 +399,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
             await navigator.clipboard.writeText(shareUrl);
             showToast('Link copiato negli appunti', 'success');
-        } catch (err) {
+        } catch {
             showToast('Errore durante la copia del link', 'error');
         }
     };
@@ -468,7 +468,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
             await navigator.clipboard.writeText(text + citation);
             showToast('Testo copiato con citazione', 'success');
-        } catch (err) {
+        } catch {
             showToast('Errore durante la copia', 'error');
         }
     };

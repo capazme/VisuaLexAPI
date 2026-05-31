@@ -182,7 +182,7 @@ export function useGlobalSearch() {
 
 // Global state for highlighting matches
 let highlightQuery: string | null = null;
-let highlightListeners: Set<(query: string | null) => void> = new Set();
+const highlightListeners: Set<(query: string | null) => void> = new Set();
 
 export function setGlobalHighlight(query: string | null) {
   highlightQuery = query;

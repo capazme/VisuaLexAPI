@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { sanitizeHTML } from '../../../utils/sanitize';
+import { sanitizeHTML } from '../../../utils/sanitizeHtml';
 import type { DossierItem } from '../../../types';
 
 interface Props {

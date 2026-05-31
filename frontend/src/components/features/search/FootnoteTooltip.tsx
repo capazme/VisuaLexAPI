@@ -72,6 +72,9 @@ export function FootnoteTooltip({
   useEffect(() => {
     if (!isOpen) return;
 
+    // External-sync: tooltip position comes from live DOM measurement on open +
+    // scroll/resize; it cannot be derived during render. (CLAUDE.md gotcha #11)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updatePosition();
 
     const handleScroll = () => updatePosition();

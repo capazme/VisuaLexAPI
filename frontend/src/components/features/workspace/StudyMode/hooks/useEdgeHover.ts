@@ -153,10 +153,14 @@ export function useEdgeHover(options: UseEdgeHoverOptions = {}): UseEdgeHoverRet
 
   // Keep pinned panels visible
   useEffect(() => {
+    // External-sync: edge visibility tracks the externally-controlled pin state.
+    // (CLAUDE.md gotcha #11)
     if (pinnedPanels.left) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEdges(prev => ({ ...prev, left: true }));
     }
     if (pinnedPanels.right) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEdges(prev => ({ ...prev, right: true }));
     }
   }, [pinnedPanels]);

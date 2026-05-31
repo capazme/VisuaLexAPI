@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
 import type { AdminUserResponse } from '../types/api';
 import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminSharedEnvironment } from '../services/adminService';
+import { getErrorMessage } from '../utils/errors';
 import {
   Users,
   UserPlus,
@@ -82,8 +83,8 @@ export function AdminPage() {
       setError(null);
       const data = await adminService.listUsers();
       setUsers(data);
-    } catch (err: any) {
-      setError(err.message || 'Errore nel caricamento degli utenti');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nel caricamento degli utenti');
     } finally {
       setLoading(false);
     }
@@ -98,8 +99,8 @@ export function AdminPage() {
       ]);
       setFeedbacks(data);
       setFeedbackStats(stats);
-    } catch (err: any) {
-      setError(err.message || 'Errore nel caricamento dei feedback');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nel caricamento dei feedback');
     } finally {
       setFeedbackLoading(false);
     }
@@ -120,8 +121,8 @@ export function AdminPage() {
         pages: response.pagination.pages,
         total: response.pagination.total,
       });
-    } catch (err: any) {
-      setError(err.message || 'Errore nel caricamento degli ambienti');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nel caricamento degli ambienti');
     } finally {
       setEnvLoading(false);
     }
@@ -150,8 +151,8 @@ export function AdminPage() {
       setActionLoading(true);
       await adminService.withdrawSharedEnvironment(id);
       setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: false } : e));
-    } catch (err: any) {
-      setError(err.message || 'Errore nel ritirare l\'ambiente');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nel ritirare l\'ambiente');
     } finally {
       setActionLoading(false);
     }
@@ -162,8 +163,8 @@ export function AdminPage() {
       setActionLoading(true);
       await adminService.republishSharedEnvironment(id);
       setEnvironments(prev => prev.map(e => e.id === id ? { ...e, isActive: true } : e));
-    } catch (err: any) {
-      setError(err.message || 'Errore nel ripubblicare l\'ambiente');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nel ripubblicare l\'ambiente');
     } finally {
       setActionLoading(false);
     }
@@ -176,8 +177,8 @@ export function AdminPage() {
       await adminService.deleteSharedEnvironment(showDeleteEnvConfirm);
       setEnvironments(prev => prev.filter(e => e.id !== showDeleteEnvConfirm));
       setShowDeleteEnvConfirm(null);
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'eliminazione dell\'ambiente');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'eliminazione dell\'ambiente');
     } finally {
       setActionLoading(false);
     }
@@ -193,8 +194,8 @@ export function AdminPage() {
       setActionLoading(true);
       await adminService.updateFeedbackStatus(id, status);
       await loadFeedbacks();
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'aggiornamento');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
     } finally {
       setActionLoading(false);
     }
@@ -207,8 +208,8 @@ export function AdminPage() {
       await adminService.deleteFeedback(showDeleteFeedbackConfirm);
       setShowDeleteFeedbackConfirm(null);
       await loadFeedbacks();
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'eliminazione');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'eliminazione');
     } finally {
       setActionLoading(false);
     }
@@ -246,8 +247,8 @@ export function AdminPage() {
       setNewUser({ email: '', username: '', password: '', isAdmin: false });
       setShowCreateModal(false);
       await loadUsers();
-    } catch (err: any) {
-      setActionError(err.message || 'Errore nella creazione utente');
+    } catch (err) {
+      setActionError(getErrorMessage(err) || 'Errore nella creazione utente');
     } finally {
       setActionLoading(false);
     }
@@ -258,8 +259,8 @@ export function AdminPage() {
       setActionLoading(true);
       await adminService.updateUser(userId, { isAdmin: !currentIsAdmin });
       await loadUsers();
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'aggiornamento');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
     } finally {
       setActionLoading(false);
     }
@@ -270,8 +271,8 @@ export function AdminPage() {
       setActionLoading(true);
       await adminService.updateUser(userId, { isActive: !currentIsActive });
       await loadUsers();
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'aggiornamento');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento');
     } finally {
       setActionLoading(false);
     }
@@ -285,8 +286,8 @@ export function AdminPage() {
       await adminService.resetPassword(showResetPasswordModal, { newPassword });
       setNewPassword('');
       setShowResetPasswordModal(null);
-    } catch (err: any) {
-      setActionError(err.message || 'Errore nel reset password');
+    } catch (err) {
+      setActionError(getErrorMessage(err) || 'Errore nel reset password');
     } finally {
       setActionLoading(false);
     }
@@ -299,8 +300,8 @@ export function AdminPage() {
       await adminService.deleteUser(showDeleteConfirm);
       setShowDeleteConfirm(null);
       await loadUsers();
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'eliminazione');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'eliminazione');
     } finally {
       setActionLoading(false);
     }

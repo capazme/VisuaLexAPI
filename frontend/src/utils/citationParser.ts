@@ -190,7 +190,7 @@ const STANDALONE_NUMBER_PATTERN = /^(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|qua
 /**
  * Pattern per numero/anno (es. "241/1990", "679/2016")
  */
-const NUMBER_YEAR_PATTERN = /\b(\d+)\s*[\/\\]\s*(\d{2,4})\b/;
+const NUMBER_YEAR_PATTERN = /\b(\d+)\s*[/\\]\s*(\d{2,4})\b/;
 
 /**
  * Pattern per anno isolato (es. "1990", "2016")

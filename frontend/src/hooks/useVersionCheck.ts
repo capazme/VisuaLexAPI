@@ -49,6 +49,9 @@ export function useVersionCheck(): UseVersionCheckReturn {
     // Throttle: don't check if we recently checked in this session
     const lastCheck = sessionStorage.getItem(VERSION_CHECK_SESSION_KEY);
     if (lastCheck && Date.now() - Number(lastCheck) < VERSION_CHECK_THROTTLE) {
+      // Async version-check effect: clear the loading flag on the throttle
+      // short-circuit. (CLAUDE.md gotcha #11)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState((s) => ({ ...s, isLoading: false }));
       return;
     }

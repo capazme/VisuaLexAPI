@@ -11,10 +11,19 @@ function normalizeArticleId(id: string): string {
   return id.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
+// A tree node is either a section-title string or an article object carrying
+// its number and (optional) annex marker.
+interface TreeArticleNode {
+  numero: string;
+  allegato?: string | null;
+  [key: string]: unknown;
+}
+type TreeViewNode = string | TreeArticleNode;
+
 export interface TreeViewPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  treeData: any[];
+  treeData: TreeViewNode[];
   urn: string;
   title?: string;
   /** Callback when article is selected - includes target annex (null for dispositivo) */
@@ -60,7 +69,7 @@ interface ParsedSection {
  * Section titles are applied to following articles, but only sections with
  * articles matching the target annex are included.
  */
-function parseTreeDataForAnnex(data: any[], targetAnnex: string | null): ParsedSection[] {
+function parseTreeDataForAnnex(data: TreeViewNode[], targetAnnex: string | null): ParsedSection[] {
   const sections: ParsedSection[] = [];
   let currentSection: ParsedSection = { title: 'Articoli', articles: [] };
   let pendingSectionTitle: string | null = null;
@@ -146,6 +155,9 @@ export function TreeViewPanel({
 
   // Reset selected annex when panel opens or when currentAnnex changes externally
   useEffect(() => {
+    // External-sync: reset local selection when the panel opens or the annex
+    // changes from outside. (CLAUDE.md gotcha #11)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedAnnex(undefined);
   }, [currentAnnex, isOpen]);
 

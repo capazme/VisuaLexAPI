@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { bookmarkService } from '../services/bookmarkService';
 import type { Bookmark, BookmarkCreate, BookmarkUpdate } from '../types/api';
+import { getErrorMessage } from '../utils/errors';
 
 interface UseBookmarksReturn {
   bookmarks: Bookmark[];
@@ -29,8 +30,8 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
     try {
       const data = await bookmarkService.getAll(folderId ? { folderId } : undefined);
       setBookmarks(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch bookmarks');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Failed to fetch bookmarks');
       console.error('Error fetching bookmarks:', err);
     } finally {
       setLoading(false);
@@ -49,8 +50,8 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
       const newBookmark = await bookmarkService.create(data);
       setBookmarks(prev => [newBookmark, ...prev]);
       return newBookmark;
-    } catch (err: any) {
-      setError(err.message || 'Failed to create bookmark');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Failed to create bookmark');
       throw err;
     }
   }, []);
@@ -66,10 +67,10 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
       const updated = await bookmarkService.update(id, data);
       setBookmarks(prev => prev.map(b => b.id === id ? updated : b));
       return updated;
-    } catch (err: any) {
+    } catch (err) {
       // Rollback on error
       setBookmarks(previousBookmarks);
-      setError(err.message || 'Failed to update bookmark');
+      setError(getErrorMessage(err) || 'Failed to update bookmark');
       throw err;
     }
   }, [bookmarks]);
@@ -83,10 +84,10 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
 
     try {
       await bookmarkService.delete(id);
-    } catch (err: any) {
+    } catch (err) {
       // Rollback on error
       setBookmarks(previousBookmarks);
-      setError(err.message || 'Failed to delete bookmark');
+      setError(getErrorMessage(err) || 'Failed to delete bookmark');
       throw err;
     }
   }, [bookmarks]);
@@ -101,9 +102,9 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
       const updated = await bookmarkService.move(id, targetFolderId);
       setBookmarks(prev => prev.map(b => b.id === id ? updated : b));
       return updated;
-    } catch (err: any) {
+    } catch (err) {
       setBookmarks(previousBookmarks);
-      setError(err.message || 'Failed to move bookmark');
+      setError(getErrorMessage(err) || 'Failed to move bookmark');
       throw err;
     }
   }, [bookmarks]);
@@ -116,9 +117,9 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
 
     try {
       await bookmarkService.bulkDelete(ids);
-    } catch (err: any) {
+    } catch (err) {
       setBookmarks(previousBookmarks);
-      setError(err.message || 'Failed to delete bookmarks');
+      setError(getErrorMessage(err) || 'Failed to delete bookmarks');
       throw err;
     }
   }, [bookmarks]);
@@ -131,9 +132,9 @@ export function useBookmarks(folderId?: string): UseBookmarksReturn {
 
     try {
       await bookmarkService.bulkMove(ids, targetFolderId);
-    } catch (err: any) {
+    } catch (err) {
       setBookmarks(previousBookmarks);
-      setError(err.message || 'Failed to move bookmarks');
+      setError(getErrorMessage(err) || 'Failed to move bookmarks');
       throw err;
     }
   }, [bookmarks]);

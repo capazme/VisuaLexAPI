@@ -41,16 +41,22 @@ export function NormaPicker({ value, onChange, placeholder, ariaLabel }: NormaPi
   useEffect(() => {
     if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
     const trimmed = query.trim();
+    // External-sync: this debounced effect maps the live `query` input to a
+    // parse state; the synchronous transitions below are intrinsic to debounce.
+    // (CLAUDE.md gotcha #11)
     if (trimmed.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ status: 'idle' });
       return;
     }
     // Power-user escape hatch: paste a urn directly and we accept it as-is.
     if (isLikelyUrn(trimmed)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ status: 'recognized', urn: trimmed, display: trimmed });
       return;
     }
     const id = ++requestIdRef.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: 'loading' });
     debounceRef.current = window.setTimeout(() => {
       void (async () => {

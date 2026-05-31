@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { highlightService } from '../services/highlightService';
 import type { HighlightResponse, HighlightCreate, HighlightUpdate } from '../types/api';
+import { getErrorMessage } from '../utils/errors';
 
 interface UseHighlightsReturn {
   highlights: HighlightResponse[];
@@ -30,8 +31,8 @@ export function useHighlights(normaKey: string | null): UseHighlightsReturn {
     try {
       const data = await highlightService.getByNormaKey(normaKey);
       setHighlights(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch highlights');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Failed to fetch highlights');
       console.error('Error fetching highlights:', err);
     } finally {
       setLoading(false);
@@ -50,8 +51,8 @@ export function useHighlights(normaKey: string | null): UseHighlightsReturn {
       const newHighlight = await highlightService.create(data);
       setHighlights(prev => [...prev, newHighlight]);
       return newHighlight;
-    } catch (err: any) {
-      setError(err.message || 'Failed to create highlight');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Failed to create highlight');
       throw err;
     }
   }, []);
@@ -66,9 +67,9 @@ export function useHighlights(normaKey: string | null): UseHighlightsReturn {
       const updated = await highlightService.update(id, data);
       setHighlights(prev => prev.map(h => h.id === id ? updated : h));
       return updated;
-    } catch (err: any) {
+    } catch (err) {
       setHighlights(previousHighlights);
-      setError(err.message || 'Failed to update highlight');
+      setError(getErrorMessage(err) || 'Failed to update highlight');
       throw err;
     }
   }, [highlights]);
@@ -81,9 +82,9 @@ export function useHighlights(normaKey: string | null): UseHighlightsReturn {
 
     try {
       await highlightService.delete(id);
-    } catch (err: any) {
+    } catch (err) {
       setHighlights(previousHighlights);
-      setError(err.message || 'Failed to delete highlight');
+      setError(getErrorMessage(err) || 'Failed to delete highlight');
       throw err;
     }
   }, [highlights]);

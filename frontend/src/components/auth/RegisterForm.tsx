@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { register } from '../../services/authService';
 import { UserPlus, Mail, Lock, User, Eye, EyeOff, AlertCircle, ArrowLeft, CheckCircle, Check, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getErrorMessage } from '../../utils/errors';
 
 export function RegisterForm() {
   const [email, setEmail] = useState('');
@@ -74,8 +75,8 @@ export function RegisterForm() {
       setLoading(true);
       await register({ email, username, password });
       setRegistrationComplete(true);
-    } catch (error: any) {
-      setFormError(error.message || 'Errore durante la registrazione. Riprova.');
+    } catch (error) {
+      setFormError(getErrorMessage(error) || 'Errore durante la registrazione. Riprova.');
     } finally {
       setLoading(false);
     }
