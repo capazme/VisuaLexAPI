@@ -1,10 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { ArticleData } from '../types';
+import type { ArticleData, Norma } from '../types';
 
 export interface NormaBlock {
     type: 'norma';
     id: string;
-    norma: any;
+    norma: Norma;
     articles: ArticleData[];
     isCollapsed: boolean;
 }
@@ -13,7 +13,7 @@ export interface LooseArticle {
     type: 'loose-article';
     id: string;
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 export type TabContent = NormaBlock | LooseArticle;
@@ -28,11 +28,18 @@ export interface WorkspaceTab {
     content: TabContent[];
 }
 
-export function createWorkspaceTabActions(set: any, _get: any) {
+interface WorkspaceTabState {
+    workspaceTabs: WorkspaceTab[];
+    highestZIndex: number;
+}
+
+type SetWorkspaceTabState = (updater: (state: WorkspaceTabState) => void) => void;
+
+export function createWorkspaceTabActions(set: SetWorkspaceTabState) {
     return {
-        addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[]) => {
+        addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[]) => {
             let tabId = '';
-            set((state: any) => {
+            set((state) => {
                 const tabCount = state.workspaceTabs.length;
                 const cascade = (tabCount % 5) * 40;
 
@@ -76,7 +83,7 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             return tabId;
         },
 
-        addNormaToTab: (tabId: string, norma: any, articles: ArticleData[]) => set((state: any) => {
+        addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === tabId);
             if (!tab) return;
 
@@ -123,7 +130,7 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             tab.zIndex = ++state.highestZIndex;
         }),
 
-        addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: any) => set((state: any) => {
+        addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: Norma) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === tabId);
             if (!tab) return;
 
@@ -137,32 +144,32 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             tab.zIndex = ++state.highestZIndex;
         }),
 
-        updateTab: (id: string, updates: Partial<WorkspaceTab>) => set((state: any) => {
+        updateTab: (id: string, updates: Partial<WorkspaceTab>) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === id);
             if (tab) {
                 Object.assign(tab, updates);
             }
         }),
 
-        removeTab: (id: string) => set((state: any) => {
+        removeTab: (id: string) => set((state) => {
             state.workspaceTabs = state.workspaceTabs.filter((t: WorkspaceTab) => t.id !== id);
         }),
 
-        bringTabToFront: (id: string) => set((state: any) => {
+        bringTabToFront: (id: string) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === id);
             if (tab) {
                 tab.zIndex = ++state.highestZIndex;
             }
         }),
 
-        toggleTabMinimize: (id: string) => set((state: any) => {
+        toggleTabMinimize: (id: string) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === id);
             if (tab) {
                 tab.isMinimized = !tab.isMinimized;
             }
         }),
 
-        toggleNormaCollapse: (tabId: string, normaId: string) => set((state: any) => {
+        toggleNormaCollapse: (tabId: string, normaId: string) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === tabId);
             if (!tab) return;
 
@@ -172,14 +179,14 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             }
         }),
 
-        setTabLabel: (id: string, label: string) => set((state: any) => {
+        setTabLabel: (id: string, label: string) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === id);
             if (tab) {
                 tab.label = label;
             }
         }),
 
-        moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => set((state: any) => {
+        moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => set((state) => {
             const sourceTab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === sourceTabId);
             const targetTab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === targetTabId);
             if (!sourceTab || !targetTab) return;
@@ -194,7 +201,7 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             targetTab.zIndex = ++state.highestZIndex;
         }),
 
-        extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => set((state: any) => {
+        extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === tabId);
             if (!tab) return;
 
@@ -218,7 +225,7 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             });
         }),
 
-        moveLooseArticleBetweenTabs: (articleId: string, sourceTabId: string, targetTabId: string) => set((state: any) => {
+        moveLooseArticleBetweenTabs: (articleId: string, sourceTabId: string, targetTabId: string) => set((state) => {
             const sourceTab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === sourceTabId);
             const targetTab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === targetTabId);
             if (!sourceTab || !targetTab) return;
@@ -233,7 +240,7 @@ export function createWorkspaceTabActions(set: any, _get: any) {
             targetTab.zIndex = ++state.highestZIndex;
         }),
 
-        removeArticleFromNorma: (tabId: string, normaId: string, articleId: string) => set((state: any) => {
+        removeArticleFromNorma: (tabId: string, normaId: string, articleId: string) => set((state) => {
             const tab = state.workspaceTabs.find((t: WorkspaceTab) => t.id === tabId);
             if (!tab) return;
 

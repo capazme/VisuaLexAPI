@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Flag, AlertCircle } from 'lucide-react';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { ReportReason } from '../../../types';
+import { getErrorMessage } from '../../../utils/errors';
 
 interface ReportModalProps {
   environmentId: string;
@@ -51,11 +52,11 @@ export function ReportModal({ environmentId, onClose, onReported }: ReportModalP
         details.trim() || undefined
       );
       onReported();
-    } catch (err: any) {
-      if (err.message?.includes('already reported')) {
+    } catch (err) {
+      if (getErrorMessage(err)?.includes('already reported')) {
         setError('Hai già segnalato questo ambiente');
       } else {
-        setError(err.message || 'Errore durante la segnalazione');
+        setError(getErrorMessage(err) || 'Errore durante la segnalazione');
       }
     } finally {
       setLoading(false);

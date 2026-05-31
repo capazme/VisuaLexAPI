@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as folderService from '../services/folderService';
 import type { FolderTree, FolderResponse, FolderCreate, FolderUpdate } from '../types/api';
+import { getErrorMessage } from '../utils/errors';
 
 interface FoldersState {
   folders: FolderResponse[];
@@ -34,11 +35,11 @@ export function useFolders() {
         loading: false,
       }));
       return tree;
-    } catch (error: any) {
+    } catch (error) {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error.message || 'Failed to load folders',
+        error: getErrorMessage(error) || 'Failed to load folders',
       }));
       throw error;
     }
@@ -58,11 +59,11 @@ export function useFolders() {
         loading: false,
       }));
       return folders;
-    } catch (error: any) {
+    } catch (error) {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: error.message || 'Failed to load folders',
+        error: getErrorMessage(error) || 'Failed to load folders',
       }));
       throw error;
     }
@@ -83,11 +84,11 @@ export function useFolders() {
 
         setState((prev) => ({ ...prev, loading: false }));
         return newFolder;
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Failed to create folder',
+          error: getErrorMessage(error) || 'Failed to create folder',
         }));
         throw error;
       }
@@ -110,11 +111,11 @@ export function useFolders() {
 
         setState((prev) => ({ ...prev, loading: false }));
         return updated;
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Failed to update folder',
+          error: getErrorMessage(error) || 'Failed to update folder',
         }));
         throw error;
       }
@@ -140,11 +141,11 @@ export function useFolders() {
 
         setState((prev) => ({ ...prev, loading: false }));
         return moved;
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Failed to move folder',
+          error: getErrorMessage(error) || 'Failed to move folder',
         }));
         throw error;
       }
@@ -166,11 +167,11 @@ export function useFolders() {
         await loadTree();
 
         setState((prev) => ({ ...prev, loading: false }));
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Failed to delete folder',
+          error: getErrorMessage(error) || 'Failed to delete folder',
         }));
         throw error;
       }
@@ -192,11 +193,11 @@ export function useFolders() {
         await loadTree();
 
         setState((prev) => ({ ...prev, loading: false }));
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Failed to delete folders',
+          error: getErrorMessage(error) || 'Failed to delete folders',
         }));
         throw error;
       }
@@ -221,11 +222,11 @@ export function useFolders() {
         await loadTree();
 
         setState((prev) => ({ ...prev, loading: false }));
-      } catch (error: any) {
+      } catch (error) {
         setState((prev) => ({
           ...prev,
           loading: false,
-          error: error.message || 'Failed to move folders',
+          error: getErrorMessage(error) || 'Failed to move folders',
         }));
         throw error;
       }

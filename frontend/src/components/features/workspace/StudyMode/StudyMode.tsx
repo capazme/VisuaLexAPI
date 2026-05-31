@@ -87,8 +87,6 @@ export function StudyMode({
   onNavigate,
   onCrossReferenceNavigate,
   normaLabel: normaLabelProp,
-  allArticleIds: _allArticleIds,
-  onLoadArticle: _onLoadArticle
 }: StudyModeProps) {
   // Handle single article mode: create single-element array if not provided
   const articles = articlesProp ?? [article];
@@ -189,6 +187,10 @@ export function StudyMode({
     }
   }, [currentIndex, articles, onNavigate]);
 
+  // React Compiler advisory: it declines to preserve this large component's
+  // manual memoization. Deps are correct and the callback works at runtime —
+  // optimization hint only.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleFontSize = useCallback((delta: number) => {
     setFontSize(prev => Math.min(32, Math.max(14, prev + delta)));
   }, []);

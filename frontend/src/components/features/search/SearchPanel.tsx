@@ -18,6 +18,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { getErrorMessage } from '../../../utils/errors';
 
 // Helper to generate keys (replicates original JS logic)
 const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -342,12 +343,12 @@ export function SearchPanel() {
 
       // Results buffer will be processed by useEffect below
 
-    } catch (err: any) {
+    } catch (err) {
       // A new search (or unmount) aborted this stream — not a user-facing error.
-      if (err?.name === 'AbortError' || controller.signal.aborted) {
+      if ((err instanceof Error && err.name === 'AbortError') || controller.signal.aborted) {
         return;
       }
-      setError(err.message || "Si è verificato un errore.");
+      setError(getErrorMessage(err) || "Si è verificato un errore.");
     } finally {
       // Only clear transient UI state if this controller is still the active one.
       // A newer search replaces streamAbortRef before reaching finally.

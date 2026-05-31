@@ -13,7 +13,24 @@ export function normalizeArticleId(id: string): string {
   return id.trim().toLowerCase().replace(/\s+/g, '-').replace(/\.$/, '');
 }
 
-export function extractArticleIdsFromTree(treeData: any[]): string[] {
+// Tree nodes come from several API shapes; a node is either a plain string or a
+// loosely-keyed object that may carry child collections under various keys.
+interface TreeNodeObject {
+  numero?: string;
+  label?: unknown;
+  title?: unknown;
+  name?: unknown;
+  children?: TreeNodes;
+  items?: TreeNodes;
+  articoli?: TreeNodes;
+  figli?: TreeNodes;
+  content?: TreeNodes;
+  [key: string]: unknown;
+}
+export type TreeNode = string | TreeNodeObject;
+type TreeNodes = TreeNode[] | Record<string, TreeNode> | null | undefined;
+
+export function extractArticleIdsFromTree(treeData: TreeNode[]): string[] {
   const articleIds: string[] = [];
   const seen = new Set<string>(); // Track normalized IDs to avoid duplicates
 
@@ -21,7 +38,7 @@ export function extractArticleIdsFromTree(treeData: any[]): string[] {
     return articleIds;
   }
 
-  const traverse = (nodes: any) => {
+  const traverse = (nodes: TreeNodes) => {
     if (!nodes) return;
 
     const list = Array.isArray(nodes) ? nodes : Object.values(nodes);
@@ -106,7 +123,7 @@ function extractArticleFromString(str: string): string | null {
  * Extracts article number from a tree node.
  * Handles various formats: numero, label "Art. X", title "Art. X"
  */
-function getArticleNumber(node: any): string | null {
+function getArticleNumber(node: TreeNodeObject): string | null {
   if (!node) return null;
 
   // Direct numero field

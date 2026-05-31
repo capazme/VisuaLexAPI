@@ -4,6 +4,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, Environment } from '../../../types';
+import { getErrorMessage } from '../../../utils/errors';
 
 interface ImportEnvironmentModalProps {
   sharedEnvironment: SharedEnvironment;
@@ -81,8 +82,8 @@ export function ImportEnvironmentModal({
       importEnvironment(newEnvironment);
 
       onImported();
-    } catch (err: any) {
-      setError(err.message || 'Errore durante l\'importazione');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore durante l\'importazione');
     } finally {
       setLoading(false);
     }

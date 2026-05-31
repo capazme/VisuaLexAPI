@@ -4,6 +4,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { EnvironmentCategory, SharedEnvironment } from '../../../types';
 import { getEnvironmentStats } from '../../../utils/environmentUtils';
+import { getErrorMessage } from '../../../utils/errors';
 
 interface PublishEnvironmentModalProps {
   onClose: () => void;
@@ -102,8 +103,8 @@ export function PublishEnvironmentModal({ onClose, onPublished }: PublishEnviron
       });
 
       onPublished(published);
-    } catch (err: any) {
-      setError(err.message || 'Errore durante la pubblicazione');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore durante la pubblicazione');
     } finally {
       setLoading(false);
     }

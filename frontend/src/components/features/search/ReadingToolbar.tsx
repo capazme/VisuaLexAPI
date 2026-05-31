@@ -35,7 +35,6 @@ export function ReadingToolbar({
     normaData,
     versionInfo,
     url,
-    articleText: _articleText,
     isNotesPeekOpen,
     notesButtonRef,
     notesCount,

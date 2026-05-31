@@ -5,7 +5,7 @@ export interface DossierItemApi {
   id: string;
   item_type: 'norm' | 'note' | 'section';
   title: string;
-  content: any;
+  content: unknown;
   position: number;
   created_at: string;
 }
@@ -35,13 +35,13 @@ export interface DossierUpdate {
 export interface DossierItemCreate {
   itemType: 'norm' | 'note' | 'section';
   title: string;
-  content?: any;
+  content?: unknown;
   position?: number;
 }
 
 export interface DossierItemUpdate {
   title?: string;
-  content?: any;
+  content?: unknown;
   position?: number;
 }
 

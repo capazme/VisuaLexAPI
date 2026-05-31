@@ -238,13 +238,19 @@ export interface Dossier {
     originalAuthor?: OriginalAuthor | null;
 }
 
-export interface DossierItem {
+// Norma payload stored in a dossier item. It is a NormaVisitata that may also
+// carry the fetched article text when the item was filed from a loaded article.
+export type DossierNormaData = NormaVisitata & { article_text?: string };
+
+interface DossierItemBase {
     id: string;
-    type: 'norma' | 'note';
-    data: any; // NormaVisitata or Note content
     addedAt: string;
     status?: 'unread' | 'reading' | 'important' | 'done';
 }
+
+export type DossierItem =
+    | (DossierItemBase & { type: 'norma'; data: DossierNormaData })
+    | (DossierItemBase & { type: 'note'; data: string });
 
 export interface Bookmark {
     id: string;

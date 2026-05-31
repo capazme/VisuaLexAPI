@@ -103,13 +103,6 @@ export function useTour(options: UseTourOptions = {}) {
         saveTourState(state);
     }, []);
 
-    // Reset all tours and immediately start the welcome tour
-    const resetAndStartTour = useCallback((tourType: TourType = 'welcome'): void => {
-        resetTour(tourType);
-        // Small delay to ensure state is saved
-        setTimeout(() => startTour(tourType), 100);
-    }, []);
-
     // Start a specific tour
     const startTour = useCallback((tourType: TourType = 'welcome'): void => {
         // Skip on mobile if disabled
@@ -165,6 +158,14 @@ export function useTour(options: UseTourOptions = {}) {
 
         driverRef.current.drive();
     }, [options, markTourComplete, disableOnMobile]);
+
+    // Reset all tours and immediately start the welcome tour.
+    // Declared after startTour so it isn't referenced before declaration.
+    const resetAndStartTour = useCallback((tourType: TourType = 'welcome'): void => {
+        resetTour(tourType);
+        // Small delay to ensure state is saved
+        setTimeout(() => startTour(tourType), 100);
+    }, [resetTour, startTour]);
 
     // Stop tour programmatically
     const stopTour = useCallback((): void => {

@@ -80,6 +80,9 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   // Expand all tabs by default when results change
   useEffect(() => {
     if (groupedResults.length > 0) {
+      // External-sync: expand-all default tracks the externally-changing
+      // results set. (CLAUDE.md gotcha #11)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpandedTabs(new Set(groupedResults.map((g) => g.tabId)));
     }
   }, [groupedResults]);
