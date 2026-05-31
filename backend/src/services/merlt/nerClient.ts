@@ -54,6 +54,23 @@ export interface NerFeedbackStats {
   by_surface: Record<string, number>;
 }
 
+export interface NerTrainingStartArgs {
+  n_iter?: number;
+  only_untrained?: boolean;
+}
+
+export interface NerTrainingStartResponse {
+  task_id: string;
+  status: string;
+}
+
+export interface NerTrainingJobStatus {
+  task_id: string;
+  status: string;
+  result?: Record<string, unknown> | null;
+  error?: string;
+}
+
 export class NerClient {
   constructor(private readonly config: NerClientConfig) {}
 
@@ -63,6 +80,14 @@ export class NerClient {
 
   stats(): Promise<NerFeedbackStats> {
     return this.request('GET', '/api/v1/ner/feedback/stats');
+  }
+
+  startTraining(a: NerTrainingStartArgs): Promise<NerTrainingStartResponse> {
+    return this.request('POST', '/api/v1/ner/training/start', a);
+  }
+
+  trainingStatus(jobId: string): Promise<NerTrainingJobStatus> {
+    return this.request('GET', `/api/v1/ner/training/jobs/${encodeURIComponent(jobId)}`);
   }
 
   private async request<T>(

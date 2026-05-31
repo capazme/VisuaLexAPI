@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { authenticate } from '../../middleware/auth';
 import { contributionGuard } from '../../services/merlt/contributionGuard';
 import { requireAdmin } from '../../middleware/merlt/requireAdmin';
-import { nerFeedbackRequestSchema } from '../../schemas/merlt/ner';
+import { nerFeedbackRequestSchema, nerTrainingStartRequestSchema } from '../../schemas/merlt/ner';
 import { getNerClient } from '../../services/merlt/nerClient';
 import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
 
@@ -78,6 +78,41 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       res.status(200).json(await getNerClient().stats());
+    } catch (err) {
+      handleMerltError(err, res);
+    }
+  }
+);
+
+router.post(
+  '/ner/training/start',
+  authenticate,
+  requireAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = nerTrainingStartRequestSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+      return;
+    }
+    try {
+      const result = await getNerClient().startTraining({
+        n_iter: parsed.data.nIter,
+        only_untrained: parsed.data.onlyUntrained,
+      });
+      res.status(202).json(result);
+    } catch (err) {
+      handleMerltError(err, res);
+    }
+  }
+);
+
+router.get(
+  '/ner/training/jobs/:jobId',
+  authenticate,
+  requireAdmin,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.status(200).json(await getNerClient().trainingStatus(req.params.jobId));
     } catch (err) {
       handleMerltError(err, res);
     }

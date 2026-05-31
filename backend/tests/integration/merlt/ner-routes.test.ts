@@ -150,3 +150,52 @@ describe('MERL-T NER routes (Loop β #2)', () => {
     expect(res.body.total).toBe(5);
   });
 });
+
+describe('MERL-T NER training routes (Loop β #2 Phase 4)', () => {
+  let user: TestUser;
+  beforeEach(async () => {
+    user = await createTestUser('ner-train-alice');
+  });
+
+  it('401 without auth', async () => {
+    const res = await request(app).post('/api/merlt/ner/training/start').send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('403 for a non-admin user', async () => {
+    const res = await request(app).post('/api/merlt/ner/training/start').set(authHeader(user)).send({});
+    expect(res.status).toBe(403);
+    expect(res.body.detail).toBe('admin_required');
+  });
+
+  it('202 enqueues training for an admin and forwards nIter → n_iter', async () => {
+    await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/ner/training/start', (b) => (b as { n_iter: number }).n_iter === 50)
+      .reply(202, { task_id: 'ner-train-xyz', status: 'queued' });
+    const res = await request(app)
+      .post('/api/merlt/ner/training/start')
+      .set(authHeader(user))
+      .send({ nIter: 50 });
+    expect(res.status).toBe(202);
+    expect(res.body.task_id).toBe('ner-train-xyz');
+  });
+
+  it('job status proxies MERL-T for an admin', async () => {
+    await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/ner/training/jobs/ner-train-xyz')
+      .reply(200, { task_id: 'ner-train-xyz', status: 'finished', result: { trained: true, examples: 10 } });
+    const res = await request(app).get('/api/merlt/ner/training/jobs/ner-train-xyz').set(authHeader(user));
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('finished');
+    expect(res.body.result.examples).toBe(10);
+  });
+
+  it('job status 404 passthrough from MERL-T', async () => {
+    await prisma.user.update({ where: { id: user.id }, data: { isAdmin: true } });
+    nock(TEST_MERLT_BASE).get('/api/v1/ner/training/jobs/nope').reply(404, { detail: 'job_not_found' });
+    const res = await request(app).get('/api/merlt/ner/training/jobs/nope').set(authHeader(user));
+    expect(res.status).toBe(404);
+  });
+});

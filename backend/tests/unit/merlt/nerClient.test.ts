@@ -71,4 +71,22 @@ describe('NerClient', () => {
       client.submitFeedback({ user_id: 'u', source_surface: 'qa_chip', feedback_type: 'confirmation' })
     ).rejects.toBeInstanceOf(MerltTimeoutError);
   });
+
+  it('startTraining() posts to /api/v1/ner/training/start', async () => {
+    nock(BASE)
+      .post('/api/v1/ner/training/start', (b) => (b as { n_iter: number }).n_iter === 30)
+      .reply(202, { task_id: 'ner-train-1', status: 'queued' });
+    const r = await client.startTraining({ n_iter: 30 });
+    expect(r.task_id).toBe('ner-train-1');
+    expect(r.status).toBe('queued');
+  });
+
+  it('trainingStatus() GETs the job path', async () => {
+    nock(BASE)
+      .get('/api/v1/ner/training/jobs/ner-train-1')
+      .reply(200, { task_id: 'ner-train-1', status: 'finished', result: { trained: true } });
+    const r = await client.trainingStatus('ner-train-1');
+    expect(r.status).toBe('finished');
+  });
+
 });

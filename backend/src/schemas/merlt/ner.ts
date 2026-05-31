@@ -41,3 +41,10 @@ export const nerFeedbackRequestSchema = z
   );
 
 export type NerFeedbackRequest = z.infer<typeof nerFeedbackRequestSchema>;
+
+export const nerTrainingStartRequestSchema = z.object({
+  nIter: z.number().int().min(1).max(200).optional(),
+  onlyUntrained: z.boolean().optional(),
+});
+
+export type NerTrainingStartRequest = z.infer<typeof nerTrainingStartRequestSchema>;
