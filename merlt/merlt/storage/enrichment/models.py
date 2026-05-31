@@ -554,6 +554,68 @@ class UserDomainAuthority(Base):
 
 
 # ====================================================
+# 8b. NER FEEDBACK (Loop β #2 — learned legal-reference NER via RLCF)
+# ====================================================
+class NERFeedback(Base):
+    """Authority-weighted NER correction signal.
+
+    Captures a user's confirmation/correction of an extracted legal reference
+    across four surfaces (article cross-ref, Q&A chip, implicit confirmation,
+    search mining). This is the labeled training set for the learned spaCy NER
+    (Phase 4); a manual admin trigger fine-tunes the model from these rows.
+
+    Privacy: for the Q&A surface only a ±500-char context window around the
+    citation is stored — never the raw user query. ``user_id`` is the VisuaLex
+    id (varchar, never an FK) and is kept for authority weighting.
+    """
+
+    __tablename__ = "ner_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    feedback_id = Column(String(64), unique=True, nullable=False)
+
+    # Surface + actor
+    source_surface = Column(String(30), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    # Span / location
+    article_urn = Column(String(300), index=True)
+    selected_text = Column(Text)
+    start_offset = Column(Integer)
+    end_offset = Column(Integer)
+    context_window = Column(Text)  # ±500 char; Q&A: never the raw query
+
+    # Label
+    feedback_type = Column(String(20), nullable=False, index=True)
+    original_parsed = Column(JSON)    # what the extractor produced
+    correct_reference = Column(JSON)  # {tipo_atto, numero, anno, articoli}
+    confidence_before = Column(Float)
+
+    # Authority weighting (computed server-side)
+    user_authority = Column(Float, default=0.5)
+    sample_weight = Column(Float, default=1.0)
+
+    # Training lifecycle
+    used_in_training = Column(Boolean, default=False, index=True)
+
+    created_at = Column(DateTime, default=func.now(), index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_surface IN ('article_xref','qa_chip','implicit','search_mining')",
+            name="check_ner_source_surface",
+        ),
+        CheckConstraint(
+            "feedback_type IN ('confirmation','correction','false_positive','missed')",
+            name="check_ner_feedback_type",
+        ),
+    )
+
+    def __repr__(self):
+        return f"<NERFeedback(id={self.feedback_id}, surface={self.source_surface}, type={self.feedback_type})>"
+
+
+# ====================================================
 # 9. ENTITY ISSUE REPORTS (RLCF Feedback Loop)
 # ====================================================
 class EntityIssueReport(Base):

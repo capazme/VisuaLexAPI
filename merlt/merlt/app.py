@@ -57,6 +57,7 @@ from merlt.api import (
     expert_metrics_router,
     ws_router,
     tracking_router,
+    ner_router,
     policy_evolution_router,
     export_router,
     devils_advocate_router,
@@ -415,6 +416,7 @@ app.include_router(rlcf_router, prefix="/api/v1", tags=["rlcf"])
 app.include_router(expert_metrics_router, prefix="/api/v1", tags=["expert-metrics"])
 app.include_router(ws_router, prefix="/api/v1", tags=["websocket"])
 app.include_router(tracking_router, prefix="/api/v1", tags=["tracking"])
+app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
 app.include_router(policy_evolution_router, prefix="/api/v1", tags=["policy-evolution"])
 app.include_router(export_router, prefix="/api/v1", tags=["export"])
 app.include_router(devils_advocate_router, prefix="/api/v1", tags=["devils-advocate"])
