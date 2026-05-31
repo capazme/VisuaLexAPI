@@ -16,8 +16,11 @@ server-side from UserDomainAuthority. Privacy: for the Q&A surface the BFF sends
 only a ±500-char context window, never the raw query.
 """
 
+import os
+import asyncio
 import hashlib
 import structlog
+from uuid import uuid4
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -149,5 +152,75 @@ async def ner_feedback_stats(api_key: ApiKey = Depends(verify_api_key)):
         "by_surface": {k: v for k, v in by_surface},
     }
 
+
+# ---------------------------------------------------------------------------
+# Learned-NER training (Loop β #2 Phase 4) — admin-gated BFF-side; here it only
+# verifies the API key. Training runs on the merlt_ner_train RQ queue (worker).
+# ---------------------------------------------------------------------------
+
+_NER_TRAIN_QUEUE_NAME = "merlt_ner_train"
+_ner_train_connection = None
+
+
+def _get_ner_train_queue():
+    from redis import Redis
+    from rq import Queue
+    global _ner_train_connection
+    if _ner_train_connection is None:
+        _ner_train_connection = Redis.from_url(os.getenv("RQ_REDIS_URL", "redis://localhost:6379/1"))
+    return Queue(_NER_TRAIN_QUEUE_NAME, connection=_ner_train_connection)
+
+
+class NERTrainingStartRequest(BaseModel):
+    n_iter: int = Field(30, ge=1, le=200)
+    only_untrained: bool = False
+
+
+@router.post("/training/start", status_code=202)
+async def start_ner_training(
+    req: NERTrainingStartRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+):
+    """Enqueue a learned-NER training run over ner_feedback (RQ worker)."""
+    job_id = "ner-train-" + uuid4().hex[:40]
+    try:
+        queue = await asyncio.to_thread(_get_ner_train_queue)
+        await asyncio.to_thread(
+            lambda: queue.enqueue(
+                "merlt.worker.ner_training_tasks.train_ner_model",
+                req.n_iter,
+                req.only_untrained,
+                job_id=job_id,
+                job_timeout=3600,
+            )
+        )
+    except Exception as e:
+        log.error("Failed to enqueue NER training", exc_info=True)
+        raise HTTPException(status_code=503, detail=f"Job queue non disponibile: {e}")
+    return {"task_id": job_id, "status": "queued"}
+
+
+@router.get("/training/jobs/{job_id}")
+async def ner_training_job_status(
+    job_id: str,
+    api_key: ApiKey = Depends(verify_api_key),
+):
+    """RQ job status (+ result/error) for a NER training run."""
+    from rq.job import Job
+    from rq.exceptions import NoSuchJobError
+    try:
+        conn = await asyncio.to_thread(lambda: _get_ner_train_queue().connection)
+        job = await asyncio.to_thread(lambda: Job.fetch(job_id, connection=conn))
+    except NoSuchJobError:
+        raise HTTPException(status_code=404, detail="job_not_found")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"job_status_unavailable: {e}")
+    status = job.get_status(refresh=True)
+    payload = {"task_id": job_id, "status": status}
+    if status == "finished":
+        payload["result"] = job.result
+    elif status == "failed":
+        payload["error"] = str(job.exc_info or "")[-1000:]
+    return payload
 
 __all__ = ["router", "compute_sample_weight"]
