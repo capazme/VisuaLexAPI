@@ -25,6 +25,7 @@ Esempio:
     >>> print(f"Mode: {result.mode}")
 """
 
+import os
 import structlog
 import asyncio
 import time
@@ -332,6 +333,42 @@ class MultiExpertOrchestrator:
         except Exception as exc:
             log.warning("ner search-mining failed (non-fatal)", error=str(exc))
 
+    def _get_learned_ner(self):
+        """Lazy singleton for the learned legal-reference NER (Loop β #2 P4).
+        Loads models/legal_ner_latest (shared volume) or the it_core_news_lg
+        base. Cached on the instance; None when unavailable."""
+        if getattr(self, "_learned_ner", "unset") == "unset":
+            self._learned_ner = None
+            try:
+                from merlt.ner.spacy_model import LegalNERModel
+                model = LegalNERModel()
+                self._learned_ner = model if model.is_ready() else None
+            except Exception as exc:  # noqa: BLE001
+                log.warning("learned NER unavailable", error=str(exc))
+                self._learned_ner = None
+        return self._learned_ner
+
+    def _augment_with_learned_ner(
+        self, query: str, refs: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Add learned-NER reference surfaces not already covered by
+        parse_query/regex. Never replaces existing refs; deduped by display."""
+        model = self._get_learned_ner()
+        if model is None:
+            return refs
+        existing = {(r.get("display") or "").strip().lower() for r in refs}
+        added: List[Dict[str, Any]] = []
+        for cit in model.extract_citations(query):
+            disp = (getattr(cit, "text", "") or "").strip()
+            if disp and disp.lower() not in existing:
+                existing.add(disp.lower())
+                added.append({"display": disp, "urn": None, "act_type": None,
+                              "article": None, "act_number": None, "date": None,
+                              "source": "learned_ner"})
+        if added:
+            log.info("learned NER augmented references", added=len(added))
+        return list(refs) + added
+
     # ------------------------------------------------------------------
     # Loop β E.3 — tool-gating policy hooks (failure-isolated, additive)
     # ------------------------------------------------------------------
@@ -558,6 +595,15 @@ class MultiExpertOrchestrator:
                 "visualex NER enrichment failed; using regex fallback",
                 error=str(e), trace_id=trace_id,
             )
+
+        # Loop β #2 Phase 4: augment the references with the learned spaCy NER
+        # when MERLT_NER_LEARNED_ENABLED is on AND a trained model is loaded.
+        # Additive only (never replaces parse_query/regex); failure-isolated.
+        if os.getenv("MERLT_NER_LEARNED_ENABLED", "false").lower() == "true":
+            try:
+                legal_references = self._augment_with_learned_ner(query, legal_references)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("learned NER augmentation failed (non-fatal)", error=str(exc))
 
         ner_time_ms = (time.perf_counter() - ner_t0) * 1000
 
