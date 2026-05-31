@@ -496,6 +496,27 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 citation,
             },
         });
+        // NER implicit confirmation (Loop β #2, surface: implicit). Opening a
+        // detected citation is a low-weight signal that it was correctly
+        // extracted. Fire-and-forget, full-consent only.
+        if (canContribute) {
+            void sendNerFeedback({
+                surface: 'implicit',
+                feedbackType: 'confirmation',
+                articleUrn: norma_data.urn,
+                selectedText: citationText,
+                originalParsed: {
+                    act_type: citation.act_type,
+                    act_number: citation.act_number ?? null,
+                    date: citation.date ?? null,
+                    article: citation.article,
+                    confidence: citation.confidence,
+                },
+                confidenceBefore: citation.confidence,
+            }).catch((err) => {
+                console.error('NER implicit confirmation failed:', err);
+            });
+        }
         triggerSearch({
             act_type: citation.act_type,
             act_number: citation.act_number || '',
@@ -504,7 +525,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             version: 'vigente',
             show_brocardi_info: true,
         });
-    }, [norma_data.urn, triggerSearch]);
+    }, [norma_data.urn, triggerSearch, canContribute]);
 
     // NER feedback for a previewed citation (Loop β #2, surface: article_xref —
     // the primary signal). Fire-and-forget, gated by full-consent canContribute.
