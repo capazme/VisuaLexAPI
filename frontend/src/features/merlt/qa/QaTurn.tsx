@@ -4,6 +4,8 @@ import { cn } from '../../../lib/utils';
 import { QaDeliberationPanel } from './QaDeliberationPanel';
 import { CANON_LABEL } from './format';
 import type { QaRetrievedSource, QaTurnModel } from './types';
+import { QaSynthesisWithCitations } from '../ner/QaSynthesisWithCitations';
+import type { NerFeedbackInput } from '../../../services/merltService';
 
 export interface QaTurnProps {
   turn: QaTurnModel;
@@ -13,6 +15,8 @@ export interface QaTurnProps {
   onRateSource: (sourceId: string, relevant: boolean) => void;
   onPrefer: (expert: string) => void;
   onDetailed: (scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number }) => void;
+  /** Forward an in-prose citation NER feedback (surface=qa_chip). */
+  onNerCitation?: (payload: NerFeedbackInput) => void;
 }
 
 function confidenceLabel(c: number): string {
@@ -21,7 +25,7 @@ function confidenceLabel(c: number): string {
   return 'bassa';
 }
 
-export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed }: QaTurnProps) {
+export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed, onNerCitation }: QaTurnProps) {
   const [refining, setRefining] = useState(false);
   const [followUp, setFollowUp] = useState('');
 
@@ -84,7 +88,7 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
                 ))}
               </div>
             ) : (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800 dark:text-slate-200">{a.synthesis}</p>
+              <QaSynthesisWithCitations text={a.synthesis} enabled onSubmit={onNerCitation} />
             )}
 
             {/* Confidence */}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, History, MessageSquare } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useMerltFeatures } from '../useMerltFeatures';
+import { sendNerFeedback } from '../../../services/merltService';
 import { useQaThread } from './useQaThread';
 import { QaComposer } from './QaComposer';
 import { QaTurn } from './QaTurn';
@@ -121,6 +122,11 @@ export function QAPage() {
                 onRateSource={(sourceId, relevant) => rateSrc(traceId, sourceId, relevant)}
                 onPrefer={(expert) => prefer(traceId, expert)}
                 onDetailed={(scores) => detailed(traceId, scores)}
+                onNerCitation={(payload) => {
+                  void sendNerFeedback(payload).catch((err) => {
+                    console.error('NER qa_chip feedback failed:', err);
+                  });
+                }}
               />
             );
           })}
