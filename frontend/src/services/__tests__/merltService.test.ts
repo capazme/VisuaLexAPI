@@ -79,3 +79,30 @@ describe('merltService — consent contract', () => {
     expect(result.level).toBe('none');
   });
 });
+
+
+import { sendNerFeedback } from '../merltService';
+
+describe('merltService — NER feedback (Loop β #2)', () => {
+  it('sendNerFeedback POSTs /merlt/ner/feedback with the camelCase payload', async () => {
+    post.mockResolvedValue({ data: { received: true, feedback_id: 'ner-1', sample_weight: 1.0 } });
+    const res = await sendNerFeedback({
+      surface: 'article_xref',
+      feedbackType: 'correction',
+      articleUrn: 'urn:nir:..~art1453',
+      selectedText: 'art. 1453',
+      correctReference: { actType: 'codice civile', article: '1453' },
+    });
+    expect(post).toHaveBeenCalledWith(
+      '/merlt/ner/feedback',
+      expect.objectContaining({
+        surface: 'article_xref',
+        feedbackType: 'correction',
+        correctReference: expect.objectContaining({ actType: 'codice civile' }),
+      }),
+      expect.anything(),
+    );
+    expect(res.received).toBe(true);
+    expect(res.feedback_id).toBe('ner-1');
+  });
+});

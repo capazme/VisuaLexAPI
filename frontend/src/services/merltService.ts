@@ -387,3 +387,47 @@ export async function getMerltOpsOverview(): Promise<Record<string, unknown>> {
 export async function startMerltTraining(payload?: JsonRecord): Promise<Record<string, unknown>> {
     return postMerlt<Record<string, unknown>>('/merlt/ops/rlcf/training/start', payload ?? {}, MERLT_LONG_RUNNING_TIMEOUT_MS);
 }
+
+// ----------------------------------------------------------------------------
+// NER feedback (Loop β #2 — learned legal-reference NER via RLCF).
+// Corrections/confirmations across four surfaces flow to the BFF
+// /api/merlt/ner/feedback (authenticate + full consent). Fire-and-forget at the
+// call sites; gated on useMerltFeatures().canContribute. Keys are camelCase to
+// match the BFF Zod schema; the BFF maps to MERL-T snake_case + injects user_id.
+// ----------------------------------------------------------------------------
+
+export type NerSurface = 'article_xref' | 'qa_chip' | 'implicit' | 'search_mining';
+export type NerFeedbackType = 'confirmation' | 'correction' | 'false_positive' | 'missed';
+
+export interface NerCorrectReference {
+    actType?: string;
+    article?: string;
+    date?: string;
+    actNumber?: string;
+    annex?: string;
+    displayText?: string;
+}
+
+export interface NerFeedbackInput {
+    surface: NerSurface;
+    feedbackType: NerFeedbackType;
+    articleUrn?: string;
+    selectedText?: string;
+    startOffset?: number;
+    endOffset?: number;
+    contextWindow?: string;
+    originalParsed?: JsonRecord;
+    correctReference?: NerCorrectReference;
+    confidenceBefore?: number;
+}
+
+export interface NerFeedbackResponse {
+    received: boolean;
+    feedback_id: string;
+    sample_weight: number;
+}
+
+/** POST /api/merlt/ner/feedback — one NER correction/confirmation (Loop β #2). */
+export async function sendNerFeedback(input: NerFeedbackInput): Promise<NerFeedbackResponse> {
+    return postMerlt<NerFeedbackResponse>('/merlt/ner/feedback', input);
+}
