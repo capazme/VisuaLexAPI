@@ -1339,6 +1339,64 @@ async def submit_refine_feedback(
         raise HTTPException(status_code=500, detail=f"Failed to process refinement: {str(e)}")
 
 
+class HistoryItem(BaseModel):
+    """One past Q&A turn for the user's history list (Loop β #1 option B)."""
+    trace_id: str
+    query: str
+    synthesis: str
+    mode: str
+    confidence: Optional[float] = None
+    experts_used: List[str] = Field(default_factory=list)
+    sources: List[SourceReference] = Field(default_factory=list)
+    created_at: Optional[str] = None
+
+
+@router.get("/history", response_model=List[HistoryItem])
+async def list_history(
+    user_id: str,
+    limit: int = 20,
+    session: AsyncSession = Depends(get_async_session_dep),
+):
+    """
+    List the user's most recent Q&A turns (newest first) so the UI can show a
+    server-backed history that survives reloads and is shared across devices.
+    Read-only; cited `sources` are returned, the (live-only) retrieved_sources
+    panel is not persisted.
+    """
+    limit = max(1, min(100, limit))
+    result = await session.execute(
+        select(QATrace)
+        .where(QATrace.user_id == user_id)
+        .order_by(QATrace.created_at.desc())
+        .limit(limit)
+    )
+    items: List[HistoryItem] = []
+    for t in result.scalars().all():
+        raw_sources = t.sources if isinstance(t.sources, list) else []
+        parsed_sources: List[SourceReference] = []
+        for s in raw_sources:
+            if not isinstance(s, dict):
+                continue
+            try:
+                parsed_sources.append(SourceReference(**s))
+            except Exception:
+                # Tolerate legacy/malformed stored source dicts.
+                continue
+        items.append(
+            HistoryItem(
+                trace_id=t.trace_id,
+                query=t.query or "",
+                synthesis=t.synthesis_text or "",
+                mode=t.synthesis_mode or "convergent",
+                confidence=t.confidence,
+                experts_used=t.selected_experts or [],
+                sources=parsed_sources,
+                created_at=t.created_at.isoformat() if t.created_at else None,
+            )
+        )
+    return items
+
+
 @router.get("/trace/{trace_id}")
 async def get_trace(
     trace_id: str,

@@ -147,6 +147,24 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.body.success).toBe(true);
   });
 
+  it('history forwards user_id + clamped limit and returns the list', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/history')
+      .query((q) => q.user_id === user.id && q.limit === '20')
+      .reply(200, [
+        { trace_id: 'trace_x', query: 'art 1453?', synthesis: 'La risoluzione…', mode: 'convergent', confidence: 0.6, experts_used: ['literal'], sources: [], created_at: '2026-05-31T10:00:00Z' },
+      ]);
+    const res = await request(app).get('/api/merlt/experts/history').set(authHeader(user));
+    expect(res.status).toBe(200);
+    expect(res.body[0].trace_id).toBe('trace_x');
+  });
+
+  it('history requires full consent (403)', async () => {
+    const res = await request(app).get('/api/merlt/experts/history').set(authHeader(user));
+    expect(res.status).toBe(403);
+  });
+
   it('preference feedback (divergent) forwards preferred_expert', async () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)

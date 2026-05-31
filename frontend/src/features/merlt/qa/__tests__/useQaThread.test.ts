@@ -32,6 +32,17 @@ const answer = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // useQaThread now hydrates/persists the thread — install a working in-memory
+  // localStorage (the project's setup mock is partial) and start empty.
+  const store = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    get length() { return store.size; },
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    key: (i: number) => Array.from(store.keys())[i] ?? null,
+  } as Storage);
 });
 
 describe('useQaThread', () => {
@@ -78,6 +89,21 @@ describe('useQaThread', () => {
     });
     await waitFor(() => expect(result.current.turns[0].rating).toBe(5));
     expect(rateAnswer).toHaveBeenCalledWith('t1', 5);
+  });
+
+  it('loadHistoryTurn() appends a read-only success turn (deduped)', async () => {
+    const { result } = renderHook(() => useQaThread());
+    const item = {
+      trace_id: 'hist1', query: 'art 1453?', synthesis: 'La risoluzione…',
+      mode: 'convergent', confidence: 0.6, experts_used: ['literal'], sources: [],
+      created_at: '2026-05-31T10:00:00Z',
+    };
+    act(() => result.current.loadHistoryTurn(item));
+    await waitFor(() => expect(result.current.turns).toHaveLength(1));
+    expect(result.current.turns[0].state.status).toBe('success');
+    // dedupe: loading the same trace again is a no-op
+    act(() => result.current.loadHistoryTurn(item));
+    expect(result.current.turns).toHaveLength(1);
   });
 
   it('confirm() marks the source done on success', async () => {

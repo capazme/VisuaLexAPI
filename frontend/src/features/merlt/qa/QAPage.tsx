@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, History, MessageSquare } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useMerltFeatures } from '../useMerltFeatures';
 import { useQaThread } from './useQaThread';
 import { QaComposer } from './QaComposer';
 import { QaTurn } from './QaTurn';
+import { QaHistoryPanel } from './QaHistoryPanel';
 
 const EXAMPLES = [
   'Requisiti della risoluzione per inadempimento (art. 1453 c.c.)',
@@ -19,7 +21,8 @@ const EXAMPLES = [
  */
 export function QAPage() {
   const { merltEnabled, canContribute } = useMerltFeatures();
-  const { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm } = useQaThread();
+  const { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn } = useQaThread();
+  const [showHistory, setShowHistory] = useState(false);
 
   if (!merltEnabled) {
     return <p className="text-slate-600 dark:text-slate-300">MERL-T non è disponibile.</p>;
@@ -42,9 +45,30 @@ export function QAPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <header>
-        <Link to="/merlt" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
-          <ArrowLeft size={14} /> MERL-T
-        </Link>
+        <div className="mb-2 flex items-center justify-between">
+          <Link to="/merlt" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+            <ArrowLeft size={14} /> MERL-T
+          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              aria-pressed={showHistory}
+              className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:underline"
+            >
+              <History size={14} /> Cronologia
+            </button>
+            {turns.length > 0 && (
+              <button
+                type="button"
+                onClick={clear}
+                className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:underline"
+              >
+                Nuova conversazione
+              </button>
+            )}
+          </div>
+        </div>
         <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
           <MessageSquare className="text-primary-500" /> Chiedi a MERL-T
         </h1>
@@ -56,6 +80,15 @@ export function QAPage() {
       </header>
 
       <QaComposer onSubmit={(q, mode) => void ask(q, mode)} disabled={busy} />
+
+      {showHistory && (
+        <QaHistoryPanel
+          onSelect={(item) => {
+            loadHistoryTurn(item);
+            setShowHistory(false);
+          }}
+        />
+      )}
 
       {turns.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">

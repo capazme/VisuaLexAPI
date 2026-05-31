@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   askQuestion,
   refineQuestion,
@@ -8,7 +8,8 @@ import {
   rateDetailed,
   confirmSource,
 } from './qaApi';
-import type { QaMode, QaTurnModel, QaRetrievedSource, QaAnswer } from './types';
+import { loadThread, saveThread, clearThread } from './qaThreadStorage';
+import type { QaMode, QaTurnModel, QaRetrievedSource, QaAnswer, QaHistoryItem } from './types';
 
 let seq = 0;
 const nextId = (): string => `turn-${++seq}`;
@@ -22,8 +23,16 @@ const nextId = (): string => `turn-${++seq}`;
  * synchronously inside an effect (react-hooks/set-state-in-effect).
  */
 export function useQaThread() {
-  const [turns, setTurns] = useState<QaTurnModel[]>([]);
+  // Hydrate the completed thread from localStorage so a reload doesn't lose
+  // past answers (Loop β #1 option A). Lazy initializer → runs once.
+  const [turns, setTurns] = useState<QaTurnModel[]>(() => loadThread());
   const tokens = useRef<Record<string, number>>({});
+
+  // Persist the thread whenever it changes (saveThread keeps only completed
+  // turns + caps the count). setState is never called here.
+  useEffect(() => {
+    saveThread(turns);
+  }, [turns]);
 
   const patch = useCallback((id: string, fn: (t: QaTurnModel) => QaTurnModel): void => {
     setTurns((prev) => prev.map((t) => (t.id === id ? fn(t) : t)));
@@ -104,5 +113,33 @@ export function useQaThread() {
     [patch],
   );
 
-  return { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm };
+  const clear = useCallback((): void => {
+    setTurns([]);
+    clearThread();
+  }, []);
+
+  // Load a past turn (from the server history) into the thread as a read-only
+  // completed turn. Skips if it's already present. retrieved_sources aren't
+  // persisted server-side, so the provenance panel is empty for history turns.
+  const loadHistoryTurn = useCallback((item: QaHistoryItem): void => {
+    const answer: QaAnswer = {
+      trace_id: item.trace_id,
+      synthesis: item.synthesis,
+      mode: item.mode,
+      alternatives: null,
+      sources: item.sources,
+      retrieved_sources: [],
+      experts_used: item.experts_used,
+      confidence: item.confidence ?? 0,
+      execution_time_ms: 0,
+    };
+    setTurns((prev) => {
+      if (prev.some((t) => t.state.status === 'success' && t.state.answer.trace_id === item.trace_id)) {
+        return prev;
+      }
+      return [...prev, { id: nextId(), question: item.query, state: { status: 'success', answer }, confirmed: {} }];
+    });
+  }, []);
+
+  return { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn };
 }

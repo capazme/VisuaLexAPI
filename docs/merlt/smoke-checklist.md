@@ -278,6 +278,8 @@ Prereq: stack Docker MERL-T attivo (`docker compose -f docker-compose.merlt.yml 
 - [ ] Su una fonte **provvisoria** (`live_unconfirmed`): "Ricorda nel grafo" → `POST /api/merlt/experts/confirm-source` → stato "Ricordata"; il nodo poi compare in `/grafo`.
 - [ ] Feedback per-fonte (pertinente/non) → `POST .../feedback/source`; valutazione dettagliata 3-layer → `POST .../feedback/detailed`.
 - [ ] Modalità "Tesi a confronto" (divergente, quando il disaccordo è alto): tesi per-canone + "Mi convince" → `POST .../feedback/preference`.
+- [ ] **Persistenza (#1A):** poni una domanda → **ricarica la pagina** → la conversazione (output completati) è ancora lì (localStorage). "Nuova conversazione" la azzera.
+- [ ] **Cronologia (#1B):** "Cronologia" → lista delle conversazioni passate (`GET /api/merlt/experts/history`, server-side, newest-first); clic su una voce → la risposta viene caricata nel thread (read-only; senza il pannello fonti-consultate, non persistito).
 
 ### Note rete (Fase F)
 - Tutte le rotte sotto `authenticate + contributionGuard` (consenso Completo); 503 `merlt_unavailable` se MERL-T è giù, 4xx passthrough.

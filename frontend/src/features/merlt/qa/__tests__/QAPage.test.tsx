@@ -17,6 +17,8 @@ vi.mock('../useQaThread', () => ({
     prefer: vi.fn(),
     detailed: vi.fn(),
     confirm: vi.fn(),
+    clear: vi.fn(),
+    loadHistoryTurn: vi.fn(),
   }),
 }));
 

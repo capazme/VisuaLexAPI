@@ -15,6 +15,12 @@ import {
 import { getExpertsClient } from '../../services/merlt/expertsClient';
 import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
 
+function clampInt(raw: unknown, def: number, min: number, max: number): number {
+  const n = typeof raw === 'string' ? Number.parseInt(raw, 10) : NaN;
+  if (Number.isNaN(n)) return def;
+  return Math.min(max, Math.max(min, n));
+}
+
 /**
  * MERL-T expert Q&A routes (Loop β Phase F). Thin proxy: authenticate +
  * contributionGuard (full consent → "full per tutto"), inject user_id, map
@@ -71,6 +77,19 @@ router.post('/experts/query', authenticate, contributionGuard, async (req: Reque
       include_trace: true,
     });
     res.status(200).json(result);
+  } catch (err) {
+    handleMerltError(err, res);
+  }
+});
+
+router.get('/experts/history', authenticate, contributionGuard, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+  const limit = clampInt(req.query.limit, 20, 1, 100);
+  try {
+    res.status(200).json(await getExpertsClient().history(req.user.id, limit));
   } catch (err) {
     handleMerltError(err, res);
   }

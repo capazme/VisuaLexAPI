@@ -1,5 +1,5 @@
 import { apiClient } from '../../../services/api';
-import type { QaAnswer, QaMode } from './types';
+import type { QaAnswer, QaHistoryItem, QaMode } from './types';
 
 /**
  * Typed BFF clients for the MERL-T expert Q&A routes (Loop β Phase F).
@@ -53,4 +53,9 @@ export async function rateDetailed(
 
 export async function confirmSource(nodeId: string, entityText?: string): Promise<void> {
   await apiClient.post('/merlt/experts/confirm-source', { nodeId, entityText });
+}
+
+export async function fetchHistory(limit = 20): Promise<QaHistoryItem[]> {
+  const res = await apiClient.get<QaHistoryItem[]>('/merlt/experts/history', { params: { limit } });
+  return res.data;
 }

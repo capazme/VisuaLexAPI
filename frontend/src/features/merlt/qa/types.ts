@@ -48,6 +48,18 @@ export type QaAnswerState =
   | { status: 'success'; answer: QaAnswer }
   | { status: 'error'; error: string };
 
+/** A past Q&A turn from the server-backed history (Loop β #1 option B). */
+export interface QaHistoryItem {
+  trace_id: string;
+  query: string;
+  synthesis: string;
+  mode: string;
+  confidence?: number | null;
+  experts_used: string[];
+  sources: QaSource[];
+  created_at?: string | null;
+}
+
 export type ConfirmState = 'pending' | 'done' | 'error';
 
 export interface QaTurnModel {

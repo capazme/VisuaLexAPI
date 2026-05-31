@@ -61,6 +61,17 @@ export interface ExpertFeedbackResponse {
   message: string;
 }
 
+export interface ExpertHistoryItem {
+  trace_id: string;
+  query: string;
+  synthesis: string;
+  mode: string;
+  confidence?: number | null;
+  experts_used: string[];
+  sources: ExpertSourceReference[];
+  created_at?: string | null;
+}
+
 export interface QueryArgs {
   query: string;
   user_id: string;
@@ -134,6 +145,10 @@ export class ExpertsClient {
   }
   confirmSource(a: ConfirmSourceArgs): Promise<Record<string, unknown>> {
     return this.request('POST', '/api/v1/enrichment/confirm-source', a);
+  }
+  history(userId: string, limit = 20): Promise<ExpertHistoryItem[]> {
+    const qs = new URLSearchParams({ user_id: userId, limit: String(limit) }).toString();
+    return this.request('GET', `/api/v1/experts/history?${qs}`);
   }
 
   private async request<T>(
