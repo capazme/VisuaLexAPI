@@ -177,6 +177,26 @@ class VisuaLexClient:
             log.warning("parse_query failed", error=str(e), query=query[:80])
             return None
 
+    async def extract_citations(self, text, context_act_type=None):
+        """Detect normative citations embedded in free text via VisuaLex's shared
+        /extract_citations endpoint. Finds refs inside a natural-language question
+        and returns each with char offsets. [] on miss/outage (fail-soft). Short
+        timeout: runs on the query hot path."""
+        if not text or not text.strip():
+            return []
+        client = await self._get_client()
+        try:
+            payload = {"text": text}
+            if context_act_type:
+                payload["context_act_type"] = context_act_type
+            response = await client.post("/extract_citations", json=payload, timeout=8.0)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("citations") or []
+        except Exception as e:
+            log.warning("extract_citations failed", error=str(e), text=text[:80])
+            return []
+
     async def fetch_norma_data(
         self,
         act_type: str,

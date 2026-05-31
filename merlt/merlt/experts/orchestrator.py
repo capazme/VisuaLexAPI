@@ -64,7 +64,10 @@ from merlt.experts.literal import LiteralExpert
 from merlt.experts.systemic import SystemicExpert
 from merlt.experts.principles import PrinciplesExpert
 from merlt.experts.precedent import PrecedentExpert
-from merlt.experts.query_analyzer import analyze_query, enrich_context, build_legal_references
+from merlt.experts.query_analyzer import (
+    analyze_query, enrich_context, build_legal_references,
+    legal_references_from_citations, merge_legal_references,
+)
 from merlt.clients import get_visualex_client
 from merlt.tools import BaseTool
 from merlt.tools.search import SemanticSearchTool
@@ -477,8 +480,19 @@ class MultiExpertOrchestrator:
         # Best-effort: any failure falls back to the regex analysis above.
         legal_references: List[Dict[str, Any]] = []
         try:
-            parse_result = await get_visualex_client().parse_query(query)
-            legal_references = build_legal_references(parse_result)
+            vlx = get_visualex_client()
+            parse_result, citations = await asyncio.gather(
+                vlx.parse_query(query), vlx.extract_citations(query),
+                return_exceptions=True,
+            )
+            if isinstance(parse_result, Exception):
+                parse_result = None
+            if isinstance(citations, Exception):
+                citations = None
+            legal_references = merge_legal_references(
+                build_legal_references(parse_result),
+                legal_references_from_citations(citations),
+            )
         except Exception as e:
             log.warning(
                 "visualex NER enrichment failed; using regex fallback",

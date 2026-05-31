@@ -194,46 +194,72 @@ def build_article_urn(article_number: str, code: str = "codice_civile") -> str:
     return f"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art{art_num}"
 
 
-def build_legal_references(parse_result: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Loop β #2 — turn a VisuaLex ``/parse_query`` payload into structured legal
-    references usable by BOTH consumers:
-
-    - the graph traversal, which keys on the canonical ``urn``;
-    - the live citation tools (``cite_law``/``fetch_law_article``), which require
-      a HUMAN reference like ``"art. 1453 codice civile"`` and reject a raw URN
-      (the URN-to-cite_law mismatch was the root cause of #2/#3).
-
-    Returns an empty list when nothing usable was recognized, so the caller can
-    fall back to the regex analysis.
-    """
-    if not parse_result or not parse_result.get("recognized"):
-        return []
-    parsed = parse_result.get("parsed") or {}
-    act_type = parsed.get("act_type")
-    article = parsed.get("article")
+def _ref_from_fields(act_type, article, act_number=None, date=None, urn=None, fallback_display=None):
+    """Build one structured legal reference with a display tuned for the live
+    citation tools (verified live): codici -> "art. 1453 codice civile";
+    numbered acts -> "art. 5 legge 241/1990" (cite_law fails on numbered acts but
+    fetch_law_article resolves them from the structured fields). None if unusable."""
     if not act_type and not article:
-        return []
-    act_number = parsed.get("act_number")
-    date = parsed.get("date")
+        return None
     if article and act_type:
-        # Build the form cite_law/fetch_law_article accept (verified live):
-        # codici → "art. 1453 codice civile"; numbered acts → "art. 5 legge 241/1990".
         display = f"art. {article} {act_type}"
         if act_number:
             display += f" {act_number}"
-            year = (date or "").split("-")[0]
+            year = (date or "").split("-")[0] if date else ""
             if year:
                 display += f"/{year}"
     else:
-        display = parse_result.get("display") or act_type or article
-    return [{
-        "display": display,
-        "urn": parse_result.get("urn"),
-        "act_type": act_type,
-        "article": article,
-        "act_number": act_number,
-        "date": date,
-    }]
+        display = fallback_display or act_type or article
+    return {"display": display, "urn": urn, "act_type": act_type,
+            "article": article, "act_number": act_number, "date": date}
+
+
+def build_legal_references(parse_result):
+    """Loop b #2 - map a VisuaLex /parse_query payload (single recognized ref +
+    canonical URN) to a structured legal-reference list. Used together with
+    legal_references_from_citations (see orchestrator)."""
+    if not parse_result or not parse_result.get("recognized"):
+        return []
+    parsed = parse_result.get("parsed") or {}
+    ref = _ref_from_fields(parsed.get("act_type"), parsed.get("article"),
+                           act_number=parsed.get("act_number"), date=parsed.get("date"),
+                           urn=parse_result.get("urn"), fallback_display=parse_result.get("display"))
+    return [ref] if ref else []
+
+
+def legal_references_from_citations(citations):
+    """Map a VisuaLex /extract_citations payload (list of citation dicts) to the
+    same structured shape. Citations carry no URN (grounding still works via
+    fetch_law_article structured params). Order preserved."""
+    if not citations:
+        return []
+    out = []
+    for c in citations:
+        if not isinstance(c, dict):
+            continue
+        ref = _ref_from_fields(c.get("act_type"), c.get("article"),
+                               act_number=c.get("act_number"), date=c.get("date"),
+                               urn=None, fallback_display=c.get("display_text"))
+        if ref:
+            out.append(ref)
+    return out
+
+
+def merge_legal_references(*lists):
+    """Merge legal-reference lists, dedup by (act_type, article, act_number, date).
+    First occurrence wins (pass parse_query refs first - they carry the URN);
+    a later duplicate's URN back-fills a missing one."""
+    by_key = {}
+    order = []
+    for lst in lists:
+        for ref in lst or []:
+            key = (ref.get("act_type"), ref.get("article"), ref.get("act_number"), ref.get("date"))
+            if key not in by_key:
+                by_key[key] = ref
+                order.append(key)
+            elif not by_key[key].get("urn") and ref.get("urn"):
+                by_key[key]["urn"] = ref["urn"]
+    return [by_key[k] for k in order]
 
 
 def analyze_query(query: str) -> QueryAnalysis:
