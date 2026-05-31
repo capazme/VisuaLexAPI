@@ -19,6 +19,7 @@ export interface QaRetrievedSource {
   provenance?: string | null;
   trust?: number | null;
   node_id?: string | null;
+  source_url?: string | null;
 }
 
 /** A divergent-mode per-canon interpretation (synthesizer shape). */

@@ -466,6 +466,15 @@ async def write_provisional_source(
             return None
 
         source_url = _extract_source_url(source)
+        if not source_url:
+            # Loop β #3: only sediment a provisional node for a single,
+            # identifiable source (one with a resolvable URL). Tool bodies
+            # without a URL are search-result lists / aggregates — valuable as
+            # expert grounding context, but not navigable graph sources (they
+            # would surface as unreadable "Fonte provvisoria" nodes keyed by an
+            # opaque live:<hash> that /grafo cannot resolve).
+            log.debug("provisional_writer.skip_no_source_url", source_id=source.get("source_id"))
+            return None
         node_id = _derive_node_id(source, source_url)
         if not node_id:
             log.warning("provisional_writer.no_node_id", source_id=source.get("source_id"))

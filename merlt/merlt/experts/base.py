@@ -41,6 +41,27 @@ if TYPE_CHECKING:
 log = structlog.get_logger()
 
 
+def _is_unusable_live_result(markdown: str) -> bool:
+    """True if an mcp-legal-it tool body is unusable as a source despite
+    success=True — i.e. an ERROR or an EMPTY result.
+
+    The tools format both as markdown:
+      * error  → ``**Errore**: atto '…' non riconosciuto``
+      * empty  → ``Nessuna decisione trovata …`` / ``Nessun risultato …``
+    Such bodies must never be sedimented as live sources (Loop β #3 fix) — they
+    pollute the graph and the expert's grounding context.
+    """
+    if not markdown:
+        return True
+    head = markdown.lstrip()[:200].lower()
+    if head.startswith("**errore**") or "non riconosciuto" in head:
+        return True
+    # Empty-result responses (Italian tool wording): "Nessun(a) … trovat(o/a/e)".
+    if head.startswith("nessun") and "trovat" in head:
+        return True
+    return False
+
+
 @dataclass
 class ExpertContext:
     """
@@ -612,13 +633,22 @@ CHECKLIST:
                 param_names = {p.name for p in (tool.parameters or [])}
             except Exception:
                 param_names = set()
+            has_query = "query" in param_names
+            needs_ref = ("reference" in param_names) or ("riferimento" in param_names)
+            # Reference-keyed tools (cite_law, fetch_law_article, …) require a
+            # real legal reference. Passing the raw query string yielded a
+            # tool-level "**Errore**: atto '<query>' non riconosciuto" body that
+            # used to be sedimented as a junk live_unconfirmed source. Without a
+            # norm reference and without a free-text `query` param, skip the tool.
+            if needs_ref and not norm_ref and not has_query:
+                continue
             kwargs: Dict[str, Any] = {}
-            if "query" in param_names:
+            if has_query:
                 kwargs["query"] = context.query_text
-            if "reference" in param_names:
-                kwargs["reference"] = norm_ref or context.query_text
-            if "riferimento" in param_names:
-                kwargs["riferimento"] = norm_ref or context.query_text
+            if norm_ref and "reference" in param_names:
+                kwargs["reference"] = norm_ref
+            if norm_ref and "riferimento" in param_names:
+                kwargs["riferimento"] = norm_ref
             for cap in ("max_risultati", "max_results"):
                 if cap in param_names:
                     kwargs[cap] = 3
@@ -635,6 +665,14 @@ CHECKLIST:
                 data.get("text") if isinstance(data, dict) else None
             )
             if not markdown:
+                continue
+            # Several mcp-legal-it tools return success=True with an ERROR markdown
+            # body (e.g. cite_law "**Errore**: atto '…' non riconosciuto"). Never
+            # sediment those as sources — they pollute the graph and surface as
+            # unreadable "Fonte provvisoria" chips.
+            if _is_unusable_live_result(markdown):
+                log.info("live legal tool returned an error/empty body; skipping",
+                         tool=tool_name, expert=self.expert_type)
                 continue
             live_sources.append({
                 "text": markdown,

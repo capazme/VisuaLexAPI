@@ -32,20 +32,32 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate }: QaSour
     stripe: 'bg-slate-300',
     chip: 'text-slate-400',
   };
-  const label = formatRetrievedUrn(source.urn);
+  // For provisional (live:) nodes the URN is an opaque hash; prefer the
+  // underlying Normattiva URL when known — it gives a readable label AND a
+  // navigable /grafo target. A bare live: hash with no source_url isn't
+  // navigable, so we render it as plain text (no broken link).
+  const displayUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
+  const label = formatRetrievedUrn(displayUrn);
+  const navigable = !displayUrn.startsWith('live:');
   const confirmable = source.provenance === 'live_unconfirmed' && !!source.node_id;
 
   return (
     <li className="relative flex items-start justify-between gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 pl-4 pr-3 dark:border-slate-700 dark:bg-slate-900">
       <span className={cn('absolute inset-y-0 left-0 w-1', meta.stripe)} aria-hidden="true" />
       <div className="min-w-0">
-        <Link
-          to={`/grafo?urn=${encodeURIComponent(source.urn)}`}
-          className="truncate font-medium text-slate-800 hover:text-primary-600 dark:text-slate-200 dark:hover:text-primary-400"
-          title={source.urn}
-        >
-          {label}
-        </Link>
+        {navigable ? (
+          <Link
+            to={`/grafo?urn=${encodeURIComponent(displayUrn)}`}
+            className="truncate font-medium text-slate-800 hover:text-primary-600 dark:text-slate-200 dark:hover:text-primary-400"
+            title={displayUrn}
+          >
+            {label}
+          </Link>
+        ) : (
+          <span className="truncate font-medium text-slate-800 dark:text-slate-200" title={source.urn}>
+            {label}
+          </span>
+        )}
         <p className="mt-0.5 flex items-center gap-2 text-xs">
           <span className={meta.chip}>{meta.label}</span>
           {typeof source.trust === 'number' && (

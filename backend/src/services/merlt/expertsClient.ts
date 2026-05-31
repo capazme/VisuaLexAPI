@@ -39,6 +39,7 @@ export interface ExpertRetrievedSource {
   provenance?: string | null;
   trust?: number | null;
   node_id?: string | null;
+  source_url?: string | null;
 }
 
 export interface ExpertQueryResponse {

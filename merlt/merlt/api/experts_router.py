@@ -102,6 +102,10 @@ class RetrievedSource(BaseModel):
     provenance: Optional[str] = None
     trust: Optional[float] = Field(None, ge=0.0, le=1.0)
     node_id: Optional[str] = None
+    # Loop β #3: for provisional (live) nodes the URN is an opaque `live:<hash>`;
+    # the underlying Normattiva URL (when known) gives the UI a readable label
+    # and a navigable /grafo target.
+    source_url: Optional[str] = None
 
 
 class ExpertQueryResponse(BaseModel):
@@ -224,7 +228,7 @@ async def _lookup_provenance_batch(urns: List[str]) -> Dict[str, dict]:
         rows = await client.query(
             "UNWIND $urns AS u MATCH (n) WHERE n.URN = u OR n.node_id = u "
             "RETURN u AS urn, n.provenance AS provenance, n.trust AS trust, "
-            "n.node_id AS node_id",
+            "n.node_id AS node_id, n.source_url AS source_url",
             {"urns": urns},
         )
         for r in rows:
@@ -234,6 +238,7 @@ async def _lookup_provenance_batch(urns: List[str]) -> Dict[str, dict]:
                     "provenance": r.get("provenance"),
                     "trust": r.get("trust"),
                     "node_id": r.get("node_id"),
+                    "source_url": r.get("source_url"),
                 }
     except Exception as e:  # noqa: BLE001
         # Drop the cached client so a stale/broken connection is rebuilt next call.
@@ -265,6 +270,7 @@ async def _build_retrieved_sources(result: Any) -> List[RetrievedSource]:
                 provenance=(enr.get(urn) or {}).get("provenance"),
                 trust=(enr.get(urn) or {}).get("trust"),
                 node_id=(enr.get(urn) or {}).get("node_id"),
+                source_url=(enr.get(urn) or {}).get("source_url"),
             )
             for urn in urns
         ]
