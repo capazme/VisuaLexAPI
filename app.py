@@ -30,6 +30,7 @@ from visualex_api.tools.text_op import format_date_to_extended, parse_article_in
 from visualex_api.tools.map import NORMATTIVA_URN_CODICI, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.alias_resolver import resolve_alias
+from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 
 # Configurazione del logging
 logging.basicConfig(
@@ -293,6 +294,11 @@ class NormaController:
         # server alongside the other /fetch_*, /health, /version endpoints —
         # /api/* is reserved for the Node BFF.
         self.app.add_url_rule('/parse_query', view_func=self.parse_query, methods=['POST'])
+        # Contextual citation linker — finds normative references embedded in free
+        # text. Used by MERL-T's query NER (Loop β #2) to detect refs inside a
+        # natural-language question. Mirrors /api/extract_citations on the prefixed
+        # server so MERL-T (which targets :5000) can reach it without the /api prefix.
+        self.app.add_url_rule('/extract_citations', view_func=self.extract_citations_endpoint, methods=['POST'])
         self.app.add_url_rule('/fetch_article_text', view_func=self.fetch_article_text, methods=['POST'])
         self.app.add_url_rule('/stream_article_text', view_func=self.stream_article_text, methods=['POST'])
         self.app.add_url_rule('/fetch_brocardi_info', view_func=self.fetch_brocardi_info, methods=['POST'])
@@ -566,6 +572,38 @@ class NormaController:
             })
         except Exception as e:
             log.error("Error in parse_query", error=str(e))
+            return jsonify({"error": str(e)}), 500
+
+    async def extract_citations_endpoint(self):
+        """Detect normative citations embedded in free text (shared linker).
+
+        Loop β #2: MERL-T's query NER calls this to find references inside a
+        natural-language question (e.g. "Cosa prevede l'art. 1218 c.c.?") with
+        char offsets. Mirrors the /api/extract_citations handler on the prefixed
+        server so the root :5000 server (the one MERL-T targets) exposes it too.
+
+        Returns: { citations: [{start, end, display_text, article, act_type,
+                   act_number, date}], count }
+        """
+        try:
+            data = await request.get_json()
+            if not data or "text" not in data:
+                return jsonify({"error": "Missing required field: text"}), 400
+            text = data["text"]
+            if not isinstance(text, str):
+                return jsonify({"error": "text must be a string"}), 400
+            if len(text) > 500_000:
+                return jsonify({"error": "Text too large (max 500KB)"}), 413
+            context_act_type = data.get("context_act_type")
+            if context_act_type is not None and not isinstance(context_act_type, str):
+                return jsonify({"error": "context_act_type must be a string"}), 400
+            citations = extract_citations_from_text(text, context_act_type=context_act_type)
+            return jsonify({
+                "citations": [c.to_dict() for c in citations],
+                "count": len(citations),
+            })
+        except Exception as e:
+            log.error("Error in extract_citations", error=str(e))
             return jsonify({"error": str(e)}), 500
 
     async def fetch_article_text(self):
