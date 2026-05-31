@@ -6,6 +6,7 @@ import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
 import { useConsent } from '../features/merlt/consent/useConsent';
 import { ConsentDialog } from '../features/merlt/consent/ConsentDialog';
 import { OpsTrainingButton } from '../features/merlt/ops/OpsTrainingButton';
+import { NerOpsCard } from '../features/merlt/ner/NerOpsCard';
 import { MyContributionsCard } from '../features/merlt/contrib/MyContributionsCard';
 import { fetchMerltProfile, type MerltProfile } from '../services/merltService';
 import type { MerltConsentLevel } from '../features/merlt/merltConsent';
@@ -243,6 +244,12 @@ export function MerltHubPage() {
               Avvia manualmente un ciclo di training RLCF sui feedback raccolti.
             </p>
             <OpsTrainingButton />
+          </HubCard>
+        )}
+
+        {features.opsVisible && (
+          <HubCard testId="hub-card-ner-ops" icon={ScrollText} title="NER giuridico (admin)">
+            <NerOpsCard />
           </HubCard>
         )}
       </div>
