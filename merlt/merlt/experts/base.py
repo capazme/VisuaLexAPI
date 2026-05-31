@@ -624,11 +624,12 @@ CHECKLIST:
         # analyzer now supplies one via VisuaLex (context.entities["legal_references"]);
         # fall back to the URN when absent so behavior is unchanged on miss.
         _legal_refs = context.entities.get("legal_references") or []
-        human_ref = (
-            _legal_refs[0].get("display")
+        legal_ref0 = (
+            _legal_refs[0]
             if _legal_refs and isinstance(_legal_refs[0], dict)
             else None
         )
+        human_ref = legal_ref0.get("display") if legal_ref0 else None
         ref_value = human_ref or norm_ref
         # Loop β E.3: honor an optional per-expert tool selection produced by the
         # tool-gating policy (orchestrator-side). Falls back to ALL curated tools
@@ -660,6 +661,20 @@ CHECKLIST:
                 kwargs["reference"] = ref_value
             if ref_value and "riferimento" in param_names:
                 kwargs["riferimento"] = ref_value
+            # Loop β #2: structured-param norm tools (fetch_law_article) — cite_law's
+            # NL resolver fails on most numbered acts (l. 241/1990, D.Lgs. 231/2001),
+            # so feed the explicit params VisuaLex already parsed. Skip when no parsed
+            # reference is available (avoids an always-failing empty call).
+            if "act_type" in param_names:
+                if not (legal_ref0 and legal_ref0.get("act_type")):
+                    continue
+                kwargs["act_type"] = legal_ref0["act_type"]
+                if "article" in param_names and legal_ref0.get("article"):
+                    kwargs["article"] = legal_ref0["article"]
+                if "act_number" in param_names and legal_ref0.get("act_number"):
+                    kwargs["act_number"] = legal_ref0["act_number"]
+                if "date" in param_names and legal_ref0.get("date"):
+                    kwargs["date"] = legal_ref0["date"]
             for cap in ("max_risultati", "max_results"):
                 if cap in param_names:
                     kwargs[cap] = 3
