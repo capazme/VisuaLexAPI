@@ -31,7 +31,7 @@ _ACT_ABBREV_PATTERN = "|".join(re.escape(a) for a in _ACT_ABBREVS)
 
 # Pattern: "art. N [suffix] [comma N] <act_abbrev>"
 _EXPLICIT_CITE_RE = re.compile(
-    r"(artt?\.?\s+)"  # group 1: article prefix
+    r"((?:artt?\.?|articol[oi])\s+)"  # group 1: article prefix
     r"(\d+(?:\s*-\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)"  # group 2: article number
     r"(?:\s*,\s*comm[ai]\.?\s*\d+)?"  # optional comma clause (non-capturing)
     r"(?:\s*(?:e|,)\s*\d+(?:\s*-\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)*"  # optional additional articles
@@ -45,7 +45,7 @@ _EXPLICIT_CITE_RE = re.compile(
 
 # Pattern: "art. N del <act_type> N/YYYY" (article before act with "del")
 _ART_DEL_ACT_RE = re.compile(
-    r"(artt?\.?\s+)"
+    r"((?:artt?\.?|articol[oi])\s+)"
     r"(\d+(?:\s*-\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)"
     r"(?:\s*,\s*comm[ai]\.?\s*\d+)?"
     r"\s+del\s+"
@@ -66,7 +66,7 @@ _STANDALONE_ACT_RE = re.compile(
 
 # Pattern: bare article reference (no act specified)
 _BARE_ART_RE = re.compile(
-    r"(artt?\.?\s+)"
+    r"((?:artt?\.?|articol[oi])\s+)"
     r"(\d+(?:\s*-\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)"
     r"(?:\s*,\s*comm[ai]\.?\s*\d+)?"
     ,
