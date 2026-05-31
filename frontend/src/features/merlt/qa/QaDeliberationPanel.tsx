@@ -75,6 +75,7 @@ export function QaDeliberationPanel({ answer, confirmed, onConfirm, onRateSource
                 <QaSourceChip
                   key={s.node_id ?? s.urn}
                   source={s}
+                  cited={answer.sources.find((c) => c.article_urn === s.urn)}
                   confirmState={s.node_id ? confirmed[s.node_id] : undefined}
                   onConfirm={onConfirm}
                   onRate={onRateSource}

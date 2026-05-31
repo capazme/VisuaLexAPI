@@ -1,8 +1,22 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Loader2, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Check, Info, Loader2, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
+import {
+  useFloating,
+  useHover,
+  useFocus,
+  useDismiss,
+  useRole,
+  useInteractions,
+  offset,
+  flip,
+  shift,
+  autoUpdate,
+  FloatingPortal,
+} from '@floating-ui/react';
 import { cn } from '../../../lib/utils';
-import { formatRetrievedUrn } from './format';
-import type { ConfirmState, QaRetrievedSource } from './types';
+import { formatRetrievedUrn, CANON_LABEL } from './format';
+import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 
 /**
  * One consulted source (Loop β F.0 Option A): readable label → /grafo, a
@@ -16,6 +30,102 @@ export interface QaSourceChipProps {
   confirmState?: ConfirmState;
   onConfirm: (s: QaRetrievedSource) => void;
   onRate?: (sourceId: string, relevant: boolean) => void;
+  /** Matching LLM-cited source (excerpt/citation/canon) to enrich the tooltip. */
+  cited?: QaSource;
+}
+
+/**
+ * Hover/focus tooltip with the full detail of one consulted source: provenance,
+ * trust, URN, node_id, source_url, and — when matched — the cited excerpt and
+ * the canon that used it. Tap-toggle on touch via useDismiss.
+ */
+function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSource }) {
+  const [open, setOpen] = useState(false);
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
+    placement: 'top-end',
+    middleware: [offset(8), flip(), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+  const hover = useHover(context, { move: false });
+  const focus = useFocus(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: 'tooltip' });
+  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, dismiss, role]);
+  const excerpt = cited?.citation ?? cited?.excerpt ?? null;
+
+  return (
+    <>
+      <button
+        ref={refs.setReference}
+        {...getReferenceProps()}
+        type="button"
+        aria-label="Dettagli della fonte consultata"
+        className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+      >
+        <Info size={14} />
+      </button>
+      {open && (
+        <FloatingPortal>
+          <div
+            // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
+            ref={refs.setFloating}
+            style={floatingStyles}
+            {...getFloatingProps()}
+            className="z-50 max-w-xs rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-900"
+          >
+            <dl className="space-y-1.5">
+              {cited?.expert && (
+                <div>
+                  <dt className="text-slate-400">Canone</dt>
+                  <dd className="text-slate-700 dark:text-slate-200">{CANON_LABEL[cited.expert] ?? cited.expert}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-slate-400">Provenienza</dt>
+                <dd className="text-slate-700 dark:text-slate-200">
+                  {source.provenance ?? 'sconosciuta'}
+                  {typeof source.trust === 'number' ? ` · affidabilità ${source.trust.toFixed(2)}` : ''}
+                </dd>
+              </div>
+              {excerpt && (
+                <div>
+                  <dt className="text-slate-400">Estratto</dt>
+                  <dd className="text-slate-700 dark:text-slate-200">{excerpt}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-slate-400">URN</dt>
+                <dd className="break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">{source.urn}</dd>
+              </div>
+              {source.node_id && (
+                <div>
+                  <dt className="text-slate-400">node_id</dt>
+                  <dd className="break-all font-mono text-[11px] text-slate-500">{source.node_id}</dd>
+                </div>
+              )}
+              {source.source_url && (
+                <div>
+                  <dt className="text-slate-400">Fonte</dt>
+                  <dd>
+                    <a
+                      href={source.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="break-all text-primary-600 hover:underline dark:text-primary-400"
+                    >
+                      {source.source_url}
+                    </a>
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        </FloatingPortal>
+      )}
+    </>
+  );
 }
 
 const PROVENANCE_META: Record<string, { label: string; stripe: string; chip: string }> = {
@@ -26,7 +136,7 @@ const PROVENANCE_META: Record<string, { label: string; stripe: string; chip: str
   live_unconfirmed: { label: 'provvisoria', stripe: 'bg-amber-400', chip: 'text-amber-600 dark:text-amber-400' },
 };
 
-export function QaSourceChip({ source, confirmState, onConfirm, onRate }: QaSourceChipProps) {
+export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }: QaSourceChipProps) {
   const meta = (source.provenance && PROVENANCE_META[source.provenance]) || {
     label: source.provenance ?? 'sconosciuta',
     stripe: 'bg-slate-300',
@@ -67,6 +177,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate }: QaSour
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        <SourceInfo source={source} cited={cited} />
         {onRate && (
           <>
             <button

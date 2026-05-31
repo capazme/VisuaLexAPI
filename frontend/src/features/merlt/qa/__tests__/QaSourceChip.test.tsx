@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
 import { QaSourceChip } from '../QaSourceChip';
@@ -45,4 +45,25 @@ describe('QaSourceChip', () => {
     expect(formatRetrievedUrn('massima_cassazione_civile_4022_2018')).toMatch(/Cass\. civ\. 4022\/2018/);
     expect(formatRetrievedUrn('live:abc')).toBe('Fonte provvisoria');
   });
+
+  it('exposes a detail tooltip with URN/provenance (and excerpt when cited)', () => {
+    render(
+      <MemoryRouter>
+        <ul>
+          <QaSourceChip
+            source={seed}
+            cited={{ article_urn: seed.urn, expert: 'literal', relevance: 0.9, excerpt: 'Il debitore...' }}
+            onConfirm={vi.fn()}
+            onRate={vi.fn()}
+          />
+        </ul>
+      </MemoryRouter>,
+    );
+    const info = screen.getByRole('button', { name: /dettagli della fonte/i });
+    fireEvent.focus(info);
+    expect(screen.getByText(/Estratto/i)).toBeInTheDocument();
+    expect(screen.getByText(/Il debitore/i)).toBeInTheDocument();
+    expect(screen.getByText(seed.urn)).toBeInTheDocument();
+  });
+
 });
