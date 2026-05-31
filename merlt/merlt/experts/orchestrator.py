@@ -64,7 +64,8 @@ from merlt.experts.literal import LiteralExpert
 from merlt.experts.systemic import SystemicExpert
 from merlt.experts.principles import PrinciplesExpert
 from merlt.experts.precedent import PrecedentExpert
-from merlt.experts.query_analyzer import analyze_query, enrich_context
+from merlt.experts.query_analyzer import analyze_query, enrich_context, build_legal_references
+from merlt.clients import get_visualex_client
 from merlt.tools import BaseTool
 from merlt.tools.search import SemanticSearchTool
 from merlt.rlcf.execution_trace import ExecutionTrace, Action
@@ -468,6 +469,22 @@ class MultiExpertOrchestrator:
         # Step 1: Analizza query per estrarre entità (NER stage)
         ner_t0 = time.perf_counter()
         query_analysis = analyze_query(query)
+
+        # Loop β #2: enrich the regex NER with VisuaLex's shared citation infra.
+        # It yields the CORRECT act type + canonical URN AND a human display
+        # reference ("art. 1453 codice civile") that cite_law/fetch_law_article
+        # actually accept — the raw URN was rejected, the root cause of #2/#3.
+        # Best-effort: any failure falls back to the regex analysis above.
+        legal_references: List[Dict[str, Any]] = []
+        try:
+            parse_result = await get_visualex_client().parse_query(query)
+            legal_references = build_legal_references(parse_result)
+        except Exception as e:
+            log.warning(
+                "visualex NER enrichment failed; using regex fallback",
+                error=str(e), trace_id=trace_id,
+            )
+
         ner_time_ms = (time.perf_counter() - ner_t0) * 1000
 
         log.info(
@@ -494,8 +511,15 @@ class MultiExpertOrchestrator:
 
         # Step 2: Costruisci context con entità estratte
         merged_entities = entities or {}
-        if query_analysis.norm_references:
+        # Prefer VisuaLex-derived URNs (correct act type); fall back to regex.
+        norm_urns = [r["urn"] for r in legal_references if r.get("urn")]
+        if norm_urns:
+            merged_entities["norm_references"] = norm_urns
+        elif query_analysis.norm_references:
             merged_entities["norm_references"] = query_analysis.norm_references
+        # Human display references for the reference-keyed live tools (cite_law…).
+        if legal_references:
+            merged_entities["legal_references"] = legal_references
         if query_analysis.legal_concepts:
             merged_entities["legal_concepts"] = query_analysis.legal_concepts
         if query_analysis.article_numbers:

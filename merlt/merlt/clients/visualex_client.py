@@ -148,6 +148,31 @@ class VisuaLexClient:
             log.error("Health check failed", error=str(e))
             return {"status": "error", "error": str(e)}
 
+    async def parse_query(self, query: str) -> Optional[Dict[str, Any]]:
+        """Parse a natural-language legal query into structured params + URN.
+
+        Calls VisuaLex's shared ``/parse_query`` endpoint (the same NL parser
+        the graph ingestion and the contribution picker rely on). Returns the
+        payload ``{recognized, parsed, urn, display, source}`` when a reference
+        is recognized, or ``None`` when nothing is recognized or VisuaLex is
+        unreachable. Fail-soft by design: the caller falls back to the in-process
+        regex NER, so a VisuaLex outage degrades extraction quality but never
+        breaks the query.
+        """
+        if not query or not query.strip():
+            return None
+        client = await self._get_client()
+        try:
+            response = await client.post("/parse_query", json={"query": query})
+            response.raise_for_status()
+            data = response.json()
+            if not data or not data.get("recognized"):
+                return None
+            return data
+        except Exception as e:
+            log.warning("parse_query failed", error=str(e), query=query[:80])
+            return None
+
     async def fetch_norma_data(
         self,
         act_type: str,

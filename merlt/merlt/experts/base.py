@@ -619,6 +619,17 @@ CHECKLIST:
         """
         live_sources: List[Dict[str, Any]] = []
         norm_ref = context.norm_references[0] if context.norm_references else None
+        # Loop β #2: reference-keyed tools (cite_law, fetch_law_article) need a
+        # HUMAN reference ("art. 1453 codice civile"), NOT a URN. The query
+        # analyzer now supplies one via VisuaLex (context.entities["legal_references"]);
+        # fall back to the URN when absent so behavior is unchanged on miss.
+        _legal_refs = context.entities.get("legal_references") or []
+        human_ref = (
+            _legal_refs[0].get("display")
+            if _legal_refs and isinstance(_legal_refs[0], dict)
+            else None
+        )
+        ref_value = human_ref or norm_ref
         # Loop β E.3: honor an optional per-expert tool selection produced by the
         # tool-gating policy (orchestrator-side). Falls back to ALL curated tools
         # when absent (control arm, flag off, or policy unavailable) → unchanged
@@ -640,15 +651,15 @@ CHECKLIST:
             # tool-level "**Errore**: atto '<query>' non riconosciuto" body that
             # used to be sedimented as a junk live_unconfirmed source. Without a
             # norm reference and without a free-text `query` param, skip the tool.
-            if needs_ref and not norm_ref and not has_query:
+            if needs_ref and not ref_value and not has_query:
                 continue
             kwargs: Dict[str, Any] = {}
             if has_query:
                 kwargs["query"] = context.query_text
-            if norm_ref and "reference" in param_names:
-                kwargs["reference"] = norm_ref
-            if norm_ref and "riferimento" in param_names:
-                kwargs["riferimento"] = norm_ref
+            if ref_value and "reference" in param_names:
+                kwargs["reference"] = ref_value
+            if ref_value and "riferimento" in param_names:
+                kwargs["riferimento"] = ref_value
             for cap in ("max_risultati", "max_results"):
                 if cap in param_names:
                     kwargs[cap] = 3

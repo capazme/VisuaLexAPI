@@ -194,6 +194,48 @@ def build_article_urn(article_number: str, code: str = "codice_civile") -> str:
     return f"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art{art_num}"
 
 
+def build_legal_references(parse_result: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Loop β #2 — turn a VisuaLex ``/parse_query`` payload into structured legal
+    references usable by BOTH consumers:
+
+    - the graph traversal, which keys on the canonical ``urn``;
+    - the live citation tools (``cite_law``/``fetch_law_article``), which require
+      a HUMAN reference like ``"art. 1453 codice civile"`` and reject a raw URN
+      (the URN-to-cite_law mismatch was the root cause of #2/#3).
+
+    Returns an empty list when nothing usable was recognized, so the caller can
+    fall back to the regex analysis.
+    """
+    if not parse_result or not parse_result.get("recognized"):
+        return []
+    parsed = parse_result.get("parsed") or {}
+    act_type = parsed.get("act_type")
+    article = parsed.get("article")
+    if not act_type and not article:
+        return []
+    act_number = parsed.get("act_number")
+    date = parsed.get("date")
+    if article and act_type:
+        # Build the form cite_law/fetch_law_article accept (verified live):
+        # codici → "art. 1453 codice civile"; numbered acts → "art. 5 legge 241/1990".
+        display = f"art. {article} {act_type}"
+        if act_number:
+            display += f" {act_number}"
+            year = (date or "").split("-")[0]
+            if year:
+                display += f"/{year}"
+    else:
+        display = parse_result.get("display") or act_type or article
+    return [{
+        "display": display,
+        "urn": parse_result.get("urn"),
+        "act_type": act_type,
+        "article": article,
+        "act_number": act_number,
+        "date": date,
+    }]
+
+
 def analyze_query(query: str) -> QueryAnalysis:
     """
     Analizza una query giuridica.
