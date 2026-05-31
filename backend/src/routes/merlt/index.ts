@@ -6,6 +6,7 @@ import contribRouter from './contrib';
 import validateRouter from './validate';
 import opsRouter from './ops';
 import expertsRouter from './experts';
+import nerRouter from './ner';
 import healthRouter from './health';
 import profileRouter from './profile';
 
@@ -42,6 +43,8 @@ router.use('/', opsRouter);
 // Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the
 // catch-all auth routers (gotcha #1).
 router.use('/', expertsRouter);
+// Loop β #2 — NER feedback. Per-route auth → order-safe; before catch-all (gotcha #1).
+router.use('/', nerRouter);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);
