@@ -163,7 +163,11 @@ class VisuaLexClient:
             return None
         client = await self._get_client()
         try:
-            response = await client.post("/parse_query", json={"query": query})
+            # Dedicated short timeout: this runs on the query hot path (NER stage),
+            # so a slow/hanging VisuaLex must not stall every expert query.
+            response = await client.post(
+                "/parse_query", json={"query": query}, timeout=8.0
+            )
             response.raise_for_status()
             data = response.json()
             if not data or not data.get("recognized"):
