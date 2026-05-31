@@ -317,6 +317,11 @@ class AdaptiveSynthesizer:
         result.confidence = self._calibrate_confidence(
             result.confidence, disagreement_analysis
         )
+        # Loop β F.0: damp confidence when the answer is poorly grounded
+        # (no/few legal sources) — agreement alone must not yield a flat 0.9.
+        result.confidence = self._apply_grounding_factor(
+            result.confidence, len(result.combined_legal_basis)
+        )
 
         # Calcola execution_time_ms
         result.execution_time_ms = (
@@ -366,6 +371,24 @@ class AdaptiveSynthesizer:
         )
 
         return result
+
+    def _apply_grounding_factor(self, confidence: float, n_sources: int) -> float:
+        """Damp confidence when the answer is poorly grounded (Loop β F.0).
+
+        Additive, monotone in n_sources:
+          - 0 sources  → hard cap 0.4 (an answer with no legal basis cannot be
+            highly confident, regardless of expert agreement);
+          - 1-2 sources → mild damp (1→0.7×, 2→0.8×);
+          - ≥3 sources → unchanged.
+
+        Complements `_calibrate_confidence` (which only models expert agreement):
+        agreement among experts on an ungrounded answer should not read as 0.9.
+        """
+        if n_sources <= 0:
+            return min(confidence, 0.4)
+        if n_sources < 3:
+            return confidence * (0.6 + 0.1 * n_sources)
+        return confidence
 
     def _calibrate_confidence(
         self,

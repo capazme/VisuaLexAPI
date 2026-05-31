@@ -82,6 +82,26 @@ class SourceReference(BaseModel):
     # when the underlying LegalSource carries no provenance signal.
     provenance: Optional[str] = None
     trust: Optional[float] = Field(None, ge=0.0, le=1.0)
+    # Loop β F.0 (Option A): the LLM-cited source carries a readable formal
+    # citation (e.g. "Art. 1453 c.c.") even when source_id is an opaque chunk id.
+    citation: Optional[str] = None
+
+
+class RetrievedSource(BaseModel):
+    """
+    A source the engine actually consulted during retrieval, carrying REAL
+    FalkorDB provenance (Loop β F.0 Option A).
+
+    Distinct from `SourceReference` (the LLM-cited basis, whose ids are LLM
+    output and lose provenance): these come from the retrieval trace's
+    `top_sources` and are enriched against the live graph. `node_id` is set
+    when the node is provisional (`provenance == 'live_unconfirmed'`) so the
+    UI can offer "remember in the graph" (confirm-source) on it.
+    """
+    urn: str
+    provenance: Optional[str] = None
+    trust: Optional[float] = Field(None, ge=0.0, le=1.0)
+    node_id: Optional[str] = None
 
 
 class ExpertQueryResponse(BaseModel):
@@ -96,6 +116,10 @@ class ExpertQueryResponse(BaseModel):
     execution_time_ms: int = Field(..., description="Execution time in milliseconds")
     pipeline_trace: Optional[Dict[str, Any]] = Field(None, description="Full pipeline trace (when include_trace=True)")
     pipeline_metrics: Optional[Dict[str, Any]] = Field(None, description="Pipeline metrics (when include_trace=True)")
+    retrieved_sources: List[RetrievedSource] = Field(
+        default_factory=list,
+        description="Sources the engine consulted, with real FalkorDB provenance/trust/node_id (Loop β F.0).",
+    )
 
 
 def _to_source_reference(legal_source: Any) -> SourceReference:
@@ -156,6 +180,9 @@ def _to_source_reference(legal_source: Any) -> SourceReference:
     else:
         trust = max(0.0, min(1.0, float(trust)))
 
+    # --- readable citation (F.0 Option A) -----------------------------------
+    citation = getattr(legal_source, "citation", None) or None
+
     return SourceReference(
         article_urn=article_urn,
         expert=expert,
@@ -163,7 +190,87 @@ def _to_source_reference(legal_source: Any) -> SourceReference:
         excerpt=excerpt,
         provenance=provenance,
         trust=trust,
+        citation=citation,
     )
+
+
+# Cached FalkorDB client for provenance lookups. _get_graph_client(None) builds
+# a NEW connected client per call and close() is a no-op (redis pool), so a
+# per-query client would leak connections — keep one connected singleton.
+_provenance_graph_client: Any = None
+
+
+async def _get_provenance_graph_client() -> Any:
+    global _provenance_graph_client
+    if _provenance_graph_client is None:
+        from merlt.pipeline.provisional_writer import _get_graph_client
+
+        _provenance_graph_client = await _get_graph_client(None)
+    return _provenance_graph_client
+
+
+async def _lookup_provenance_batch(urns: List[str]) -> Dict[str, dict]:
+    """
+    Read ``{provenance, trust, node_id}`` for each URN from FalkorDB (Loop β
+    F.0 Option A). Reuses the configured graph client so the graph name follows
+    the environment (``merl_t_legal`` on the live stack). Best-effort: returns
+    ``{}`` on any error — provenance enrichment must never break a query.
+    """
+    out: Dict[str, dict] = {}
+    if not urns:
+        return out
+    try:
+        client = await _get_provenance_graph_client()
+        rows = await client.query(
+            "UNWIND $urns AS u MATCH (n) WHERE n.URN = u OR n.node_id = u "
+            "RETURN u AS urn, n.provenance AS provenance, n.trust AS trust, "
+            "n.node_id AS node_id",
+            {"urns": urns},
+        )
+        for r in rows:
+            urn = r.get("urn")
+            if urn and urn not in out:
+                out[urn] = {
+                    "provenance": r.get("provenance"),
+                    "trust": r.get("trust"),
+                    "node_id": r.get("node_id"),
+                }
+    except Exception as e:  # noqa: BLE001
+        # Drop the cached client so a stale/broken connection is rebuilt next call.
+        global _provenance_graph_client
+        _provenance_graph_client = None
+        log.warning("provenance batch lookup failed (non-blocking)", error=str(e))
+    return out
+
+
+async def _build_retrieved_sources(result: Any) -> List[RetrievedSource]:
+    """
+    Build the "sources the engine consulted" panel from the retrieval trace
+    (``pipeline_trace.stages.expert_executions[*].retrieval_trace.top_sources``)
+    enriched with real FalkorDB provenance. Best-effort, never raises.
+    """
+    try:
+        pt = (getattr(result, "metadata", None) or {}).get("pipeline_trace") or {}
+        execs = (pt.get("stages") or {}).get("expert_executions") or []
+        urns: List[str] = []
+        for ex in execs:
+            for u in ((ex.get("retrieval_trace") or {}).get("top_sources") or []):
+                urn = u if isinstance(u, str) else (u.get("urn") if isinstance(u, dict) else None)
+                if urn and urn not in urns:
+                    urns.append(urn)
+        enr = await _lookup_provenance_batch(urns)
+        return [
+            RetrievedSource(
+                urn=urn,
+                provenance=(enr.get(urn) or {}).get("provenance"),
+                trust=(enr.get(urn) or {}).get("trust"),
+                node_id=(enr.get(urn) or {}).get("node_id"),
+            )
+            for urn in urns
+        ]
+    except Exception as e:  # noqa: BLE001
+        log.warning("retrieved_sources build failed (non-blocking)", error=str(e))
+        return []
 
 
 class InlineFeedbackRequest(BaseModel):
@@ -551,6 +658,10 @@ async def query_experts(
         # Extract sources from combined_legal_basis
         sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
 
+        # Loop β F.0 (Option A): the consulted sources, with real FalkorDB
+        # provenance (the LLM-cited `sources` above lose it).
+        retrieved_sources = await _build_retrieved_sources(result)
+
         # Extract experts used from expert_contributions
         experts_used = list(result.expert_contributions.keys())
 
@@ -625,6 +736,7 @@ async def query_experts(
             execution_time_ms=execution_time_ms,
             pipeline_trace=pipeline_trace_data,
             pipeline_metrics=pipeline_metrics_data,
+            retrieved_sources=retrieved_sources,
         )
 
     except Exception as e:
@@ -1159,6 +1271,7 @@ async def submit_refine_feedback(
 
         # Extract sources (same LegalSource shape as the main query path)
         sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
+        retrieved_sources = await _build_retrieved_sources(result)
 
         experts_used = list(result.expert_contributions.keys())
 
@@ -1209,7 +1322,8 @@ async def submit_refine_feedback(
             sources=sources,
             experts_used=experts_used,
             confidence=result.confidence,
-            execution_time_ms=execution_time_ms
+            execution_time_ms=execution_time_ms,
+            retrieved_sources=retrieved_sources,
         )
 
     except HTTPException:
