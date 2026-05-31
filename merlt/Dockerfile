@@ -29,6 +29,10 @@ RUN pip install --upgrade pip setuptools wheel && \
 # Install package dependencies
 RUN pip install -e .
 
+# Loop β #2 Phase 4: base Italian model for the learned legal-reference NER.
+# Installed as a pip package into site-packages → copied to the prod stage.
+RUN python -m spacy download it_core_news_lg
+
 # Production stage
 FROM python:3.11-slim
 
@@ -74,6 +78,10 @@ RUN mkdir -p /home/appuser/.cache/huggingface && \
 # appuser ownership — otherwise saving a trained policy hits "Permission denied".
 RUN mkdir -p /app/checkpoints && \
     chown -R appuser:appuser /app/checkpoints
+# Loop β #2 Phase 4: pre-create the NER model dir owned by appuser so the
+# shared named volume (merlt_ner_models, api↔worker) initializes appuser-owned.
+RUN mkdir -p /app/models && \
+    chown -R appuser:appuser /app/models
 USER appuser
 
 # Expose API port

@@ -71,6 +71,9 @@ dependencies = [
     # Background job queue (lazy graph ingestion)
     "rq>=2.0.0",
 
+    # Learned legal-reference NER (Loop β #2, Phase 4)
+    "spacy>=3.7.0,<3.8.0",
+
     # JWT verification
     "PyJWT>=2.8.0",
 

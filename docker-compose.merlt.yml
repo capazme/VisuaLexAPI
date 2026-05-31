@@ -146,6 +146,8 @@ services:
       # needs the queue Redis too (not just the worker). Without this the api
       # defaults to localhost:6379 and enqueue fails inside the container.
       RQ_REDIS_URL: "redis://merlt-redis:6379/1"
+      # Loop β #2 Phase 4: gate the learned NER at inference. OFF until A/B proves it.
+      MERLT_NER_LEARNED_ENABLED: "false"
 
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"
@@ -198,6 +200,8 @@ services:
       # learned routing/pruning. The WeightStore (DB) keeps the surfaced weights,
       # but the runtime policy lives in these checkpoints.
       - merlt_checkpoints:/app/checkpoints
+      # Loop β #2 Phase 4: shared learned-NER model dir (worker trains, api infers).
+      - merlt_ner_models:/app/models
     ports:
       - "${MERLT_API_PORT:-8000}:8000"
     command: ["uvicorn", "merlt.app:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -283,8 +287,10 @@ services:
       - merlt_hf_cache:/home/appuser/.cache/huggingface
       # Loop β E.2/E.3: share the policy-checkpoint volume with merlt-api.
       - merlt_checkpoints:/app/checkpoints
+      # Loop β #2 Phase 4: shared learned-NER model dir (worker trains, api infers).
+      - merlt_ner_models:/app/models
     # Slice 2c: also consume the merlt_extract queue (extract_to_staging task).
-    command: ["rq", "worker", "merlt_ingest", "merlt_extract", "--url", "redis://merlt-redis:6379/1"]
+    command: ["rq", "worker", "merlt_ingest", "merlt_extract", "merlt_ner_train", "--url", "redis://merlt-redis:6379/1"]
     # Override the API image's HTTP healthcheck (curl :8000) — the worker is not
     # an HTTP server. Liveness here = it can reach its RQ Redis (DB 1).
     healthcheck:
@@ -301,3 +307,4 @@ volumes:
   merlt_uploads:
   merlt_hf_cache:
   merlt_checkpoints:
+  merlt_ner_models:
