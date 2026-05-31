@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, History, MessageSquare } from 'lucide-react';
+import { ArrowLeft, History, MessageSquare, Terminal } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { useMerltFeatures } from '../useMerltFeatures';
 import { sendNerFeedback } from '../../../services/merltService';
 import { useQaThread } from './useQaThread';
+import { useQaDevMode } from './useQaDevMode';
 import { QaComposer } from './QaComposer';
 import { QaTurn } from './QaTurn';
 import { QaHistoryPanel } from './QaHistoryPanel';
@@ -24,6 +25,7 @@ export function QAPage() {
   const { merltEnabled, canContribute } = useMerltFeatures();
   const { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn } = useQaThread();
   const [showHistory, setShowHistory] = useState(false);
+  const [devMode, toggleDevMode] = useQaDevMode();
 
   if (!merltEnabled) {
     return <p className="text-slate-600 dark:text-slate-300">MERL-T non è disponibile.</p>;
@@ -51,6 +53,19 @@ export function QAPage() {
             <ArrowLeft size={14} /> MERL-T
           </Link>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleDevMode}
+              aria-pressed={devMode}
+              title="Mostra i dettagli del processo sotto ogni risposta"
+              className={
+                devMode
+                  ? 'inline-flex items-center gap-1 text-sm font-medium text-amber-600 dark:text-amber-400 focus-visible:outline-none focus-visible:underline'
+                  : 'inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:underline'
+              }
+            >
+              <Terminal size={14} /> Dev
+            </button>
             <button
               type="button"
               onClick={() => setShowHistory((v) => !v)}
@@ -122,6 +137,7 @@ export function QAPage() {
                 onRateSource={(sourceId, relevant) => rateSrc(traceId, sourceId, relevant)}
                 onPrefer={(expert) => prefer(traceId, expert)}
                 onDetailed={(scores) => detailed(traceId, scores)}
+                devMode={devMode}
                 onNerCitation={(payload) => {
                   void sendNerFeedback(payload).catch((err) => {
                     console.error('NER qa_chip feedback failed:', err);

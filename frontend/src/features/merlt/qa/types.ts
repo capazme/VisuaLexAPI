@@ -41,6 +41,9 @@ export interface QaAnswer {
   experts_used: string[];
   confidence: number;
   execution_time_ms: number;
+  /** Present when the query ran with include_trace (always, via the BFF). */
+  pipeline_trace?: Record<string, unknown> | null;
+  pipeline_metrics?: Record<string, unknown> | null;
 }
 
 export type QaAnswerState =

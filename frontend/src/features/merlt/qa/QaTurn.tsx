@@ -5,6 +5,7 @@ import { QaDeliberationPanel } from './QaDeliberationPanel';
 import { CANON_LABEL } from './format';
 import type { QaRetrievedSource, QaTurnModel } from './types';
 import { QaSynthesisWithCitations } from '../ner/QaSynthesisWithCitations';
+import { QaProcessTrace } from './QaProcessTrace';
 import type { NerFeedbackInput } from '../../../services/merltService';
 
 export interface QaTurnProps {
@@ -17,6 +18,8 @@ export interface QaTurnProps {
   onDetailed: (scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number }) => void;
   /** Forward an in-prose citation NER feedback (surface=qa_chip). */
   onNerCitation?: (payload: NerFeedbackInput) => void;
+  /** Dev mode: render the pipeline trace under the answer. */
+  devMode?: boolean;
 }
 
 function confidenceLabel(c: number): string {
@@ -25,7 +28,7 @@ function confidenceLabel(c: number): string {
   return 'bassa';
 }
 
-export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed, onNerCitation }: QaTurnProps) {
+export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed, onNerCitation, devMode }: QaTurnProps) {
   const [refining, setRefining] = useState(false);
   const [followUp, setFollowUp] = useState('');
 
@@ -113,6 +116,8 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
               onRateSource={onRateSource}
               onDetailed={onDetailed}
             />
+
+            {devMode && <QaProcessTrace answer={a} />}
 
             {/* Inline feedback + refine */}
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
