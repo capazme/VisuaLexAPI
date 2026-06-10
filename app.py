@@ -177,6 +177,8 @@ class NormaController:
         Supporta anche info Brocardi in parallelo.
         """
         data = await request.get_json()
+        if not data:
+            return jsonify({'error': 'Request body required'}), 400
         log.info("Received data for stream_article_text", data=data)
         add_to_history(data)
         normavisitate = await self.create_norma_visitata_from_data(data)
@@ -374,7 +376,7 @@ class NormaController:
         )
         log.info("Norma instance created", norma=norma)
 
-        articles = await parse_article_input(str(data.get('article')), norma.url)
+        articles = await parse_article_input(str(data.get('article') or ''), norma.url)
         log.info("Articles parsed", articles=articles)
 
         # Validate and sanitize annex parameter
@@ -503,6 +505,8 @@ class NormaController:
     async def fetch_norma_data(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_norma_data", data=data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
@@ -609,6 +613,8 @@ class NormaController:
     async def fetch_article_text(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_article_text", data=data)
             add_to_history(data)
 
@@ -650,6 +656,8 @@ class NormaController:
     async def fetch_tree(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_tree", data=data)
 
             urn = data.get('urn')
@@ -696,6 +704,8 @@ class NormaController:
     async def fetch_brocardi_info(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_brocardi_info", data=data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
@@ -742,6 +752,8 @@ class NormaController:
     async def fetch_all_data(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             log.info("Received data for fetch_all_data", data=data)
             add_to_history(data)
 
@@ -877,6 +889,8 @@ class NormaController:
         """Crea un nuovo dossier."""
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             title = data.get('title', 'Nuovo Dossier')
             description = data.get('description', '')
             dossier = dossier_manager.create(title, description)
@@ -912,6 +926,8 @@ class NormaController:
         """Aggiunge un item a un dossier."""
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             item_data = data.get('data')
             item_type = data.get('type', 'norma')
             item = dossier_manager.add_item(dossier_id, item_data, item_type)
@@ -950,6 +966,8 @@ class NormaController:
         """Importa un dossier (da share link)."""
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             dossier = dossier_manager.import_dossier(data)
             return jsonify(dossier), 201
         except Exception as e:
@@ -960,6 +978,8 @@ class NormaController:
         """Sincronizza tutti i dossier (sovrascrive dal frontend)."""
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             dossiers = data.get('dossiers', [])
             dossier_manager.sync_all(dossiers)
             return jsonify({'success': True, 'count': len(dossiers)})
@@ -1113,9 +1133,14 @@ class NormaController:
     async def export_pdf(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             urn = data.get('urn')
-            if not urn:
+            if not urn or not isinstance(urn, str):
                 return jsonify({'error': 'URN mancante'}), 400
+            urn = urn.strip()
+            if not urn.startswith(('https://www.normattiva.it/', 'http://www.normattiva.it/')):
+                return jsonify({'error': 'URN non valido: sono ammessi solo URL normattiva.it'}), 400
 
             log.info("Received data for export_pdf", data=data)
             pdf_path = urn_to_filename(urn)

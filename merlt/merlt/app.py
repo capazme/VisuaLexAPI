@@ -57,7 +57,6 @@ from merlt.api import (
     expert_metrics_router,
     ws_router,
     tracking_router,
-    ner_router,
     policy_evolution_router,
     export_router,
     devils_advocate_router,
@@ -105,27 +104,12 @@ async def lifespan(app: FastAPI):
             log.warning("Community votes will NOT reach consensus until triggers are installed")
         log.info("✅ Enrichment database initialized")
 
-        # Initialize Expert System (MultiExpertOrchestrator) WITH retrieval tools.
-        # Loop β Bug 1: the experts MUST be wired with SemanticSearchTool +
-        # GraphSearchTool, otherwise every analyze() silently skips retrieval and the
-        # answer comes from the LLM's parametric memory with ZERO grounding (empty
-        # `sources`). LegalKnowledgeGraph.connect() builds FalkorDB + Qdrant + bridge +
-        # embeddings, and _init_orchestrator() assembles the retrieval-backed
-        # orchestrator (synthesizer + ai_service + tools) — the single canonical
-        # wiring path. (Previously app.py built the orchestrator inline with tools=[].)
+        # Initialize Expert System (MultiExpertOrchestrator)
         try:
             from merlt.rlcf.ai_service import OpenRouterService
             from merlt.experts.synthesizer import AdaptiveSynthesizer, SynthesisConfig
             from merlt.experts.orchestrator import MultiExpertOrchestrator, OrchestratorConfig
             from merlt.api.experts_router import initialize_expert_system
-            from merlt.storage import FalkorDBClient
-            from merlt.tools import GraphSearchTool
-            from merlt.rlcf.policy_manager import get_policy_manager
-            from merlt.experts.neural_gating import (
-                ExpertGatingMLP,
-                GatingConfig,
-                HybridExpertRouter,
-            )
 
             ai_service = OpenRouterService()
             synthesizer = AdaptiveSynthesizer(
@@ -137,179 +121,10 @@ async def lifespan(app: FastAPI):
                 ),
                 ai_service=ai_service,
             )
-
-            # Loop β Bug 1: wire retrieval tools so the experts GROUND their answers in
-            # the legal knowledge graph instead of the LLM's parametric memory (which
-            # produced empty `sources`). FalkorDBClient() with no args reads
-            # FALKORDB_HOST/PORT/GRAPH_NAME from env (merlt-falkordb:6379, merl_t_legal)
-            # — the same env-aware path graph_router and the seed loader use.
-            # IMPORTANT: do NOT route this through LegalKnowledgeGraph/MerltConfig —
-            # MerltConfig hardcodes the FalkorDB endpoint to localhost:6380
-            # (legal_knowledge_graph.py), unreachable inside the container network; its
-            # FalkorDB driver does a sentinel `INFO server` on connect and ConnectionErrors.
-            # (NB: get_policy_manager() is NOT the culprit — it has no Redis; it loads a
-            # filesystem PolicyManager checkpoint (DEFAULT_TRAVERSAL_WEIGHTS until a .pt
-            # exists). Loop β E.1 NOW wires it into the GraphAwareRetriever below, so
-            # graph-traversal weights become RLCF-tunable — see the co-evolution sprint-plan.)
-            tools = []
-            graph_client = FalkorDBClient()
-            await graph_client.connect()
-            tools.append(GraphSearchTool(graph_db=graph_client))
-
-            # Best-effort semantic retrieval over Qdrant. Skipped (graph grounding still
-            # works) if Qdrant/embeddings are unavailable or the collection is empty.
-            try:
-                from qdrant_client import QdrantClient
-                from merlt.storage import GraphAwareRetriever, RetrieverConfig
-                from merlt.storage.vectors.embeddings import EmbeddingService
-                from merlt.tools import SemanticSearchTool
-
-                qdrant = QdrantClient(
-                    host=os.getenv("QDRANT_HOST", "localhost"),
-                    port=int(os.getenv("QDRANT_PORT", "6333")),
-                )
-                embeddings = EmbeddingService.get_instance(
-                    model_name=os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-large")
-                )
-                # RetrieverConfig defaults the Qdrant collection to "merl_t_dev_chunks";
-                # the live collection is "<graph>_chunks" (merl_t_legal_chunks). Point it
-                # at the right one (env override wins) or semantic search 404s the
-                # collection. NB: MERLT_SKIP_EMBEDDINGS=true only skips embedding the seed
-                # AT LOAD TIME — the seed chunks were backfilled separately (Qdrant
-                # merl_t_legal_chunks ≈ 17.2k points), so semantic retrieval IS live and
-                # is a primary grounding source alongside the graph.
-                _collection = os.getenv("QDRANT_COLLECTION") or (
-                    os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal") + "_chunks"
-                )
-                # Loop β E.1: the learnable traversal PolicyManager (filesystem
-                # checkpoint singleton, no Redis). Wired into the retriever so
-                # graph-traversal relation weights are RLCF-tunable (REINFORCE in
-                # Phase E updates them). Falls back to DEFAULT_TRAVERSAL_WEIGHTS
-                # until a checkpoints/traversal_policy_latest.pt exists.
-                traversal_policy_manager = get_policy_manager()
-                retriever = GraphAwareRetriever(
-                    vector_db=qdrant,
-                    graph_db=graph_client,
-                    bridge_table=None,
-                    config=RetrieverConfig(collection_name=_collection),
-                    policy_manager=traversal_policy_manager,
-                )
-                tools.append(SemanticSearchTool(retriever=retriever, embeddings=embeddings))
-                log.info("Semantic retrieval tool wired")
-
-                # Loop β prereq (0.0): WARM the e5-large model at boot. It loads
-                # lazily on first use (~86s cold / ~7s warm for 1.2GB), and each
-                # expert is wrapped in asyncio.wait_for(timeout=60s) — so a cold load
-                # on the first /experts/query times out ALL experts and returns
-                # sources=0. Boot has no per-request timeout, so paying the load here
-                # (in a thread, non-blocking to the loop) makes the first user query
-                # fast. Persisted across rebuilds by the merlt_hf_cache volume.
-                if os.getenv("MERLT_SKIP_EMBED_WARMUP", "").lower() != "true":
-                    try:
-                        await embeddings.encode_query_async("warmup")
-                        log.info("✅ Embedding model warmed at boot",
-                                 model=embeddings.model_name, device=embeddings.device)
-                    except Exception as warm_err:
-                        log.warning("Embedding warmup failed; first query may be slow",
-                                    error=str(warm_err))
-            except Exception as e:
-                log.warning("Semantic retrieval unavailable; graph grounding only", error=str(e))
-
-            # Loop β A.3: wire the CURATED live mcp-legal-it tools (jurisprudence,
-            # doctrine, norm text) into the shared tool list. Only the names in the
-            # orchestrator's per-expert map are added — never the ~180 calculator
-            # tools — and _init_experts then splits them by canon. Failure-isolated:
-            # if the MCP sidecar is down the experts still run on graph+semantic.
-            try:
-                from merlt.tools.mcp_legal_adapter import build_mcp_legal_tools
-                _curated = set().union(*MultiExpertOrchestrator.EXPERT_MCP_TOOLS.values())
-                mcp_tools = [t for t in await build_mcp_legal_tools() if t.name in _curated]
-                tools.extend(mcp_tools)
-                log.info("Live mcp-legal-it tools wired",
-                         count=len(mcp_tools), names=[t.name for t in mcp_tools])
-            except Exception as mcp_err:
-                log.warning("mcp-legal-it tools unavailable; experts run without live legal tools",
-                            error=str(mcp_err))
-
-            # Loop β E.1/0.3: wire neural gating so the router emits LEARNABLE
-            # expert_selection Actions (carrying query_embedding + log_prob) into
-            # the ExecutionTrace — without these, REINFORCE (Phase E) trains on
-            # nothing. HybridExpertRouter warm-starts WITHOUT a checkpoint and
-            # falls back to the LLM router below confidence_threshold. The default
-            # threshold is 0.0 (neural routing always used) so the co-evolution
-            # loop is fully exercised and the gating weights are tuned from
-            # feedback; raise MERLT_GATING_CONFIDENCE_THRESHOLD to gate it.
-            from merlt.storage.vectors.embeddings import EmbeddingService
-            orchestrator_embeddings = EmbeddingService.get_instance()
-            hybrid_router = None
-            try:
-                gating_mlp = ExpertGatingMLP(GatingConfig())
-                # Loop β E.2 (closed-loop): load the TRAINED gating checkpoint so
-                # runtime routing reflects what REINFORCE learned — not just the
-                # warm-start prior. The scheduler writes gating_policy_latest.pt
-                # (model_state_dict format) to the durable merlt_checkpoints volume;
-                # HybridExpertRouter.__init__ loads it when the path exists and sets
-                # loaded_from_checkpoint. Warm-start fallback when no checkpoint yet.
-                _gating_ckpt = Path("checkpoints/gating_policy_latest.pt")
-                hybrid_router = HybridExpertRouter(
-                    neural_gating=gating_mlp,
-                    embedding_service=orchestrator_embeddings,
-                    confidence_threshold=float(
-                        os.getenv("MERLT_GATING_CONFIDENCE_THRESHOLD", "0.0")
-                    ),
-                    checkpoint_path=_gating_ckpt,
-                )
-                log.info("✅ Neural gating router wired",
-                         source="trained-checkpoint" if getattr(hybrid_router, "loaded_from_checkpoint", False) else "warm-start",
-                         confidence_threshold=hybrid_router.confidence_threshold)
-            except Exception as gate_err:
-                log.warning("Neural gating unavailable; falling back to LLM routing",
-                            error=str(gate_err))
-
-            # Loop β E.3: tool-gating policy (warm-start). Decides which live
-            # mcp-legal-it tools each expert calls; learns from feedback via
-            # REINFORCE. MERLT_TOOL_GATING_ENABLED master switch (default on);
-            # MERLT_TOOL_GATING_AB_RATIO is the treatment(prune)/control split
-            # (default 0.7 = exploit 70% / explore 30%). Failure-isolated.
-            tool_selector = None
-            try:
-                from merlt.experts.neural_gating.tool_neural import ToolGatingMLP, ToolGatingConfig
-                from merlt.experts.neural_gating.tool_selector import ToolSelector
-
-                _tg_enabled = os.getenv("MERLT_TOOL_GATING_ENABLED", "true").lower() not in ("false", "0", "")
-                _tg_ratio = float(os.getenv("MERLT_TOOL_GATING_AB_RATIO", "0.7"))
-                # Load the trained tool policy from checkpoint so pruning reflects
-                # learning (the scheduler writes tool_policy_latest.pt); warm-start
-                # fresh on first boot / no checkpoint.
-                tool_policy = None
-                try:
-                    from merlt.rlcf.policy_manager import get_policy_manager
-                    tool_policy = get_policy_manager().get_tool_policy()
-                except Exception as load_err:
-                    log.warning("Tool policy checkpoint load failed", error=str(load_err))
-                    tool_policy = None
-                _tg_source = "trained-checkpoint" if tool_policy is not None else "warm-start"
-                if tool_policy is None:
-                    tool_policy = ToolGatingMLP(ToolGatingConfig())
-                tool_selector = ToolSelector(
-                    policy=tool_policy,
-                    expert_tool_map=MultiExpertOrchestrator.EXPERT_MCP_TOOLS,
-                    enabled=_tg_enabled,
-                    ab_ratio=_tg_ratio,
-                )
-                log.info("✅ Tool-gating policy wired",
-                         source=_tg_source, enabled=_tg_enabled, ab_ratio=_tg_ratio)
-            except Exception as tg_err:
-                log.warning("Tool-gating unavailable; experts call all live tools (A.3)",
-                            error=str(tg_err))
-
             orchestrator = MultiExpertOrchestrator(
                 synthesizer=synthesizer,
-                tools=tools,
+                tools=[],
                 ai_service=ai_service,
-                hybrid_router=hybrid_router,
-                embedding_service=orchestrator_embeddings,
-                tool_selector=tool_selector,
                 config=OrchestratorConfig(
                     max_experts=4,
                     timeout_seconds=60,
@@ -317,9 +132,7 @@ async def lifespan(app: FastAPI):
                 ),
             )
             initialize_expert_system(orchestrator)
-            log.info("✅ Expert System initialized with retrieval",
-                     tools=len(tools),
-                     routing="neural" if hybrid_router else "llm")
+            log.info("✅ Expert System initialized")
         except Exception as e:
             log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
             log.warning("Expert System endpoints will return 503 errors")
@@ -416,7 +229,6 @@ app.include_router(rlcf_router, prefix="/api/v1", tags=["rlcf"])
 app.include_router(expert_metrics_router, prefix="/api/v1", tags=["expert-metrics"])
 app.include_router(ws_router, prefix="/api/v1", tags=["websocket"])
 app.include_router(tracking_router, prefix="/api/v1", tags=["tracking"])
-app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
 app.include_router(policy_evolution_router, prefix="/api/v1", tags=["policy-evolution"])
 app.include_router(export_router, prefix="/api/v1", tags=["export"])
 app.include_router(devils_advocate_router, prefix="/api/v1", tags=["devils-advocate"])

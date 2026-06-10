@@ -3,7 +3,9 @@ History Manager per la persistenza della cronologia delle ricerche.
 Gestisce salvataggio/caricamento su file JSON con deduplicazione.
 """
 import json
+import os
 import asyncio
+import threading
 from datetime import datetime
 from collections import deque
 from typing import Optional
@@ -17,6 +19,7 @@ class HistoryManager:
     def __init__(self):
         self._history: deque = deque(maxlen=HISTORY_LIMIT)
         self._lock = asyncio.Lock()
+        self._mutex = threading.Lock()
         self._load_from_file()
 
     def _load_from_file(self):
@@ -30,13 +33,21 @@ class HistoryManager:
         except Exception as e:
             print(f"Warning: Could not load history: {e}")
 
+    def _write_file(self):
+        """Scrittura atomica: serializza sotto lock, scrive su .tmp e poi os.replace."""
+        with self._mutex:
+            payload = json.dumps(list(self._history), ensure_ascii=False, indent=2)
+        HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = str(HISTORY_FILE) + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            f.write(payload)
+        os.replace(tmp_path, HISTORY_FILE)
+
     async def _save_to_file(self):
         """Salva la history su file JSON."""
         async with self._lock:
             try:
-                HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-                with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-                    json.dump(list(self._history), f, ensure_ascii=False, indent=2)
+                self._write_file()
             except Exception as e:
                 print(f"Warning: Could not save history: {e}")
 
@@ -56,15 +67,16 @@ class HistoryManager:
         }
 
         # Evita duplicati consecutivi
-        if self._history:
-            last = self._history[-1]
-            if (last.get('act_type') == entry['act_type'] and
-                last.get('act_number') == entry['act_number'] and
-                last.get('article') == entry['article'] and
-                last.get('date') == entry['date']):
-                return False
+        with self._mutex:
+            if self._history:
+                last = self._history[-1]
+                if (last.get('act_type') == entry['act_type'] and
+                    last.get('act_number') == entry['act_number'] and
+                    last.get('article') == entry['article'] and
+                    last.get('date') == entry['date']):
+                    return False
 
-        self._history.append(entry)
+            self._history.append(entry)
         # Salvataggio asincrono (fire and forget)
         try:
             loop = asyncio.get_running_loop()
@@ -77,9 +89,7 @@ class HistoryManager:
     def _save_sync(self):
         """Salvataggio sincrono per contesti senza event loop."""
         try:
-            HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-                json.dump(list(self._history), f, ensure_ascii=False, indent=2)
+            self._write_file()
         except Exception as e:
             print(f"Warning: Could not save history: {e}")
 
@@ -89,7 +99,8 @@ class HistoryManager:
 
     def clear(self) -> None:
         """Svuota la history."""
-        self._history.clear()
+        with self._mutex:
+            self._history.clear()
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self._save_to_file())
@@ -103,15 +114,20 @@ class HistoryManager:
         Returns:
             True se trovato e rimosso, False altrimenti
         """
-        for i, item in enumerate(self._history):
-            if item.get('timestamp') == timestamp:
-                del self._history[i]
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.create_task(self._save_to_file())
-                except RuntimeError:
-                    self._save_sync()
-                return True
+        removed = False
+        with self._mutex:
+            for i, item in enumerate(self._history):
+                if item.get('timestamp') == timestamp:
+                    del self._history[i]
+                    removed = True
+                    break
+        if removed:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._save_to_file())
+            except RuntimeError:
+                self._save_sync()
+            return True
         return False
 
 

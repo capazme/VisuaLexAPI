@@ -753,7 +753,8 @@ async def query_experts(
 @router.post("/feedback/inline", response_model=FeedbackResponse)
 async def submit_inline_feedback(
     request: InlineFeedbackRequest,
-    session: AsyncSession = Depends(get_async_session_dep)
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Submit quick thumbs up/down feedback.
@@ -833,7 +834,8 @@ async def submit_inline_feedback(
 @router.post("/feedback/detailed", response_model=FeedbackResponse)
 async def submit_detailed_feedback(
     request: DetailedFeedbackRequest,
-    session: AsyncSession = Depends(get_async_session_dep)
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Submit detailed 3-dimension feedback.
@@ -923,7 +925,8 @@ async def submit_detailed_feedback(
 @router.post("/feedback/source", response_model=FeedbackResponse)
 async def submit_source_feedback(
     request: SourceFeedbackRequest,
-    session: AsyncSession = Depends(get_async_session_dep)
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Submit per-source rating feedback.
@@ -1003,7 +1006,8 @@ async def submit_source_feedback(
 @router.post("/feedback/preference", response_model=FeedbackResponse)
 async def submit_expert_preference_feedback(
     request: ExpertPreferenceFeedbackRequest,
-    session: AsyncSession = Depends(get_async_session_dep)
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Submit expert preference feedback for divergent interpretations.
@@ -1111,7 +1115,8 @@ ROUTER_FEEDBACK_AUTHORITY_THRESHOLD = 0.7
 @router.post("/feedback/router", response_model=FeedbackResponse)
 async def submit_router_feedback(
     request: RouterFeedbackRequest,
-    session: AsyncSession = Depends(get_async_session_dep)
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Submit router feedback from high-authority users (F2).
@@ -1221,7 +1226,8 @@ async def submit_router_feedback(
 async def submit_refine_feedback(
     request: RefineFeedbackRequest,
     session: AsyncSession = Depends(get_async_session_dep),
-    orchestrator: MultiExpertOrchestrator = Depends(get_orchestrator)
+    orchestrator: MultiExpertOrchestrator = Depends(get_orchestrator),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Submit conversational refinement feedback and get new response.
@@ -1356,6 +1362,7 @@ async def list_history(
     user_id: str,
     limit: int = 20,
     session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     List the user's most recent Q&A turns (newest first) so the UI can show a
@@ -1401,7 +1408,8 @@ async def list_history(
 async def get_trace(
     trace_id: str,
     caller_consent: Optional[str] = None,
-    session: AsyncSession = Depends(get_async_session_dep)
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
 ):
     """
     Recupera il trace completo di una query precedente.

@@ -1,8 +1,9 @@
 import os
 import asyncio
 import structlog
+from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Download
-from typing import Optional
+from typing import AsyncIterator, Optional
 
 log = structlog.get_logger()
 
@@ -48,8 +49,9 @@ class BrowserPool:
             )
             log.info("Browser launched in pool")
 
-    async def get_context(self) -> BrowserContext:
-        """Get a new browser context (isolated session)."""
+    @asynccontextmanager
+    async def get_context(self) -> AsyncIterator[BrowserContext]:
+        """Get a new browser context (isolated session), capped by the pool semaphore."""
         await self._ensure_browser()
         async with self._context_semaphore:
             context = await self.browser.new_context(
@@ -57,7 +59,10 @@ class BrowserPool:
                 accept_downloads=True,
                 java_script_enabled=True
             )
-            return context
+            try:
+                yield context
+            finally:
+                await context.close()
 
     async def close(self):
         """Close the browser and playwright."""
@@ -100,11 +105,8 @@ class PDFExtractor:
         if use_pool:
             # Use persistent browser pool (faster for multiple requests)
             pool = await BrowserPool.get_instance()
-            context = await pool.get_context()
-            try:
+            async with pool.get_context() as context:
                 return await self._extract_with_context(context, urn, timeout, download_dir)
-            finally:
-                await context.close()
         else:
             # One-off browser (slower but isolated)
             async with async_playwright() as p:

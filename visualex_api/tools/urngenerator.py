@@ -96,14 +96,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     codici_urn = NORMATTIVA_URN_CODICI
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
     normalized_act_type = normalize_act_type(act_type)
-    
-    # Check if 'article' is a valid string before attempting to split it
-    extension = None
-    if article and '-' in article:
-        parts = article.split('-')
-        article = parts[0]
-        extension = parts[1]
-    
+
     # Handle EURLEX cases (check before replacing spaces with dots)
     if normalized_act_type.lower() in EURLEX:
         eurlex_scraper = EurlexScraper()
@@ -145,7 +138,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         urn = urn + f':{annex.strip()}'
     
     # Assuming these functions are defined elsewhere
-    urn = append_article_info(urn, article, extension)  
+    urn = append_article_info(urn, article)
     urn = append_version_info(urn, version, version_date)
 
     final_urn = base_url + urn
@@ -198,9 +191,12 @@ async def complete_date_or_parse_async(date, act_type, act_number):
         return parse_date(full_date)
     return parse_date(date)
 
-def append_article_info(urn, article, extension):
+def append_article_info(urn, article, extension=None):
     """
     Appends article information to the URN.
+
+    Single normalization point for article suffixes: '2-bis', '2 bis' and an
+    explicit extension all emit the hyphenated form '~art2-bis'.
 
     Arguments:
     urn -- The base URN
@@ -211,12 +207,14 @@ def append_article_info(urn, article, extension):
     str -- The URN with article information appended
     """
     if article:
-        if "-" in article:
-            article, extension = article.split("-")
-        article = re.sub(r'\b[Aa]rticoli?\b|\b[Aa]rt\.?\b', "", article).strip()
-        urn += f"~art{article}"
+        article = re.sub(r'\b[Aa]rticoli?\b\.?|\b[Aa]rt\b\.?', "", str(article)).strip()
+        if not extension:
+            parts = re.split(r'[\s-]+', article, maxsplit=1)
+            if len(parts) == 2:
+                article, extension = parts
+        urn += f"~art{article.strip()}"
         if extension:
-            urn += extension
+            urn += f"-{extension.strip()}"
         logging.info(f"Appended article info to URN: {urn}")
     return urn
 

@@ -125,44 +125,11 @@ async def _callback_bff(
         "error": error,
     }
     secret = os.getenv("MERLT_INTERNAL_SECRET", "")
-    headers = {"X-Internal-Secret": secret}
-    # Retry with backoff: previously a single httpx error left rows stuck in
-    # 'pending' forever (the BFF watchdog now cleans up the long-tail, but
-    # retries keep the happy path snappy when the BFF restarts mid-ingest).
-    import asyncio as _asyncio
-    delays = [1, 3, 8]
-    last_exc: Optional[str] = None
-    for attempt, delay in enumerate(delays, start=1):
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(url, json=payload, headers=headers)
-                resp.raise_for_status()
-            log.info(
-                "BFF ingestion callback ok",
-                bff_job_id=bff_job_id,
-                status=status,
-                attempt=attempt,
-                http_status=resp.status_code,
-            )
-            return
-        except Exception as e:
-            last_exc = f"{type(e).__name__}: {e}"
-            log.warning(
-                "BFF ingestion callback attempt failed, will retry",
-                bff_job_id=bff_job_id,
-                status=status,
-                attempt=attempt,
-                exc=last_exc,
-            )
-            if attempt < len(delays):
-                await _asyncio.sleep(delay)
-    log.error(
-        "BFF ingestion callback FAILED after retries",
-        bff_job_id=bff_job_id,
-        status=status,
-        attempts=len(delays),
-        last_exc=last_exc,
-    )
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(url, json=payload, headers={"X-Internal-Secret": secret})
+    except Exception as e:
+        log.error("BFF callback failed", bff_job_id=bff_job_id, status=status, exc=str(e))
 
 
 async def _run_ingest(urn: str, bff_job_id: Optional[str]) -> dict:

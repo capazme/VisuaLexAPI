@@ -26,21 +26,13 @@ async def _callback_extraction(
     candidates_created: Optional[int] = None,
     error: Optional[str] = None,
 ) -> None:
-    """Notify the BFF about the extraction job lifecycle with retry+backoff.
-
-    The first version swallowed every failure silently (httpx exception OR a
-    non-2xx response), which left MerltExtractionJob rows stuck in 'pending'
-    when the BFF was momentarily down (e.g. dev restart mid-extraction). Now:
-      - Retry 3× with 1s/3s/8s backoff for transient network/server errors.
-      - Raise-for-status to surface 4xx/5xx instead of treating them as ok.
-      - Log success too, so we can confirm callbacks are arriving.
-    """
     if not bff_job_id:
         return
     url = os.getenv("BFF_EXTRACTION_CALLBACK_URL")
     if not url:
         log.warning("BFF_EXTRACTION_CALLBACK_URL not set, skipping callback", bff_job_id=bff_job_id)
         return
+    # camelCase keys: the BFF is Node/Zod (MerltExtractionJob fields).
     payload = {
         "bffJobId": bff_job_id,
         "status": status,
@@ -48,40 +40,11 @@ async def _callback_extraction(
         "error": error,
     }
     secret = os.getenv("MERLT_INTERNAL_SECRET", "")
-    headers = {"X-Internal-Secret": secret}
-    delays = [1, 3, 8]  # 3 attempts, exponential-ish backoff
-    last_exc: Optional[str] = None
-    for attempt, delay in enumerate(delays, start=1):
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(url, json=payload, headers=headers)
-                resp.raise_for_status()
-            log.info(
-                "BFF extraction callback ok",
-                bff_job_id=bff_job_id,
-                status=status,
-                attempt=attempt,
-                http_status=resp.status_code,
-            )
-            return
-        except Exception as e:
-            last_exc = f"{type(e).__name__}: {e}"
-            log.warning(
-                "BFF extraction callback attempt failed, will retry",
-                bff_job_id=bff_job_id,
-                status=status,
-                attempt=attempt,
-                exc=last_exc,
-            )
-            if attempt < len(delays):
-                await asyncio.sleep(delay)
-    log.error(
-        "BFF extraction callback FAILED after retries (job will look 'pending' until watchdog sweep)",
-        bff_job_id=bff_job_id,
-        status=status,
-        attempts=len(delays),
-        last_exc=last_exc,
-    )
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(url, json=payload, headers={"X-Internal-Secret": secret})
+    except Exception as e:
+        log.error("BFF extraction callback failed", bff_job_id=bff_job_id, status=status, exc=str(e))
 
 
 async def _run_extract(document_id: int, user_id: str, bff_job_id: Optional[str]) -> dict:
