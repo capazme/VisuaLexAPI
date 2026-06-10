@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../ALIS_CORE"
+		},
+		{
+			"path": "../server-infra2.0/mcp-legal-it"
+		}
+	],
+	"settings": {}
+}
