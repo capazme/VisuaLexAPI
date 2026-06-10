@@ -124,11 +124,10 @@ export function edgeStyleMapper(datum: EdgeData): Record<string, unknown> {
     lineDash: spec?.dash ? [4, 4] : undefined,
     endArrow: true,
     endArrowSize: 6,
-    // Relation labels are visible by default (faded, then opaque on hover)
-    // so the user can read the meaning of every edge without hovering — most
-    // legal queries are about "how is X related to Y", that's the answer.
+    // Relation labels hidden until hover (hover-activate flips labelOpacity) to
+    // keep dense graphs clean; text stays set for tooltips/accessibility.
     labelText: data.label ?? '',
-    labelOpacity: 0.7,
+    labelOpacity: 0,
     labelFontSize: 9,
     labelFill: '#475569',
     labelBackground: true,

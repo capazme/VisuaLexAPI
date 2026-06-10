@@ -530,7 +530,7 @@ export function AdminPage() {
                                 <p>Ultimo: {new Date(u.last_login_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
                               )}
                               {u.stats && (
-                                <p className="text-gray-400">{u.stats.bookmarks} bookmarks</p>
+                                <p className="text-gray-400">{u.stats.bookmarks} segnalibri</p>
                               )}
                             </div>
                           </td>
@@ -542,7 +542,7 @@ export function AdminPage() {
                               <button
                                 onClick={() => setShowResetPasswordModal(u.id)}
                                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                title="Reset password"
+                                title="Reimposta password"
                               >
                                 <Key size={16} />
                               </button>

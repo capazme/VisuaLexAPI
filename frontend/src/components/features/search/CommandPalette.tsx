@@ -5,6 +5,7 @@ import type { SearchParams, CustomAlias } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 import { useTour } from '../../../hooks/useTour';
 import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
@@ -23,7 +24,15 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
     customAliases, trackAliasUsage, openAliasManager
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    quickNorms: s.quickNorms,
+    selectQuickNorm: s.selectQuickNorm,
+    settings: s.settings,
+    openQuickNormsManager: s.openQuickNormsManager,
+    customAliases: s.customAliases,
+    trackAliasUsage: s.trackAliasUsage,
+    openAliasManager: s.openAliasManager,
+  })));
   const { tryStartTour } = useTour({ theme: settings.theme as 'light' | 'dark' });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
@@ -223,7 +232,8 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
           <div className="border-b border-slate-200 dark:border-slate-800">
             {/* Navigation / Step Breadcrumbs */}
             <div className="flex items-center gap-2 px-6 pt-5 pb-3">
-              <div
+              <button
+                type="button"
                 onClick={() => setStep('select_act')}
                 className={cn(
                   "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
@@ -236,10 +246,11 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
               >
                 {selectedAct && step !== 'select_act' ? <Check size={12} strokeWidth={3} /> : <Book size={12} strokeWidth={3} />}
                 <span>Atto</span>
-              </div>
+              </button>
 
               {ACT_TYPES_REQUIRING_DETAILS.includes(selectedAct) && (
-                <div
+                <button
+                  type="button"
                   onClick={() => selectedAct && setStep('input_details')}
                   className={cn(
                     "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
@@ -252,7 +263,7 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                 >
                   {(actNumber && actDate) && step !== 'input_details' ? <Check size={12} strokeWidth={3} /> : <Zap size={12} strokeWidth={3} />}
                   <span>Dettagli</span>
-                </div>
+                </button>
               )}
 
               <div className={cn(
@@ -311,12 +322,12 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                             ? "text-indigo-600 dark:text-indigo-400"
                             : citationReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
                         )}>
-                          {parsedCitation.fromAlias && <span className="opacity-60 mr-1">via alias →</span>}
+                          {parsedCitation.fromAlias && <span className="opacity-60 mr-1">tramite alias →</span>}
                           {citationPreview}
                         </span>
                         <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          {citationReady ? "Enter Ricerca" : "Enter Completa"}
+                          {citationReady ? "Invio Ricerca" : "Invio Completa"}
                         </span>
                       </motion.div>
                     )}

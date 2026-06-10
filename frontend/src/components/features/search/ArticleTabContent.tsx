@@ -24,8 +24,6 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
-import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
-import { sendNerFeedback, type NerFeedbackType, type NerCorrectReference } from '../../../services/merltService';
 import type { Annotation } from '../../../types';
 
 interface ArticleTabContentProps {
@@ -116,7 +114,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const citationPreviewState = useCitationPreview();
     const { showPreview, hidePreview } = citationPreviewState;
     const isHoveringPopupRef = useRef(false);
-    const { canContribute } = useMerltFeatures();
 
     const itemKey = useMemo(() => {
         const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -496,27 +493,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 citation,
             },
         });
-        // NER implicit confirmation (Loop β #2, surface: implicit). Opening a
-        // detected citation is a low-weight signal that it was correctly
-        // extracted. Fire-and-forget, full-consent only.
-        if (canContribute) {
-            void sendNerFeedback({
-                surface: 'implicit',
-                feedbackType: 'confirmation',
-                articleUrn: norma_data.urn,
-                selectedText: citationText,
-                originalParsed: {
-                    act_type: citation.act_type,
-                    act_number: citation.act_number ?? null,
-                    date: citation.date ?? null,
-                    article: citation.article,
-                    confidence: citation.confidence,
-                },
-                confidenceBefore: citation.confidence,
-            }).catch((err) => {
-                console.error('NER implicit confirmation failed:', err);
-            });
-        }
         triggerSearch({
             act_type: citation.act_type,
             act_number: citation.act_number || '',
@@ -525,45 +501,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             version: 'vigente',
             show_brocardi_info: true,
         });
-    }, [norma_data.urn, triggerSearch, canContribute]);
-
-    // NER feedback for a previewed citation (Loop β #2, surface: article_xref —
-    // the primary signal). Fire-and-forget, gated by full-consent canContribute.
-    // The host article body is public legal text, so the surrounding context is
-    // safe to send (no PII); the BFF caps it to 1200 chars regardless.
-    const handleCitationNerFeedback = (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => {
-        const citation = citationPreviewState.citation;
-        if (!citation) return;
-        const displayText = [
-            citation.act_type,
-            citation.act_number ? `n. ${citation.act_number}` : null,
-            citation.article ? `art. ${citation.article}` : null,
-        ].filter(Boolean).join(' ');
-        const context = (article_text || '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 1000);
-        void sendNerFeedback({
-            surface: 'article_xref',
-            feedbackType,
-            articleUrn: norma_data.urn,
-            selectedText: displayText,
-            contextWindow: context || undefined,
-            originalParsed: {
-                act_type: citation.act_type,
-                act_number: citation.act_number ?? null,
-                date: citation.date ?? null,
-                article: citation.article,
-                confidence: citation.confidence,
-            },
-            correctReference,
-            confidenceBefore: citation.confidence,
-        }).catch((err) => {
-            console.error('NER feedback (article_xref) failed:', err);
-        });
-        showToast(feedbackType === 'false_positive' ? 'Segnalazione inviata' : 'Grazie per il riscontro', 'success');
-    };
+    }, [norma_data.urn, triggerSearch]);
 
     const handleCompare = () => {
         const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
@@ -936,8 +874,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     isHoveringPopupRef.current = false;
                     hidePreview();
                 }}
-                nerFeedbackEnabled={canContribute}
-                onNerFeedback={handleCitationNerFeedback}
             />
 
         </div>

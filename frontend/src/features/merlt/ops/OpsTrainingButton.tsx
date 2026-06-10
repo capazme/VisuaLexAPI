@@ -6,7 +6,7 @@ import { startMerltTraining } from '../../../services/merltService';
  * Admin-only control to kick off a manual RLCF training run (loop-closure A5).
  *
  * No auto-training: a run starts only on this explicit click. The server gate
- * (requireAdmin on POST /api/merlt/ops/rlcf/training/start) is authoritative; this
+ * (requireAdmin on POST /api/merlt/ops/training/start) is authoritative; this
  * button is rendered only inside the opsVisible card of the hub.
  */
 

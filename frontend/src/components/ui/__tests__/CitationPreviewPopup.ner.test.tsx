@@ -1,7 +1,8 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { CitationPreviewPopup } from '../CitationPreviewPopup';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
+import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
 
 const citation: ParsedCitationData = {
   act_type: 'codice civile',
@@ -9,8 +10,10 @@ const citation: ParsedCitationData = {
   confidence: 0.6,
 };
 
-function renderPopup(opts?: { enabled?: boolean; onNerFeedback?: ReturnType<typeof vi.fn> }) {
-  const onNerFeedback = opts?.onNerFeedback ?? vi.fn();
+type OnNerFeedback = (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => void;
+
+function renderPopup(opts?: { enabled?: boolean; onNerFeedback?: Mock<OnNerFeedback> }) {
+  const onNerFeedback = opts?.onNerFeedback ?? vi.fn<OnNerFeedback>();
   render(
     <CitationPreviewPopup
       isVisible

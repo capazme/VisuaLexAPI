@@ -36,8 +36,6 @@ export interface GraphCanvasProps {
   highlightNodeType?: string | null;
   onNodeClick?: (nodeId: string) => void;
   onNodeDblClick?: (nodeId: string) => void;
-  /** Click on a relation edge → opens the EdgeDetailsDrawer. */
-  onEdgeClick?: (edgeId: string) => void;
 }
 
 function layoutConfig(name: GraphLayoutName): LayoutOptions {
@@ -132,7 +130,6 @@ export default function GraphCanvas({
   highlightNodeType,
   onNodeClick,
   onNodeDblClick,
-  onEdgeClick,
 }: GraphCanvasProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
@@ -144,12 +141,10 @@ export default function GraphCanvas({
   // Keep handlers in refs so the once-attached listeners never go stale.
   const clickRef = useRef(onNodeClick);
   const dblRef = useRef(onNodeDblClick);
-  const edgeClickRef = useRef(onEdgeClick);
   useEffect(() => {
     clickRef.current = onNodeClick;
     dblRef.current = onNodeDblClick;
-    edgeClickRef.current = onEdgeClick;
-  }, [onNodeClick, onNodeDblClick, onEdgeClick]);
+  }, [onNodeClick, onNodeDblClick]);
 
   // Create the graph once. Data/filter/layout changes are applied by the
   // sibling effects below (G6 is an external system synced imperatively).
@@ -187,10 +182,6 @@ export default function GraphCanvas({
       const id = (e as unknown as { target?: { id?: string } }).target?.id;
       if (id) dblRef.current?.(id);
     });
-    graph.on('edge:click', (e) => {
-      const id = (e as unknown as { target?: { id?: string } }).target?.id;
-      if (id) edgeClickRef.current?.(id);
-    });
 
     renderRef.current = graph.render();
 
@@ -203,11 +194,6 @@ export default function GraphCanvas({
 
   // Data OR filter change. Relayout only when the node/edge set actually changed;
   // a filter-only change just toggles visibility (preserves positions).
-  //
-  // Every async continuation guards on `graphRef.current === g`: if React 18's
-  // StrictMode (or a real unmount) destroyed `g` between effect start and the
-  // resolution of the in-flight render, the captured `g` is now dead and
-  // calling methods on it logs "The graph instance has been destroyed".
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
@@ -218,12 +204,9 @@ export default function GraphCanvas({
       g.setData({ nodes, edges });
       renderRef.current = g.render();
     }
-    void renderRef.current
-      .then(() => {
-        if (graphRef.current !== g) return;
-        g.setElementVisibility(visibility);
-      })
-      .catch(() => {});
+    // Apply visibility after the latest render resolves (covers both the data
+    // path's fresh render and a filter-only change racing the initial render).
+    void renderRef.current.then(() => g.setElementVisibility(visibility)).catch(() => {});
   }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes]);
 
   // Legend hover → emphasize nodes of a type, fade the rest (no relayout).
@@ -231,27 +214,16 @@ export default function GraphCanvas({
     const g = graphRef.current;
     if (!g) return;
     void renderRef.current
-      .then(() => {
-        if (graphRef.current !== g) return;
-        g.setElementState(buildHighlightState(nodes, edges, highlightNodeType));
-      })
+      .then(() => g.setElementState(buildHighlightState(nodes, edges, highlightNodeType)))
       .catch(() => {});
   }, [highlightNodeType, nodes, edges]);
 
-  // Re-run layout when the layout changes (no data refetch). Chain on the
-  // latest render and guard so we never call .layout() on a destroyed instance
-  // (g6's internal layout chain throws "Cannot read properties of undefined
-  // (reading 'postLayout')" if the graph dies mid-flight).
+  // Re-run layout when the layout changes (no data refetch).
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
-    void renderRef.current
-      .then(() => {
-        if (graphRef.current !== g) return;
-        g.setLayout(layoutConfig(layout));
-        return g.layout();
-      })
-      .catch(() => {});
+    g.setLayout(layoutConfig(layout));
+    void g.layout();
   }, [layout]);
 
   return <div ref={containerRef} style={{ width: '100%', height }} />;

@@ -15,6 +15,7 @@ import { addToHistory } from '../../../services/historyService';
 import { isAuthenticated } from '../../../services/authService';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -65,7 +66,27 @@ export function SearchPanel() {
     quickNorms, selectQuickNorm, triggerSearch,
     commandPaletteOpen, openCommandPalette, closeCommandPalette,
     quickNormsManagerOpen, openQuickNormsManager, closeQuickNormsManager
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    addWorkspaceTab: s.addWorkspaceTab,
+    addNormaToTab: s.addNormaToTab,
+    workspaceTabs: s.workspaceTabs,
+    removeArticleFromNorma: s.removeArticleFromNorma,
+    removeTab: s.removeTab,
+    focusArticleInTab: s.focusArticleInTab,
+    searchTrigger: s.searchTrigger,
+    clearSearchTrigger: s.clearSearchTrigger,
+    searchQueue: s.searchQueue,
+    drainNextSearch: s.drainNextSearch,
+    quickNorms: s.quickNorms,
+    selectQuickNorm: s.selectQuickNorm,
+    triggerSearch: s.triggerSearch,
+    commandPaletteOpen: s.commandPaletteOpen,
+    openCommandPalette: s.openCommandPalette,
+    closeCommandPalette: s.closeCommandPalette,
+    quickNormsManagerOpen: s.quickNormsManagerOpen,
+    openQuickNormsManager: s.openQuickNormsManager,
+    closeQuickNormsManager: s.closeQuickNormsManager,
+  })));
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
   const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
   // Remember the expected article count for the current search so the loading
@@ -122,7 +143,6 @@ export function SearchPanel() {
 
     // Mark as historical if version_date was provided
     if (versionDate) {
-      console.log('📅 Processing with versionDate:', versionDate, 'norma data_versione:', normaData.data_versione);
       result.versionInfo = {
         isHistorical: true,
         requestedDate: versionDate,
@@ -243,7 +263,6 @@ export function SearchPanel() {
   }, [workspaceTabs, addNormaToTab, addWorkspaceTab, focusArticleInTab]);
 
   const handleSearch = useCallback(async (params: SearchParams) => {
-    console.log('🔍 SearchPanel handleSearch called with:', params);
 
     // Cancel any in-flight streaming fetch so its reader does not keep writing
     // into the workspace after this new search took over.
@@ -375,15 +394,13 @@ export function SearchPanel() {
   // Process results buffer and create workspace tabs
   useEffect(() => {
     if (Object.keys(resultsBuffer).length > 0 && !isLoading) {
-      console.log('📦 Processing results buffer:', resultsBuffer);
 
       // Use custom label if provided (e.g., from dossier), otherwise generate default
       const useCustomLabel = customTabLabel && Object.keys(resultsBuffer).length > 0;
 
-      Object.entries(resultsBuffer).forEach(([key, group], index) => {
+      Object.values(resultsBuffer).forEach((group, index) => {
         // For historical versions, always create a new tab
         const isHistorical = group.articles.some(a => a.versionInfo?.isHistorical);
-        console.log('🏷️ Processing group:', key, 'isHistorical:', isHistorical, 'versionDate:', group.versionDate);
 
         const isCustomForThisGroup = !!useCustomLabel && index === 0;
 
@@ -393,7 +410,6 @@ export function SearchPanel() {
           const label = isCustomForThisGroup
             ? customTabLabel!
             : `${group.norma.tipo_atto}${group.norma.numero_atto ? ` ${group.norma.numero_atto}` : ''}${versionDate}`;
-          console.log('➕ Creating historical tab with label:', label);
           addWorkspaceTab(label, group.norma, group.articles, { isCustom: isCustomForThisGroup });
         } else {
           // R3 (streaming-ux): merge into an existing tab that holds the
@@ -511,7 +527,6 @@ export function SearchPanel() {
       );
 
       duplicateTabs.forEach(tab => {
-        console.log('🗑️ Auto-switch: Removing duplicate tab', tab.id, tab.label);
         removeTab(tab.id);
       });
     }

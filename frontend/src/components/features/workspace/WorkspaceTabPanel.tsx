@@ -3,7 +3,7 @@ import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus, FileText } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
-import { useAppStore, appStore, type WorkspaceTab } from '../../../store/useAppStore';
+import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { NormaBlockComponent } from './NormaBlockComponent';
 import { LooseArticleCard } from './LooseArticleCard';
@@ -131,19 +131,15 @@ export function WorkspaceTabPanel({
   };
 
   // Create new dossier and add articles
-  const handleCreateAndAdd = () => {
-    if (!newDossierName.trim()) return;
-    createDossier(newDossierName.trim());
-    // Get the newly created dossier (it's the last one)
-    setTimeout(() => {
-      const state = appStore.getState();
-      const newDossier = state.dossiers[state.dossiers.length - 1];
-      if (newDossier) {
-        handleAddToDossier(newDossier.id);
-      }
-    }, 0);
+  const handleCreateAndAdd = async () => {
+    const name = newDossierName.trim();
+    if (!name) return;
     setNewDossierName('');
     setIsCreatingDossier(false);
+    const newDossierId = await createDossier(name);
+    if (newDossierId) {
+      handleAddToDossier(newDossierId);
+    }
   };
 
   // Make this tab a drop zone
@@ -233,8 +229,8 @@ export function WorkspaceTabPanel({
     updateTab(tab.id, { position: { x: finalX, y: finalY } });
   }, [tab.id, updateTab, x, y, dragConstraints]);
 
-  // Resize handlers
-  const handleResizeStart = useCallback((e: React.MouseEvent, direction: string) => {
+  // Resize handlers (Pointer Events so resize works with mouse, pen and touch)
+  const handleResizeStart = useCallback((e: React.PointerEvent, direction: string) => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
@@ -248,7 +244,7 @@ export function WorkspaceTabPanel({
     };
   }, [bringTabToFront, tab.id, width, height]);
 
-  const handleResizeMove = useCallback((e: MouseEvent) => {
+  const handleResizeMove = useCallback((e: PointerEvent) => {
     if (!isResizing || !resizeRef.current) return;
 
     const { startX, startY, startW, startH, direction } = resizeRef.current;
@@ -290,14 +286,16 @@ export function WorkspaceTabPanel({
     resizeRef.current = null;
   }, [isResizing, tab.id, updateTab, width, height, x, y]);
 
-  // Global mouse listeners for resize
+  // Global pointer listeners for resize
   useEffect(() => {
     if (isResizing) {
-      window.addEventListener('mousemove', handleResizeMove);
-      window.addEventListener('mouseup', handleResizeEnd);
+      window.addEventListener('pointermove', handleResizeMove);
+      window.addEventListener('pointerup', handleResizeEnd);
+      window.addEventListener('pointercancel', handleResizeEnd);
       return () => {
-        window.removeEventListener('mousemove', handleResizeMove);
-        window.removeEventListener('mouseup', handleResizeEnd);
+        window.removeEventListener('pointermove', handleResizeMove);
+        window.removeEventListener('pointerup', handleResizeEnd);
+        window.removeEventListener('pointercancel', handleResizeEnd);
       };
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
@@ -576,15 +574,15 @@ export function WorkspaceTabPanel({
         {/* Resize handles */}
         {!tab.isMinimized && (
           <>
-            <div onMouseDown={(e) => handleResizeStart(e, 'right')} className="absolute right-0 top-2 bottom-2 w-1.5 cursor-ew-resize hover:bg-primary-400/30 transition-colors z-10" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'bottom')} className="absolute bottom-0 left-2 right-2 h-1.5 cursor-ns-resize hover:bg-primary-400/30 transition-colors z-10" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'left')} className="absolute left-0 top-2 bottom-2 w-1.5 cursor-ew-resize hover:bg-primary-400/30 transition-colors z-10" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'top')} className="absolute top-0 left-2 right-2 h-1.5 cursor-ns-resize hover:bg-primary-400/30 transition-colors z-10" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'right')} className="absolute right-0 top-2 bottom-2 w-1.5 cursor-ew-resize touch-none hover:bg-primary-400/30 transition-colors z-10" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'bottom')} className="absolute bottom-0 left-2 right-2 h-1.5 cursor-ns-resize touch-none hover:bg-primary-400/30 transition-colors z-10" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'left')} className="absolute left-0 top-2 bottom-2 w-1.5 cursor-ew-resize touch-none hover:bg-primary-400/30 transition-colors z-10" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'top')} className="absolute top-0 left-2 right-2 h-1.5 cursor-ns-resize touch-none hover:bg-primary-400/30 transition-colors z-10" />
 
-            <div onMouseDown={(e) => handleResizeStart(e, 'top-left')} className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize z-20" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'top-right')} className="absolute top-0 right-0 w-4 h-4 cursor-nesw-resize z-20" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-left')} className="absolute bottom-0 left-0 w-4 h-4 cursor-nesw-resize z-20" />
-            <div onMouseDown={(e) => handleResizeStart(e, 'bottom-right')} className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-20" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'top-left')} className="absolute top-0 left-0 w-4 h-4 cursor-nwse-resize touch-none z-20" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'top-right')} className="absolute top-0 right-0 w-4 h-4 cursor-nesw-resize touch-none z-20" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'bottom-left')} className="absolute bottom-0 left-0 w-4 h-4 cursor-nesw-resize touch-none z-20" />
+            <div onPointerDown={(e) => handleResizeStart(e, 'bottom-right')} className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize touch-none z-20" />
           </>
         )}
       </div>

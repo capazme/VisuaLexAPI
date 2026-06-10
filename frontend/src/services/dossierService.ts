@@ -1,12 +1,15 @@
 import { apiClient } from './api';
 
 // API types matching backend response format
+export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
+
 export interface DossierItemApi {
   id: string;
   item_type: 'norm' | 'note' | 'section';
   title: string;
   content: unknown;
   position: number;
+  status: DossierItemStatus;
   created_at: string;
 }
 
@@ -15,6 +18,7 @@ export interface DossierApi {
   name: string;
   description?: string | null;
   color?: string | null;
+  is_pinned: boolean;
   created_at: string;
   updated_at: string;
   items: DossierItemApi[];
@@ -30,6 +34,7 @@ export interface DossierUpdate {
   name?: string;
   description?: string | null;
   color?: string | null;
+  isPinned?: boolean;
 }
 
 export interface DossierItemCreate {
@@ -37,12 +42,14 @@ export interface DossierItemCreate {
   title: string;
   content?: unknown;
   position?: number;
+  status?: DossierItemStatus;
 }
 
 export interface DossierItemUpdate {
   title?: string;
   content?: unknown;
   position?: number;
+  status?: DossierItemStatus;
 }
 
 export const dossierService = {

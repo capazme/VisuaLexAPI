@@ -24,18 +24,8 @@ export default defineConfig({
       '/export_pdf': 'http://localhost:5000',
       '/version': 'http://localhost:5000',
       '/health': 'http://localhost:5000',
-      '/parse_query': 'http://localhost:5000',
-      // Node.js backend routes (port 3001).
-      // Use the verbose form for explicit options — the shorthand
-      // ('/api': 'http://...') has known issues proxying multipart bodies on
-      // some http-proxy-middleware versions (browser hangs with ERR_TIMED_OUT
-      // while curl directly to :3001 succeeds). `changeOrigin` rewrites the
-      // Host header to the target so the BFF sees a clean request.
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        ws: true,
-      },
+      // Node.js backend routes (port 3001)
+      '/api': 'http://localhost:3001',
     }
   }
 })

@@ -14,7 +14,7 @@ function normalizeArticleId(id: string): string {
 // A tree node is either a section-title string or an article object carrying
 // its number and (optional) annex marker.
 interface TreeArticleNode {
-  numero: string;
+  numero?: string;
   allegato?: string | null;
   [key: string]: unknown;
 }

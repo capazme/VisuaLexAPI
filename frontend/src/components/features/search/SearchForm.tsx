@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, RefreshCw, Eraser, Plus, Minus, Loader2, ChevronDown } from 'lucide-react';
+import { Search, RefreshCw, Plus, Minus, Loader2, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SearchParams } from '../../../types';
 import { parseItalianDate } from '../../../utils/dateUtils';
-import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
+import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { cn } from '../../../lib/utils';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
 import { FOCUS_RING } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { fetchNormaData, fetchArticleTree } from '../../../services/legalApi';
 
 interface SearchFormProps {
@@ -74,7 +75,10 @@ const ACT_TYPES_REQUIRING_DETAILS = [
 
 export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
   // Get alias data and functions from store
-  const { customAliases, trackAliasUsage } = useAppStore();
+  const { customAliases, trackAliasUsage } = useAppStore(useShallow(s => ({
+    customAliases: s.customAliases,
+    trackAliasUsage: s.trackAliasUsage,
+  })));
 
   // Memoized sorted aliases for dropdown (by usage, then alphabetically)
   const sortedAliases = useMemo(() => {
@@ -146,9 +150,13 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         }
 
         const treeResponse = await fetchArticleTree({ urn: urnToUse, link: false, details: false });
-        const treeData = Array.isArray(treeResponse)
+        const rawTreeData = Array.isArray(treeResponse)
           ? treeResponse
           : (treeResponse as { articles?: unknown[] }).articles ?? [];
+        const treeData = rawTreeData.filter(
+          (node): node is TreeNode =>
+            typeof node === 'string' || (typeof node === 'object' && node !== null)
+        );
         const articles = extractArticleIdsFromTree(treeData);
 
         setArticleList(articles);
@@ -373,7 +381,7 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           {/* Premium Article Navigator */}
           <div id="tour-article-input" className="flex flex-col gap-3 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between px-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Articolo</label>
+              <label htmlFor="article" className="text-xs font-bold text-slate-400 uppercase tracking-widest">Articolo</label>
               {isLoadingArticles ? (
                 <div className="flex items-center gap-2 text-[10px] font-bold text-primary-500 uppercase">
                   <Loader2 size={12} className="animate-spin" />
@@ -471,7 +479,22 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
           </div>
 
           {/* Brocardi Toggle - Modern look */}
-          <div id="tour-brocardi-toggle" className="group flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-900/20 rounded-2xl cursor-pointer hover:border-purple-300 dark:hover:border-purple-800 transition-colors shadow-sm" onClick={() => setFormData(p => ({ ...p, show_brocardi_info: !p.show_brocardi_info }))}>
+          <div
+            id="tour-brocardi-toggle"
+            role="switch"
+            aria-checked={formData.show_brocardi_info}
+            aria-label="Brocardi & Ratio"
+            tabIndex={0}
+            className="group flex items-center justify-between p-4 bg-white dark:bg-slate-800 border border-purple-100/50 dark:border-purple-900/20 rounded-2xl cursor-pointer hover:border-purple-300 dark:hover:border-purple-800 transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            onClick={() => setFormData(p => ({ ...p, show_brocardi_info: !p.show_brocardi_info }))}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setFormData(p => ({ ...p, show_brocardi_info: !p.show_brocardi_info }));
+              }
+            }}
+          >
             <div className="flex items-center gap-3">
               <div className={cn(
                 "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
@@ -567,28 +590,16 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
             >
               Estrai Contenuto
             </Button>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                type="button"
-                onClick={handleReset}
-                variant="outline"
-                size="md"
-                icon={<RefreshCw size={14} />}
-                className="text-xs font-bold uppercase tracking-wider"
-              >
-                Reset
-              </Button>
-              <Button
-                type="button"
-                onClick={handleReset}
-                variant="outline"
-                size="md"
-                icon={<Eraser size={14} />}
-                className="text-xs font-bold uppercase tracking-wider"
-              >
-                Pulisci
-              </Button>
-            </div>
+            <Button
+              type="button"
+              onClick={handleReset}
+              variant="outline"
+              size="md"
+              icon={<RefreshCw size={14} />}
+              className="w-full text-xs font-bold uppercase tracking-wider"
+            >
+              Reset
+            </Button>
           </div>
         </form>
       </div>

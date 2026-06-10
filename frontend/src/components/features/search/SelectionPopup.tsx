@@ -106,13 +106,18 @@ export function SelectionPopup({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [containerRef, hidePopup]);
 
-  // Attach mouseup listener to container
+  // Attach mouseup + touchend listeners to container so selection works
+  // with both pointer types
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     container.addEventListener('mouseup', handleMouseUp);
-    return () => container.removeEventListener('mouseup', handleMouseUp);
+    container.addEventListener('touchend', handleMouseUp);
+    return () => {
+      container.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('touchend', handleMouseUp);
+    };
   }, [containerRef, handleMouseUp]);
 
   // Handle keyboard shortcuts

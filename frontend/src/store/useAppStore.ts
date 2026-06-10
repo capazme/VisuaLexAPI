@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 import { getErrorMessage } from '../utils/errors';
+import { normalizeArticleId } from '../utils/treeUtils';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -276,7 +277,7 @@ interface AppState {
     removeBookmark: (normaKey: string) => void;
     isBookmarked: (normaKey: string) => boolean;
 
-    createDossier: (title: string, description?: string) => void;
+    createDossier: (title: string, description?: string) => Promise<string | null>; // returns new server-side dossier ID, null on failure
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
@@ -490,16 +491,18 @@ const appStore = createStore<AppState>()(
                                     type: 'norma',
                                     data: item.content as DossierNormaData,
                                     addedAt: item.created_at,
+                                    status: item.status,
                                 }
                                 : {
                                     id: item.id,
                                     type: 'note',
                                     data: item.content as string,
                                     addedAt: item.created_at,
+                                    status: item.status,
                                 }
                         ),
                         tags: [],
-                        isPinned: false,
+                        isPinned: d.is_pinned,
                     }));
 
                     const environments: Environment[] = environmentsRes.map(environmentApiToStore);
@@ -533,6 +536,7 @@ const appStore = createStore<AppState>()(
                 state.loadedHighlightKeys = {};
                 state.loadedAnnotationKeys = {};
                 state.quickNorms = [];
+                state.customAliases = [];
                 state.environments = [];
                 state.isDataLoaded = false;
                 state.dataError = null;
@@ -920,10 +924,13 @@ const appStore = createStore<AppState>()(
 
                     if (!isSameNorma) return;
 
-                    // Check for duplicate article
-                    const articleNumber = loose.article.norma_data.numero_articolo;
+                    // Check for duplicate article. Normalized comparison:
+                    // the tree API and the scraper disagree on suffix
+                    // formatting ("1-bis" vs "1 bis"), a bare === would
+                    // miss the match (gotcha #9).
+                    const articleNumber = normalizeArticleId(loose.article.norma_data.numero_articolo);
                     const isDuplicate = targetNorma.articles.some(
-                        a => a.norma_data.numero_articolo === articleNumber
+                        a => normalizeArticleId(a.norma_data.numero_articolo) === articleNumber
                     );
 
                     if (isDuplicate) return;
@@ -1085,16 +1092,6 @@ const appStore = createStore<AppState>()(
                     }
                 });
 
-                // MERLT-1.8: emit bookmark_add event so useDossierBookmarkTracker
-                // forwards it to /api/merlt/events/dossier-bookmark.
-                if (norma.urn) {
-                    publishMerltEvent({
-                        interaction_type: MERLT_EVENT_TYPES.bookmarkCreated,
-                        article_urn: norma.urn,
-                        metadata: { source: 'bookmark', tags },
-                    });
-                }
-
                 // API call in background
                 bookmarkService.create({
                     norma_key: key,
@@ -1108,6 +1105,18 @@ const appStore = createStore<AppState>()(
                             bookmark.id = created.id;
                         }
                     });
+
+                    // MERLT-1.8: emit bookmark_add event so useDossierBookmarkTracker
+                    // forwards it to /api/merlt/events/dossier-bookmark. Only on
+                    // server confirmation — RLCF must never receive signals for
+                    // creations the backend rejected (and rolled back below).
+                    if (norma.urn) {
+                        publishMerltEvent({
+                            interaction_type: MERLT_EVENT_TYPES.bookmarkCreated,
+                            article_urn: norma.urn,
+                            metadata: { source: 'bookmark', tags },
+                        });
+                    }
                 }).catch(err => {
                     console.error('Failed to create bookmark:', err);
                     // Rollback on error
@@ -1131,6 +1140,7 @@ const appStore = createStore<AppState>()(
                 // API call
                 bookmarkService.update(bookmark.id, { tags }).catch(err => {
                     console.error('Failed to update bookmark tags:', err);
+                    get().pushSyncError('Impossibile salvare i tag del segnalibro. Riprova.');
                 });
             },
 
@@ -1158,39 +1168,31 @@ const appStore = createStore<AppState>()(
                 return !!get().bookmarks.find(b => b.normaKey === key);
             },
 
-            createDossier: (title, description) => {
-                const tempId = uuidv4();
-
-                // Optimistic update
-                set((state) => {
-                    state.dossiers.push({
-                        id: tempId,
-                        title,
+            // Server-first like importDossier: callers need the real server
+            // id back (e.g. to addToDossier right after) — the old optimistic
+            // tempId forced a fragile "read the last dossier in the store"
+            // dance that raced with the id swap.
+            createDossier: async (title, description) => {
+                try {
+                    const created = await dossierService.create({
+                        name: title,
                         description,
-                        createdAt: new Date().toISOString(),
-                        items: []
                     });
-                });
-
-                // API call
-                dossierService.create({
-                    name: title,
-                    description,
-                }).then(created => {
-                    // Update with server ID
                     set((state) => {
-                        const dossier = state.dossiers.find(d => d.id === tempId);
-                        if (dossier) {
-                            dossier.id = created.id;
-                        }
+                        state.dossiers.push({
+                            id: created.id,
+                            title,
+                            description,
+                            createdAt: created.created_at,
+                            items: []
+                        });
                     });
-                }).catch(err => {
+                    return created.id;
+                } catch (err) {
                     console.error('Failed to create dossier:', err);
-                    // Rollback
-                    set((state) => {
-                        state.dossiers = state.dossiers.filter(d => d.id !== tempId);
-                    });
-                });
+                    get().pushSyncError('Impossibile creare il dossier. Riprova.');
+                    return null;
+                }
             },
 
             deleteDossier: (id) => {
@@ -1231,49 +1233,46 @@ const appStore = createStore<AppState>()(
                     description: updates.description,
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
+                    get().pushSyncError('Impossibile salvare le modifiche al dossier. Riprova.');
                 });
             },
 
-            toggleDossierPin: (id) => set((state) => {
-                const dossier = state.dossiers.find(d => d.id === id);
-                if (dossier) {
-                    dossier.isPinned = !dossier.isPinned;
-                }
-            }),
+            toggleDossierPin: (id) => {
+                // Optimistic toggle
+                set((state) => {
+                    const dossier = state.dossiers.find(d => d.id === id);
+                    if (dossier) {
+                        dossier.isPinned = !dossier.isPinned;
+                    }
+                });
+
+                // Sync to server
+                const dossier = get().dossiers.find(d => d.id === id);
+                if (!dossier) return;
+                dossierService.update(id, { isPinned: dossier.isPinned }).catch(err => {
+                    console.error('Failed to update dossier pin:', err);
+                    get().pushSyncError('Impossibile salvare il dossier in evidenza. Riprova.');
+                });
+            },
 
             addToDossier: (dossierId, itemData, type) => {
                 const tempId = uuidv4();
+                const newItem: DossierItem = typeof itemData === 'string'
+                    ? { id: tempId, type: 'note', data: itemData, addedAt: new Date().toISOString() }
+                    : { id: tempId, type: 'norma', data: itemData, addedAt: new Date().toISOString() };
 
                 // Optimistic update
                 set((state) => {
                     const dossier = state.dossiers.find(d => d.id === dossierId);
                     if (dossier) {
-                        dossier.items.push({
-                            id: tempId,
-                            type,
-                            data: itemData,
-                            addedAt: new Date().toISOString()
-                        });
+                        dossier.items.push(newItem);
                     }
                 });
-
-                // MERLT-1.8: emit dossier_item_add when a norma is filed into
-                // a dossier. Notes have no article_urn and are skipped here.
-                if (type === 'norma') {
-                    const urn = (itemData as NormaVisitata).urn;
-                    if (urn) {
-                        publishMerltEvent({
-                            interaction_type: MERLT_EVENT_TYPES.dossierItemAdded,
-                            article_urn: urn,
-                            metadata: { dossier_id: dossierId },
-                        });
-                    }
-                }
 
                 // API call
                 dossierService.addItem(dossierId, {
                     itemType: type === 'norma' ? 'norm' : 'note',
-                    title: itemData.tipo_atto || 'Nota',
+                    title: typeof itemData === 'string' ? 'Nota' : (itemData.tipo_atto || 'Nota'),
                     content: itemData,
                 }).then(created => {
                     // Update with server ID
@@ -1284,6 +1283,21 @@ const appStore = createStore<AppState>()(
                             item.id = created.id;
                         }
                     });
+
+                    // MERLT-1.8: emit dossier_item_add when a norma is filed
+                    // into a dossier. Notes have no article_urn and are skipped
+                    // here. Only on server confirmation — RLCF must never
+                    // receive signals for creations the backend rejected.
+                    if (type === 'norma') {
+                        const urn = (itemData as NormaVisitata).urn;
+                        if (urn) {
+                            publishMerltEvent({
+                                interaction_type: MERLT_EVENT_TYPES.dossierItemAdded,
+                                article_urn: urn,
+                                metadata: { dossier_id: dossierId },
+                            });
+                        }
+                    }
                 }).catch(err => {
                     console.error('Failed to add item to dossier:', err);
                     // Rollback
@@ -1370,28 +1384,75 @@ const appStore = createStore<AppState>()(
 
                 dossierService.reorderItems(dossierId, itemIds).catch(err => {
                     console.error('Failed to reorder dossier items:', err);
+                    get().pushSyncError('Impossibile salvare il nuovo ordine degli elementi. Riprova.');
                 });
             },
 
-            updateDossierItemStatus: (dossierId, itemId, status) => set((state) => {
-                const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (dossier) {
-                    const item = dossier.items.find(i => i.id === itemId);
-                    if (item) {
-                        item.status = status;
+            updateDossierItemStatus: (dossierId, itemId, status) => {
+                // Optimistic update
+                set((state) => {
+                    const dossier = state.dossiers.find(d => d.id === dossierId);
+                    if (dossier) {
+                        const item = dossier.items.find(i => i.id === itemId);
+                        if (item) {
+                            item.status = status;
+                        }
                     }
-                }
-            }),
+                });
 
-            moveToDossier: (sourceDossierId, targetDossierId, itemIds) => set((state) => {
-                const source = state.dossiers.find(d => d.id === sourceDossierId);
-                const target = state.dossiers.find(d => d.id === targetDossierId);
-                if (source && target) {
-                    const itemsToMove = source.items.filter(i => itemIds.includes(i.id));
-                    source.items = source.items.filter(i => !itemIds.includes(i.id));
-                    target.items.push(...itemsToMove);
-                }
-            }),
+                // Sync to server
+                dossierService.updateItem(dossierId, itemId, { status }).catch(err => {
+                    console.error('Failed to update dossier item status:', err);
+                    get().pushSyncError('Impossibile salvare lo stato dell\'elemento. Riprova.');
+                });
+            },
+
+            moveToDossier: (sourceDossierId, targetDossierId, itemIds) => {
+                const source = get().dossiers.find(d => d.id === sourceDossierId);
+                const target = get().dossiers.find(d => d.id === targetDossierId);
+                if (!source || !target) return;
+                const itemsToMove = source.items.filter(i => itemIds.includes(i.id));
+                if (itemsToMove.length === 0) return;
+
+                // Optimistic update
+                set((state) => {
+                    const s = state.dossiers.find(d => d.id === sourceDossierId);
+                    const t = state.dossiers.find(d => d.id === targetDossierId);
+                    if (s && t) {
+                        const moving = s.items.filter(i => itemIds.includes(i.id));
+                        s.items = s.items.filter(i => !itemIds.includes(i.id));
+                        t.items.push(...moving);
+                    }
+                });
+
+                // Server sync: a move is add-to-target + delete-from-source
+                // (in that order, so a failure can't lose the item). The
+                // re-created item gets a fresh server id — swap it into the
+                // store so later updates/deletes hit the right row.
+                void Promise.allSettled(
+                    itemsToMove.map(async (item) => {
+                        const created = await dossierService.addItem(targetDossierId, {
+                            itemType: item.type === 'norma' ? 'norm' : 'note',
+                            title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
+                            content: item.data,
+                        });
+                        await dossierService.deleteItem(sourceDossierId, item.id);
+                        set((state) => {
+                            const t = state.dossiers.find(d => d.id === targetDossierId);
+                            const moved = t?.items.find(i => i.id === item.id);
+                            if (moved) {
+                                moved.id = created.id;
+                            }
+                        });
+                    })
+                ).then((results) => {
+                    const failedCount = results.filter(r => r.status === 'rejected').length;
+                    if (failedCount > 0) {
+                        console.error(`moveToDossier: ${failedCount}/${itemsToMove.length} items failed to sync`);
+                        get().pushSyncError('Impossibile spostare alcuni elementi tra i dossier. Riprova.');
+                    }
+                });
+            },
 
             importDossier: async (dossier) => {
                 // Persist the dossier server-side first: any `addItem` call later
@@ -1419,11 +1480,9 @@ const appStore = createStore<AppState>()(
                     const items: DossierItem[] = itemResults
                         .filter((r): r is PromiseFulfilledResult<{ serverItem: DossierItemApi; original: DossierItem }> => r.status === 'fulfilled')
                         .map((r) => ({
+                            ...r.value.original,
                             id: r.value.serverItem.id,
-                            type: r.value.original.type,
-                            data: r.value.original.data,
                             addedAt: r.value.serverItem.created_at,
-                            status: r.value.original.status,
                         }));
 
                     const failedCount = itemResults.filter((r) => r.status === 'rejected').length;
@@ -2366,11 +2425,10 @@ const appStore = createStore<AppState>()(
         {
             name: 'visualex-storage',
             // Only persist UI state and settings, NOT user data. Bookmarks,
-            // dossiers, environments, annotations, highlights are now all
-            // server-backed and hydrated by fetchUserData on login/refresh —
-            // persisting them locally would cause drift with the server.
-            // quickNorms and customAliases are intrinsically client-only
-            // (no backend route); they stay in the partialize on purpose.
+            // dossiers, environments, quickNorms, customAliases, annotations,
+            // highlights are now all server-backed and hydrated by
+            // fetchUserData on login/refresh — persisting them locally would
+            // cause drift with the server.
             partialize: (state) => ({
                 settings: state.settings,
                 searchPanelState: state.searchPanelState,

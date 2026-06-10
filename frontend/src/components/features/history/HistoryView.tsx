@@ -6,7 +6,7 @@ import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { useAppStore, appStore } from '../../../store/useAppStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
@@ -235,21 +235,19 @@ export function HistoryView() {
         setShowDossierList(null);
     };
 
-    const handleConfirmCreateDossier = () => {
+    const handleConfirmCreateDossier = async () => {
         const title = newDossierTitle.trim();
         if (!title || !createDossierFor) return;
         const norma = historyToNormaVisitata(createDossierFor);
-        createDossier(title);
-        // Il dossier appena creato sarà l'ultimo nello store
-        setTimeout(() => {
-            const newDossier = appStore.getState().dossiers.slice(-1)[0];
-            if (newDossier) {
-                addToDossier(newDossier.id, norma, 'norma');
-                showFeedback(`Creato "${title}" e aggiunta norma`);
-            }
-        }, 0);
         setCreateDossierFor(null);
         setNewDossierTitle('');
+        const newDossierId = await createDossier(title);
+        if (newDossierId) {
+            addToDossier(newDossierId, norma, 'norma');
+            showFeedback(`Creato "${title}" e aggiunta norma`);
+        } else {
+            showFeedback('Impossibile creare il dossier', 'error');
+        }
     };
 
     const handleClearHistory = () => {
@@ -271,11 +269,14 @@ export function HistoryView() {
 
     const handleDeleteItem = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        const previous = history;
+        setHistory(prev => prev.filter(item => item.id !== id));
         try {
             await deleteHistoryItem(id);
-            setHistory(prev => prev.filter(item => item.id !== id));
         } catch (err) {
             console.error(err);
+            setHistory(previous);
+            showFeedback('Impossibile eliminare la voce dalla cronologia', 'error');
         }
     };
 

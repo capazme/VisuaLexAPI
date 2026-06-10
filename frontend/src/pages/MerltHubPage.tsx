@@ -6,8 +6,6 @@ import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
 import { useConsent } from '../features/merlt/consent/useConsent';
 import { ConsentDialog } from '../features/merlt/consent/ConsentDialog';
 import { OpsTrainingButton } from '../features/merlt/ops/OpsTrainingButton';
-import { NerOpsCard } from '../features/merlt/ner/NerOpsCard';
-import { MyContributionsCard } from '../features/merlt/contrib/MyContributionsCard';
 import { fetchMerltProfile, type MerltProfile } from '../services/merltService';
 import type { MerltConsentLevel } from '../features/merlt/merltConsent';
 
@@ -190,14 +188,6 @@ export function MerltHubPage() {
               </p>
             )}
           </div>
-          {features.canContribute && (
-            <div className="mt-4 border-t border-slate-200 pt-3 dark:border-slate-800">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                I miei contributi recenti
-              </p>
-              <MyContributionsCard />
-            </div>
-          )}
         </HubCard>
 
         <HubCard testId="hub-card-validate" icon={ScrollText} title="Validazione community">
@@ -221,21 +211,11 @@ export function MerltHubPage() {
 
         <HubCard testId="hub-card-qa" icon={MessageSquare} title="Q&A esperti">
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Domande giuridiche al sistema multi-expert, con fonti e provenienza sempre visibili.
+            Domande giuridiche al sistema multi-expert.
           </p>
-          <div className="mt-3">
-            {features.canContribute ? (
-              <Link to="/merlt/chiedi">
-                <Button variant="primary" size="sm">
-                  Apri
-                </Button>
-              </Link>
-            ) : (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Richiede consenso <strong>Completo</strong>.
-              </p>
-            )}
-          </div>
+          <p className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            In arrivo
+          </p>
         </HubCard>
 
         {features.opsVisible && (
@@ -244,12 +224,6 @@ export function MerltHubPage() {
               Avvia manualmente un ciclo di training RLCF sui feedback raccolti.
             </p>
             <OpsTrainingButton />
-          </HubCard>
-        )}
-
-        {features.opsVisible && (
-          <HubCard testId="hub-card-ner-ops" icon={ScrollText} title="NER giuridico (admin)">
-            <NerOpsCard />
           </HubCard>
         )}
       </div>

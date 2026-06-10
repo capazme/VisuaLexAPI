@@ -201,6 +201,7 @@ export function NormaBlockComponent({
             {...listeners}
             className="cursor-grab active:cursor-grabbing p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
             title="Trascina norma"
+            aria-label="Trascina norma"
           >
             <GripVertical size={16} className="text-slate-400" />
           </div>
@@ -214,6 +215,7 @@ export function NormaBlockComponent({
               }}
               className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
               title="Elimina norma"
+              aria-label="Elimina norma"
             >
               <Trash2 size={14} className="text-red-500 opacity-70 hover:opacity-100" />
             </button>
@@ -270,6 +272,7 @@ export function NormaBlockComponent({
                 setStudyModeOpen(true);
               }}
               title="Modalità studio"
+              aria-label="Modalità studio"
             >
               <BookOpen size={12} />
               <span className="hidden sm:inline">Studio</span>
@@ -284,6 +287,7 @@ export function NormaBlockComponent({
                     fetchTree();
                   }
                 }}
+                aria-label="Struttura della norma"
               >
                 <GitBranch size={12} />
                 <span className="hidden sm:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>
@@ -296,6 +300,7 @@ export function NormaBlockComponent({
                   e.stopPropagation();
                   onViewPdf(normaUrn);
                 }}
+                aria-label="Esporta PDF della norma"
               >
                 PDF
               </button>
@@ -461,6 +466,7 @@ export function NormaBlockComponent({
                         onExtractArticle(uniqueId);
                       }}
                       title="Estrai come articolo loose"
+                      aria-label={`Estrai art. ${article.norma_data.numero_articolo} come articolo loose`}
                     >
                       <ExternalLink size={10} />
                     </button>
@@ -471,6 +477,7 @@ export function NormaBlockComponent({
                         onRemoveArticle(uniqueId);
                       }}
                       title="Chiudi articolo"
+                      aria-label={`Chiudi art. ${article.norma_data.numero_articolo}`}
                     >
                       <X size={10} />
                     </button>
