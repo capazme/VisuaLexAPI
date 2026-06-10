@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 /**
  * Express middleware that blocks event-capture requests when the user has
@@ -19,8 +19,6 @@ import { PrismaClient } from '@prisma/client';
  * needs (e.g. forum signals require contribution); the bare consentGuard
  * here only ensures *some* level of consent exists.
  */
-
-const prisma = new PrismaClient();
 
 export async function consentGuard(
   req: Request,

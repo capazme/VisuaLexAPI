@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import multer from 'multer';
 import { authenticate } from '../../middleware/auth';
 import { internalAuth } from '../../middleware/internalAuth';
@@ -26,7 +26,6 @@ import { MerltClientError } from '../../services/merlt/merltClient';
  */
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // mirror MERL-T MAX_UPLOAD_SIZE_MB=50
 const ALLOWED_EXT = /\.(pdf|txt|docx)$/i;

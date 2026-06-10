@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, EnvironmentCategory, ReportReason } from '@prisma/client';
+import { Prisma, EnvironmentCategory, ReportReason } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;
@@ -166,19 +165,20 @@ function formatSuggestion(suggestion: any, currentUserId: string) {
 
 // Helper: create a new version snapshot
 async function createVersionSnapshot(
+  client: Prisma.TransactionClient,
   envId: string,
   content: any,
   changelog?: string,
 ) {
   // Get next version number
-  const latestVersion = await prisma.sharedEnvironmentVersion.findFirst({
+  const latestVersion = await client.sharedEnvironmentVersion.findFirst({
     where: { sharedEnvironmentId: envId },
     orderBy: { version: 'desc' },
   });
 
   const nextVersion = (latestVersion?.version ?? 0) + 1;
 
-  return prisma.sharedEnvironmentVersion.create({
+  return client.sharedEnvironmentVersion.create({
     data: {
       sharedEnvironmentId: envId,
       version: nextVersion,
@@ -200,7 +200,7 @@ export const listSharedEnvironments = async (req: Request, res: Response) => {
   const sort = (req.query.sort as string) || 'newest';
   const search = req.query.search as string;
 
-  const where: any = {};
+  const where: any = { isActive: true };
 
   // Category filter
   if (category && category !== 'all') {
@@ -579,10 +579,18 @@ export const updateReportStatus = async (req: Request, res: Response) => {
     throw new AppError(400, 'Invalid status');
   }
 
-  const report = await prisma.sharedEnvironmentReport.update({
-    where: { id },
-    data: { status },
-  });
+  let report;
+  try {
+    report = await prisma.sharedEnvironmentReport.update({
+      where: { id },
+      data: { status },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Report not found');
+    }
+    throw err;
+  }
 
   res.json({
     id: report.id,
@@ -820,36 +828,41 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
 
   // Handle coexist mode: create a NEW environment, keep original as is
   if (data.versionMode === 'coexist' && data.content) {
-    // Create a version snapshot of the original
-    await createVersionSnapshot(id, existing.content, 'Versione originale (prima di coesistenza)');
+    const newContent = data.content;
+    const newEnv = await prisma.$transaction(async (tx) => {
+      // Create a version snapshot of the original
+      await createVersionSnapshot(tx, id, existing.content, 'Versione originale (prima di coesistenza)');
 
-    // Create NEW environment with updated content
-    const newEnv = await prisma.sharedEnvironment.create({
-      data: {
-        title: data.title ?? existing.title,
-        description: data.description !== undefined ? data.description : existing.description,
-        content: data.content,
-        category: (data.category ?? existing.category) as EnvironmentCategory,
-        tags: data.tags ?? (existing.tags as string[]),
-        includeNotes: existing.includeNotes,
-        includeHighlights: existing.includeHighlights,
-        userId: req.user!.id,
-        currentVersion: existing.currentVersion + 1,
-        isActive: true,
-        // Link to original via replacedById (new version points to old)
-        // This allows tracking the lineage
-      },
-      include: {
-        user: { select: { id: true, username: true } },
-        likes: { where: { userId: req.user!.id }, select: { userId: true } },
-        _count: { select: { likes: true } },
-      },
+      // Create NEW environment with updated content
+      const created = await tx.sharedEnvironment.create({
+        data: {
+          title: data.title ?? existing.title,
+          description: data.description !== undefined ? data.description : existing.description,
+          content: newContent,
+          category: (data.category ?? existing.category) as EnvironmentCategory,
+          tags: data.tags ?? (existing.tags as string[]),
+          includeNotes: existing.includeNotes,
+          includeHighlights: existing.includeHighlights,
+          userId: req.user!.id,
+          currentVersion: existing.currentVersion + 1,
+          isActive: true,
+          // Link to original via replacedById (new version points to old)
+          // This allows tracking the lineage
+        },
+        include: {
+          user: { select: { id: true, username: true } },
+          likes: { where: { userId: req.user!.id }, select: { userId: true } },
+          _count: { select: { likes: true } },
+        },
+      });
+
+      // Create version snapshot for new environment
+      if (data.changelog) {
+        await createVersionSnapshot(tx, created.id, newContent, data.changelog);
+      }
+
+      return created;
     });
-
-    // Create version snapshot for new environment
-    if (data.changelog) {
-      await createVersionSnapshot(newEnv.id, data.content, data.changelog);
-    }
 
     // Original environment stays active and unchanged
     // User now has both versions in their "I miei ambienti"
@@ -859,11 +872,6 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
   }
 
   // Handle replace mode (default): update existing environment in place
-  if (data.content) {
-    // Save current content as a version before replacing
-    await createVersionSnapshot(id, existing.content, 'Versione precedente');
-  }
-
   const updateData: any = {
     ...(data.title !== undefined && { title: data.title }),
     ...(data.description !== undefined && { description: data.description }),
@@ -876,20 +884,29 @@ export const updateEnvironmentWithVersion = async (req: Request, res: Response) 
     updateData.currentVersion = existing.currentVersion + 1;
   }
 
-  const env = await prisma.sharedEnvironment.update({
-    where: { id },
-    data: updateData,
-    include: {
-      user: { select: { id: true, username: true } },
-      likes: { where: { userId: req.user!.id }, select: { userId: true } },
-      _count: { select: { likes: true } },
-    },
-  });
+  const env = await prisma.$transaction(async (tx) => {
+    if (data.content) {
+      // Save current content as a version before replacing
+      await createVersionSnapshot(tx, id, existing.content, 'Versione precedente');
+    }
 
-  // Create new version snapshot with changelog
-  if (data.content && data.changelog) {
-    await createVersionSnapshot(id, data.content, data.changelog);
-  }
+    const updated = await tx.sharedEnvironment.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: { select: { id: true, username: true } },
+        likes: { where: { userId: req.user!.id }, select: { userId: true } },
+        _count: { select: { likes: true } },
+      },
+    });
+
+    // Create new version snapshot with changelog
+    if (data.content && data.changelog) {
+      await createVersionSnapshot(tx, id, data.content, data.changelog);
+    }
+
+    return updated;
+  });
 
   res.json(formatSharedEnvironment(env, req.user!.id));
 };
@@ -1318,25 +1335,29 @@ export const restoreVersion = async (req: Request, res: Response) => {
     throw new AppError(404, 'Version not found');
   }
 
-  // Create snapshot of current state before restoring
-  await createVersionSnapshot(id, env.content, 'Prima del ripristino');
+  const updatedEnv = await prisma.$transaction(async (tx) => {
+    // Create snapshot of current state before restoring
+    await createVersionSnapshot(tx, id, env.content, 'Prima del ripristino');
 
-  // Restore the content
-  const updatedEnv = await prisma.sharedEnvironment.update({
-    where: { id },
-    data: {
-      content: version.content as object,
-      currentVersion: env.currentVersion + 1,
-    },
-    include: {
-      user: { select: { id: true, username: true } },
-      likes: { where: { userId: req.user!.id }, select: { userId: true } },
-      _count: { select: { likes: true } },
-    },
+    // Restore the content
+    const updated = await tx.sharedEnvironment.update({
+      where: { id },
+      data: {
+        content: version.content as object,
+        currentVersion: env.currentVersion + 1,
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+        likes: { where: { userId: req.user!.id }, select: { userId: true } },
+        _count: { select: { likes: true } },
+      },
+    });
+
+    // Create version entry for the restore
+    await createVersionSnapshot(tx, id, version.content, `Ripristinato alla versione ${version.version}`);
+
+    return updated;
   });
-
-  // Create version entry for the restore
-  await createVersionSnapshot(id, version.content, `Ripristinato alla versione ${version.version}`);
 
   res.json(formatSharedEnvironment(updatedEnv, req.user!.id));
 };

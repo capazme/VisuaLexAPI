@@ -1,13 +1,11 @@
 import type { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 /**
  * Blocks RLCF validation routes unless the user's consent grants validation
  * (level `full` → validationEnabled true). Mirrors contributionGuard; runs
  * after authenticate (Slice 2c #8).
  */
-
-const prisma = new PrismaClient();
 
 export async function validationGuard(
   req: Request,

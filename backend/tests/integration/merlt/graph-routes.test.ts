@@ -17,6 +17,7 @@ beforeAll(() => {
   process.env.MERLT_API_URL = TEST_MERLT_BASE;
   process.env.MERLT_TIMEOUT_MS = '500';
   process.env.MERLT_INTERNAL_SECRET = INTERNAL_SECRET;
+  process.env.MERLT_API_KEY = 'test-graph-key';
   _resetGraphClientForTests();
   if (!nock.isActive()) nock.activate();
   nock.disableNetConnect();
@@ -33,6 +34,7 @@ afterAll(() => {
   delete process.env.MERLT_API_URL;
   delete process.env.MERLT_TIMEOUT_MS;
   delete process.env.MERLT_INTERNAL_SECRET;
+  delete process.env.MERLT_API_KEY;
 });
 
 async function grantConsent(user: TestUser, level: 'basic' | 'full' = 'basic'): Promise<void> {
@@ -63,10 +65,14 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     await grantConsent(user, 'basic');
     const urn = 'urn:nir:stato:codice.civile:1942;2043';
 
+    let sentApiKey: string | undefined;
     nock(TEST_MERLT_BASE)
       .get('/api/v1/graph/subgraph')
       .query((q) => q.root_urn === urn)
-      .reply(200, mockSubgraph(urn));
+      .reply(function () {
+        sentApiKey = this.req.headers['x-api-key'] as string | undefined;
+        return [200, mockSubgraph(urn)];
+      });
 
     const res = await request(app)
       .get(`/api/merlt/graph/article/${encodeURIComponent(urn)}`)
@@ -76,6 +82,10 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     expect(res.body.nodes).toHaveLength(2);
     expect(res.body.edges).toHaveLength(1);
     expect(res.body.nodes[0].urn).toBe(urn);
+    // MERL-T auth scheme is X-API-Key, NOT Authorization: Bearer.
+    // Regression guard: graphClient previously sent `Authorization: Bearer`
+    // which MERL-T rejects with 401 "API key required".
+    expect(sentApiKey).toBe('test-graph-key');
   });
 
   it('forwards depth and limit query params to MERL-T (clamped)', async () => {
@@ -161,10 +171,7 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     expect(seen.depth).toBe('3');
   });
 
-  it('strips the !vig= version suffix but preserves the URL wrapper before querying MERL-T', async () => {
-    // The seed AND VisuaLex key Norma nodes by the FULL Normattiva URL form and
-    // MERL-T matches on exact URN/node_id equality, so the wrapper MUST stay.
-    // `normalizeGraphUrn` strips only the version marker (from the first `!`).
+  it('strips the !vig= version suffix from the urn before querying MERL-T', async () => {
     await grantConsent(user, 'basic');
     const rawUrn =
       'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043!vig=';

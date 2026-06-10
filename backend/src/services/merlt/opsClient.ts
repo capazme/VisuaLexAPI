@@ -44,7 +44,7 @@ export class OpsClient {
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (this.config.apiKey) headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    if (this.config.apiKey) headers['X-API-Key'] = this.config.apiKey;
 
     let response: Response;
     try {

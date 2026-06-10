@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { PrismaClient, type MerltConsentLevel } from '@prisma/client';
+import { type MerltConsentLevel } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import {
   consentSetRequestSchema,
   consentRevokeRequestSchema,
@@ -10,7 +11,6 @@ import {
 import { authenticate } from '../../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * Build the GET response shape from current DB state.

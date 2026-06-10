@@ -317,6 +317,8 @@ model Dossier {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  isPinned    Boolean  @default(false) @map("is_pinned")
+
   sourceSuggestionId String?                @map("source_suggestion_id")
   originalAuthorId   String?                @map("original_author_id")
 
@@ -336,14 +338,22 @@ enum DossierItemType {
   section
 }
 
+enum DossierItemStatus {
+  unread
+  reading
+  important
+  done
+}
+
 model DossierItem {
-  id        String          @id @default(uuid())
-  dossierId String          @map("dossier_id")
-  itemType  DossierItemType @map("item_type")
+  id        String            @id @default(uuid())
+  dossierId String            @map("dossier_id")
+  itemType  DossierItemType   @map("item_type")
   title     String
   content   Json? // Flexible content (norm data, note text, etc.)
-  position  Int             @default(0)
-  createdAt DateTime        @default(now()) @map("created_at")
+  position  Int               @default(0)
+  status    DossierItemStatus @default(unread)
+  createdAt DateTime          @default(now()) @map("created_at")
 
   // Relationships
   dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)

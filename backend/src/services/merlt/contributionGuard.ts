@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 
 /**
  * Blocks contribution routes unless the user's consent level grants
@@ -8,8 +8,6 @@ import { PrismaClient } from '@prisma/client';
  * consent): the "Apprendi dai miei appunti" flow feeds the shared graph, so it
  * needs explicit full consent (Slice 2c, decision C8).
  */
-
-const prisma = new PrismaClient();
 
 export async function contributionGuard(
   req: Request,

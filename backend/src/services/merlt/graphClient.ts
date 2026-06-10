@@ -50,17 +50,17 @@ export interface IngestArticleResponse {
 }
 
 /**
- * Normalize a VisuaLex URN to the canonical bare NIR form the graph indexes.
+ * Normalize a VisuaLex URN to the form indexed in the graph.
  *
- * Strips ONLY the NIR version/annex marker — everything from the first "!"
- * (e.g. "!vig=" / "!orig=..."). The seed AND VisuaLex both key Norma nodes by
- * the full Normattiva URL form
- *   "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:...~art2043"
- * and MERL-T matches on EXACT URN/node_id equality, so the URL wrapper MUST be
- * preserved: stripping it to the bare "urn:nir:..." form makes every seeded
- * article unmatchable (exists:false -> empty subgraph -> infinite lazy-ingest).
- * The seed carries no version marker, so dropping it is all that is needed
- * (the worker's parse_urn reads the article from the full URL just fine).
+ * **Anti-regression (vedi CLAUDE.md "URN version-marker mismatch"):**
+ * la chiave del grafo è la forma URL Normattiva COMPLETA — `URN`/`node_id`
+ * memorizzano "https://www.normattiva.it/uri-res/N2Ls?urn:nir:…~art2043"
+ * (wrapper URL **INCLUSO**). VisuaLex e MERL-T producono la stessa forma e
+ * fanno match esatto. Quindi qui si strippa SOLO il marker `!vig=`/`!orig=…`
+ * (la versione NIR), MAI il prefisso URL. Strippare il wrapper rende il seed
+ * Libro IV completamente irreperibile via check-article → /grafo vuoto.
+ *
+ * Trasforma "…~art2043!vig=" → "…~art2043" e lascia tutto il resto invariato.
  */
 export function normalizeGraphUrn(urn: string): string {
   const bang = urn.indexOf('!');
@@ -120,8 +120,10 @@ export class GraphClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
+    // MERL-T auth scheme is X-API-Key, NOT Authorization: Bearer — verify_api_key
+    // rejects Bearer with 401 "API key required" (same regression as opsClient.ts).
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (this.config.apiKey) headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    if (this.config.apiKey) headers['X-API-Key'] = this.config.apiKey;
 
     let response: Response;
     try {

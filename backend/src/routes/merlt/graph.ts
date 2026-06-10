@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { internalAuth } from '../../middleware/internalAuth';
 import { consentGuard } from '../../services/merlt/consentGuard';
@@ -27,7 +27,6 @@ import { MerltClientError } from '../../services/merlt/merltClient';
  */
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /** Parse a query param to an int, falling back to `def`, clamped to [min,max]. */
 function clampInt(raw: unknown, def: number, min: number, max: number): number {

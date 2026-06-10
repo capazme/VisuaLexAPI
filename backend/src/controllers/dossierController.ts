@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, DossierItemType } from '@prisma/client';
+import { Prisma, DossierItemType } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Validation schemas
 const createDossierSchema = z.object({
@@ -16,6 +15,7 @@ const updateDossierSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
+  isPinned: z.boolean().optional(),
 });
 
 const createDossierItemSchema = z.object({
@@ -23,12 +23,14 @@ const createDossierItemSchema = z.object({
   title: z.string().min(1),
   content: z.any().optional(),
   position: z.number().optional(),
+  status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
 });
 
 const updateDossierItemSchema = z.object({
   title: z.string().min(1).optional(),
   content: z.any().optional(),
   position: z.number().optional(),
+  status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
 });
 
 /**
@@ -50,6 +52,7 @@ export const listDossiers = async (req: Request, res: Response) => {
     name: d.name,
     description: d.description,
     color: d.color,
+    is_pinned: d.isPinned,
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     items: d.items.map(i => ({
@@ -58,6 +61,7 @@ export const listDossiers = async (req: Request, res: Response) => {
       title: i.title,
       content: i.content,
       position: i.position,
+      status: i.status,
       created_at: i.createdAt,
     })),
   })));
@@ -87,6 +91,7 @@ export const getDossier = async (req: Request, res: Response) => {
     name: dossier.name,
     description: dossier.description,
     color: dossier.color,
+    is_pinned: dossier.isPinned,
     created_at: dossier.createdAt,
     updated_at: dossier.updatedAt,
     items: dossier.items.map(i => ({
@@ -95,6 +100,7 @@ export const getDossier = async (req: Request, res: Response) => {
       title: i.title,
       content: i.content,
       position: i.position,
+      status: i.status,
       created_at: i.createdAt,
     })),
   });
@@ -123,6 +129,7 @@ export const createDossier = async (req: Request, res: Response) => {
     name: dossier.name,
     description: dossier.description,
     color: dossier.color,
+    is_pinned: dossier.isPinned,
     created_at: dossier.createdAt,
     updated_at: dossier.updatedAt,
     items: [],
@@ -151,6 +158,7 @@ export const updateDossier = async (req: Request, res: Response) => {
       ...(data.name !== undefined && { name: data.name }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.color !== undefined && { color: data.color }),
+      ...(data.isPinned !== undefined && { isPinned: data.isPinned }),
     },
     include: {
       items: {
@@ -164,6 +172,7 @@ export const updateDossier = async (req: Request, res: Response) => {
     name: dossier.name,
     description: dossier.description,
     color: dossier.color,
+    is_pinned: dossier.isPinned,
     created_at: dossier.createdAt,
     updated_at: dossier.updatedAt,
     items: dossier.items.map(i => ({
@@ -172,6 +181,7 @@ export const updateDossier = async (req: Request, res: Response) => {
       title: i.title,
       content: i.content,
       position: i.position,
+      status: i.status,
       created_at: i.createdAt,
     })),
   });
@@ -228,6 +238,7 @@ export const addDossierItem = async (req: Request, res: Response) => {
       title: data.title,
       content: data.content || null,
       position: data.position ?? (maxPos._max.position ?? -1) + 1,
+      ...(data.status !== undefined && { status: data.status }),
     },
   });
 
@@ -237,6 +248,7 @@ export const addDossierItem = async (req: Request, res: Response) => {
     title: item.title,
     content: item.content,
     position: item.position,
+    status: item.status,
     created_at: item.createdAt,
   });
 };
@@ -257,14 +269,23 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  const item = await prisma.dossierItem.update({
-    where: { id: itemId },
-    data: {
-      ...(data.title !== undefined && { title: data.title }),
-      ...(data.content !== undefined && { content: data.content }),
-      ...(data.position !== undefined && { position: data.position }),
-    },
-  });
+  let item;
+  try {
+    item = await prisma.dossierItem.update({
+      where: { id: itemId, dossierId: id },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.content !== undefined && { content: data.content }),
+        ...(data.position !== undefined && { position: data.position }),
+        ...(data.status !== undefined && { status: data.status }),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 
   res.json({
     id: item.id,
@@ -272,6 +293,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     title: item.title,
     content: item.content,
     position: item.position,
+    status: item.status,
     created_at: item.createdAt,
   });
 };
@@ -291,9 +313,16 @@ export const deleteDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  await prisma.dossierItem.delete({
-    where: { id: itemId },
-  });
+  try {
+    await prisma.dossierItem.delete({
+      where: { id: itemId, dossierId: id },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 
   res.status(204).send();
 };
@@ -319,14 +348,21 @@ export const reorderDossierItems = async (req: Request, res: Response) => {
   }
 
   // Update positions
-  await prisma.$transaction(
-    itemIds.map((itemId, index) =>
-      prisma.dossierItem.update({
-        where: { id: itemId },
-        data: { position: index },
-      })
-    )
-  );
+  try {
+    await prisma.$transaction(
+      itemIds.map((itemId, index) =>
+        prisma.dossierItem.update({
+          where: { id: itemId, dossierId: id },
+          data: { position: index },
+        })
+      )
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 
   res.json({ message: 'Items reordered successfully' });
 };

@@ -16,13 +16,11 @@
  * If the user doesn't exist, run `npm run db:seed` first.
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { hashPassword } from './password';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const prisma = new PrismaClient();
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@visualex.it';

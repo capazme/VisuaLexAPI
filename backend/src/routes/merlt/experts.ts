@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { contributionGuard } from '../../services/merlt/contributionGuard';
 import {
@@ -28,7 +28,6 @@ function clampInt(raw: unknown, def: number, min: number, max: number): number {
  * the catch-all auth routers (per-route auth → order-safe; gotcha #1).
  */
 
-const prisma = new PrismaClient();
 const router = Router();
 
 export function mapConsentLevel(

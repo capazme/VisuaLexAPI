@@ -1,30 +1,42 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeGraphUrn } from '../../../src/services/merlt/graphClient';
 
-// The seed AND VisuaLex key Norma nodes by the FULL Normattiva URL form, and
-// MERL-T matches on exact URN/node_id equality. normalizeGraphUrn must drop
-// ONLY the NIR version marker (from the first "!") and PRESERVE the URL wrapper
-// — stripping the wrapper makes every seeded article unmatchable.
-describe('normalizeGraphUrn — strip only the version marker, keep the seed key form', () => {
-  const FULL =
-    'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043';
-
-  it('leaves the full Normattiva URL form unchanged (the seed/VisuaLex key)', () => {
-    expect(normalizeGraphUrn(FULL)).toBe(FULL);
+/**
+ * Anti-regressione (vedi CLAUDE.md "URN version-marker mismatch"):
+ * il seed del grafo MEMORIZZA la forma URL Normattiva COMPLETA, wrapper incluso.
+ * `normalizeGraphUrn` deve strippare SOLO il marker `!vig=`/`!orig=`, MAI il
+ * wrapper URL — altrimenti il match col seed fallisce sempre.
+ */
+describe('normalizeGraphUrn — strip ONLY the NIR version marker', () => {
+  it('preserves the full Normattiva URL wrapper', () => {
+    const url = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1';
+    expect(normalizeGraphUrn(url)).toBe(url);
   });
 
-  it('strips the version marker (!vig=) but keeps the URL wrapper', () => {
-    expect(normalizeGraphUrn(`${FULL}!vig=`)).toBe(FULL);
+  it('strips the !vig= version marker, keeping the wrapper', () => {
+    expect(
+      normalizeGraphUrn(
+        'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942~art2043!vig=',
+      ),
+    ).toBe('https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942~art2043');
   });
 
-  it('strips the version marker on a bare NIR urn too', () => {
-    expect(normalizeGraphUrn('urn:nir:stato:codice.civile:1942~art2043!vig=')).toBe(
-      'urn:nir:stato:codice.civile:1942~art2043',
-    );
+  it('strips !orig=… too (same NIR marker family)', () => {
+    expect(
+      normalizeGraphUrn(
+        'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1!orig=1947',
+      ),
+    ).toBe('https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art1');
   });
 
-  it('leaves a marker-less urn unchanged (bare or wrapped)', () => {
+  it('leaves a bare canonical NIR urn unchanged (no wrapper, no marker)', () => {
     const bare = 'urn:nir:stato:codice.civile:1942~art2043';
     expect(normalizeGraphUrn(bare)).toBe(bare);
+  });
+
+  it('strips the marker on a bare NIR urn too', () => {
+    expect(normalizeGraphUrn('urn:nir:stato:costituzione~art1!vig=')).toBe(
+      'urn:nir:stato:costituzione~art1',
+    );
   });
 });

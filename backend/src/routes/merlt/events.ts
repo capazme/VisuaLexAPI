@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { consentGuard } from '../../services/merlt/consentGuard';
 import {
@@ -29,7 +29,6 @@ import { createGraphClient, GraphClient } from '../../services/merlt/graphClient
 import { ensureIngestionJob } from '../../services/merlt/lazyIngest';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Singleton client: reuse the HTTP connection pool across requests.
 let cachedClient: MerltClient | null = null;

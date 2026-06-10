@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, AnnotationType } from '@prisma/client';
+import { AnnotationType } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Validation schemas
 const createAnnotationSchema = z.object({

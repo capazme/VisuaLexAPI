@@ -16,7 +16,11 @@ import { dirname, join } from 'node:path';
 const LOG_DIR = process.env.MERLT_DEAD_LETTER_DIR ?? join(process.cwd(), 'logs');
 const LOG_FILE = join(LOG_DIR, 'merlt-dead-letter.jsonl');
 
+// Cap the file so a prolonged MERL-T outage can't fill the disk.
+const MAX_LOG_BYTES = 50 * 1024 * 1024;
+
 let dirEnsured = false;
+let sizeCapReached = false;
 
 async function ensureDir(): Promise<void> {
   if (dirEnsured) return;
@@ -45,6 +49,17 @@ export async function logDeadLetter(
 
   try {
     await ensureDir();
+    const stat = await fs.stat(LOG_FILE).catch(() => null);
+    if (stat && stat.size >= MAX_LOG_BYTES) {
+      if (!sizeCapReached) {
+        sizeCapReached = true;
+        // eslint-disable-next-line no-console
+        console.error(
+          `[merlt] dead-letter log reached ${MAX_LOG_BYTES} bytes — dropping further entries (rotate or delete ${LOG_FILE})`
+        );
+      }
+      return;
+    }
     await fs.appendFile(LOG_FILE, JSON.stringify(entry) + '\n', 'utf8');
   } catch (logErr) {
     // Never let dead-letter logging crash the request path

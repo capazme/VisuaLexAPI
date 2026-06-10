@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { MerltClient, MerltClientError } from './merltClient';
 
 /**
@@ -14,7 +14,6 @@ import { MerltClient, MerltClientError } from './merltClient';
  * No background worker yet. Future stories may add periodic refresh.
  */
 
-const prisma = new PrismaClient();
 const DEFAULT_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 export interface CachedAuthority {
