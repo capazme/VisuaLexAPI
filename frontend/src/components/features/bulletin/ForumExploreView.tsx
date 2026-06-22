@@ -1,6 +1,8 @@
-import { Search, Share2, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, X as XIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, Share2, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
 import { SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { EmptyState } from '../../ui/EmptyState';
+import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment, EnvironmentCategory } from '../../../types';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
@@ -187,6 +189,9 @@ export function ForumExploreView({
         />
       )}
 
+      {/* Top environments social proof */}
+      <TopEnvironmentsWidget onImport={onImport} />
+
       {/* Results count */}
       {!loading && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -293,5 +298,92 @@ export function ForumExploreView({
         </div>
       )}
     </>
+  );
+}
+
+type TopState =
+  | { status: 'loading' }
+  | { status: 'success'; items: SharedEnvironment[] }
+  | { status: 'error' };
+
+interface TopEnvironmentsWidgetProps {
+  onImport: (env: SharedEnvironment) => void;
+}
+
+// Small social-proof block listing the 3 most-downloaded shared
+// environments. Self-contained: fetches once on mount via the existing
+// `sort=mostDownloaded&limit=3` list endpoint (no backend changes). Renders
+// nothing on error or when there is no download history yet.
+function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
+  const [state, setState] = useState<TopState>({ status: 'loading' });
+
+  useEffect(() => {
+    let active = true;
+    sharedEnvironmentService
+      .list({ sort: 'mostDownloaded', limit: 3 })
+      .then((res) => {
+        if (!active) return;
+        setState({ status: 'success', items: res.data });
+      })
+      .catch((err) => {
+        console.error('TopEnvironmentsWidget: failed to load top environments:', err);
+        if (!active) return;
+        setState({ status: 'error' });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (state.status === 'error') return null;
+
+  if (state.status === 'loading') {
+    return (
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Trophy size={16} className="text-amber-500" />
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Top Ambienti</h3>
+        </div>
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-9 bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Only environments with a real download history are worth surfacing.
+  const items = state.items.filter((env) => env.downloadCount > 0);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Trophy size={16} className="text-amber-500" />
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Top Ambienti</h3>
+        <span className="text-xs text-slate-400 dark:text-slate-500">i più scaricati</span>
+      </div>
+      <ul className="space-y-1">
+        {items.map((env, idx) => (
+          <li key={env.id}>
+            <button
+              type="button"
+              onClick={() => onImport(env)}
+              className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800"
+            >
+              <span className="w-5 shrink-0 text-sm font-bold text-amber-500 text-center">{idx + 1}</span>
+              <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                {env.title}
+              </span>
+              <span className="flex items-center gap-1 shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                <Download size={12} />
+                {env.downloadCount}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
