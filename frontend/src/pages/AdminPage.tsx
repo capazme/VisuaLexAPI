@@ -5,8 +5,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import * as adminService from '../services/adminService';
+import { sharedEnvironmentService } from '../services/sharedEnvironmentService';
 import type { AdminUserResponse } from '../types/api';
 import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminSharedEnvironment } from '../services/adminService';
+import type { SharedEnvironmentReport, ReportStatus } from '../types';
+import { getErrorMessage } from '../utils/errors';
 import {
   Users,
   UserPlus,
@@ -33,10 +36,11 @@ import {
   TrendingUp,
   Download,
   Heart,
+  Flag,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type AdminTab = 'users' | 'feedback' | 'environments';
+type AdminTab = 'users' | 'feedback' | 'environments' | 'reports';
 
 export function AdminPage() {
   const navigate = useNavigate();
@@ -64,6 +68,11 @@ export function AdminPage() {
   const [envSearch, setEnvSearch] = useState('');
   const [envStatusFilter, setEnvStatusFilter] = useState<'active' | 'withdrawn' | 'all'>('all');
   const [showDeleteEnvConfirm, setShowDeleteEnvConfirm] = useState<string | null>(null);
+
+  // Reports state
+  const [reports, setReports] = useState<SharedEnvironmentReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportStatusFilter, setReportStatusFilter] = useState<ReportStatus | 'all'>('pending');
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -127,6 +136,18 @@ export function AdminPage() {
     }
   };
 
+  const loadReports = async () => {
+    try {
+      setReportsLoading(true);
+      const data = await sharedEnvironmentService.getReports(reportStatusFilter);
+      setReports(data);
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nel caricamento delle segnalazioni');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadFeedbacks();
@@ -143,6 +164,12 @@ export function AdminPage() {
       loadEnvironments(1);
     }
   }, [activeTab, envStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      loadReports();
+    }
+  }, [activeTab, reportStatusFilter]);
 
   // Environment handlers
   const handleWithdrawEnv = async (id: string) => {
@@ -186,6 +213,39 @@ export function AdminPage() {
   const handleEnvSearch = (e: React.FormEvent) => {
     e.preventDefault();
     loadEnvironments(1);
+  };
+
+  const handleUpdateReportStatus = async (id: string, status: ReportStatus) => {
+    try {
+      setActionLoading(true);
+      await sharedEnvironmentService.updateReportStatus(id, status);
+      await loadReports();
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'aggiornamento della segnalazione');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getReportStatusBadge = (status: ReportStatus) => {
+    const styles = {
+      pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+      reviewed: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      dismissed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+    };
+    const labels = { pending: 'In attesa', reviewed: 'Esaminata', dismissed: 'Ignorata' };
+    return (
+      <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', styles[status])}>
+        {labels[status]}
+      </span>
+    );
+  };
+
+  const REPORT_REASON_LABELS: Record<SharedEnvironmentReport['reason'], string> = {
+    spam: 'Spam',
+    inappropriate: 'Contenuto inappropriato',
+    copyright: 'Violazione copyright',
+    other: 'Altro',
   };
 
   const handleUpdateFeedbackStatus = async (id: string, status: FeedbackStatus) => {
@@ -365,6 +425,18 @@ export function AdminPage() {
                 >
                   <Package size={16} />
                   Ambienti
+                </button>
+                <button
+                  onClick={() => setActiveTab('reports')}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                    activeTab === 'reports'
+                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                  )}
+                >
+                  <Flag size={16} />
+                  Segnalazioni
                 </button>
               </div>
             </div>
@@ -926,6 +998,128 @@ export function AdminPage() {
                     </div>
                   )}
                 </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ==================== REPORTS TAB ==================== */}
+        {activeTab === 'reports' && (
+          <>
+            {/* Actions Bar */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Flag size={20} className="text-gray-500" />
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Segnalazioni ({reports.length})
+                  </h2>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={reportStatusFilter}
+                  onChange={(e) => setReportStatusFilter(e.target.value as ReportStatus | 'all')}
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="pending">In attesa</option>
+                  <option value="reviewed">Esaminate</option>
+                  <option value="dismissed">Ignorate</option>
+                  <option value="all">Tutte</option>
+                </select>
+                <button
+                  onClick={loadReports}
+                  disabled={reportsLoading}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  title="Aggiorna"
+                >
+                  <RefreshCw size={20} className={reportsLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Reports List */}
+            <div className="space-y-4">
+              {reportsLoading && reports.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
+                  <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+                  Caricamento segnalazioni...
+                </div>
+              ) : reports.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center text-gray-500 border border-gray-200 dark:border-gray-700">
+                  <Flag size={32} className="mx-auto mb-2 opacity-50" />
+                  Nessuna segnalazione trovata
+                </div>
+              ) : (
+                reports.map((r) => (
+                  <div
+                    key={r.id}
+                    className={cn(
+                      'bg-white dark:bg-gray-800 rounded-xl border p-4 transition-colors',
+                      r.status === 'pending'
+                        ? 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                        : 'border-gray-200 dark:border-gray-700'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Flag size={16} className="text-red-500" />
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            {REPORT_REASON_LABELS[r.reason]}
+                          </span>
+                          {getReportStatusBadge(r.status)}
+                          <span className="text-xs text-gray-400">
+                            {new Date(r.createdAt).toLocaleString('it-IT')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          Ambiente: <span className="font-medium">{r.environment.title}</span>
+                        </p>
+                        {r.details && (
+                          <p className="mt-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                            {r.details}
+                          </p>
+                        )}
+                        <p className="mt-2 text-xs text-gray-500">
+                          Segnalato da: <span className="font-medium">{r.reporter.username}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {r.status !== 'reviewed' && (
+                          <button
+                            onClick={() => handleUpdateReportStatus(r.id, 'reviewed')}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                            title="Segna come esaminata"
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                        )}
+                        {r.status !== 'dismissed' && (
+                          <button
+                            onClick={() => handleUpdateReportStatus(r.id, 'dismissed')}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                            title="Ignora"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        )}
+                        {r.status !== 'pending' && (
+                          <button
+                            onClick={() => handleUpdateReportStatus(r.id, 'pending')}
+                            disabled={actionLoading}
+                            className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"
+                            title="Rimetti in attesa"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </>
