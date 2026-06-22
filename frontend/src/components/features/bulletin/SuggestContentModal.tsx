@@ -73,6 +73,7 @@ export function SuggestContentModal({
       for (const id of selection.annotationIds) {
         const a = annotations.find(x => x.id === id);
         if (a) items.push({ itemType: 'annotation', payload: {
+          normaKey: a.normaKey,
           articleId: a.articleId,
           anchorText: a.anchorText,
           startOffset: a.startOffset,
@@ -82,6 +83,7 @@ export function SuggestContentModal({
       for (const id of selection.highlightIds) {
         const h = highlights.find(x => x.id === id);
         if (h) items.push({ itemType: 'highlight', payload: {
+          normaKey: h.normaKey,
           articleId: h.articleId,
           anchorText: h.text,
           startOffset: h.startOffset ?? 0,

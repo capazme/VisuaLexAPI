@@ -89,6 +89,10 @@ export const getAnnotations = async (req: Request, res: Response) => {
   const annotations = await prisma.annotation.findMany({
     where,
     orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
+    // Include the original author so forum-imported notes keep their
+    // AttributionChip across reloads (gotcha #21). originalAuthorId is null for
+    // personal notes; SetNull leaves it null when the author is deleted.
+    include: { originalAuthor: { select: { id: true, username: true } } },
   });
 
   res.json(annotations);
