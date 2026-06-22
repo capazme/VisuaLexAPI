@@ -14,6 +14,7 @@ const publishEnvironmentSchema = z.object({
   content: z.object({
     dossiers: z.array(z.any()),
     quickNorms: z.array(z.any()),
+    customAliases: z.array(z.any()).optional(),
     annotations: z.array(z.any()),
     highlights: z.array(z.any()),
   }),
