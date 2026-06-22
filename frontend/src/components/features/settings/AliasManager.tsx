@@ -1,10 +1,22 @@
 import { useState, useCallback, useMemo } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { Tag, Pencil, Trash2, ArrowRight, AlertCircle, Plus } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import type { CustomAlias } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
+
+// Relative "ultima <when>" recency label from an ISO timestamp. Returns
+// null when the timestamp is absent or unparseable so the caller can omit
+// it. Mirrors the date-fns + it-locale pattern used in EnvironmentCard.
+function formatLastUsed(iso?: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return `ultima ${formatDistanceToNow(date, { addSuffix: true, locale: it })}`;
+}
 
 // Available act types for aliases
 const ACT_TYPES = [
@@ -397,8 +409,13 @@ function AliasItem({
                     </p>
                 )}
             </div>
-            <div className="text-xs text-slate-400 shrink-0">
-                {alias.usageCount > 0 && <span>{alias.usageCount}×</span>}
+            <div className="text-xs text-slate-400 shrink-0 text-right">
+                {alias.usageCount > 0 && (
+                    <span className="block">{alias.usageCount}×</span>
+                )}
+                {alias.usageCount > 0 && formatLastUsed(alias.lastUsedAt) && (
+                    <span className="block text-[11px] text-slate-400/80">{formatLastUsed(alias.lastUsedAt)}</span>
+                )}
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
