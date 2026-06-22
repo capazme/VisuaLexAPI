@@ -85,6 +85,26 @@ echo -e "${GREEN}VisuaLex API started (PID: $API_PID)${NC}"
 # 2. Start Platform Backend (Node - port 3001)
 echo -e "\n${YELLOW}[2/3] Starting Platform Backend (port 3001)...${NC}"
 cd "$PROJECT_ROOT/backend"
+
+# Bootstrap the platform DB before launching the server so a fresh checkout is
+# usable end-to-end: regenerate the Prisma client, apply pending migrations,
+# and seed the admin. Without this, a clean clone has an unmigrated DB and zero
+# loginable accounts (register creates inactive users; login rejects them), so
+# the whole authenticated app is unreachable. Non-fatal (guarded against set -e)
+# so the dev server still comes up if something needs fixing by hand. The admin
+# seed runs only when ADMIN_PASSWORD is set (seed.ts exits 1 otherwise).
+# Uses backend/.env DATABASE_URL — the MERL-T DATABASE_URL export happens later
+# (step 4) and only targets the MERL-T sidecar.
+echo -e "${BLUE}  Bootstrapping platform DB (prisma generate + migrate deploy + seed)...${NC}"
+npx prisma generate > /dev/null 2>&1 || echo -e "${YELLOW}  ⚠ prisma generate failed${NC}"
+npx prisma migrate deploy || echo -e "${YELLOW}  ⚠ prisma migrate deploy failed — is the platform DB reachable on DATABASE_URL?${NC}"
+if [ -n "$ADMIN_PASSWORD" ]; then
+    npm run db:seed || echo -e "${YELLOW}  ⚠ db:seed failed${NC}"
+else
+    echo -e "${YELLOW}  ⚠ ADMIN_PASSWORD not set — skipping admin seed (no admin will exist on a fresh DB).${NC}"
+    echo -e "${YELLOW}    Set ADMIN_PASSWORD then run 'npm run db:seed' in backend/ to create one.${NC}"
+fi
+
 npm run dev &
 BACKEND_PID=$!
 echo -e "${GREEN}Platform Backend started (PID: $BACKEND_PID)${NC}"
