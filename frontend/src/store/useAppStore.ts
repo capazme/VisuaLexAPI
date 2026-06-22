@@ -501,7 +501,7 @@ const appStore = createStore<AppState>()(
                                     status: item.status,
                                 }
                         ),
-                        tags: [],
+                        tags: d.tags ?? [],
                         isPinned: d.is_pinned,
                     }));
 
@@ -1231,6 +1231,7 @@ const appStore = createStore<AppState>()(
                 dossierService.update(id, {
                     name: updates.title,
                     description: updates.description,
+                    ...(updates.tags !== undefined && { tags: updates.tags }),
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
                     get().pushSyncError('Impossibile salvare le modifiche al dossier. Riprova.');
@@ -1476,6 +1477,7 @@ const appStore = createStore<AppState>()(
                     const created = await dossierService.create({
                         name: dossier.title,
                         description: dossier.description,
+                        ...(dossier.tags && dossier.tags.length > 0 && { tags: dossier.tags }),
                     });
 
                     const itemResults = await Promise.allSettled(
