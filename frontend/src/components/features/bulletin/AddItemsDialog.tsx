@@ -42,13 +42,13 @@ export function AddItemsDialog({ suggestionId, onAdded, onClose }: AddItemsDialo
       for (const id of selection.annotationIds) {
         const a = annotations.find(x => x.id === id);
         if (a) items.push({ itemType: 'annotation', payload: {
-          articleId: a.articleId, anchorText: a.anchorText, startOffset: a.startOffset, text: a.text,
+          normaKey: a.normaKey, articleId: a.articleId, anchorText: a.anchorText, startOffset: a.startOffset, text: a.text,
         }});
       }
       for (const id of selection.highlightIds) {
         const h = highlights.find(x => x.id === id);
         if (h) items.push({ itemType: 'highlight', payload: {
-          articleId: h.articleId, anchorText: h.text, startOffset: h.startOffset ?? 0,
+          normaKey: h.normaKey, articleId: h.articleId, anchorText: h.text, startOffset: h.startOffset ?? 0,
           endOffset: (h.startOffset ?? 0) + h.text.length, colorVar: h.color,
         }});
       }

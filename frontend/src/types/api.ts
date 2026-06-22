@@ -2,7 +2,7 @@
  * Type definitions for API requests and responses
  */
 
-import type { NormaVisitata } from './index';
+import type { NormaVisitata, OriginalAuthor } from './index';
 
 // ============================================================================
 // Authentication Types
@@ -208,6 +208,8 @@ export interface AnnotationResponse {
   userId: string;
   createdAt: string;
   updatedAt?: string;
+  sourceSuggestionId?: string | null;
+  originalAuthor?: OriginalAuthor | null;
 }
 
 // ============================================================================
@@ -240,6 +242,8 @@ export interface HighlightResponse {
   bookmarkId?: string;
   userId: string;
   createdAt: string;
+  sourceSuggestionId?: string | null;
+  originalAuthor?: OriginalAuthor | null;
 }
 
 // ============================================================================

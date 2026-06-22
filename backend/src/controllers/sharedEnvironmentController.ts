@@ -1065,13 +1065,22 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
   try {
     createdRow = await prisma.$transaction(async (tx) => {
       const payload = item.payload as any;
+      // The article view loads notes/highlights by the wire-encoded key
+      // `${itemKey}::art::${articleId}` (storeApiMappers.buildWireNormaKey). A
+      // raw articleId never matches that prefix query, so a taken note would be
+      // invisible in-context. Reconstruct the wire key when the payload carries
+      // both parts; fall back to the raw value for legacy payloads (no normaKey).
+      const wireNormaKey =
+        payload.normaKey && payload.articleId
+          ? `${payload.normaKey}::art::${payload.articleId}`
+          : payload.articleId ?? payload.normaKey ?? '';
       const row = await (async () => {
         switch (item.itemType) {
           case 'annotation':
             return tx.annotation.create({
               data: {
                 userId: req.user!.id,
-                normaKey: payload.articleId ?? payload.normaKey ?? '',
+                normaKey: wireNormaKey,
                 content: payload.text,
                 textContext: payload.anchorText,
                 position: payload.startOffset,
@@ -1082,7 +1091,7 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
             return tx.highlight.create({
               data: {
                 userId: req.user!.id,
-                normaKey: payload.articleId ?? payload.normaKey ?? '',
+                normaKey: wireNormaKey,
                 text: payload.anchorText ?? '',
                 color: payload.colorVar ?? 'yellow',
                 startOffset: payload.startOffset ?? 0,
