@@ -6,16 +6,21 @@
 # Usage: ./deploy.sh [OPTIONS]
 #
 # Options:
-#   --major     Increment major version (1.0.0 -> 2.0.0)
-#   --minor     Increment minor version (1.0.0 -> 1.1.0)
-#   --patch     Increment patch version (1.0.0 -> 1.0.1)
-#   --no-pull   Skip git pull
-#   --no-restart Skip service restart
-#   -h, --help  Show this help message
+#   --major          Increment major version (1.0.0 -> 2.0.0)
+#   --minor          Increment minor version (1.0.0 -> 1.1.0)
+#   --patch          Increment patch version (1.0.0 -> 1.0.1)
+#   --no-pull        Skip git pull
+#   --no-restart     Skip service restart
+#   --merlt          Build + (re)start the MERL-T Docker stack this deploy
+#   --no-merlt-build Bring the MERL-T stack up WITHOUT rebuilding images
+#                    (only meaningful together with --merlt)
+#   -h, --help       Show this help message
 #
 # Example:
-#   ./deploy.sh --patch           # Build and bump patch version
-#   ./deploy.sh --minor --no-pull # Build without pull, bump minor
+#   ./deploy.sh --patch             # Build and bump patch version (vanilla)
+#   ./deploy.sh --minor --no-pull   # Build without pull, bump minor
+#   ./deploy.sh --merlt             # Vanilla deploy + rebuild MERL-T stack
+#   ./deploy.sh --merlt --no-merlt-build  # Vanilla deploy + restart MERL-T (no rebuild)
 #===============================================================================
 
 set -e  # Exit on error
@@ -35,6 +40,12 @@ VERSION_FILE="$SCRIPT_DIR/version.txt"
 DO_PULL=true
 DO_RESTART=true
 VERSION_BUMP=""
+DO_MERLT=false          # --merlt: manage the MERL-T Docker stack this deploy
+MERLT_REBUILD=true      # --no-merlt-build flips this off (up without rebuild)
+
+# MERL-T compose invocation — keep in sync with start.sh / docs.
+MERLT_COMPOSE_FILE="docker-compose.merlt.yml"
+MERLT_BUILD_SERVICES=("merlt-api" "merlt-worker" "mcp-legal-it")
 
 #===============================================================================
 # Functions
@@ -69,17 +80,22 @@ show_help() {
 Usage: ./deploy.sh [OPTIONS]
 
 Options:
-  --major       Increment major version (1.0.0 -> 2.0.0)
-  --minor       Increment minor version (1.0.0 -> 1.1.0)
-  --patch       Increment patch version (1.0.0 -> 1.0.1)
-  --no-pull     Skip git pull
-  --no-restart  Skip service restart
-  -h, --help    Show this help message
+  --major          Increment major version (1.0.0 -> 2.0.0)
+  --minor          Increment minor version (1.0.0 -> 1.1.0)
+  --patch          Increment patch version (1.0.0 -> 1.0.1)
+  --no-pull        Skip git pull
+  --no-restart     Skip service restart
+  --merlt          Build + (re)start the MERL-T Docker stack this deploy
+  --no-merlt-build Bring the MERL-T stack up WITHOUT rebuilding images
+                   (only meaningful together with --merlt)
+  -h, --help       Show this help message
 
 Examples:
-  ./deploy.sh --patch             # Build and bump patch version
+  ./deploy.sh --patch             # Build and bump patch version (vanilla)
   ./deploy.sh --minor --no-pull   # Build without pull, bump minor
   ./deploy.sh                     # Build only, no version bump
+  ./deploy.sh --merlt             # Vanilla deploy + rebuild MERL-T stack
+  ./deploy.sh --merlt --no-merlt-build   # Vanilla deploy + restart MERL-T (no rebuild)
 EOF
     exit 0
 }
@@ -148,6 +164,14 @@ while [[ $# -gt 0 ]]; do
             DO_RESTART=false
             shift
             ;;
+        --merlt)
+            DO_MERLT=true
+            shift
+            ;;
+        --no-merlt-build)
+            MERLT_REBUILD=false
+            shift
+            ;;
         -h|--help)
             show_help
             ;;
@@ -181,6 +205,15 @@ if [[ "$DO_PULL" == true ]]; then
     cd "$SCRIPT_DIR"
     git pull -r origin "$(git branch --show-current)"
     print_success "Git pull completed"
+
+    # The mcp-legal-it MERL-T sidecar is a git submodule at vendor/mcp-legal-it.
+    # A plain pull does NOT update submodules, leaving its Docker build context
+    # empty. Only needed when we are going to build the MERL-T stack.
+    if [[ "$DO_MERLT" == true ]]; then
+        print_step "Updating git submodules (vendor/mcp-legal-it)..."
+        git submodule update --init --recursive
+        print_success "Submodules updated"
+    fi
 else
     print_warning "Skipping git pull (--no-pull)"
 fi
@@ -247,6 +280,72 @@ print_step "Building backend..."
 cd "$SCRIPT_DIR/backend"
 npm run build
 print_success "Backend build completed"
+
+# Step 6b: MERL-T Docker stack (opt-in via --merlt)
+# Builds the three code-bearing images (api/worker/mcp-legal-it) from the
+# freshly pulled source and (re)creates the whole stack. The DB/cache/graph
+# containers (postgres/redis/falkordb/qdrant) keep their data volumes, so a
+# recreate reloads state intact. Heavy: needs Docker + a >=4GB instance.
+if [[ "$DO_MERLT" == true ]]; then
+    print_step "Deploying MERL-T Docker stack..."
+    cd "$SCRIPT_DIR"
+
+    # Preflight — fail loudly with a clear message instead of half-way.
+    if ! command -v docker &> /dev/null; then
+        print_error "Docker not found. Install Docker before deploying MERL-T (--merlt)."
+        exit 1
+    fi
+    if ! docker compose version &> /dev/null; then
+        print_error "'docker compose' (v2) not available. Install the Docker Compose plugin."
+        exit 1
+    fi
+    if [[ ! -f "$SCRIPT_DIR/$MERLT_COMPOSE_FILE" ]]; then
+        print_error "$MERLT_COMPOSE_FILE not found in $SCRIPT_DIR."
+        exit 1
+    fi
+
+    DC=(docker compose -f "$MERLT_COMPOSE_FILE" --profile api-in-docker)
+
+    if [[ "$MERLT_REBUILD" == true ]]; then
+        print_step "Building MERL-T images (${MERLT_BUILD_SERVICES[*]})..."
+        "${DC[@]}" build "${MERLT_BUILD_SERVICES[@]}"
+        print_success "MERL-T images built"
+    else
+        print_warning "Skipping MERL-T image rebuild (--no-merlt-build)"
+    fi
+
+    print_step "Starting MERL-T stack..."
+    "${DC[@]}" up -d
+    print_success "MERL-T stack up"
+
+    # Wait for the two code-bearing services to report healthy (or fail fast on
+    # a crash loop). set -e is disabled around the poll so a transient
+    # non-healthy read doesn't abort the deploy.
+    print_step "Waiting for merlt-api / merlt-worker to be healthy..."
+    set +e
+    MERLT_DEADLINE=$(( $(date +%s) + 240 ))
+    while true; do
+        api_h=$(docker inspect -f '{{.State.Health.Status}}' visualex-merlt-api 2>/dev/null)
+        wrk_h=$(docker inspect -f '{{.State.Health.Status}}' visualex-merlt-worker 2>/dev/null)
+        api_s=$(docker inspect -f '{{.State.Status}}' visualex-merlt-api 2>/dev/null)
+        if [[ "$api_h" == "healthy" && "$wrk_h" == "healthy" ]]; then
+            print_success "MERL-T api + worker healthy"
+            break
+        fi
+        if [[ "$api_s" == "exited" || "$api_s" == "restarting" ]]; then
+            print_error "merlt-api is $api_s — check 'docker logs visualex-merlt-api'"
+            break
+        fi
+        if [[ $(date +%s) -ge $MERLT_DEADLINE ]]; then
+            print_warning "MERL-T not healthy after 240s (api=$api_h worker=$wrk_h). Check 'docker compose -f $MERLT_COMPOSE_FILE ps'."
+            break
+        fi
+        sleep 5
+    done
+    set -e
+else
+    print_warning "Skipping MERL-T Docker stack (pass --merlt to deploy it)"
+fi
 
 # Step 7: Update version (only if build succeeded and bump requested)
 if [[ -n "$VERSION_BUMP" ]]; then
