@@ -106,13 +106,14 @@ describe('MerltClient.sendEvent', () => {
     expect(err.status).toBe(401);
   });
 
-  it('sets Authorization header when apiKey is configured', async () => {
+  it('sets the X-API-Key header (NOT Authorization: Bearer) when apiKey is configured', async () => {
     const authedClient = new MerltClient({
       baseUrl: BASE,
       apiKey: 'secret-key',
       timeoutMs: 1000,
     });
-    nock(BASE, { reqheaders: { authorization: 'Bearer secret-key' } })
+    // MERL-T verify_api_key reads X-API-Key; Bearer is rejected (gotcha #1).
+    nock(BASE, { reqheaders: { 'x-api-key': 'secret-key' }, badheaders: ['authorization'] })
       .post('/api/v1/tracking/events')
       .reply(200, { received: 1, timestamp: 't' });
 
@@ -121,8 +122,8 @@ describe('MerltClient.sendEvent', () => {
     ).resolves.toEqual({ received: 1, timestamp: 't' });
   });
 
-  it('does NOT set Authorization header when apiKey is missing', async () => {
-    nock(BASE, { badheaders: ['authorization'] })
+  it('does NOT set any auth header when apiKey is missing', async () => {
+    nock(BASE, { badheaders: ['authorization', 'x-api-key'] })
       .post('/api/v1/tracking/events')
       .reply(200, { received: 1, timestamp: 't' });
 
@@ -218,7 +219,7 @@ describe('createMerltClient', () => {
       MERLT_TIMEOUT_MS: '2500',
     } as NodeJS.ProcessEnv);
 
-    nock(BASE, { reqheaders: { authorization: 'Bearer k' } })
+    nock(BASE, { reqheaders: { 'x-api-key': 'k' } })
       .get('/health')
       .reply(200, { status: 'ok' });
 

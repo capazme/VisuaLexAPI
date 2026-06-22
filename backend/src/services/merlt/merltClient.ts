@@ -142,7 +142,9 @@ export class MerltClient {
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (this.config.apiKey) headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+    // MERL-T auth scheme is X-API-Key, NOT Authorization: Bearer (verify_api_key
+    // reads the X-API-Key header alias) — see graphClient/opsClient.
+    if (this.config.apiKey) headers['X-API-Key'] = this.config.apiKey;
 
     let response: Response;
     try {
