@@ -213,6 +213,21 @@ cd "$SCRIPT_DIR/backend"
 npm install --silent
 print_success "Backend dependencies installed"
 
+# Step 3b: Regenerate Prisma client to match the current schema.
+# Without this, schema changes pulled from git leave node_modules/@prisma/client
+# stale and `tsc --noEmit` fails on missing models/fields.
+print_step "Regenerating Prisma client..."
+npx prisma generate > /dev/null
+print_success "Prisma client regenerated"
+
+# Step 3c: Apply pending migrations to the production database.
+# Idempotent — no-op if there are no pending migrations. Without this, a
+# schema change ships to prod with no matching DB column/table and the API
+# fails at runtime on the first query.
+print_step "Applying database migrations..."
+npx prisma migrate deploy
+print_success "Database migrations applied"
+
 # Step 4: Frontend dependencies
 print_step "Installing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
@@ -224,11 +239,14 @@ print_step "Building frontend..."
 npm run build
 print_success "Frontend build completed"
 
-# Step 6: TypeScript check for backend
-print_step "Checking backend TypeScript..."
+# Step 6: Compile backend TypeScript to dist/.
+# pm2 launches `node dist/index.js` (see backend/package.json `start` script),
+# so without this step the service runs against a stale dist on every deploy.
+# `tsc` performs the type-check too — it fails on any error before emitting.
+print_step "Building backend..."
 cd "$SCRIPT_DIR/backend"
-npx tsc --noEmit
-print_success "Backend TypeScript check passed"
+npm run build
+print_success "Backend build completed"
 
 # Step 7: Update version (only if build succeeded and bump requested)
 if [[ -n "$VERSION_BUMP" ]]; then
