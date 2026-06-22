@@ -30,6 +30,7 @@ merlt/merlt.egg-info/
 .env
 .env.*
 !.env.example
+!.env.merlt.example
 !backend/.env.test
 *.env.local
 

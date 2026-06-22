@@ -113,6 +113,12 @@ services:
       dockerfile: Dockerfile
     container_name: visualex-merlt-api
     profiles: ["api-in-docker"]
+    # host.docker.internal resolves automatically on Docker Desktop (Mac/Win)
+    # but NOT on Linux (Lightsail/prod). Without this mapping the api/worker
+    # cannot reach the host-run Python API (:5000) or BFF (:3001) →
+    # lazy ingestion returns 0 nodes and job callbacks fail silently.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       merlt-postgres:
         condition: service_healthy
@@ -218,6 +224,10 @@ services:
       dockerfile: Dockerfile
     container_name: visualex-merlt-worker
     profiles: ["api-in-docker"]
+    # See merlt-api: required on Linux so the worker can reach the host-run
+    # Python API (:5000, scraping) and BFF (:3001, job callbacks).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       merlt-postgres:
         condition: service_healthy
