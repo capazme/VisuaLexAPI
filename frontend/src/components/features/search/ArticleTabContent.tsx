@@ -24,6 +24,10 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
+import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
+import { sendNerFeedback } from '../../../services/merltService';
+import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
+import { buildArticleXrefNerPayload } from './articleXrefNer';
 import type { Annotation } from '../../../types';
 
 interface ArticleTabContentProps {
@@ -114,6 +118,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const citationPreviewState = useCitationPreview();
     const { showPreview, hidePreview } = citationPreviewState;
     const isHoveringPopupRef = useRef(false);
+
+    // Full-consent contributors get the inline NER feedback bar on the citation
+    // preview popup (surface=article_xref, Loop β #2). Gated strictly on
+    // canContribute (level === 'full'); never widen this.
+    const { canContribute } = useMerltFeatures();
 
     const itemKey = useMemo(() => {
         const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -503,6 +512,32 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         });
     }, [norma_data.urn, triggerSearch]);
 
+    // Loop β #2: forward one NER correction/confirmation for the previewed
+    // citation (surface=article_xref — the highest-volume capture surface).
+    // Context window is ±500 chars of the SOURCE article around the citation
+    // span (the privacy budget); fire-and-forget. Only reachable when the
+    // popup renders the bar, which itself is gated on canContribute.
+    const handleCitationNerFeedback = useCallback(
+        (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => {
+            const citation = citationPreviewState.citation;
+            if (!citation) return;
+
+            const payload = buildArticleXrefNerPayload({
+                citation,
+                articleUrn: norma_data.urn,
+                articleText: article_text || '',
+                matchText: citationPreviewState.targetElement?.textContent ?? '',
+                feedbackType,
+                correctReference,
+            });
+
+            void sendNerFeedback(payload).catch((err) => {
+                console.error('NER article_xref feedback failed:', err);
+            });
+        },
+        [citationPreviewState.citation, citationPreviewState.targetElement, article_text, norma_data.urn],
+    );
+
     const handleCompare = () => {
         const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
         openCompareWithArticle({
@@ -869,6 +904,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 position={citationPreviewState.position}
                 onClose={hidePreview}
                 onOpenInTab={handleOpenCitationInTab}
+                nerFeedbackEnabled={canContribute}
+                onNerFeedback={handleCitationNerFeedback}
                 onMouseEnter={() => { isHoveringPopupRef.current = true; }}
                 onMouseLeave={() => {
                     isHoveringPopupRef.current = false;
