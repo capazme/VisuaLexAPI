@@ -15,6 +15,7 @@ export interface DossierApi {
   name: string;
   description?: string | null;
   color?: string | null;
+  tags?: string[];
   created_at: string;
   updated_at: string;
   items: DossierItemApi[];
@@ -24,12 +25,14 @@ export interface DossierCreate {
   name: string;
   description?: string;
   color?: string;
+  tags?: string[];
 }
 
 export interface DossierUpdate {
   name?: string;
   description?: string | null;
   color?: string | null;
+  tags?: string[];
 }
 
 export interface DossierItemCreate {

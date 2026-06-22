@@ -482,14 +482,24 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map(item => ({
-                            id: item.id,
-                            type: item.item_type === 'norm' ? 'norma' : 'note',
-                            data: item.content,
-                            addedAt: item.created_at,
-                        })),
-                        tags: [],
-                        isPinned: false,
+                        items: d.items.map((item): DossierItem =>
+                            item.item_type === 'norm'
+                                ? {
+                                    id: item.id,
+                                    type: 'norma',
+                                    data: item.content as DossierNormaData,
+                                    addedAt: item.created_at,
+                                    status: item.status,
+                                }
+                                : {
+                                    id: item.id,
+                                    type: 'note',
+                                    data: item.content as string,
+                                    addedAt: item.created_at,
+                                    status: item.status,
+                                }
+                        ),
+                        tags: d.tags ?? [],
                     }));
 
                     const environments: Environment[] = environmentsRes.map(environmentApiToStore);
@@ -1219,6 +1229,7 @@ const appStore = createStore<AppState>()(
                 dossierService.update(id, {
                     name: updates.title,
                     description: updates.description,
+                    ...(updates.tags !== undefined && { tags: updates.tags }),
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
                 });
@@ -1392,6 +1403,7 @@ const appStore = createStore<AppState>()(
                     const created = await dossierService.create({
                         name: dossier.title,
                         description: dossier.description,
+                        ...(dossier.tags && dossier.tags.length > 0 && { tags: dossier.tags }),
                     });
 
                     const itemResults = await Promise.allSettled(

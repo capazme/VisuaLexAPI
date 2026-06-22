@@ -10,12 +10,14 @@ const createDossierSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional(),
   color: z.string().optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 const updateDossierSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional(),
 });
 
 const createDossierItemSchema = z.object({
@@ -50,6 +52,7 @@ export const listDossiers = async (req: Request, res: Response) => {
     name: d.name,
     description: d.description,
     color: d.color,
+    tags: d.tags,
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     items: d.items.map(i => ({
@@ -87,6 +90,7 @@ export const getDossier = async (req: Request, res: Response) => {
     name: dossier.name,
     description: dossier.description,
     color: dossier.color,
+    tags: dossier.tags,
     created_at: dossier.createdAt,
     updated_at: dossier.updatedAt,
     items: dossier.items.map(i => ({
@@ -111,6 +115,7 @@ export const createDossier = async (req: Request, res: Response) => {
       name: data.name,
       description: data.description,
       color: data.color,
+      tags: data.tags ?? [],
       userId: req.user!.id,
     },
     include: {
@@ -123,6 +128,7 @@ export const createDossier = async (req: Request, res: Response) => {
     name: dossier.name,
     description: dossier.description,
     color: dossier.color,
+    tags: dossier.tags,
     created_at: dossier.createdAt,
     updated_at: dossier.updatedAt,
     items: [],
@@ -151,6 +157,7 @@ export const updateDossier = async (req: Request, res: Response) => {
       ...(data.name !== undefined && { name: data.name }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.color !== undefined && { color: data.color }),
+      ...(data.tags !== undefined && { tags: data.tags }),
     },
     include: {
       items: {
@@ -164,6 +171,7 @@ export const updateDossier = async (req: Request, res: Response) => {
     name: dossier.name,
     description: dossier.description,
     color: dossier.color,
+    tags: dossier.tags,
     created_at: dossier.createdAt,
     updated_at: dossier.updatedAt,
     items: dossier.items.map(i => ({
