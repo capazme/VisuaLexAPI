@@ -163,7 +163,7 @@ export async function sendMerltSourceFeedback(payload: JsonRecord): Promise<Merl
 }
 
 export async function refineMerltAnswer(payload: JsonRecord): Promise<MerltQueryResponse> {
-    return postMerlt<MerltQueryResponse>('/merlt/experts/feedback/refine', payload);
+    return postMerlt<MerltQueryResponse>('/merlt/experts/refine', payload);
 }
 
 export async function getMerltHealth(): Promise<Record<string, unknown>> {

@@ -139,6 +139,7 @@ export function QAPage() {
                 onDetailed={(scores) => detailed(traceId, scores)}
                 devMode={devMode}
                 onNerCitation={(payload) => {
+                  if (!canContribute) return;
                   void sendNerFeedback(payload).catch((err) => {
                     console.error('NER qa_chip feedback failed:', err);
                   });

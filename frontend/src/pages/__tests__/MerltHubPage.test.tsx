@@ -22,6 +22,11 @@ vi.mock('../../services/merltService', () => ({
   getMerlt: () => Promise.resolve({ total: 0, untrained: 0, by_type: {}, by_surface: {} }),
   postMerlt: () => Promise.resolve({ task_id: 't', status: 'queued' }),
 }));
+// MyContributionsCard (mounted in the contrib card when canContribute) fetches
+// its own jobs — stub it to keep the hub render isolated from contribApi.
+vi.mock('../../features/merlt/contrib/MyContributionsCard', () => ({
+  MyContributionsCard: () => <div data-testid="my-contributions" />,
+}));
 
 import { MerltHubPage } from '../MerltHubPage';
 
@@ -82,6 +87,22 @@ describe('MerltHubPage', () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId('hub-card-ops')).toBeInTheDocument();
+  });
+
+  it('shows the consent-upgrade message on the Q&A card when consent is not full', () => {
+    renderHub();
+    const qa = screen.getByTestId('hub-card-qa');
+    expect(qa).toHaveTextContent(/Richiede consenso/i);
+    expect(qa.querySelector('a[href="/merlt/qa"]')).toBeNull();
+  });
+
+  it('shows a "Chiedi a MERL-T" link on the Q&A card when canContribute', () => {
+    useMerltFeaturesMock.mockReturnValue({ ...baseFeatures, canContribute: true });
+    renderHub();
+    const qa = screen.getByTestId('hub-card-qa');
+    const link = qa.querySelector('a[href="/merlt/qa"]');
+    expect(link).not.toBeNull();
+    expect(qa).toHaveTextContent(/Chiedi a MERL-T/i);
   });
 
   it('loads and renders the authority profile', async () => {

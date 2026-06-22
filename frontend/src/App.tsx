@@ -22,6 +22,9 @@ const ContribPage = lazy(() =>
 const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
 );
+const QAPage = lazy(() =>
+  import('./features/merlt/qa/QAPage').then(m => ({ default: m.QAPage })),
+);
 
 function App() {
   return (
@@ -61,6 +64,14 @@ function App() {
             element={
               <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
                 <ValidationPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="merlt/qa"
+            element={
+              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                <QAPage />
               </Suspense>
             }
           />
