@@ -42,7 +42,7 @@ router.get('/validate/pending', authenticate, validationGuard, async (req: Reque
   }
   const limit = clampInt(req.query.limit, 50, 1, 200);
   try {
-    res.status(200).json(await client().getPending(limit));
+    res.status(200).json(await client().getPending(limit, req.user.id));
   } catch (err) {
     if (err instanceof MerltClientError) {
       res.status(503).json({ detail: 'merlt_unavailable' });

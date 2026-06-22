@@ -173,9 +173,12 @@ export class ContribClient {
 
   // ---- Validation (Slice 2c #8) -------------------------------------------
 
-  async getPending(limit = 50): Promise<PendingQueueResponse> {
-    const qs = new URLSearchParams({ limit: String(limit) }).toString();
-    return this.request('GET', `/api/v1/enrichment/pending?${qs}`);
+  async getPending(limit = 50, userId?: string): Promise<PendingQueueResponse> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    // Forward the voter id so MERL-T excludes items this user already voted on
+    // (it defaults to 'anonymous' otherwise → voted items reappear every reload).
+    if (userId) params.set('user_id', userId);
+    return this.request('GET', `/api/v1/enrichment/pending?${params.toString()}`);
   }
 
   async validateEntity(payload: ValidateEntityPayload): Promise<unknown> {
