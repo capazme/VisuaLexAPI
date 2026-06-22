@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { formatDistanceToNow } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { X, Plus, Link, FileText, Star, Trash2, ExternalLink, Pencil, Check } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { parseNormattivaUrl, generateLabelFromParams, validateSearchParams } from '../../../utils/normattivaParser';
@@ -16,6 +18,16 @@ interface QuickNormsManagerProps {
 }
 
 type InputMode = 'url' | 'manual';
+
+// Relative "ultima <when>" recency label from an ISO timestamp. Returns
+// null when the timestamp is absent or unparseable so the caller can omit
+// it. Mirrors the date-fns + it-locale pattern used in EnvironmentCard.
+function formatLastUsed(iso?: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return `ultima ${formatDistanceToNow(date, { addSuffix: true, locale: it })}`;
+}
 
 export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
   const { quickNorms, addQuickNorm, removeQuickNorm, updateQuickNormLabel, selectQuickNorm, triggerSearch } = useAppStore();
@@ -400,6 +412,7 @@ export function QuickNormsManager({ isOpen, onClose }: QuickNormsManagerProps) {
                               {qn.searchParams.act_type}
                               {qn.searchParams.act_number && ` n. ${qn.searchParams.act_number}`}
                               {qn.usageCount > 0 && ` · Usato ${qn.usageCount}x`}
+                              {qn.usageCount > 0 && formatLastUsed(qn.lastUsedAt) && ` · ${formatLastUsed(qn.lastUsedAt)}`}
                             </p>
                           </div>
                         </button>
