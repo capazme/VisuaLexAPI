@@ -14,6 +14,7 @@ type State =
   | { status: 'idle' }
   | { status: 'starting' }
   | { status: 'started'; message: string }
+  | { status: 'refused'; message: string }
   | { status: 'error'; message: string };
 
 export function OpsTrainingButton(): React.ReactElement {
@@ -23,8 +24,15 @@ export function OpsTrainingButton(): React.ReactElement {
     setState({ status: 'starting' });
     try {
       const res = await startMerltTraining();
-      const message = typeof res.message === 'string' ? res.message : 'Training avviato';
-      setState({ status: 'started', message });
+      const message = typeof res.message === 'string' ? res.message : '';
+      // MERL-T returns HTTP 200 with { success: false, message } when it
+      // refuses (e.g. "Buffer insufficiente (0/50)") — that is NOT a started
+      // run, so it must not render as green success.
+      if (res.success === false) {
+        setState({ status: 'refused', message: message || 'Training non avviato' });
+      } else {
+        setState({ status: 'started', message: message || 'Training avviato' });
+      }
     } catch {
       setState({ status: 'error', message: 'MERL-T non raggiungibile' });
     }
@@ -42,6 +50,9 @@ export function OpsTrainingButton(): React.ReactElement {
       </Button>
       {state.status === 'started' && (
         <p className="text-xs text-emerald-600 dark:text-emerald-400">{state.message}</p>
+      )}
+      {state.status === 'refused' && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">{state.message}</p>
       )}
       {state.status === 'error' && (
         <p className="text-xs text-red-600 dark:text-red-400">{state.message}</p>

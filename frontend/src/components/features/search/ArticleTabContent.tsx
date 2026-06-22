@@ -502,6 +502,22 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 citation,
             },
         });
+        // Loop β #2: the 'implicit' NER capture surface — clicking a citation
+        // chip through to a tab is a low-weight automatic CONFIRMATION that the
+        // detected reference was real. Full-consent only, fire-and-forget.
+        if (canContribute) {
+            const implicitPayload = buildArticleXrefNerPayload({
+                citation,
+                articleUrn: norma_data.urn,
+                articleText: article_text || '',
+                matchText: citationText,
+                feedbackType: 'confirmation',
+                surface: 'implicit',
+            });
+            void sendNerFeedback(implicitPayload).catch((err) => {
+                console.error('NER implicit feedback failed:', err);
+            });
+        }
         triggerSearch({
             act_type: citation.act_type,
             act_number: citation.act_number || '',
@@ -510,7 +526,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             version: 'vigente',
             show_brocardi_info: true,
         });
-    }, [norma_data.urn, triggerSearch]);
+    }, [norma_data.urn, article_text, canContribute, triggerSearch]);
 
     // Loop β #2: forward one NER correction/confirmation for the previewed
     // citation (surface=article_xref — the highest-volume capture surface).

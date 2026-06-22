@@ -2,6 +2,7 @@ import type {
     NerFeedbackType,
     NerCorrectReference,
     NerFeedbackInput,
+    NerSurface,
 } from '../../../services/merltService';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
 
@@ -23,8 +24,11 @@ export function buildArticleXrefNerPayload(args: {
     matchText: string;
     feedbackType: NerFeedbackType;
     correctReference?: NerCorrectReference;
+    // Defaults to 'article_xref' (the explicit feedback bar). Pass 'implicit'
+    // for the low-weight automatic confirmation when a chip is clicked through.
+    surface?: NerSurface;
 }): NerFeedbackInput {
-    const { citation, articleUrn, articleText, matchText, feedbackType, correctReference } = args;
+    const { citation, articleUrn, articleText, matchText, feedbackType, correctReference, surface = 'article_xref' } = args;
     const plainText = articleText.replace(/<[^>]+>/g, '');
     const matchIndex = matchText ? plainText.indexOf(matchText) : -1;
     const contextWindow =
@@ -36,7 +40,7 @@ export function buildArticleXrefNerPayload(args: {
             : undefined;
 
     return {
-        surface: 'article_xref',
+        surface,
         feedbackType,
         articleUrn,
         selectedText: matchText || undefined,
