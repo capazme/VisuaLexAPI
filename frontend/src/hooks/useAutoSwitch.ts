@@ -329,6 +329,12 @@ export function useAutoSwitch({
 
       checkForAutoSwitch();
     }
+    // Intentionally keyed on the loading transition only: the check must fire
+    // once per completed search (guarded by hasCheckedRef, set asynchronously).
+    // onSearch/onRemoveDuplicateTabs are inline callbacks from SearchPanel —
+    // adding them to deps would re-run this effect on every parent render and
+    // double-fire the async check before hasCheckedRef flips.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
   return {
