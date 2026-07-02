@@ -183,7 +183,11 @@ export default function GraphCanvas({
       if (id) dblRef.current?.(id);
     });
 
+    // render() rejects with "The graph instance has been destroyed" if the
+    // component unmounts (or StrictMode double-mounts) before it settles.
+    // Swallow that rejection so it never surfaces as an unhandled error.
     renderRef.current = graph.render();
+    renderRef.current.catch(() => {});
 
     return () => {
       graph.destroy();
@@ -203,10 +207,17 @@ export default function GraphCanvas({
       dataSigRef.current = sig;
       g.setData({ nodes, edges });
       renderRef.current = g.render();
+      renderRef.current.catch(() => {});
     }
     // Apply visibility after the latest render resolves (covers both the data
     // path's fresh render and a filter-only change racing the initial render).
-    void renderRef.current.then(() => g.setElementVisibility(visibility)).catch(() => {});
+    // Guard on the instance still being current — the render may resolve after
+    // a destroy (unmount / StrictMode), and calling into a destroyed graph throws.
+    void renderRef.current
+      .then(() => {
+        if (graphRef.current === g) g.setElementVisibility(visibility);
+      })
+      .catch(() => {});
   }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes]);
 
   // Legend hover → emphasize nodes of a type, fade the rest (no relayout).
@@ -214,7 +225,11 @@ export default function GraphCanvas({
     const g = graphRef.current;
     if (!g) return;
     void renderRef.current
-      .then(() => g.setElementState(buildHighlightState(nodes, edges, highlightNodeType)))
+      .then(() => {
+        if (graphRef.current === g) {
+          g.setElementState(buildHighlightState(nodes, edges, highlightNodeType));
+        }
+      })
       .catch(() => {});
   }, [highlightNodeType, nodes, edges]);
 
@@ -223,7 +238,8 @@ export default function GraphCanvas({
     const g = graphRef.current;
     if (!g) return;
     g.setLayout(layoutConfig(layout));
-    void g.layout();
+    // layout() also rejects if the instance is destroyed mid-flight.
+    void g.layout().catch(() => {});
   }, [layout]);
 
   return <div ref={containerRef} style={{ width: '100%', height }} />;
