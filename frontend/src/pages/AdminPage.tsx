@@ -148,27 +148,39 @@ export function AdminPage() {
     }
   };
 
+  // The load* helpers are plain closures re-created every render (they read the
+  // live filter state); listing them in the deps below would refetch on every
+  // render (fetch → setState → render → new identity → refetch, ad infinitum).
+  // Each effect is intentionally keyed on its semantic trigger only.
   useEffect(() => {
     loadUsers();
     loadFeedbacks();
+    // Mount-only initial load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (activeTab === 'feedback') {
       loadFeedbacks();
     }
+    // Refetch on filter change only; switching tabs keeps the mount-time data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedbackFilter]);
 
   useEffect(() => {
     if (activeTab === 'environments') {
       loadEnvironments(1);
     }
+    // Refetch on tab entry or status-filter change; search is submit-driven.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, envStatusFilter]);
 
   useEffect(() => {
     if (activeTab === 'reports') {
       loadReports();
     }
+    // Refetch on tab entry or status-filter change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, reportStatusFilter]);
 
   // Environment handlers

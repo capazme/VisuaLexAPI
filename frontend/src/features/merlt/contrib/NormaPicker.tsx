@@ -51,12 +51,10 @@ export function NormaPicker({ value, onChange, placeholder, ariaLabel }: NormaPi
     }
     // Power-user escape hatch: paste a urn directly and we accept it as-is.
     if (isLikelyUrn(trimmed)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ status: 'recognized', urn: trimmed, display: trimmed });
       return;
     }
     const id = ++requestIdRef.current;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: 'loading' });
     debounceRef.current = window.setTimeout(() => {
       void (async () => {

@@ -131,11 +131,14 @@ export function useEdgeHover(options: UseEdgeHoverOptions = {}): UseEdgeHoverRet
       }
     };
 
+    // The ref object is created once and mutated in place, so capturing it here
+    // reads the same map the cleanup would see (react-hooks/exhaustive-deps).
+    const timeouts = hideTimeouts.current;
     window.addEventListener('mousemove', handleMouseMove);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       // Clear all timeouts on cleanup
-      Object.values(hideTimeouts.current).forEach(timeout => {
+      Object.values(timeouts).forEach(timeout => {
         if (timeout) clearTimeout(timeout);
       });
     };
@@ -160,7 +163,6 @@ export function useEdgeHover(options: UseEdgeHoverOptions = {}): UseEdgeHoverRet
       setEdges(prev => ({ ...prev, left: true }));
     }
     if (pinnedPanels.right) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEdges(prev => ({ ...prev, right: true }));
     }
   }, [pinnedPanels]);

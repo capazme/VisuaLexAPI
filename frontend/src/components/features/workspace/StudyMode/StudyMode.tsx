@@ -88,8 +88,9 @@ export function StudyMode({
   onCrossReferenceNavigate,
   normaLabel: normaLabelProp,
 }: StudyModeProps) {
-  // Handle single article mode: create single-element array if not provided
-  const articles = articlesProp ?? [article];
+  // Handle single article mode: create single-element array if not provided.
+  // Memoized so downstream useMemo/useCallback deps stay stable across renders.
+  const articles = useMemo(() => articlesProp ?? [article], [articlesProp, article]);
 
   // Generate norma label if not provided
   const normaLabel = normaLabelProp ?? `${article.norma_data.tipo_atto}${article.norma_data.numero_atto ? ` ${article.norma_data.numero_atto}` : ''}`;
@@ -187,13 +188,9 @@ export function StudyMode({
     }
   }, [currentIndex, articles, onNavigate]);
 
-  // React Compiler advisory: it declines to preserve this large component's
-  // manual memoization. Deps are correct and the callback works at runtime —
-  // optimization hint only.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleFontSize = useCallback((delta: number) => {
     setFontSize(prev => Math.min(32, Math.max(14, prev + delta)));
-  }, []);
+  }, [setFontSize]);
 
   const handleToggleBrocardi = useCallback(() => {
     setShowBrocardi(prev => !prev);
