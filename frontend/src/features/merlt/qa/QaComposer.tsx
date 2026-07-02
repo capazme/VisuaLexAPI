@@ -7,15 +7,29 @@ import type { QaMode } from './types';
 /**
  * Q&A input: a question textarea + convergent/divergent mode toggle.
  * Cmd/Ctrl+Enter submits. Empty/whitespace is ignored; clears on submit.
+ *
+ * `prefill` seeds the textarea from an external source (the "Chiedi su questo
+ * articolo" in-article entry, via QAPage's location.state read). It is a
+ * `{ text, token }` pair so a new prefill — even with the same text — re-seeds
+ * the field; the seeding is derived during render via a prev-input tracker
+ * (react-hooks/set-state-in-effect), never an in-effect setState.
  */
 export interface QaComposerProps {
   onSubmit: (query: string, mode: QaMode) => void;
   disabled: boolean;
+  prefill?: { text: string; token: number };
 }
 
-export function QaComposer({ onSubmit, disabled }: QaComposerProps) {
+export function QaComposer({ onSubmit, disabled, prefill }: QaComposerProps) {
   const [value, setValue] = useState('');
   const [mode, setMode] = useState<QaMode>('convergent');
+  const [prefillToken, setPrefillToken] = useState<number | undefined>(undefined);
+
+  // Seed the field when a new prefill arrives. Derived during render (gotcha #11).
+  if (prefill && prefill.token !== prefillToken) {
+    setPrefillToken(prefill.token);
+    setValue(prefill.text);
+  }
 
   const submit = (): void => {
     const q = value.trim();

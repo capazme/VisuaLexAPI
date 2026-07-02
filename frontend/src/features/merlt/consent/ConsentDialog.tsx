@@ -7,9 +7,13 @@ import { useConsent } from './useConsent';
 import type { MerltConsentLevel } from '../merltConsent';
 
 /**
- * Consent management dialog (Slice 2b). Explains the three levels in plain,
- * privacy-first Italian and writes the choice via the consent context (which
+ * Consent management dialog (Slice 2b, reframed as the ladder in Slice 3 §3.2).
+ * Explains the three levels as a progression — read → ask → teach — in plain,
+ * privacy-first Italian, and writes the choice via the consent context (which
  * round-trips POST /api/merlt/consent — the server is the source of truth).
+ *
+ * The ladder (D2): "Leggere è libero. Con il consenso base fai domande.
+ * Con quello completo insegni al sistema."
  */
 
 interface LevelMeta {
@@ -21,36 +25,36 @@ interface LevelMeta {
 const LEVELS: LevelMeta[] = [
   {
     level: 'none',
-    title: 'Nessun apprendimento',
+    title: 'Nessun consenso — solo lettura',
     description:
-      'MERL-T non raccoglie nulla dalla tua attività. Continui a usare VisuaLex normalmente, ma il sistema non impara dai tuoi utilizzi.',
+      'Leggere è sempre libero: consulti le norme e il grafo giuridico senza dare alcun consenso. MERL-T non raccoglie nulla dalla tua attività e non impara dai tuoi utilizzi.',
   },
   {
     level: 'basic',
-    title: 'Base',
+    title: 'Base — fai domande all’assistente',
     description:
-      'MERL-T può consultare il grafo giuridico e raccogliere segnali d’uso (articoli letti, evidenziazioni, note) per migliorare i suggerimenti. Nessun tuo contenuto viene pubblicato o condiviso.',
+      'Puoi porre domande all’assistente MERL-T e ricevere risposte con le fonti. MERL-T raccoglie segnali d’uso (articoli letti, evidenziazioni, note) per migliorare i suggerimenti. Nessun tuo contenuto viene pubblicato o condiviso.',
   },
   {
     level: 'full',
-    title: 'Completo',
+    title: 'Completo — insegni al sistema',
     description:
-      'Oltre al livello Base, puoi contribuire e validare nodi del grafo giuridico (RLCF). I tuoi contributi sono attribuiti a te e passano dalla validazione della community prima di entrare nel grafo condiviso.',
+      'Oltre a leggere e fare domande, insegni a MERL-T: invii riscontri, contribuisci nodi al grafo giuridico e voti le proposte della community (RLCF). I tuoi contributi sono attribuiti a te e passano dalla validazione della community prima di entrare nel grafo condiviso.',
   },
 ];
 
 function capabilitiesFor(level: MerltConsentLevel): {
-  contribution: boolean;
-  validation: boolean;
-  graph: boolean;
+  read: boolean;
+  ask: boolean;
+  teach: boolean;
 } {
   switch (level) {
     case 'none':
-      return { contribution: false, validation: false, graph: false };
+      return { read: true, ask: false, teach: false };
     case 'basic':
-      return { contribution: false, validation: false, graph: true };
+      return { read: true, ask: true, teach: false };
     case 'full':
-      return { contribution: true, validation: true, graph: true };
+      return { read: true, ask: true, teach: true };
   }
 }
 
@@ -95,9 +99,13 @@ export function ConsentDialog({ open, onClose }: ConsentDialogProps) {
     <Modal isOpen={open} onClose={onClose} title="Consenso MERL-T" size="lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Scegli quanto MERL-T può imparare dal tuo utilizzo di VisuaLex. Puoi cambiare o revocare
-          questa scelta in qualsiasi momento. I dati di tracciamento sono usati per migliorare il
-          sistema; i tuoi contenuti non vengono mai condivisi senza una tua azione esplicita.
+          <span className="font-medium text-slate-700 dark:text-slate-200">
+            Leggere è libero. Con il consenso base fai domande. Con quello completo insegni al
+            sistema.
+          </span>{' '}
+          Scegli fino a che punto vuoi far crescere MERL-T con il tuo utilizzo di VisuaLex. Puoi
+          cambiare o revocare questa scelta in qualsiasi momento; i tuoi contenuti non vengono mai
+          condivisi senza una tua azione esplicita.
         </p>
 
         <div className="space-y-2" role="radiogroup" aria-label="Livello di consenso">
@@ -134,12 +142,15 @@ export function ConsentDialog({ open, onClose }: ConsentDialogProps) {
           className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-800/50"
         >
           <p className="mb-2 font-medium text-slate-700 dark:text-slate-200">
-            Con questo livello MERL-T potrà:
+            Con questo livello potrai:
           </p>
           <ul className="space-y-1">
-            <CapabilityRow on={caps.graph} label="Consultare il grafo giuridico" />
-            <CapabilityRow on={caps.contribution} label="Accettare la tua contribuzione di nodi (RLCF)" />
-            <CapabilityRow on={caps.validation} label="Accettare la tua validazione di proposte" />
+            <CapabilityRow on={caps.read} label="Leggere le norme e consultare il grafo giuridico" />
+            <CapabilityRow on={caps.ask} label="Fare domande all’assistente MERL-T" />
+            <CapabilityRow
+              on={caps.teach}
+              label="Insegnare al sistema: riscontri, contribuzione di nodi e validazione (voti) delle proposte"
+            />
           </ul>
         </div>
 

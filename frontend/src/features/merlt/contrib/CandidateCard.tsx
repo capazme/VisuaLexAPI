@@ -1,9 +1,39 @@
 import { useState } from 'react';
-import { AlertTriangle, Check } from 'lucide-react';
+import { AlertTriangle, Check, Clock, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { promoteCandidate } from './contribApi';
 import { NormaPicker } from './NormaPicker';
 import type { ExtractionCandidate, PromoteCandidatePayload } from './types';
+
+/**
+ * Per-requirement checklist for the copyright gate (Slice 3 §3.8): makes each
+ * ✓/✗ legible to a lawyer instead of a bare disabled button. Every requirement
+ * is derived from the SAME booleans that drive `canPromote`.
+ */
+interface GateRequirement {
+  label: string;
+  met: boolean;
+}
+
+function PromotionChecklist({ requirements }: { requirements: GateRequirement[] }) {
+  return (
+    <ul data-testid="promotion-checklist" className="mt-3 space-y-1 text-xs">
+      {requirements.map((req) => (
+        <li
+          key={req.label}
+          className={
+            req.met
+              ? 'flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400'
+              : 'flex items-center gap-1.5 text-slate-500 dark:text-slate-400'
+          }
+        >
+          {req.met ? <Check size={13} /> : <X size={13} />}
+          <span>{req.label}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * Review + promote a single extracted candidate (Slice 2c). The promote action
@@ -46,17 +76,21 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  const hasFonte = fonte.trim().length > 0;
   const reformulated = normalize(descrizione).length > 0 && normalize(descrizione) !== normalize(verbatim);
   // For entities the article URN is optional (BFF fallback). For relations it
   // still carries semantic weight (source endpoint), so we keep requiring it.
   const articleRequired = candidate.candidate_type === 'relation';
   const hasArticle = articleUrn.trim().length > 0 && articleUrn.trim() !== PLACEHOLDER_URN;
-  const canPromote =
-    fonte.trim().length > 0 &&
-    attested &&
-    reformulated &&
-    (!articleRequired || hasArticle) &&
-    !submitting;
+  const canPromote = hasFonte && attested && reformulated && (!articleRequired || hasArticle) && !submitting;
+
+  // Legible copyright gate — each requirement mirrors a `canPromote` condition.
+  const requirements: GateRequirement[] = [
+    { label: 'Fonte indicata', met: hasFonte },
+    { label: 'Riformulazione diversa dall’estratto originale', met: reformulated },
+    { label: 'Dichiarazione di riformulazione originale', met: attested },
+    ...(articleRequired ? [{ label: 'Norma di riferimento selezionata', met: hasArticle }] : []),
+  ];
 
   const handlePromote = async () => {
     setSubmitting(true);
@@ -110,11 +144,23 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
       data-testid={`candidate-${candidate.id}`}
       className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
     >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          {candidate.candidate_type === 'entity' ? 'Entità' : 'Relazione'}
-          {typeof candidate.llm_confidence === 'number' && ` · conf. ${candidate.llm_confidence.toFixed(2)}`}
-        </span>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {candidate.candidate_type === 'entity' ? 'Entità' : 'Relazione'}
+            {typeof candidate.llm_confidence === 'number' && ` · conf. ${candidate.llm_confidence.toFixed(2)}`}
+          </span>
+          {/* The extractor produces entities only; the relation path is wired
+              but not yet fed by the pipeline — label it honestly (§3.8). */}
+          {candidate.candidate_type === 'relation' && (
+            <span
+              data-testid="relation-coming-soon"
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+            >
+              <Clock size={12} /> in arrivo
+            </span>
+          )}
+        </div>
         <span className="font-medium text-slate-900 dark:text-white">{candidate.entity_text}</span>
       </div>
 
@@ -180,6 +226,10 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
           {error}
         </p>
       )}
+
+      {/* When the gate blocks promotion, spell out the missing requirements so
+          the copyright gate is legible rather than a silent disabled button. */}
+      {!canPromote && !submitting && <PromotionChecklist requirements={requirements} />}
 
       <div className="mt-3 flex justify-end">
         <Button variant="primary" size="sm" disabled={!canPromote} loading={submitting} onClick={() => void handlePromote()}>

@@ -30,7 +30,16 @@ beforeEach(() => {
   voteRelationMock.mockReset().mockResolvedValue(undefined);
   fetchPending.mockReset().mockResolvedValue({
     pending_entities: [
-      { id: 'e1', nome: 'Buona fede', descrizione: 'principio', votes_count: 0 },
+      {
+        id: 'e1',
+        nome: 'Buona fede',
+        descrizione: 'principio',
+        votes_count: 0,
+        fonte: 'llm_extraction',
+        contributed_by: 'user-42',
+        created_at: '2026-06-30T10:00:00.000Z',
+        articoli_correlati: ['urn:nir:stato:codice.civile:1942-03-16;262~art1375'],
+      },
     ],
     pending_relations: [],
     total_entities: 1,
@@ -53,8 +62,38 @@ describe('ValidationPage', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /approva buona fede/i }));
     });
-    expect(voteEntityMock).toHaveBeenCalledWith('e1', 'approve');
+    // approve carries no quick-reason (reason is reject-only)
+    expect(voteEntityMock).toHaveBeenCalledWith('e1', 'approve', undefined);
     await waitFor(() => expect(screen.queryByText('Buona fede')).not.toBeInTheDocument());
+  });
+
+  it('renders provenance and a norm link for each proposal', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Buona fede')).toBeInTheDocument());
+    expect(screen.getByTestId('provenance-fonte')).toHaveTextContent(/automatica/i);
+    expect(screen.getByRole('button', { name: /apri la norma/i })).toBeInTheDocument();
+  });
+
+  it('skips a proposal locally without casting a vote', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Buona fede')).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /salta buona fede/i }));
+    });
+    expect(voteEntityMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByText('Buona fede')).not.toBeInTheDocument());
+  });
+
+  it('reject with a quick-reason forwards the reason to the api', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Buona fede')).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /motivo del rifiuto/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /non pertinente/i }));
+    });
+    expect(voteEntityMock).toHaveBeenCalledWith('e1', 'reject', 'non pertinente');
   });
 
   it('shows a degraded message when the queue fetch fails', async () => {
@@ -93,7 +132,7 @@ describe('ValidationPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
     });
     expect(voteEntityMock).toHaveBeenCalledTimes(2);
-    expect(voteEntityMock).toHaveBeenLastCalledWith('e1', 'approve');
+    expect(voteEntityMock).toHaveBeenLastCalledWith('e1', 'approve', undefined);
     await waitFor(() => expect(screen.queryByText('Buona fede')).not.toBeInTheDocument());
     consoleError.mockRestore();
   });

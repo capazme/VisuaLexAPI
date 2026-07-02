@@ -6,6 +6,7 @@ import { useArticleViewedTracker } from '../useArticleViewedTracker';
 // ---- Module mocks (must be hoisted above imports of mocked modules) ----
 const sendEventMock = vi.fn().mockResolvedValue({ trace_id: 'trace-mock' });
 const hasConsentMock = vi.fn().mockReturnValue(true);
+const publishMock = vi.fn();
 
 vi.mock('../../../../services/merltService', () => ({
   sendArticleViewedEvent: (...args: unknown[]) => sendEventMock(...args),
@@ -13,6 +14,12 @@ vi.mock('../../../../services/merltService', () => ({
 
 vi.mock('../../consent/useConsent', () => ({
   useConsent: () => ({ canTrack: hasConsentMock() }),
+}));
+
+vi.mock('../../merltEventBus', () => ({
+  publishMerltEvent: (...args: unknown[]) => publishMock(...args),
+  // Mirror the real constant so the assertion checks the exact wire value.
+  MERLT_EVENT_TYPES: { articleViewed: 'article_viewed' },
 }));
 
 // ---- IntersectionObserver mock ----
@@ -32,6 +39,7 @@ beforeEach(() => {
   sendEventMock.mockClear();
   hasConsentMock.mockClear();
   hasConsentMock.mockReturnValue(true);
+  publishMock.mockClear();
   lastIOCallback = null;
   // @ts-expect-error mock injection
   global.IntersectionObserver = MockIntersectionObserver;
@@ -232,5 +240,70 @@ describe('useArticleViewedTracker', () => {
       })
     );
     perfSpy.mockRestore();
+  });
+
+  describe('bus publish for ConsentBanner (Slice 3 §3.2)', () => {
+    it('publishes article_viewed on the bus for a genuine view', () => {
+      const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const { unmount } = renderTrackerHook({});
+
+      perfSpy.mockReturnValue(0);
+      act(() => triggerVisible(true));
+      perfSpy.mockReturnValue(4000);
+      act(() => triggerVisible(false));
+      unmount();
+
+      expect(publishMock).toHaveBeenCalledTimes(1);
+      expect(publishMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          interaction_type: 'article_viewed',
+          article_urn: 'urn:nir~art2043',
+        })
+      );
+      perfSpy.mockRestore();
+    });
+
+    it('publishes on the bus even for a consent-none (read-only) user, while suppressing the POST', () => {
+      // The banner is FOR read-only users — the bus publish must NOT be
+      // consent-gated, but the BFF POST must stay gated.
+      hasConsentMock.mockReturnValue(false);
+      const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const { unmount } = renderTrackerHook({});
+
+      perfSpy.mockReturnValue(0);
+      act(() => triggerVisible(true));
+      perfSpy.mockReturnValue(4000);
+      act(() => triggerVisible(false));
+      unmount();
+
+      expect(publishMock).toHaveBeenCalledTimes(1);
+      expect(publishMock).toHaveBeenCalledWith(
+        expect.objectContaining({ interaction_type: 'article_viewed' })
+      );
+      // POST stays consent-gated.
+      expect(sendEventMock).not.toHaveBeenCalled();
+      perfSpy.mockRestore();
+    });
+
+    it('does NOT publish on the bus when the view is not genuine (short dwell, no scroll)', () => {
+      const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+      const { unmount } = renderTrackerHook({});
+
+      perfSpy.mockReturnValue(0);
+      act(() => triggerVisible(true));
+      perfSpy.mockReturnValue(1500); // 1.5s < 3s and no scroll
+      act(() => triggerVisible(false));
+      unmount();
+
+      expect(publishMock).not.toHaveBeenCalled();
+      perfSpy.mockRestore();
+    });
+
+    it('does NOT publish when disabled=true', () => {
+      const { unmount } = renderTrackerHook({ disabled: true });
+      act(() => triggerVisible(true));
+      unmount();
+      expect(publishMock).not.toHaveBeenCalled();
+    });
   });
 });

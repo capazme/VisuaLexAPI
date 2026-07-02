@@ -31,6 +31,7 @@ describe('useMerltFeatures (client-side derivation)', () => {
       graphEnabled: true,
       consentLevel: 'full',
       canTrack: true,
+      qaAskable: true,
       canContribute: true,
       canValidate: true,
       graphReadable: true,
@@ -38,21 +39,25 @@ describe('useMerltFeatures (client-side derivation)', () => {
     });
   });
 
-  it('none consent → contribute/validate/canTrack false, but graph stays readable (flag-only)', () => {
+  it('none consent → contribute/validate/canTrack/qaAskable false, but graph stays readable (flag-only)', () => {
     const { result } = renderHook(() => useMerltFeatures());
     expect(result.current.canContribute).toBe(false);
     expect(result.current.canValidate).toBe(false);
     // Reading the graph is free (D2): graphReadable follows the flag, not consent.
     expect(result.current.graphReadable).toBe(true);
     expect(result.current.canTrack).toBe(false);
+    // Q&A needs at least `basic` (D2 ladder): none → not askable.
+    expect(result.current.qaAskable).toBe(false);
     expect(result.current.opsVisible).toBe(false);
   });
 
-  it('basic consent → graph readable + canTrack, but no contribution', () => {
+  it('basic consent → graph readable + canTrack + qaAskable, but no contribution', () => {
     useConsentMock.mockReturnValue({ level: 'basic', canTrack: true, status: 'ready' });
     const { result } = renderHook(() => useMerltFeatures());
     expect(result.current.graphReadable).toBe(true);
     expect(result.current.canTrack).toBe(true);
+    // D2: asking is unlocked at basic (below the teaching threshold).
+    expect(result.current.qaAskable).toBe(true);
     expect(result.current.canContribute).toBe(false);
   });
 
@@ -73,6 +78,8 @@ describe('useMerltFeatures (client-side derivation)', () => {
     expect(result.current.graphReadable).toBe(false);
     expect(result.current.opsVisible).toBe(false);
     expect(result.current.canTrack).toBe(false);
+    // qaAskable is also flag-gated: full consent cannot unlock Q&A when merlt off.
+    expect(result.current.qaAskable).toBe(false);
   });
 
   it('graph flag off → graph capabilities off but contribution stays', () => {

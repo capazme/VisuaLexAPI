@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { sendArticleViewedEvent } from '../../../services/merltService';
 import { useConsent } from '../consent/useConsent';
+import { publishMerltEvent, MERLT_EVENT_TYPES } from '../merltEventBus';
 
 /**
  * Hook that emits an `article:viewed` event to the BFF when the article
@@ -67,7 +68,10 @@ export function useArticleViewedTracker({
 
   useEffect(() => {
     if (disabled || !articleUrn || !containerRef.current) return;
-    if (!canTrackRef.current) return;
+    // NOTE: no consent gate here. The observers must run for read-only
+    // (consent-none) users too, so a genuine view can publish `article_viewed`
+    // on the bus and let the ConsentBanner surface (Slice 3 §3.2). The consent
+    // gate is applied ONLY to the BFF POST in the cleanup path below.
 
     const el = containerRef.current;
     const state = stateRef.current;
@@ -131,12 +135,30 @@ export function useArticleViewedTracker({
       const meetsDwell = state.dwellMs >= DWELL_THRESHOLD_MS;
       const meetsScroll = state.scrollMaxPct >= SCROLL_THRESHOLD_PCT;
       if (state.emitted) return;
-      // Consent may have been revoked mid-read (effect re-ran with canTrack
-      // false → this cleanup): honour the live value, don't dead-letter a 403.
-      if (!canTrackRef.current) return;
       if (!(meetsDwell || meetsScroll)) return;
 
+      // Mark emitted up-front so neither the bus publish nor the POST can fire
+      // twice for the same article view (at-most-once, no mid-scroll spam).
       state.emitted = true;
+
+      // Publish on the bus regardless of consent: this is what lets the
+      // ConsentBanner trigger for the read-only majority (consent-none users
+      // never reach the POST below). Fire-and-forget, gated only by the genuine-
+      // view decision. Shape matches what ConsentBanner subscribes to.
+      publishMerltEvent({
+        interaction_type: MERLT_EVENT_TYPES.articleViewed,
+        article_urn: articleUrn,
+        metadata: {
+          dwell_ms: Math.round(state.dwellMs),
+          scroll_max_pct: Math.round(state.scrollMaxPct * 100) / 100,
+        },
+      });
+
+      // Consent may have been revoked mid-read (effect re-ran with canTrack
+      // false → this cleanup): honour the live value, don't dead-letter a 403.
+      // Only the BFF POST is consent-gated — the bus publish above is not.
+      if (!canTrackRef.current) return;
+
       void sendArticleViewedEvent({
         articleUrn,
         normaVisitataId,

@@ -28,7 +28,8 @@ import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 export interface QaSourceChipProps {
   source: QaRetrievedSource;
   confirmState?: ConfirmState;
-  onConfirm: (s: QaRetrievedSource) => void;
+  /** Teaching channel (full consent): omit to hide "ricorda nel grafo". */
+  onConfirm?: (s: QaRetrievedSource) => void;
   onRate?: (sourceId: string, relevant: boolean) => void;
   /** Matching LLM-cited source (excerpt/citation/canon) to enrich the tooltip. */
   cited?: QaSource;
@@ -198,7 +199,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
             </button>
           </>
         )}
-        {confirmable && (
+        {confirmable && onConfirm && (
           <button
             type="button"
             disabled={confirmState === 'pending' || confirmState === 'done'}

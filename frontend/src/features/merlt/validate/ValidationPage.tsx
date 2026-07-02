@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, Loader2, ScrollText, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Check, Loader2, ScrollText } from 'lucide-react';
+import type { SearchParams } from '../../../types';
+import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../../components/ui/Button';
 import { Toast } from '../../../components/ui/Toast';
 import { useMerltFeatures } from '../useMerltFeatures';
+import { ValidationCard, type ValidationCardModel } from './ValidationCard';
 import {
   fetchPendingQueue,
   voteEntity,
@@ -29,9 +32,20 @@ interface VoteToast {
  */
 export function ValidationPage() {
   const { canValidate, merltEnabled } = useMerltFeatures();
+  const triggerSearch = useAppStore((s) => s.triggerSearch);
+  const navigate = useNavigate();
   const [queue, setQueue] = useState<QueueState>({ status: 'loading' });
+  // Items removed from view: voted (optimistic) OR skipped (deferred). Both hide
+  // the card; only votes hit the server, so skip never reverts.
   const [resolved, setResolved] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<VoteToast | null>(null);
+
+  // Open the source norm in the reading view — the vanilla mechanism history /
+  // dossiers use: navigate home, then park the params on the search trigger.
+  const openNorm = (params: SearchParams): void => {
+    navigate('/');
+    triggerSearch(params);
+  };
 
   useEffect(() => {
     if (!merltEnabled || !canValidate) return;
@@ -56,15 +70,25 @@ export function ValidationPage() {
       return next;
     });
 
+  // "Salta": defer without voting. Removes the card locally (no server call, so
+  // no revert bookkeeping); the item resurfaces on the next queue reload.
+  const skip = (id: string): void => markResolved(id);
+
   // Optimistic removal with revert on failure: the item comes back into the
   // queue and a retry toast is offered (no silent catch — repo gotcha #18).
-  const submitVote = async (kind: 'entity' | 'relation', id: string, vote: MerltVote): Promise<void> => {
+  // `reason` is only carried by rejects (quick-reasons from the card).
+  const submitVote = async (
+    kind: 'entity' | 'relation',
+    id: string,
+    vote: MerltVote,
+    reason?: string,
+  ): Promise<void> => {
     markResolved(id);
     try {
       if (kind === 'entity') {
-        await voteEntity(id, vote);
+        await voteEntity(id, vote, reason);
       } else {
-        await voteRelation(id, vote);
+        await voteRelation(id, vote, reason);
       }
     } catch (err) {
       console.error(`ValidationPage: ${kind} vote failed:`, err);
@@ -75,7 +99,7 @@ export function ValidationPage() {
           label: 'Riprova',
           onClick: () => {
             setToast(null);
-            void submitVote(kind, id, vote);
+            void submitVote(kind, id, vote, reason);
           },
         },
       });
@@ -133,9 +157,15 @@ export function ValidationPage() {
                 id: e.id,
                 title: e.nome ?? e.id,
                 body: e.descrizione,
+                fonte: e.fonte,
+                contributedBy: e.contributed_by,
+                createdAt: e.created_at,
                 votes: e.votes_count,
+                normRef: e.articoli_correlati?.[0],
               }))}
-            onVote={(id, v) => void submitVote('entity', id, v)}
+            onVote={(id, v, reason) => void submitVote('entity', id, v, reason)}
+            onSkip={skip}
+            onOpenNorm={openNorm}
           />
           <ValidationSection
             title="Relazioni proposte"
@@ -144,11 +174,17 @@ export function ValidationPage() {
               .filter((r) => !resolved.has(r.id))
               .map((r) => ({
                 id: r.id,
-                title: r.tipo_relazione ?? r.id,
-                body: r.descrizione,
+                title: r.relation_type ?? r.id,
+                body: r.evidence,
+                fonte: r.fonte,
+                contributedBy: r.contributed_by,
+                createdAt: r.created_at,
                 votes: r.votes_count,
+                normRef: r.source_urn,
               }))}
-            onVote={(id, v) => void submitVote('relation', id, v)}
+            onVote={(id, v, reason) => void submitVote('relation', id, v, reason)}
+            onSkip={skip}
+            onOpenNorm={openNorm}
           />
         </div>
       )}
@@ -167,23 +203,20 @@ export function ValidationPage() {
   );
 }
 
-interface SectionItem {
-  id: string;
-  title: string;
-  body?: string;
-  votes?: number;
-}
-
 function ValidationSection({
   title,
   testId,
   items,
   onVote,
+  onSkip,
+  onOpenNorm,
 }: {
   title: string;
   testId: string;
-  items: SectionItem[];
-  onVote: (id: string, vote: MerltVote) => void;
+  items: ValidationCardModel[];
+  onVote: (id: string, vote: MerltVote, reason?: string) => void;
+  onSkip: (id: string) => void;
+  onOpenNorm: (params: SearchParams) => void;
 }) {
   return (
     <section data-testid={testId}>
@@ -197,36 +230,13 @@ function ValidationSection({
       ) : (
         <ul className="space-y-2">
           {items.map((item) => (
-            <li
+            <ValidationCard
               key={item.id}
-              className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-slate-900 dark:text-white">{item.title}</p>
-                {item.body && <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{item.body}</p>}
-                {typeof item.votes === 'number' && (
-                  <p className="mt-1 text-xs text-slate-400">{item.votes} voti</p>
-                )}
-              </div>
-              <div className="flex shrink-0 gap-1">
-                <button
-                  type="button"
-                  aria-label={`Approva ${item.title}`}
-                  onClick={() => onVote(item.id, 'approve')}
-                  className="rounded-lg border border-emerald-200 p-2 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900 dark:hover:bg-emerald-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-                >
-                  <ThumbsUp size={16} />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Respingi ${item.title}`}
-                  onClick={() => onVote(item.id, 'reject')}
-                  className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                >
-                  <ThumbsDown size={16} />
-                </button>
-              </div>
-            </li>
+              item={item}
+              onVote={onVote}
+              onSkip={onSkip}
+              onOpenNorm={onOpenNorm}
+            />
           ))}
         </ul>
       )}

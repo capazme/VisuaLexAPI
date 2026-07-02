@@ -25,6 +25,10 @@ async function grantFull(user: TestUser): Promise<void> {
   await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full' });
 }
 
+async function grantBasic(user: TestUser): Promise<void> {
+  await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'basic' });
+}
+
 const QUERY_OK = {
   trace_id: 'trace_abc',
   synthesis: 'La risoluzione...',
@@ -47,13 +51,26 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('403 without full (contribution) consent', async () => {
+  it('403 without any consent (asking needs at least basic — Slice 3 D2)', async () => {
     const res = await request(app)
       .post('/api/merlt/experts/query')
       .set(authHeader(user))
       .send({ query: 'art 1453 risoluzione' });
     expect(res.status).toBe(403);
-    expect(res.body.detail).toBe('contribution_consent_required');
+    expect(res.body.detail).toBe('consent_required');
+  });
+
+  it('basic consent CAN ask (asking is consumption, not contribution — Slice 3 D2)', async () => {
+    await grantBasic(user);
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/query', (b) => (b as { consent_level: string }).consent_level === 'basic')
+      .reply(200, QUERY_OK);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'art 1453 risoluzione' });
+    expect(res.status).toBe(200);
+    expect(res.body.trace_id).toBe('trace_abc');
   });
 
   it('400 on too-short query', async () => {
@@ -160,9 +177,10 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.body[0].trace_id).toBe('trace_x');
   });
 
-  it('history requires full consent (403)', async () => {
+  it('history requires at least basic consent (403 when none)', async () => {
     const res = await request(app).get('/api/merlt/experts/history').set(authHeader(user));
     expect(res.status).toBe(403);
+    expect(res.body.detail).toBe('consent_required');
   });
 
   it('preference feedback (divergent) forwards preferred_expert', async () => {

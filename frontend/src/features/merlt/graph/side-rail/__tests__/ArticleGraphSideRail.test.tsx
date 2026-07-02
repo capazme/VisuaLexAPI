@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ArticleGraphSideRail } from '../ArticleGraphSideRail';
+import { __resetRailFocus } from '../railFocus';
 import type { ArticleGraphState } from '../../shared/useArticleGraph';
 import type { IngestionJobState } from '../../shared/useIngestionJob';
 
@@ -43,6 +44,7 @@ function setJob(state: IngestionJobState): void {
 const URN = 'urn:nir:stato:codice.civile:1942;2043';
 
 beforeEach(() => {
+  __resetRailFocus();
   useArticleGraphMock.mockReset();
   useIngestionJobMock.mockReset();
   triggerIngestionMock.mockReset();
@@ -190,6 +192,71 @@ describe('ArticleGraphSideRail', () => {
       setGraph(emptySuccess);
       rerender(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
       await waitFor(() => expect(triggerIngestionMock).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe('single-instance dedup (design §3.4)', () => {
+    function setViewport(width: number): void {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+      window.dispatchEvent(new Event('resize'));
+    }
+
+    it('renders only ONE fixed panel when several rails are mounted', () => {
+      setViewport(1440); // reflow mode: no scrim to confuse the count
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: URN }], edges: [] },
+        elements: { nodes: [{ id: 'a' }], edges: [] },
+      });
+      render(
+        <>
+          <ArticleGraphSideRail articleUrn={URN} defaultOpen />
+          <ArticleGraphSideRail articleUrn="urn:nir:stato:codice.penale:1930;575" defaultOpen />
+        </>,
+      );
+      // Exactly one visible rail, not one per article card.
+      expect(screen.getAllByRole('complementary', { name: /grafo dell'articolo/i })).toHaveLength(1);
+    });
+
+    it('opens as a bottom-sheet with a dismiss scrim on mobile (<768px)', () => {
+      setViewport(375);
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: URN }], edges: [] },
+        elements: { nodes: [{ id: 'a' }], edges: [] },
+      });
+      render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+      const sheet = screen.getByRole('complementary', { name: /grafo dell'articolo/i });
+      expect(sheet.className).toMatch(/bottom-0/);
+      // Scrim tap dismisses.
+      fireEvent.click(screen.getByRole('button', { name: /chiudi grafo/i }));
+      expect(screen.queryByRole('complementary', { name: /grafo dell'articolo/i })).not.toBeInTheDocument();
+    });
+
+    it('opens as a right overlay with a scrim on tablet (768–1279px)', () => {
+      setViewport(1000);
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: URN }], edges: [] },
+        elements: { nodes: [{ id: 'a' }], edges: [] },
+      });
+      render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+      const panel = screen.getByRole('complementary', { name: /grafo dell'articolo/i });
+      expect(panel.className).toMatch(/right-0/);
+      expect(screen.getByRole('button', { name: /chiudi grafo/i })).toBeInTheDocument();
+    });
+
+    it('reflows the reading column (no scrim) on desktop (≥1280px)', () => {
+      setViewport(1440);
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'a', type: 'Norma', label: 'A', urn: URN }], edges: [] },
+        elements: { nodes: [{ id: 'a' }], edges: [] },
+      });
+      render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+      expect(screen.getByRole('complementary', { name: /grafo dell'articolo/i })).toBeInTheDocument();
+      // Reflow mode has no dismiss scrim (the column is pushed, text stays visible).
+      expect(screen.queryByRole('button', { name: /chiudi grafo/i })).not.toBeInTheDocument();
     });
   });
 });

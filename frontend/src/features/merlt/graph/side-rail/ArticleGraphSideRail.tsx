@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { cn } from '../../../../lib/utils';
 import { useArticleGraph } from '../shared/useArticleGraph';
 import { useIngestionJob } from '../shared/useIngestionJob';
 import {
@@ -9,6 +10,8 @@ import {
   type IngestionTriggerErrorKind,
 } from '../shared/graphApi';
 import { CollapseToggle } from './CollapseToggle';
+import { useRailFocus, useRailMode } from './useRailPresentation';
+import { useReflowReadingColumn } from './useReflowReadingColumn';
 
 const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
 
@@ -21,12 +24,23 @@ export interface ArticleGraphSideRailProps {
 // Side rail shows the immediate concept neighbourhood: depth 1, capped small.
 const SIDE_RAIL_DEPTH = 1;
 const SIDE_RAIL_LIMIT = 25;
+// Panel width used for the desktop reflow padding (matches the `w-[340px]` panel).
+const RAIL_WIDTH_PX = 340;
 
 /**
- * Collapsible right-edge rail showing the article's concept neighbourhood.
- * Mounted via the `article_sidebar` plugin slot. When the article is not yet in
- * the graph (empty subgraph) it transparently triggers lazy ingestion and polls
- * until the graph is ready, then refetches.
+ * Collapsible rail showing the focused article's concept neighbourhood.
+ *
+ * Mounted via the `article_sidebar` plugin slot — which renders once per
+ * `ArticleTabContent`. To avoid stacked `fixed` rails when several articles are
+ * open (Slice 3 §3.4), a module-level coordinator (`useRailFocus`) elects a
+ * single winner bound to the most-recently-focused article; the losers render
+ * null. The winner presents responsively (design §3.4):
+ *  - desktop ≥1280px: reflows the reading column (no overlay over the text)
+ *  - 768–1279px: overlay from the right with a scrim
+ *  - <768px: bottom-sheet (~55% height), dismissed by scrim tap
+ *
+ * When the article is not yet in the graph (empty subgraph) it transparently
+ * triggers lazy ingestion and polls until ready (bounded budget), then refetches.
  */
 export function ArticleGraphSideRail({
   articleUrn,
@@ -34,6 +48,19 @@ export function ArticleGraphSideRail({
 }: ArticleGraphSideRailProps): React.ReactElement | null {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  // A zero-size anchor kept in the normal document flow (the panel/toggle are
+  // `fixed`). It lets the reflow hook locate THIS rail's Layout scroll container
+  // via `closest('main')`, and lets the focus coordinator tell whether THIS
+  // copy is the one currently displayed (NormaCard renders the article twice
+  // behind mutually-exclusive `md:hidden` / `hidden md:block` containers).
+  const [anchorEl, setAnchorEl] = useState<HTMLSpanElement | null>(null);
+
+  // Single-instance election (only the displayed copy wins) + responsive mode.
+  const isWinner = useRailFocus(articleUrn, anchorEl);
+  const mode = useRailMode();
+
+  useReflowReadingColumn(anchorEl, isWinner && isOpen && mode === 'reflow', RAIL_WIDTH_PX);
 
   // Only fetch while the rail is open AND we have a urn.
   const activeUrn = isOpen && articleUrn ? articleUrn : null;
@@ -82,19 +109,31 @@ export function ArticleGraphSideRail({
 
   if (!articleUrn) return null;
 
+  // In-flow anchor for the reflow hook + the displayed-copy probe (see anchorEl
+  // above). Rendered by every instance so `closest('main')` resolves for the
+  // winner and the coordinator can read this copy's `display`. Zero-size and
+  // absolutely positioned — NOT `display:none`, otherwise the probe would read
+  // every copy as hidden and no rail would ever register.
+  const anchor = (
+    <span ref={setAnchorEl} aria-hidden className="absolute h-0 w-0 overflow-hidden" />
+  );
+
+  // Only the elected winner paints the fixed UI — dedupes stacked rails (§3.4).
+  if (!isWinner) return anchor;
+
   if (!isOpen) {
     return (
-      <div className="fixed right-0 top-1/2 z-30 -translate-y-1/2">
-        <CollapseToggle isOpen={false} onToggle={() => setIsOpen(true)} />
-      </div>
+      <>
+        {anchor}
+        <div className="fixed right-0 top-1/2 z-30 -translate-y-1/2">
+          <CollapseToggle isOpen={false} onToggle={() => setIsOpen(true)} />
+        </div>
+      </>
     );
   }
 
-  return (
-    <aside
-      className="fixed right-0 top-1/2 z-30 flex h-[70vh] max-h-[560px] w-[320px] -translate-y-1/2 flex-col rounded-l-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
-      aria-label="Grafo dell'articolo"
-    >
+  const body = (
+    <>
       <header className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-700">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
           Grafo dell&apos;articolo
@@ -115,7 +154,36 @@ export function ArticleGraphSideRail({
           onNodeNavigate={(urn) => navigate(`/grafo?urn=${encodeURIComponent(urn)}&depth=2`)}
         />
       </div>
-    </aside>
+    </>
+  );
+
+  // Overlay (tablet) and bottom-sheet (mobile) dismiss on scrim tap; the desktop
+  // reflow mode has no scrim (the column is pushed, text stays fully visible).
+  const showScrim = mode === 'overlay' || mode === 'bottom-sheet';
+
+  return (
+    <>
+      {anchor}
+      {showScrim && (
+        <button
+          type="button"
+          aria-label="Chiudi grafo"
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-[1px] transition-opacity duration-200"
+        />
+      )}
+      <aside
+        className={cn(
+          'fixed z-40 flex flex-col border-slate-200 bg-white shadow-xl transition-transform duration-200 dark:border-slate-700 dark:bg-slate-900',
+          mode === 'bottom-sheet'
+            ? 'inset-x-0 bottom-0 h-[55vh] rounded-t-2xl border-t'
+            : 'right-0 top-0 h-full w-[340px] max-w-[90vw] border-l',
+        )}
+        aria-label="Grafo dell'articolo"
+      >
+        {body}
+      </aside>
+    </>
   );
 }
 

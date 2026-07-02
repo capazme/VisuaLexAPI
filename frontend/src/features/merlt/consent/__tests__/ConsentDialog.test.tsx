@@ -21,6 +21,25 @@ describe('ConsentDialog', () => {
     expect(screen.getByTestId('consent-option-full')).toBeInTheDocument();
   });
 
+  it('frames the levels as the read → ask → teach ladder (Slice 3 §3.2)', () => {
+    render(<ConsentDialog open onClose={() => {}} />);
+    // The intro conveys the ladder in plain Italian.
+    expect(screen.getByText(/Leggere è libero/i)).toBeInTheDocument();
+    // Each option carries its ladder rung in the title.
+    expect(screen.getByTestId('consent-option-none')).toHaveTextContent(/solo lettura/i);
+    expect(screen.getByTestId('consent-option-basic')).toHaveTextContent(/fai domande|domande/i);
+    expect(screen.getByTestId('consent-option-full')).toHaveTextContent(/insegni/i);
+  });
+
+  it('capabilities checklist reflects the ladder for the none level (read only)', () => {
+    render(<ConsentDialog open onClose={() => {}} />);
+    // Default selection is the current level (none): only reading is on.
+    const caps = screen.getByTestId('consent-capabilities');
+    expect(caps).toHaveTextContent(/leggere/i);
+    expect(caps).toHaveTextContent(/domande/i);
+    expect(caps).toHaveTextContent(/insegnare|contribuzione|validazione/i);
+  });
+
   it('pre-selects the current consent level', () => {
     useConsentMock.mockReturnValue({ level: 'basic', status: 'ready', setConsent });
     render(<ConsentDialog open onClose={() => {}} />);

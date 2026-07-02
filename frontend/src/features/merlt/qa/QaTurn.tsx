@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Loader2, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2, Lock, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { QaDeliberationPanel } from './QaDeliberationPanel';
+import { QaSourceChip } from './QaSourceChip';
 import { CANON_LABEL } from './format';
 import type { QaRetrievedSource, QaTurnModel } from './types';
 import { QaSynthesisWithCitations } from '../ner/QaSynthesisWithCitations';
@@ -18,8 +19,18 @@ export interface QaTurnProps {
   onDetailed: (scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number }) => void;
   /** Re-submit this turn's question after a failure (Riprova). */
   onRetry?: () => void;
+  /** Abort the in-flight request while loading (Annulla). */
+  onCancel?: () => void;
   /** Forward an in-prose citation NER feedback (surface=qa_chip). */
   onNerCitation?: (payload: NerFeedbackInput) => void;
+  /**
+   * Full consent (D2): unlocks the teaching channels — inline rating, per-source
+   * relevance, "mi convince", detailed assessment, "ricorda nel grafo", in-prose
+   * NER feedback. Asking/refining stays available at `basic` (that's `qaAskable`).
+   */
+  canContribute?: boolean;
+  /** Open the consent dialog from the inline upsell shown when !canContribute. */
+  onOpenConsent?: () => void;
   /** Dev mode: render the pipeline trace under the answer. */
   devMode?: boolean;
 }
@@ -30,9 +41,71 @@ function confidenceLabel(c: number): string {
   return 'bassa';
 }
 
-export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed, onRetry, onNerCitation, devMode }: QaTurnProps) {
+/**
+ * Ticks once per second while a turn is loading, so the elapsed indicator stays
+ * live during the up-to-120s wait. External-clock subscription: the setState
+ * lives only in the interval callback, never synchronously in the effect body
+ * (react-hooks/set-state-in-effect). The "reset on a new startedAt" is derived
+ * during render via a prev-input tracker (gotcha #11), not via an in-effect
+ * setState. Returns whole elapsed seconds, or null when there is no known start
+ * time (e.g. a turn restored from storage).
+ */
+function useElapsedSeconds(startedAt?: number): number | null {
+  // Baseline `now` at the wait's start (a pure value in scope) so 0s shows until
+  // the first tick; the interval then advances it. Re-baseline on a new startedAt
+  // is derived during render (gotcha #11), keeping render pure (react-hooks/purity).
+  const [now, setNow] = useState(startedAt ?? 0);
+  const [trackedStart, setTrackedStart] = useState(startedAt);
+  if (startedAt !== trackedStart) {
+    setTrackedStart(startedAt);
+    setNow(startedAt ?? 0);
+  }
+  useEffect(() => {
+    if (startedAt === undefined) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+  if (startedAt === undefined) return null;
+  return Math.max(0, Math.floor((now - startedAt) / 1000));
+}
+
+/** Compact inline upsell: asking is unlocked, teaching needs full consent (D2). */
+function TeachUpsell({ onOpenConsent }: { onOpenConsent?: () => void }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <Lock size={13} className="shrink-0" />
+      <span>Per insegnare a MERL-T serve il consenso completo.</span>
+      {onOpenConsent && (
+        <button
+          type="button"
+          onClick={onOpenConsent}
+          className="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 focus-visible:outline-none focus-visible:underline"
+        >
+          Attiva
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function QaTurn({
+  turn,
+  onRate,
+  onRefine,
+  onConfirm,
+  onRateSource,
+  onPrefer,
+  onDetailed,
+  onRetry,
+  onCancel,
+  onNerCitation,
+  canContribute,
+  onOpenConsent,
+  devMode,
+}: QaTurnProps) {
   const [refining, setRefining] = useState(false);
   const [followUp, setFollowUp] = useState('');
+  const elapsed = useElapsedSeconds(turn.state.status === 'loading' ? turn.state.startedAt : undefined);
 
   const submitRefine = (): void => {
     const q = followUp.trim();
@@ -52,9 +125,25 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
       </div>
 
       {turn.state.status === 'loading' && (
-        <p className="flex items-center gap-2 text-sm text-slate-500">
-          <Loader2 className="animate-spin" size={16} /> MERL-T sta ragionando…
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+          <span className="flex items-center gap-2">
+            <Loader2 className="animate-spin" size={16} /> MERL-T sta ragionando…
+          </span>
+          {elapsed !== null && (
+            <span className="tabular-nums text-xs text-slate-400" aria-live="polite">
+              {elapsed}s
+            </span>
+          )}
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            >
+              Annulla
+            </button>
+          )}
+        </div>
       )}
 
       {turn.state.status === 'error' && (
@@ -78,6 +167,7 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
       {turn.state.status === 'success' && (() => {
         const a = turn.state.answer;
         const isDivergent = a.mode === 'divergent' && a.alternatives && a.alternatives.length > 0;
+        const hasSources = a.retrieved_sources.length > 0;
         return (
           <div className="rounded-2xl rounded-tl-sm border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             {isDivergent ? (
@@ -89,13 +179,15 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                         {CANON_LABEL[alt.expert] ?? alt.expert}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => onPrefer(alt.expert)}
-                        className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-primary-300 hover:text-primary-600 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                      >
-                        Mi convince
-                      </button>
+                      {canContribute && (
+                        <button
+                          type="button"
+                          onClick={() => onPrefer(alt.expert)}
+                          className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:border-primary-300 hover:text-primary-600 dark:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                        >
+                          Mi convince
+                        </button>
+                      )}
                     </div>
                     <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{alt.position}</p>
                     {alt.legal_basis.length > 0 && (
@@ -105,7 +197,7 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
                 ))}
               </div>
             ) : (
-              <QaSynthesisWithCitations text={a.synthesis} enabled onSubmit={onNerCitation} />
+              <QaSynthesisWithCitations text={a.synthesis} enabled={canContribute} onSubmit={onNerCitation} />
             )}
 
             {/* Confidence */}
@@ -123,50 +215,85 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
               <span className="text-slate-400">{a.confidence.toFixed(2)}</span>
             </div>
 
-            <QaDeliberationPanel
-              answer={a}
-              confirmed={turn.confirmed}
-              onConfirm={onConfirm}
-              onRateSource={onRateSource}
-              onDetailed={onDetailed}
-            />
+            {/* Sources always visible (§3.5, "non-negotiable"): rendered directly
+                under the answer, OUTSIDE the collapsed deliberation panel. A turn
+                with 0 sources (e.g. reloaded from history) shows no sources block
+                and no source-rating control — an empty "FONTI CONSULTATE (0)" +
+                rating request undermines trust. */}
+            {hasSources && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Fonti consultate ({a.retrieved_sources.length})
+                </p>
+                <ul className="space-y-1.5">
+                  {a.retrieved_sources.map((s) => (
+                    <QaSourceChip
+                      key={s.node_id ?? s.urn}
+                      source={s}
+                      cited={a.sources.find((c) => c.article_urn === s.urn)}
+                      confirmState={s.node_id ? turn.confirmed[s.node_id] : undefined}
+                      onConfirm={canContribute ? onConfirm : undefined}
+                      onRate={canContribute ? onRateSource : undefined}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <QaDeliberationPanel answer={a} onDetailed={onDetailed} canContribute={canContribute} />
 
             {devMode && <QaProcessTrace answer={a} />}
 
-            {/* Inline feedback + refine */}
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-              <button
-                type="button"
-                aria-label="Risposta utile"
-                aria-pressed={turn.rating === 5}
-                onClick={() => onRate(5)}
-                className={cn(
-                  'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
-                  turn.rating === 5 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'text-slate-400 hover:text-emerald-600',
-                )}
-              >
-                <ThumbsUp size={15} />
-              </button>
-              <button
-                type="button"
-                aria-label="Risposta non utile"
-                aria-pressed={turn.rating === 1}
-                onClick={() => onRate(1)}
-                className={cn(
-                  'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500',
-                  turn.rating === 1 ? 'bg-red-50 text-red-600 dark:bg-red-950/40' : 'text-slate-400 hover:text-red-600',
-                )}
-              >
-                <ThumbsDown size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setRefining((v) => !v)}
-                className="ml-auto text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 focus-visible:outline-none focus-visible:underline"
-              >
-                Approfondisci
-              </button>
-            </div>
+            {/* Inline feedback + refine. Rating is a teaching channel (full
+                consent); refine is asking, available at basic. */}
+            {canContribute ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                <button
+                  type="button"
+                  aria-label="Risposta utile"
+                  aria-pressed={turn.rating === 5}
+                  onClick={() => onRate(5)}
+                  className={cn(
+                    'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500',
+                    turn.rating === 5 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'text-slate-400 hover:text-emerald-600',
+                  )}
+                >
+                  <ThumbsUp size={15} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Risposta non utile"
+                  aria-pressed={turn.rating === 1}
+                  onClick={() => onRate(1)}
+                  className={cn(
+                    'rounded-md p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500',
+                    turn.rating === 1 ? 'bg-red-50 text-red-600 dark:bg-red-950/40' : 'text-slate-400 hover:text-red-600',
+                  )}
+                >
+                  <ThumbsDown size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefining((v) => !v)}
+                  className="ml-auto text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 focus-visible:outline-none focus-visible:underline"
+                >
+                  Approfondisci
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mt-3 flex items-center border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setRefining((v) => !v)}
+                    className="ml-auto text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 focus-visible:outline-none focus-visible:underline"
+                  >
+                    Approfondisci
+                  </button>
+                </div>
+                <TeachUpsell onOpenConsent={onOpenConsent} />
+              </>
+            )}
 
             {refining && (
               <div className="mt-2 flex gap-2">

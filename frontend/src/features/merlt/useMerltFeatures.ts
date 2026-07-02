@@ -17,6 +17,8 @@ export interface MerltFeatures {
   consentLevel: MerltConsentLevel;
   status: 'loading' | 'ready' | 'error';
   canTrack: boolean;
+  /** Q&A composing/asking (Slice 3, D2): unlocked at `basic` OR `full`. */
+  qaAskable: boolean;
   canContribute: boolean;
   canValidate: boolean;
   graphReadable: boolean;
@@ -36,6 +38,9 @@ export function useMerltFeatures(): MerltFeatures {
     consentLevel: level,
     status,
     canTrack: merltEnabled && canTrack,
+    // Q&A is queryable from `basic` (D2 consent ladder: "reading is free, asking
+    // needs basic, teaching needs full"). Distinct from canContribute/canValidate.
+    qaAskable: merltEnabled && level !== 'none',
     canContribute: merltEnabled && level === 'full',
     canValidate: merltEnabled && level === 'full',
     graphReadable: graphEnabled, // reading is free (D2): flag-only, no consent coupling

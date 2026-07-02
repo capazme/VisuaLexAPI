@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
+import { consentGuard } from '../../services/merlt/consentGuard';
 import { contributionGuard } from '../../services/merlt/contributionGuard';
 import {
   expertQueryRequestSchema,
@@ -22,10 +23,14 @@ function clampInt(raw: unknown, def: number, min: number, max: number): number {
 }
 
 /**
- * MERL-T expert Q&A routes (Loop β Phase F). Thin proxy: authenticate +
- * contributionGuard (full consent → "full per tutto"), inject user_id, map
- * consent, forward to MERL-T :8000. Registered in routes/merlt/index.ts BEFORE
- * the catch-all auth routers (per-route auth → order-safe; gotcha #1).
+ * MERL-T expert Q&A routes (Loop β Phase F). Thin proxy: authenticate + a
+ * consent guard, inject user_id, map consent, forward to MERL-T :8000.
+ * Consent ladder (Slice 3 D2 "leggere è libero, insegnare richiede consenso"):
+ *   - ASK is consumption → consentGuard (basic OR full): /query, /refine, /history
+ *   - TEACH writes to the shared model → contributionGuard (full): all
+ *     /feedback/* channels + /confirm-source
+ * Registered in routes/merlt/index.ts BEFORE the catch-all auth routers
+ * (per-route auth → order-safe; gotcha #1).
  */
 
 const router = Router();
@@ -52,7 +57,7 @@ function handleMerltError(err: unknown, res: Response): void {
   throw err;
 }
 
-router.post('/experts/query', authenticate, contributionGuard, async (req: Request, res: Response): Promise<void> => {
+router.post('/experts/query', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ detail: 'Authentication required' });
     return;
@@ -81,7 +86,7 @@ router.post('/experts/query', authenticate, contributionGuard, async (req: Reque
   }
 });
 
-router.get('/experts/history', authenticate, contributionGuard, async (req: Request, res: Response): Promise<void> => {
+router.get('/experts/history', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ detail: 'Authentication required' });
     return;
@@ -191,7 +196,7 @@ router.post('/experts/feedback/preference', authenticate, contributionGuard, asy
   }
 });
 
-router.post('/experts/refine', authenticate, contributionGuard, async (req: Request, res: Response): Promise<void> => {
+router.post('/experts/refine', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ detail: 'Authentication required' });
     return;

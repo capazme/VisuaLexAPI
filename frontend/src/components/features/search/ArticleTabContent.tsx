@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
 import { ExternalLink, Clock } from 'lucide-react';
+import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { DossierModal } from '../../ui/DossierModal';
@@ -122,7 +123,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Full-consent contributors get the inline NER feedback bar on the citation
     // preview popup (surface=article_xref, Loop β #2). Gated strictly on
     // canContribute (level === 'full'); never widen this.
-    const { canContribute } = useMerltFeatures();
+    // qaAskable/consentLevel drive the in-article "Chiedi su questo articolo"
+    // entry (Slice 3 §3.5): shown from `basic`, teaser-at-`none`.
+    const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
 
     const itemKey = useMemo(() => {
         const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
@@ -753,6 +756,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupAddNote={handlePopupAddNote}
                 onPopupCopy={handlePopupCopy}
                 onRemoveHighlight={removeHighlight}
+            />
+
+            <AskMerltEntry
+                merltEnabled={merltEnabled}
+                qaAskable={qaAskable}
+                consentNone={consentLevel === 'none'}
+                articleUrn={norma_data.urn}
+                articleNumber={norma_data.numero_articolo}
+                actType={norma_data.tipo_atto}
+                actNumber={norma_data.numero_atto}
+                annex={norma_data.allegato}
             />
 
             <PluginSlot

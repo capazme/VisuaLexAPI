@@ -92,9 +92,13 @@ describe('useQaThread', () => {
       await result.current.retry(result.current.turns[0].id);
     });
     await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
-    // same question, same mode, same (single) turn
+    // same question, same mode, same (single) turn (an AbortSignal now trails
+    // the args — assert on the leading positional args only).
     expect(askQuestion).toHaveBeenCalledTimes(2);
-    expect(askQuestion).toHaveBeenNthCalledWith(2, 'art 1453?', 'convergent');
+    const secondCall = askQuestion.mock.calls[1];
+    expect(secondCall[0]).toBe('art 1453?');
+    expect(secondCall[1]).toBe('convergent');
+    expect(secondCall[3]).toBeInstanceOf(AbortSignal);
     expect(result.current.turns).toHaveLength(1);
   });
 
@@ -115,7 +119,10 @@ describe('useQaThread', () => {
       await result.current.retry(result.current.turns[1].id);
     });
     await waitFor(() => expect(result.current.turns[1].state.status).toBe('success'));
-    expect(refineQuestion).toHaveBeenNthCalledWith(2, 't1', 'e la diffida?');
+    const secondRefine = refineQuestion.mock.calls[1];
+    expect(secondRefine[0]).toBe('t1');
+    expect(secondRefine[1]).toBe('e la diffida?');
+    expect(secondRefine[2]).toBeInstanceOf(AbortSignal);
   });
 
   it('retry() is a no-op on non-error turns', async () => {
@@ -172,6 +179,46 @@ describe('useQaThread', () => {
     // dedupe: loading the same trace again is a no-op
     act(() => result.current.loadHistoryTurn(item));
     expect(result.current.turns).toHaveLength(1);
+  });
+
+  it('cancel() aborts the in-flight ask → recoverable "annullata" error, question preserved', async () => {
+    // A signal-aware mock: rejects with an abort-style error when the caller
+    // aborts (mirrors axios' CanceledError), otherwise stays pending.
+    askQuestion.mockImplementation(
+      (_q: string, _m: string, _max: unknown, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('canceled', 'AbortError')));
+        }),
+    );
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      void result.current.ask('art 1453?', 'convergent');
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('loading'));
+
+    await act(async () => {
+      result.current.cancel(result.current.turns[0].id);
+    });
+
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('error'));
+    const turn = result.current.turns[0];
+    expect(turn.question).toBe('art 1453?');
+    if (turn.state.status !== 'error') throw new Error('expected error state');
+    expect(turn.state.error).toMatch(/annullata/i);
+    // Still retryable (the ask request is preserved).
+    expect(turn.request).toEqual({ kind: 'ask', mode: 'convergent' });
+  });
+
+  it('cancel() on a non-loading turn is a no-op', async () => {
+    askQuestion.mockResolvedValue(answer);
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('q', 'convergent');
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+    act(() => result.current.cancel(result.current.turns[0].id));
+    // The completed turn is untouched.
+    expect(result.current.turns[0].state.status).toBe('success');
   });
 
   it('confirm() marks the source done on success', async () => {

@@ -114,6 +114,40 @@ describe('CandidateCard', () => {
     expect(promoteBtn()).toBeEnabled();
   });
 
+  it('shows a per-requirement checklist while promotion is gated', () => {
+    render(<CandidateCard candidate={candidate} articleUrn="urn:test" onPromoted={() => {}} />);
+    const checklist = screen.getByTestId('promotion-checklist');
+    expect(checklist).toBeInTheDocument();
+    // fonte is pre-filled ("Appunti personali"), reformulation + attestation are not
+    expect(checklist).toHaveTextContent(/fonte indicata/i);
+    expect(checklist).toHaveTextContent(/riformulazione/i);
+    expect(checklist).toHaveTextContent(/dichiarazione/i);
+  });
+
+  it('hides the checklist once every requirement is met', () => {
+    render(<CandidateCard candidate={candidate} articleUrn="urn:test" onPromoted={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+    fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+      target: { value: 'La risoluzione estingue il contratto.' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(promoteBtn()).toBeEnabled();
+    expect(screen.queryByTestId('promotion-checklist')).not.toBeInTheDocument();
+  });
+
+  it('labels the relation path as "in arrivo" (extractor produces entities only)', () => {
+    const relation = { ...candidate, candidate_type: 'relation' as const };
+    render(<CandidateCard candidate={relation} articleUrn="" onPromoted={() => {}} />);
+    expect(screen.getByTestId('relation-coming-soon')).toHaveTextContent(/in arrivo/i);
+    // the relation checklist also demands a reference norma
+    expect(screen.getByTestId('promotion-checklist')).toHaveTextContent(/norma di riferimento/i);
+  });
+
+  it('does not label an entity card as "in arrivo"', () => {
+    render(<CandidateCard candidate={candidate} articleUrn="urn:test" onPromoted={() => {}} />);
+    expect(screen.queryByTestId('relation-coming-soon')).not.toBeInTheDocument();
+  });
+
   it('shows a dedup hint when potential_duplicate_of is set', () => {
     render(
       <CandidateCard

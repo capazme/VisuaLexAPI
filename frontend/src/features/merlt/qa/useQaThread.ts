@@ -31,6 +31,11 @@ function friendlyQaError(err: unknown): string {
   if (status === 429) {
     return 'Troppe richieste in poco tempo. Attendi qualche istante e riprova.';
   }
+  if (status === 403) {
+    // The ask/refine routes need at least basic consent (Slice 3 D2). A revoke
+    // mid-thread lands here — point at consent, not a retry that can't succeed.
+    return 'Per usare l’assistente serve il consenso a MERL-T. Attivalo dalle impostazioni per continuare.';
+  }
   if (status === undefined) {
     return 'Nessuna risposta dal server: la connessione è assente o la richiesta ha impiegato troppo tempo. Riprova.';
   }
@@ -50,6 +55,9 @@ export function useQaThread() {
   // past answers (Loop β #1 option A). Lazy initializer → runs once.
   const [turns, setTurns] = useState<QaTurnModel[]>(() => loadThread());
   const tokens = useRef<Record<string, number>>({});
+  // One AbortController per in-flight turn, so the user can cancel the up-to-120s
+  // wait (design §3.5 "Annulla"). Cleared once the turn settles.
+  const controllers = useRef<Record<string, AbortController>>({});
 
   // Persist the thread whenever it changes (saveThread keeps only completed
   // turns + caps the count). setState is never called here.
@@ -62,19 +70,27 @@ export function useQaThread() {
   }, []);
 
   const run = useCallback(
-    async (id: string, work: () => Promise<QaAnswer>): Promise<void> => {
+    async (id: string, work: (signal: AbortSignal) => Promise<QaAnswer>): Promise<void> => {
       const token = (tokens.current[id] = (tokens.current[id] ?? 0) + 1);
+      const controller = new AbortController();
+      controllers.current[id] = controller;
       try {
-        const answer = await work();
+        const answer = await work(controller.signal);
         if (tokens.current[id] === token) patch(id, (t) => ({ ...t, state: { status: 'success', answer } }));
       } catch (err) {
-        console.error('QA ask/refine failed:', err);
+        // A user-initiated Annulla aborts the request: surface the dedicated
+        // "annullata" copy (still recoverable via Riprova) rather than a scary
+        // network-failure message.
+        const aborted = controller.signal.aborted;
+        if (!aborted) console.error('QA ask/refine failed:', err);
         if (tokens.current[id] === token) {
           patch(id, (t) => ({
             ...t,
-            state: { status: 'error', error: friendlyQaError(err) },
+            state: { status: 'error', error: aborted ? 'Richiesta annullata.' : friendlyQaError(err) },
           }));
         }
+      } finally {
+        if (controllers.current[id] === controller) delete controllers.current[id];
       }
     },
     [patch],
@@ -85,9 +101,9 @@ export function useQaThread() {
       const id = nextId();
       setTurns((prev) => [
         ...prev,
-        { id, question, state: { status: 'loading' }, confirmed: {}, request: { kind: 'ask', mode } },
+        { id, question, state: { status: 'loading', startedAt: Date.now() }, confirmed: {}, request: { kind: 'ask', mode } },
       ]);
-      await run(id, () => askQuestion(question, mode));
+      await run(id, (signal) => askQuestion(question, mode, undefined, signal));
     },
     [run],
   );
@@ -97,9 +113,9 @@ export function useQaThread() {
       const id = nextId();
       setTurns((prev) => [
         ...prev,
-        { id, question: followUp, state: { status: 'loading' }, confirmed: {}, request: { kind: 'refine', traceId } },
+        { id, question: followUp, state: { status: 'loading', startedAt: Date.now() }, confirmed: {}, request: { kind: 'refine', traceId } },
       ]);
-      await run(id, () => refineQuestion(traceId, followUp));
+      await run(id, (signal) => refineQuestion(traceId, followUp, signal));
     },
     [run],
   );
@@ -112,13 +128,22 @@ export function useQaThread() {
       const turn = turns.find((t) => t.id === turnId);
       if (!turn || turn.state.status !== 'error' || !turn.request) return;
       const req = turn.request;
-      patch(turnId, (t) => ({ ...t, state: { status: 'loading' } }));
-      await run(turnId, () =>
-        req.kind === 'ask' ? askQuestion(turn.question, req.mode) : refineQuestion(req.traceId, turn.question),
+      patch(turnId, (t) => ({ ...t, state: { status: 'loading', startedAt: Date.now() } }));
+      await run(turnId, (signal) =>
+        req.kind === 'ask'
+          ? askQuestion(turn.question, req.mode, undefined, signal)
+          : refineQuestion(req.traceId, turn.question, signal),
       );
     },
     [turns, patch, run],
   );
+
+  // Abort the in-flight request for a turn (Annulla). run()'s catch sees the
+  // aborted signal and transitions the turn to a recoverable "annullata" error
+  // with Riprova; the composer is never blocked, so the user can also re-type.
+  const cancel = useCallback((turnId: string): void => {
+    controllers.current[turnId]?.abort();
+  }, []);
 
   const rate = useCallback(
     (turnId: string, traceId: string, rating: 1 | 5): void => {
@@ -187,5 +212,5 @@ export function useQaThread() {
     });
   }, []);
 
-  return { turns, ask, refine, retry, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn };
+  return { turns, ask, refine, retry, cancel, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn };
 }

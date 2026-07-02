@@ -47,7 +47,9 @@ export interface QaAnswer {
 }
 
 export type QaAnswerState =
-  | { status: 'loading' }
+  // `startedAt` (epoch ms) drives the elapsed-time indicator during the wait
+  // (queries can take up to 120s). Absent on turns restored from localStorage.
+  | { status: 'loading'; startedAt?: number }
   | { status: 'success'; answer: QaAnswer }
   | { status: 'error'; error: string };
 
@@ -75,4 +77,16 @@ export interface QaTurnModel {
   rating?: 1 | 5; // optimistic 👍/👎
   confirmed: Record<string, ConfirmState>; // by retrieved-source node_id
   request?: QaTurnRequest; // absent on history-loaded turns (nothing to retry)
+}
+
+/**
+ * QA-PREFILL CONTRACT (Slice 3 §3.5): the in-article "Chiedi su questo articolo"
+ * button navigates to `/merlt/qa` with this in `location.state`. QAPage reads it
+ * once on mount to prefill the composer, then clears it so a manual reload does
+ * not re-prefill.
+ */
+export interface QaPrefillState {
+  prefillQuery: string;
+  articleUrn: string;
+  articleHeading?: string;
 }

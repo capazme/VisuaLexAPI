@@ -9,20 +9,29 @@ import type { QaAnswer, QaHistoryItem, QaMode } from './types';
 
 const QA_TIMEOUT_MS = 120000;
 
-export async function askQuestion(query: string, mode: QaMode, maxExperts?: number): Promise<QaAnswer> {
+export async function askQuestion(
+  query: string,
+  mode: QaMode,
+  maxExperts?: number,
+  signal?: AbortSignal,
+): Promise<QaAnswer> {
   const res = await apiClient.post<QaAnswer>(
     '/merlt/experts/query',
     { query, mode, maxExperts },
-    { timeout: QA_TIMEOUT_MS },
+    { timeout: QA_TIMEOUT_MS, signal },
   );
   return res.data;
 }
 
-export async function refineQuestion(traceId: string, followUpQuery: string): Promise<QaAnswer> {
+export async function refineQuestion(
+  traceId: string,
+  followUpQuery: string,
+  signal?: AbortSignal,
+): Promise<QaAnswer> {
   const res = await apiClient.post<QaAnswer>(
     '/merlt/experts/refine',
     { traceId, followUpQuery },
-    { timeout: QA_TIMEOUT_MS },
+    { timeout: QA_TIMEOUT_MS, signal },
   );
   return res.data;
 }
