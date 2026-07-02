@@ -17,9 +17,15 @@ vi.mock('../../shared/useArticleGraph', () => ({
 vi.mock('../../shared/useIngestionJob', () => ({
   useIngestionJob: (...a: unknown[]) => useIngestionJobMock(...a),
 }));
-vi.mock('../../shared/graphApi', () => ({
-  triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
-}));
+vi.mock('../../shared/graphApi', async (importOriginal) => {
+  // Keep the real classifyIngestionTriggerError so the 403-vs-5xx mapping is
+  // exercised end-to-end; only the network call is mocked.
+  const actual = await importOriginal<typeof import('../../shared/graphApi')>();
+  return {
+    ...actual,
+    triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
+  };
+});
 vi.mock('../../shared/GraphCanvas', () => ({
   default: () => <div data-testid="cytoscape" />,
 }));
@@ -123,5 +129,67 @@ describe('ArticleGraphSideRail', () => {
     render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
     fireEvent.click(screen.getByRole('button', { name: /esplora nel grafo/i }));
     expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining('/grafo?urn='));
+  });
+
+  describe('ingestion failure states (design §3.4)', () => {
+    const emptySuccess: ArticleGraphState = {
+      status: 'success',
+      data: { nodes: [], edges: [] },
+      elements: { nodes: [], edges: [] },
+    };
+
+    it('shows the consent hint when the trigger is rejected with 403', async () => {
+      triggerIngestionMock.mockRejectedValue({ status: 403, message: "consent_required" });
+      setGraph(emptySuccess);
+
+      render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+
+      expect(await screen.findByText(/serve il consenso/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
+      expect(screen.queryByText(/sto indicizzando/i)).not.toBeInTheDocument();
+    });
+
+    it('shows the unreachable message when the trigger fails with a 5xx', async () => {
+      triggerIngestionMock.mockRejectedValue({ response: { status: 500 } });
+      setGraph(emptySuccess);
+
+      render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+
+      expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
+    });
+
+    it('shows the unreachable message when the polling budget is exhausted (job timeout)', () => {
+      triggerIngestionMock.mockResolvedValue({ jobId: 'job-t', status: 'pending' });
+      setGraph(emptySuccess);
+      setJob({ status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null });
+
+      render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+
+      expect(screen.getByText(/non raggiungibile/i)).toBeInTheDocument();
+      expect(screen.queryByText(/sto indicizzando/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
+    });
+
+    it('Riprova resets the machine: refetch + re-armed trigger', async () => {
+      triggerIngestionMock.mockRejectedValue({ response: { status: 500 } });
+      setGraph(emptySuccess);
+
+      const { rerender } = render(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+      expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
+      expect(triggerIngestionMock).toHaveBeenCalledTimes(1);
+
+      triggerIngestionMock.mockResolvedValue({ jobId: 'job-2', status: 'pending' });
+      fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
+      expect(refetchMock).toHaveBeenCalled();
+      expect(screen.queryByText(/non raggiungibile/i)).not.toBeInTheDocument();
+
+      // Simulate the refetch round-trip: loading → success(empty) re-fires the trigger.
+      setGraph({ status: 'loading' });
+      rerender(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+      setGraph(emptySuccess);
+      rerender(<ArticleGraphSideRail articleUrn={URN} defaultOpen />);
+      await waitFor(() => expect(triggerIngestionMock).toHaveBeenCalledTimes(2));
+    });
   });
 });

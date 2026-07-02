@@ -38,7 +38,7 @@ export function useMerltFeatures(): MerltFeatures {
     canTrack: merltEnabled && canTrack,
     canContribute: merltEnabled && level === 'full',
     canValidate: merltEnabled && level === 'full',
-    graphReadable: graphEnabled && level !== 'none',
+    graphReadable: graphEnabled, // reading is free (D2): flag-only, no consent coupling
     opsVisible: merltEnabled && isAdmin,
   };
 }

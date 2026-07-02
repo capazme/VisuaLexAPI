@@ -62,4 +62,39 @@ describe('ValidationPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
   });
+
+  it('reverts the optimistic removal and shows a retry toast when the vote fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    voteEntityMock.mockRejectedValue(new Error('500'));
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Buona fede')).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /approva buona fede/i }));
+    });
+    // reverted: the item is back in the queue
+    await waitFor(() => expect(screen.getByText('Buona fede')).toBeInTheDocument());
+    // Italian retry toast, no silent catch
+    expect(screen.getByText(/invio del voto non riuscito/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it('retries the vote from the toast and removes the item on success', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    voteEntityMock.mockRejectedValueOnce(new Error('500')).mockResolvedValueOnce(undefined);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Buona fede')).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /approva buona fede/i }));
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    });
+    expect(voteEntityMock).toHaveBeenCalledTimes(2);
+    expect(voteEntityMock).toHaveBeenLastCalledWith('e1', 'approve');
+    await waitFor(() => expect(screen.queryByText('Buona fede')).not.toBeInTheDocument());
+    consoleError.mockRestore();
+  });
 });

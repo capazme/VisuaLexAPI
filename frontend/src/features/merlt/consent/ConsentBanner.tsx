@@ -26,6 +26,42 @@ const TRACKED_EVENT_TYPES = new Set<string>([
 ]);
 
 /**
+ * "Non ora" snooze (design §3.2): persisted for 30 days so the banner does not
+ * nag on every session. The key stores the expiry timestamp (ms). Namespaced
+ * like the other MERL-T local keys (`visualex.merlt.*`). Choosing any consent
+ * level clears it, so a later revoke lets the banner surface again.
+ */
+const SNOOZE_KEY = 'visualex.merlt.consent-snooze';
+const SNOOZE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function isSnoozed(): boolean {
+  try {
+    const raw = localStorage.getItem(SNOOZE_KEY);
+    if (!raw) return false;
+    const until = Number(raw);
+    return Number.isFinite(until) && Date.now() < until;
+  } catch {
+    return false;
+  }
+}
+
+function persistSnooze(): void {
+  try {
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_MS));
+  } catch {
+    /* localStorage unavailable — the in-memory dismiss still applies */
+  }
+}
+
+function clearSnooze(): void {
+  try {
+    localStorage.removeItem(SNOOZE_KEY);
+  } catch {
+    /* localStorage unavailable — nothing to clear */
+  }
+}
+
+/**
  * Non-blocking first-run consent prompt (Slice 2b). Mounted on the `global`
  * plugin slot so it survives route changes. It surfaces only when MERL-T is
  * enabled, the consent state is known (ready), no consent has been granted
@@ -36,7 +72,8 @@ const TRACKED_EVENT_TYPES = new Set<string>([
 export function ConsentBanner() {
   const { level, status } = useConsent();
   const [triggered, setTriggered] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  // Lazy initializer honours a persisted (unexpired) snooze on mount.
+  const [dismissed, setDismissed] = useState(isSnoozed);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -47,6 +84,12 @@ export function ConsentBanner() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    // External-state sync only (no setState): once a consent level is chosen
+    // the snooze is moot — drop it so a future revoke re-enables the banner.
+    if (level !== 'none') clearSnooze();
+  }, [level]);
 
   const visible =
     isMerltEnabled() && status === 'ready' && level === 'none' && triggered && !dismissed;
@@ -71,7 +114,14 @@ export function ConsentBanner() {
                 contenuto viene condiviso senza una tua azione esplicita.
               </p>
               <div className="mt-3 flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setDismissed(true)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    persistSnooze();
+                    setDismissed(true);
+                  }}
+                >
                   Non ora
                 </Button>
                 <Button variant="primary" size="sm" onClick={() => setDialogOpen(true)}>

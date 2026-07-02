@@ -88,7 +88,7 @@ export function MerltHubPage() {
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
               Il tuo centro per l’intelligenza giuridica MERL-T: gestisci il consenso, esplora il
-              grafo, e (presto) contribuisci con i tuoi appunti.
+              grafo e contribuisci con i tuoi appunti.
             </p>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-white/60 bg-white/70 px-4 py-2 dark:border-slate-700 dark:bg-slate-900/60">
@@ -158,7 +158,8 @@ export function MerltHubPage() {
           )}
         </HubCard>
 
-        {features.graphReadable && (
+        {/* Reading the graph is free (D2): visibility follows the feature flag, never the consent level. */}
+        {features.graphEnabled && (
           <HubCard testId="hub-card-graph" icon={Network} title="Grafo giuridico">
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Esplora le relazioni tra norme, principi e concetti.

@@ -65,10 +65,14 @@ export interface QaHistoryItem {
 
 export type ConfirmState = 'pending' | 'done' | 'error';
 
+/** How the turn's answer was requested — kept so a failed turn can be re-run in place (Riprova). */
+export type QaTurnRequest = { kind: 'ask'; mode: QaMode } | { kind: 'refine'; traceId: string };
+
 export interface QaTurnModel {
   id: string;
   question: string;
   state: QaAnswerState;
   rating?: 1 | 5; // optimistic 👍/👎
   confirmed: Record<string, ConfirmState>; // by retrieved-source node_id
+  request?: QaTurnRequest; // absent on history-loaded turns (nothing to retry)
 }

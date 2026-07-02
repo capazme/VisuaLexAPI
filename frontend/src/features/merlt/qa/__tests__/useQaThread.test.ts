@@ -64,6 +64,74 @@ describe('useQaThread', () => {
     await waitFor(() => expect(result.current.turns[0].state.status).toBe('error'));
   });
 
+  it('ask() failure preserves the question and maps the error to Italian copy', async () => {
+    // apiClient's interceptor rejects with a plain { status, message } object.
+    askQuestion.mockRejectedValue({ status: 503, message: 'Service Unavailable' });
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('art 1453?', 'convergent');
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('error'));
+    const turn = result.current.turns[0];
+    expect(turn.question).toBe('art 1453?');
+    if (turn.state.status !== 'error') throw new Error('expected error state');
+    expect(turn.state.error).not.toMatch(/Service Unavailable/);
+    expect(turn.state.error).toMatch(/non è al momento raggiungibile/i);
+  });
+
+  it('retry() re-submits the same failed question in place and can succeed', async () => {
+    askQuestion.mockRejectedValueOnce({ status: undefined, message: 'Network Error' });
+    askQuestion.mockResolvedValueOnce(answer);
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('art 1453?', 'convergent');
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('error'));
+
+    await act(async () => {
+      await result.current.retry(result.current.turns[0].id);
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+    // same question, same mode, same (single) turn
+    expect(askQuestion).toHaveBeenCalledTimes(2);
+    expect(askQuestion).toHaveBeenNthCalledWith(2, 'art 1453?', 'convergent');
+    expect(result.current.turns).toHaveLength(1);
+  });
+
+  it('retry() on a failed refine re-calls refineQuestion with the original traceId', async () => {
+    askQuestion.mockResolvedValue(answer);
+    refineQuestion.mockRejectedValueOnce({ status: 500, message: 'Internal' });
+    refineQuestion.mockResolvedValueOnce({ ...answer, trace_id: 't2' });
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('q', 'convergent');
+    });
+    await act(async () => {
+      await result.current.refine('t1', 'e la diffida?');
+    });
+    await waitFor(() => expect(result.current.turns[1].state.status).toBe('error'));
+
+    await act(async () => {
+      await result.current.retry(result.current.turns[1].id);
+    });
+    await waitFor(() => expect(result.current.turns[1].state.status).toBe('success'));
+    expect(refineQuestion).toHaveBeenNthCalledWith(2, 't1', 'e la diffida?');
+  });
+
+  it('retry() is a no-op on non-error turns', async () => {
+    askQuestion.mockResolvedValue(answer);
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('q', 'convergent');
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+    await act(async () => {
+      await result.current.retry(result.current.turns[0].id);
+    });
+    expect(askQuestion).toHaveBeenCalledTimes(1);
+    expect(result.current.turns[0].state.status).toBe('success');
+  });
+
   it('refine() appends a second turn', async () => {
     askQuestion.mockResolvedValue(answer);
     refineQuestion.mockResolvedValue({ ...answer, trace_id: 't2' });

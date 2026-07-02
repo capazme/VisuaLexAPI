@@ -12,7 +12,11 @@ import {
   type GraphSliceSnapshot,
 } from '../shared/snapshotIO';
 import { useIngestionJob } from '../shared/useIngestionJob';
-import { triggerIngestion } from '../shared/graphApi';
+import {
+  classifyIngestionTriggerError,
+  triggerIngestion,
+  type IngestionTriggerErrorKind,
+} from '../shared/graphApi';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
 import type { GraphLayoutName } from '../shared/GraphCanvas';
 import { Toast } from '../../../../components/ui/Toast';
@@ -59,6 +63,7 @@ export function GraphExplorerPage(): React.ReactElement {
   // Lazy ingestion: a urn that resolves to an empty subgraph isn't in the graph
   // yet — enqueue an ingestion job, poll it, then refetch when it completes.
   const [jobId, setJobId] = useState<string | null>(null);
+  const [triggerError, setTriggerError] = useState<IngestionTriggerErrorKind | null>(null);
   const job = useIngestionJob(jobId);
   const triggeredRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -76,6 +81,7 @@ export function GraphExplorerPage(): React.ReactElement {
   useEffect(() => {
     triggeredRef.current = false;
     setJobId(null);
+    setTriggerError(null);
     setHiddenNodeTypes(new Set());
     setHiddenEdgeTypes(new Set());
     setHighlightType(null);
@@ -87,13 +93,20 @@ export function GraphExplorerPage(): React.ReactElement {
     triggeredRef.current = true;
     triggerIngestion(urn)
       .then((r) => setJobId(r.jobId))
-      .catch(() => {
-        /* opportunistic — empty state will show "non indicizzabile" */
-      });
+      .catch((err: unknown) => setTriggerError(classifyIngestionTriggerError(err)));
     // Keyed on status (data is undefined outside success; read at fire time;
     // triggeredRef guards re-entry).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph.status, urn]);
+
+  // Full machine reset: re-arm the trigger and refetch — an empty subgraph
+  // then re-enqueues the ingestion (with a fresh polling budget).
+  const retryIngestion = (): void => {
+    triggeredRef.current = false;
+    setJobId(null);
+    setTriggerError(null);
+    graph.refetch();
+  };
 
   useEffect(() => {
     if (job.status === 'completed') {
@@ -280,7 +293,22 @@ export function GraphExplorerPage(): React.ReactElement {
           ) : graph.status === 'error' ? (
             <ErrorState />
           ) : graph.data.nodes.length === 0 ? (
-            job.status === 'failed' || job.status === 'timeout' || job.status === 'completed' ? (
+            // The ingestion trigger failed: distinct copy per cause (design §3.4).
+            triggerError === 'consent' ? (
+              <IngestionErrorState
+                tone="amber"
+                message="Per costruire il grafo serve il consenso."
+                onRetry={retryIngestion}
+              />
+            ) : triggerError === 'unavailable' || job.status === 'timeout' ? (
+              // 5xx/network trigger failure OR polling budget/job timeout:
+              // MERL-T is unreachable or too slow — never an unbounded spinner.
+              <IngestionErrorState
+                tone="red"
+                message="Grafo non raggiungibile — riprova più tardi."
+                onRetry={retryIngestion}
+              />
+            ) : job.status === 'failed' || job.status === 'completed' ? (
               <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
                 <AlertCircle className="h-8 w-8 text-amber-500" />
                 <p className="text-slate-500 dark:text-slate-400">Articolo non indicizzabile nel grafo.</p>
@@ -385,6 +413,32 @@ function EmptyState(): React.ReactElement {
       <p className="max-w-sm text-slate-500 dark:text-slate-400">
         Cerca un articolo o un concetto per iniziare a esplorare il grafo.
       </p>
+    </div>
+  );
+}
+
+/** Ingestion-failure fallback: cause-specific copy + a retry that resets the
+ *  trigger machine (design §3.4 — no infinite "sto indicizzando" spinner). */
+function IngestionErrorState({
+  tone,
+  message,
+  onRetry,
+}: {
+  tone: 'amber' | 'red';
+  message: string;
+  onRetry: () => void;
+}): React.ReactElement {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <AlertCircle className={tone === 'amber' ? 'h-8 w-8 text-amber-500' : 'h-8 w-8 text-red-500'} />
+      <p className="text-slate-500 dark:text-slate-400">{message}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
+        Riprova
+      </button>
     </div>
   );
 }

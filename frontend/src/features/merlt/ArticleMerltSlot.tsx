@@ -1,8 +1,5 @@
 import type { RefObject } from 'react';
 import { useArticleViewedTracker } from './tracking/useArticleViewedTracker';
-import { useHighlightAnnotationTracker } from './tracking/useHighlightAnnotationTracker';
-import { useDossierBookmarkTracker } from './tracking/useDossierBookmarkTracker';
-import { useCitationTracker } from './tracking/useCitationTracker';
 
 /**
  * MERL-T slot mounted in `article_content_after` (see plugins/registry).
@@ -11,6 +8,12 @@ import { useCitationTracker } from './tracking/useCitationTracker';
  * `useArticleViewedTracker` hook so the host (`ArticleTabContent`) does
  * not import MERL-T directly. Toggling `VITE_FEATURE_MERLT=false` skips
  * the registry entry and this component is never mounted.
+ *
+ * This slot hosts ONLY the article-scoped tracker (dwell/scroll observer
+ * on the article element). The bus-subscriber trackers (highlight,
+ * dossier/bookmark, citation) live in `GlobalMerltSlot`: mounting them
+ * here duplicated every event ×N with N article cards open, and missed
+ * events emitted outside any article view (Slice 3 §3.9).
  *
  * The richer UI from commit 81be277 (Q&A panel, live enrichment, graph
  * preview, feedback buttons) called endpoints that no longer exist in
@@ -33,17 +36,6 @@ export function ArticleMerltSlot({
         normaVisitataId,
         containerRef,
     });
-
-    // MERLT-1.7: subscribes to the merltEventBus and forwards
-    // highlight/annotation events to the BFF. Singleton — the hook itself
-    // guards against duplicate subscriptions via React's effect cleanup.
-    useHighlightAnnotationTracker();
-
-    // MERLT-1.8: dossier-add + bookmark-add events.
-    useDossierBookmarkTracker();
-
-    // MERLT-1.9: citation:clicked events from the in-article citation linker.
-    useCitationTracker();
 
     return null;
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Check, Loader2, ScrollText, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { Toast } from '../../../components/ui/Toast';
 import { useMerltFeatures } from '../useMerltFeatures';
 import {
   fetchPendingQueue,
@@ -16,6 +17,11 @@ type QueueState =
   | { status: 'success'; data: PendingQueue }
   | { status: 'error' };
 
+interface VoteToast {
+  message: string;
+  action: { label: string; onClick: () => void };
+}
+
 /**
  * RLCF validation page (Slice 2c #8): vote on the community's pending entity /
  * relation proposals. Gated by full (validation) consent. setState lives in
@@ -25,6 +31,7 @@ export function ValidationPage() {
   const { canValidate, merltEnabled } = useMerltFeatures();
   const [queue, setQueue] = useState<QueueState>({ status: 'loading' });
   const [resolved, setResolved] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<VoteToast | null>(null);
 
   useEffect(() => {
     if (!merltEnabled || !canValidate) return;
@@ -42,21 +49,36 @@ export function ValidationPage() {
   }, [merltEnabled, canValidate]);
 
   const markResolved = (id: string): void => setResolved((prev) => new Set(prev).add(id));
+  const unmarkResolved = (id: string): void =>
+    setResolved((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
-  const handleEntityVote = async (id: string, vote: MerltVote): Promise<void> => {
+  // Optimistic removal with revert on failure: the item comes back into the
+  // queue and a retry toast is offered (no silent catch — repo gotcha #18).
+  const submitVote = async (kind: 'entity' | 'relation', id: string, vote: MerltVote): Promise<void> => {
     markResolved(id);
     try {
-      await voteEntity(id, vote);
-    } catch {
-      // optimistic: a failed vote is recoverable on next load; keep UX snappy.
-    }
-  };
-  const handleRelationVote = async (id: string, vote: MerltVote): Promise<void> => {
-    markResolved(id);
-    try {
-      await voteRelation(id, vote);
-    } catch {
-      /* optimistic */
+      if (kind === 'entity') {
+        await voteEntity(id, vote);
+      } else {
+        await voteRelation(id, vote);
+      }
+    } catch (err) {
+      console.error(`ValidationPage: ${kind} vote failed:`, err);
+      unmarkResolved(id);
+      setToast({
+        message: 'Invio del voto non riuscito. La proposta è di nuovo in coda.',
+        action: {
+          label: 'Riprova',
+          onClick: () => {
+            setToast(null);
+            void submitVote(kind, id, vote);
+          },
+        },
+      });
     }
   };
 
@@ -113,7 +135,7 @@ export function ValidationPage() {
                 body: e.descrizione,
                 votes: e.votes_count,
               }))}
-            onVote={(id, v) => void handleEntityVote(id, v)}
+            onVote={(id, v) => void submitVote('entity', id, v)}
           />
           <ValidationSection
             title="Relazioni proposte"
@@ -126,9 +148,20 @@ export function ValidationPage() {
                 body: r.descrizione,
                 votes: r.votes_count,
               }))}
-            onVote={(id, v) => void handleRelationVote(id, v)}
+            onVote={(id, v) => void submitVote('relation', id, v)}
           />
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type="error"
+          isVisible
+          onClose={() => setToast(null)}
+          duration={6000}
+          action={toast.action}
+        />
       )}
     </div>
   );

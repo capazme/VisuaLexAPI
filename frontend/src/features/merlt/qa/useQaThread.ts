@@ -15,6 +15,29 @@ let seq = 0;
 const nextId = (): string => `turn-${++seq}`;
 
 /**
+ * Map a failed ask/refine to user-facing Italian copy. The apiClient response
+ * interceptor rejects with a plain `{ status?, message? }` object — the raw
+ * (English/HTTP) message must never reach the UI. The failed question stays on
+ * the turn, so every message can point at "Riprova".
+ */
+function friendlyQaError(err: unknown): string {
+  const status =
+    typeof err === 'object' && err !== null && 'status' in err
+      ? (err as { status?: number }).status
+      : undefined;
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Il motore MERL-T non è al momento raggiungibile. Riprova più tardi.';
+  }
+  if (status === 429) {
+    return 'Troppe richieste in poco tempo. Attendi qualche istante e riprova.';
+  }
+  if (status === undefined) {
+    return 'Nessuna risposta dal server: la connessione è assente o la richiesta ha impiegato troppo tempo. Riprova.';
+  }
+  return 'Non è stato possibile ottenere una risposta. Riprova.';
+}
+
+/**
  * Conversational Q&A thread over the MERL-T experts. Holds the turns, drives
  * ask/refine, and the granular feedback channels (inline / per-source /
  * preference / detailed) + confirm-source. All feedback is fire-and-forget and
@@ -45,10 +68,11 @@ export function useQaThread() {
         const answer = await work();
         if (tokens.current[id] === token) patch(id, (t) => ({ ...t, state: { status: 'success', answer } }));
       } catch (err) {
+        console.error('QA ask/refine failed:', err);
         if (tokens.current[id] === token) {
           patch(id, (t) => ({
             ...t,
-            state: { status: 'error', error: err instanceof Error ? err.message : 'Errore' },
+            state: { status: 'error', error: friendlyQaError(err) },
           }));
         }
       }
@@ -59,7 +83,10 @@ export function useQaThread() {
   const ask = useCallback(
     async (question: string, mode: QaMode): Promise<void> => {
       const id = nextId();
-      setTurns((prev) => [...prev, { id, question, state: { status: 'loading' }, confirmed: {} }]);
+      setTurns((prev) => [
+        ...prev,
+        { id, question, state: { status: 'loading' }, confirmed: {}, request: { kind: 'ask', mode } },
+      ]);
       await run(id, () => askQuestion(question, mode));
     },
     [run],
@@ -68,10 +95,29 @@ export function useQaThread() {
   const refine = useCallback(
     async (traceId: string, followUp: string): Promise<void> => {
       const id = nextId();
-      setTurns((prev) => [...prev, { id, question: followUp, state: { status: 'loading' }, confirmed: {} }]);
+      setTurns((prev) => [
+        ...prev,
+        { id, question: followUp, state: { status: 'loading' }, confirmed: {}, request: { kind: 'refine', traceId } },
+      ]);
       await run(id, () => refineQuestion(traceId, followUp));
     },
     [run],
+  );
+
+  // Re-submit a failed turn in place (Riprova). The question is preserved on
+  // the turn model, so the same request re-runs without re-typing; run()'s
+  // token bump makes any stale in-flight response for this turn discardable.
+  const retry = useCallback(
+    async (turnId: string): Promise<void> => {
+      const turn = turns.find((t) => t.id === turnId);
+      if (!turn || turn.state.status !== 'error' || !turn.request) return;
+      const req = turn.request;
+      patch(turnId, (t) => ({ ...t, state: { status: 'loading' } }));
+      await run(turnId, () =>
+        req.kind === 'ask' ? askQuestion(turn.question, req.mode) : refineQuestion(req.traceId, turn.question),
+      );
+    },
+    [turns, patch, run],
   );
 
   const rate = useCallback(
@@ -141,5 +187,5 @@ export function useQaThread() {
     });
   }, []);
 
-  return { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn };
+  return { turns, ask, refine, retry, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn };
 }

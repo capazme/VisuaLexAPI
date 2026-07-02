@@ -72,9 +72,34 @@ describe('MerltHubPage', () => {
     expect(screen.getByTestId('hub-card-consent')).toHaveTextContent(/base/i);
   });
 
-  it('shows the graph card when graph is readable', () => {
+  it('shows the graph card when the graph flag is enabled', () => {
     renderHub();
     expect(screen.getByTestId('hub-card-graph')).toBeInTheDocument();
+  });
+
+  it('shows the graph card with consent none when the graph flag is on (reading is free)', () => {
+    useMerltFeaturesMock.mockReturnValue({
+      ...baseFeatures,
+      consentLevel: 'none' as const,
+      canTrack: false,
+      graphEnabled: true,
+      // stale consent-coupled value must not matter: the card follows the flag
+      graphReadable: false,
+    });
+    useConsentMock.mockReturnValue({ level: 'none', status: 'ready', consent: null });
+    renderHub();
+    expect(screen.getByTestId('hub-card-graph')).toBeInTheDocument();
+  });
+
+  it('hides the graph card when the graph flag is off', () => {
+    useMerltFeaturesMock.mockReturnValue({ ...baseFeatures, graphEnabled: false, graphReadable: false });
+    renderHub();
+    expect(screen.queryByTestId('hub-card-graph')).not.toBeInTheDocument();
+  });
+
+  it('does not show the stale "(presto)" copy in the header', () => {
+    renderHub();
+    expect(screen.queryByText(/\(presto\)/)).not.toBeInTheDocument();
   });
 
   it('hides the ops card for non-admins and shows it for admins', () => {

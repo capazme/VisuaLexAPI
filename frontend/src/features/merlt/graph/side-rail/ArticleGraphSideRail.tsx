@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useArticleGraph } from '../shared/useArticleGraph';
 import { useIngestionJob } from '../shared/useIngestionJob';
-import { triggerIngestion } from '../shared/graphApi';
+import {
+  classifyIngestionTriggerError,
+  triggerIngestion,
+  type IngestionTriggerErrorKind,
+} from '../shared/graphApi';
 import { CollapseToggle } from './CollapseToggle';
 
 const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
@@ -36,6 +40,7 @@ export function ArticleGraphSideRail({
   const graph = useArticleGraph(activeUrn, SIDE_RAIL_DEPTH, SIDE_RAIL_LIMIT);
 
   const [jobId, setJobId] = useState<string | null>(null);
+  const [triggerError, setTriggerError] = useState<IngestionTriggerErrorKind | null>(null);
   const job = useIngestionJob(jobId);
 
   // Trigger ingestion once when the subgraph comes back empty. Reset keyed on
@@ -45,6 +50,7 @@ export function ArticleGraphSideRail({
   useEffect(() => {
     triggeredRef.current = false;
     setJobId(null);
+    setTriggerError(null);
   }, [activeUrn]);
 
   useEffect(() => {
@@ -53,9 +59,7 @@ export function ArticleGraphSideRail({
     triggeredRef.current = true;
     triggerIngestion(articleUrn)
       .then((r) => setJobId(r.jobId))
-      .catch(() => {
-        /* opportunistic — the empty state will show "not indexable" */
-      });
+      .catch((err: unknown) => setTriggerError(classifyIngestionTriggerError(err)));
     // Keyed on status, not graph.data: data is undefined outside 'success' (so it
     // can't go in deps), it's read at fire time, and triggeredRef guards re-entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,6 +70,15 @@ export function ArticleGraphSideRail({
     if (job.status === 'completed') graph.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.status]);
+
+  // Full machine reset: re-arm the trigger and refetch — an empty subgraph
+  // then re-enqueues the ingestion (with a fresh polling budget).
+  const retryIngestion = (): void => {
+    triggeredRef.current = false;
+    setJobId(null);
+    setTriggerError(null);
+    graph.refetch();
+  };
 
   if (!articleUrn) return null;
 
@@ -93,7 +106,9 @@ export function ArticleGraphSideRail({
         <RailBody
           graph={graph}
           job={job}
+          triggerError={triggerError}
           articleUrn={articleUrn}
+          onRetryIngestion={retryIngestion}
           onNavigateExplore={() =>
             navigate(`/grafo?urn=${encodeURIComponent(articleUrn)}&depth=2`)
           }
@@ -107,7 +122,9 @@ export function ArticleGraphSideRail({
 interface RailBodyProps {
   graph: ReturnType<typeof useArticleGraph>;
   job: ReturnType<typeof useIngestionJob>;
+  triggerError: IngestionTriggerErrorKind | null;
   articleUrn: string;
+  onRetryIngestion: () => void;
   onNavigateExplore: () => void;
   onNodeNavigate: (urn: string) => void;
 }
@@ -115,6 +132,8 @@ interface RailBodyProps {
 function RailBody({
   graph,
   job,
+  triggerError,
+  onRetryIngestion,
   onNavigateExplore,
   onNodeNavigate,
 }: RailBodyProps): React.ReactElement {
@@ -127,24 +146,41 @@ function RailBody({
       <Centered>
         <AlertCircle className="h-6 w-6 text-red-500" />
         <p className="text-sm text-slate-600 dark:text-slate-300">Errore nel caricamento del grafo.</p>
-        <button
-          type="button"
-          onClick={graph.refetch}
-          className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-        >
-          Riprova
-        </button>
+        <RetryButton onClick={graph.refetch} />
       </Centered>
     );
   }
 
   // success
   if (graph.data.nodes.length === 0) {
+    // The ingestion trigger itself failed: distinct copy per cause (design §3.4).
+    if (triggerError === 'consent') {
+      return (
+        <Centered>
+          <AlertCircle className="h-6 w-6 text-amber-500" />
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Per costruire il grafo serve il consenso.
+          </p>
+          <RetryButton onClick={onRetryIngestion} />
+        </Centered>
+      );
+    }
+    // 5xx/network trigger failure OR polling budget/job timeout: MERL-T is
+    // unreachable or too slow — never leave the spinner unbounded.
+    if (triggerError === 'unavailable' || job.status === 'timeout') {
+      return (
+        <Centered>
+          <AlertCircle className="h-6 w-6 text-red-500" />
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Grafo non raggiungibile — riprova più tardi.
+          </p>
+          <RetryButton onClick={onRetryIngestion} />
+        </Centered>
+      );
+    }
     // A completed job that still yields no nodes means the article isn't
     // indexable — otherwise we'd spin on "indicizzando…" forever.
-    const failed =
-      job.status === 'failed' || job.status === 'timeout' || job.status === 'completed';
-    if (failed) {
+    if (job.status === 'failed' || job.status === 'completed') {
       return (
         <Centered>
           <AlertCircle className="h-6 w-6 text-amber-500" />
@@ -203,4 +239,16 @@ function Skeleton({ label, building }: { label: string; building?: boolean }): R
 
 function Centered({ children }: { children: React.ReactNode }): React.ReactElement {
   return <div className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center">{children}</div>;
+}
+
+function RetryButton({ onClick }: { onClick: () => void }): React.ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+    >
+      Riprova
+    </button>
+  );
 }

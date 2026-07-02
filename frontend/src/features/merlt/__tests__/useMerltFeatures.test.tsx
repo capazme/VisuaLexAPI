@@ -38,11 +38,12 @@ describe('useMerltFeatures (client-side derivation)', () => {
     });
   });
 
-  it('none consent → contribute/validate/graphReadable/canTrack all false', () => {
+  it('none consent → contribute/validate/canTrack false, but graph stays readable (flag-only)', () => {
     const { result } = renderHook(() => useMerltFeatures());
     expect(result.current.canContribute).toBe(false);
     expect(result.current.canValidate).toBe(false);
-    expect(result.current.graphReadable).toBe(false);
+    // Reading the graph is free (D2): graphReadable follows the flag, not consent.
+    expect(result.current.graphReadable).toBe(true);
     expect(result.current.canTrack).toBe(false);
     expect(result.current.opsVisible).toBe(false);
   });

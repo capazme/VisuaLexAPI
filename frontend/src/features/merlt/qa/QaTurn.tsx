@@ -16,6 +16,8 @@ export interface QaTurnProps {
   onRateSource: (sourceId: string, relevant: boolean) => void;
   onPrefer: (expert: string) => void;
   onDetailed: (scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number }) => void;
+  /** Re-submit this turn's question after a failure (Riprova). */
+  onRetry?: () => void;
   /** Forward an in-prose citation NER feedback (surface=qa_chip). */
   onNerCitation?: (payload: NerFeedbackInput) => void;
   /** Dev mode: render the pipeline trace under the answer. */
@@ -28,7 +30,7 @@ function confidenceLabel(c: number): string {
   return 'bassa';
 }
 
-export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed, onNerCitation, devMode }: QaTurnProps) {
+export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPrefer, onDetailed, onRetry, onNerCitation, devMode }: QaTurnProps) {
   const [refining, setRefining] = useState(false);
   const [followUp, setFollowUp] = useState('');
 
@@ -56,9 +58,21 @@ export function QaTurn({ turn, onRate, onRefine, onConfirm, onRateSource, onPref
       )}
 
       {turn.state.status === 'error' && (
-        <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
-          Non è stato possibile ottenere una risposta ({turn.state.error}). Riprova.
-        </p>
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-950/30"
+        >
+          <p className="text-sm text-amber-700 dark:text-amber-400">{turn.state.error}</p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-sm font-medium text-amber-800 underline transition-colors hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-amber-300 dark:hover:text-amber-200"
+            >
+              Riprova
+            </button>
+          )}
+        </div>
       )}
 
       {turn.state.status === 'success' && (() => {

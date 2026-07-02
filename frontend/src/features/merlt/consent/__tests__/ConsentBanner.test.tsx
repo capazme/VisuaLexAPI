@@ -24,6 +24,8 @@ vi.mock('../ConsentDialog', () => ({
 
 import { ConsentBanner } from '../ConsentBanner';
 
+const SNOOZE_KEY = 'visualex.merlt.consent-snooze';
+
 function fireTrackable() {
   act(() => {
     busListener?.({ interaction_type: 'article_viewed' });
@@ -35,6 +37,7 @@ beforeEach(() => {
   isMerltEnabledMock.mockReturnValue(true);
   busListener = null;
   unsubscribe.mockReset();
+  localStorage.removeItem(SNOOZE_KEY);
 });
 
 describe('ConsentBanner', () => {
@@ -87,5 +90,47 @@ describe('ConsentBanner', () => {
     render(<ConsentBanner />);
     fireTrackable();
     expect(screen.queryByTestId('consent-banner')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConsentBanner — 30-day snooze (design §3.2)', () => {
+  it('"Non ora" persists the snooze and it is honoured on a fresh mount', () => {
+    const { unmount } = render(<ConsentBanner />);
+    fireTrackable();
+    fireEvent.click(screen.getByRole('button', { name: /non ora/i }));
+
+    const raw = localStorage.getItem(SNOOZE_KEY);
+    expect(raw).not.toBeNull();
+    // expiry ≈ now + 30 days
+    const until = Number(raw);
+    expect(until).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
+    expect(until).toBeLessThanOrEqual(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    // a new mount (next session) still honours the snooze
+    unmount();
+    render(<ConsentBanner />);
+    fireTrackable();
+    expect(screen.queryByTestId('consent-banner')).not.toBeInTheDocument();
+  });
+
+  it('an expired snooze is ignored on mount', () => {
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() - 1000));
+    render(<ConsentBanner />);
+    fireTrackable();
+    expect(screen.getByTestId('consent-banner')).toBeInTheDocument();
+  });
+
+  it('a malformed snooze value is ignored on mount', () => {
+    localStorage.setItem(SNOOZE_KEY, 'not-a-timestamp');
+    render(<ConsentBanner />);
+    fireTrackable();
+    expect(screen.getByTestId('consent-banner')).toBeInTheDocument();
+  });
+
+  it('choosing a consent level clears the snooze', () => {
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() + 1000000));
+    useConsentMock.mockReturnValue({ level: 'basic', status: 'ready' });
+    render(<ConsentBanner />);
+    expect(localStorage.getItem(SNOOZE_KEY)).toBeNull();
   });
 });

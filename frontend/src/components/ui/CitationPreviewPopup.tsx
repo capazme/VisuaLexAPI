@@ -184,17 +184,8 @@ export function CitationPreviewPopup({
               )}
             </div>
 
-            {/* Footer - NER feedback (contributors) + Open in Tab button */}
+            {/* Footer - Open in Tab button (primary) + NER feedback below it (design §3.7) */}
             <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
-              {nerFeedbackEnabled && onNerFeedback && (
-                <div className="mb-3 border-b border-slate-100 pb-3 dark:border-slate-800">
-                  <CitationNerFeedback
-                    key={`${citation.act_type}-${citation.article}-${citation.act_number ?? ''}`}
-                    citation={citation}
-                    onSubmit={onNerFeedback}
-                  />
-                </div>
-              )}
               <button
                 onClick={handleOpenInTab}
                 disabled={isLoading}
@@ -208,6 +199,15 @@ export function CitationPreviewPopup({
                 <ExternalLink size={14} />
                 Apri in nuova tab
               </button>
+              {nerFeedbackEnabled && onNerFeedback && (
+                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <CitationNerFeedback
+                    key={`${citation.act_type}-${citation.article}-${citation.act_number ?? ''}`}
+                    citation={citation}
+                    onSubmit={onNerFeedback}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

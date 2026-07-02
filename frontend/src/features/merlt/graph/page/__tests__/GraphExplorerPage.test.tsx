@@ -19,9 +19,15 @@ vi.mock('../../featureFlag', () => ({
 
 const triggerIngestionMock = vi.fn();
 const useIngestionJobMock = vi.fn();
-vi.mock('../../shared/graphApi', () => ({
-  triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
-}));
+vi.mock('../../shared/graphApi', async (importOriginal) => {
+  // Keep the real classifyIngestionTriggerError so the 403-vs-5xx mapping is
+  // exercised end-to-end; only the network call is mocked.
+  const actual = await importOriginal<typeof import('../../shared/graphApi')>();
+  return {
+    ...actual,
+    triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
+  };
+});
 vi.mock('../../shared/useIngestionJob', () => ({
   useIngestionJob: (...a: unknown[]) => useIngestionJobMock(...a),
 }));
@@ -154,5 +160,63 @@ describe('GraphExplorerPage', () => {
     });
     renderAt('/grafo?urn=urn:test');
     expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
+  });
+
+  describe('ingestion failure states (design §3.4)', () => {
+    beforeEach(() => {
+      setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
+    });
+
+    it('shows the consent hint when the trigger is rejected with 403', async () => {
+      triggerIngestionMock.mockRejectedValue({ status: 403, message: "consent_required" });
+      renderAt('/grafo?urn=urn%3Anew');
+
+      expect(await screen.findByText(/serve il consenso/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
+      expect(screen.queryByText(/indicizzazione in corso/i)).not.toBeInTheDocument();
+    });
+
+    it('shows the unreachable message when the trigger fails with a 5xx', async () => {
+      triggerIngestionMock.mockRejectedValue({ response: { status: 503 } });
+      renderAt('/grafo?urn=urn%3Anew');
+
+      expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
+    });
+
+    it('shows the unreachable message when the polling budget is exhausted (job timeout)', async () => {
+      // Job state follows the component's jobId: timeout while polling, idle after reset.
+      useIngestionJobMock.mockImplementation((jobId: string | null) =>
+        jobId
+          ? { status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null }
+          : { status: null, error: null, nodesCreated: null }
+      );
+      renderAt('/grafo?urn=urn%3Anew');
+
+      expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
+      expect(screen.queryByText(/indicizzazione in corso/i)).not.toBeInTheDocument();
+    });
+
+    it('Riprova on timeout resets the machine (refetch + job cleared)', async () => {
+      const refetch = vi.fn();
+      useArticleGraphMock.mockReturnValue({
+        status: 'success',
+        data: { nodes: [], edges: [] },
+        elements: { nodes: [], edges: [] },
+        refetch,
+      });
+      useIngestionJobMock.mockImplementation((jobId: string | null) =>
+        jobId
+          ? { status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null }
+          : { status: null, error: null, nodesCreated: null }
+      );
+      renderAt('/grafo?urn=urn%3Anew');
+      expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
+      expect(refetch).toHaveBeenCalled();
+      // jobId reset → the job hook is back to idle → no stale timeout banner.
+      expect(screen.queryByText(/non raggiungibile/i)).not.toBeInTheDocument();
+    });
   });
 });

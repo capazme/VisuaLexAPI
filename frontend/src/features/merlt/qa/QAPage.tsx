@@ -22,8 +22,8 @@ const EXAMPLES = [
  * thread; all setState lives in handlers/callbacks.
  */
 export function QAPage() {
-  const { merltEnabled, canContribute } = useMerltFeatures();
-  const { turns, ask, refine, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn } = useQaThread();
+  const { merltEnabled, canContribute, opsVisible } = useMerltFeatures();
+  const { turns, ask, refine, retry, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn } = useQaThread();
   const [showHistory, setShowHistory] = useState(false);
   const [devMode, toggleDevMode] = useQaDevMode();
 
@@ -53,19 +53,21 @@ export function QAPage() {
             <ArrowLeft size={14} /> MERL-T
           </Link>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleDevMode}
-              aria-pressed={devMode}
-              title="Mostra i dettagli del processo sotto ogni risposta"
-              className={
-                devMode
-                  ? 'inline-flex items-center gap-1 text-sm font-medium text-amber-600 dark:text-amber-400 focus-visible:outline-none focus-visible:underline'
-                  : 'inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:underline'
-              }
-            >
-              <Terminal size={14} /> Dev
-            </button>
+            {opsVisible && (
+              <button
+                type="button"
+                onClick={toggleDevMode}
+                aria-pressed={devMode}
+                title="Mostra i dettagli del processo sotto ogni risposta"
+                className={
+                  devMode
+                    ? 'inline-flex items-center gap-1 text-sm font-medium text-amber-600 dark:text-amber-400 focus-visible:outline-none focus-visible:underline'
+                    : 'inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:underline'
+                }
+              >
+                <Terminal size={14} /> Dev
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowHistory((v) => !v)}
@@ -137,7 +139,8 @@ export function QAPage() {
                 onRateSource={(sourceId, relevant) => rateSrc(traceId, sourceId, relevant)}
                 onPrefer={(expert) => prefer(traceId, expert)}
                 onDetailed={(scores) => detailed(traceId, scores)}
-                devMode={devMode}
+                onRetry={() => void retry(turn.id)}
+                devMode={opsVisible && devMode}
                 onNerCitation={(payload) => {
                   if (!canContribute) return;
                   void sendNerFeedback(payload).catch((err) => {
