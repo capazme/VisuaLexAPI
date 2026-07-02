@@ -28,6 +28,7 @@ import { DepthSelector } from './DepthSelector';
 import { GraphFilterPanel } from './GraphFilterPanel';
 import { LAYOUT_OPTIONS } from './graphLayouts';
 import { useBreadcrumbHistory } from './useBreadcrumbHistory';
+import { isArticleCenter } from './graphCenter';
 
 const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
 
@@ -53,8 +54,11 @@ export function GraphExplorerPage(): React.ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
   const enabled = isMerltGraphEnabled();
   const urn = searchParams.get('urn');
+  const centerType = searchParams.get('type'); // C1: threaded so it survives refresh/deeplink
   const depth = clampDepth(searchParams.get('depth'));
   const layout = parseLayout(searchParams.get('layout'));
+  // C2: only Norma/article centers are lazy-ingestable; concepts are not.
+  const centerIsArticle = isArticleCenter(centerType, urn);
   // Hooks must run unconditionally; pass null urn when disabled so no fetch fires.
   const graph = useArticleGraph(enabled ? urn : null, depth);
   const { entries, push } = useBreadcrumbHistory();
@@ -90,6 +94,10 @@ export function GraphExplorerPage(): React.ReactElement {
   useEffect(() => {
     if (graph.status !== 'success' || graph.data.nodes.length > 0) return;
     if (triggeredRef.current || !urn) return;
+    // C2: a concept with an empty subgraph is "not connected", NOT an article to
+    // ingest — never enqueue ingestion for it (would spin forever, then wrongly
+    // claim "Articolo non indicizzabile").
+    if (!centerIsArticle) return;
     triggeredRef.current = true;
     triggerIngestion(urn)
       .then((r) => setJobId(r.jobId))
@@ -97,7 +105,7 @@ export function GraphExplorerPage(): React.ReactElement {
     // Keyed on status (data is undefined outside success; read at fire time;
     // triggeredRef guards re-entry).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph.status, urn]);
+  }, [graph.status, urn, centerIsArticle]);
 
   // Full machine reset: re-arm the trigger and refetch — an empty subgraph
   // then re-enqueues the ingestion (with a fresh polling budget).
@@ -148,27 +156,33 @@ export function GraphExplorerPage(): React.ReactElement {
 
   // Single navigation entry point: records the breadcrumb, resets selection,
   // and drives the fetch via the URL (so refresh/deeplink reproduce the state).
-  const goToCenter = (target: string, label: string): void => {
+  // `type` (C1) is threaded into the URL so the article-vs-concept decision
+  // survives a refresh / shared deeplink instead of only living in click state.
+  const goToCenter = (target: string, label: string, type?: string | null): void => {
     push({ urn: target, label });
     setSelectedNodeId(null);
-    setSearchParams({ urn: target, depth: String(depth), layout });
+    const next: Record<string, string> = { urn: target, depth: String(depth), layout };
+    if (type) next.type = type;
+    setSearchParams(next);
   };
 
   // Depth changes refetch (depth is a useArticleGraph dep); layout changes only
   // re-run the client-side layout. Both round-trip the URL for shareable deeplinks.
   const setDepth = (d: number): void => {
-    if (urn) setSearchParams({ urn, depth: String(d), layout });
+    if (urn) setSearchParams(withCenterType({ urn, depth: String(d), layout }, centerType));
   };
   const setLayout = (l: GraphLayoutName): void => {
-    if (urn) setSearchParams({ urn, depth: String(depth), layout: l });
+    if (urn) setSearchParams(withCenterType({ urn, depth: String(depth), layout: l }, centerType));
   };
 
   const handleSelect = (item: GraphSearchItem): void => {
-    goToCenter(item.urn ?? item.id, item.nome ?? item.id);
+    // C1: pass the search-result node type through so the center is classified
+    // as article vs concept downstream (drives the C2 ingestion gate).
+    goToCenter(item.urn ?? item.id, item.nome ?? item.id, item.tipo);
   };
 
   const handleRecenter = (node: GraphNode): void => {
-    goToCenter(node.urn ?? node.id, node.label);
+    goToCenter(node.urn ?? node.id, node.label, node.type);
   };
 
   // #7: export the current subgraph to a local JSON the user keeps off-server.
@@ -293,7 +307,12 @@ export function GraphExplorerPage(): React.ReactElement {
           ) : graph.status === 'error' ? (
             <ErrorState />
           ) : graph.data.nodes.length === 0 ? (
-            // The ingestion trigger failed: distinct copy per cause (design §3.4).
+            // C3: a concept center with an empty subgraph means "no neighbours /
+            // not found" — NOT an article to (re-)ingest. No spinner, no
+            // "Articolo non indicizzabile", no retry.
+            !centerIsArticle ? (
+              <ConceptEmptyState />
+            ) : // The ingestion trigger failed: distinct copy per cause (design §3.4).
             triggerError === 'consent' ? (
               <IngestionErrorState
                 tone="amber"
@@ -390,6 +409,14 @@ function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>[
   return entries.find((e) => e.urn === urn)?.label ?? urn;
 }
 
+/** Preserve the current center `type` param across depth/layout URL updates. */
+function withCenterType(
+  params: Record<string, string>,
+  centerType: string | null
+): Record<string, string> {
+  return centerType ? { ...params, type: centerType } : params;
+}
+
 /** Map a local snapshot to the cytoscape-ready element shape (#7 read-only view). */
 function sliceToElements(snap: GraphSliceSnapshot): GraphElements {
   return {
@@ -412,6 +439,22 @@ function EmptyState(): React.ReactElement {
       <Network className="h-10 w-10 text-slate-300 dark:text-slate-600" />
       <p className="max-w-sm text-slate-500 dark:text-slate-400">
         Cerca un articolo o un concetto per iniziare a esplorare il grafo.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * C3: empty-subgraph state for a concept center. Unlike an article, a concept
+ * is never lazy-ingested, so this is a terminal, no-retry message — not an
+ * "indicizzazione in corso" spinner nor "Articolo non indicizzabile".
+ */
+function ConceptEmptyState(): React.ReactElement {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+      <Network className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+      <p className="max-w-sm text-slate-500 dark:text-slate-400">
+        Concetto non collegato nel grafo.
       </p>
     </div>
   );

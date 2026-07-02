@@ -236,6 +236,27 @@ describe('useQaThread', () => {
       });
     });
     await waitFor(() => expect(result.current.turns[0].confirmed['live:abc']).toBe('done'));
-    expect(confirmSource).toHaveBeenCalledWith('live:abc', 'live:abc');
+    // B3: never forward the raw live: id as the entity name; a bare live: node
+    // with no source_url falls back to a human placeholder.
+    expect(confirmSource).toHaveBeenCalledWith('live:abc', 'Fonte provvisoria');
+  });
+
+  it('confirm() derives a readable entity name from source_url when present (B3)', async () => {
+    askQuestion.mockResolvedValue(answer);
+    confirmSource.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('q', 'convergent');
+    });
+    await act(async () => {
+      await result.current.confirm(result.current.turns[0].id, {
+        urn: 'live:abc',
+        provenance: 'live_unconfirmed',
+        node_id: 'live:abc',
+        source_url: 'https://normattiva.it/...~art467',
+      });
+    });
+    await waitFor(() => expect(result.current.turns[0].confirmed['live:abc']).toBe('done'));
+    expect(confirmSource).toHaveBeenCalledWith('live:abc', 'art. 467');
   });
 });

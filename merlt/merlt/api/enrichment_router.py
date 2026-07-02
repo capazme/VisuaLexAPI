@@ -95,6 +95,7 @@ from merlt.rlcf.domain_authority import (
 )
 from merlt.rlcf.edit_merge import process_entity_consensus, process_relation_consensus
 from merlt.pipeline.enrichment.models import EntityType, RelationType
+from merlt.pipeline.enrichment.quality import is_valid_entity_name
 
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
@@ -617,11 +618,19 @@ async def _save_entities_to_db(
     if not entities:
         return 0
 
+    skipped = 0
     async with get_db_session() as session:
         for entity_data in entities:
             entity_type_str = entity_data.get("tipo", "concetto")
             if hasattr(entity_type_str, 'value'):
                 entity_type_str = entity_type_str.value
+
+            # Quality gate: never persist junk entity names
+            entity_name = entity_data.get("nome", "")
+            if not is_valid_entity_name(entity_name, entity_type_str):
+                log.warning("Skipping junk entity (LLM extraction)", nome=entity_name, tipo=entity_type_str)
+                skipped += 1
+                continue
 
             pending_entity = PendingEntity(
                 entity_id=entity_data.get("id", f"pending:{uuid4().hex[:12]}"),
@@ -642,8 +651,9 @@ async def _save_entities_to_db(
         # Commit esplicito nella transazione
         await session.commit()
 
-    log.info(f"Saved {len(entities)} entities to DB", article_urn=article_urn)
-    return len(entities)
+    saved = len(entities) - skipped
+    log.info(f"Saved {saved} entities to DB ({skipped} junk skipped)", article_urn=article_urn)
+    return saved
 
 
 async def _save_relations_to_db(
@@ -1014,6 +1024,14 @@ async def live_enrich(
 
             # Save pending entities to DB
             for entity_data in response.pending_entities:
+                # Get entity type as string value
+                entity_type_str = entity_data.tipo.value if hasattr(entity_data.tipo, 'value') else str(entity_data.tipo)
+
+                # Quality gate: never persist junk entity names
+                if not is_valid_entity_name(entity_data.nome, entity_type_str):
+                    log.warning("Skipping junk entity (live enrich)", nome=entity_data.nome, tipo=entity_type_str)
+                    continue
+
                 # Get user authority for this domain
                 voter_authority = await get_user_authority_for_vote(
                     session,
@@ -1023,9 +1041,6 @@ async def live_enrich(
 
                 # Get article_urn from articoli_correlati list (first item)
                 article_urn = entity_data.articoli_correlati[0] if entity_data.articoli_correlati else response.article.urn
-
-                # Get entity type as string value
-                entity_type_str = entity_data.tipo.value if hasattr(entity_data.tipo, 'value') else str(entity_data.tipo)
 
                 pending_entity = PendingEntity(
                     entity_id=entity_data.id,
@@ -1616,6 +1631,11 @@ async def get_pending(
     entities_result = await session.execute(entities_stmt)
     entities = entities_result.scalars().all()
 
+    # B1 defensive filter: hide junk rows already sitting in the validation
+    # queue (written before the write-site gate existed). The backfill deletes
+    # them for good; this protects the read path in the meantime.
+    entities = [e for e in entities if is_valid_entity_name(e.entity_text, e.entity_type)]
+
     # Convert to PendingEntityData
     pending_entities = [
         PendingEntityData(
@@ -1925,6 +1945,18 @@ async def propose_entity(
     )
 
     tipo_str = request.tipo.value if hasattr(request.tipo, 'value') else str(request.tipo)
+
+    # Quality gate: reject junk entity names before writing to pending_entities
+    if not is_valid_entity_name(request.nome, tipo_str):
+        log.info("Rejected junk entity proposal", nome=request.nome, tipo=tipo_str)
+        return EntityProposalResponse(
+            success=False,
+            pending_entity=None,
+            message="Nome entita' non valido: sembra un artefatto o un identificatore, non un'entita' giuridica reale.",
+            has_duplicates=False,
+            duplicates=[],
+            duplicate_action_required=False,
+        )
 
     # Track duplicates for info in response (even if not blocking)
     found_duplicates: List[DuplicateCandidateData] = []

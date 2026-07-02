@@ -35,6 +35,7 @@ from merlt.pipeline.enrichment.models import (
     EntityType,
     RelationType,
 )
+from merlt.pipeline.enrichment.quality import is_valid_entity_name
 
 log = structlog.get_logger()
 
@@ -191,6 +192,9 @@ class MechanisticExtractor:
                 confidence=1.0,  # Meccanicistico = 100% confidence
                 raw_context=testo,
             )
+            # Quality gate: skip junk names (leaked ids, test artifacts, ...)
+            if not is_valid_entity_name(entity.nome, entity.tipo):
+                continue
             entities.append(entity)
 
             # Crea relazione INTERPRETA
@@ -255,6 +259,9 @@ class MechanisticExtractor:
                     confidence=1.0,
                     raw_context=brocardi_text[:200],
                 )
+                # Quality gate: skip junk names (leaked ids, test artifacts, ...)
+                if not is_valid_entity_name(entity.nome, entity.tipo):
+                    continue
                 entities.append(entity)
 
                 # Relazione APPLICA: Brocardo → Articolo

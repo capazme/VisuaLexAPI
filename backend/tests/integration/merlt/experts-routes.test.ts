@@ -123,18 +123,18 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.body.detail).toBe('query too short upstream');
   });
 
-  it('confirm-source forwards node_id + injected user_id', async () => {
+  it('confirm-source forwards node_id + entity_text + injected user_id', async () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .post('/api/v1/enrichment/confirm-source', (b) => {
-        const body = b as { node_id: string; user_id: string };
-        return body.node_id === 'live:abc123' && body.user_id === user.id;
+        const body = b as { node_id: string; user_id: string; entity_text: string };
+        return body.node_id === 'live:abc123' && body.user_id === user.id && body.entity_text === 'art. 1453';
       })
       .reply(200, { node_id: 'live:abc123', pending_entity_id: 42 });
     const res = await request(app)
       .post('/api/merlt/experts/confirm-source')
       .set(authHeader(user))
-      .send({ nodeId: 'live:abc123' });
+      .send({ nodeId: 'live:abc123', entityText: 'art. 1453' });
     expect(res.status).toBe(200);
     expect(res.body.pending_entity_id).toBe(42);
   });
@@ -144,8 +144,38 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     const res = await request(app)
       .post('/api/merlt/experts/confirm-source')
       .set(authHeader(user))
-      .send({ nodeId: 'urn:nir:..~art1453' });
+      .send({ nodeId: 'urn:nir:..~art1453', entityText: 'art. 1453' });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects confirm-source without entityText (400, B3)', async () => {
+    await grantFull(user);
+    const res = await request(app)
+      .post('/api/merlt/experts/confirm-source')
+      .set(authHeader(user))
+      .send({ nodeId: 'live:abc123' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toBe('invalid_body');
+  });
+
+  it('rejects confirm-source when entityText is the raw provisional id (400, B3)', async () => {
+    await grantFull(user);
+    const res = await request(app)
+      .post('/api/merlt/experts/confirm-source')
+      .set(authHeader(user))
+      .send({ nodeId: 'live:abc123', entityText: 'live:abc123' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toBe('invalid_body');
+  });
+
+  it('rejects confirm-source when entityText starts with a bare live: prefix (400, B3)', async () => {
+    await grantFull(user);
+    const res = await request(app)
+      .post('/api/merlt/experts/confirm-source')
+      .set(authHeader(user))
+      .send({ nodeId: 'live:abc123', entityText: 'live:deadbeef' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toBe('invalid_body');
   });
 
   it('inline feedback forwards rating + user_id', async () => {

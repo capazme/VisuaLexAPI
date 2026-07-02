@@ -9,6 +9,7 @@ import {
   confirmSource,
 } from './qaApi';
 import { loadThread, saveThread, clearThread } from './qaThreadStorage';
+import { confirmSourceEntityText } from './format';
 import type { QaMode, QaTurnModel, QaRetrievedSource, QaAnswer, QaHistoryItem } from './types';
 
 let seq = 0;
@@ -174,7 +175,9 @@ export function useQaThread() {
       const nodeId = source.node_id;
       patch(turnId, (t) => ({ ...t, confirmed: { ...t.confirmed, [nodeId]: 'pending' } }));
       try {
-        await confirmSource(nodeId, source.urn);
+        // Pass a human-readable entity name (never the raw live: id — the BFF
+        // rejects a name that starts with the provisional node id).
+        await confirmSource(nodeId, confirmSourceEntityText(source));
         patch(turnId, (t) => ({ ...t, confirmed: { ...t.confirmed, [nodeId]: 'done' } }));
       } catch (e) {
         console.error('confirm-source failed:', e);

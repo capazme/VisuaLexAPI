@@ -278,7 +278,13 @@ Estrai entità giuridiche strutturate. Rispondi SEMPRE in formato JSON valido.""
 
     def _validate_entity(self, entity: "ExtractedEntity") -> bool:
         """
-        Valida un'entità estratta usando config da YAML.
+        Valida un'entità estratta.
+
+        Il gate di qualità del nome (lunghezza + firme junk) è delegato alla
+        funzione condivisa ``is_valid_entity_name`` (unica fonte di verità,
+        riusata da tutti i write site e dal backfill). Qui restano solo i
+        controlli specifici configurati da YAML (descrizione minima, termini
+        esclusi).
 
         Args:
             entity: Entità da validare
@@ -286,24 +292,20 @@ Estrai entità giuridiche strutturate. Rispondi SEMPRE in formato JSON valido.""
         Returns:
             True se valida
         """
+        from merlt.pipeline.enrichment.quality import is_valid_entity_name
+
+        # Gate condiviso su nome (junk signatures + lunghezza per-tipo)
+        if not is_valid_entity_name(entity.nome, entity.tipo):
+            return False
+
         validation = self.validation_config
-
-        # Nome non vuoto
-        min_name = validation.get("min_name_length", 2)
-        if not entity.nome or len(entity.nome) < min_name:
-            return False
-
-        # Nome non troppo lungo
-        max_name = validation.get("max_name_length", 100)
-        if len(entity.nome) > max_name:
-            return False
 
         # Descrizione minima (se richiesta)
         min_desc = validation.get("min_description_length", 0)
         if min_desc > 0 and len(entity.descrizione or "") < min_desc:
             return False
 
-        # Termini esclusi
+        # Termini esclusi (lista extra specifica per estrattore da YAML)
         excluded = validation.get("excluded_terms", [])
         nome_lower = entity.nome.lower()
         if nome_lower in excluded:

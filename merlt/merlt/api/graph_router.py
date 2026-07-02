@@ -26,7 +26,7 @@ from rq import Queue, Retry
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +39,7 @@ from merlt.pipeline.enrichment.models import EntityType
 
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
+from merlt.utils.urn_labels import build_node_label, article_label_from_urn
 
 # TODO: Implement full URN generation locally
 # For now, generate_urn returns None and callers handle it gracefully
@@ -438,6 +439,54 @@ async def get_article_relations(
         await graph_client.close()
 
 
+def _classify_search_result(entity_id: str, tipo: Optional[str], article_urn: Optional[str]) -> Tuple[str, Optional[str]]:
+    """
+    Derive ``(type, urn)`` for a search result so the FE can route it (C5).
+
+    - ``type`` is the concept-family tipo when present ("principio"/"concetto"/
+      ...), else "norma" for norm ids, else "entity". The FE uses this to
+      decide whether a click is a routable article (Norma) or a concept
+      (which must NOT trigger article lazy-ingestion).
+    - ``urn`` is the entity's attaching ``article_urn`` when available, else the
+      id itself when it already looks like a norm URN. ``None`` for pure
+      concepts with no article context.
+
+    Args:
+        entity_id: The result id (e.g. "principio:abc", "norma:hash", URN).
+        tipo: The entity ``tipo`` field (may be None).
+        article_urn: The article the entity attaches to (may be None).
+
+    Returns:
+        ``(type, urn)``.
+    """
+    result_type = (tipo or "").strip().lower()
+    if not result_type:
+        if entity_id.startswith("norma:") or "~art" in entity_id:
+            result_type = "norma"
+        else:
+            result_type = "entity"
+
+    urn: Optional[str] = None
+    if article_urn:
+        urn = article_urn
+    elif "~art" in entity_id or entity_id.startswith("urn:"):
+        urn = entity_id
+
+    return result_type, urn
+
+
+def _is_openable_search_id(entity_id: Optional[str]) -> bool:
+    """
+    Reject search results whose id can't be opened by the FE (C5).
+
+    Currently drops leaked ``live:`` provisional node ids — they have no stable
+    graph URN and clicking them leads nowhere.
+    """
+    if not entity_id:
+        return False
+    return not entity_id.strip().lower().startswith("live:")
+
+
 @router.get("/entities/search")
 async def search_entities(
     q: str,
@@ -518,6 +567,7 @@ async def search_entities(
                     e.id as id,
                     e.nome as nome,
                     e.tipo as tipo,
+                    e.article_urn as article_urn,
                     COALESCE(e.approval_score, 0.0) as approval_score,
                     COALESCE(e.validation_status, 'approved') as validation_status,
                     COALESCE(e.llm_confidence, 0.5) as llm_confidence
@@ -534,6 +584,7 @@ async def search_entities(
                     e.id as id,
                     e.nome as nome,
                     e.tipo as tipo,
+                    e.article_urn as article_urn,
                     COALESCE(e.approval_score, 0.0) as approval_score,
                     COALESCE(e.validation_status, 'approved') as validation_status,
                     COALESCE(e.llm_confidence, 0.5) as llm_confidence
@@ -545,10 +596,17 @@ async def search_entities(
             graph_result = await graph_client.query(query, params)
 
             for row in graph_result:
+                if not _is_openable_search_id(row["id"]):
+                    continue
+                result_type, result_urn = _classify_search_result(
+                    row["id"], row["tipo"], row.get("article_urn")
+                )
                 all_entities.append({
                     "id": row["id"],
                     "nome": row["nome"],
                     "tipo": row["tipo"],
+                    "type": result_type,
+                    "urn": result_urn,
                     "approval_score": row["approval_score"],
                     "validation_status": row["validation_status"],
                     "is_pending": False,  # In graph = not pending
@@ -588,13 +646,20 @@ async def search_entities(
             pending_entities = result.scalars().all()
 
             for entity in pending_entities:
+                if not _is_openable_search_id(entity.entity_id):
+                    continue
                 # Avoid duplicates (same entity_id)
                 existing_ids = {e["id"] for e in all_entities}
                 if entity.entity_id not in existing_ids:
+                    result_type, result_urn = _classify_search_result(
+                        entity.entity_id, entity.entity_type, entity.article_urn
+                    )
                     all_entities.append({
                         "id": entity.entity_id,
                         "nome": entity.entity_text,
                         "tipo": entity.entity_type,
+                        "type": result_type,
+                        "urn": result_urn,
                         "approval_score": entity.approval_score or 0.0,
                         "validation_status": "pending",
                         "is_pending": True,
@@ -1809,14 +1874,9 @@ def _parse_graph_node_v2(node_data: Dict[str, Any], include_metadata: bool) -> S
     # Get node type from labels
     node_type = labels[0] if labels else "Unknown"
 
-    # Get display label
-    label = (
-        props.get("nome")
-        or props.get("estremi")
-        or props.get("rubrica")
-        or props.get("titolo")
-        or node_id[:50]
-    )
+    # Get display label (A1: nome→estremi→rubrica→titolo→Norma synth→
+    # numero_articolo→testo→URN-derived "Art. N"→id, never the raw URL).
+    label = build_node_label(props, node_id)
 
     # Build properties (exclude internal fields)
     internal_fields = {"URN", "urn", "node_id", "id", "created_at", "updated_at"}

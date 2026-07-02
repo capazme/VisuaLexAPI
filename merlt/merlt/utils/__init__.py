@@ -55,6 +55,13 @@ from .urngenerator import (
     urn_to_filename,
 )
 
+from .urn_labels import (
+    article_number_from_urn,
+    article_label_from_urn,
+    derive_article_fields_from_urn,
+    build_node_label,
+)
+
 
 __all__ = [
     # Map constants
@@ -87,4 +94,9 @@ __all__ = [
     # URN Generator
     "generate_urn",
     "urn_to_filename",
+    # URN labels / estremi derivation (data-quality A1 + A2)
+    "article_number_from_urn",
+    "article_label_from_urn",
+    "derive_article_fields_from_urn",
+    "build_node_label",
 ]

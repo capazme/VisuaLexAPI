@@ -58,6 +58,7 @@ from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.enrichment.models import PendingEntity, PendingRelation
+from merlt.utils.urn_labels import derive_article_fields_from_urn
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 
 log = structlog.get_logger()
@@ -468,13 +469,22 @@ class EntityGraphWriter:
 
         relation_type = relation_mapping.get(entity.entity_type, "DISCIPLINA")
 
+        # A2: give a freshly-created Norma stub a minimal identity derived from
+        # the URN so it never renders as a raw URL. ON CREATE only — an existing
+        # (seed/community) node is never overwritten. Both may be None when the
+        # URN has no article segment; the SET then just writes null (harmless).
+        numero_articolo, estremi = derive_article_fields_from_urn(entity.article_urn)
+
         # Create relation (create Norma node if it doesn't exist).
         # Stamp provenance/trust on the (possibly stub) Norma node with coalesce
         # so an existing seed/community node is never downgraded; the relation
         # itself also carries `provenance` (best-effort, task B.1).
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
-        ON CREATE SET art.created_at = $timestamp
+        ON CREATE SET
+            art.created_at = $timestamp,
+            art.numero_articolo = $numero_articolo,
+            art.estremi = $estremi
         SET art.provenance = coalesce(art.provenance, $provenance),
             art.trust = coalesce(art.trust, $trust)
         WITH art
@@ -494,6 +504,8 @@ class EntityGraphWriter:
             "provenance": "community_validated",
             "trust": 1.0,
             "timestamp": self._timestamp,
+            "numero_articolo": numero_articolo,
+            "estremi": estremi,
         }
 
         await self.falkordb.query(query, params)

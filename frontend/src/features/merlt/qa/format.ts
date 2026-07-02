@@ -1,5 +1,7 @@
 /** Shared non-component helpers for the Q&A feature (react-refresh boundary). */
 
+import type { QaRetrievedSource } from './types';
+
 export const CANON_LABEL: Record<string, string> = {
   literal: 'Letterale',
   systemic: 'Sistematico',
@@ -16,4 +18,17 @@ export function formatRetrievedUrn(urn: string): string {
   const art = urn.match(/~art([0-9a-z-]+)/i);
   if (art) return `art. ${art[1].replace(/-/g, ' ')}`;
   return urn.length > 60 ? `${urn.slice(0, 57)}…` : urn;
+}
+
+/**
+ * Human-readable entity name for a consulted source, for the "ricorda nel grafo"
+ * (confirm-source) teaching channel. Mirrors {@link QaSourceChip}'s displayed
+ * label: for provisional (`live:`) nodes the URN is an opaque hash, so we prefer
+ * the underlying Normattiva URL (which yields a readable "art. N") before falling
+ * back. NEVER returns the raw `live:` node id — the BFF rejects a name that starts
+ * with the provisional id, since a raw id must not become an entity name.
+ */
+export function confirmSourceEntityText(source: QaRetrievedSource): string {
+  const readableUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
+  return formatRetrievedUrn(readableUrn);
 }

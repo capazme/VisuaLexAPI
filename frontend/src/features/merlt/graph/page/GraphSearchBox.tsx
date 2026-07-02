@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { searchGraph } from '../shared/graphApi';
 import type { GraphSearchItem } from '../shared/types';
+import { isOpenableResult } from './graphCenter';
 
 export interface GraphSearchBoxProps {
   onSelect: (item: GraphSearchItem) => void;
@@ -36,7 +37,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
       searchGraph(term, RESULT_LIMIT)
         .then((items) => {
           if (requestId !== requestIdRef.current) return; // stale
-          setResults(items);
+          setResults(items.filter(isOpenableResult)); // C4: drop unopenable live: ids
           setOpen(true);
           setHighlighted(-1); // no pre-selection; arrow keys move into the list
         })

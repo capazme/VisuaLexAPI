@@ -110,7 +110,7 @@ describe('GraphExplorerPage', () => {
 
   it('triggers ingestion and shows a building banner when the subgraph is empty', async () => {
     setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
-    renderAt('/grafo?urn=urn%3Anew');
+    renderAt('/grafo?urn=urn%3Anew&type=Norma');
 
     await waitFor(() => expect(triggerIngestionMock).toHaveBeenCalledWith('urn:new'));
     expect(screen.getByText(/indicizzazione in corso/i)).toBeInTheDocument();
@@ -119,7 +119,7 @@ describe('GraphExplorerPage', () => {
   it('shows "non indicizzabile" with retry when ingestion finished but graph is still empty', () => {
     useIngestionJobMock.mockReturnValue({ status: 'completed', error: null, nodesCreated: 0 });
     setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
-    renderAt('/grafo?urn=urn%3Anew');
+    renderAt('/grafo?urn=urn%3Anew&type=Norma');
     expect(screen.getByText(/non indicizzabile/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
   });
@@ -144,7 +144,7 @@ describe('GraphExplorerPage', () => {
       refetch,
     });
     useIngestionJobMock.mockReturnValue({ status: 'completed', error: null, nodesCreated: 0 });
-    renderAt('/grafo?urn=urn%3Anew');
+    renderAt('/grafo?urn=urn%3Anew&type=Norma');
 
     triggerIngestionMock.mockClear();
     fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
@@ -169,7 +169,7 @@ describe('GraphExplorerPage', () => {
 
     it('shows the consent hint when the trigger is rejected with 403', async () => {
       triggerIngestionMock.mockRejectedValue({ status: 403, message: "consent_required" });
-      renderAt('/grafo?urn=urn%3Anew');
+      renderAt('/grafo?urn=urn%3Anew&type=Norma');
 
       expect(await screen.findByText(/serve il consenso/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('GraphExplorerPage', () => {
 
     it('shows the unreachable message when the trigger fails with a 5xx', async () => {
       triggerIngestionMock.mockRejectedValue({ response: { status: 503 } });
-      renderAt('/grafo?urn=urn%3Anew');
+      renderAt('/grafo?urn=urn%3Anew&type=Norma');
 
       expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /riprova/i })).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe('GraphExplorerPage', () => {
           ? { status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null }
           : { status: null, error: null, nodesCreated: null }
       );
-      renderAt('/grafo?urn=urn%3Anew');
+      renderAt('/grafo?urn=urn%3Anew&type=Norma');
 
       expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
       expect(screen.queryByText(/indicizzazione in corso/i)).not.toBeInTheDocument();
@@ -210,13 +210,45 @@ describe('GraphExplorerPage', () => {
           ? { status: 'timeout', error: 'poll_budget_exhausted', nodesCreated: null }
           : { status: null, error: null, nodesCreated: null }
       );
-      renderAt('/grafo?urn=urn%3Anew');
+      renderAt('/grafo?urn=urn%3Anew&type=Norma');
       expect(await screen.findByText(/non raggiungibile/i)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
       expect(refetch).toHaveBeenCalled();
       // jobId reset → the job hook is back to idle → no stale timeout banner.
       expect(screen.queryByText(/non raggiungibile/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('concept center (C2/C3 — no lazy ingestion)', () => {
+    beforeEach(() => {
+      setGraph({ status: 'success', data: { nodes: [], edges: [] }, elements: { nodes: [], edges: [] } });
+    });
+
+    it('does NOT trigger ingestion when the center is a concept', async () => {
+      renderAt('/grafo?urn=concetto%3Acolpa&type=ConcettoGiuridico');
+      // Give the debounce/effects a tick; ingestion must never fire for a concept.
+      await waitFor(() =>
+        expect(screen.getByText(/concetto non collegato/i)).toBeInTheDocument()
+      );
+      expect(triggerIngestionMock).not.toHaveBeenCalled();
+    });
+
+    it('shows the concept empty-state copy (no spinner, no "non indicizzabile")', () => {
+      renderAt('/grafo?urn=concetto%3Acolpa&type=ConcettoGiuridico');
+      expect(screen.getByText(/concetto non collegato/i)).toBeInTheDocument();
+      expect(screen.queryByText(/indicizzazione in corso/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/non indicizzabile/i)).not.toBeInTheDocument();
+    });
+
+    it('classifies an article by the ~art urn marker even without a type param', async () => {
+      // Deeplink with only the urn: the ~art marker must still route to the
+      // article ingestion path (not the concept empty state).
+      renderAt('/grafo?urn=' + encodeURIComponent('urn:nir:stato:codice.civile~art2043'));
+      await waitFor(() =>
+        expect(triggerIngestionMock).toHaveBeenCalledWith('urn:nir:stato:codice.civile~art2043')
+      );
+      expect(screen.queryByText(/concetto non collegato/i)).not.toBeInTheDocument();
     });
   });
 });

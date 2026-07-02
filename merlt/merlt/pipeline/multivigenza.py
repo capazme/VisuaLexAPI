@@ -43,6 +43,7 @@ from merlt.clients import (
     StoriaArticolo,
     NormattivaScraper,
 )
+from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
 
@@ -1206,6 +1207,11 @@ class MultivigenzaPipeline:
         base_urn = normavisitata.urn
         versioned_urn = f"{base_urn}!vig={version_date}"
 
+        # A2: derive numero_articolo/estremi from the base article URN so a
+        # freshly-created version stub carries a minimal identity instead of a
+        # raw URL. ON CREATE only — never overwrite an existing node.
+        numero_articolo, estremi = derive_article_fields_from_urn(base_urn)
+
         await self.falkordb.query(
             """
             MERGE (ver:Norma {URN: $urn})
@@ -1215,6 +1221,8 @@ class MultivigenzaPipeline:
                 ver.versione = $label,
                 ver.data_versione = $date,
                 ver.testo_storico = $testo,
+                ver.numero_articolo = $numero_articolo,
+                ver.estremi = $estremi,
                 ver.is_versione_vigente = false,
                 ver.fonte = 'Normattiva',
                 ver.created_at = $timestamp
@@ -1224,6 +1232,8 @@ class MultivigenzaPipeline:
                 "label": version_label,
                 "date": version_date,
                 "testo": testo,
+                "numero_articolo": numero_articolo,
+                "estremi": estremi,
                 "timestamp": self._timestamp,
             }
         )

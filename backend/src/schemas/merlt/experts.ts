@@ -42,11 +42,27 @@ export const refineRequestSchema = z.object({
   followUpQuery: z.string().min(5).max(2000),
 });
 
-export const confirmSourceRequestSchema = z.object({
-  nodeId: z.string().regex(/^live:/, 'must be a provisional node id (live:...)'),
-  entityText: z.string().max(500).optional(),
-  entityType: z.string().max(100).optional(),
-  ambito: z.string().max(100).optional(),
-});
+export const confirmSourceRequestSchema = z
+  .object({
+    nodeId: z.string().regex(/^live:/, 'must be a provisional node id (live:...)'),
+    // entityText is REQUIRED (B3): confirm-source is a graph write, so the
+    // provisional node must carry a human-readable name — a raw id must never
+    // become an entity name.
+    entityText: z.string().trim().min(3).max(500),
+    entityType: z.string().max(100).optional(),
+    ambito: z.string().max(100).optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Reject a name that IS a raw provisional id: either a bare `live:` prefix
+    // or the exact nodeId echoed back as the entity text.
+    const name = data.entityText.trim().toLowerCase();
+    if (name.startsWith('live:') || name.startsWith(data.nodeId.toLowerCase())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['entityText'],
+        message: 'entityText must be a human-readable name, not the provisional node id',
+      });
+    }
+  });
 
 export type ExpertQueryRequest = z.infer<typeof expertQueryRequestSchema>;

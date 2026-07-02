@@ -112,4 +112,19 @@ describe('GraphSearchBox', () => {
     expect(screen.getByText('Fast')).toBeInTheDocument();
     expect(screen.queryByText('Colpa')).not.toBeInTheDocument();
   });
+
+  it('C4: filters out unopenable live: results (not selectable)', async () => {
+    const onSelect = vi.fn();
+    searchGraphMock.mockResolvedValue([
+      { id: 'live:abc123', nome: 'Nodo live non aperibile', tipo: 'Norma' },
+      { id: 'norma:2043', nome: 'Art. 2043 c.c.', tipo: 'Norma', urn: 'urn:a' },
+    ] satisfies GraphSearchItem[]);
+    render(<GraphSearchBox onSelect={onSelect} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '20' } });
+    await advance(300);
+
+    // The live: row is dropped entirely; only the real result remains.
+    expect(screen.queryByText('Nodo live non aperibile')).not.toBeInTheDocument();
+    expect(screen.getByText('Art. 2043 c.c.')).toBeInTheDocument();
+  });
 });
