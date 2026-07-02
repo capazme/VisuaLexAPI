@@ -88,6 +88,15 @@ def generate_urn(
             default_allegato = allegato_match.group(2)
             log.info(f"Stripped default allegato {default_allegato}, base: {base_urn}")
             urn = base_urn
+            if annex is None:
+                # Re-apply the codice's default allegato when the caller does
+                # not override it. Every reader keys articles WITH the default
+                # annex (seed nodes and BFF subgraph lookups use ';262:2~artN');
+                # leaving it stripped orphans lazily-ingested articles under an
+                # annex-less URN the read path can never match (side rail and
+                # /grafo would loop on ingest forever). VisuaLex's live API
+                # applies the same default in create_norma_visitata_from_data().
+                annex = default_allegato
     else:
         # For regular act types, generate URN from components
         if not date or not act_number:
