@@ -1,5 +1,6 @@
 import type { GraphData, NodeData, EdgeData } from '@antv/g6';
-import type { SubgraphResponse } from './types';
+import type { SubgraphResponse, GraphNodeData } from './types';
+import { deriveProvenance, readNodeTrust } from './types';
 import { nodeG6Type } from './graphStyles';
 
 export type GraphElements = Required<Pick<GraphData, 'nodes' | 'edges'>>;
@@ -14,6 +15,10 @@ export type GraphElements = Required<Pick<GraphData, 'nodes' | 'edges'>>;
  *
  * The semantic label lives in `data.type` (Norma, ConcettoGiuridico, …); the
  * G6 render shape is the item-level `type` (circle/rect/…), derived from it.
+ *
+ * Slice 4 P1 widens `node.data` to also carry `provenance`, `trust` and a raw
+ * `properties` passthrough so the CANVAS (not just the drawer) can colour nodes
+ * by provenance/trust. Dedup + dangling-edge logic is unchanged.
  */
 export function transformSubgraphResponse(response: SubgraphResponse): GraphElements {
   const seen = new Set<string>();
@@ -22,11 +27,15 @@ export function transformSubgraphResponse(response: SubgraphResponse): GraphElem
   for (const node of response.nodes) {
     if (seen.has(node.id)) continue;
     seen.add(node.id);
-    nodes.push({
-      id: node.id,
-      type: nodeG6Type(node.type),
-      data: { label: node.label, type: node.type, urn: node.urn ?? undefined },
-    });
+    const data: GraphNodeData = {
+      label: node.label,
+      type: node.type,
+      urn: node.urn ?? undefined,
+      provenance: deriveProvenance(node),
+      trust: readNodeTrust(node),
+      properties: node.properties,
+    };
+    nodes.push({ id: node.id, type: nodeG6Type(node.type), data });
   }
 
   const edges: EdgeData[] = [];

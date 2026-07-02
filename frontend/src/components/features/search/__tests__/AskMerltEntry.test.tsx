@@ -42,15 +42,31 @@ describe('AskMerltEntry', () => {
   });
 
   describe('qaAskable (consent ≥ basic)', () => {
-    it('shows the ask action and navigates with the QA-PREFILL CONTRACT payload', () => {
+    it('navigates to /grafo (Slice 4 absorb) with the QA-PREFILL CONTRACT payload + ?urn=', () => {
       render(<AskMerltEntry {...BASE} qaAskable consentNone={false} />);
       const btn = screen.getByRole('button', { name: /chiedi su questo articolo/i });
       fireEvent.click(btn);
       expect(navigateMock).toHaveBeenCalledTimes(1);
-      expect(navigateMock).toHaveBeenCalledWith('/merlt/qa', {
+      // ?urn= centers the graph on the article; state carries the prefill contract.
+      expect(navigateMock).toHaveBeenCalledWith(
+        `/grafo?urn=${encodeURIComponent(BASE.articleUrn)}`,
+        {
+          state: {
+            prefillQuery: "Spiegami l'art. 2043 codice civile",
+            articleUrn: BASE.articleUrn,
+            articleHeading: 'Art. 2043 codice civile',
+          },
+        },
+      );
+    });
+
+    it('navigates to bare /grafo (no ?urn=) when the article has no urn', () => {
+      render(<AskMerltEntry {...BASE} articleUrn={undefined} qaAskable consentNone={false} />);
+      fireEvent.click(screen.getByRole('button', { name: /chiedi su questo articolo/i }));
+      expect(navigateMock).toHaveBeenCalledWith('/grafo', {
         state: {
           prefillQuery: "Spiegami l'art. 2043 codice civile",
-          articleUrn: BASE.articleUrn,
+          articleUrn: '',
           articleHeading: 'Art. 2043 codice civile',
         },
       });

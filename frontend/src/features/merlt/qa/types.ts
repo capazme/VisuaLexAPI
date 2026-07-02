@@ -80,10 +80,10 @@ export interface QaTurnModel {
 }
 
 /**
- * QA-PREFILL CONTRACT (Slice 3 §3.5): the in-article "Chiedi su questo articolo"
- * button navigates to `/merlt/qa` with this in `location.state`. QAPage reads it
- * once on mount to prefill the composer, then clears it so a manual reload does
- * not re-prefill.
+ * QA-PREFILL CONTRACT (Slice 3 §3.5, Slice 4 absorb): the in-article "Chiedi su
+ * questo articolo" button navigates to `/grafo` with this in `location.state`
+ * (plus `?urn=` to center the graph). GraphExplorerPage reads it once on mount
+ * to prefill the ask field, then clears it so a manual reload does not re-prefill.
  */
 export interface QaPrefillState {
   prefillQuery: string;

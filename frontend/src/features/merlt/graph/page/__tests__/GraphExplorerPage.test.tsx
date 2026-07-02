@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GraphExplorerPage } from '../GraphExplorerPage';
 import type { ArticleGraphState } from '../../shared/useArticleGraph';
+import type { MerltFeatures } from '../../../useMerltFeatures';
+import type { QaTurnModel } from '../../../qa/types';
 
 const useArticleGraphMock = vi.fn();
 const isEnabledMock = vi.fn();
@@ -10,11 +12,55 @@ const isEnabledMock = vi.fn();
 vi.mock('../../shared/useArticleGraph', () => ({
   useArticleGraph: (...a: unknown[]) => useArticleGraphMock(...a),
 }));
+// GraphCanvas is code-split; capture the props each render so tests can assert
+// the effective hidden-types set + the sources-as-nodes highlight ids.
+let lastCanvasProps: Record<string, unknown> = {};
 vi.mock('../../shared/GraphCanvas', () => ({
-  default: () => <div data-testid="cytoscape" />,
+  default: (props: Record<string, unknown>) => {
+    lastCanvasProps = props;
+    return <div data-testid="cytoscape" />;
+  },
 }));
 vi.mock('../../featureFlag', () => ({
   isMerltGraphEnabled: () => isEnabledMock(),
+}));
+
+// Slice 4 P1: the page now derives ask/teach gating from useMerltFeatures and
+// owns useQaThread. Both are mocked so the page renders without the consent/auth
+// providers and without hitting the QA API — the wiring is asserted via spies.
+const featuresMock = vi.fn<() => MerltFeatures>();
+vi.mock('../../../useMerltFeatures', () => ({
+  useMerltFeatures: () => featuresMock(),
+}));
+
+const qaAskMock = vi.fn();
+const loadHistoryTurnMock = vi.fn();
+const qaThreadState: { turns: QaTurnModel[] } = { turns: [] };
+vi.mock('../../../qa/useQaThread', () => ({
+  useQaThread: () => ({
+    turns: qaThreadState.turns,
+    ask: (...a: unknown[]) => {
+      qaAskMock(...a);
+      return Promise.resolve();
+    },
+    refine: vi.fn(),
+    retry: vi.fn(),
+    cancel: vi.fn(),
+    rate: vi.fn(),
+    rateSrc: vi.fn(),
+    prefer: vi.fn(),
+    detailed: vi.fn(),
+    confirm: vi.fn(),
+    clear: vi.fn(),
+    loadHistoryTurn: (...a: unknown[]) => loadHistoryTurnMock(...a),
+  }),
+}));
+
+// The deliberation column's "Cronologia" affordance mounts QaHistoryPanel, which
+// hits GET /experts/history — mock the network so the page test is deterministic.
+const fetchHistoryMock = vi.fn();
+vi.mock('../../../qa/qaApi', () => ({
+  fetchHistory: (...a: unknown[]) => fetchHistoryMock(...a),
 }));
 
 const triggerIngestionMock = vi.fn();
@@ -32,13 +78,29 @@ vi.mock('../../shared/useIngestionJob', () => ({
   useIngestionJob: (...a: unknown[]) => useIngestionJobMock(...a),
 }));
 
+function features(overrides: Partial<MerltFeatures> = {}): MerltFeatures {
+  return {
+    merltEnabled: true,
+    graphEnabled: true,
+    consentLevel: 'full',
+    status: 'ready',
+    canTrack: true,
+    qaAskable: true,
+    canContribute: true,
+    canValidate: true,
+    graphReadable: true,
+    opsVisible: false,
+    ...overrides,
+  };
+}
+
 function setGraph(state: ArticleGraphState): void {
   useArticleGraphMock.mockReturnValue({ ...state, refetch: vi.fn() });
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[{ pathname: path.split('?')[0], search: path.includes('?') ? `?${path.split('?')[1]}` : '', state }]}>
       <GraphExplorerPage />
     </MemoryRouter>
   );
@@ -48,6 +110,14 @@ beforeEach(() => {
   useArticleGraphMock.mockReset();
   isEnabledMock.mockReset();
   isEnabledMock.mockReturnValue(true);
+  featuresMock.mockReset();
+  featuresMock.mockReturnValue(features());
+  qaAskMock.mockReset();
+  loadHistoryTurnMock.mockReset();
+  fetchHistoryMock.mockReset();
+  fetchHistoryMock.mockResolvedValue([]);
+  qaThreadState.turns = [];
+  lastCanvasProps = {};
   triggerIngestionMock.mockReset();
   triggerIngestionMock.mockResolvedValue({ jobId: 'job-1', status: 'pending' });
   useIngestionJobMock.mockReset();
@@ -249,6 +319,192 @@ describe('GraphExplorerPage', () => {
         expect(triggerIngestionMock).toHaveBeenCalledWith('urn:nir:stato:codice.civile~art2043')
       );
       expect(screen.queryByText(/concetto non collegato/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Slice 4 P1 — il dibattito sul grafo', () => {
+    // A populated subgraph with two nodes (one matches a deliberation source by
+    // node_id, one by urn) so the sources-as-nodes join can be asserted.
+    function setPopulatedGraph(): void {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [
+            { id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' },
+            { id: 'node-2059', type: 'Norma', label: 'Art. 2059', urn: 'urn:x~art2059' },
+            { id: 'sent-1', type: 'AttoGiudiziario', label: 'Cass. 123/2020', urn: 'urn:sent1' },
+          ],
+          edges: [],
+        },
+        elements: {
+          nodes: [{ id: 'node-2043' }, { id: 'node-2059' }, { id: 'sent-1' }],
+          edges: [],
+        },
+      });
+    }
+
+    function successTurn(): QaTurnModel {
+      return {
+        id: 'turn-1',
+        question: 'Qual è la ratio dell’art. 2043?',
+        confirmed: {},
+        state: {
+          status: 'success',
+          answer: {
+            trace_id: 'trace-1',
+            synthesis: 'La ratio è il neminem laedere.',
+            mode: 'convergent',
+            alternatives: null,
+            sources: [],
+            retrieved_sources: [
+              // Matches node-2043 by node_id, node-2059 by urn, third is absent.
+              { urn: 'urn:x~art2043', provenance: 'seed', trust: 0.9, node_id: 'node-2043' },
+              { urn: 'urn:x~art2059', provenance: 'seed', trust: 0.8, node_id: null },
+              { urn: 'urn:absent', provenance: 'live_unconfirmed', trust: 0.3, node_id: null },
+            ],
+            experts_used: ['literal'],
+            confidence: 0.8,
+            execution_time_ms: 100,
+          },
+        },
+      };
+    }
+
+    it('mounts the header "Chiedi al grafo" field and forwards asks to useQaThread', () => {
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // Two ask inputs share the label (header + column composer) — the header is
+      // first in DOM order.
+      const field = screen.getAllByLabelText('Chiedi al grafo', { selector: 'input' })[0];
+      fireEvent.change(field, { target: { value: 'Perché neminem laedere?' } });
+      fireEvent.keyDown(field, { key: 'Enter' });
+
+      expect(qaAskMock).toHaveBeenCalledWith('Perché neminem laedere?', 'convergent');
+    });
+
+    it('disables asking when consent is below basic (qaAskable=false)', () => {
+      featuresMock.mockReturnValue(features({ qaAskable: false, canContribute: false }));
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      // The AskGraphField renders its inert consent hint instead of the input.
+      expect(screen.getAllByText(/serve il consenso base/i).length).toBeGreaterThan(0);
+    });
+
+    it('consumes the QA-PREFILL location.state once and fires an ask', async () => {
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043', {
+        prefillQuery: 'Spiega la responsabilità aquiliana',
+        articleUrn: 'urn:x~art2043',
+        articleHeading: 'Art. 2043',
+      });
+      await waitFor(() =>
+        expect(qaAskMock).toHaveBeenCalledWith('Spiega la responsabilità aquiliana', 'convergent')
+      );
+      // Consumed exactly once — no duplicate ask on re-render.
+      expect(qaAskMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT consume the QA-PREFILL when asking is locked (no silent drop)', async () => {
+      featuresMock.mockReturnValue(features({ qaAskable: false, canContribute: false }));
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043', {
+        prefillQuery: 'Spiega la responsabilità aquiliana',
+        articleUrn: 'urn:x~art2043',
+        articleHeading: 'Art. 2043',
+      });
+      // The ask must NOT fire while locked — the prefill stays intact (F4: no
+      // silent loss). The disabled AskGraphField surfaces the consent hint instead.
+      await waitFor(() =>
+        expect(screen.getAllByText(/serve il consenso base/i).length).toBeGreaterThan(0)
+      );
+      expect(qaAskMock).not.toHaveBeenCalled();
+    });
+
+    it('highlights source nodes present in the subgraph and lists absent ones as chips', () => {
+      qaThreadState.turns = [successTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // node-2043 (by node_id) + node-2059 (by urn) light up; urn:absent does not.
+      const ids = lastCanvasProps.highlightNodeIds as ReadonlySet<string>;
+      expect(ids).toBeTruthy();
+      expect(ids.has('node-2043')).toBe(true);
+      expect(ids.has('node-2059')).toBe(true);
+      expect(ids.has('sent-1')).toBe(false);
+    });
+
+    it('hides jurisprudence by default once a deliberation is active', () => {
+      qaThreadState.turns = [successTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      const hidden = lastCanvasProps.hiddenNodeTypes as ReadonlySet<string>;
+      expect(hidden.has('AttoGiudiziario')).toBe(true);
+      // The primary control reflects the pressed (hidden) state.
+      expect(
+        screen.getByRole('button', { name: /nascondi giurisprudenza/i })
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('does NOT hide jurisprudence when there is no deliberation (manual off default)', () => {
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      const hidden = lastCanvasProps.hiddenNodeTypes as ReadonlySet<string>;
+      expect(hidden.has('AttoGiudiziario')).toBe(false);
+      expect(
+        screen.getByRole('button', { name: /nascondi giurisprudenza/i })
+      ).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('toggling the jurisprudence control overrides the derived default', () => {
+      qaThreadState.turns = [successTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      // Default-on with a deliberation → click turns it OFF.
+      fireEvent.click(screen.getByRole('button', { name: /nascondi giurisprudenza/i }));
+      const hidden = lastCanvasProps.hiddenNodeTypes as ReadonlySet<string>;
+      expect(hidden.has('AttoGiudiziario')).toBe(false);
+    });
+
+    it('exposes the Cronologia affordance and loads a past deliberation via useQaThread', async () => {
+      fetchHistoryMock.mockResolvedValue([
+        {
+          trace_id: 'trace-past-1',
+          query: 'Domanda passata sull’art. 2043?',
+          synthesis: 'Sintesi passata.',
+          mode: 'convergent',
+          confidence: 0.7,
+          experts_used: ['literal'],
+          sources: [],
+          created_at: '2026-06-01T10:00:00Z',
+        },
+      ]);
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // Open the server history from the docked deliberation column.
+      fireEvent.click(screen.getByRole('button', { name: /^cronologia$/i }));
+      const pastItem = await screen.findByText(/domanda passata/i);
+      fireEvent.click(pastItem);
+
+      // Selecting a past item loads it back into the thread (Decision A).
+      expect(loadHistoryTurnMock).toHaveBeenCalledWith(
+        expect.objectContaining({ trace_id: 'trace-past-1' }),
+      );
+    });
+
+    it('a node click selects it and switches the column to the Nodo tab', () => {
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      // Drive the canvas onNodeClick prop directly (canvas is mocked); wrap in act
+      // so the resulting setState (select + tab switch) flushes before asserting.
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
+      });
+      // The Nodo tab is now selected in the docked column.
+      const nodoTab = screen.getByRole('tab', { name: /nodo/i });
+      expect(nodoTab).toHaveAttribute('aria-selected', 'true');
     });
   });
 });

@@ -15,7 +15,7 @@ import {
   FloatingPortal,
 } from '@floating-ui/react';
 import { cn } from '../../../lib/utils';
-import { formatRetrievedUrn, CANON_LABEL } from './format';
+import { formatRetrievedUrn, CANON_LABEL, provenanceMeta } from './format';
 import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 
 /**
@@ -129,20 +129,8 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
   );
 }
 
-const PROVENANCE_META: Record<string, { label: string; stripe: string; chip: string }> = {
-  seed: { label: 'fondativa', stripe: 'bg-slate-400', chip: 'text-slate-500 dark:text-slate-400' },
-  lazy_ingest: { label: 'acquisita', stripe: 'bg-sky-400', chip: 'text-sky-600 dark:text-sky-400' },
-  community_validated: { label: 'validata dalla community', stripe: 'bg-emerald-500', chip: 'text-emerald-600 dark:text-emerald-400' },
-  live_confirmed: { label: 'confermata', stripe: 'bg-emerald-500', chip: 'text-emerald-600 dark:text-emerald-400' },
-  live_unconfirmed: { label: 'provvisoria', stripe: 'bg-amber-400', chip: 'text-amber-600 dark:text-amber-400' },
-};
-
 export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }: QaSourceChipProps) {
-  const meta = (source.provenance && PROVENANCE_META[source.provenance]) || {
-    label: source.provenance ?? 'sconosciuta',
-    stripe: 'bg-slate-300',
-    chip: 'text-slate-400',
-  };
+  const meta = provenanceMeta(source.provenance);
   // For provisional (live:) nodes the URN is an opaque hash; prefer the
   // underlying Normattiva URL when known — it gives a readable label AND a
   // navigable /grafo target. A bare live: hash with no source_url isn't

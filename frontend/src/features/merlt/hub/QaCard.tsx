@@ -30,10 +30,11 @@ function confidenceLabel(confidence: number | null | undefined): string | null {
 export function QaCard({ qaAskable, lastQa }: QaCardProps) {
   const navigate = useNavigate();
 
-  // Navigate to the Q&A page. The prefill contract (QA-PREFILL) is a
-  // location.state the QAPage reads once on mount.
+  // Slice 4 absorb (Decision A): the graph is the sole Q&A surface. The prefill
+  // contract (QA-PREFILL) rides in location.state; GraphExplorerPage reads it
+  // once on mount to seed the "Chiedi al grafo" field.
   const goAsk = (prefillQuery?: string) => {
-    navigate('/merlt/qa', prefillQuery ? { state: { prefillQuery } } : undefined);
+    navigate('/grafo', prefillQuery ? { state: { prefillQuery } } : undefined);
   };
 
   const pill = !qaAskable ? <StatusPill tone="gated">Consenso base</StatusPill> : undefined;

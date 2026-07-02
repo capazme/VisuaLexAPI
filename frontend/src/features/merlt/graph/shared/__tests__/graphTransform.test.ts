@@ -90,4 +90,61 @@ describe('transformSubgraphResponse (G6 GraphData)', () => {
     expect(out.nodes).toEqual([]);
     expect(out.edges).toEqual([]);
   });
+
+  it('widens node.data with provenance/trust/properties for the canvas', () => {
+    const out = transformSubgraphResponse(
+      resp({
+        nodes: [
+          {
+            id: 'live:1',
+            type: 'AttoGiudiziario',
+            label: 'Massima live',
+            properties: { provenance: 'live_unconfirmed', trust: 0.6, massima: 'x' },
+          },
+        ],
+      })
+    );
+    expect(out.nodes[0].data).toMatchObject({
+      provenance: 'live_unconfirmed',
+      trust: 0.6,
+    });
+    // Raw properties pass through so the drawer can read them off node.data too.
+    expect((out.nodes[0].data as { properties?: Record<string, unknown> }).properties).toEqual({
+      provenance: 'live_unconfirmed',
+      trust: 0.6,
+      massima: 'x',
+    });
+  });
+
+  it('derives community_validated provenance from the boolean flag', () => {
+    const out = transformSubgraphResponse(
+      resp({ nodes: [{ id: 'v', type: 'ConcettoGiuridico', label: 'V', properties: { community_validated: true } }] })
+    );
+    expect((out.nodes[0].data as { provenance?: string }).provenance).toBe('community_validated');
+  });
+
+  it('leaves provenance undefined when no provenance signal exists (plain seed styling)', () => {
+    const out = transformSubgraphResponse(
+      resp({ nodes: [{ id: 'n', type: 'Norma', label: 'Art. 2043' }] })
+    );
+    expect((out.nodes[0].data as { provenance?: string }).provenance).toBeUndefined();
+    expect((out.nodes[0].data as { trust?: number }).trust).toBeUndefined();
+  });
+
+  it('reads provenance/trust from metadata when properties omit them', () => {
+    const out = transformSubgraphResponse(
+      resp({
+        nodes: [
+          {
+            id: 'm',
+            type: 'Norma',
+            label: 'X',
+            metadata: { community_validated: true, trust: '1.0' },
+          },
+        ],
+      })
+    );
+    expect((out.nodes[0].data as { provenance?: string }).provenance).toBe('community_validated');
+    expect((out.nodes[0].data as { trust?: number }).trust).toBe(1);
+  });
 });

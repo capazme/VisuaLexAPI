@@ -52,12 +52,13 @@ export interface AskMerltEntryProps {
 }
 
 /**
- * Discreet in-context entry to the Q&A page — the question is born while reading
- * the norm (design §3.5). Follows the NER-row pattern: one unobtrusive line at
- * the end of the article body.
+ * Discreet in-context entry to the deliberation surface — the question is born
+ * while reading the norm (design §3.5). Follows the NER-row pattern: one
+ * unobtrusive line at the end of the article body.
  *  - `qaAskable` (consent ≥ basic): a "Chiedi su questo articolo" button that
- *    navigates to /merlt/qa prefilled with the article context (QA-PREFILL
- *    CONTRACT: { prefillQuery, articleUrn, articleHeading }).
+ *    navigates to /grafo (Slice 4 absorb, Decision A). It carries the QA-PREFILL
+ *    CONTRACT ({ prefillQuery, articleUrn, articleHeading }) in location.state
+ *    AND ?urn= in the query so the graph centers on the article on arrival.
  *  - consent `none`: a one-off teaser chip that opens the consent dialog; its
  *    dismissal is persisted so it does not nag.
  *  - MERL-T disabled / any other state: renders nothing.
@@ -88,9 +89,14 @@ export function AskMerltEntry({
                 <button
                     type="button"
                     onClick={() =>
-                        navigate('/merlt/qa', {
-                            state: { prefillQuery, articleUrn: articleUrn ?? '', articleHeading: heading },
-                        })
+                        navigate(
+                            // ?urn= centers the graph on the article; location.state
+                            // carries the QA-PREFILL CONTRACT for the ask field.
+                            articleUrn ? `/grafo?urn=${encodeURIComponent(articleUrn)}` : '/grafo',
+                            {
+                                state: { prefillQuery, articleUrn: articleUrn ?? '', articleHeading: heading },
+                            },
+                        )
                     }
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 transition-colors duration-150 hover:text-primary-700 focus-visible:outline-none focus-visible:underline dark:text-primary-400 dark:hover:text-primary-300"
                 >

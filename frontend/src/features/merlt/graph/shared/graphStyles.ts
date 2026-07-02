@@ -1,4 +1,5 @@
 import type { NodeData, EdgeData } from '@antv/g6';
+import type { NodeProvenance } from './types';
 
 /**
  * G6 v5 styling for the MERL-T legal knowledge graph.
@@ -79,6 +80,29 @@ export const EDGE_TYPE_STYLE: Record<string, EdgeTypeStyle> = {
 const DEFAULT_NODE_COLOR = '#94a3b8';
 const DEFAULT_EDGE_COLOR = '#cbd5e1';
 
+/**
+ * Border treatment keyed on node provenance (Slice 4 P1).
+ *
+ * The border, NOT the fill, encodes provenance so the type hue (fill) stays
+ * legible: a `seed` node looks exactly as before; `community_validated` gets a
+ * thicker peer-review ring; `live_unconfirmed` gets a dashed amber outline that
+ * overrides the type stroke so provisional sources are unmistakable on canvas.
+ */
+export interface ProvenanceStyle {
+  lineWidth: number;
+  lineDash?: [number, number];
+  /** When set, overrides the type-hue stroke (amber for provisional). */
+  strokeOverride?: string;
+}
+
+const PROVISIONAL_AMBER = '#d97706';
+
+export const PROVENANCE_STYLE: Record<NodeProvenance, ProvenanceStyle> = {
+  seed: { lineWidth: 1.75 },
+  community_validated: { lineWidth: 3 },
+  live_unconfirmed: { lineWidth: 2, lineDash: [4, 3], strokeOverride: PROVISIONAL_AMBER },
+};
+
 /** Render shape for a semantic node type (fallback: circle). */
 export function nodeG6Type(semanticType: string | undefined): G6NodeShape {
   return (semanticType && NODE_TYPE_STYLE[semanticType]?.g6Type) || 'circle';
@@ -86,14 +110,28 @@ export function nodeG6Type(semanticType: string | undefined): G6NodeShape {
 
 /** G6 node style mapper — reads the semantic type/label from `datum.data`. */
 export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
-  const data = (datum.data ?? {}) as { type?: string; label?: string };
+  const data = (datum.data ?? {}) as {
+    type?: string;
+    label?: string;
+    provenance?: NodeProvenance;
+    trust?: number;
+  };
   const color = (data.type && NODE_TYPE_STYLE[data.type]?.color) || DEFAULT_NODE_COLOR;
+  const prov = data.provenance ? PROVENANCE_STYLE[data.provenance] : undefined;
+  // Trust nudges fill saturation so a solid seed reads denser than a faint
+  // provisional source; clamped so nothing disappears or over-saturates.
+  const fillOpacity =
+    typeof data.trust === 'number'
+      ? Math.min(0.32, Math.max(0.1, 0.1 + 0.22 * data.trust))
+      : 0.18;
   return {
     // Soft tinted fill + saturated border in the type hue → readable, not garish.
+    // Provenance overrides the border (ring / dashed amber), never the fill hue.
     fill: color,
-    fillOpacity: 0.18,
-    stroke: color,
-    lineWidth: 1.75,
+    fillOpacity,
+    stroke: prov?.strokeOverride ?? color,
+    lineWidth: prov?.lineWidth ?? 1.75,
+    lineDash: prov?.lineDash,
     size: 30,
     radius: 6,
     labelText: data.label ?? '',

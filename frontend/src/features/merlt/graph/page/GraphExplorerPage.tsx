@@ -1,7 +1,11 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, Download, Loader2, Network, Upload, X } from 'lucide-react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertCircle, Download, EyeOff, Loader2, Network, Upload, X } from 'lucide-react';
+import { cn } from '../../../../lib/utils';
 import { isMerltGraphEnabled } from '../featureFlag';
+import { useMerltFeatures } from '../../useMerltFeatures';
+import { useQaThread } from '../../qa/useQaThread';
+import type { QaMode, QaPrefillState, QaRetrievedSource } from '../../qa/types';
 import { useArticleGraph } from '../shared/useArticleGraph';
 import type { GraphElements } from '../shared/graphTransform';
 import {
@@ -22,8 +26,9 @@ import type { GraphLayoutName } from '../shared/GraphCanvas';
 import { Toast } from '../../../../components/ui/Toast';
 import { computeTypeCounts } from '../shared/graphFilters';
 import { GraphSearchBox } from './GraphSearchBox';
+import { AskGraphField } from './AskGraphField';
+import { DeliberationColumn } from './DeliberationColumn';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
-import { NodeDetailsDrawer } from './NodeDetailsDrawer';
 import { DepthSelector } from './DepthSelector';
 import { GraphFilterPanel } from './GraphFilterPanel';
 import { LAYOUT_OPTIONS } from './graphLayouts';
@@ -31,6 +36,13 @@ import { useBreadcrumbHistory } from './useBreadcrumbHistory';
 import { isArticleCenter } from './graphCenter';
 
 const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
+
+/**
+ * Node types that carry case-law density (the ~10k `AttoGiudiziario` sentenze +
+ * `Caso`). "Nascondi giurisprudenza" toggles these (design §4/§8 — the one real
+ * legibility lever), default-on while a deliberation is active.
+ */
+const JURISPRUDENCE_TYPES: readonly string[] = ['AttoGiudiziario', 'Caso'];
 
 function clampDepth(raw: string | null): number {
   const n = raw ? Number.parseInt(raw, 10) : NaN;
@@ -52,7 +64,10 @@ function parseLayout(raw: string | null): GraphLayoutName {
  */
 export function GraphExplorerPage(): React.ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const enabled = isMerltGraphEnabled();
+  const { qaAskable, canContribute } = useMerltFeatures();
   const urn = searchParams.get('urn');
   const centerType = searchParams.get('type'); // C1: threaded so it survives refresh/deeplink
   const depth = clampDepth(searchParams.get('depth'));
@@ -63,6 +78,17 @@ export function GraphExplorerPage(): React.ReactElement {
   const graph = useArticleGraph(enabled ? urn : null, depth);
   const { entries, push } = useBreadcrumbHistory();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Slice 4 P1: the page OWNS the Q&A thread (useQaThread lifted here); the
+  // header field + deliberation column are presentational and receive turns +
+  // handlers. `ask`/`retry`/`cancel` are stable callbacks (useCallback in the
+  // hook), so passing them down does not thrash the column.
+  const qa = useQaThread();
+  // Deliberation column tab: 'dibattito' after an ask, 'nodo' after a node click.
+  const [activeTab, setActiveTab] = useState<'dibattito' | 'nodo'>('dibattito');
+  // "Nascondi giurisprudenza" (design §4/§8). User-controllable primary toggle;
+  // default-on is derived (see hideJurisprudence below) while a debate is active.
+  const [hideJurisManual, setHideJurisManual] = useState<boolean | null>(null);
 
   // Lazy ingestion: a urn that resolves to an empty subgraph isn't in the graph
   // yet — enqueue an ingestion job, poll it, then refetch when it completes.
@@ -89,7 +115,35 @@ export function GraphExplorerPage(): React.ReactElement {
     setHiddenNodeTypes(new Set());
     setHiddenEdgeTypes(new Set());
     setHighlightType(null);
+    // Re-arm the derived default for "nascondi giurisprudenza" on the new center.
+    setHideJurisManual(null);
   }, [urn]);
+
+  // QA-PREFILL CONTRACT (qa/types.ts): the in-article "Chiedi su questo articolo"
+  // navigates here with a QaPrefillState in location.state (+ ?urn= to center).
+  // Consume it exactly once — fire the ask, switch to the Dibattito tab, and
+  // clear location.state via replace so a manual reload does not re-ask.
+  const prefillConsumedRef = useRef(false);
+  useEffect(() => {
+    if (prefillConsumedRef.current) return;
+    const state = location.state as QaPrefillState | null;
+    if (!state?.prefillQuery) return;
+    // F4: only CONSUME (fire + strip) when asking is unlocked. When !qaAskable the
+    // ask would be silently dropped, so leave location.state intact instead —
+    // once consent is granted (qaAskable flips true) this effect re-runs on the
+    // same state and the question is asked, never lost. The disabled AskGraphField
+    // already surfaces the "serve il consenso base" hint in the meantime.
+    if (!qaAskable) {
+      setActiveTab('dibattito');
+      return;
+    }
+    prefillConsumedRef.current = true;
+    setActiveTab('dibattito');
+    void qa.ask(state.prefillQuery, 'convergent');
+    // Strip the consumed prefill from history so reload / back does not re-fire it.
+    navigate(location.pathname + location.search, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, qaAskable]);
 
   useEffect(() => {
     if (graph.status !== 'success' || graph.data.nodes.length > 0) return;
@@ -132,15 +186,70 @@ export function GraphExplorerPage(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urn]);
 
-  const nodes = graph.status === 'success' ? graph.data.nodes : [];
-  const edges = graph.status === 'success' ? graph.data.edges : [];
-  const nodesById = new Map<string, GraphNode>(nodes.map((n) => [n.id, n]));
+  // `useArticleGraph` returns a FRESH object every render (`{ ...state, refetch }`),
+  // so keying memos on `graph` never actually memoizes. Key on the per-fetch
+  // stable payload instead: `data`/`elements` are only new references when a
+  // fetch settles, so the derived joins below stay reference-stable between
+  // renders that don't refetch. (`graphData`/`graphElements` are `undefined`
+  // outside the success branch — a stable sentinel the memos treat as "empty".)
+  const graphData = graph.status === 'success' ? graph.data : undefined;
+  const graphElements = graph.status === 'success' ? graph.elements : undefined;
+  const nodes = useMemo(() => graphData?.nodes ?? [], [graphData]);
+  const edges = useMemo(() => graphData?.edges ?? [], [graphData]);
+  const nodesById = useMemo(() => new Map<string, GraphNode>(nodes.map((n) => [n.id, n])), [nodes]);
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
 
+  // The most recent successful deliberation drives the sources-as-nodes highlight
+  // (design §3.2). Sources present in the current subgraph light up on canvas; the
+  // rest stay listed as chips in the column. Pure FE join — no missing node added.
+  const latestSources = useMemo<QaRetrievedSource[]>(() => {
+    for (let i = qa.turns.length - 1; i >= 0; i -= 1) {
+      const t = qa.turns[i];
+      if (t.state.status === 'success') return t.state.answer.retrieved_sources;
+    }
+    return [];
+  }, [qa.turns]);
+
+  // Is there an active/pending deliberation? Drives the "nascondi giurisprudenza"
+  // default-on and the source highlight. True the moment the first turn appears.
+  const hasDeliberation = qa.turns.length > 0;
+
+  // Join retrieved_sources to canvas node ids: a source lands on the graph iff its
+  // node_id (preferred) OR urn matches a node id/urn currently rendered. Uses the
+  // TRANSFORMED elements' ids (same id space the canvas highlights on).
+  const sourceHighlightIds = useMemo<ReadonlySet<string> | null>(() => {
+    if (latestSources.length === 0) return null;
+    const byUrn = new Map<string, string>();
+    for (const n of nodes) if (n.urn) byUrn.set(n.urn, n.id);
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const hit = new Set<string>();
+    for (const s of latestSources) {
+      if (s.node_id && nodeIds.has(s.node_id)) hit.add(s.node_id);
+      else if (byUrn.has(s.urn)) hit.add(byUrn.get(s.urn)!);
+    }
+    return hit.size > 0 ? hit : null;
+  }, [latestSources, nodes]);
+
+  // "Nascondi giurisprudenza": manual override wins; otherwise default-on while a
+  // deliberation is active (density mitigation), off in plain exploration.
+  const hideJurisprudence = hideJurisManual ?? hasDeliberation;
+
+  // Human label of the current center → prefills the AskGraphField placeholder.
+  const centerLabel = urn ? labelFor(urn, entries) : undefined;
+
   const typeCounts = useMemo(
-    () => (graph.status === 'success' ? computeTypeCounts(graph.elements) : { nodes: [], edges: [] }),
-    [graph]
+    () => (graphElements ? computeTypeCounts(graphElements) : { nodes: [], edges: [] }),
+    [graphElements]
   );
+
+  // Merge the jurisprudence toggle into the per-type visibility set the canvas
+  // consumes — a superset of the filter panel's manual hides.
+  const effectiveHiddenNodeTypes = useMemo<ReadonlySet<string>>(() => {
+    if (!hideJurisprudence) return hiddenNodeTypes;
+    const next = new Set(hiddenNodeTypes);
+    for (const t of JURISPRUDENCE_TYPES) next.add(t);
+    return next;
+  }, [hiddenNodeTypes, hideJurisprudence]);
 
   const importedElements = useMemo(
     () => (importedSlice ? sliceToElements(importedSlice) : null),
@@ -183,6 +292,42 @@ export function GraphExplorerPage(): React.ReactElement {
 
   const handleRecenter = (node: GraphNode): void => {
     goToCenter(node.urn ?? node.id, node.label, node.type);
+  };
+
+  // A node click on the canvas selects it AND flips the column to the Nodo tab
+  // so its details are visible (design §4 — click a node → inspect it).
+  const handleNodeClick = (id: string): void => {
+    setSelectedNodeId(id);
+    setActiveTab('nodo');
+  };
+
+  // Header/column "Chiedi al grafo": fire the ask and surface the Dibattito tab.
+  const handleAsk = useCallback(
+    (question: string, mode: QaMode): void => {
+      setActiveTab('dibattito');
+      void qa.ask(question, mode);
+    },
+    [qa],
+  );
+
+  // A deliberation source chip re-centers the CANVAS (design §3.2). node_id is a
+  // real graph node id → if it's in the current subgraph, just select it (no
+  // navigation); otherwise navigate by urn. Falls back to navigation for urns.
+  const handleSourceCenter = (nodeIdOrUrn: string): void => {
+    const local = nodesById.get(nodeIdOrUrn);
+    if (local) {
+      setSelectedNodeId(local.id);
+      setActiveTab('nodo');
+      return;
+    }
+    const byUrn = nodes.find((n) => n.urn === nodeIdOrUrn);
+    if (byUrn) {
+      setSelectedNodeId(byUrn.id);
+      setActiveTab('nodo');
+      return;
+    }
+    // Not in the current subgraph → treat as a urn and re-center the graph.
+    goToCenter(nodeIdOrUrn, labelFor(nodeIdOrUrn, entries));
   };
 
   // #7: export the current subgraph to a local JSON the user keeps off-server.
@@ -231,8 +376,18 @@ export function GraphExplorerPage(): React.ReactElement {
           <Network className="h-5 w-5 text-primary-600" />
           <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Grafo giuridico</h1>
         </div>
-        <div className="flex-1 sm:max-w-md">
+        <div className="sm:max-w-xs sm:flex-1">
           <GraphSearchBox onSelect={handleSelect} />
+        </div>
+        {/* Distinct "Chiedi al grafo" ask affordance (design §3): message icon,
+            prefilled with the current center. Presentational — page owns useQaThread. */}
+        <div className="sm:max-w-sm sm:flex-1">
+          <AskGraphField
+            centerUrn={urn ?? undefined}
+            centerLabel={centerLabel}
+            disabled={!qaAskable}
+            onAsk={handleAsk}
+          />
         </div>
         {urn && (
           <DepthSelector depth={depth} layout={layout} onDepthChange={setDepth} onLayoutChange={setLayout} />
@@ -362,15 +517,33 @@ export function GraphExplorerPage(): React.ReactElement {
                 }
                 onHoverType={setHighlightType}
               />
+              {/* Primary "nascondi giurisprudenza" control (design §4/§8): the
+                  one real legibility lever, promoted out of the filter panel.
+                  Default-on while a deliberation is active. */}
+              <button
+                type="button"
+                onClick={() => setHideJurisManual(!hideJurisprudence)}
+                aria-pressed={hideJurisprudence}
+                title="Nascondi le sentenze per alleggerire il grafo"
+                className={cn(
+                  'absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                  hideJurisprudence
+                    ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
+                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                )}
+              >
+                <EyeOff size={14} /> Nascondi giurisprudenza
+              </button>
               <GraphCanvas
                 nodes={graph.elements.nodes}
                 edges={graph.elements.edges}
                 layout={layout}
                 height="100%"
-                hiddenNodeTypes={hiddenNodeTypes}
+                hiddenNodeTypes={effectiveHiddenNodeTypes}
                 hiddenEdgeTypes={hiddenEdgeTypes}
                 highlightNodeType={highlightType}
-                onNodeClick={setSelectedNodeId}
+                highlightNodeIds={sourceHighlightIds}
+                onNodeClick={handleNodeClick}
                 onNodeDblClick={(id) => {
                   const n = nodesById.get(id);
                   if (n) handleRecenter(n);
@@ -378,18 +551,34 @@ export function GraphExplorerPage(): React.ReactElement {
               />
             </Suspense>
           )}
-          {selectedNode && (
-            <div className="absolute bottom-3 right-3 top-3 z-20 flex w-[360px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-              <NodeDetailsDrawer
-                node={selectedNode}
-                edges={edges}
-                nodesById={nodesById}
-                onRecenter={handleRecenter}
-                onClose={() => setSelectedNodeId(null)}
-              />
-            </div>
-          )}
         </main>
+
+        {/* Docked deliberation column (design §4): the canvas is `flex-1`, so a
+            fixed-width sibling reflows it to `calc(100% − 400px)` — no imperative
+            padding. Dual-tab: Dibattito (the absorbed Q&A) / Nodo (details). */}
+        <div className="hidden w-[400px] shrink-0 md:block">
+          <DeliberationColumn
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            turns={qa.turns}
+            onAsk={handleAsk}
+            onRetry={qa.retry}
+            onCancel={qa.cancel}
+            onSourceCenter={handleSourceCenter}
+            onLoadHistoryTurn={qa.loadHistoryTurn}
+            selectedNode={selectedNode}
+            selectedEdge={null}
+            canContribute={canContribute}
+            qaAskable={qaAskable}
+            nodesById={nodesById}
+            edges={edges}
+            onRecenter={handleRecenter}
+            onCloseNode={() => {
+              setSelectedNodeId(null);
+              setActiveTab('dibattito');
+            }}
+          />
+        </div>
       </div>
 
       {toast && (

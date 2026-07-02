@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   NODE_TYPE_STYLE,
   EDGE_TYPE_STYLE,
+  PROVENANCE_STYLE,
   nodeG6Type,
   nodeStyleMapper,
   edgeStyleMapper,
@@ -41,5 +42,40 @@ describe('graphStyles (G6)', () => {
     const unknown = edgeStyleMapper({ id: 'e2', source: 'a', target: 'b', data: { type: 'WAT' } });
     expect(typeof unknown.stroke).toBe('string');
     expect(unknown.stroke).toBeTruthy();
+  });
+
+  it('declares a style for each of the three provenance states', () => {
+    expect(PROVENANCE_STYLE).toHaveProperty('seed');
+    expect(PROVENANCE_STYLE).toHaveProperty('community_validated');
+    expect(PROVENANCE_STYLE).toHaveProperty('live_unconfirmed');
+  });
+
+  it('seed provenance keeps the plain type border (no dash, no override)', () => {
+    const style = nodeStyleMapper({ id: 'n', data: { type: 'Norma', provenance: 'seed' } });
+    // Stroke stays the type hue; no dash.
+    expect(style.stroke).toBe(NODE_TYPE_STYLE.Norma.color);
+    expect(style.lineDash).toBeUndefined();
+  });
+
+  it('community_validated provenance thickens the border (ring), keeps the type hue', () => {
+    const style = nodeStyleMapper({ id: 'n', data: { type: 'Norma', provenance: 'community_validated' } });
+    expect(style.stroke).toBe(NODE_TYPE_STYLE.Norma.color);
+    expect(style.lineWidth).toBe(PROVENANCE_STYLE.community_validated.lineWidth);
+    expect(style.lineWidth).toBeGreaterThan(PROVENANCE_STYLE.seed.lineWidth);
+  });
+
+  it('live_unconfirmed provenance draws a dashed amber border overriding the type hue', () => {
+    const style = nodeStyleMapper({ id: 'n', data: { type: 'Norma', provenance: 'live_unconfirmed' } });
+    expect(style.lineDash).toEqual(PROVENANCE_STYLE.live_unconfirmed.lineDash);
+    expect(style.stroke).toBe(PROVENANCE_STYLE.live_unconfirmed.strokeOverride);
+    expect(style.stroke).not.toBe(NODE_TYPE_STYLE.Norma.color);
+  });
+
+  it('trust nudges fill opacity within a clamped range', () => {
+    const high = nodeStyleMapper({ id: 'h', data: { type: 'Norma', trust: 1 } });
+    const low = nodeStyleMapper({ id: 'l', data: { type: 'Norma', trust: 0 } });
+    expect(high.fillOpacity as number).toBeGreaterThan(low.fillOpacity as number);
+    expect(high.fillOpacity as number).toBeLessThanOrEqual(0.32);
+    expect(low.fillOpacity as number).toBeGreaterThanOrEqual(0.1);
   });
 });

@@ -71,4 +71,53 @@ describe('NodeDetailsDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: /chiudi/i }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('renders `massima` as prominent body text, not in "Altre proprietà"', () => {
+    const massimaNode: GraphNode = {
+      id: 'sentenza:1',
+      type: 'AttoGiudiziario',
+      label: 'Cass. 12345/2020',
+      properties: {
+        massima: 'La responsabilità aquiliana presuppone un danno ingiusto.',
+        organo_emittente: 'Cassazione',
+      },
+    };
+    render(
+      <NodeDetailsDrawer node={massimaNode} edges={[]} nodesById={new Map()} onRecenter={vi.fn()} onClose={vi.fn()} />
+    );
+    // The friendly "Massima" label appears (prominent Field), and the legacy
+    // typo `massima_text` no longer buries it in the generic list.
+    expect(screen.getByText('Massima')).toBeInTheDocument();
+    expect(
+      screen.getByText(/La responsabilità aquiliana presuppone un danno ingiusto\./)
+    ).toBeInTheDocument();
+    // "massima" must NOT surface under the raw "Altre proprietà" humanized key.
+    expect(screen.queryByText('Massima text')).not.toBeInTheDocument();
+  });
+
+  it('shows a provenance chip for a live_unconfirmed node', () => {
+    const liveNode: GraphNode = {
+      id: 'live:1',
+      type: 'AttoGiudiziario',
+      label: 'Massima live',
+      properties: { provenance: 'live_unconfirmed', trust: 0.6, massima: 'x' },
+    };
+    render(
+      <NodeDetailsDrawer node={liveNode} edges={[]} nodesById={new Map()} onRecenter={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.getByText('Non confermato')).toBeInTheDocument();
+  });
+
+  it('shows the community-validated provenance chip', () => {
+    const validated: GraphNode = {
+      id: 'v:1',
+      type: 'ConcettoGiuridico',
+      label: 'Colpa',
+      properties: { community_validated: true },
+    };
+    render(
+      <NodeDetailsDrawer node={validated} edges={[]} nodesById={new Map()} onRecenter={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.getByText('Validato dalla comunità')).toBeInTheDocument();
+  });
 });

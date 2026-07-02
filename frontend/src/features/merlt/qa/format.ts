@@ -32,3 +32,35 @@ export function confirmSourceEntityText(source: QaRetrievedSource): string {
   const readableUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
   return formatRetrievedUrn(readableUrn);
 }
+
+/** Visual descriptor for a source's provenance (colored stripe + chip label). */
+export interface ProvenanceMeta {
+  label: string;
+  /** Leading-edge stripe colour class (bg-*). */
+  stripe: string;
+  /** Chip text colour class. */
+  chip: string;
+}
+
+const PROVENANCE_META: Record<string, ProvenanceMeta> = {
+  seed: { label: 'fondativa', stripe: 'bg-slate-400', chip: 'text-slate-500 dark:text-slate-400' },
+  lazy_ingest: { label: 'acquisita', stripe: 'bg-sky-400', chip: 'text-sky-600 dark:text-sky-400' },
+  community_validated: { label: 'validata dalla community', stripe: 'bg-emerald-500', chip: 'text-emerald-600 dark:text-emerald-400' },
+  live_confirmed: { label: 'confermata', stripe: 'bg-emerald-500', chip: 'text-emerald-600 dark:text-emerald-400' },
+  live_unconfirmed: { label: 'provvisoria', stripe: 'bg-amber-400', chip: 'text-amber-600 dark:text-amber-400' },
+};
+
+/**
+ * Provenance → visual descriptor (single source of truth for QaSourceChip and
+ * the Slice 4 deliberation column's source chips). Unknown provenance degrades
+ * to a neutral grey stripe with the raw value as the label.
+ */
+export function provenanceMeta(provenance: string | null | undefined): ProvenanceMeta {
+  return (
+    (provenance && PROVENANCE_META[provenance]) || {
+      label: provenance ?? 'sconosciuta',
+      stripe: 'bg-slate-300',
+      chip: 'text-slate-400',
+    }
+  );
+}

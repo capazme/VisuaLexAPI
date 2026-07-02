@@ -42,7 +42,6 @@ vi.mock('../features/merlt/graph/page/GraphExplorerPage', () => ({
 }));
 vi.mock('../features/merlt/contrib/ContribPage', () => ({ ContribPage: () => <div /> }));
 vi.mock('../features/merlt/validate/ValidationPage', () => ({ ValidationPage: () => <div /> }));
-vi.mock('../features/merlt/qa/QAPage', () => ({ QAPage: () => <div data-testid="qa-page" /> }));
 
 import App from '../App';
 
@@ -56,10 +55,18 @@ beforeEach(() => {
 });
 
 describe('App routing', () => {
-  it('redirects the legacy /merlt/chiedi path to /merlt/qa', async () => {
+  // Slice 4 absorb (Decision A): the Q&A page is gone — /merlt/qa and the legacy
+  // /merlt/chiedi both redirect to the graph, the sole deliberation surface.
+  it('redirects the absorbed /merlt/qa path to /grafo', async () => {
+    renderAt('/merlt/qa');
+    expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/grafo');
+  });
+
+  it('redirects the legacy /merlt/chiedi path to /grafo', async () => {
     renderAt('/merlt/chiedi');
-    expect(await screen.findByTestId('qa-page')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/merlt/qa');
+    expect(await screen.findByTestId('graph-explorer')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/grafo');
   });
 
   it('renders the global 404 page inside the layout for unknown paths', async () => {

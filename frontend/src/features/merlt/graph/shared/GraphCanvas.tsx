@@ -34,6 +34,12 @@ export interface GraphCanvasProps {
   hiddenEdgeTypes?: ReadonlySet<string>;
   /** Emphasize nodes of this type (legend hover); fade the rest. null = clear. */
   highlightNodeType?: string | null;
+  /**
+   * Emphasize this SET of node ids (Slice 4 P1 "sources-as-nodes"): matched
+   * nodes go `active`, the rest `inactive`. Takes precedence over
+   * `highlightNodeType`. `null`/empty clears the emphasis.
+   */
+  highlightNodeIds?: ReadonlySet<string> | null;
   onNodeClick?: (nodeId: string) => void;
   onNodeDblClick?: (nodeId: string) => void;
 }
@@ -105,17 +111,26 @@ function buildVisibilityMap(
 function buildHighlightState(
   nodes: NodeData[],
   edges: EdgeData[],
-  type: string | null | undefined
+  type: string | null | undefined,
+  ids: ReadonlySet<string> | null | undefined
 ): Record<string, string[]> {
   const map: Record<string, string[]> = {};
+  // Id-set emphasis (deliberation sources) wins over the legend's type emphasis.
+  const byIds = !!(ids && ids.size > 0);
+  const active = byIds || !!type;
   for (const n of nodes) {
     if (n.id == null) continue;
-    if (!type) map[String(n.id)] = [];
-    else map[String(n.id)] = n.data?.type === type ? ['active'] : ['inactive'];
+    const id = String(n.id);
+    if (!active) {
+      map[id] = [];
+      continue;
+    }
+    const isActive = byIds ? ids!.has(id) : n.data?.type === type;
+    map[id] = isActive ? ['active'] : ['inactive'];
   }
   for (const e of edges) {
     if (e.id == null) continue;
-    map[String(e.id)] = type ? ['inactive'] : [];
+    map[String(e.id)] = active ? ['inactive'] : [];
   }
   return map;
 }
@@ -128,6 +143,7 @@ export default function GraphCanvas({
   hiddenNodeTypes,
   hiddenEdgeTypes,
   highlightNodeType,
+  highlightNodeIds,
   onNodeClick,
   onNodeDblClick,
 }: GraphCanvasProps): React.ReactElement {
@@ -220,18 +236,19 @@ export default function GraphCanvas({
       .catch(() => {});
   }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes]);
 
-  // Legend hover → emphasize nodes of a type, fade the rest (no relayout).
+  // Legend hover (type) OR deliberation sources (id-set) → emphasize the match,
+  // fade the rest (no relayout). The id-set wins when both are set.
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
     void renderRef.current
       .then(() => {
         if (graphRef.current === g) {
-          g.setElementState(buildHighlightState(nodes, edges, highlightNodeType));
+          g.setElementState(buildHighlightState(nodes, edges, highlightNodeType, highlightNodeIds));
         }
       })
       .catch(() => {});
-  }, [highlightNodeType, nodes, edges]);
+  }, [highlightNodeType, highlightNodeIds, nodes, edges]);
 
   // Re-run layout when the layout changes (no data refetch).
   useEffect(() => {

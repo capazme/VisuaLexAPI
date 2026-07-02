@@ -26,9 +26,6 @@ const ContribPage = lazy(() =>
 const ValidationPage = lazy(() =>
   import('./features/merlt/validate/ValidationPage').then(m => ({ default: m.ValidationPage })),
 );
-const QAPage = lazy(() =>
-  import('./features/merlt/qa/QAPage').then(m => ({ default: m.QAPage })),
-);
 
 // Global 404 rendered inside the authenticated layout so the sidebar stays visible.
 function NotFoundPage() {
@@ -96,16 +93,11 @@ function App() {
               </Suspense>
             }
           />
-          <Route
-            path="merlt/qa"
-            element={
-              <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                <QAPage />
-              </Suspense>
-            }
-          />
-          {/* Legacy docs path — keep working via redirect */}
-          <Route path="merlt/chiedi" element={<Navigate to="/merlt/qa" replace />} />
+          {/* Slice 4 absorb (Decision A): the Q&A page is gone — the graph is the
+              SOLE deliberation surface. Both the old ask route and the legacy
+              docs path redirect to /grafo, where the debate now lives. */}
+          <Route path="merlt/qa" element={<Navigate to="/grafo" replace />} />
+          <Route path="merlt/chiedi" element={<Navigate to="/grafo" replace />} />
           <Route
             path="grafo"
             element={

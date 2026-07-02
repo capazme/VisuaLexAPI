@@ -1,6 +1,7 @@
 import { X, Crosshair } from 'lucide-react';
 import { NODE_TYPE_STYLE } from '../shared/graphStyles';
-import type { GraphNode, GraphEdge } from '../shared/types';
+import type { GraphNode, GraphEdge, NodeProvenance } from '../shared/types';
+import { deriveProvenance } from '../shared/types';
 
 export interface NodeDetailsDrawerProps {
   node: GraphNode | null;
@@ -11,17 +12,28 @@ export interface NodeDetailsDrawerProps {
 }
 
 // Prominent properties shown first, in this order, with friendly labels.
+// The key is the REAL FalkorDB property name (verified against the Libro IV
+// seed): `massima` (9.9k sentenze), NOT the historical typo `massima_text`.
 const PRIMARY_PROPS: Array<{ key: string; label: string; long?: boolean }> = [
   { key: 'rubrica', label: 'Rubrica' },
   { key: 'fonte', label: 'Fonte' },
   { key: 'testo_vigente', label: 'Testo vigente', long: true },
   { key: 'testo', label: 'Testo', long: true },
+  { key: 'massima', label: 'Massima', long: true },
+  { key: 'regola_generale', label: 'Regola generale', long: true },
+  { key: 'principi_applicati', label: 'Principi applicati', long: true },
   { key: 'descrizione', label: 'Descrizione', long: true },
-  { key: 'massima_text', label: 'Massima', long: true },
   { key: 'spiegazione', label: 'Spiegazione', long: true },
   { key: 'ratio', label: 'Ratio', long: true },
 ];
 const PRIMARY_KEYS = new Set(PRIMARY_PROPS.map((p) => p.key));
+
+// Provenance chip copy + colour (matches the canvas provenance encoding).
+const PROVENANCE_META: Record<NodeProvenance, { label: string; color: string }> = {
+  seed: { label: 'Corpus', color: '#2563eb' },
+  community_validated: { label: 'Validato dalla comunità', color: '#059669' },
+  live_unconfirmed: { label: 'Non confermato', color: '#d97706' },
+};
 
 function asText(value: unknown): string | null {
   if (typeof value === 'string') return value.trim() || null;
@@ -52,6 +64,8 @@ export function NodeDetailsDrawer({
   const outgoing = edges.filter((e) => e.source === node.id);
   const incoming = edges.filter((e) => e.target === node.id);
   const typeColor = NODE_TYPE_STYLE[node.type]?.color ?? '#94a3b8';
+  const provenance = deriveProvenance(node);
+  const provMeta = provenance ? PROVENANCE_META[provenance] : null;
 
   // Remaining primitive properties not already shown prominently.
   const extraProps = Object.entries(props)
@@ -66,13 +80,24 @@ export function NodeDetailsDrawer({
           <h2 className="text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
             {node.label}
           </h2>
-          <span
-            className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
-            style={{ backgroundColor: `${typeColor}22` }}
-          >
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: typeColor }} />
-            {node.type}
-          </span>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+              style={{ backgroundColor: `${typeColor}22` }}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: typeColor }} />
+              {node.type}
+            </span>
+            {provMeta && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+                style={{ backgroundColor: `${provMeta.color}22` }}
+              >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: provMeta.color }} />
+                {provMeta.label}
+              </span>
+            )}
+          </div>
         </div>
         <button
           type="button"
