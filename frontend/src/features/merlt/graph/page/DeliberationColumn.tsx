@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, History, Info, Loader2, MessageSquare, Network, Swords, X } from 'lucide-react';
+import { Check, ChevronDown, History, Info, Loader2, Lock, MessageSquare, Network, Scale, Swords, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { AskGraphField } from './AskGraphField';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
@@ -68,6 +68,17 @@ export interface DeliberationColumnProps {
   expertContributions?: ExpertContribution[];
   /** Full consent (D2): enables in-prose NER feedback in the synthesis. */
   canContribute: boolean;
+  /**
+   * Slice 4 P2b (L2, design §5) — "pesa di più questo canone". Fires the EXISTING
+   * preference feedback channel (`useQaThread.prefer` → `/experts/feedback/preference`)
+   * carrying the turn's `trace_id` + the chosen canon; the MERL-T side turns it into a
+   * real per-expert gating gradient (authority-weighted). Absent → the steer control
+   * is hidden. Gated on `canContribute`: when the user lacks full consent the row
+   * renders a compact upsell instead of a dead button.
+   */
+  onPreferCanon?: (traceId: string, expert: string) => void;
+  /** Open the consent dialog from the steer upsell shown when !canContribute. */
+  onOpenConsent?: () => void;
   /** Asking unlocked (consent ≥ basic): the compose field is live. */
   qaAskable: boolean;
   /** Edge inspection needs the node map to resolve endpoints; empty when unused. */
@@ -125,6 +136,8 @@ export function DeliberationColumn({
   selectedEdge,
   expertContributions,
   canContribute,
+  onPreferCanon,
+  onOpenConsent,
   qaAskable,
   nodesById,
   edges = [],
@@ -163,6 +176,8 @@ export function DeliberationColumn({
           onLoadHistoryTurn={onLoadHistoryTurn}
           expertContributions={expertContributions}
           canContribute={canContribute}
+          onPreferCanon={onPreferCanon}
+          onOpenConsent={onOpenConsent}
           qaAskable={qaAskable}
           centerLabel={selectedNode?.label}
           centerUrn={selectedNode?.urn ?? undefined}
@@ -220,6 +235,8 @@ function DibattitoTab({
   onLoadHistoryTurn,
   expertContributions,
   canContribute,
+  onPreferCanon,
+  onOpenConsent,
   qaAskable,
   centerLabel,
   centerUrn,
@@ -232,6 +249,8 @@ function DibattitoTab({
   onLoadHistoryTurn?: (item: QaHistoryItem) => void;
   expertContributions?: ExpertContribution[];
   canContribute: boolean;
+  onPreferCanon?: (traceId: string, expert: string) => void;
+  onOpenConsent?: () => void;
   qaAskable: boolean;
   centerLabel?: string;
   centerUrn?: string;
@@ -286,6 +305,8 @@ function DibattitoTab({
               onCancel={() => onCancel(turn.id)}
               onSourceCenter={onSourceCenter}
               canContribute={canContribute}
+              onPreferCanon={onPreferCanon}
+              onOpenConsent={onOpenConsent}
               // The `expertContributions` prop is the CURRENT deliberation's set
               // — only the latest turn falls back to it when its own answer lacks
               // per-canon contributions (a history-loaded turn keeps its own/none).
@@ -325,6 +346,8 @@ function DeliberationTurn({
   onCancel,
   onSourceCenter,
   canContribute,
+  onPreferCanon,
+  onOpenConsent,
   fallbackContributions,
 }: {
   turn: QaTurnModel;
@@ -332,6 +355,8 @@ function DeliberationTurn({
   onCancel: () => void;
   onSourceCenter: (nodeIdOrUrn: string) => void;
   canContribute: boolean;
+  onPreferCanon?: (traceId: string, expert: string) => void;
+  onOpenConsent?: () => void;
   fallbackContributions?: ExpertContribution[];
 }): React.ReactElement {
   return (
@@ -397,7 +422,13 @@ function DeliberationTurn({
               <QaSynthesisWithCitations text={a.synthesis} enabled={canContribute} />
 
               {hasContributions ? (
-                <CanonTheses contributions={contributions} />
+                <CanonTheses
+                  contributions={contributions}
+                  traceId={a.trace_id}
+                  canContribute={canContribute}
+                  onPreferCanon={onPreferCanon}
+                  onOpenConsent={onOpenConsent}
+                />
               ) : legacyDivergent ? (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tesi a confronto</p>
@@ -458,14 +489,39 @@ function DeliberationTurn({
  * routing weight. Legal lexicon, no gamified bars. A canon that failed to argue
  * renders a subdued "non ha argomentato" — never a scary error.
  */
-function CanonTheses({ contributions }: { contributions: ExpertContribution[] }): React.ReactElement {
+function CanonTheses({
+  contributions,
+  traceId,
+  canContribute,
+  onPreferCanon,
+  onOpenConsent,
+}: {
+  contributions: ExpertContribution[];
+  /** The turn's `trace_id`, threaded to each steer so the gradient targets THIS deliberation. */
+  traceId: string;
+  canContribute: boolean;
+  onPreferCanon?: (traceId: string, expert: string) => void;
+  onOpenConsent?: () => void;
+}): React.ReactElement {
   const ordered = orderContributions(contributions);
+  // The steer affordance appears only when the page wires the preference channel
+  // AND the turn has a trace_id to key the feedback on. Consent is enforced INSIDE
+  // the item (full → the steer button; otherwise → the compact upsell), so the
+  // section itself is unconditional and never a dead surface.
+  const steerable = Boolean(onPreferCanon) && traceId.length > 0;
   return (
     <div className="mt-3 space-y-1.5">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Le tesi dei canoni</p>
       <div className="space-y-1.5">
         {ordered.map((c) => (
-          <CanonThesisItem key={c.expert} contribution={c} />
+          <CanonThesisItem
+            key={c.expert}
+            contribution={c}
+            traceId={traceId}
+            canContribute={canContribute}
+            onPreferCanon={steerable ? onPreferCanon : undefined}
+            onOpenConsent={onOpenConsent}
+          />
         ))}
       </div>
     </div>
@@ -478,7 +534,19 @@ function CanonTheses({ contributions }: { contributions: ExpertContribution[] })
  * interpretation and the weight/confidence meta. Errored canons collapse to a
  * subdued, non-expandable "non ha argomentato" row.
  */
-function CanonThesisItem({ contribution }: { contribution: ExpertContribution }): React.ReactElement {
+function CanonThesisItem({
+  contribution,
+  traceId,
+  canContribute,
+  onPreferCanon,
+  onOpenConsent,
+}: {
+  contribution: ExpertContribution;
+  traceId: string;
+  canContribute: boolean;
+  onPreferCanon?: (traceId: string, expert: string) => void;
+  onOpenConsent?: () => void;
+}): React.ReactElement {
   const { expert, thesis, confidence, weight } = contribution;
   const label = CANON_LABEL[expert] ?? expert;
   const color = (CANON_STYLE as Record<string, { color: string } | undefined>)[expert]?.color ?? '#475569';
@@ -516,8 +584,95 @@ function CanonThesisItem({ contribution }: { contribution: ExpertContribution })
       </summary>
       <div className="border-t border-slate-100 py-2 pl-4 pr-3 dark:border-slate-800">
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">{thesis}</p>
+        {onPreferCanon && (
+          <CanonSteer
+            label={label}
+            canContribute={canContribute}
+            onPrefer={() => onPreferCanon(traceId, expert)}
+            onOpenConsent={onOpenConsent}
+          />
+        )}
       </div>
     </details>
+  );
+}
+
+/**
+ * "Pesa di più questo canone" (design §5 L2 — teach-the-weights). Reuses the
+ * EXISTING preference feedback channel (`useQaThread.prefer`): one click fires it
+ * optimistically and fire-and-forget, so the jurist's directional steer becomes a
+ * real per-expert gating gradient (authority-weighted server-side). The click is
+ * scoped inside a `<details>` body — {@link handleClick} stops propagation so it
+ * never toggles the disclosure. Copy stays legal-lexicon, no gamification.
+ *
+ * Consent gate (D2 / §5): with `full` consent the steer button is live; otherwise
+ * a compact upsell replaces it (opening the consent dialog) — never a dead button.
+ */
+function CanonSteer({
+  label,
+  canContribute,
+  onPrefer,
+  onOpenConsent,
+}: {
+  label: string;
+  canContribute: boolean;
+  onPrefer: () => void;
+  onOpenConsent?: () => void;
+}): React.ReactElement {
+  const [steered, setSteered] = useState(false);
+
+  if (!canContribute) {
+    return (
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <Lock size={12} className="shrink-0" aria-hidden="true" />
+        <span>Per orientare il collegio serve il consenso completo.</span>
+        {onOpenConsent && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenConsent();
+            }}
+            className="font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:underline focus-visible:outline-none dark:text-primary-400"
+          >
+            Attiva
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Optimistic + fire-and-forget: flip to the confirmation the instant the jurist
+  // clicks; the preference POST is issued by the page's handler and its outcome is
+  // not surfaced (a failed teach is not worth a scary error — the next deliberation
+  // stands on its own). Re-steering is allowed (click again) but idempotent-looking.
+  const handleClick = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    onPrefer();
+    setSteered(true);
+  };
+
+  if (steered) {
+    return (
+      <p className="mt-2.5 flex items-center gap-1.5 border-t border-slate-100 pt-2.5 text-xs text-emerald-600 dark:border-slate-800 dark:text-emerald-400">
+        <Check size={13} className="shrink-0" aria-hidden="true" />
+        Terrò conto della tua preferenza.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+      <button
+        type="button"
+        onClick={handleClick}
+        title={`Indica al collegio di dare più peso al canone ${label}`}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+      >
+        <Scale size={13} className="shrink-0" aria-hidden="true" />
+        Pesa di più questo canone
+      </button>
+    </div>
   );
 }
 

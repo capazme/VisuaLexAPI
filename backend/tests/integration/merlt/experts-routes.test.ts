@@ -265,6 +265,67 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.status).toBe(200);
   });
 
+  // Slice 4 P2b "insegna i pesi" (L2 teach-the-weights): the preference channel
+  // is the ONLY path that carries the canon identity MERL-T now routes into the
+  // gating gradient. The BFF must forward (a) preferred_expert verbatim AND
+  // (b) user_id — MERL-T derives the jurist's authority server-side FROM user_id
+  // to authority-weight the advantage. Neither can be dropped or the gradient is
+  // wrong (unweighted) or lost (no canon).
+  it('preference feedback forwards trace_id + preferred_expert + injected user_id (L2 authority key)', async () => {
+    await grantFull(user);
+    let captured: { trace_id?: string; preferred_expert?: string; user_id?: string } = {};
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/feedback/preference', (b) => {
+        captured = b as typeof captured;
+        return true;
+      })
+      .reply(200, { success: true, message: 'ok' });
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/preference')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_xyz', preferredExpert: 'precedent', comment: 'più peso al precedente' });
+    expect(res.status).toBe(200);
+    expect(captured.trace_id).toBe('trace_xyz');
+    expect(captured.preferred_expert).toBe('precedent');
+    // user_id is the authority-lookup key on the MERL-T side; the client must
+    // never let it be client-supplied — it comes from the JWT.
+    expect(captured.user_id).toBe(user.id);
+  });
+
+  it('preference feedback accepts all 4 canon identities (literal|systemic|principles|precedent)', async () => {
+    await grantFull(user);
+    for (const canon of ['literal', 'systemic', 'principles', 'precedent'] as const) {
+      nock(TEST_MERLT_BASE)
+        .post('/api/v1/experts/feedback/preference', (b) => (b as { preferred_expert: string }).preferred_expert === canon)
+        .reply(200, { success: true, message: 'ok' });
+      const res = await request(app)
+        .post('/api/merlt/experts/feedback/preference')
+        .set(authHeader(user))
+        .send({ traceId: 'trace_abc', preferredExpert: canon });
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('preference feedback rejects an unknown canon (400, no forward to MERL-T)', async () => {
+    await grantFull(user);
+    // No nock interceptor: if the route forwarded, the request would fail on
+    // disabled net-connect — the 400 must come from Zod BEFORE any MERL-T call.
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/preference')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_abc', preferredExpert: 'gating' });
+    expect(res.status).toBe(400);
+  });
+
+  it('preference feedback requires full consent (403 with only basic)', async () => {
+    await grantBasic(user);
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/preference')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_abc', preferredExpert: 'systemic' });
+    expect(res.status).toBe(403);
+  });
+
   // Slice 4 P2a "il dibattito visibile": the BFF must forward the 3 deliberation
   // DTO fields verbatim (disagreement_analysis + devils_advocate_flag +
   // expert_contributions). FE renders contrast arcs / canon nodes / theses off them.

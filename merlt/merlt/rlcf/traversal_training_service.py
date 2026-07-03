@@ -41,6 +41,22 @@ RELATION_TYPES = [
 ]
 
 
+def _safe_authority(raw, default: float = 1.0) -> float:
+    """Slice 4 P2b (L2): coerce a stored ``user_authority`` to a training-safe
+    non-negative float. Returns ``default`` (1.0 — authority-neutral) on None /
+    non-numeric / NaN / inf / negative so authority weighting can never crash
+    traversal training or invert the REINFORCE gradient sign."""
+    if raw is None:
+        return default
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return default
+    if val != val or val in (float("inf"), float("-inf")) or val < 0.0:
+        return default
+    return val
+
+
 @dataclass
 class TraversalTrainingSample:
     """Single training sample for TraversalPolicy."""
@@ -48,6 +64,9 @@ class TraversalTrainingSample:
     relation_type: str            # RIFERIMENTO, CITATO_DA, etc.
     expert_type: str              # literal, systemic, principles, precedent
     reward: float                 # 0-1 from source feedback
+    # Slice 4 P2b (L2): dynamic-authority weight for this feedback's jurist.
+    # Defaults to 1.0 (authority-neutral) so pre-L2 samples train identically.
+    authority: float = 1.0
 
 
 @dataclass
@@ -107,6 +126,9 @@ class TraversalTrainingService:
         for feedback, trace in rows:
             reward = (feedback.source_relevance - 1) / 4  # 1→0, 5→1
             source_urn = feedback.source_id
+            # Slice 4 P2b (L2): the server-computed authority of the jurist who
+            # rated this source (defaults to 1.0 when absent/invalid).
+            authority = _safe_authority(getattr(feedback, "user_authority", None))
 
             # Extract traversal paths from trace
             relations = self._extract_relations_for_source(
@@ -132,6 +154,7 @@ class TraversalTrainingService:
                         relation_type=relation_type,
                         expert_type=expert_type,
                         reward=reward,
+                        authority=authority,
                     ))
 
             # If no specific relations found, still create samples for general feedback
@@ -142,6 +165,7 @@ class TraversalTrainingService:
                         relation_type="GENERAL",
                         expert_type=expert_type,
                         reward=reward,
+                        authority=authority,
                     ))
 
         log.info(
@@ -209,8 +233,11 @@ class TraversalTrainingService:
                         # Get relation weight and log_prob from policy
                         weight, log_prob = policy.forward(query_tensor, rel_tensor)
 
-                        # REINFORCE loss: -log_prob * reward
-                        loss = -log_prob * sample.reward
+                        # REINFORCE loss: -log_prob * (authority · reward).
+                        # Slice 4 P2b (L2): authority-weight the advantage so the
+                        # senior jurist moves the traversal weights more than the
+                        # novice (authority defaults to 1.0 ⇒ legacy behaviour).
+                        loss = -log_prob * (sample.authority * sample.reward)
 
                         # Backward + step (with gradient clipping)
                         optimizer.zero_grad()

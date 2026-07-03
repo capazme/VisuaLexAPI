@@ -340,3 +340,115 @@ describe('DeliberationColumn per-canon theses (Slice 4 P2a — il dibattito visi
     expect(screen.getByText(/lettura sistematica dell’istituto/i)).toBeInTheDocument();
   });
 });
+
+describe('DeliberationColumn per-canon steer (Slice 4 P2b — insegna i pesi, L2)', () => {
+  it('calls onPreferCanon with the turn trace_id and the canon expert when full consent', () => {
+    const onPreferCanon = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute
+        onPreferCanon={onPreferCanon}
+      />,
+    );
+    // Two arguing canons (Letterale, Principî) each carry a steer button; the
+    // errored Precedente canon has none (see its own test below).
+    const steerButtons = screen.getAllByRole('button', { name: /pesa di più questo canone/i });
+    expect(steerButtons).toHaveLength(2);
+    // The FIRST arguing canon in art. 12 order is `literal` (Letterale).
+    fireEvent.click(steerButtons[0]);
+    expect(onPreferCanon).toHaveBeenCalledTimes(1);
+    expect(onPreferCanon).toHaveBeenCalledWith('trace-canon', 'literal');
+  });
+
+  it('steering a different canon carries THAT canon identity + the same trace_id', () => {
+    const onPreferCanon = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute
+        onPreferCanon={onPreferCanon}
+      />,
+    );
+    // The SECOND arguing canon in art. 12 order is `principles` (Principî).
+    const steerButtons = screen.getAllByRole('button', { name: /pesa di più questo canone/i });
+    fireEvent.click(steerButtons[1]);
+    expect(onPreferCanon).toHaveBeenCalledWith('trace-canon', 'principles');
+  });
+
+  it('shows an optimistic confirmation and hides the steer button after a click', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute
+        onPreferCanon={vi.fn()}
+      />,
+    );
+    const steerButtons = screen.getAllByRole('button', { name: /pesa di più questo canone/i });
+    fireEvent.click(steerButtons[0]);
+    expect(screen.getByText(/terrò conto della tua preferenza/i)).toBeInTheDocument();
+    // The clicked canon's steer button is replaced by the confirmation (one fewer).
+    expect(screen.getAllByRole('button', { name: /pesa di più questo canone/i })).toHaveLength(1);
+  });
+
+  it('renders the compact upsell (not a dead button) when the user lacks full consent', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute={false}
+        onPreferCanon={vi.fn()}
+        onOpenConsent={vi.fn()}
+      />,
+    );
+    // No steer button at all when !canContribute…
+    expect(screen.queryByRole('button', { name: /pesa di più questo canone/i })).not.toBeInTheDocument();
+    // …instead the upsell copy + an "Attiva" affordance (one per arguing canon).
+    expect(screen.getAllByText(/serve il consenso completo/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /^attiva$/i }).length).toBeGreaterThan(0);
+  });
+
+  it('opens the consent dialog from the upsell "Attiva" affordance', () => {
+    const onOpenConsent = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute={false}
+        onPreferCanon={vi.fn()}
+        onOpenConsent={onOpenConsent}
+      />,
+    );
+    fireEvent.click(screen.getAllByRole('button', { name: /^attiva$/i })[0]);
+    expect(onOpenConsent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT render a steer control for an errored canon (nothing to weigh)', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute
+        onPreferCanon={vi.fn()}
+      />,
+    );
+    // Precedente errored → "non ha argomentato", and carries no steer button:
+    // only the two arguing canons expose the affordance.
+    expect(screen.getByText(/non ha argomentato/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /pesa di più questo canone/i })).toHaveLength(2);
+  });
+
+  it('renders no steer control when onPreferCanon is not wired (P2a-only pages)', () => {
+    render(
+      <DeliberationColumn {...baseProps()} turns={[turnWithContributions()]} canContribute />,
+    );
+    // The per-canon theses still render, but with no preference channel there is
+    // neither a steer button nor an upsell.
+    expect(screen.getByText(/le tesi dei canoni/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pesa di più questo canone/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/serve il consenso completo/i)).not.toBeInTheDocument();
+  });
+});

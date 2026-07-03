@@ -41,6 +41,7 @@ import { computeTypeCounts } from '../shared/graphFilters';
 import { GraphSearchBox } from './GraphSearchBox';
 import { AskGraphField } from './AskGraphField';
 import { DeliberationColumn } from './DeliberationColumn';
+import { ConsentDialog } from '../../consent/ConsentDialog';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
 import { DepthSelector } from './DepthSelector';
 import { GraphFilterPanel } from './GraphFilterPanel';
@@ -103,6 +104,10 @@ export function GraphExplorerPage(): React.ReactElement {
   const qa = useQaThread();
   // Deliberation column tab: 'dibattito' after an ask, 'nodo' after a node click.
   const [activeTab, setActiveTab] = useState<'dibattito' | 'nodo'>('dibattito');
+  // Slice 4 P2b (§5 L2): the "pesa di più questo canone" upsell opens the consent
+  // dialog when the jurist lacks full consent. Hosted here so the steer control can
+  // route users to grant `full` without leaving the deliberation.
+  const [consentDialogOpen, setConsentDialogOpen] = useState(false);
   // "Nascondi giurisprudenza" (design §4/§8). User-controllable primary toggle;
   // default-on is derived (see hideJurisprudence below) while a debate is active.
   const [hideJurisManual, setHideJurisManual] = useState<boolean | null>(null);
@@ -672,6 +677,8 @@ export function GraphExplorerPage(): React.ReactElement {
             selectedEdge={selectedEdge}
             expertContributions={expertContributions}
             canContribute={canContribute}
+            onPreferCanon={qa.prefer}
+            onOpenConsent={() => setConsentDialogOpen(true)}
             qaAskable={qaAskable}
             nodesById={nodesById}
             edges={edges}
@@ -692,6 +699,14 @@ export function GraphExplorerPage(): React.ReactElement {
           isVisible
           onClose={() => setToast(null)}
         />
+      )}
+
+      {/* Consent dialog opened from the "pesa di più questo canone" upsell (§5 L2):
+          lets the jurist grant `full` consent so the steer control unlocks. Mounted
+          only while open — the dialog consumes `useConsent()` unconditionally, so
+          gating the mount keeps it inert (and provider-free) until actually needed. */}
+      {consentDialogOpen && (
+        <ConsentDialog open onClose={() => setConsentDialogOpen(false)} />
       )}
     </div>
   );

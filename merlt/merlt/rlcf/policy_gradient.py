@@ -77,6 +77,89 @@ def _get_torch():
 
 
 # =============================================================================
+# Slice 4 P2b (L2) — teach-the-weights helpers
+# =============================================================================
+#
+# Two integration signals feed the EXISTING gating head (no new architecture):
+#
+# 1. **Per-expert reward shaping** — the jurist's ``preferredExpert`` (a canon in
+#    ``literal|systemic|principles|precedent``) becomes an ADDITIVE shaping term
+#    ``+GATING_SHAPING_BETA`` on the preferred canon's advantage, mirroring the
+#    tool head's productivity shaping (``ToolPolicyTrainer.SHAPING_BETA``). Under
+#    REINFORCE the per-action loss is ``-logπ(a)·advantage``; a *larger positive*
+#    advantage on the preferred canon's log-prob ⇒ its gradient pushes that
+#    logit UP ⇒ softmax P(preferred) rises next time. This is the exact sign
+#    proven in ``tests/unit/test_gating_preference_authority.py``.
+#
+# 2. **Authority weighting** — ``advantage = authority · (returns + shaping)``.
+#    The senior jurist (higher authority) moves the weights more than the novice
+#    (dynamic-authority pillar). Authority is a server-side scalar carried in
+#    ``feedback.metadata['authority']``; it defaults to ``1.0`` when absent so
+#    the pre-L2 behaviour (authority-agnostic) is exactly recovered, and it is
+#    applied here and ONLY here on the live heads (grep authority = 0 elsewhere),
+#    so there is no double-counting. NOTE: server authority ∈ [0,1] (authority.py
+#    convex combination), so a *present* authority SHRINKS the step — real
+#    feedback trains slightly slower than pre-L2 by design (stabilising), it is
+#    not a no-op.
+#
+# LOAD-BEARING INVARIANT for the shaping sign: the preference reward is a fixed
+# positive endorsement (0.7) and the baseline is an EMA of rewards ∈ [0,1], so
+# ``returns + β = reward − baseline + β ≥ 0`` ALWAYS on the preference channel —
+# the preferred canon's advantage can never go negative (which would train the
+# OPPOSITE). If the preference reward magnitude or the baseline range ever
+# changes, re-verify this stays ≥ 0.
+
+# Mirrors ToolPolicyTrainer.SHAPING_BETA (policy_gradient.py) — same magnitude so
+# the two heads shape at a comparable scale.
+GATING_SHAPING_BETA = 0.3
+
+# Canonical expert ordering = the gating softmax index order
+# (merlt.experts.neural_gating.neural.EXPERT_NAMES). Kept as a module constant so
+# the trainer never has to import the neural package (lazy-torch discipline).
+GATING_EXPERT_NAMES = ["literal", "systemic", "principles", "precedent"]
+
+
+def _extract_authority(feedback: Any, default: float = 1.0) -> float:
+    """Read the server-computed authority scalar from ``feedback.metadata``.
+
+    Returns ``default`` (1.0 — authority-neutral) when the feedback carries no
+    authority, when it is ``None``, or when it is non-numeric/non-finite, so a
+    missing signal can never crash training or flip the gradient sign. The value
+    is clamped to ``>= 0`` (a negative authority would invert REINFORCE, which is
+    never intended).
+    """
+    meta = getattr(feedback, "metadata", None) or {}
+    raw = meta.get("authority")
+    if raw is None:
+        return default
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return default
+    # Reject NaN / inf and negative authority.
+    if val != val or val in (float("inf"), float("-inf")) or val < 0.0:
+        return default
+    return val
+
+
+def _preferred_expert_index(feedback: Any) -> Optional[int]:
+    """Map ``feedback.metadata['preferred_expert']`` to its gating softmax index.
+
+    Returns ``None`` when there is no preference or the canon name is unknown, so
+    callers add NO shaping term (pure baseline advantage) in that case.
+    """
+    meta = getattr(feedback, "metadata", None) or {}
+    pref = meta.get("preferred_expert")
+    if not pref:
+        return None
+    try:
+        return GATING_EXPERT_NAMES.index(str(pref))
+    except ValueError:
+        log.warning("Unknown preferred_expert, ignoring shaping", preferred_expert=pref)
+        return None
+
+
+# =============================================================================
 # POLICY NETWORKS
 # =============================================================================
 
@@ -534,6 +617,15 @@ class PolicyGradientTrainer:
             (1 - self.config.baseline_decay) * reward
         )
 
+        # Slice 4 P2b (L2) — authority weighting + per-expert preference shaping.
+        # ``authority`` scales the whole advantage (senior jurist moves the
+        # weights more; defaults to 1.0 = pre-L2 behaviour). ``preferred_idx`` is
+        # the gating softmax index the jurist asked to weigh more (None = no
+        # preference → no shaping term). Both are read from feedback.metadata,
+        # which round-trips through the replay buffer.
+        authority = _extract_authority(feedback)
+        preferred_idx = _preferred_expert_index(feedback)
+
         # =====================================================================
         # REINFORCE con backpropagation REALE
         # =====================================================================
@@ -575,7 +667,10 @@ class PolicyGradientTrainer:
             )
             # Crea un proxy tensor per ottenere gradients
             proxy = torch.zeros_like(log_probs, requires_grad=True)
-            policy_loss = -(proxy * returns).sum()
+            # Authority-weight the return. Per-expert preference shaping is NOT
+            # possible here: without a live forward pass there is no per-canon
+            # log-prob to attach the shaping to. Authority still applies.
+            policy_loss = -(proxy * (authority * returns)).sum()
         else:
             # CASO CORRETTO: ri-calcola log_probs con forward pass
             query_embedding = torch.tensor(
@@ -611,8 +706,30 @@ class PolicyGradientTrainer:
             # Weighted log probability
             weighted_log_prob = (all_log_probs.squeeze(0) * expert_weights).sum()
 
-            # REINFORCE loss: -log_prob * returns
-            policy_loss = -weighted_log_prob * returns
+            # -----------------------------------------------------------------
+            # Slice 4 P2b (L2): advantage = authority · (returns + shaping)
+            # -----------------------------------------------------------------
+            # Baseline (no preference, authority=1.0) reduces EXACTLY to the
+            # legacy ``-weighted_log_prob * returns`` — regression-safe.
+            #
+            # With a preference, we ADD a per-expert shaping term applied to the
+            # preferred canon's own log-prob (indexed by EXPERT_NAMES order, the
+            # gating softmax index). Under REINFORCE (loss = -logπ(a)·advantage),
+            # a strictly larger positive advantage on the preferred canon's
+            # log-prob drives its logit UP ⇒ P(preferred) rises next forward.
+            # The soft-combination term keeps the answer-quality (returns)
+            # signal on every consulted expert.
+            base_loss = -weighted_log_prob * (authority * returns)
+
+            if preferred_idx is not None:
+                # advantage_pref = authority · (returns + β); the "+β" is what
+                # makes the preferred canon's advantage STRICTLY greater than a
+                # non-preferred canon's (which sees only authority·returns).
+                pref_log_prob = all_log_probs.squeeze(0)[preferred_idx]
+                pref_shaping = authority * (returns + GATING_SHAPING_BETA)
+                policy_loss = base_loss + (-pref_log_prob * pref_shaping)
+            else:
+                policy_loss = base_loss
 
         # Backpropagation REALE
         policy_loss.backward()
@@ -708,8 +825,13 @@ class PolicyGradientTrainer:
         total_actions = 0
         accumulated_losses = []
 
-        for trace, reward in zip(traces, rewards):
+        for trace, feedback, reward in zip(traces, feedbacks, rewards):
             returns = reward - self.baseline
+
+            # Slice 4 P2b (L2): per-experience authority + preference shaping
+            # (same semantics as update_from_feedback; see helper docstrings).
+            authority = _extract_authority(feedback)
+            preferred_idx = _preferred_expert_index(feedback)
 
             # Filtra solo azioni di expert_selection
             expert_actions = [
@@ -751,8 +873,15 @@ class PolicyGradientTrainer:
 
             weighted_log_prob = (all_log_probs.squeeze(0) * expert_weights).sum()
 
-            # REINFORCE loss: -log_prob * returns
-            policy_loss = -weighted_log_prob * returns
+            # REINFORCE loss with L2 authority weighting + preference shaping
+            # (regression-safe: authority=1.0 & no preference ⇒ legacy loss).
+            base_loss = -weighted_log_prob * (authority * returns)
+            if preferred_idx is not None:
+                pref_log_prob = all_log_probs.squeeze(0)[preferred_idx]
+                pref_shaping = authority * (returns + GATING_SHAPING_BETA)
+                policy_loss = base_loss + (-pref_log_prob * pref_shaping)
+            else:
+                policy_loss = base_loss
             accumulated_losses.append(policy_loss)
 
             total_loss += policy_loss.item()
@@ -1034,6 +1163,11 @@ class ToolPolicyTrainer:
         probs, _ = self.policy.forward(query_embedding)  # (1, num_tools)
         probs = probs.squeeze(0)
 
+        # Slice 4 P2b (L2): authority-weight the tool advantage too, so the
+        # dynamic-authority pillar applies consistently across the live heads.
+        # Defaults to 1.0 when feedback carries no authority ⇒ legacy behaviour.
+        authority = _extract_authority(feedback)
+
         terms = []
         for a in tool_actions:
             idx = self._tool_index.get(a.parameters.get("tool_name"))
@@ -1044,7 +1178,7 @@ class ToolPolicyTrainer:
             p = probs[idx].clamp(1e-8, 1.0 - 1e-8)
             log_p = torch.log(p) if called else torch.log(1.0 - p)
             shaping = (self.SHAPING_BETA if produced else -self.SHAPING_BETA) if called else 0.0
-            advantage = returns + shaping
+            advantage = authority * (returns + shaping)
             terms.append(-advantage * log_p)
 
         if not terms:

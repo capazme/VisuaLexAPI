@@ -597,12 +597,26 @@ def _wire_feedback_to_training(
     trace: QATrace,
     feedback: QAFeedback,
     feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router"],
+    authority: Optional[float] = None,
 ) -> None:
     """
     Wire a feedback submission to the RLCF training buffer.
 
     Computes reward, builds MultilevelFeedback, and pushes to scheduler.
     Wrapped in try/except so it never breaks the feedback submission.
+
+    Slice 4 P2b (L2) — teach-the-weights:
+    - For ``preference`` feedback the reward is a genuinely POSITIVE scalar
+      (0.7) so its return sits ABOVE the neutral baseline, and the chosen canon
+      (``feedback.preferred_expert``) is carried through
+      ``ml_feedback.metadata['preferred_expert']``. The gating trainer turns
+      that into a per-expert reward-shaping term that raises P(preferred canon)
+      (see ``policy_gradient._preferred_expert_index`` / ``GATING_SHAPING_BETA``).
+    - ``authority`` (server-side scalar) is carried through
+      ``ml_feedback.metadata['authority']`` and authority-weights the advantage
+      on the live heads. ``None`` ⇒ downstream defaults to 1.0 (authority-neutral,
+      i.e. exactly the pre-L2 behaviour) — so non-preference call sites that pass
+      no authority are unchanged.
     """
     try:
         # 1. Compute reward based on feedback type
@@ -617,7 +631,11 @@ def _wire_feedback_to_training(
         elif feedback_type == "source":
             reward = (feedback.source_relevance - 1) / 4  # 1→0, 5→1
         elif feedback_type == "preference":
-            reward = 0.5
+            # Positive return above the neutral baseline: "I prefer this canon"
+            # is an endorsement, not a neutral event. The DIRECTIONAL signal
+            # (which canon) rides in metadata below and is what actually shifts
+            # the gating weights via per-expert shaping.
+            reward = 0.7
         elif feedback_type == "refine":
             reward = 0.3
         elif feedback_type == "router":
@@ -659,6 +677,21 @@ def _wire_feedback_to_training(
                 user_rating=reward,
                 user_id=feedback.user_id,
             )
+
+        # 3b. Slice 4 P2b (L2) — attach the teach-the-weights signals to
+        # ml_feedback.metadata. This dict round-trips through the replay buffer
+        # (MultilevelFeedback.to_dict/from_dict) and is read by the gating/tool
+        # trainers (policy_gradient._extract_authority / _preferred_expert_index).
+        # preferred_expert: only the preference channel carries a canon; other
+        # channels leave it absent → no per-expert shaping (pure baseline).
+        preferred_expert = getattr(feedback, "preferred_expert", None)
+        if preferred_expert:
+            ml_feedback.metadata["preferred_expert"] = preferred_expert
+        # authority: explicit arg wins; else fall back to the value already
+        # stored on the feedback row (may be None → downstream defaults to 1.0).
+        eff_authority = authority if authority is not None else getattr(feedback, "user_authority", None)
+        if eff_authority is not None:
+            ml_feedback.metadata["authority"] = eff_authority
 
         # 4. Push to training buffer
         scheduler = get_scheduler()
@@ -1251,12 +1284,17 @@ async def submit_expert_preference_feedback(
         session.add(feedback)
         await session.commit()
 
-        _wire_feedback_to_training(trace, feedback, "preference")
+        # Slice 4 P2b (L2): compute authority FIRST so the preference signal is
+        # authority-weighted when wired into training (senior jurist moves the
+        # gating weights more). Order matters only for this channel — the wire
+        # call is otherwise identical to the other feedback endpoints.
         await _audit_feedback(session, feedback, "preference")
         new_authority = await _update_user_authority(request.user_id, feedback, "preference")
         if new_authority is not None:
             feedback.user_authority = new_authority
             await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "preference", authority=new_authority)
 
         # F8 implicit: preference feedback boosts the preferred expert's sources
         try:
