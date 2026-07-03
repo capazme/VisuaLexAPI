@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, Info, Loader2, MessageSquare, Network, X } from 'lucide-react';
+import { ChevronDown, History, Info, Loader2, MessageSquare, Network, Swords, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { AskGraphField } from './AskGraphField';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
@@ -8,7 +8,13 @@ import { QaHistoryPanel } from '../../qa/QaHistoryPanel';
 import { QaSynthesisWithCitations } from '../../ner/QaSynthesisWithCitations';
 import { CANON_LABEL, formatRetrievedUrn, provenanceMeta } from '../../qa/format';
 import type { QaHistoryItem, QaMode, QaRetrievedSource, QaTurnModel } from '../../qa/types';
-import type { GraphEdge, GraphNode } from '../shared/types';
+import { CANON_STYLE } from '../shared/graphDeliberation';
+import type {
+  ExpertContribution,
+  GraphEdge,
+  GraphEdgeSelection,
+  GraphNode,
+} from '../shared/types';
 
 /**
  * Docked dual-tab deliberation column (Slice 4 P1, design §4). Right-hand,
@@ -45,7 +51,21 @@ export interface DeliberationColumnProps {
    */
   onLoadHistoryTurn?: (item: QaHistoryItem) => void;
   selectedNode?: GraphNode | null;
-  selectedEdge?: GraphEdge | null;
+  /**
+   * Slice 4 P2a — the current canvas edge selection (discriminated union from
+   * FE-canvas via `resolveEdgeSelection`). `kind:'relation'` opens the built
+   * EdgeDetailsDrawer; `kind:'contrast'` opens the per-conflict view. Null → the
+   * Nodo tab falls back to the node drawer / empty hint.
+   */
+  selectedEdge?: GraphEdgeSelection | null;
+  /**
+   * Slice 4 P2a — per-canon full theses for the CURRENT deliberation (from the
+   * page's `readDeliberation(latestAnswer)`), used as a fallback when a turn's own
+   * `answer.expert_contributions` is absent (e.g. a history-loaded turn). Each
+   * turn primarily renders from its OWN answer; this keeps the canvas and the
+   * column reading the same contributions.
+   */
+  expertContributions?: ExpertContribution[];
   /** Full consent (D2): enables in-prose NER feedback in the synthesis. */
   canContribute: boolean;
   /** Asking unlocked (consent ≥ basic): the compose field is live. */
@@ -63,6 +83,35 @@ function confidenceLabel(c: number): string {
   return 'bassa';
 }
 
+/** Fixed art. 12 preleggi order; extra experts (rare) keep their reported order last. */
+const CANON_ORDER = ['literal', 'systemic', 'principles', 'precedent'];
+
+/**
+ * Order the per-canon contributions in the art. 12 preleggi sequence
+ * (Letterale → Sistematico → Principî → Precedente), any extra expert last.
+ */
+function orderContributions(contributions: ExpertContribution[]): ExpertContribution[] {
+  return [...contributions].sort((a, b) => {
+    const ia = CANON_ORDER.indexOf(a.expert);
+    const ib = CANON_ORDER.indexOf(b.expert);
+    return (ia === -1 ? CANON_ORDER.length : ia) - (ib === -1 ? CANON_ORDER.length : ib);
+  });
+}
+
+/**
+ * A canon that failed to argue carries its error in the `thesis` string with
+ * `confidence === 0` (MERL-T base.py:1366-1396 → "Errore durante l'analisi: …"
+ * or "AI service non configurato"). We surface this as a subdued
+ * "non ha argomentato" state, never a scary red error — the other canons still
+ * deliberated. Heuristic on the FULL text: an Italian error prefix, not a
+ * mid-sentence "errore".
+ */
+function isErroredThesis(thesis: string): boolean {
+  const t = thesis.trim().toLowerCase();
+  if (t.length === 0) return true;
+  return t.startsWith('errore durante') || t.startsWith('ai service non configurato');
+}
+
 export function DeliberationColumn({
   activeTab,
   onTabChange,
@@ -74,6 +123,7 @@ export function DeliberationColumn({
   onLoadHistoryTurn,
   selectedNode,
   selectedEdge,
+  expertContributions,
   canContribute,
   qaAskable,
   nodesById,
@@ -111,6 +161,7 @@ export function DeliberationColumn({
           onCancel={onCancel}
           onSourceCenter={onSourceCenter}
           onLoadHistoryTurn={onLoadHistoryTurn}
+          expertContributions={expertContributions}
           canContribute={canContribute}
           qaAskable={qaAskable}
           centerLabel={selectedNode?.label}
@@ -167,6 +218,7 @@ function DibattitoTab({
   onCancel,
   onSourceCenter,
   onLoadHistoryTurn,
+  expertContributions,
   canContribute,
   qaAskable,
   centerLabel,
@@ -178,11 +230,13 @@ function DibattitoTab({
   onCancel: (turnId: string) => void;
   onSourceCenter: (nodeIdOrUrn: string) => void;
   onLoadHistoryTurn?: (item: QaHistoryItem) => void;
+  expertContributions?: ExpertContribution[];
   canContribute: boolean;
   qaAskable: boolean;
   centerLabel?: string;
   centerUrn?: string;
 }): React.ReactElement {
+  const lastTurnId = turns.length > 0 ? turns[turns.length - 1].id : null;
   // "Cronologia" toggle: reveals the server-backed QaHistoryPanel over the thread
   // (Decision A). Selecting a past item loads it into the thread and closes the
   // panel so the loaded turn is immediately visible in the current conversation.
@@ -232,6 +286,10 @@ function DibattitoTab({
               onCancel={() => onCancel(turn.id)}
               onSourceCenter={onSourceCenter}
               canContribute={canContribute}
+              // The `expertContributions` prop is the CURRENT deliberation's set
+              // — only the latest turn falls back to it when its own answer lacks
+              // per-canon contributions (a history-loaded turn keeps its own/none).
+              fallbackContributions={turn.id === lastTurnId ? expertContributions : undefined}
             />
           ))
         )}
@@ -252,10 +310,14 @@ function DibattitoTab({
 }
 
 /**
- * One deliberation turn: question + prose synthesis (or per-canon theses in
- * divergent mode) + confidence + consulted sources as canvas-centering chips.
- * Loading/error surface the page's onCancel/onRetry. The teaching feedback
- * channels (rating/prefer/detailed/confirm) are intentionally absent in P1.
+ * One deliberation turn: question + prose synthesis + per-canon theses + confidence
+ * + consulted sources as canvas-centering chips. Loading/error surface the page's
+ * onCancel/onRetry. The teaching feedback channels (rating/prefer/detailed/confirm)
+ * are P2b (design §5 L2), not shown here.
+ *
+ * The per-canon theses read from the turn's OWN `answer.expert_contributions`
+ * (each turn deliberated independently); `fallbackContributions` (the CURRENT
+ * deliberation from the page) only fills in when the answer omits them.
  */
 function DeliberationTurn({
   turn,
@@ -263,12 +325,14 @@ function DeliberationTurn({
   onCancel,
   onSourceCenter,
   canContribute,
+  fallbackContributions,
 }: {
   turn: QaTurnModel;
   onRetry: () => void;
   onCancel: () => void;
   onSourceCenter: (nodeIdOrUrn: string) => void;
   canContribute: boolean;
+  fallbackContributions?: ExpertContribution[];
 }): React.ReactElement {
   return (
     <div className="space-y-2">
@@ -312,12 +376,30 @@ function DeliberationTurn({
       {turn.state.status === 'success' &&
         (() => {
           const a = turn.state.answer;
-          const isDivergent = a.mode === 'divergent' && a.alternatives && a.alternatives.length > 0;
           const hasSources = a.retrieved_sources.length > 0;
+          // Per-canon FULL theses (design §3.3): prefer the turn's own answer, fall
+          // back to the page's current-deliberation set. When present they REPLACE
+          // the flat divergent-only "Tesi a confronto" preview with the real
+          // per-canon arguments (they exist in both convergent and divergent runs).
+          const contributions =
+            a.expert_contributions && a.expert_contributions.length > 0
+              ? a.expert_contributions
+              : fallbackContributions ?? [];
+          const hasContributions = contributions.length > 0;
+          // Pre-P2a backward-compat: no contributions but a divergent answer still
+          // carries `alternatives` — keep showing those so old responses don't lose
+          // the per-canon view.
+          const legacyDivergent =
+            !hasContributions && a.mode === 'divergent' && Boolean(a.alternatives && a.alternatives.length > 0);
           return (
             <div className="rounded-2xl rounded-tl-sm border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-              {isDivergent ? (
-                <div className="space-y-2">
+              {/* The synthesis stays the primary readable prose (design §C). */}
+              <QaSynthesisWithCitations text={a.synthesis} enabled={canContribute} />
+
+              {hasContributions ? (
+                <CanonTheses contributions={contributions} />
+              ) : legacyDivergent ? (
+                <div className="mt-3 space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tesi a confronto</p>
                   {a.alternatives!.map((alt) => (
                     <div key={alt.expert} className="rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
@@ -331,9 +413,7 @@ function DeliberationTurn({
                     </div>
                   ))}
                 </div>
-              ) : (
-                <QaSynthesisWithCitations text={a.synthesis} enabled={canContribute} />
-              )}
+              ) : null}
 
               <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
                 <span>confidenza {confidenceLabel(a.confidence)}</span>
@@ -369,6 +449,82 @@ function DeliberationTurn({
         })()}
     </div>
   );
+}
+
+/**
+ * Per-canon FULL theses (design §3.3 "each canon claims its sources", §6 P2).
+ * Replaces the flat "Tesi a confronto" preview: each canon's full argument, in a
+ * canon-colored, individually-expandable section, with its self-confidence and
+ * routing weight. Legal lexicon, no gamified bars. A canon that failed to argue
+ * renders a subdued "non ha argomentato" — never a scary error.
+ */
+function CanonTheses({ contributions }: { contributions: ExpertContribution[] }): React.ReactElement {
+  const ordered = orderContributions(contributions);
+  return (
+    <div className="mt-3 space-y-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Le tesi dei canoni</p>
+      <div className="space-y-1.5">
+        {ordered.map((c) => (
+          <CanonThesisItem key={c.expert} contribution={c} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One canon's thesis: a canon-colored leading stripe (matching the canvas canon
+ * colours, {@link CANON_STYLE}) + an expandable `<details>` carrying the FULL
+ * interpretation and the weight/confidence meta. Errored canons collapse to a
+ * subdued, non-expandable "non ha argomentato" row.
+ */
+function CanonThesisItem({ contribution }: { contribution: ExpertContribution }): React.ReactElement {
+  const { expert, thesis, confidence, weight } = contribution;
+  const label = CANON_LABEL[expert] ?? expert;
+  const color = (CANON_STYLE as Record<string, { color: string } | undefined>)[expert]?.color ?? '#475569';
+  const errored = isErroredThesis(thesis);
+
+  if (errored) {
+    return (
+      <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/30">
+        <span className="absolute inset-y-0 left-0 w-1 opacity-40" style={{ backgroundColor: color }} aria-hidden="true" />
+        <div className="flex items-center justify-between gap-2 py-2 pl-4 pr-3">
+          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</span>
+          <span className="text-xs italic text-slate-400 dark:text-slate-500">non ha argomentato</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <details className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: color }} aria-hidden="true" />
+      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 py-2 pl-4 pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-400">
+            <span>peso {formatCanonPct(weight)}</span>
+            <span aria-hidden="true">·</span>
+            <span>confidenza {confidenceLabel(confidence)}</span>
+          </span>
+        </span>
+        <ChevronDown
+          size={15}
+          className="shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="border-t border-slate-100 py-2 pl-4 pr-3 dark:border-slate-800">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">{thesis}</p>
+      </div>
+    </details>
+  );
+}
+
+/** A canon weight [0..1] as a rounded percentage; clamped and defensive on NaN. */
+function formatCanonPct(weight: number): string {
+  const w = Number.isFinite(weight) ? Math.max(0, Math.min(1, weight)) : 0;
+  return `${Math.round(w * 100)}%`;
 }
 
 /**
@@ -422,7 +578,7 @@ function NodoTab({
   onClose,
 }: {
   selectedNode: GraphNode | null;
-  selectedEdge: GraphEdge | null;
+  selectedEdge: GraphEdgeSelection | null;
   nodesById: Map<string, GraphNode>;
   edges: GraphEdge[];
   onRecenter?: (node: GraphNode) => void;
@@ -431,10 +587,20 @@ function NodoTab({
   const recenter = onRecenter ?? (() => {});
   const close = onClose ?? (() => {});
 
+  // Edge selection takes precedence (the user just clicked an arc). A REAL
+  // relation opens the built EdgeDetailsDrawer; a synthetic CONTRAST arc opens the
+  // per-conflict view. The discriminated union makes the two branches exhaustive.
   if (selectedEdge) {
+    if (selectedEdge.kind === 'relation') {
+      return (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <EdgeDetailsDrawer edge={selectedEdge.edge} nodesById={nodesById} onRecenter={recenter} onClose={close} />
+        </div>
+      );
+    }
     return (
       <div className="min-h-0 flex-1 overflow-hidden">
-        <EdgeDetailsDrawer edge={selectedEdge} nodesById={nodesById} onRecenter={recenter} onClose={close} />
+        <ContrastConflictView selection={selectedEdge} onClose={close} />
       </div>
     );
   }
@@ -457,6 +623,107 @@ function NodoTab({
       <p className="max-w-[16rem] text-sm text-slate-500 dark:text-slate-400">
         Seleziona un nodo o una relazione sul grafo per vederne i dettagli.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Per-conflict view for a CONTRAST arc (design §3.4 "dissent is an arc, not a
+ * paragraph"). Mirrors the EdgeDetailsDrawer layout: header + the two canons in
+ * contrast (canon-colored) + the intensity + the reason (`contention_point`) and,
+ * when present, each canon's excerpt at the point of contrast. A devil's-advocate
+ * contrast is flagged as a DELIBERATE challenge, not an organic split.
+ */
+function ContrastConflictView({
+  selection,
+  onClose,
+}: {
+  selection: Extract<GraphEdgeSelection, { kind: 'contrast' }>;
+  onClose: () => void;
+}): React.ReactElement {
+  const { conflict, expertALabel, expertBLabel, isDevilsAdvocate } = selection;
+  const colorA = (CANON_STYLE as Record<string, { color: string } | undefined>)[conflict.expert_a]?.color ?? '#475569';
+  const colorB = (CANON_STYLE as Record<string, { color: string } | undefined>)[conflict.expert_b]?.color ?? '#475569';
+  const score = Number.isFinite(conflict.conflict_score)
+    ? Math.max(0, Math.min(1, conflict.conflict_score))
+    : 0;
+
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex items-start justify-between gap-2 border-b border-slate-200 p-3 dark:border-slate-700">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">
+            <Swords size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+            Contrasto tra canoni
+          </h2>
+          {isDevilsAdvocate && (
+            <span className="mt-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-950/40 dark:text-red-400">
+              Sfida deliberata (avvocato del diavolo)
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          aria-label="Chiudi"
+          onClick={onClose}
+          className="shrink-0 rounded p-1 text-slate-400 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </header>
+
+      <div className="flex-1 space-y-4 overflow-y-auto p-3 text-sm">
+        {/* The two canons in contrast, canon-colored. */}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200" style={{ backgroundColor: `${colorA}22` }}>
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorA }} />
+            {expertALabel}
+          </span>
+          <span className="text-xs text-slate-400" aria-hidden="true">⚔</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200" style={{ backgroundColor: `${colorB}22` }}>
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorB }} />
+            {expertBLabel}
+          </span>
+        </div>
+
+        {/* Intensity of the contrast (drives the arc thickness on canvas). */}
+        <div>
+          <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">Intensità del contrasto</p>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <span className="block h-full rounded-full bg-red-400" style={{ width: `${Math.round(score * 100)}%` }} />
+            </span>
+            <span className="tabular-nums text-slate-400">{score.toFixed(2)}</span>
+          </div>
+        </div>
+
+        {conflict.contention_point && (
+          <div>
+            <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">Punto di divergenza</p>
+            <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{conflict.contention_point}</p>
+          </div>
+        )}
+
+        {conflict.excerpt_a && (
+          <div>
+            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-400">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorA }} aria-hidden="true" />
+              {expertALabel}
+            </p>
+            <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{conflict.excerpt_a}</p>
+          </div>
+        )}
+
+        {conflict.excerpt_b && (
+          <div>
+            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-400">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorB }} aria-hidden="true" />
+              {expertBLabel}
+            </p>
+            <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{conflict.excerpt_b}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

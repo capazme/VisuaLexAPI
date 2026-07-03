@@ -42,6 +42,51 @@ export interface ExpertRetrievedSource {
   source_url?: string | null;
 }
 
+/**
+ * Slice 4 P2a "il dibattito visibile": deliberation the engine already computes
+ * but historically dropped at the DTO. All three fields below are additive and
+ * backward-compatible — old responses omit them, new ones surface the debate.
+ *
+ * Grounding (MERL-T experts_router.py DTOs + synthesizer.py / orchestrator.py):
+ *  - disagreement_analysis ← SynthesisResult.disagreement_analysis.to_dict()
+ *    (disagreement/types.py:249-260; null on convergent responses)
+ *  - devils_advocate_flag ← SynthesisResult.devils_advocate_flag (synthesizer.py:345);
+ *    `expert` is always null today (per-canon attribution deferred to P2b)
+ *  - expert_contributions ← per-canon full thesis + confidence + routing weight
+ *    (synthesizer.py:624-631,680-703); canon-node size ∝ weight, [] when degenerate
+ */
+export interface ExpertPairConflict {
+  expert_a: string;
+  expert_b: string;
+  conflict_score: number;
+  contention_point?: string | null;
+  excerpt_a?: string | null;
+  excerpt_b?: string | null;
+}
+
+export interface DisagreementAnalysis {
+  has_disagreement: boolean;
+  disagreement_type?: string | null;
+  disagreement_level?: string | null;
+  intensity: number;
+  resolvability: number;
+  confidence: number;
+  conflicts: ExpertPairConflict[];
+  pairwise_matrix?: number[][] | null;
+}
+
+export interface DevilsAdvocateFlag {
+  active: boolean;
+  expert?: string | null;
+}
+
+export interface ExpertContribution {
+  expert: string;
+  thesis: string;
+  confidence: number;
+  weight: number;
+}
+
 export interface ExpertQueryResponse {
   trace_id: string;
   synthesis: string;
@@ -53,6 +98,9 @@ export interface ExpertQueryResponse {
   confidence: number;
   execution_time_ms: number;
   pipeline_trace?: Record<string, unknown> | null;
+  disagreement_analysis?: DisagreementAnalysis | null;
+  devils_advocate_flag?: DevilsAdvocateFlag | null;
+  expert_contributions?: ExpertContribution[];
 }
 
 export interface ExpertFeedbackResponse {

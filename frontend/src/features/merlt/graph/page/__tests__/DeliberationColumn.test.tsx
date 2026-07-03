@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DeliberationColumn } from '../DeliberationColumn';
-import type { QaHistoryItem, QaTurnModel } from '../../../qa/types';
-import type { GraphEdge, GraphNode } from '../../shared/types';
+import type { ExpertContribution, QaHistoryItem, QaTurnModel } from '../../../qa/types';
+import type { GraphEdge, GraphEdgeSelection, GraphNode } from '../../shared/types';
 
 // QaHistoryPanel (rendered by the Dibattito "Cronologia" affordance) fetches the
 // server history on mount — mock the network so the panel is deterministic.
@@ -33,6 +33,51 @@ function successTurn(): QaTurnModel {
         experts_used: ['literal'],
         confidence: 0.8,
         execution_time_ms: 100,
+      },
+    },
+  };
+}
+
+/** A turn whose answer carries per-canon FULL theses (one canon errored). */
+function turnWithContributions(): QaTurnModel {
+  const contributions: ExpertContribution[] = [
+    {
+      expert: 'literal',
+      thesis: 'Il tenore letterale dell’art. 2043 richiede un fatto doloso o colposo.',
+      confidence: 0.82,
+      weight: 0.4,
+    },
+    {
+      expert: 'principles',
+      thesis: 'La ratio è il principio del neminem laedere di rango costituzionale.',
+      confidence: 0.71,
+      weight: 0.35,
+    },
+    {
+      // Errored canon: MERL-T base.py emits this string with confidence 0.
+      expert: 'precedent',
+      thesis: 'Errore durante l’analisi: timeout del servizio.',
+      confidence: 0,
+      weight: 0.1,
+    },
+  ];
+  return {
+    id: 'turn-canon',
+    question: 'Qual è la ratio dell’art. 2043?',
+    confirmed: {},
+    state: {
+      status: 'success',
+      answer: {
+        trace_id: 'trace-canon',
+        synthesis: 'La ratio è il neminem laedere.',
+        mode: 'convergent',
+        alternatives: null,
+        sources: [],
+        retrieved_sources: [],
+        experts_used: ['literal', 'principles', 'precedent'],
+        confidence: 0.8,
+        execution_time_ms: 100,
+        expert_contributions: contributions,
       },
     },
   };
@@ -201,7 +246,7 @@ describe('DeliberationColumn nodo tab', () => {
     expect(screen.getByText('Risarcimento per fatto illecito')).toBeInTheDocument();
   });
 
-  it('renders EdgeDetailsDrawer for the selected edge', () => {
+  it('renders EdgeDetailsDrawer for a selected RELATION edge (kind: relation)', () => {
     const edge: GraphEdge = {
       id: 'e1',
       source: 'node-2043',
@@ -209,11 +254,12 @@ describe('DeliberationColumn nodo tab', () => {
       type: 'RIGUARDA',
       properties: {},
     };
+    const selection: GraphEdgeSelection = { kind: 'relation', edge };
     render(
       <DeliberationColumn
         {...baseProps()}
         activeTab="nodo"
-        selectedEdge={edge}
+        selectedEdge={selection}
         nodesById={new Map([[node.id, node]])}
         edges={[edge]}
       />,
@@ -221,8 +267,76 @@ describe('DeliberationColumn nodo tab', () => {
     expect(screen.getByRole('heading', { name: 'Relazione' })).toBeInTheDocument();
   });
 
+  it('renders the contrast conflict view for a selected CONTRAST arc (kind: contrast)', () => {
+    const selection: GraphEdgeSelection = {
+      kind: 'contrast',
+      conflict: {
+        expert_a: 'literal',
+        expert_b: 'principles',
+        conflict_score: 0.68,
+        contention_point: 'La lettera esclude ciò che la ratio impone.',
+        excerpt_a: 'Il testo è tassativo.',
+        excerpt_b: 'Il principio prevale sul dato letterale.',
+      },
+      expertALabel: 'Letterale',
+      expertBLabel: 'Principî',
+      isDevilsAdvocate: true,
+    };
+    render(
+      <DeliberationColumn {...baseProps()} activeTab="nodo" selectedEdge={selection} />,
+    );
+    expect(screen.getByRole('heading', { name: /contrasto tra canoni/i })).toBeInTheDocument();
+    // Devil's-advocate flag surfaces as a deliberate-challenge badge.
+    expect(screen.getByText(/sfida deliberata/i)).toBeInTheDocument();
+    // Reason + both excerpts are shown.
+    expect(screen.getByText(/la lettera esclude/i)).toBeInTheDocument();
+    expect(screen.getByText(/il testo è tassativo/i)).toBeInTheDocument();
+    expect(screen.getByText(/il principio prevale/i)).toBeInTheDocument();
+  });
+
   it('shows the empty inspection hint when nothing is selected', () => {
     render(<DeliberationColumn {...baseProps()} activeTab="nodo" />);
     expect(screen.getByText(/seleziona un nodo o una relazione/i)).toBeInTheDocument();
+  });
+});
+
+describe('DeliberationColumn per-canon theses (Slice 4 P2a — il dibattito visibile)', () => {
+  it('renders each canon FULL thesis from expert_contributions, canon-labelled', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithContributions()]} />);
+    expect(screen.getByText(/le tesi dei canoni/i)).toBeInTheDocument();
+    // The two arguing canons render their labels and FULL theses.
+    expect(screen.getByText('Letterale')).toBeInTheDocument();
+    expect(screen.getByText('Principî')).toBeInTheDocument();
+    expect(screen.getByText(/tenore letterale dell’art\. 2043 richiede un fatto doloso/i)).toBeInTheDocument();
+    expect(screen.getByText(/principio del neminem laedere di rango costituzionale/i)).toBeInTheDocument();
+  });
+
+  it('shows the per-canon weight and confidence meta', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithContributions()]} />);
+    // Literal: weight 0.40 → "peso 40%"; confidence 0.82 → "alta".
+    expect(screen.getByText(/peso 40%/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/confidenza alta/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders an errored canon as a subdued "non ha argomentato" state, not the error string', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithContributions()]} />);
+    // Precedente errored (thesis starts with "Errore durante…", confidence 0).
+    expect(screen.getByText('Precedente')).toBeInTheDocument();
+    expect(screen.getByText(/non ha argomentato/i)).toBeInTheDocument();
+    // The raw error string is NEVER surfaced to the reader.
+    expect(screen.queryByText(/errore durante l’analisi/i)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the expertContributions prop when the turn answer omits them (current deliberation)', () => {
+    // successTurn() carries no expert_contributions → the latest turn uses the prop.
+    const contributions: ExpertContribution[] = [
+      { expert: 'systemic', thesis: 'Lettura sistematica dell’istituto.', confidence: 0.6, weight: 0.5 },
+    ];
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} expertContributions={contributions} />,
+    );
+    expect(screen.getByText(/le tesi dei canoni/i)).toBeInTheDocument();
+    expect(screen.getByText('Sistematico')).toBeInTheDocument();
+    expect(screen.getByText(/lettura sistematica dell’istituto/i)).toBeInTheDocument();
   });
 });

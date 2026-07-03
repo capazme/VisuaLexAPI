@@ -12,8 +12,19 @@ import { loadThread, saveThread, clearThread } from './qaThreadStorage';
 import { confirmSourceEntityText } from './format';
 import type { QaMode, QaTurnModel, QaRetrievedSource, QaAnswer, QaHistoryItem } from './types';
 
+// Module-level counter. On reload it resets to 0 while the persisted thread
+// keeps its `turn-N` ids, so a new turn would reuse `turn-1` and collide with a
+// restored turn (React duplicate-key). hydrateSeq() bumps it past the loaded max
+// before the first nextId() call.
 let seq = 0;
 const nextId = (): string => `turn-${++seq}`;
+
+function hydrateSeq(turns: QaTurnModel[]): void {
+  for (const t of turns) {
+    const n = Number(t.id.slice('turn-'.length));
+    if (Number.isFinite(n) && n > seq) seq = n;
+  }
+}
 
 /**
  * Map a failed ask/refine to user-facing Italian copy. The apiClient response
@@ -54,7 +65,11 @@ function friendlyQaError(err: unknown): string {
 export function useQaThread() {
   // Hydrate the completed thread from localStorage so a reload doesn't lose
   // past answers (Loop β #1 option A). Lazy initializer → runs once.
-  const [turns, setTurns] = useState<QaTurnModel[]>(() => loadThread());
+  const [turns, setTurns] = useState<QaTurnModel[]>(() => {
+    const loaded = loadThread();
+    hydrateSeq(loaded); // continue ids past the restored max — no turn-1 reuse
+    return loaded;
+  });
   const tokens = useRef<Record<string, number>>({});
   // One AbortController per in-flight turn, so the user can cancel the up-to-120s
   // wait (design §3.5 "Annulla"). Cleared once the turn settles.

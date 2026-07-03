@@ -31,6 +31,57 @@ export interface QaAlternative {
   reasoning_type?: string;
 }
 
+/**
+ * Slice 4 P2a "il dibattito visibile" — deliberation the engine already computes
+ * but historically dropped at the DTO. Mirror the BFF ExpertQueryResponse widening
+ * (backend/src/services/merlt/expertsClient.ts) VERBATIM. All three fields are
+ * additive/backward-compatible: old responses omit them.
+ */
+
+/** One expert pair in conflict (thickness ∝ conflict_score on the contrast arc). */
+export interface QaExpertPairConflict {
+  expert_a: string;
+  expert_b: string;
+  conflict_score: number;
+  contention_point?: string | null;
+  excerpt_a?: string | null;
+  excerpt_b?: string | null;
+}
+
+/** Full disagreement analysis; `null` on convergent responses (no conflict object). */
+export interface QaDisagreementAnalysis {
+  has_disagreement: boolean;
+  disagreement_type?: string | null;
+  disagreement_level?: string | null;
+  intensity: number;
+  resolvability: number;
+  confidence: number;
+  conflicts: QaExpertPairConflict[];
+  pairwise_matrix?: number[][] | null;
+}
+
+/**
+ * Devil's-advocate marker — `active` says a deliberate challenge occurred;
+ * `expert` (WHICH canon) is always null today (per-canon attribution is P2b).
+ */
+export interface QaDevilsAdvocateFlag {
+  active: boolean;
+  expert?: string | null;
+}
+
+/**
+ * A per-canon FULL thesis (not the 300-char divergent preview): the canon's own
+ * interpretation + self-confidence + routing/gating weight. `weight` drives the
+ * canon-node size on the canvas; a canon that errored carries an error string in
+ * `thesis` with `confidence === 0` (see `isErroredThesis`).
+ */
+export interface ExpertContribution {
+  expert: string;
+  thesis: string;
+  confidence: number;
+  weight: number;
+}
+
 export interface QaAnswer {
   trace_id: string;
   synthesis: string;
@@ -44,6 +95,12 @@ export interface QaAnswer {
   /** Present when the query ran with include_trace (always, via the BFF). */
   pipeline_trace?: Record<string, unknown> | null;
   pipeline_metrics?: Record<string, unknown> | null;
+  /** Slice 4 P2a: full disagreement object; null when the canons converge. */
+  disagreement_analysis?: QaDisagreementAnalysis | null;
+  /** Slice 4 P2a: devil's-advocate marker; `expert` null until P2b. */
+  devils_advocate_flag?: QaDevilsAdvocateFlag | null;
+  /** Slice 4 P2a: per-canon full theses; `[]` on the degenerate no-expert path. */
+  expert_contributions?: ExpertContribution[];
 }
 
 export type QaAnswerState =

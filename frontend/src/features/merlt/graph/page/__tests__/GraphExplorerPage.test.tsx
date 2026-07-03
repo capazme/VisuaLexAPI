@@ -507,4 +507,149 @@ describe('GraphExplorerPage', () => {
       expect(nodoTab).toHaveAttribute('aria-selected', 'true');
     });
   });
+
+  describe('Slice 4 P2a — il dibattito visibile (debate overlay on canvas)', () => {
+    function setPopulatedGraph(): void {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }],
+          edges: [],
+        },
+        elements: { nodes: [{ id: 'node-2043' }], edges: [] },
+      });
+    }
+
+    // A successful turn carrying the widened deliberation fields (expert
+    // contributions + one expert-pair conflict + devil's-advocate flag).
+    function deliberationTurn(): QaTurnModel {
+      const answer = {
+        trace_id: 'trace-d',
+        synthesis: 'Sintesi con dissenso.',
+        mode: 'convergent',
+        alternatives: null,
+        sources: [],
+        retrieved_sources: [],
+        experts_used: ['literal', 'principles'],
+        confidence: 0.7,
+        execution_time_ms: 100,
+        expert_contributions: [
+          { expert: 'literal', thesis: 'Tesi letterale', confidence: 0.9, weight: 0.6 },
+          { expert: 'principles', thesis: 'Tesi principî', confidence: 0.8, weight: 0.4 },
+        ],
+        disagreement_analysis: {
+          has_disagreement: true,
+          conflicts: [
+            { expert_a: 'literal', expert_b: 'principles', conflict_score: 0.68, contention_point: 'testo/spirito' },
+          ],
+        },
+        devils_advocate_flag: { active: true, expert: null },
+      };
+      // Cast: QaAnswer does not type the P2a fields yet; the BFF passes them
+      // through and readDeliberation narrows them structurally at runtime.
+      return {
+        id: 'turn-d',
+        question: 'C’è contrasto?',
+        confirmed: {},
+        state: { status: 'success', answer },
+      } as unknown as QaTurnModel;
+    }
+
+    it('injects canon nodes + a contrast arc onto the canvas from a deliberation', () => {
+      qaThreadState.turns = [deliberationTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      const nodes = lastCanvasProps.nodes as Array<{ id: string }>;
+      const edges = lastCanvasProps.edges as Array<{ id: string; source?: string }>;
+      const ids = nodes.map((n) => n.id);
+      expect(ids).toContain('canon:literal');
+      expect(ids).toContain('canon:principles');
+      // The contrast arc between the two canons is present.
+      expect(edges.some((e) => e.id.startsWith('contrast:'))).toBe(true);
+      // And an anchor tether ties a canon to the centered article node.
+      expect(edges.some((e) => e.source === 'node-2043' && e.id.startsWith('canon:anchor:'))).toBe(true);
+    });
+
+    it('sizes canon nodes by routing weight (weight carried onto the item data)', () => {
+      qaThreadState.turns = [deliberationTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      const nodes = lastCanvasProps.nodes as Array<{ id: string; data?: { weight?: number } }>;
+      const literal = nodes.find((n) => n.id === 'canon:literal');
+      const principles = nodes.find((n) => n.id === 'canon:principles');
+      expect(literal?.data?.weight).toBe(0.6);
+      expect(principles?.data?.weight).toBe(0.4);
+    });
+
+    it('removes the overlay on a NEW ask (latest turn loading → no synthetic nodes)', () => {
+      // Newest turn is a fresh (loading) ask AFTER a completed deliberation.
+      qaThreadState.turns = [
+        deliberationTurn(),
+        { id: 'turn-new', question: 'Nuova domanda', confirmed: {}, state: { status: 'loading' } } as QaTurnModel,
+      ];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      const ids = (lastCanvasProps.nodes as Array<{ id: string }>).map((n) => n.id);
+      // Only the real subgraph node remains — no lingering canon overlay.
+      expect(ids).toEqual(['node-2043']);
+    });
+
+    it('does not overlay canons when the answer carries no deliberation fields', () => {
+      qaThreadState.turns = [
+        {
+          id: 'turn-plain',
+          question: 'Domanda semplice',
+          confirmed: {},
+          state: {
+            status: 'success',
+            answer: {
+              trace_id: 't',
+              synthesis: 's',
+              mode: 'convergent',
+              alternatives: null,
+              sources: [],
+              retrieved_sources: [],
+              experts_used: ['literal'],
+              confidence: 0.8,
+              execution_time_ms: 10,
+            },
+          },
+        } as QaTurnModel,
+      ];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      const ids = (lastCanvasProps.nodes as Array<{ id: string }>).map((n) => n.id);
+      expect(ids).toEqual(['node-2043']);
+    });
+
+    it('an edge:click on a contrast arc selects it and switches the column to Nodo', () => {
+      qaThreadState.turns = [deliberationTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // The contrast-arc id emitted by the canvas for this canon pair.
+      const edges = lastCanvasProps.edges as Array<{ id: string }>;
+      const contrastId = edges.find((e) => e.id.startsWith('contrast:'))!.id;
+
+      act(() => {
+        (lastCanvasProps.onEdgeClick as (id: string) => void)(contrastId);
+      });
+      expect(screen.getByRole('tab', { name: /nodo/i })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('ignores an edge:click on a canon-anchor tether (structural, not inspectable)', () => {
+      qaThreadState.turns = [deliberationTurn()];
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      const edges = lastCanvasProps.edges as Array<{ id: string }>;
+      const anchorId = edges.find((e) => e.id.startsWith('canon:anchor:'))!.id;
+      act(() => {
+        (lastCanvasProps.onEdgeClick as (id: string) => void)(anchorId);
+      });
+      // Stays on the Dibattito tab — an anchor is not a selectable relation.
+      expect(screen.getByRole('tab', { name: /dibattito/i })).toHaveAttribute('aria-selected', 'true');
+    });
+  });
 });

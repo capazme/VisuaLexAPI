@@ -106,6 +106,96 @@ export interface GraphEdge {
   properties?: Record<string, unknown>;
 }
 
+/* ------------------------------------------------------------------ *
+ * Slice 4 P2a — "il dibattito visibile" (deliberation overlay types)  *
+ *                                                                     *
+ * These mirror the widened BFF `ExpertQueryResponse` (backend agent's *
+ * additive DTO): per-canon contributions + expert-pair disagreement + *
+ * a devil's-advocate flag. Read defensively off `QaAnswer` (the fields*
+ * are optional — a convergent answer carries no disagreement object). *
+ * ------------------------------------------------------------------ */
+
+/** The four interpretive canons MERL-T routes across (art. 12 preleggi order). */
+export type CanonKey = 'literal' | 'systemic' | 'principles' | 'precedent';
+
+export const CANON_KEYS: readonly CanonKey[] = ['literal', 'systemic', 'principles', 'precedent'];
+
+/** Per-canon contribution — full thesis + self-confidence + routing weight. */
+export interface ExpertContribution {
+  /** Canon key (`literal`/`systemic`/`principles`/`precedent`, extras last). */
+  expert: string;
+  /** Full interpretation text (NOT the 300-char preview). */
+  thesis: string;
+  /** Expert self-confidence [0..1]. */
+  confidence: number;
+  /** Routing/gating weight [0..1] — drives canon-node size/opacity on canvas. */
+  weight: number;
+}
+
+/** One expert-pair conflict — the contrast arc between two canon nodes. */
+export interface DisagreementConflict {
+  /** Canon key of the first expert in contrast. */
+  expert_a: string;
+  /** Canon key of the second expert in contrast. */
+  expert_b: string;
+  /** Conflict intensity [0..1] — drives contrast-arc thickness. */
+  conflict_score: number;
+  /** Human reason for the contrast (shown on hover); null when unavailable. */
+  contention_point?: string | null;
+  /** Excerpt of expert_a's reasoning at the point of contrast. */
+  excerpt_a?: string | null;
+  /** Excerpt of expert_b's reasoning at the point of contrast. */
+  excerpt_b?: string | null;
+}
+
+/** Expert-pair disagreement analysis (null on a convergent answer). */
+export interface DisagreementAnalysis {
+  has_disagreement: boolean;
+  disagreement_type?: string | null;
+  disagreement_level?: string | null;
+  intensity?: number;
+  resolvability?: number;
+  confidence?: number;
+  conflicts: DisagreementConflict[];
+  pairwise_matrix?: number[][] | null;
+}
+
+/** Devil's-advocate flag — a deliberate challenge, not an organic split. */
+export interface DevilsAdvocateFlag {
+  active: boolean;
+  /** Which canon played devil's advocate; null today (attribution deferred). */
+  expert?: string | null;
+}
+
+/**
+ * Deliberation fields as they land on the BFF Q&A answer. `QaAnswer` (owned by
+ * the qa feature) does not type them yet, so we read them off the answer via a
+ * structural subset — {@link readDeliberation} in graphDeliberation.ts.
+ */
+export interface DeliberationFields {
+  expert_contributions?: ExpertContribution[] | null;
+  disagreement_analysis?: DisagreementAnalysis | null;
+  devils_advocate_flag?: DevilsAdvocateFlag | null;
+}
+
+/**
+ * What the canvas emits on `edge:click`, threaded to the deliberation column.
+ * A discriminated union so a click on a REAL relation opens the
+ * EdgeDetailsDrawer while a click on a synthetic CONTRAST arc opens the
+ * per-conflict view (built by FE-panel).
+ */
+export type GraphEdgeSelection =
+  | { kind: 'relation'; edge: GraphEdge }
+  | {
+      kind: 'contrast';
+      conflict: DisagreementConflict;
+      /** Readable canon labels for the two experts in contrast. */
+      expertALabel: string;
+      expertBLabel: string;
+      /** True when the devil's-advocate flag marks this a deliberate challenge. */
+      isDevilsAdvocate: boolean;
+    };
+
 export interface SubgraphResponse {
   nodes: GraphNode[];
   edges: GraphEdge[];

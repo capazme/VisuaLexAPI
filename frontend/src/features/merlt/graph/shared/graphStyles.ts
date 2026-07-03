@@ -108,14 +108,52 @@ export function nodeG6Type(semanticType: string | undefined): G6NodeShape {
   return (semanticType && NODE_TYPE_STYLE[semanticType]?.g6Type) || 'circle';
 }
 
+/**
+ * Slice 4 P2a — canon-node styling. A synthetic canon node (`data.kind:'canon'`)
+ * carries its own colour + routing weight; size/opacity scale with the weight so
+ * a consulted canon reads bold and a not-consulted one stays a dim hint.
+ */
+function canonNodeStyle(data: {
+  label?: string;
+  color?: string;
+  weight?: number;
+}): Record<string, unknown> {
+  const color = data.color ?? '#475569';
+  const w = typeof data.weight === 'number' ? Math.max(0, Math.min(1, data.weight)) : 0;
+  const size = 26 + Math.round(28 * w); // 26px (dim) → 54px (dominant canon)
+  const opacity = 0.28 + 0.62 * w;
+  return {
+    fill: color,
+    fillOpacity: opacity,
+    stroke: color,
+    strokeOpacity: opacity,
+    lineWidth: 2.5,
+    size,
+    labelText: data.label ?? '',
+    labelFill: color,
+    labelFontSize: 12,
+    labelFontWeight: 700,
+    labelPlacement: 'bottom',
+    labelBackground: true,
+    labelBackgroundFill: '#ffffff',
+    labelBackgroundOpacity: 0.85,
+    labelBackgroundRadius: 3,
+    labelPadding: [1, 4],
+  };
+}
+
 /** G6 node style mapper — reads the semantic type/label from `datum.data`. */
 export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
   const data = (datum.data ?? {}) as {
+    kind?: string;
     type?: string;
     label?: string;
+    color?: string;
+    weight?: number;
     provenance?: NodeProvenance;
     trust?: number;
   };
+  if (data.kind === 'canon') return canonNodeStyle(data);
   const color = (data.type && NODE_TYPE_STYLE[data.type]?.color) || DEFAULT_NODE_COLOR;
   const prov = data.provenance ? PROVENANCE_STYLE[data.provenance] : undefined;
   // Trust nudges fill saturation so a solid seed reads denser than a faint
@@ -150,9 +188,66 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
   };
 }
 
+/** Contrast-arc colours (Slice 4 P2a). Oxblood for an organic split; a
+ *  distinct violet for a deliberate devil's-advocate challenge. */
+export const CONTRAST_ARC_COLOR = '#b91c1c';
+export const DEVILS_ADVOCATE_ARC_COLOR = '#7c3aed';
+
+/**
+ * Slice 4 P2a — contrast-arc styling: a dashed edge between two canon nodes,
+ * thickness ∝ `conflictScore`. A devil's-advocate dissent is drawn in a distinct
+ * violet with a tighter dash so a deliberate challenge reads apart from an
+ * organic split.
+ */
+function contrastEdgeStyle(data: {
+  conflictScore?: number;
+  devilsAdvocate?: boolean;
+  label?: string;
+}): Record<string, unknown> {
+  const score = typeof data.conflictScore === 'number' ? Math.max(0, Math.min(1, data.conflictScore)) : 0;
+  const devil = data.devilsAdvocate === true;
+  const color = devil ? DEVILS_ADVOCATE_ARC_COLOR : CONTRAST_ARC_COLOR;
+  return {
+    stroke: color,
+    strokeOpacity: 0.85,
+    lineWidth: 1.5 + 5 * score, // 1.5px (faint) → 6.5px (sharp contrast)
+    lineDash: devil ? [2, 3] : [6, 4],
+    endArrow: false,
+    startArrow: false,
+    labelText: data.label ?? 'contrasto',
+    labelOpacity: 0,
+    labelFontSize: 9,
+    labelFill: color,
+    labelBackground: true,
+    labelBackgroundFill: '#ffffff',
+    labelBackgroundOpacity: 0.9,
+    labelBackgroundRadius: 2,
+  };
+}
+
 /** G6 edge style mapper — reads the relation type/label from `datum.data`. */
 export function edgeStyleMapper(datum: EdgeData): Record<string, unknown> {
-  const data = (datum.data ?? {}) as { type?: string; label?: string };
+  const data = (datum.data ?? {}) as {
+    kind?: string;
+    type?: string;
+    label?: string;
+    conflictScore?: number;
+    devilsAdvocate?: boolean;
+  };
+  if (data.kind === 'contrast') return contrastEdgeStyle(data);
+  if (data.kind === 'canon-anchor') {
+    // Structural tether canon→center: faint, arrow-less, unlabeled; it only
+    // guides the layout, never a relation the jurist inspects.
+    return {
+      stroke: '#cbd5e1',
+      strokeOpacity: 0.25,
+      lineWidth: 1,
+      lineDash: [2, 4],
+      endArrow: false,
+      labelText: '',
+      labelOpacity: 0,
+    };
+  }
   const spec = data.type ? EDGE_TYPE_STYLE[data.type] : undefined;
   const color = spec?.color ?? DEFAULT_EDGE_COLOR;
   return {

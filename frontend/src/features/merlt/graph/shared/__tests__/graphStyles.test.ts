@@ -3,6 +3,8 @@ import {
   NODE_TYPE_STYLE,
   EDGE_TYPE_STYLE,
   PROVENANCE_STYLE,
+  CONTRAST_ARC_COLOR,
+  DEVILS_ADVOCATE_ARC_COLOR,
   nodeG6Type,
   nodeStyleMapper,
   edgeStyleMapper,
@@ -77,5 +79,65 @@ describe('graphStyles (G6)', () => {
     expect(high.fillOpacity as number).toBeGreaterThan(low.fillOpacity as number);
     expect(high.fillOpacity as number).toBeLessThanOrEqual(0.32);
     expect(low.fillOpacity as number).toBeGreaterThanOrEqual(0.1);
+  });
+
+  describe('Slice 4 P2a — canon nodes + contrast arcs', () => {
+    it('a canon node uses its own colour and scales size/opacity with the weight', () => {
+      const bold = nodeStyleMapper({
+        id: 'canon:literal',
+        data: { kind: 'canon', canon: 'literal', label: 'Letterale', color: '#1e3a8a', weight: 1 },
+      });
+      const dim = nodeStyleMapper({
+        id: 'canon:precedent',
+        data: { kind: 'canon', canon: 'precedent', label: 'Precedente', color: '#7f1d1d', weight: 0 },
+      });
+      expect(bold.fill).toBe('#1e3a8a');
+      expect(bold.labelText).toBe('Letterale');
+      // A consulted canon reads bolder + bigger than a not-consulted one.
+      expect(bold.size as number).toBeGreaterThan(dim.size as number);
+      expect(bold.fillOpacity as number).toBeGreaterThan(dim.fillOpacity as number);
+    });
+
+    it('a contrast arc is dashed, thickens with conflict_score, no arrow', () => {
+      const sharp = edgeStyleMapper({
+        id: 'contrast:a--b',
+        source: 'a',
+        target: 'b',
+        data: { kind: 'contrast', conflictScore: 1, devilsAdvocate: false, label: 'x' },
+      });
+      const faint = edgeStyleMapper({
+        id: 'contrast:c--d',
+        source: 'c',
+        target: 'd',
+        data: { kind: 'contrast', conflictScore: 0, devilsAdvocate: false },
+      });
+      expect(sharp.stroke).toBe(CONTRAST_ARC_COLOR);
+      expect(sharp.lineDash).toBeTruthy();
+      expect(sharp.endArrow).toBe(false);
+      expect(sharp.lineWidth as number).toBeGreaterThan(faint.lineWidth as number);
+    });
+
+    it('a devil\'s-advocate contrast arc gets the distinct violet styling', () => {
+      const devil = edgeStyleMapper({
+        id: 'contrast:a--b',
+        source: 'a',
+        target: 'b',
+        data: { kind: 'contrast', conflictScore: 0.5, devilsAdvocate: true },
+      });
+      expect(devil.stroke).toBe(DEVILS_ADVOCATE_ARC_COLOR);
+      expect(devil.stroke).not.toBe(CONTRAST_ARC_COLOR);
+    });
+
+    it('a canon-anchor tether is faint and unlabeled (layout-only)', () => {
+      const anchor = edgeStyleMapper({
+        id: 'canon:anchor:literal',
+        source: 'node',
+        target: 'canon:literal',
+        data: { kind: 'canon-anchor' },
+      });
+      expect(anchor.endArrow).toBe(false);
+      expect(anchor.labelText).toBe('');
+      expect(anchor.strokeOpacity as number).toBeLessThan(0.5);
+    });
   });
 });

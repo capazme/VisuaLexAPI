@@ -18,10 +18,17 @@ export function loadThread(): QaTurnModel[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    // Keep only well-formed, completed turns.
-    return (parsed as QaTurnModel[]).filter(
-      (t) => t && typeof t.id === 'string' && t.state?.status === 'success',
-    );
+    // Keep only well-formed, completed turns, and DEDUPE by id (keep the last
+    // occurrence): older builds could persist a fresh turn under a reused
+    // `turn-N` id, leaving duplicate ids in storage → React duplicate-key
+    // errors on render. This heals already-corrupted threads on load.
+    const byId = new Map<string, QaTurnModel>();
+    for (const t of parsed as QaTurnModel[]) {
+      if (t && typeof t.id === 'string' && t.state?.status === 'success') {
+        byId.set(t.id, t);
+      }
+    }
+    return [...byId.values()];
   } catch (err) {
     console.error('qaThreadStorage.loadThread failed:', err);
     return [];

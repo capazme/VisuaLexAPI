@@ -108,6 +108,87 @@ class RetrievedSource(BaseModel):
     source_url: Optional[str] = None
 
 
+# ----------------------------------------------------------------------------
+# Slice 4 P2a ("il dibattito visibile"): surface the deliberation that the
+# synthesizer/orchestrator already compute but drop at the DTO (Decision D).
+# All three models are ADDITIVE + nullable/empty — existing consumers unaffected.
+# No new computation: every value is copied from `SynthesisResult` /
+# `pipeline_trace` (see `_build_disagreement_analysis` /
+# `_build_expert_contributions`). Embeddings are never touched here (the
+# execution_trace embedding lives in a separate, stripped path).
+# ----------------------------------------------------------------------------
+
+class DisagreementConflict(BaseModel):
+    """A single pairwise conflict between two canons (Slice 4 P2a).
+
+    Copied verbatim from `ExpertPairConflict.to_dict()`
+    (disagreement/types.py:212-221). `excerpt_a`/`excerpt_b` are excerpts from
+    the experts' own responses (their legal reasoning), never the user query.
+    """
+    expert_a: str
+    expert_b: str
+    conflict_score: float
+    contention_point: Optional[str] = None
+    excerpt_a: Optional[str] = None
+    excerpt_b: Optional[str] = None
+
+
+class DisagreementAnalysisDTO(BaseModel):
+    """The synthesis-stage disagreement (Slice 4 P2a, Decision D).
+
+    Copied from `DisagreementAnalysis.to_dict()` (disagreement/types.py:249-260)
+    as produced at synthesizer.py:313 / orchestrator.py:915-916. Nullable on the
+    response: `null` when the collegio converges with no detected conflict.
+    """
+    has_disagreement: bool
+    disagreement_type: Optional[str] = None
+    disagreement_level: Optional[str] = None
+    intensity: float = Field(0.0, description="Disagreement intensity [0-1]")
+    resolvability: float = Field(
+        0.5, description="P(resolvable via art. 12 preleggi ordering) [0-1]"
+    )
+    confidence: float = Field(0.0, description="Detector confidence [0-1]")
+    conflicts: List[DisagreementConflict] = Field(
+        default_factory=list,
+        description="Pairwise canon conflicts (contrasti); empty when convergent.",
+    )
+    pairwise_matrix: Optional[List[List[float]]] = Field(
+        None, description="Full expert×expert conflict matrix, when available."
+    )
+
+
+class DevilsAdvocateFlag(BaseModel):
+    """Whether a deliberate devil's-advocate dissent was raised (Slice 4 P2a).
+
+    `active` copies `SynthesisResult.devils_advocate_flag` (synthesizer.py:345).
+    `expert` is the canon that played it WHEN the engine records it; today the
+    synthesizer derives the flag from `has_disagreement` and does NOT attribute a
+    canon, so `expert` stays null (no recompute — L2 attribution is deferred).
+    """
+    active: bool = False
+    expert: Optional[str] = Field(
+        None,
+        description="Canon that played devil's advocate, when recorded; else null.",
+    )
+
+
+class ExpertContribution(BaseModel):
+    """One canon's full thesis in the deliberation (Slice 4 P2a).
+
+    Copied from `SynthesisResult.expert_contributions` (synthesizer.py:624-631
+    convergent / 680-703 divergent), whose `weight` is the routing/gating weight
+    (`weights_dict` at orchestrator.py:885, threaded into the synthesizer at :900).
+    `thesis` is the FULL `interpretation` text, NOT the 300-char preview used in
+    the pipeline trace.
+    """
+    expert: str = Field(
+        ..., description="Canon: 'literal' | 'systemic' | 'principles' | 'precedent'"
+    )
+    thesis: str = Field(..., description="Full interpretation text (not a preview).")
+    confidence: float = Field(..., description="Expert self-confidence [0-1].")
+    weight: float = Field(..., description="Routing/gating weight [0-1].")
+
+
 class ExpertQueryResponse(BaseModel):
     """Response from Expert Q&A system."""
     trace_id: str = Field(..., description="Unique trace ID for feedback")
@@ -124,6 +205,101 @@ class ExpertQueryResponse(BaseModel):
         default_factory=list,
         description="Sources the engine consulted, with real FalkorDB provenance/trust/node_id (Loop β F.0).",
     )
+    # Slice 4 P2a ("il dibattito visibile", Decision D): surface the debate the
+    # engine already computes. All three are additive + backward-compatible.
+    disagreement_analysis: Optional[DisagreementAnalysisDTO] = Field(
+        None,
+        description=(
+            "Synthesis-stage disagreement (intensity, resolvability, pairwise "
+            "conflicts, matrix). null when the collegio converges without conflict."
+        ),
+    )
+    devils_advocate_flag: Optional[DevilsAdvocateFlag] = Field(
+        None,
+        description=(
+            "Whether a deliberate devil's-advocate dissent was raised (+ which "
+            "canon, when recorded). null when no dissent was analysed."
+        ),
+    )
+    expert_contributions: List[ExpertContribution] = Field(
+        default_factory=list,
+        description=(
+            "Per-canon full theses with confidence + routing weight. Empty when "
+            "the engine produced no per-expert contributions."
+        ),
+    )
+
+
+def _build_disagreement_analysis(result: Any) -> Optional[DisagreementAnalysisDTO]:
+    """Copy `SynthesisResult.disagreement_analysis` onto the DTO (Slice 4 P2a).
+
+    Returns null when the synthesizer detected no disagreement object
+    (convergent, no conflict). No recomputation — reads what
+    synthesizer.py:313 already attached to `result`.
+    """
+    analysis = getattr(result, "disagreement_analysis", None)
+    if analysis is None:
+        return None
+    data = analysis.to_dict()  # disagreement/types.py:249-260
+    return DisagreementAnalysisDTO(
+        has_disagreement=data.get("has_disagreement", False),
+        disagreement_type=data.get("disagreement_type"),
+        disagreement_level=data.get("disagreement_level"),
+        intensity=data.get("intensity", 0.0),
+        resolvability=data.get("resolvability", 0.5),
+        confidence=data.get("confidence", 0.0),
+        conflicts=[
+            DisagreementConflict(**pair)
+            for pair in data.get("conflicting_pairs", [])
+        ],
+        pairwise_matrix=data.get("pairwise_matrix"),
+    )
+
+
+def _build_devils_advocate_flag(result: Any) -> Optional[DevilsAdvocateFlag]:
+    """Copy `SynthesisResult.devils_advocate_flag` onto the DTO (Slice 4 P2a).
+
+    The synthesizer derives the bool from `has_disagreement` (synthesizer.py:345)
+    and does NOT record which canon played it — `expert` stays null (no recompute).
+    Returns null only when the attribute is entirely absent (defensive).
+    """
+    if not hasattr(result, "devils_advocate_flag"):
+        return None
+    return DevilsAdvocateFlag(
+        active=bool(getattr(result, "devils_advocate_flag", False)),
+        expert=None,
+    )
+
+
+# Canonical canon keys — the synthesizer keys `expert_contributions` by these.
+_CANON_KEYS = ("literal", "systemic", "principles", "precedent")
+
+
+def _build_expert_contributions(result: Any) -> List[ExpertContribution]:
+    """Copy `SynthesisResult.expert_contributions` onto the DTO (Slice 4 P2a).
+
+    Each entry carries the FULL `interpretation` thesis (not the 300-char trace
+    preview) and the routing/gating `weight` threaded from orchestrator.py:885.
+    Iterates the canonical canon order first, then any extra keys, so the FE gets
+    a stable ordering. No recomputation — reads synthesizer.py:624-631/680-703.
+    """
+    raw = getattr(result, "expert_contributions", None) or {}
+    if not isinstance(raw, dict):
+        return []
+    ordered_keys = [k for k in _CANON_KEYS if k in raw]
+    ordered_keys += [k for k in raw if k not in _CANON_KEYS]
+    contributions: List[ExpertContribution] = []
+    for key in ordered_keys:
+        entry = raw.get(key) or {}
+        contributions.append(
+            ExpertContribution(
+                expert=key,
+                thesis=str(entry.get("interpretation", "") or ""),
+                confidence=float(entry.get("confidence", 0.0) or 0.0),
+                weight=float(entry.get("weight", 0.0) or 0.0),
+            )
+        )
+    return contributions
 
 
 def _to_source_reference(legal_source: Any) -> SourceReference:
@@ -743,6 +919,10 @@ async def query_experts(
             pipeline_trace=pipeline_trace_data,
             pipeline_metrics=pipeline_metrics_data,
             retrieved_sources=retrieved_sources,
+            # Slice 4 P2a: surface the deliberation (copied from `result`, no recompute).
+            disagreement_analysis=_build_disagreement_analysis(result),
+            devils_advocate_flag=_build_devils_advocate_flag(result),
+            expert_contributions=_build_expert_contributions(result),
         )
 
     except Exception as e:
@@ -1336,6 +1516,10 @@ async def submit_refine_feedback(
             confidence=result.confidence,
             execution_time_ms=execution_time_ms,
             retrieved_sources=retrieved_sources,
+            # Slice 4 P2a: keep the debate visible on follow-ups too (same shape).
+            disagreement_analysis=_build_disagreement_analysis(result),
+            devils_advocate_flag=_build_devils_advocate_flag(result),
+            expert_contributions=_build_expert_contributions(result),
         )
 
     except HTTPException:

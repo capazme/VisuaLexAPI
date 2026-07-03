@@ -42,6 +42,11 @@ export interface GraphCanvasProps {
   highlightNodeIds?: ReadonlySet<string> | null;
   onNodeClick?: (nodeId: string) => void;
   onNodeDblClick?: (nodeId: string) => void;
+  /**
+   * Slice 4 P2a: a click on an edge (real relation OR synthetic contrast arc)
+   * — the page resolves the id to a GraphEdgeSelection and opens the Nodo tab.
+   */
+  onEdgeClick?: (edgeId: string) => void;
 }
 
 function layoutConfig(name: GraphLayoutName): LayoutOptions {
@@ -146,6 +151,7 @@ export default function GraphCanvas({
   highlightNodeIds,
   onNodeClick,
   onNodeDblClick,
+  onEdgeClick,
 }: GraphCanvasProps): React.ReactElement {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
@@ -157,10 +163,12 @@ export default function GraphCanvas({
   // Keep handlers in refs so the once-attached listeners never go stale.
   const clickRef = useRef(onNodeClick);
   const dblRef = useRef(onNodeDblClick);
+  const edgeClickRef = useRef(onEdgeClick);
   useEffect(() => {
     clickRef.current = onNodeClick;
     dblRef.current = onNodeDblClick;
-  }, [onNodeClick, onNodeDblClick]);
+    edgeClickRef.current = onEdgeClick;
+  }, [onNodeClick, onNodeDblClick, onEdgeClick]);
 
   // Create the graph once. Data/filter/layout changes are applied by the
   // sibling effects below (G6 is an external system synced imperatively).
@@ -197,6 +205,10 @@ export default function GraphCanvas({
     graph.on('node:dblclick', (e) => {
       const id = (e as unknown as { target?: { id?: string } }).target?.id;
       if (id) dblRef.current?.(id);
+    });
+    graph.on('edge:click', (e) => {
+      const id = (e as unknown as { target?: { id?: string } }).target?.id;
+      if (id) edgeClickRef.current?.(id);
     });
 
     // render() rejects with "The graph instance has been destroyed" if the

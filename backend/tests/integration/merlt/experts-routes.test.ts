@@ -40,6 +40,46 @@ const QUERY_OK = {
   execution_time_ms: 1234,
 };
 
+// Slice 4 P2a "il dibattito visibile": the 3 deliberation fields the engine
+// computes and now surfaces at the DTO. The BFF must forward them verbatim.
+const QUERY_OK_WITH_DEBATE = {
+  trace_id: 'trace_debate',
+  synthesis: 'I canoni divergono...',
+  mode: 'divergent',
+  sources: [],
+  retrieved_sources: [],
+  experts_used: ['literal', 'principles'],
+  confidence: 0.42,
+  execution_time_ms: 5678,
+  disagreement_analysis: {
+    has_disagreement: true,
+    disagreement_type: 'interpretive',
+    disagreement_level: 'expert_pair',
+    intensity: 0.72,
+    resolvability: 0.35,
+    confidence: 0.81,
+    conflicts: [
+      {
+        expert_a: 'literal',
+        expert_b: 'principles',
+        conflict_score: 0.68,
+        contention_point: 'ambito di applicazione',
+        excerpt_a: 'la lettera della norma...',
+        excerpt_b: 'la ratio impone...',
+      },
+    ],
+    pairwise_matrix: [
+      [0, 0.68],
+      [0.68, 0],
+    ],
+  },
+  devils_advocate_flag: { active: true, expert: null },
+  expert_contributions: [
+    { expert: 'literal', thesis: 'Tesi letterale completa...', confidence: 0.9, weight: 0.42 },
+    { expert: 'principles', thesis: 'Tesi per principi completa...', confidence: 0.8, weight: 0.58 },
+  ],
+};
+
 describe('MERL-T experts routes (Loop β Phase F)', () => {
   let user: TestUser;
   beforeEach(async () => {
@@ -223,5 +263,76 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
       .set(authHeader(user))
       .send({ traceId: 'trace_abc', preferredExpert: 'systemic' });
     expect(res.status).toBe(200);
+  });
+
+  // Slice 4 P2a "il dibattito visibile": the BFF must forward the 3 deliberation
+  // DTO fields verbatim (disagreement_analysis + devils_advocate_flag +
+  // expert_contributions). FE renders contrast arcs / canon nodes / theses off them.
+  it('query forwards disagreement_analysis + devils_advocate_flag + expert_contributions verbatim (P2a)', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).post('/api/v1/experts/query').reply(200, QUERY_OK_WITH_DEBATE);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'art 1453 risoluzione' });
+    expect(res.status).toBe(200);
+    // disagreement_analysis: the contrast arc + intensity/resolvability metrics
+    expect(res.body.disagreement_analysis.has_disagreement).toBe(true);
+    expect(res.body.disagreement_analysis.intensity).toBe(0.72);
+    expect(res.body.disagreement_analysis.resolvability).toBe(0.35);
+    expect(res.body.disagreement_analysis.conflicts).toHaveLength(1);
+    expect(res.body.disagreement_analysis.conflicts[0].expert_a).toBe('literal');
+    expect(res.body.disagreement_analysis.conflicts[0].expert_b).toBe('principles');
+    expect(res.body.disagreement_analysis.conflicts[0].conflict_score).toBe(0.68);
+    expect(res.body.disagreement_analysis.pairwise_matrix).toEqual([
+      [0, 0.68],
+      [0.68, 0],
+    ]);
+    // devils_advocate_flag: active, expert null (attribution deferred to P2b)
+    expect(res.body.devils_advocate_flag.active).toBe(true);
+    expect(res.body.devils_advocate_flag.expert).toBeNull();
+    // expert_contributions: per-canon full thesis + confidence + routing weight
+    expect(res.body.expert_contributions).toHaveLength(2);
+    expect(res.body.expert_contributions[0].expert).toBe('literal');
+    expect(res.body.expert_contributions[0].thesis).toBe('Tesi letterale completa...');
+    expect(res.body.expert_contributions[0].weight).toBe(0.42);
+    expect(res.body.expert_contributions[1].expert).toBe('principles');
+    expect(res.body.expert_contributions[1].weight).toBe(0.58);
+  });
+
+  it('convergent query omits disagreement (null) and still forwards it (P2a)', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).post('/api/v1/experts/query').reply(200, {
+      ...QUERY_OK,
+      disagreement_analysis: null,
+      devils_advocate_flag: { active: false, expert: null },
+      expert_contributions: [],
+    });
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'art 1453 risoluzione' });
+    expect(res.status).toBe(200);
+    expect(res.body.disagreement_analysis).toBeNull();
+    expect(res.body.devils_advocate_flag.active).toBe(false);
+    expect(res.body.expert_contributions).toEqual([]);
+  });
+
+  it('refine forwards the debate fields too (the debate stays visible on follow-ups, P2a)', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/feedback/refine', (b) => {
+        const body = b as { trace_id: string; user_id: string; follow_up_query: string };
+        return body.trace_id === 'trace_debate' && body.user_id === user.id && body.follow_up_query === 'e la buona fede?';
+      })
+      .reply(200, QUERY_OK_WITH_DEBATE);
+    const res = await request(app)
+      .post('/api/merlt/experts/refine')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_debate', followUpQuery: 'e la buona fede?' });
+    expect(res.status).toBe(200);
+    expect(res.body.disagreement_analysis.conflicts[0].conflict_score).toBe(0.68);
+    expect(res.body.devils_advocate_flag.active).toBe(true);
+    expect(res.body.expert_contributions).toHaveLength(2);
   });
 });

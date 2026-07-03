@@ -9,6 +9,19 @@ import type { QaMode, QaPrefillState, QaRetrievedSource } from '../../qa/types';
 import { useArticleGraph } from '../shared/useArticleGraph';
 import type { GraphElements } from '../shared/graphTransform';
 import {
+  buildDeliberationOverlay,
+  readDeliberation,
+  resolveEdgeSelection,
+  withDeliberationOverlay,
+} from '../shared/graphDeliberation';
+import type {
+  DisagreementConflict,
+  ExpertContribution,
+  GraphEdge,
+  GraphEdgeSelection,
+} from '../shared/types';
+import { CANON_LABEL } from '../../qa/format';
+import {
   buildSnapshot,
   parseSnapshot,
   downloadSnapshot,
@@ -78,6 +91,10 @@ export function GraphExplorerPage(): React.ReactElement {
   const graph = useArticleGraph(enabled ? urn : null, depth);
   const { entries, push } = useBreadcrumbHistory();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // Slice 4 P2a: a clicked edge (real relation or synthetic contrast arc). Lives
+  // beside the node selection; a node click clears it and vice versa so the Nodo
+  // tab shows exactly one inspection target.
+  const [selectedEdge, setSelectedEdge] = useState<GraphEdgeSelection | null>(null);
 
   // Slice 4 P1: the page OWNS the Q&A thread (useQaThread lifted here); the
   // header field + deliberation column are presentational and receive turns +
@@ -115,6 +132,7 @@ export function GraphExplorerPage(): React.ReactElement {
     setHiddenNodeTypes(new Set());
     setHiddenEdgeTypes(new Set());
     setHighlightType(null);
+    setSelectedEdge(null);
     // Re-arm the derived default for "nascondi giurisprudenza" on the new center.
     setHideJurisManual(null);
   }, [urn]);
@@ -214,6 +232,26 @@ export function GraphExplorerPage(): React.ReactElement {
   // default-on and the source highlight. True the moment the first turn appears.
   const hasDeliberation = qa.turns.length > 0;
 
+  // Slice 4 P2a — the debate overlay reflects ONLY the LATEST turn's answer, and
+  // only while it is settled successfully. A new ask (newest turn → loading) or a
+  // failed turn clears the overlay, so synthetic canon/contrast elements never
+  // linger over a stale or in-flight deliberation (lifecycle: §3).
+  const latestAnswer = useMemo<unknown>(() => {
+    const last = qa.turns[qa.turns.length - 1];
+    return last?.state.status === 'success' ? last.state.answer : null;
+  }, [qa.turns]);
+
+  const deliberation = useMemo(() => readDeliberation(latestAnswer), [latestAnswer]);
+  const expertContributions = useMemo<ExpertContribution[]>(
+    () => deliberation.expert_contributions ?? [],
+    [deliberation],
+  );
+  const conflicts = useMemo<DisagreementConflict[]>(
+    () => deliberation.disagreement_analysis?.conflicts ?? [],
+    [deliberation],
+  );
+  const devilsAdvocateActive = deliberation.devils_advocate_flag?.active === true;
+
   // Join retrieved_sources to canvas node ids: a source lands on the graph iff its
   // node_id (preferred) OR urn matches a node id/urn currently rendered. Uses the
   // TRANSFORMED elements' ids (same id space the canvas highlights on).
@@ -251,6 +289,40 @@ export function GraphExplorerPage(): React.ReactElement {
     return next;
   }, [hiddenNodeTypes, hideJurisprudence]);
 
+  // Center node the canons attach to: the rendered node whose urn matches the
+  // page urn (exact, else version-marker-stripped per gotcha #6), else the first
+  // node. Best-effort — canons float when there is no center (overlay handles it).
+  const centerNodeId = useMemo<string | null>(() => {
+    if (nodes.length === 0) return null;
+    if (!urn) return nodes[0].id;
+    const bare = stripVersionMarker(urn);
+    const exact = nodes.find((n) => n.urn === urn);
+    if (exact) return exact.id;
+    const byBare = nodes.find((n) => n.urn && stripVersionMarker(n.urn) === bare);
+    return (byBare ?? nodes[0]).id;
+  }, [nodes, urn]);
+
+  // The debate overlay (canon nodes + contrast arcs), derived from the latest
+  // answer. Empty when there is no settled deliberation → withDeliberationOverlay
+  // returns the real elements unchanged (no synthetic churn on exploration).
+  const deliberationOverlay = useMemo(() => {
+    if (expertContributions.length === 0) return null;
+    return buildDeliberationOverlay({
+      contributions: expertContributions,
+      conflicts,
+      devilsAdvocateActive,
+      centerNodeId,
+    });
+  }, [expertContributions, conflicts, devilsAdvocateActive, centerNodeId]);
+
+  // Canvas elements = real subgraph + overlay. The export-slice and the drawer
+  // read the RAW graph.data/graph.elements, never this merged set, so synthetic
+  // elements never pollute an export or a node/edge lookup.
+  const canvasElements = useMemo<GraphElements>(
+    () => withDeliberationOverlay(graphElements ?? { nodes: [], edges: [] }, deliberationOverlay),
+    [graphElements, deliberationOverlay],
+  );
+
   const importedElements = useMemo(
     () => (importedSlice ? sliceToElements(importedSlice) : null),
     [importedSlice]
@@ -270,6 +342,7 @@ export function GraphExplorerPage(): React.ReactElement {
   const goToCenter = (target: string, label: string, type?: string | null): void => {
     push({ urn: target, label });
     setSelectedNodeId(null);
+    setSelectedEdge(null);
     const next: Record<string, string> = { urn: target, depth: String(depth), layout };
     if (type) next.type = type;
     setSearchParams(next);
@@ -295,9 +368,35 @@ export function GraphExplorerPage(): React.ReactElement {
   };
 
   // A node click on the canvas selects it AND flips the column to the Nodo tab
-  // so its details are visible (design §4 — click a node → inspect it).
+  // so its details are visible (design §4 — click a node → inspect it). Clears
+  // any edge selection so the Nodo tab shows exactly one target.
   const handleNodeClick = (id: string): void => {
     setSelectedNodeId(id);
+    setSelectedEdge(null);
+    setActiveTab('nodo');
+  };
+
+  // Real relation edges keyed by id (raw subgraph, NOT the overlaid set) so a
+  // relation click resolves to a GraphEdge; contrast arcs resolve via conflicts.
+  const edgesById = useMemo<Map<string, GraphEdge>>(
+    () => new Map(edges.map((e) => [e.id ?? `${e.source}-${e.type}-${e.target}`, e])),
+    [edges],
+  );
+
+  // An edge click (real relation OR synthetic contrast arc) → resolve to a
+  // GraphEdgeSelection and open the Nodo tab (design §4/P2a "edge:click →
+  // EdgeDetailsDrawer" + the contrast-arc detail). Canon-anchor tethers resolve
+  // to null and are ignored (structural, not inspectable).
+  const handleEdgeClick = (edgeId: string): void => {
+    const selection = resolveEdgeSelection(edgeId, {
+      edgesById,
+      conflicts,
+      devilsAdvocateActive,
+      canonLabel: (key) => CANON_LABEL[key] ?? key,
+    });
+    if (!selection) return;
+    setSelectedEdge(selection);
+    setSelectedNodeId(null);
     setActiveTab('nodo');
   };
 
@@ -317,12 +416,14 @@ export function GraphExplorerPage(): React.ReactElement {
     const local = nodesById.get(nodeIdOrUrn);
     if (local) {
       setSelectedNodeId(local.id);
+      setSelectedEdge(null);
       setActiveTab('nodo');
       return;
     }
     const byUrn = nodes.find((n) => n.urn === nodeIdOrUrn);
     if (byUrn) {
       setSelectedNodeId(byUrn.id);
+      setSelectedEdge(null);
       setActiveTab('nodo');
       return;
     }
@@ -535,8 +636,8 @@ export function GraphExplorerPage(): React.ReactElement {
                 <EyeOff size={14} /> Nascondi giurisprudenza
               </button>
               <GraphCanvas
-                nodes={graph.elements.nodes}
-                edges={graph.elements.edges}
+                nodes={canvasElements.nodes}
+                edges={canvasElements.edges}
                 layout={layout}
                 height="100%"
                 hiddenNodeTypes={effectiveHiddenNodeTypes}
@@ -548,6 +649,7 @@ export function GraphExplorerPage(): React.ReactElement {
                   const n = nodesById.get(id);
                   if (n) handleRecenter(n);
                 }}
+                onEdgeClick={handleEdgeClick}
               />
             </Suspense>
           )}
@@ -567,7 +669,8 @@ export function GraphExplorerPage(): React.ReactElement {
             onSourceCenter={handleSourceCenter}
             onLoadHistoryTurn={qa.loadHistoryTurn}
             selectedNode={selectedNode}
-            selectedEdge={null}
+            selectedEdge={selectedEdge}
+            expertContributions={expertContributions}
             canContribute={canContribute}
             qaAskable={qaAskable}
             nodesById={nodesById}
@@ -575,6 +678,7 @@ export function GraphExplorerPage(): React.ReactElement {
             onRecenter={handleRecenter}
             onCloseNode={() => {
               setSelectedNodeId(null);
+              setSelectedEdge(null);
               setActiveTab('dibattito');
             }}
           />
@@ -596,6 +700,16 @@ export function GraphExplorerPage(): React.ReactElement {
 /** Best-known label for a breadcrumb urn (falls back to the urn itself). */
 function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>['entries']): string {
   return entries.find((e) => e.urn === urn)?.label ?? urn;
+}
+
+/**
+ * Strip the NIR version/annex marker (`!vig=`, `!multivigente`, …) from a urn so
+ * the graph's marker-less seed urns match VisuaLex's marker-carrying urns
+ * (gotcha #6). Best-effort center matching only — the canvas keeps the raw urn.
+ */
+function stripVersionMarker(urn: string): string {
+  const i = urn.indexOf('!');
+  return i === -1 ? urn : urn.slice(0, i);
 }
 
 /** Preserve the current center `type` param across depth/layout URL updates. */
