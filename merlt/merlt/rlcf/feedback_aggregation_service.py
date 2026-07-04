@@ -175,8 +175,15 @@ class FeedbackAggregationService:
             # Detailed feedback targets synthesizer
             query = query.where(QAFeedback.synthesis_score.isnot(None))
         elif component == "bridge":
-            # Source feedback targets bridge
-            query = query.where(QAFeedback.source_id.isnot(None))
+            # Source feedback targets bridge. Relation-preference rows (Slice 4
+            # L3) reuse the nullable source_id column with a "relation:" prefix
+            # (policy_gradient.RELATION_FEEDBACK_SOURCE_PREFIX) and carry no
+            # scores — including them would count each steer as a neutral 0.5
+            # rating and distort the bridge metrics. Exclude them explicitly.
+            query = query.where(
+                QAFeedback.source_id.isnot(None),
+                ~QAFeedback.source_id.like("relation:%"),
+            )
         else:
             # NER or generic
             query = query.where(

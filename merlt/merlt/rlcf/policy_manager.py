@@ -261,7 +261,10 @@ class PolicyManager:
                     device=device
                 )
 
-                policy.mlp.load_state_dict(checkpoint["mlp_state_dict"])
+                # Slice 4 L3: route through the legacy-aware loader — old
+                # checkpoints (no expert one-hot columns) are zero-init expanded
+                # and produce identical outputs until retrained.
+                policy.load_mlp_state_dict(checkpoint["mlp_state_dict"])
                 policy.relation_embeddings.load_state_dict(
                     checkpoint["relation_embeddings_state_dict"]
                 )
@@ -398,9 +401,18 @@ class PolicyManager:
                 device=policy.device
             )
 
+            # Slice 4 L3: expert conditioning (None → zero one-hot, legacy-equal)
+            expert_idx = policy.get_expert_index(expert_type)
+            expert_tensor = (
+                torch.tensor([expert_idx], dtype=torch.long, device=policy.device)
+                if expert_idx is not None else None
+            )
+
             # Forward pass (inference mode)
             with torch.no_grad():
-                weights, log_probs = policy.forward(query_tensor, relation_tensor)
+                weights, log_probs = policy.forward(
+                    query_tensor, relation_tensor, expert_tensor
+                )
 
             weight = float(weights[0, 0].cpu())
             log_prob = float(log_probs[0, 0].cpu())
@@ -485,9 +497,18 @@ class PolicyManager:
                 device=policy.device
             )
 
+            # Slice 4 L3: expert conditioning (None → zero one-hot, legacy-equal)
+            expert_idx = policy.get_expert_index(expert_type)
+            expert_indices = (
+                torch.tensor([expert_idx] * batch_size, dtype=torch.long, device=policy.device)
+                if expert_idx is not None else None
+            )
+
             # Forward pass (inference mode)
             with torch.no_grad():
-                weights, log_probs = policy.forward(query_batch, relation_indices)
+                weights, log_probs = policy.forward(
+                    query_batch, relation_indices, expert_indices
+                )
 
             # Extract results
             results = {}
@@ -691,7 +712,9 @@ class PolicyManager:
             "hidden_dim": policy.hidden_dim,
             "mlp_state_dict": policy.mlp.state_dict(),
             "relation_embeddings_state_dict": policy.relation_embeddings.state_dict(),
-            "relation_types": policy.relation_types
+            "relation_types": policy.relation_types,
+            # Slice 4 L3 (provenance, additive): expert one-hot vocabulary.
+            "expert_types": getattr(policy, "expert_types", None),
         }
 
         torch.save(checkpoint, checkpoint_path)

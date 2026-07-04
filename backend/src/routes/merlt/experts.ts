@@ -10,6 +10,7 @@ import {
   sourceFeedbackRequestSchema,
   detailedFeedbackRequestSchema,
   preferenceFeedbackRequestSchema,
+  relationFeedbackRequestSchema,
   refineRequestSchema,
   confirmSourceRequestSchema,
 } from '../../schemas/merlt/experts';
@@ -188,6 +189,33 @@ router.post('/experts/feedback/preference', authenticate, contributionGuard, asy
         trace_id: parsed.data.traceId,
         user_id: req.user.id,
         preferred_expert: parsed.data.preferredExpert,
+        comment: parsed.data.comment,
+      })
+    );
+  } catch (err) {
+    handleMerltError(err, res);
+  }
+});
+
+// Slice 4 L3 "privilegia questa relazione": per-relation traversal steer.
+// TEACH channel (trains the TraversalPolicy) → contributionGuard (full),
+// exactly like the sibling /feedback/* channels.
+router.post('/experts/feedback/relation', authenticate, contributionGuard, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+  const parsed = relationFeedbackRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+  try {
+    res.status(200).json(
+      await getExpertsClient().feedbackRelation({
+        trace_id: parsed.data.traceId,
+        user_id: req.user.id,
+        relation_type: parsed.data.relationType,
         comment: parsed.data.comment,
       })
     );

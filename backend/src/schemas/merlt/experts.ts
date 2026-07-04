@@ -37,6 +37,16 @@ export const preferenceFeedbackRequestSchema = z.object({
   comment: z.string().max(2000).optional(),
 });
 
+// Slice 4 L3 "privilegia questa relazione": per-relation traversal steer.
+// relationType is an open string (the graph vocabulary evolves — MERL-T
+// validates against its own vocabulary and accepts unknowns with a warn),
+// trimmed, 1..100. Stricter than MERL-T's 180 cap on purpose.
+export const relationFeedbackRequestSchema = z.object({
+  traceId: z.string().min(1),
+  relationType: z.string().trim().min(1).max(100),
+  comment: z.string().max(2000).optional(),
+});
+
 export const refineRequestSchema = z.object({
   traceId: z.string().min(1),
   followUpQuery: z.string().min(5).max(2000),

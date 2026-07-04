@@ -5,6 +5,7 @@ import { cn } from '../../../../lib/utils';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useMerltFeatures } from '../../useMerltFeatures';
 import { useQaThread } from '../../qa/useQaThread';
+import { sendRelationFeedback } from '../../qa/qaApi';
 import type { QaMode, QaPrefillState, QaRetrievedSource } from '../../qa/types';
 import { useArticleGraph } from '../shared/useArticleGraph';
 import type { GraphElements } from '../shared/graphTransform';
@@ -246,6 +247,17 @@ export function GraphExplorerPage(): React.ReactElement {
     return last?.state.status === 'success' ? last.state.answer : null;
   }, [qa.turns]);
 
+  // Slice 4 L3 — the LATEST settled deliberation's trace_id: the handle every
+  // relation steer attaches to. Same lifecycle as the overlay (an in-flight or
+  // failed newest turn clears it), so the edge steer control hides exactly when
+  // there is no current deliberation to teach against.
+  const latestTraceId = useMemo<string | null>(() => {
+    const last = qa.turns[qa.turns.length - 1];
+    return last?.state.status === 'success' && last.state.answer.trace_id
+      ? last.state.answer.trace_id
+      : null;
+  }, [qa.turns]);
+
   const deliberation = useMemo(() => readDeliberation(latestAnswer), [latestAnswer]);
   const expertContributions = useMemo<ExpertContribution[]>(
     () => deliberation.expert_contributions ?? [],
@@ -404,6 +416,20 @@ export function GraphExplorerPage(): React.ReactElement {
     setSelectedNodeId(null);
     setActiveTab('nodo');
   };
+
+  // Slice 4 L3 — "privilegia questa relazione": mirror of onPreferCanon (P2b),
+  // but for the traversal head. Binds the LATEST trace_id to the NEW relation
+  // feedback channel; fire-and-forget like useQaThread.prefer (a failed teach is
+  // never surfaced — the column already flipped to its optimistic confirmation).
+  const handlePreferRelation = useCallback(
+    (relationType: string): void => {
+      if (!latestTraceId) return;
+      void sendRelationFeedback(latestTraceId, relationType).catch((e) =>
+        console.error('sendRelationFeedback failed:', e),
+      );
+    },
+    [latestTraceId],
+  );
 
   // Header/column "Chiedi al grafo": fire the ask and surface the Dibattito tab.
   const handleAsk = useCallback(
@@ -678,6 +704,9 @@ export function GraphExplorerPage(): React.ReactElement {
             expertContributions={expertContributions}
             canContribute={canContribute}
             onPreferCanon={qa.prefer}
+            // No settled trace → undefined → the column hides the edge steer
+            // entirely (steering needs a deliberation to attach to).
+            onPreferRelation={latestTraceId ? handlePreferRelation : undefined}
             onOpenConsent={() => setConsentDialogOpen(true)}
             qaAskable={qaAskable}
             nodesById={nodesById}

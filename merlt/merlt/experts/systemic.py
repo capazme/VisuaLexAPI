@@ -21,6 +21,7 @@ Approccio:
 4. Considera la ratio sistemica (coerenza dell'ordinamento)
 """
 
+import os
 import structlog
 from typing import Dict, Any, Optional, List
 
@@ -38,6 +39,35 @@ from merlt.tools import BaseTool
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
+
+
+# =============================================================================
+# Slice 4 L3 — neural traversal (TraversalPolicy decides per-query relations)
+# =============================================================================
+
+# Env flag: unset/"false"/"0"/"" → EXACTLY the pre-L3 static behaviour (no
+# policy call, no trace recording). DEFAULT OFF, mirroring the repo's learned-
+# behaviour precedent (MERLT_NER_LEARNED_ENABLED): a trained checkpoint sitting
+# on the durable volume must not change systemic retrieval on deploy without an
+# explicit opt-in. The dev compose (docker-compose.merlt.yml) sets it "true" so
+# the steer→traversal loop is live where it is actively verified. Read once and
+# cached; tests reset via _reset_neural_traversal_flag_for_tests().
+_NEURAL_TRAVERSAL_ENV = "MERLT_NEURAL_TRAVERSAL_ENABLED"
+_neural_traversal_flag: Optional[bool] = None
+
+
+def _neural_traversal_enabled() -> bool:
+    global _neural_traversal_flag
+    if _neural_traversal_flag is None:
+        raw = os.getenv(_NEURAL_TRAVERSAL_ENV, "false").strip().lower()
+        _neural_traversal_flag = raw in ("true", "1", "yes")
+    return _neural_traversal_flag
+
+
+def _reset_neural_traversal_flag_for_tests() -> None:
+    """Re-read the env flag on next call (test helper only)."""
+    global _neural_traversal_flag
+    _neural_traversal_flag = None
 
 
 class SystemicExpert(BaseExpert, ReActMixin):
@@ -85,6 +115,25 @@ class SystemicExpert(BaseExpert, ReActMixin):
         "cita": 0.70,          # Citazioni
         "default": 0.50
     }
+
+    # ------------------------------------------------------------------
+    # Slice 4 L3 — neural traversal (safe blend)
+    # ------------------------------------------------------------------
+    # SAFETY FLOOR (non-negotiable): this curated list is ALWAYS in the
+    # traversed set. The TraversalPolicy can only ADD/reorder relations on
+    # top of it, never remove the proven ones. Relazioni reali nel grafo
+    # (verificate con: MATCH ()-[r]->() RETURN type(r), count(*)).
+    STATIC_SYSTEMIC_RELATIONS = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE"]
+
+    # Extra graph-native candidates the policy may promote (subset of
+    # DEFAULT_TRAVERSAL_WEIGHTS keys — plausible-but-unproven relations).
+    NEURAL_EXTRA_CANDIDATE_RELATIONS = ["deroga", "rinvia", "cita", "connesso_a", "contiene"]
+
+    # An extra is added only when its policy score clearly beats the best
+    # floor score (+margin). An untrained/uniform policy scores everything
+    # ~equal → no extra clears the margin → behaviour ≈ today's.
+    NEURAL_TRAVERSAL_MAX_EXTRA = 2
+    NEURAL_TRAVERSAL_EXTRA_MARGIN = 0.05
 
     def __init__(
         self,
@@ -285,6 +334,138 @@ class SystemicExpert(BaseExpert, ReActMixin):
 
         return sources
 
+    async def _select_traversal_relations(
+        self,
+        context: ExpertContext
+    ) -> List[str]:
+        """Slice 4 L3: per-query relation choice via TraversalPolicy — SAFE BLEND.
+
+        Contract:
+        - The static curated floor (STATIC_SYSTEMIC_RELATIONS) is ALWAYS fully
+          included — the policy can only ADD extras / reorder, never remove.
+        - Extras (NEURAL_EXTRA_CANDIDATE_RELATIONS) are added only when their
+          policy score beats max(floor scores) + margin, capped at
+          NEURAL_TRAVERSAL_MAX_EXTRA. An untrained/uniform policy therefore
+          returns exactly the floor (behaviour ≈ today's).
+        - MERLT_NEURAL_TRAVERSAL_ENABLED=false → the legacy static list, no
+          policy call, no trace recording.
+        - The decision is recorded in the RLCF ExecutionTrace via
+          add_graph_traversal (chosen relations, scores, log_probs, neural vs
+          fallback) — same record-with-log_prob pattern as the gating head —
+          so the trainer can replay it and the FE can show "relazioni percorse".
+        Any failure falls back to the static floor (failure-isolated).
+        """
+        static_floor = list(self.STATIC_SYSTEMIC_RELATIONS)
+
+        if not _neural_traversal_enabled():
+            # Flag off → EXACTLY today's behaviour (no recording either).
+            return static_floor
+
+        def _record_fallback(reason: str) -> None:
+            if not self._current_trace:
+                return
+            for rel in static_floor:
+                self._current_trace.add_graph_traversal(
+                    relation_type=rel,
+                    weight=self.traversal_weights.get(
+                        rel.lower(), self.traversal_weights.get("default", 0.5)
+                    ) if self.traversal_weights else 0.5,
+                    log_prob=0.0,
+                    metadata={
+                        "expert_type": self.expert_type,
+                        "source": "traversal_static_fallback",
+                        "neural": False,
+                        "selected": True,
+                        "fallback_reason": reason,
+                    },
+                )
+
+        if not context.query_embedding:
+            _record_fallback("no_query_embedding")
+            return static_floor
+
+        try:
+            from merlt.rlcf.policy_gradient import normalize_relation_type
+
+            policy_manager = self.policy_manager
+            if policy_manager is None:
+                from merlt.rlcf.policy_manager import get_policy_manager
+                policy_manager = get_policy_manager()
+
+            if not policy_manager.is_traversal_policy_available():
+                _record_fallback("no_traversal_checkpoint")
+                return static_floor
+
+            candidates = static_floor + [
+                r for r in self.NEURAL_EXTRA_CANDIDATE_RELATIONS
+                if r not in static_floor
+            ]
+            # Graph-native name → policy vocabulary (dedup for the batch call).
+            policy_name_by_rel = {r: normalize_relation_type(r) for r in candidates}
+            policy_names = list(dict.fromkeys(policy_name_by_rel.values()))
+
+            # Score WITHOUT passing the trace: we record below with the richer
+            # selected/neural metadata instead of the generic batch records.
+            weights = await policy_manager.compute_batch_weights(
+                query_embedding=context.query_embedding,
+                relation_types=policy_names,
+                expert_type=self.expert_type,
+                trace=None,
+            )
+
+            scored = []  # (relation, weight, log_prob)
+            for rel in candidates:
+                w, lp = weights.get(policy_name_by_rel[rel], (0.5, 0.0))
+                scored.append((rel, w, lp))
+
+            floor_max = max(w for rel, w, _ in scored if rel in static_floor)
+            extras_ranked = sorted(
+                (s for s in scored if s[0] not in static_floor),
+                key=lambda s: s[1],
+                reverse=True,
+            )
+            threshold = floor_max + self.NEURAL_TRAVERSAL_EXTRA_MARGIN
+            extras_selected = [
+                rel for rel, w, _ in extras_ranked if w > threshold
+            ][: self.NEURAL_TRAVERSAL_MAX_EXTRA]
+
+            selected_set = set(static_floor) | set(extras_selected)
+            # Reorder by score desc — the floor stays fully included.
+            chosen = [
+                rel for rel, _, _ in sorted(scored, key=lambda s: s[1], reverse=True)
+                if rel in selected_set
+            ]
+
+            # Record the decision (first real caller of add_graph_traversal).
+            if self._current_trace:
+                for rel, w, lp in scored:
+                    self._current_trace.add_graph_traversal(
+                        relation_type=rel,
+                        weight=w,
+                        log_prob=lp,
+                        metadata={
+                            "expert_type": self.expert_type,
+                            "source": "traversal_policy",
+                            "neural": True,
+                            "selected": rel in selected_set,
+                            "static_floor": rel in static_floor,
+                            "policy_relation": policy_name_by_rel[rel],
+                        },
+                    )
+
+            log.info(
+                "Neural traversal relations selected",
+                floor=static_floor,
+                extras=extras_selected,
+                trace_id=context.trace_id,
+            )
+            return chosen
+
+        except Exception as e:
+            log.warning(f"Neural traversal selection failed, using static floor: {e}")
+            _record_fallback("error")
+            return static_floor
+
     async def _expand_systemic_relations(
         self,
         context: ExpertContext,
@@ -310,9 +491,11 @@ class SystemicExpert(BaseExpert, ReActMixin):
             log.debug("SystemicExpert: No URNs to expand")
             return expanded
 
-        # Espandi con relazioni sistematiche
-        # Relazioni reali nel grafo (verificate con: MATCH ()-[r]->() RETURN type(r), count(*))
-        systemic_relations = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE"]
+        # Espandi con relazioni sistematiche.
+        # Slice 4 L3: the TraversalPolicy ranks the candidates per-query and may
+        # ADD extras on top of the static floor (never removes it). Flag off /
+        # policy absent / no embedding → exactly the legacy static list.
+        systemic_relations = await self._select_traversal_relations(context)
 
         log.debug(
             f"SystemicExpert graph expansion",

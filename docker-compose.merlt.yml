@@ -154,6 +154,11 @@ services:
       RQ_REDIS_URL: "redis://merlt-redis:6379/1"
       # Loop β #2 Phase 4: gate the learned NER at inference. OFF until A/B proves it.
       MERLT_NER_LEARNED_ENABLED: "false"
+      # Slice 4 L3: the trained TraversalPolicy ranks/extends the systemic
+      # expert's graph relations per-query (safe blend: the static curated list
+      # is ALWAYS included — the policy can only ADD relations). "false" →
+      # exactly the legacy static traversal.
+      MERLT_NEURAL_TRAVERSAL_ENABLED: "${MERLT_NEURAL_TRAVERSAL_ENABLED:-true}"
 
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"
@@ -253,6 +258,10 @@ services:
       REDIS_URL: "redis://merlt-redis:6379/0"
       REDIS_HOST: "merlt-redis"
       REDIS_PORT: "6379"
+
+      # Slice 4 L3: keep the worker in lockstep with the api (any worker task
+      # that runs expert pipelines must see the same traversal behaviour).
+      MERLT_NEURAL_TRAVERSAL_ENABLED: "${MERLT_NEURAL_TRAVERSAL_ENABLED:-true}"
 
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"

@@ -379,6 +379,98 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.body.expert_contributions).toEqual([]);
   });
 
+  // Slice 4 L3 "privilegia questa relazione": the relation channel carries the
+  // TARGET IDENTITY (which graph relation to favour) into the traversal-head
+  // gradient. Like preference (L2), the BFF must forward relation_type verbatim
+  // and inject user_id from the JWT (MERL-T's authority-lookup key) — never
+  // client-supplied.
+  it('relation feedback 401 without auth', async () => {
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/relation')
+      .send({ traceId: 'trace_abc', relationType: 'modifica' });
+    expect(res.status).toBe(401);
+  });
+
+  it('relation feedback requires full consent (403 with only basic — teaching, Slice 3 D2)', async () => {
+    await grantBasic(user);
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/relation')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_abc', relationType: 'modifica' });
+    expect(res.status).toBe(403);
+  });
+
+  it('relation feedback rejects an invalid body (400, no forward to MERL-T)', async () => {
+    await grantFull(user);
+    // No nock interceptor: if the route forwarded, the request would fail on
+    // disabled net-connect — the 400 must come from Zod BEFORE any MERL-T call.
+    for (const body of [
+      {}, // both missing
+      { relationType: 'modifica' }, // traceId missing
+      { traceId: 'trace_abc' }, // relationType missing
+      { traceId: 'trace_abc', relationType: '   ' }, // blank after trim
+      { traceId: 'trace_abc', relationType: 'x'.repeat(101) }, // over 100 cap
+    ]) {
+      const res = await request(app)
+        .post('/api/merlt/experts/feedback/relation')
+        .set(authHeader(user))
+        .send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.detail).toBe('invalid_body');
+    }
+  });
+
+  it('relation feedback forwards trace_id + relation_type + injected user_id (L3 target identity)', async () => {
+    await grantFull(user);
+    let captured: { trace_id?: string; relation_type?: string; user_id?: string; comment?: string } = {};
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/feedback/relation', (b) => {
+        captured = b as typeof captured;
+        return true;
+      })
+      .reply(200, { success: true, feedback_id: 7, message: 'Relation preference saved: modifica' });
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/relation')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_rel', relationType: 'modifica', comment: 'la catena delle novelle è decisiva qui' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(captured.trace_id).toBe('trace_rel');
+    expect(captured.relation_type).toBe('modifica');
+    expect(captured.comment).toBe('la catena delle novelle è decisiva qui');
+    // user_id is the authority-lookup key on the MERL-T side; it comes from the
+    // JWT, never from the client body.
+    expect(captured.user_id).toBe(user.id);
+  });
+
+  it('relation feedback trims relationType before forwarding', async () => {
+    await grantFull(user);
+    let captured: { relation_type?: string } = {};
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/feedback/relation', (b) => {
+        captured = b as typeof captured;
+        return true;
+      })
+      .reply(200, { success: true, message: 'ok' });
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/relation')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_rel', relationType: '  DISCIPLINA  ' });
+    expect(res.status).toBe(200);
+    expect(captured.relation_type).toBe('DISCIPLINA');
+  });
+
+  it('relation feedback maps MERL-T 5xx to 503 merlt_unavailable', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/relation').reply(502, 'down');
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/relation')
+      .set(authHeader(user))
+      .send({ traceId: 'trace_rel', relationType: 'modifica' });
+    expect(res.status).toBe(503);
+    expect(res.body.detail).toBe('merlt_unavailable');
+  });
+
   it('refine forwards the debate fields too (the debate stays visible on follow-ups, P2a)', async () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)

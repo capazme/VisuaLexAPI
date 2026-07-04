@@ -58,9 +58,13 @@ vi.mock('../../../qa/useQaThread', () => ({
 
 // The deliberation column's "Cronologia" affordance mounts QaHistoryPanel, which
 // hits GET /experts/history — mock the network so the page test is deterministic.
+// Slice 4 L3: the page also imports sendRelationFeedback (the relation steer
+// channel) from the same module — spied so the trace_id binding is assertable.
 const fetchHistoryMock = vi.fn();
+const sendRelationFeedbackMock = vi.fn();
 vi.mock('../../../qa/qaApi', () => ({
   fetchHistory: (...a: unknown[]) => fetchHistoryMock(...a),
+  sendRelationFeedback: (...a: unknown[]) => sendRelationFeedbackMock(...a),
 }));
 
 const triggerIngestionMock = vi.fn();
@@ -116,6 +120,8 @@ beforeEach(() => {
   loadHistoryTurnMock.mockReset();
   fetchHistoryMock.mockReset();
   fetchHistoryMock.mockResolvedValue([]);
+  sendRelationFeedbackMock.mockReset();
+  sendRelationFeedbackMock.mockResolvedValue(undefined);
   qaThreadState.turns = [];
   lastCanvasProps = {};
   triggerIngestionMock.mockReset();
@@ -650,6 +656,108 @@ describe('GraphExplorerPage', () => {
       });
       // Stays on the Dibattito tab — an anchor is not a selectable relation.
       expect(screen.getByRole('tab', { name: /dibattito/i })).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('Slice 4 L3 — relation steer (privilegia questa relazione)', () => {
+    /** Real subgraph with one DISCIPLINA relation between two Norma nodes. */
+    function setRelationGraph(): void {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [
+            { id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' },
+            { id: 'node-2059', type: 'Norma', label: 'Art. 2059', urn: 'urn:x~art2059' },
+          ],
+          edges: [
+            { id: 'e1', source: 'node-2043', target: 'node-2059', type: 'DISCIPLINA', properties: {} },
+          ],
+        },
+        elements: {
+          nodes: [{ id: 'node-2043' }, { id: 'node-2059' }],
+          edges: [{ id: 'e1', source: 'node-2043', target: 'node-2059' }],
+        },
+      });
+    }
+
+    /** A settled turn: only trace_id matters — the steer keys the feedback on it. */
+    function settledTurn(traceId: string): QaTurnModel {
+      return {
+        id: `turn-${traceId}`,
+        question: 'Domanda deliberata',
+        confirmed: {},
+        state: {
+          status: 'success',
+          answer: {
+            trace_id: traceId,
+            synthesis: 'Sintesi.',
+            mode: 'convergent',
+            alternatives: null,
+            sources: [],
+            retrieved_sources: [],
+            experts_used: ['literal'],
+            confidence: 0.8,
+            execution_time_ms: 10,
+          },
+        },
+      } as QaTurnModel;
+    }
+
+    function selectRelationEdge(): void {
+      act(() => {
+        (lastCanvasProps.onEdgeClick as (id: string) => void)('e1');
+      });
+    }
+
+    it('shows the steer on a selected relation and POSTs the latest trace_id + the edge relation type', () => {
+      qaThreadState.turns = [settledTurn('trace-r')];
+      setRelationGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      selectRelationEdge();
+      const steer = screen.getByRole('button', { name: /privilegia questa relazione/i });
+      fireEvent.click(steer);
+
+      expect(sendRelationFeedbackMock).toHaveBeenCalledTimes(1);
+      expect(sendRelationFeedbackMock).toHaveBeenCalledWith('trace-r', 'DISCIPLINA');
+      // Optimistic Italian confirmation quoting the relation.
+      expect(screen.getByText(/terrò conto: privilegerò «DISCIPLINA»/i)).toBeInTheDocument();
+    });
+
+    it('hides the steer when there is no deliberation yet (no trace to attach to)', () => {
+      qaThreadState.turns = [];
+      setRelationGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      selectRelationEdge();
+      // The edge details open, but no steer and no upsell.
+      expect(screen.getByRole('heading', { name: 'Relazione' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+      expect(sendRelationFeedbackMock).not.toHaveBeenCalled();
+    });
+
+    it('hides the steer while the newest turn is still deliberating (same lifecycle as the overlay)', () => {
+      qaThreadState.turns = [
+        settledTurn('trace-old'),
+        { id: 'turn-live', question: 'Nuova domanda', confirmed: {}, state: { status: 'loading' } } as QaTurnModel,
+      ];
+      setRelationGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      selectRelationEdge();
+      expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+    });
+
+    it('renders the consent upsell instead of the steer when the user lacks full consent', () => {
+      featuresMock.mockReturnValue(features({ canContribute: false, canValidate: false, consentLevel: 'basic' }));
+      qaThreadState.turns = [settledTurn('trace-r')];
+      setRelationGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      selectRelationEdge();
+      expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/serve il consenso completo/i)).toBeInTheDocument();
+      expect(sendRelationFeedbackMock).not.toHaveBeenCalled();
     });
   });
 });

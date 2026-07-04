@@ -452,3 +452,83 @@ describe('DeliberationColumn per-canon steer (Slice 4 P2b — insegna i pesi, L2
     expect(screen.queryByText(/serve il consenso completo/i)).not.toBeInTheDocument();
   });
 });
+
+describe('DeliberationColumn relation steer (Slice 4 L3 — privilegia questa relazione)', () => {
+  const relationEdge: GraphEdge = {
+    id: 'e1',
+    source: 'node-2043',
+    target: 'node-2059',
+    type: 'DISCIPLINA',
+    properties: {},
+  };
+  const relationSelection: GraphEdgeSelection = { kind: 'relation', edge: relationEdge };
+
+  it('renders the steer on a selected relation with a trace + full consent, firing with the edge relation type', () => {
+    const onPreferRelation = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        activeTab="nodo"
+        selectedEdge={relationSelection}
+        canContribute
+        onPreferRelation={onPreferRelation}
+      />,
+    );
+    const steer = screen.getByRole('button', { name: /privilegia questa relazione/i });
+    fireEvent.click(steer);
+    expect(onPreferRelation).toHaveBeenCalledTimes(1);
+    expect(onPreferRelation).toHaveBeenCalledWith('DISCIPLINA');
+    // Optimistic confirmation quoting the relation type; the button is replaced.
+    expect(screen.getByText(/terrò conto: privilegerò «DISCIPLINA»/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+  });
+
+  it('hides the control entirely when there is no deliberation trace (onPreferRelation absent)', () => {
+    render(
+      <DeliberationColumn {...baseProps()} activeTab="nodo" selectedEdge={relationSelection} canContribute />,
+    );
+    // The edge details still render — only the steer (and its upsell) are hidden.
+    expect(screen.getByRole('heading', { name: 'Relazione' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/serve il consenso completo/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the compact upsell (not a dead button) when the user lacks full consent', () => {
+    const onOpenConsent = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        activeTab="nodo"
+        selectedEdge={relationSelection}
+        canContribute={false}
+        onPreferRelation={vi.fn()}
+        onOpenConsent={onOpenConsent}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/serve il consenso completo/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^attiva$/i }));
+    expect(onOpenConsent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT render the steer on a contrast arc (synthetic, not a traversable relation)', () => {
+    const contrast: GraphEdgeSelection = {
+      kind: 'contrast',
+      conflict: { expert_a: 'literal', expert_b: 'principles', conflict_score: 0.5 },
+      expertALabel: 'Letterale',
+      expertBLabel: 'Principî',
+      isDevilsAdvocate: false,
+    };
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        activeTab="nodo"
+        selectedEdge={contrast}
+        canContribute
+        onPreferRelation={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('heading', { name: /contrasto tra canoni/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+  });
+});

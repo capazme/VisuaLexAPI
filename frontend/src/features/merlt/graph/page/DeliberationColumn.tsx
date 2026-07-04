@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ChevronDown, History, Info, Loader2, Lock, MessageSquare, Network, Scale, Swords, X } from 'lucide-react';
+import { Check, ChevronDown, History, Info, Loader2, Lock, MessageSquare, Network, Route, Scale, Swords, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { AskGraphField } from './AskGraphField';
 import { NodeDetailsDrawer } from './NodeDetailsDrawer';
@@ -77,6 +77,17 @@ export interface DeliberationColumnProps {
    * renders a compact upsell instead of a dead button.
    */
   onPreferCanon?: (traceId: string, expert: string) => void;
+  /**
+   * Slice 4 L3 (design §5 "teach-the-weights") — "privilegia questa relazione".
+   * Bound by the PAGE to the LATEST settled deliberation's `trace_id` and the NEW
+   * relation feedback channel (POST /experts/feedback/relation), so one click on a
+   * selected edge becomes a traversal-head gradient with the edge's relation type
+   * as target identity. Absent (no settled trace) → the edge steer control is
+   * hidden entirely: steering needs a deliberation to attach to. Consent is
+   * enforced INSIDE the control (`canContribute` → live button; otherwise the
+   * compact upsell), mirroring the canon steer.
+   */
+  onPreferRelation?: (relationType: string) => void;
   /** Open the consent dialog from the steer upsell shown when !canContribute. */
   onOpenConsent?: () => void;
   /** Asking unlocked (consent ≥ basic): the compose field is live. */
@@ -137,6 +148,7 @@ export function DeliberationColumn({
   expertContributions,
   canContribute,
   onPreferCanon,
+  onPreferRelation,
   onOpenConsent,
   qaAskable,
   nodesById,
@@ -188,6 +200,9 @@ export function DeliberationColumn({
           selectedEdge={selectedEdge ?? null}
           nodesById={nodesById ?? new Map()}
           edges={edges}
+          canContribute={canContribute}
+          onPreferRelation={onPreferRelation}
+          onOpenConsent={onOpenConsent}
           onRecenter={onRecenter}
           onClose={onCloseNode}
         />
@@ -676,6 +691,77 @@ function CanonSteer({
   );
 }
 
+/**
+ * "Privilegia questa relazione" (Slice 4 L3 — teach the traversal head). Pinned
+ * under the EdgeDetailsDrawer when a REAL relation is selected AND the page has a
+ * settled deliberation trace to attach the steer to (the page binds `trace_id`
+ * into `onPreferRelation`). One click fires the NEW relation feedback channel
+ * (`/experts/feedback/relation`) optimistically and fire-and-forget — the
+ * confirmation quotes the relation, stays subtle and legal-lexicon, no
+ * gamification. Mirrors {@link CanonSteer}'s consent gate: `full` consent → live
+ * button; otherwise the compact upsell (never a dead button).
+ */
+function RelationSteer({
+  relationType,
+  canContribute,
+  onPrefer,
+  onOpenConsent,
+}: {
+  relationType: string;
+  canContribute: boolean;
+  onPrefer: () => void;
+  onOpenConsent?: () => void;
+}): React.ReactElement {
+  const [steered, setSteered] = useState(false);
+
+  if (!canContribute) {
+    return (
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-t border-slate-200 px-3 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <Lock size={12} className="shrink-0" aria-hidden="true" />
+        <span>Per orientare il collegio serve il consenso completo.</span>
+        {onOpenConsent && (
+          <button
+            type="button"
+            onClick={onOpenConsent}
+            className="font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:underline focus-visible:outline-none dark:text-primary-400"
+          >
+            Attiva
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (steered) {
+    return (
+      <p className="flex shrink-0 items-center gap-1.5 border-t border-slate-200 px-3 py-2.5 text-xs text-emerald-600 dark:border-slate-800 dark:text-emerald-400">
+        <Check size={13} className="shrink-0" aria-hidden="true" />
+        Terrò conto: privilegerò «{relationType}».
+      </p>
+    );
+  }
+
+  // Optimistic + fire-and-forget, same contract as CanonSteer: flip to the
+  // confirmation instantly; the POST outcome is not surfaced (a failed teach is
+  // not worth a scary error — the next deliberation stands on its own).
+  return (
+    <div className="shrink-0 border-t border-slate-200 px-3 py-2.5 dark:border-slate-800">
+      <button
+        type="button"
+        onClick={() => {
+          onPrefer();
+          setSteered(true);
+        }}
+        title={`Indica al collegio di privilegiare la relazione ${relationType} nell'esplorazione del grafo`}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+      >
+        <Route size={13} className="shrink-0" aria-hidden="true" />
+        Privilegia questa relazione
+      </button>
+    </div>
+  );
+}
+
 /** A canon weight [0..1] as a rounded percentage; clamped and defensive on NaN. */
 function formatCanonPct(weight: number): string {
   const w = Number.isFinite(weight) ? Math.max(0, Math.min(1, weight)) : 0;
@@ -729,6 +815,9 @@ function NodoTab({
   selectedEdge,
   nodesById,
   edges,
+  canContribute,
+  onPreferRelation,
+  onOpenConsent,
   onRecenter,
   onClose,
 }: {
@@ -736,6 +825,9 @@ function NodoTab({
   selectedEdge: GraphEdgeSelection | null;
   nodesById: Map<string, GraphNode>;
   edges: GraphEdge[];
+  canContribute: boolean;
+  onPreferRelation?: (relationType: string) => void;
+  onOpenConsent?: () => void;
   onRecenter?: (node: GraphNode) => void;
   onClose?: () => void;
 }): React.ReactElement {
@@ -747,9 +839,25 @@ function NodoTab({
   // per-conflict view. The discriminated union makes the two branches exhaustive.
   if (selectedEdge) {
     if (selectedEdge.kind === 'relation') {
+      const edge = selectedEdge.edge;
       return (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <EdgeDetailsDrawer edge={selectedEdge.edge} nodesById={nodesById} onRecenter={recenter} onClose={close} />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <EdgeDetailsDrawer edge={edge} nodesById={nodesById} onRecenter={recenter} onClose={close} />
+          </div>
+          {/* Slice 4 L3 — the relation steer, rendered ONLY when the page bound a
+              deliberation trace (onPreferRelation present). A CONTRAST arc never
+              gets one: it is synthetic, not a graph relation to traverse. Keyed
+              per edge so a new selection re-arms the optimistic state. */}
+          {onPreferRelation && (
+            <RelationSteer
+              key={edge.id ?? `${edge.source}-${edge.type}-${edge.target}`}
+              relationType={edge.type}
+              canContribute={canContribute}
+              onPrefer={() => onPreferRelation(edge.type)}
+              onOpenConsent={onOpenConsent}
+            />
+          )}
         </div>
       );
     }

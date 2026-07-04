@@ -411,6 +411,27 @@ class MultiExpertOrchestrator:
         except Exception as exc:  # noqa: BLE001 - never break the answer path
             log.warning("tool-gating apply failed (fallback to all tools)", error=str(exc))
 
+    def _merge_expert_traversal_actions(self, trace: "ExecutionTrace", responses: List[Any]) -> None:
+        """Slice 4 L3: copy the experts' ``graph_traversal`` actions (recorded by
+        the systemic expert's neural relation selection) into the orchestrator's
+        persisted ExecutionTrace, so the decision reaches full_trace →
+        (a) the traversal trainer can replay it, (b) the FE can show
+        "relazioni percorse". Additive: the gating trainer filters on
+        ``expert_selection`` + source, the tool trainer on ``tool_use`` +
+        source — extra graph_traversal actions are invisible to both.
+        Failure-isolated."""
+        try:
+            for r in responses:
+                expert = self._experts.get(getattr(r, "expert_type", None))
+                etrace = expert.get_current_trace() if expert else None
+                if not etrace:
+                    continue
+                for action in etrace.actions:
+                    if action.action_type == "graph_traversal":
+                        trace.add_action(action)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("graph_traversal action merge skipped", error=str(exc))
+
     def _annotate_tool_use_outcomes(self, trace: "ExecutionTrace", responses: List[Any]) -> None:
         """Mark each ``tool_use`` action with the observed outcome — did that
         (expert, tool) actually return a live source — so the tool-policy trainer
@@ -465,6 +486,13 @@ class MultiExpertOrchestrator:
         query_embedding = await self.embedding_service.encode_query_async(
             context.query_text
         )
+
+        # Slice 4 L3: expose the embedding to the experts (neural traversal).
+        if context.query_embedding is None:
+            context.query_embedding = (
+                query_embedding.tolist()
+                if hasattr(query_embedding, "tolist") else list(query_embedding)
+            )
 
         # 2. Converti in tensor (usa cpu per evitare problemi MPS in test)
         query_tensor = torch.tensor(
@@ -725,6 +753,13 @@ class MultiExpertOrchestrator:
                         },
                     ))
 
+            # Slice 4 L3: expose the routing-stage query embedding to the experts
+            # so the TraversalPolicy can score relations per-query (systemic
+            # neural traversal). Additive — nothing downstream required it before.
+            if context.query_embedding is None and getattr(routing_decision, "query_embedding", None) is not None:
+                emb = routing_decision.query_embedding
+                context.query_embedding = emb.tolist() if hasattr(emb, "tolist") else list(emb)
+
             selected_experts = routing_decision.get_selected_experts(
                 threshold=self.config.selection_threshold
             )[:self.config.max_experts]
@@ -946,6 +981,9 @@ class MultiExpertOrchestrator:
         # observed outcome (did that tool actually return a live source) so the
         # tool-policy trainer can credit productive tools — must run before to_dict().
         self._annotate_tool_use_outcomes(trace, responses)
+        # Slice 4 L3: persist the experts' traversal decisions alongside the
+        # routing/tool actions (must run before to_dict()).
+        self._merge_expert_traversal_actions(trace, responses)
         synthesis_result.metadata["execution_trace"] = trace.to_dict()
 
         # Loop β C.2: sediment this query's LIVE retrievals into the graph —

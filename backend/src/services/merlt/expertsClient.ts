@@ -8,7 +8,7 @@
  *
  * Real MERL-T paths (merlt/merlt/api/experts_router.py + enrichment_router.py):
  *  - POST /api/v1/experts/query
- *  - POST /api/v1/experts/feedback/{inline,detailed,source,preference,refine}
+ *  - POST /api/v1/experts/feedback/{inline,detailed,source,preference,relation,refine}
  *  - POST /api/v1/enrichment/confirm-source
  */
 
@@ -153,6 +153,13 @@ export interface PreferenceFeedbackArgs {
   preferred_expert: string;
   comment?: string;
 }
+/** Slice 4 L3: per-relation traversal steer ("privilegia questa relazione"). */
+export interface RelationFeedbackArgs {
+  trace_id: string;
+  user_id: string;
+  relation_type: string;
+  comment?: string;
+}
 export interface RefineArgs {
   trace_id: string;
   user_id: string;
@@ -187,6 +194,9 @@ export class ExpertsClient {
   }
   feedbackPreference(a: PreferenceFeedbackArgs): Promise<ExpertFeedbackResponse> {
     return this.request('POST', '/api/v1/experts/feedback/preference', a);
+  }
+  feedbackRelation(a: RelationFeedbackArgs): Promise<ExpertFeedbackResponse> {
+    return this.request('POST', '/api/v1/experts/feedback/relation', a);
   }
   refine(a: RefineArgs): Promise<ExpertQueryResponse> {
     return this.request('POST', '/api/v1/experts/feedback/refine', a);

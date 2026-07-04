@@ -30,6 +30,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from merlt.experts.models import QATrace, QAFeedback
+from merlt.rlcf.policy_gradient import (
+    RELATION_FEEDBACK_SOURCE_PREFIX,
+    RELATION_PREFERENCE_REWARD,
+    TRAVERSAL_SHAPING_BETA,
+    _authority_scaled_lr,
+    normalize_relation_type,
+    preferred_relation_from_source_id,
+)
 
 log = structlog.get_logger()
 
@@ -67,6 +75,11 @@ class TraversalTrainingSample:
     # Slice 4 P2b (L2): dynamic-authority weight for this feedback's jurist.
     # Defaults to 1.0 (authority-neutral) so pre-L2 samples train identically.
     authority: float = 1.0
+    # Slice 4 L3: True when this sample comes from an explicit relation
+    # preference ("privilegia questa relazione"). Preferred samples get the
+    # +TRAVERSAL_SHAPING_BETA advantage bonus; the False default keeps every
+    # pre-L3 sample (and its P2b authority weighting) training identically.
+    preferred: bool = False
 
 
 @dataclass
@@ -119,8 +132,22 @@ class TraversalTrainingService:
         result = await session.execute(query)
         rows = result.all()
 
+        # Slice 4 L3: relation-preference rows ("privilegia questa relazione").
+        # Encoded as source_id = "relation:<TYPE>" with source_relevance NULL —
+        # disjoint from the F8 query above by construction.
+        pref_query = (
+            select(QAFeedback, QATrace)
+            .join(QATrace, QAFeedback.trace_id == QATrace.trace_id)
+            .where(
+                QAFeedback.source_id.like(f"{RELATION_FEEDBACK_SOURCE_PREFIX}%"),
+                QAFeedback.created_at >= period_start,
+            )
+        )
+        pref_result = await session.execute(pref_query)
+        pref_rows = pref_result.all()
+
         # Batch embedding: collect all queries that need real embeddings
-        embedding_cache = self._batch_query_embeddings(rows)
+        embedding_cache = self._batch_query_embeddings(list(rows) + list(pref_rows))
 
         samples = []
         for feedback, trace in rows:
@@ -168,9 +195,31 @@ class TraversalTrainingService:
                         authority=authority,
                     ))
 
+        # Slice 4 L3: turn relation preferences into PREFERRED samples for the
+        # systemic traversal head (the only traversal consumer today). Fixed
+        # positive endorsement reward (mirrors the endpoint wire's 0.7) +
+        # jurist authority; the +β shaping is applied in train_traversal_policy.
+        for feedback, trace in pref_rows:
+            relation_raw = preferred_relation_from_source_id(feedback.source_id)
+            if not relation_raw:
+                continue
+            authority = _safe_authority(getattr(feedback, "user_authority", None))
+            query_embedding = embedding_cache.get(
+                trace.trace_id, self._get_query_embedding(trace)
+            )
+            samples.append(TraversalTrainingSample(
+                query_embedding=query_embedding,
+                relation_type=normalize_relation_type(relation_raw),
+                expert_type="systemic",
+                reward=RELATION_PREFERENCE_REWARD,
+                authority=authority,
+                preferred=True,
+            ))
+
         log.info(
             "Traversal training data prepared",
             total_feedback=len(rows),
+            relation_preferences=len(pref_rows),
             total_samples=len(samples),
             since=period_start.isoformat(),
         )
@@ -214,6 +263,12 @@ class TraversalTrainingService:
             # Force CPU for training (avoids MPS allocation issues with small batches)
             policy.to("cpu")
             policy.train()
+            # Slice 4 L3 fix: PolicyManager freezes loaded checkpoints for
+            # inference (requires_grad_(False)). Without re-enabling grads here,
+            # every loss.backward() on a checkpoint-loaded policy raises and is
+            # silently swallowed by the per-sample except → training no-ops.
+            for p in policy.parameters():
+                p.requires_grad_(True)
             optimizer = torch.optim.Adam(policy.parameters(), lr=1e-4)
 
             total_loss = 0.0
@@ -230,20 +285,47 @@ class TraversalTrainingService:
                         rel_idx = policy.get_relation_index(sample.relation_type)
                         rel_tensor = torch.tensor([rel_idx], dtype=torch.long)
 
+                        # Slice 4 L3: expert one-hot conditioning (None → zeros,
+                        # numerically identical to the pre-L3 forward on legacy
+                        # zero-init-expanded checkpoints).
+                        expert_idx = None
+                        if hasattr(policy, "get_expert_index"):
+                            expert_idx = policy.get_expert_index(sample.expert_type)
+                        expert_tensor = (
+                            torch.tensor([expert_idx], dtype=torch.long)
+                            if expert_idx is not None else None
+                        )
+
                         # Get relation weight and log_prob from policy
-                        weight, log_prob = policy.forward(query_tensor, rel_tensor)
+                        weight, log_prob = policy.forward(
+                            query_tensor, rel_tensor, expert_tensor
+                        )
 
-                        # REINFORCE loss: -log_prob * (authority · reward).
-                        # Slice 4 P2b (L2): authority-weight the advantage so the
-                        # senior jurist moves the traversal weights more than the
-                        # novice (authority defaults to 1.0 ⇒ legacy behaviour).
-                        loss = -log_prob * (sample.authority * sample.reward)
+                        # REINFORCE loss: -log_prob * advantage, with
+                        #   advantage = reward + β·preferred
+                        # Slice 4 L3: the jurist's preferred relation gets the
+                        # +TRAVERSAL_SHAPING_BETA bonus (mirror of
+                        # GATING_SHAPING_BETA). REINFORCE sign: log_prob =
+                        # log σ(w) < 0 and advantage > 0 (reward ≥ 0, β > 0, no
+                        # baseline subtraction here) ⇒ minimizing
+                        # -log_prob·advantage pushes log σ(w) UP ⇒ the selection
+                        # probability of the preferred relation RISES — proven
+                        # end-to-end in test_traversal_inference_steering.py.
+                        # Slice 4 P2b (L2): authority is applied to the STEP as
+                        # an lr-scale, NOT to the loss — this loop steps Adam
+                        # once per sample, and Adam's second-moment
+                        # normalisation cancels a uniform loss scaling (see the
+                        # design note in policy_gradient.py).
+                        shaping = TRAVERSAL_SHAPING_BETA if sample.preferred else 0.0
+                        loss = -log_prob * (sample.reward + shaping)
 
-                        # Backward + step (with gradient clipping)
+                        # Backward + step (with gradient clipping); the senior
+                        # jurist's sample steps with a proportionally larger lr.
                         optimizer.zero_grad()
                         loss.backward()
                         torch.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1.0)
-                        optimizer.step()
+                        with _authority_scaled_lr(optimizer, sample.authority):
+                            optimizer.step()
 
                         epoch_loss += loss.item()
                     except Exception as e:
@@ -288,10 +370,10 @@ class TraversalTrainingService:
         """
         Return relation weight table per Expert from trained TraversalPolicy.
 
-        Note: current TraversalPolicy.forward() doesn't differentiate by expert_type;
-        it produces the same weight for all experts given the same query+relation.
-        Per-expert differentiation will come when the policy architecture is extended
-        to accept expert_type as an additional input dimension.
+        Slice 4 L3: TraversalPolicy.forward() now accepts an expert one-hot, so
+        the table is genuinely per-expert once the policy has been trained with
+        expert conditioning. Legacy (zero-init expanded) checkpoints still
+        produce identical rows for every expert — the pre-L3 behaviour.
 
         Returns:
             {"literal": {"RIFERIMENTO": 0.3, "CITATO_DA": 0.1, ...}, ...}
@@ -311,11 +393,18 @@ class TraversalTrainingService:
             dummy = torch.zeros(1, 1024)
             for expert in ["literal", "systemic", "principles", "precedent"]:
                 table[expert] = {}
+                expert_idx = None
+                if hasattr(policy, "get_expert_index"):
+                    expert_idx = policy.get_expert_index(expert)
+                expert_tensor = (
+                    torch.tensor([expert_idx], dtype=torch.long)
+                    if expert_idx is not None else None
+                )
                 for rel_type in RELATION_TYPES:
                     try:
                         rel_idx = policy.get_relation_index(rel_type)
                         rel_tensor = torch.tensor([rel_idx], dtype=torch.long)
-                        w, _ = policy.forward(dummy, rel_tensor)
+                        w, _ = policy.forward(dummy, rel_tensor, expert_tensor)
                         table[expert][rel_type] = round(w.item(), 4)
                     except Exception as e:
                         log.debug("traversal_weight_fallback", expert=expert, rel_type=rel_type, error=str(e))

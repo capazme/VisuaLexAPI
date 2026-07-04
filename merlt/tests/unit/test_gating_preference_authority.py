@@ -117,83 +117,121 @@ def test_preferred_index_none_for_unknown_canon():
 # advantage math (i) + (ii): the load-bearing formulas, proven arithmetically
 # ===========================================================================
 #
-# advantage_pref = authority·(returns + β)   (preferred canon)
-# advantage_base = authority· returns        (every other consulted canon)
-# The trainer applies these as loss terms -logπ·advantage; here we prove the
-# advantage SCALARS directly (deterministic, no network needed).
+# advantage_pref = returns + β   (preferred canon)
+# advantage_base = returns       (every other consulted canon)
+# Authority is NOT in the loss: the live heads step Adam on a single sample,
+# and Adam's second-moment normalisation cancels a uniform loss scaling — so
+# authority is applied as a per-step LEARNING-RATE scale (_authority_scaled_lr).
+# The trainer applies the advantages as loss terms -logπ·advantage; here we
+# prove the SCALARS + the lr-scaling directly (deterministic, no network).
 
-def _advantages(returns: float, authority: float, beta: float = GATING_SHAPING_BETA):
-    return authority * returns, authority * (returns + beta)
+def _advantages(returns: float, beta: float = GATING_SHAPING_BETA):
+    return returns, returns + beta
+
+
+class _FakeOptimizer:
+    """Duck-typed optimizer: _authority_scaled_lr only touches param_groups."""
+
+    def __init__(self, lrs):
+        self.param_groups = [{"lr": lr} for lr in lrs]
 
 
 def test_preferred_advantage_strictly_greater_than_non_preferred():
     """(i) Preferring canon X yields a strictly larger advantage for X."""
-    returns, authority = 0.2, 1.0
-    base, pref = _advantages(returns, authority)
+    returns = 0.2
+    base, pref = _advantages(returns)
     assert pref > base
-    assert math.isclose(pref - base, authority * GATING_SHAPING_BETA)
+    assert math.isclose(pref - base, GATING_SHAPING_BETA)
 
 
 def test_preferred_advantage_greater_even_with_negative_returns():
-    """The shaping gap is +authority·β regardless of the sign of returns, so the
-    preferred canon is always advantaged relative to the others in the SAME
-    update (even when the overall answer scored below baseline)."""
-    returns, authority = -0.4, 1.0
-    base, pref = _advantages(returns, authority)
+    """The shaping gap is +β regardless of the sign of returns, so the preferred
+    canon is always advantaged relative to the others in the SAME update (even
+    when the overall answer scored below baseline)."""
+    returns = -0.4
+    base, pref = _advantages(returns)
     assert pref > base
-    assert math.isclose(pref - base, authority * GATING_SHAPING_BETA)
+    assert math.isclose(pref - base, GATING_SHAPING_BETA)
 
 
-def test_higher_authority_scales_advantage_magnitude():
-    """(ii) Higher authority scales the advantage magnitude linearly."""
-    returns = 0.2
-    _, pref_novice = _advantages(returns, authority=1.0)
-    _, pref_senior = _advantages(returns, authority=3.0)
-    assert pref_senior > pref_novice
-    # exact 3× scaling of the whole (returns+β) advantage
-    assert math.isclose(pref_senior, 3.0 * pref_novice)
+def test_higher_authority_scales_the_step_lr_linearly():
+    """(ii) Authority scales the per-step learning rate linearly — the
+    Adam-correct per-sample importance weight."""
+    from merlt.rlcf.policy_gradient import _authority_scaled_lr
+
+    opt = _FakeOptimizer([0.1, 0.01])
+    with _authority_scaled_lr(opt, 3.0):
+        assert math.isclose(opt.param_groups[0]["lr"], 0.3)
+        assert math.isclose(opt.param_groups[1]["lr"], 0.03)
+    # restored after the step
+    assert math.isclose(opt.param_groups[0]["lr"], 0.1)
+    assert math.isclose(opt.param_groups[1]["lr"], 0.01)
 
 
-def test_authority_scales_the_preference_gap_too():
-    """The preferred-vs-nonpreferred GAP itself scales with authority: the senior
-    jurist's 'weigh this canon more' shifts the weights more than the novice's."""
-    returns = 0.2
-    base_n, pref_n = _advantages(returns, authority=1.0)
-    base_s, pref_s = _advantages(returns, authority=4.0)
-    gap_novice = pref_n - base_n
-    gap_senior = pref_s - base_s
-    assert gap_senior > gap_novice
-    assert math.isclose(gap_senior, 4.0 * gap_novice)
+def test_authority_lr_scale_restores_even_on_error():
+    """The original lrs are restored even if the step raises (finally-path)."""
+    from merlt.rlcf.policy_gradient import _authority_scaled_lr
+
+    opt = _FakeOptimizer([0.1])
+    with pytest.raises(RuntimeError):
+        with _authority_scaled_lr(opt, 5.0):
+            assert math.isclose(opt.param_groups[0]["lr"], 0.5)
+            raise RuntimeError("step exploded")
+    assert math.isclose(opt.param_groups[0]["lr"], 0.1)
 
 
 # ===========================================================================
-# (iii) regression: authority-neutral + no preference ⇒ legacy advantage
+# (iii) regression: authority-neutral + no preference ⇒ legacy behaviour
 # ===========================================================================
 
 def test_no_preference_no_authority_reduces_to_legacy_return():
-    """With authority defaulting to 1.0 and no preferred canon, the advantage is
-    exactly the legacy `returns` — the pre-L2 behaviour."""
+    """With authority defaulting to 1.0 (lr untouched — fast no-op path) and no
+    preferred canon, the update is exactly the legacy `-logπ·returns` step."""
+    from merlt.rlcf.policy_gradient import _authority_scaled_lr
+
     returns = 0.2
     authority = _extract_authority(_make_feedback(0.7))  # → 1.0
     assert _preferred_expert_index(_make_feedback(0.7)) is None
-    legacy_advantage = authority * returns
-    assert math.isclose(legacy_advantage, returns)
+    base, _ = _advantages(returns)
+    assert math.isclose(base, returns)
+    # authority == 1.0 must leave the lr untouched (no-op fast path)
+    opt = _FakeOptimizer([0.07])
+    with _authority_scaled_lr(opt, authority):
+        assert math.isclose(opt.param_groups[0]["lr"], 0.07)
 
 
 # ===========================================================================
 # Trainer-level end-to-end: the REAL gradient-direction proof (needs torch)
 # ===========================================================================
 
-def _fresh_gating_trainer():
-    """A fresh ExpertGatingMLP + PolicyGradientTrainer on CPU."""
+def _fresh_gating_trainer(clip_grad_norm: float = 0.5, seed: int = 1453,
+                          learning_rate: float = 0.1):
+    """A fresh ExpertGatingMLP + PolicyGradientTrainer on CPU.
+
+    SEEDED: the end-to-end assertions compare step magnitudes across fresh
+    networks — without a seed the random init makes them non-deterministic
+    (this bit us once: a lucky init passed one day, failed the next).
+
+    ``clip_grad_norm`` defaults to the production value (0.5). Direction (SIGN)
+    tests keep it: clipping rescales but never flips a gradient. Magnitude-
+    monotonicity tests must pass 0.0 (disabled): when the clip BINDS, the step
+    norm is capped at the same value for EVERY authority — authority scales the
+    LOSS, the clamp equalises the STEP, and the monotonicity is masked by
+    design (a per-step safety cap, not a bug).
+    """
+    import torch
     from merlt.experts.neural_gating.neural import ExpertGatingMLP, GatingConfig
     from merlt.rlcf.policy_gradient import PolicyGradientTrainer, TrainerConfig
 
+    torch.manual_seed(seed)
     policy = ExpertGatingMLP(GatingConfig(input_dim=16))
     policy.to("cpu")
     # A larger LR makes the single-step probability shift unambiguous for the
     # direction assertions; correctness (the SIGN) is LR-independent.
-    trainer = PolicyGradientTrainer(policy, config=TrainerConfig(learning_rate=0.1))
+    trainer = PolicyGradientTrainer(
+        policy,
+        config=TrainerConfig(learning_rate=learning_rate, clip_grad_norm=clip_grad_norm),
+    )
     return policy, trainer
 
 
@@ -232,7 +270,14 @@ def test_preferring_a_canon_raises_its_probability():
 def test_higher_authority_moves_weights_more_end_to_end():
     """(ii) end-to-end: the same preference from a HIGHER-authority jurist shifts
     P(preferred) by a strictly LARGER amount (the gradient magnitude scales with
-    authority). Two independent fresh policies, identical inputs."""
+    authority). Two independent fresh policies (SAME seed), identical inputs.
+
+    Clipping DISABLED and a SMALL lr here: this test verifies the authority
+    lr-scaling of the step. The production clamp is an orthogonal safety cap,
+    and a large lr saturates the softmax for BOTH authorities (identical
+    shifts at the ceiling) — the property is only observable in the linear
+    regime. The production interaction (clip caps the pre-scale gradient) is
+    intentional and documented in policy_gradient.py."""
     pytest.importorskip("torch")
     import numpy as np
 
@@ -240,7 +285,7 @@ def test_higher_authority_moves_weights_more_end_to_end():
     preferred = "systemic"
 
     def shift_for(authority):
-        policy, trainer = _fresh_gating_trainer()
+        policy, trainer = _fresh_gating_trainer(clip_grad_norm=0.0, learning_rate=1e-3)
         before = _prob_of(policy, embedding, preferred)
         trace = _make_trace(embedding)
         fb = _make_feedback(0.7, preferred_expert=preferred, authority=authority)

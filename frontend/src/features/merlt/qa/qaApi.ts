@@ -52,6 +52,16 @@ export async function preferExpert(traceId: string, preferredExpert: string): Pr
   await apiClient.post('/merlt/experts/feedback/preference', { traceId, preferredExpert });
 }
 
+/**
+ * Slice 4 L3 — "privilegia questa relazione". NEW feedback channel: the jurist
+ * steers the traversal head toward a graph relation type (the systemic expert's
+ * walk), keyed on the deliberation's `trace_id` like every other channel. The
+ * BFF contract is `{ traceId, relationType }` → POST /experts/feedback/relation.
+ */
+export async function sendRelationFeedback(traceId: string, relationType: string): Promise<void> {
+  await apiClient.post('/merlt/experts/feedback/relation', { traceId, relationType });
+}
+
 export async function rateDetailed(
   traceId: string,
   scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number },

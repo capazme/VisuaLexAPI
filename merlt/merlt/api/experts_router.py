@@ -502,6 +502,23 @@ class ExpertPreferenceFeedbackRequest(BaseModel):
     comment: Optional[str] = Field(None, description="Optional comment explaining preference")
 
 
+class RelationPreferenceFeedbackRequest(BaseModel):
+    """
+    Slice 4 L3 — per-relation steer ("privilegia questa relazione").
+
+    The jurist indicates a graph relation type the systemic traversal should
+    favour. Trains the TraversalPolicy with a positive shaping term (mirror of
+    the expert-preference channel).
+    """
+    trace_id: str
+    user_id: str
+    relation_type: str = Field(
+        ..., min_length=1, max_length=180,
+        description="Graph relation type to favour (e.g. 'modifica', 'DISCIPLINA', 'RIFERIMENTO')"
+    )
+    comment: Optional[str] = Field(None, description="Optional comment explaining the steer")
+
+
 class RouterFeedbackRequest(BaseModel):
     """Router feedback from high-authority users (F2)."""
     trace_id: str
@@ -596,7 +613,7 @@ async def _audit_feedback(
 def _wire_feedback_to_training(
     trace: QATrace,
     feedback: QAFeedback,
-    feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router"],
+    feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router", "relation"],
     authority: Optional[float] = None,
 ) -> None:
     """
@@ -635,6 +652,12 @@ def _wire_feedback_to_training(
             # is an endorsement, not a neutral event. The DIRECTIONAL signal
             # (which canon) rides in metadata below and is what actually shifts
             # the gating weights via per-expert shaping.
+            reward = 0.7
+        elif feedback_type == "relation":
+            # Slice 4 L3: "privilegia questa relazione" is a positive endorsement
+            # — mirror of the preference channel (0.7). The DIRECTIONAL signal
+            # (which relation) rides in metadata['preferred_relation'] below and
+            # is what shapes the traversal head (advantage = authority·(r + β)).
             reward = 0.7
         elif feedback_type == "refine":
             reward = 0.3
@@ -687,6 +710,15 @@ def _wire_feedback_to_training(
         preferred_expert = getattr(feedback, "preferred_expert", None)
         if preferred_expert:
             ml_feedback.metadata["preferred_expert"] = preferred_expert
+        # Slice 4 L3: relation-preference rows encode the relation in source_id
+        # ("relation:<TYPE>", no schema change). Carry it through metadata so
+        # traversal trainers can shape on it (mirror of preferred_expert).
+        from merlt.rlcf.policy_gradient import preferred_relation_from_source_id
+        preferred_relation = preferred_relation_from_source_id(
+            getattr(feedback, "source_id", None)
+        )
+        if preferred_relation:
+            ml_feedback.metadata["preferred_relation"] = preferred_relation
         # authority: explicit arg wins; else fall back to the value already
         # stored on the feedback row (may be None → downstream defaults to 1.0).
         eff_authority = authority if authority is not None else getattr(feedback, "user_authority", None)
@@ -730,7 +762,7 @@ def _wire_feedback_to_training(
 async def _update_user_authority(
     user_id: str,
     feedback: QAFeedback,
-    feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router"],
+    feedback_type: Literal["inline", "detailed", "source", "preference", "refine", "router", "relation"],
 ) -> Optional[float]:
     """
     Update user authority score after feedback submission.
@@ -756,7 +788,7 @@ async def _update_user_authority(
         elif feedback_type == "router":
             quality_score = 1.0 if (feedback.inline_rating or 0) >= 4 else 0.0
         else:
-            # preference, refine → neutral
+            # preference, refine, relation → neutral
             quality_score = 0.5
 
         # 2. Open RLCF session and update authority
@@ -1323,6 +1355,111 @@ async def submit_expert_preference_feedback(
         raise
     except Exception as e:
         log.error("Failed to save expert preference feedback", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
+
+
+@router.post("/feedback/relation", response_model=FeedbackResponse)
+async def submit_relation_preference_feedback(
+    request: RelationPreferenceFeedbackRequest,
+    session: AsyncSession = Depends(get_async_session_dep),
+    api_key: ApiKey = Depends(verify_api_key),
+):
+    """
+    Slice 4 L3 — submit a per-relation traversal steer ("privilegia questa relazione").
+
+    The relation preference is a positive endorsement of a graph relation type:
+    the TraversalPolicy is trained so P(traverse that relation | similar query)
+    RISES, authority-weighted (the senior jurist steers more than the novice).
+
+    Storage: reuses QAFeedback.source_id with the "relation:" prefix (no schema
+    migration); source_relevance stays NULL so the F8 source-rating training
+    query can never pick these rows up.
+
+    Example:
+        POST /api/v1/experts/feedback/relation
+        {
+            "trace_id": "trace_abc123",
+            "user_id": "user456",
+            "relation_type": "modifica",
+            "comment": "Per questa domanda conta l'evoluzione storica della norma"
+        }
+    """
+    from merlt.rlcf.policy_gradient import (
+        KNOWN_RELATION_VOCABULARY,
+        RELATION_FEEDBACK_SOURCE_PREFIX,
+    )
+
+    relation_type = request.relation_type.strip()
+
+    log.info(
+        "Relation preference feedback received",
+        trace_id=request.trace_id,
+        user_id=request.user_id,
+        relation_type=relation_type,
+    )
+
+    try:
+        # Verify trace exists
+        result = await session.execute(
+            select(QATrace).where(QATrace.trace_id == request.trace_id)
+        )
+        trace = result.scalar_one_or_none()
+
+        if not trace:
+            raise HTTPException(status_code=404, detail=f"Trace {request.trace_id} not found")
+
+        # Validate against the known relation vocabulary — do NOT hard-fail on
+        # unknown names (the graph evolves): log + accept.
+        if (
+            relation_type not in KNOWN_RELATION_VOCABULARY
+            and relation_type.upper() not in KNOWN_RELATION_VOCABULARY
+            and relation_type.lower() not in KNOWN_RELATION_VOCABULARY
+        ):
+            log.warning(
+                "Unknown relation_type in relation feedback (accepted anyway)",
+                relation_type=relation_type,
+                trace_id=request.trace_id,
+            )
+
+        # Create feedback row. Encoding: source_id = "relation:<TYPE>";
+        # source_relevance intentionally NULL (see docstring).
+        masked_comment = _pii_service.mask_text(request.comment) if request.comment else None
+        feedback = QAFeedback(
+            trace_id=request.trace_id,
+            user_id=request.user_id,
+            source_id=f"{RELATION_FEEDBACK_SOURCE_PREFIX}{relation_type}",
+            detailed_comment=masked_comment,
+        )
+        session.add(feedback)
+        await session.commit()
+
+        # Authority FIRST (like the preference channel) so the steer is
+        # authority-weighted when wired into training.
+        await _audit_feedback(session, feedback, "relation")
+        new_authority = await _update_user_authority(request.user_id, feedback, "relation")
+        if new_authority is not None:
+            feedback.user_authority = new_authority
+            await session.commit()
+
+        _wire_feedback_to_training(trace, feedback, "relation", authority=new_authority)
+
+        log.info(
+            "Relation preference feedback saved",
+            feedback_id=feedback.id,
+            trace_id=request.trace_id,
+            relation_type=relation_type,
+        )
+
+        return FeedbackResponse(
+            success=True,
+            feedback_id=feedback.id,
+            message=f"Relation preference saved: {relation_type}",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Failed to save relation preference feedback", error=str(e))
         raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
 
 

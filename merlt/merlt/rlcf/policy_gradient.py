@@ -91,16 +91,32 @@ def _get_torch():
 #    logit UP ⇒ softmax P(preferred) rises next time. This is the exact sign
 #    proven in ``tests/unit/test_gating_preference_authority.py``.
 #
-# 2. **Authority weighting** — ``advantage = authority · (returns + shaping)``.
-#    The senior jurist (higher authority) moves the weights more than the novice
-#    (dynamic-authority pillar). Authority is a server-side scalar carried in
-#    ``feedback.metadata['authority']``; it defaults to ``1.0`` when absent so
-#    the pre-L2 behaviour (authority-agnostic) is exactly recovered, and it is
-#    applied here and ONLY here on the live heads (grep authority = 0 elsewhere),
-#    so there is no double-counting. NOTE: server authority ∈ [0,1] (authority.py
-#    convex combination), so a *present* authority SHRINKS the step — real
-#    feedback trains slightly slower than pre-L2 by design (stabilising), it is
-#    not a no-op.
+# 2. **Authority weighting** — applied as a PER-STEP LEARNING-RATE SCALE
+#    (``lr_step = lr · authority``), NOT as a loss multiplier, on the live
+#    single-sample heads. The senior jurist (higher authority) moves the weights
+#    more than the novice (dynamic-authority pillar). Authority is a server-side
+#    scalar carried in ``feedback.metadata['authority']``; it defaults to ``1.0``
+#    when absent so the pre-L2 behaviour is exactly recovered.
+#
+#    WHY lr-scale and not loss-scale: all three live heads step with Adam on a
+#    SINGLE sample per update. Adam normalises the gradient by its running
+#    second moment (update ≈ lr·m̂/√v̂), so a UNIFORM scaling of the loss —
+#    which is what multiplying the advantage by authority does — cancels out
+#    and the step is authority-invariant (found empirically: identical weight
+#    shifts for authority 1.0 vs 5.0 at every lr). Scaling the step's learning
+#    rate is the standard way to give a per-sample importance weight under
+#    Adam. The β-shaping term stays IN the loss because it changes the gradient
+#    DIRECTION (preferred canon vs others), which Adam preserves.
+#    NOTE: server authority ∈ [0,1] (authority.py convex combination), so a
+#    *present* authority SHRINKS the step — real feedback trains slightly
+#    slower than pre-L2 by design (stabilising), it is not a no-op.
+#    INTERACTION with grad clipping: clipping caps the gradient NORM before the
+#    optimizer step; the authority lr-scale applies after, so authority
+#    differentiates steps even when the clip binds.
+#    (The BATCH path, update_from_batch — used only by ppo_trainer, not live —
+#    keeps authority in the loss: with many samples in one step, RELATIVE
+#    per-sample weighting changes the aggregate gradient direction, which is
+#    meaningful under Adam.)
 #
 # LOAD-BEARING INVARIANT for the shaping sign: the preference reward is a fixed
 # positive endorsement (0.7) and the baseline is an EMA of rewards ∈ [0,1], so
@@ -117,6 +133,103 @@ GATING_SHAPING_BETA = 0.3
 # (merlt.experts.neural_gating.neural.EXPERT_NAMES). Kept as a module constant so
 # the trainer never has to import the neural package (lazy-torch discipline).
 GATING_EXPERT_NAMES = ["literal", "systemic", "principles", "precedent"]
+
+# =============================================================================
+# Slice 4 L3 — teach-the-weights, traversal head
+# =============================================================================
+
+# Reward-shaping bonus for the jurist's "privilegia questa relazione" signal on
+# the traversal head. Mirrors GATING_SHAPING_BETA / ToolPolicyTrainer.SHAPING_BETA
+# so all three heads shape at a comparable scale.
+TRAVERSAL_SHAPING_BETA = 0.3
+
+# Fixed positive endorsement for a relation preference (mirrors the preference
+# channel's 0.7 in experts_router._wire_feedback_to_training). Because the
+# traversal trainer has no baseline subtraction, advantage = authority·(0.7+β) is
+# ALWAYS > 0 for the preferred relation ⇒ REINFORCE pushes P(traverse) UP.
+RELATION_PREFERENCE_REWARD = 0.7
+
+# Storage encoding for relation-preference feedback: it reuses QAFeedback's
+# nullable `source_id` column with this prefix (no schema migration needed).
+# `source_relevance` stays NULL on these rows, so the F8 source-rating training
+# query (`source_relevance.isnot(None)`) can never pick them up by accident.
+RELATION_FEEDBACK_SOURCE_PREFIX = "relation:"
+
+# Canonical TraversalPolicy relation vocabulary (single source of truth — the
+# policy instance copies it; traversal_training_service.RELATION_TYPES mirrors it).
+TRAVERSAL_RELATION_TYPES = [
+    "RIFERIMENTO", "CITATO_DA", "MODIFICA", "MODIFICATO_DA",
+    "DEROGA", "DEROGATO_DA", "ABROGATO_DA", "ABROGA",
+    "INTERPRETED_BY", "RELATED_TO", "APPLIES_TO",
+]
+
+# Canonical expert ordering for the traversal head's expert one-hot (Slice 4 L3).
+# Same order as GATING_EXPERT_NAMES — index i = one-hot slot i.
+TRAVERSAL_EXPERT_TYPES = ["literal", "systemic", "principles", "precedent"]
+
+# Map the RAW relation names that actually exist in the FalkorDB graph (mixed
+# case, Italian — e.g. "modifica", "DISCIPLINA") to the TraversalPolicy embedding
+# vocabulary above, so per-query scoring does not collapse everything onto the
+# RELATED_TO fallback. Best-effort semantic mapping; unknown names still fall
+# back to RELATED_TO inside get_relation_index (existing behaviour).
+GRAPH_TO_POLICY_RELATION = {
+    "modifica": "MODIFICA",
+    "modificato_da": "MODIFICATO_DA",
+    "abroga": "ABROGA",
+    "abrogato_da": "ABROGATO_DA",
+    "deroga": "DEROGA",
+    "derogato_da": "DEROGATO_DA",
+    "interpreta": "INTERPRETED_BY",
+    "rinvia": "RIFERIMENTO",
+    "cita": "CITATO_DA",
+    "connesso_a": "RELATED_TO",
+    "contiene": "RELATED_TO",
+    "disciplina": "APPLIES_TO",
+    "impone": "APPLIES_TO",
+}
+
+
+def normalize_relation_type(relation_type: str) -> str:
+    """Map a graph-native relation name to the TraversalPolicy vocabulary.
+
+    Resolution order: exact vocab match → lowercase mapping table → uppercase
+    vocab match → the raw name unchanged (``get_relation_index`` then applies its
+    existing RELATED_TO fallback). Never raises — the graph vocabulary evolves.
+    """
+    if not relation_type:
+        return "RELATED_TO"
+    rel = str(relation_type).strip()
+    if rel in TRAVERSAL_RELATION_TYPES:
+        return rel
+    mapped = GRAPH_TO_POLICY_RELATION.get(rel.lower())
+    if mapped:
+        return mapped
+    if rel.upper() in TRAVERSAL_RELATION_TYPES:
+        return rel.upper()
+    return rel
+
+
+# Vocabulary accepted (without warning) by the relation-preference feedback
+# endpoint: policy vocab + every graph-native name we know how to map.
+KNOWN_RELATION_VOCABULARY = (
+    set(TRAVERSAL_RELATION_TYPES)
+    | set(GRAPH_TO_POLICY_RELATION.keys())
+    | {k.upper() for k in GRAPH_TO_POLICY_RELATION.keys()}
+)
+
+
+def preferred_relation_from_source_id(source_id: Any) -> Optional[str]:
+    """Decode the relation name from a ``relation:<TYPE>``-encoded source_id.
+
+    Returns None for anything that is not a relation-preference row (URNs,
+    None, empty suffix) — used by the feedback wire and the traversal trainer.
+    """
+    if not source_id or not isinstance(source_id, str):
+        return None
+    if not source_id.startswith(RELATION_FEEDBACK_SOURCE_PREFIX):
+        return None
+    relation = source_id[len(RELATION_FEEDBACK_SOURCE_PREFIX):].strip()
+    return relation or None
 
 
 def _extract_authority(feedback: Any, default: float = 1.0) -> float:
@@ -140,6 +253,32 @@ def _extract_authority(feedback: Any, default: float = 1.0) -> float:
     if val != val or val in (float("inf"), float("-inf")) or val < 0.0:
         return default
     return val
+
+
+from contextlib import contextmanager  # noqa: E402  (kept near its sole users)
+
+
+@contextmanager
+def _authority_scaled_lr(optimizer: Any, authority: float):
+    """Scale every param-group learning rate by ``authority`` for ONE step.
+
+    This is how per-sample authority weighting is applied on the live
+    single-sample heads: Adam's second-moment normalisation makes a uniform
+    LOSS scaling step-invariant (see the module design note), so the scale
+    must be applied to the step size itself. Restores the original lrs even
+    if the step raises. ``authority == 1.0`` is a fast no-op.
+    """
+    if authority == 1.0:
+        yield
+        return
+    originals = [group["lr"] for group in optimizer.param_groups]
+    try:
+        for group in optimizer.param_groups:
+            group["lr"] = group["lr"] * authority
+        yield
+    finally:
+        for group, lr0 in zip(optimizer.param_groups, originals):
+            group["lr"] = lr0
 
 
 def _preferred_expert_index(feedback: Any) -> Optional[int]:
@@ -304,17 +443,25 @@ class TraversalPolicy:
     """
     Policy per traversal del grafo.
 
-    Mappa (query_embedding, relation_type_embedding) → relation_weight.
+    Mappa (query_embedding, relation_type_embedding, expert_one_hot) → relation_weight.
 
     Architettura:
-        concat(query_emb, relation_emb) → hidden → ReLU → hidden → sigmoid
+        concat(query_emb, relation_emb, expert_one_hot) → hidden → ReLU → hidden → sigmoid
 
     Output: weight [0-1] per la relazione
+
+    Slice 4 L3 (checkpoint-safe expert conditioning): the input now carries a
+    small expert one-hot (4 dims, TRAVERSAL_EXPERT_TYPES order). Legacy
+    checkpoints (trained WITHOUT the one-hot) load via
+    ``load_mlp_state_dict``, which zero-initialises the new input columns —
+    with zero columns the one-hot contributes nothing, so the loaded net is
+    numerically IDENTICAL to the old one until retrained.
 
     Attributes:
         input_dim: Dimensione input query embedding
         relation_dim: Dimensione relation type embedding
         hidden_dim: Dimensione hidden layer
+        num_expert_types: Dimensione one-hot expert (default 4)
         device: Device per training
     """
 
@@ -340,6 +487,10 @@ class TraversalPolicy:
         self.relation_dim = relation_dim
         self.hidden_dim = hidden_dim
 
+        # Slice 4 L3: expert one-hot conditioning (canonical order).
+        self.expert_types = list(TRAVERSAL_EXPERT_TYPES)
+        self.num_expert_types = len(self.expert_types)
+
         # Device
         if device:
             self.device = device
@@ -350,8 +501,8 @@ class TraversalPolicy:
         else:
             self.device = "cpu"
 
-        # Network
-        total_input = input_dim + relation_dim
+        # Network — input = query ⊕ relation-embedding ⊕ expert-one-hot
+        total_input = input_dim + relation_dim + self.num_expert_types
         self.mlp = nn.Sequential(
             nn.Linear(total_input, hidden_dim),
             nn.ReLU(),
@@ -363,12 +514,8 @@ class TraversalPolicy:
         ).to(self.device)
 
         # Relation type embeddings (learnable)
-        # Comuni relation types nel grafo MERL-T
-        self.relation_types = [
-            "RIFERIMENTO", "CITATO_DA", "MODIFICA", "MODIFICATO_DA",
-            "DEROGA", "DEROGATO_DA", "ABROGATO_DA", "ABROGA",
-            "INTERPRETED_BY", "RELATED_TO", "APPLIES_TO"
-        ]
+        # Comuni relation types nel grafo MERL-T (canonical module constant)
+        self.relation_types = list(TRAVERSAL_RELATION_TYPES)
         self.num_relations = len(self.relation_types)
 
         self.relation_embeddings = nn.Embedding(
@@ -382,13 +529,15 @@ class TraversalPolicy:
             relation_dim=relation_dim,
             hidden_dim=hidden_dim,
             num_relations=self.num_relations,
+            num_expert_types=self.num_expert_types,
             device=self.device
         )
 
     def forward(
         self,
         query_embedding: Any,  # torch.Tensor [batch, input_dim]
-        relation_indices: Any  # torch.Tensor [batch] indices delle relazioni
+        relation_indices: Any,  # torch.Tensor [batch] indices delle relazioni
+        expert_indices: Any = None  # Optional torch.Tensor [batch] indici expert
     ) -> Tuple[Any, Any]:
         """
         Forward pass.
@@ -396,19 +545,36 @@ class TraversalPolicy:
         Args:
             query_embedding: Embedding della query [batch, input_dim]
             relation_indices: Indici relation types [batch]
+            expert_indices: Indici expert (TRAVERSAL_EXPERT_TYPES order) [batch].
+                None → zero one-hot (backward-compatible: identical to a legacy
+                checkpoint whose new input columns are zero-initialised).
 
         Returns:
             Tuple (weights, log_probs)
             - weights: [batch, 1] pesi relazioni
             - log_probs: [batch, 1] log probabilities
         """
-        torch, _, _, _ = _get_torch()
+        torch, _, _, F = _get_torch()
 
         # Ottieni relation embeddings
         relation_emb = self.relation_embeddings(relation_indices)  # [batch, relation_dim]
 
+        # Expert one-hot (zeros when unconditioned — legacy-compatible)
+        batch_size = relation_emb.shape[0]
+        if expert_indices is None:
+            expert_onehot = torch.zeros(
+                batch_size, self.num_expert_types,
+                dtype=query_embedding.dtype, device=relation_emb.device
+            )
+        else:
+            expert_onehot = F.one_hot(
+                expert_indices, num_classes=self.num_expert_types
+            ).to(dtype=query_embedding.dtype)
+
         # Concatena
-        combined = torch.cat([query_embedding, relation_emb], dim=-1)  # [batch, input_dim + relation_dim]
+        combined = torch.cat(
+            [query_embedding, relation_emb, expert_onehot], dim=-1
+        )  # [batch, input_dim + relation_dim + num_expert_types]
 
         # Forward
         weights = self.mlp(combined)  # [batch, 1]
@@ -418,6 +584,49 @@ class TraversalPolicy:
         log_probs = torch.log(weights + 1e-8)  # Evita log(0)
 
         return weights, log_probs
+
+    def get_expert_index(self, expert_type: str) -> Optional[int]:
+        """Indice one-hot per expert_type, None se sconosciuto (→ no conditioning)."""
+        try:
+            return self.expert_types.index(expert_type)
+        except ValueError:
+            log.debug(f"Unknown expert type for traversal one-hot: {expert_type}")
+            return None
+
+    def load_mlp_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        """Load an MLP state dict, expanding LEGACY (pre-expert-one-hot) shapes.
+
+        A legacy checkpoint's first Linear has in_features =
+        ``input_dim + relation_dim``; the current net expects
+        ``input_dim + relation_dim + num_expert_types``. The missing columns are
+        zero-initialised, so the loaded network produces EXACTLY the legacy
+        output for every input (the one-hot multiplies zeros) until retrained.
+        """
+        torch, _, _, _ = _get_torch()
+
+        expected_in = self.input_dim + self.relation_dim + self.num_expert_types
+        first_w = state_dict.get("0.weight")
+        if first_w is not None and first_w.shape[-1] < expected_in:
+            missing = expected_in - first_w.shape[-1]
+            if missing != self.num_expert_types:
+                raise ValueError(
+                    f"Incompatible TraversalPolicy checkpoint: first-layer "
+                    f"in_features={first_w.shape[-1]}, expected {expected_in} "
+                    f"or legacy {expected_in - self.num_expert_types}"
+                )
+            state_dict = dict(state_dict)  # never mutate the caller's dict
+            zeros = torch.zeros(
+                first_w.shape[0], missing,
+                dtype=first_w.dtype, device=first_w.device
+            )
+            state_dict["0.weight"] = torch.cat([first_w, zeros], dim=-1)
+            log.info(
+                "Legacy TraversalPolicy checkpoint expanded with zero-init "
+                "expert-one-hot columns (behaviour unchanged until retrained)",
+                legacy_in_features=int(first_w.shape[-1]),
+                new_in_features=expected_in,
+            )
+        self.mlp.load_state_dict(state_dict)
 
     def get_relation_index(self, relation_type: str) -> int:
         """
@@ -468,8 +677,8 @@ class TraversalPolicy:
         }
 
     def load_state_dict(self, state_dict: Dict[str, Any]):
-        """Carica state dict da checkpoint."""
-        self.mlp.load_state_dict(state_dict["mlp"])
+        """Carica state dict da checkpoint (legacy shapes expanded, zero-init)."""
+        self.load_mlp_state_dict(state_dict["mlp"])
         self.relation_embeddings.load_state_dict(state_dict["relation_embeddings"])
 
 
@@ -667,10 +876,10 @@ class PolicyGradientTrainer:
             )
             # Crea un proxy tensor per ottenere gradients
             proxy = torch.zeros_like(log_probs, requires_grad=True)
-            # Authority-weight the return. Per-expert preference shaping is NOT
-            # possible here: without a live forward pass there is no per-canon
-            # log-prob to attach the shaping to. Authority still applies.
-            policy_loss = -(proxy * (authority * returns)).sum()
+            # Per-expert preference shaping is NOT possible here: without a live
+            # forward pass there is no per-canon log-prob to attach the shaping
+            # to. Authority applies via the lr-scaled step below, not the loss.
+            policy_loss = -(proxy * returns).sum()
         else:
             # CASO CORRETTO: ri-calcola log_probs con forward pass
             query_embedding = torch.tensor(
@@ -707,10 +916,11 @@ class PolicyGradientTrainer:
             weighted_log_prob = (all_log_probs.squeeze(0) * expert_weights).sum()
 
             # -----------------------------------------------------------------
-            # Slice 4 P2b (L2): advantage = authority · (returns + shaping)
+            # Slice 4 P2b (L2): loss carries returns + β-shaping; authority is
+            # applied to the STEP (lr-scale), not the loss — see design note.
             # -----------------------------------------------------------------
-            # Baseline (no preference, authority=1.0) reduces EXACTLY to the
-            # legacy ``-weighted_log_prob * returns`` — regression-safe.
+            # Baseline (no preference) reduces EXACTLY to the legacy
+            # ``-weighted_log_prob * returns`` — regression-safe.
             #
             # With a preference, we ADD a per-expert shaping term applied to the
             # preferred canon's own log-prob (indexed by EXPERT_NAMES order, the
@@ -719,14 +929,14 @@ class PolicyGradientTrainer:
             # log-prob drives its logit UP ⇒ P(preferred) rises next forward.
             # The soft-combination term keeps the answer-quality (returns)
             # signal on every consulted expert.
-            base_loss = -weighted_log_prob * (authority * returns)
+            base_loss = -weighted_log_prob * returns
 
             if preferred_idx is not None:
-                # advantage_pref = authority · (returns + β); the "+β" is what
-                # makes the preferred canon's advantage STRICTLY greater than a
-                # non-preferred canon's (which sees only authority·returns).
+                # advantage_pref = returns + β; the "+β" is what makes the
+                # preferred canon's advantage STRICTLY greater than a
+                # non-preferred canon's (which sees only ``returns``).
                 pref_log_prob = all_log_probs.squeeze(0)[preferred_idx]
-                pref_shaping = authority * (returns + GATING_SHAPING_BETA)
+                pref_shaping = returns + GATING_SHAPING_BETA
                 policy_loss = base_loss + (-pref_log_prob * pref_shaping)
             else:
                 policy_loss = base_loss
@@ -741,8 +951,10 @@ class PolicyGradientTrainer:
                 self.config.clip_grad_norm
             )
 
-        # Optimizer step - applica i gradienti calcolati
-        self.optimizer.step()
+        # Optimizer step — authority scales THIS step's learning rate (the
+        # Adam-correct way to weight a single sample; see _authority_scaled_lr).
+        with _authority_scaled_lr(self.optimizer, authority):
+            self.optimizer.step()
 
         self.num_updates += 1
 
@@ -1163,9 +1375,9 @@ class ToolPolicyTrainer:
         probs, _ = self.policy.forward(query_embedding)  # (1, num_tools)
         probs = probs.squeeze(0)
 
-        # Slice 4 P2b (L2): authority-weight the tool advantage too, so the
-        # dynamic-authority pillar applies consistently across the live heads.
-        # Defaults to 1.0 when feedback carries no authority ⇒ legacy behaviour.
+        # Slice 4 P2b (L2): authority applies to the STEP (lr-scale), not the
+        # loss — Adam neutralises uniform loss scaling on a single-sample step
+        # (see the module design note). Defaults to 1.0 ⇒ legacy behaviour.
         authority = _extract_authority(feedback)
 
         terms = []
@@ -1178,7 +1390,7 @@ class ToolPolicyTrainer:
             p = probs[idx].clamp(1e-8, 1.0 - 1e-8)
             log_p = torch.log(p) if called else torch.log(1.0 - p)
             shaping = (self.SHAPING_BETA if produced else -self.SHAPING_BETA) if called else 0.0
-            advantage = authority * (returns + shaping)
+            advantage = returns + shaping
             terms.append(-advantage * log_p)
 
         if not terms:
@@ -1188,7 +1400,8 @@ class ToolPolicyTrainer:
         loss.backward()
         if getattr(self.config, "clip_grad_norm", None):
             torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.config.clip_grad_norm)
-        self.optimizer.step()
+        with _authority_scaled_lr(self.optimizer, authority):
+            self.optimizer.step()
         self.num_updates += 1
 
         metrics = {
