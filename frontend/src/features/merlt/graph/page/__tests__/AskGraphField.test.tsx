@@ -58,4 +58,14 @@ describe('AskGraphField', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /chiedi/i })).toBeNull();
   });
+
+  it('blocks submission while a deliberation is in flight (busy) but keeps typing enabled', () => {
+    render(<AskGraphField onAsk={onAsk} busy />);
+    const input = screen.getByRole('textbox', { name: /chiedi al grafo/i }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Qual è la ratio?' } });
+    expect(input.value).toBe('Qual è la ratio?'); // drafting stays possible
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /chiedi al grafo/i })).toBeDisabled();
+  });
 });

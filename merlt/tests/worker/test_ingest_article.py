@@ -28,7 +28,7 @@ def _fake_kg(result: object | None = None, ingest_error: Exception | None = None
     return kg
 
 
-async def test_ingest_success_calls_callback_completed():
+async def test_ingest_success_calls_callback_running_then_completed():
     result = MagicMock()
     result.nodes_created = ["a", "b"]
     result.relations_created = ["x"]
@@ -43,10 +43,12 @@ async def test_ingest_success_calls_callback_completed():
 
     kg.connect.assert_awaited_once()
     kg.close.assert_awaited_once()
-    mock_callback.assert_awaited_once()
-    assert mock_callback.await_args.args == ("job-1", "completed")
-    assert mock_callback.await_args.kwargs["nodes_created"] == 2
-    assert mock_callback.await_args.kwargs["edges_created"] == 1
+    # Deadlock fix: the worker reports `running` at pickup, then the terminal state.
+    assert mock_callback.await_count == 2
+    assert mock_callback.await_args_list[0].args == ("job-1", "running")
+    assert mock_callback.await_args_list[1].args == ("job-1", "completed")
+    assert mock_callback.await_args_list[1].kwargs["nodes_created"] == 2
+    assert mock_callback.await_args_list[1].kwargs["edges_created"] == 1
     assert out["nodes_created"] == 2
     assert out["edges_created"] == 1
 
@@ -65,13 +67,15 @@ async def test_ingest_failure_last_retry_calls_callback_failed():
             await _run_ingest(CC_2043_URN, "job-1")
 
     kg.close.assert_awaited_once()
-    mock_callback.assert_awaited_once()
-    assert mock_callback.await_args.args == ("job-1", "failed")
-    assert mock_callback.await_args.kwargs["error"] == "falkordb exploded"
+    assert mock_callback.await_count == 2  # running at pickup, failed at last retry
+    assert mock_callback.await_args_list[0].args == ("job-1", "running")
+    assert mock_callback.await_args_list[1].args == ("job-1", "failed")
+    assert mock_callback.await_args_list[1].kwargs["error"] == "falkordb exploded"
 
 
-async def test_ingest_failure_non_final_retry_does_not_call_callback():
-    # ingest_norm raises but RQ still has retries left -> NO failed callback yet.
+async def test_ingest_failure_non_final_retry_sends_only_running_callback():
+    # ingest_norm raises but RQ still has retries left -> NO failed callback yet,
+    # only the `running` transition sent at pickup.
     boom = RuntimeError("transient falkordb hiccup")
     kg = _fake_kg(ingest_error=boom)
 
@@ -85,7 +89,19 @@ async def test_ingest_failure_non_final_retry_does_not_call_callback():
             await _run_ingest(CC_2043_URN, "job-1")
 
     kg.close.assert_awaited_once()
-    mock_callback.assert_not_awaited()
+    assert mock_callback.await_count == 1
+    assert mock_callback.await_args_list[0].args == ("job-1", "running")
+
+
+async def test_ingest_urn_parse_error_sends_running_then_failed():
+    # A malformed URN must still notify the BFF (running at pickup, then failed).
+    with patch("merlt.worker.tasks._callback_bff", new=AsyncMock()) as mock_callback:
+        with pytest.raises(ValueError):
+            await _run_ingest("urn:nir:stato:garbage", "job-1")
+
+    assert mock_callback.await_count == 2
+    assert mock_callback.await_args_list[0].args == ("job-1", "running")
+    assert mock_callback.await_args_list[1].args == ("job-1", "failed")
 
 
 def test_urn_to_ingest_params_resolves_cc():

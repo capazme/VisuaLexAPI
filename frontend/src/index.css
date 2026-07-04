@@ -17,6 +17,24 @@
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+
+  /* Full primary scale. The semantic --color-primary above resolves to the
+     app primary (blue-600 hue in light, blue-500 in dark); numbered utilities
+     (bg-primary-600, ring-primary-500, text-primary-700, …) used across the
+     MERL-T surfaces only generate CSS if each step is declared in @theme.
+     Values are the Tailwind blue scale, which contains both theme primaries,
+     so the palette stays coherent. */
+  --color-primary-50: hsl(213.8 100% 96.9%);
+  --color-primary-100: hsl(214.3 94.6% 92.7%);
+  --color-primary-200: hsl(213.3 96.9% 87.3%);
+  --color-primary-300: hsl(211.7 96.4% 78.4%);
+  --color-primary-400: hsl(213.1 93.9% 67.8%);
+  --color-primary-500: hsl(217.2 91.2% 59.8%);
+  --color-primary-600: hsl(221.2 83.2% 53.3%);
+  --color-primary-700: hsl(224.3 76.3% 48%);
+  --color-primary-800: hsl(225.9 70.7% 40.2%);
+  --color-primary-900: hsl(224.4 64.3% 32.9%);
+  --color-primary-950: hsl(226.2 57% 21%);
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));

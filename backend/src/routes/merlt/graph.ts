@@ -7,8 +7,14 @@ import { consentGuard } from '../../services/merlt/consentGuard';
 import { ingestRequestSchema, jobCallbackSchema } from '../../schemas/merlt/graph';
 import {
   createGraphClient,
+  normalizeGraphUrn,
   GraphClient,
 } from '../../services/merlt/graphClient';
+import {
+  createSubgraphCache,
+  subgraphCacheKey,
+  SubgraphCache,
+} from '../../services/merlt/subgraphCache';
 import { ensureIngestionJob } from '../../services/merlt/lazyIngest';
 import { MerltClientError } from '../../services/merlt/merltClient';
 
@@ -46,6 +52,18 @@ export function _resetGraphClientForTests(): void {
   cachedGraphClient = null;
 }
 
+// Singleton subgraph cache (P1.12): TTL + LRU + request coalescing, shared by
+// the article GET (read path) and the internal job-callback (invalidation).
+let cachedSubgraphCache: SubgraphCache | null = null;
+function subgraphCache(): SubgraphCache {
+  if (!cachedSubgraphCache) cachedSubgraphCache = createSubgraphCache();
+  return cachedSubgraphCache;
+}
+/** Test hook: drop the cache (entries + pending) and re-read env on next use. */
+export function _resetSubgraphCacheForTests(): void {
+  cachedSubgraphCache = null;
+}
+
 /**
  * GET /api/merlt/graph/article/:urn
  *
@@ -65,12 +83,20 @@ router.get('/graph/article/:urn', authenticate, async (req: Request, res: Respon
   }
 
   const urn = decodeURIComponent(req.params.urn);
-  // depth ∈ [1,3] (side rail wants 1, page allows up to 3), limit ∈ [1,500].
+  // depth ∈ [1,3] (side rail wants 1, page allows up to 3), limit ∈ [1,200].
+  // MERL-T hard-caps max_nodes at 200 (graph_router.py) — a higher BFF cap
+  // would be silently truncated upstream, so the clamps must stay aligned.
   const depth = clampInt(req.query.depth, 2, 1, 3);
-  const limit = clampInt(req.query.limit, 500, 1, 500);
+  const limit = clampInt(req.query.limit, 200, 1, 200);
 
   try {
-    const subgraph = await graphClient().getSubgraph(urn, depth, limit);
+    // TTL+LRU cache with request coalescing (P1.12). Keyed on the NORMALIZED
+    // urn so "…!vig=" and the bare form share one entry, matching what the
+    // graphClient actually sends to MERL-T.
+    const cacheKey = subgraphCacheKey(normalizeGraphUrn(urn), depth, limit);
+    const subgraph = await subgraphCache().getOrFetch(cacheKey, () =>
+      graphClient().getSubgraph(urn, depth, limit)
+    );
     res.status(200).json(subgraph);
   } catch (err) {
     if (err instanceof MerltClientError) {
@@ -218,6 +244,13 @@ router.post('/internal/job-callback', internalAuth, async (req: Request, res: Re
       completedAt: isTerminal ? new Date() : undefined,
     },
   });
+
+  // P1.12: a completed ingestion changes the graph around this URN — drop every
+  // cached (depth, limit) subgraph for it so the next read sees the new nodes
+  // instead of a stale (possibly empty) snapshot for up to a full TTL.
+  if (status === 'completed') {
+    subgraphCache().invalidateUrn(normalizeGraphUrn(job.articleUrn));
+  }
 
   res.status(200).json({ updated: true });
 });

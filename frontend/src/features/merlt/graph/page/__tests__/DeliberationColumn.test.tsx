@@ -453,6 +453,69 @@ describe('DeliberationColumn per-canon steer (Slice 4 P2b — insegna i pesi, L2
   });
 });
 
+describe('DeliberationColumn wave-1 interactions (P1)', () => {
+  it('keeps BOTH tabs mounted and toggles via CSS (no drawer flash on switch)', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        activeTab="dibattito"
+        selectedNode={node}
+        nodesById={new Map([[node.id, node]])}
+        edges={[]}
+      />,
+    );
+    // The node drawer content is MOUNTED although the Dibattito tab is active…
+    expect(screen.getByText('Risarcimento per fatto illecito')).toBeInTheDocument();
+    // …but its tabpanel carries the display-hidden class.
+    expect(screen.getByRole('tabpanel', { name: 'Nodo' }).className).toContain('hidden');
+    expect(screen.getByRole('tabpanel', { name: 'Dibattito' }).className).not.toContain('hidden');
+  });
+
+  it('pulses the Dibattito tab when dibattitoBadge is set (turn settled on Nodo)', () => {
+    render(<DeliberationColumn {...baseProps()} activeTab="nodo" dibattitoBadge />);
+    expect(screen.getByText('nuova risposta')).toBeInTheDocument();
+  });
+
+  it('renders no pulse without the badge', () => {
+    render(<DeliberationColumn {...baseProps()} activeTab="nodo" />);
+    expect(screen.queryByText('nuova risposta')).not.toBeInTheDocument();
+  });
+
+  it('renders the scope chip and fires onReturn from "Torna" (defect #10)', () => {
+    const onReturn = vi.fn();
+    render(
+      <DeliberationColumn {...baseProps()} scopeChip={{ label: 'Art. 2043 c.c.', onReturn }} />,
+    );
+    expect(screen.getByText(/dibattito attivo su art\. 2043/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /torna/i }));
+    expect(onReturn).toHaveBeenCalledTimes(1);
+  });
+
+  it('expands ONLY the focused canon thesis on canonFocus (defect #5)', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canonFocus={{ key: 'principles', nonce: 1 }}
+      />,
+    );
+    const focused = document.querySelector('details[data-canon="principles"]') as HTMLDetailsElement;
+    const other = document.querySelector('details[data-canon="literal"]') as HTMLDetailsElement;
+    expect(focused).toBeTruthy();
+    expect(focused.open).toBe(true);
+    expect(other.open).toBe(false);
+  });
+
+  it('disables the composer submission while a deliberation is in flight (askBusy)', () => {
+    const props = baseProps();
+    render(<DeliberationColumn {...props} askBusy />);
+    const input = screen.getByRole('textbox', { name: /chiedi al grafo/i });
+    fireEvent.change(input, { target: { value: 'domanda' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(props.onAsk).not.toHaveBeenCalled();
+  });
+});
+
 describe('DeliberationColumn relation steer (Slice 4 L3 — privilegia questa relazione)', () => {
   const relationEdge: GraphEdge = {
     id: 'e1',

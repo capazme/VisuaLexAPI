@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useImperativeHandle, useRef } from 'react';
 import { Graph } from '@antv/g6';
 import type { NodeData, EdgeData, LayoutOptions } from '@antv/g6';
 import { nodeStyleMapper, edgeStyleMapper } from './graphStyles';
+import { isDeliberationElementId } from './graphDeliberation';
 
 /**
  * Shared G6 v5 graph canvas for both the article side rail and the /grafo page.
@@ -23,7 +24,17 @@ export type GraphLayoutName =
   | 'concentric'
   | 'circle';
 
+/**
+ * Imperative handle exposed via the `ref` prop (React 19 ref-as-prop, no
+ * forwardRef needed). P1.7: the page's "Adatta alla vista" button calls `fit()`.
+ */
+export interface GraphCanvasHandle {
+  /** Fit the whole graph into the viewport (chained on the in-flight render). */
+  fit: () => void;
+}
+
 export interface GraphCanvasProps {
+  ref?: React.Ref<GraphCanvasHandle>;
   nodes: NodeData[];
   edges: EdgeData[];
   layout?: GraphLayoutName;
@@ -126,7 +137,10 @@ function buildHighlightState(
   for (const n of nodes) {
     if (n.id == null) continue;
     const id = String(n.id);
-    if (!active) {
+    // P1.9: synthetic deliberation elements (canon stars, contrast arcs, anchor
+    // tethers) are commentary ON the debate — never faded by the sources/legend
+    // emphasis. They keep their base style.
+    if (!active || isDeliberationElementId(id)) {
       map[id] = [];
       continue;
     }
@@ -135,12 +149,14 @@ function buildHighlightState(
   }
   for (const e of edges) {
     if (e.id == null) continue;
-    map[String(e.id)] = active ? ['inactive'] : [];
+    const id = String(e.id);
+    map[id] = active && !isDeliberationElementId(id) ? ['inactive'] : [];
   }
   return map;
 }
 
 export default function GraphCanvas({
+  ref,
   nodes,
   edges,
   layout = 'cose-bilkent',
@@ -179,6 +195,9 @@ export default function GraphCanvas({
       autoResize: true,
       autoFit: 'view',
       padding: 24,
+      // P1.7: clamp wheel-zoom so the graph can neither vanish into a dot nor
+      // blow past legibility (G6 default is [0.01, 10]).
+      zoomRange: [0.15, 4],
       data: { nodes, edges },
       node: { style: nodeStyleMapper, state: NODE_STATE },
       edge: { type: 'quadratic', style: edgeStyleMapper, state: EDGE_STATE },
@@ -270,6 +289,24 @@ export default function GraphCanvas({
     // layout() also rejects if the instance is destroyed mid-flight.
     void g.layout().catch(() => {});
   }, [layout]);
+
+  // P1.7 "Adatta alla vista": fit chained on the latest render so it never runs
+  // against a graph that hasn't laid out yet; guarded against a destroyed instance.
+  useImperativeHandle(
+    ref,
+    () => ({
+      fit: (): void => {
+        const g = graphRef.current;
+        if (!g) return;
+        void renderRef.current
+          .then(() => {
+            if (graphRef.current === g) return g.fitView();
+          })
+          .catch(() => {});
+      },
+    }),
+    [],
+  );
 
   return <div ref={containerRef} style={{ width: '100%', height }} />;
 }

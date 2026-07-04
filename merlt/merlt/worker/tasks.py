@@ -133,6 +133,14 @@ async def _callback_bff(
 
 
 async def _run_ingest(urn: str, bff_job_id: Optional[str]) -> dict:
+    # Tell the BFF the worker actually picked the job up (deadlock fix): a job
+    # that stays `pending` with no transition is indistinguishable from a lost
+    # enqueue, and the BFF idempotency check would block re-ingestion of the
+    # URN forever. `running` stamps startedAt on the MerltIngestionJob row and
+    # lets the stale-TTL sweeper reason on real worker liveness. Best-effort
+    # (_callback_bff swallows errors) — a lost `running` never fails the task.
+    await _callback_bff(bff_job_id, "running")
+
     # URN parsing must happen INSIDE error-callback scope: a malformed URN
     # raised here used to escape without notifying the BFF, leaving the
     # MerltIngestionJob row stuck in `pending` forever (idempotency check

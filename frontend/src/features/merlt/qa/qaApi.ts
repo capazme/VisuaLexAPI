@@ -7,7 +7,11 @@ import type { QaAnswer, QaHistoryItem, QaMode } from './types';
  * are long-running (multi-expert) — give them a generous client timeout.
  */
 
-const QA_TIMEOUT_MS = 120000;
+// P1.10: FE timeout = the BFF experts timeout (MERLT_EXPERTS_TIMEOUT_MS,
+// default 120s in expertsClient.ts) + 10s of headroom, so the BFF's own
+// 502/504 reaches the client with real status copy instead of the FE aborting
+// first with a generic "nessuna risposta dal server".
+const QA_TIMEOUT_MS = 130000;
 
 export async function askQuestion(
   query: string,

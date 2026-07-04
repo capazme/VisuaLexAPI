@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, History, Info, Loader2, Lock, MessageSquare, Network, Route, Scale, Swords, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { AskGraphField } from './AskGraphField';
@@ -92,6 +92,24 @@ export interface DeliberationColumnProps {
   onOpenConsent?: () => void;
   /** Asking unlocked (consent ≥ basic): the compose field is live. */
   qaAskable: boolean;
+  /** P1.10: a deliberation is in flight — the composer's submit is disabled. */
+  askBusy?: boolean;
+  /**
+   * Defect #4: a turn settled while the user was inspecting the Nodo tab — pulse
+   * the Dibattito tab so the arrival is visible. The page clears it on tab switch.
+   */
+  dibattitoBadge?: boolean;
+  /**
+   * Defect #10: the active deliberation belongs to ANOTHER center. Renders a
+   * compact chip at the top of the Dibattito tab with a "Torna" recenter action.
+   */
+  scopeChip?: { label: string; onReturn: () => void } | null;
+  /**
+   * Defect #5: a canon star was clicked on the canvas — expand + scroll to that
+   * canon's thesis in the LATEST turn. The nonce re-arms the scroll when the same
+   * canon is clicked twice.
+   */
+  canonFocus?: { key: string; nonce: number } | null;
   /** Edge inspection needs the node map to resolve endpoints; empty when unused. */
   nodesById?: Map<string, GraphNode>;
   edges?: GraphEdge[];
@@ -151,6 +169,10 @@ export function DeliberationColumn({
   onPreferRelation,
   onOpenConsent,
   qaAskable,
+  askBusy = false,
+  dibattitoBadge = false,
+  scopeChip,
+  canonFocus,
   nodesById,
   edges = [],
   onRecenter,
@@ -169,6 +191,7 @@ export function DeliberationColumn({
           onClick={() => onTabChange('dibattito')}
           icon={<MessageSquare size={15} />}
           label="Dibattito"
+          badge={dibattitoBadge}
         />
         <TabButton
           active={activeTab === 'nodo'}
@@ -178,7 +201,14 @@ export function DeliberationColumn({
         />
       </div>
 
-      {activeTab === 'dibattito' ? (
+      {/* Both tabs stay MOUNTED and toggle via CSS (defect #4): unmounting the
+          inactive tab caused a visible drawer flash on every switch and lost the
+          composer draft / drawer scroll position. */}
+      <div
+        role="tabpanel"
+        aria-label="Dibattito"
+        className={cn(activeTab === 'dibattito' ? 'flex' : 'hidden', 'min-h-0 flex-1 flex-col')}
+      >
         <DibattitoTab
           turns={turns}
           onAsk={onAsk}
@@ -191,10 +221,18 @@ export function DeliberationColumn({
           onPreferCanon={onPreferCanon}
           onOpenConsent={onOpenConsent}
           qaAskable={qaAskable}
+          askBusy={askBusy}
+          scopeChip={scopeChip}
+          canonFocus={canonFocus}
           centerLabel={selectedNode?.label}
           centerUrn={selectedNode?.urn ?? undefined}
         />
-      ) : (
+      </div>
+      <div
+        role="tabpanel"
+        aria-label="Nodo"
+        className={cn(activeTab === 'nodo' ? 'flex' : 'hidden', 'min-h-0 flex-1 flex-col')}
+      >
         <NodoTab
           selectedNode={selectedNode ?? null}
           selectedEdge={selectedEdge ?? null}
@@ -206,7 +244,7 @@ export function DeliberationColumn({
           onRecenter={onRecenter}
           onClose={onCloseNode}
         />
-      )}
+      </div>
     </aside>
   );
 }
@@ -216,11 +254,14 @@ function TabButton({
   onClick,
   icon,
   label,
+  badge = false,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  /** Pulse dot: something arrived in this tab while another one was active. */
+  badge?: boolean;
 }): React.ReactElement {
   return (
     <button
@@ -237,6 +278,13 @@ function TabButton({
     >
       {icon}
       {label}
+      {badge && (
+        <span className="relative ml-0.5 flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-75" aria-hidden="true" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-500" aria-hidden="true" />
+          <span className="sr-only">nuova risposta</span>
+        </span>
+      )}
     </button>
   );
 }
@@ -253,6 +301,9 @@ function DibattitoTab({
   onPreferCanon,
   onOpenConsent,
   qaAskable,
+  askBusy = false,
+  scopeChip,
+  canonFocus,
   centerLabel,
   centerUrn,
 }: {
@@ -267,6 +318,9 @@ function DibattitoTab({
   onPreferCanon?: (traceId: string, expert: string) => void;
   onOpenConsent?: () => void;
   qaAskable: boolean;
+  askBusy?: boolean;
+  scopeChip?: { label: string; onReturn: () => void } | null;
+  canonFocus?: { key: string; nonce: number } | null;
   centerLabel?: string;
   centerUrn?: string;
 }): React.ReactElement {
@@ -276,6 +330,26 @@ function DibattitoTab({
   // panel so the loaded turn is immediately visible in the current conversation.
   const [showHistory, setShowHistory] = useState(false);
   const canShowHistory = Boolean(onLoadHistoryTurn);
+  const turnsRef = useRef<HTMLDivElement | null>(null);
+
+  // Defect #5: a canon star click on the canvas lands HERE — expand + reveal the
+  // matching thesis of the LATEST turn. Imperative DOM sync (the <details> stays
+  // uncontrolled; the browser owns subsequent toggles), keyed on the nonce so
+  // re-clicking the same canon re-scrolls.
+  useEffect(() => {
+    if (!canonFocus) return;
+    const root = turnsRef.current;
+    if (!root) return;
+    const matches = root.querySelectorAll<HTMLDetailsElement>(
+      `details[data-canon="${canonFocus.key}"]`,
+    );
+    const target = matches[matches.length - 1];
+    if (!target) return;
+    target.open = true;
+    if (typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [canonFocus]);
 
   const handleSelectHistory = (item: QaHistoryItem): void => {
     onLoadHistoryTurn?.(item);
@@ -304,7 +378,22 @@ function DibattitoTab({
         </div>
       )}
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-3">
+      <div ref={turnsRef} className="flex-1 space-y-4 overflow-y-auto p-3">
+        {/* Defect #10: the deliberation belongs to another center — say so and
+            offer the way back instead of silently hiding the overlay. */}
+        {scopeChip && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+            <span className="min-w-0 truncate">Dibattito attivo su {scopeChip.label}</span>
+            <button
+              type="button"
+              onClick={scopeChip.onReturn}
+              title={`Torna al centro del dibattito (${scopeChip.label})`}
+              className="shrink-0 font-medium underline transition-colors hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:hover:text-amber-200"
+            >
+              Torna
+            </button>
+          </div>
+        )}
         {showHistory && canShowHistory ? (
           <QaHistoryPanel onSelect={handleSelectHistory} />
         ) : turns.length === 0 ? (
@@ -338,6 +427,7 @@ function DibattitoTab({
           centerLabel={centerLabel}
           centerUrn={centerUrn}
           disabled={!qaAskable}
+          busy={askBusy}
           onAsk={onAsk}
         />
       </div>
@@ -580,7 +670,12 @@ function CanonThesisItem({
   }
 
   return (
-    <details className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+    // data-canon: the canvas canon-star click resolves to this element to expand
+    // + scroll it into view (defect #5 — see DibattitoTab's canonFocus effect).
+    <details
+      data-canon={expert}
+      className="group relative overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+    >
       <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: color }} aria-hidden="true" />
       <summary className="flex cursor-pointer select-none items-center justify-between gap-2 py-2 pl-4 pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500">
         <span className="min-w-0">

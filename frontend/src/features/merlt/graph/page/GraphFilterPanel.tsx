@@ -17,10 +17,13 @@ export interface GraphFilterPanelProps {
 }
 
 /**
- * Floating filter panel + legend for the explorer. Lists the node and relation
+ * Filter panel + legend for the explorer. Lists the node and relation
  * types present in the current graph with a colour swatch, count and a
  * visibility toggle. Toggling hides elements without re-laying-out the graph;
  * hovering a node type highlights it in the canvas.
+ * Positioning is owned by the caller: GraphExplorerPage stacks this panel and
+ * the "nascondi giurisprudenza" pill in one absolute flex-col overlay so the
+ * two never collide.
  */
 export function GraphFilterPanel({
   nodeTypes,
@@ -36,7 +39,7 @@ export function GraphFilterPanel({
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="absolute left-3 top-3 z-20 w-60 max-w-[80%] overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

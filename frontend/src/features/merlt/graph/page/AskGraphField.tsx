@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lock, MessageSquare, Send } from 'lucide-react';
+import { Loader2, Lock, MessageSquare, Send } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { QaMode } from '../../qa/types';
 
@@ -21,6 +21,13 @@ export interface AskGraphFieldProps {
   centerLabel?: string;
   /** Asking not unlocked (consent < basic): the field is inert + shows the hint. */
   disabled?: boolean;
+  /**
+   * P1.10: a deliberation is already in flight — submission is blocked until it
+   * settles (one collegial run at a time). The page owns the in-flight state and
+   * threads it to BOTH instances (header + column composer) so they stay in sync.
+   * Typing stays enabled: the next question can be drafted while waiting.
+   */
+  busy?: boolean;
   onAsk: (question: string, mode: QaMode) => void;
 }
 
@@ -28,6 +35,7 @@ export function AskGraphField({
   centerUrn,
   centerLabel,
   disabled = false,
+  busy = false,
   onAsk,
 }: AskGraphFieldProps): React.ReactElement {
   void centerUrn; // reserved: the page centers/threads the urn; kept in the contract.
@@ -38,7 +46,7 @@ export function AskGraphField({
 
   const submit = (): void => {
     const q = value.trim();
-    if (!q || disabled) return;
+    if (!q || disabled || busy) return;
     onAsk(q, mode);
     setValue('');
   };
@@ -95,11 +103,12 @@ export function AskGraphField({
       <button
         type="button"
         onClick={submit}
-        disabled={!value.trim()}
+        disabled={!value.trim() || busy}
         aria-label="Chiedi al grafo"
+        title={busy ? 'Attendi la deliberazione in corso…' : undefined}
         className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:disabled:bg-slate-700"
       >
-        <Send size={13} /> Chiedi
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Chiedi
       </button>
     </div>
   );

@@ -81,9 +81,11 @@ export class GraphClient {
 
   /**
    * Fetch the subgraph around a root URN for visualization.
-   * Query param is `root_urn` (NOT `urn`).
+   * Query param is `root_urn` (NOT `urn`). The maxNodes default mirrors the
+   * MERL-T hard cap (graph_router.py clamps max_nodes to 200) — anything
+   * higher would be silently truncated upstream.
    */
-  async getSubgraph(urn: string, depth = 2, maxNodes = 500): Promise<SubgraphResponse> {
+  async getSubgraph(urn: string, depth = 2, maxNodes = 200): Promise<SubgraphResponse> {
     const qs = new URLSearchParams({
       root_urn: normalizeGraphUrn(urn),
       depth: String(depth),

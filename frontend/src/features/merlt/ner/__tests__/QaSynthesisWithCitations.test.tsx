@@ -32,4 +32,45 @@ describe('QaSynthesisWithCitations (surface: qa_chip)', () => {
     expect(typeof payload.contextWindow).toBe('string');
     expect(payload.contextWindow).toContain('1453');
   });
+
+  it('renders markdown bold/heading/list without literal markers', () => {
+    const md = '## Sintesi\n\nLa **risoluzione** è disciplinata:\n- da *norme* speciali\n- da principi generali';
+    render(<QaSynthesisWithCitations text={md} enabled={false} />);
+
+    expect(screen.getByRole('heading', { level: 3, name: 'Sintesi' })).toBeInTheDocument();
+    expect(screen.getByText('risoluzione').tagName).toBe('STRONG');
+    expect(screen.getByText('norme').tagName).toBe('EM');
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(document.body.textContent).not.toContain('**');
+    expect(document.body.textContent).not.toContain('##');
+  });
+
+  it('keeps citation chips working inside markdown and strips markers from the context window', () => {
+    const onSubmit = vi.fn();
+    const md = '### Analisi\n\nSi applica l’**art. 1453 c.c.** in tema di inadempimento.';
+    render(<QaSynthesisWithCitations text={md} enabled onSubmit={onSubmit} />);
+
+    const chip = screen.getAllByRole('button', { name: /citazione:/i })[0];
+    fireEvent.click(chip);
+    fireEvent.click(screen.getByRole('button', { name: /conferma la citazione/i }));
+
+    const payload = onSubmit.mock.calls[0][0];
+    expect(payload.surface).toBe('qa_chip');
+    expect(payload.contextWindow).toContain('1453');
+    expect(payload.contextWindow).not.toContain('**');
+    expect(payload.contextWindow).not.toContain('###');
+  });
+
+  it('detects citations inside list items and renders chips there', () => {
+    render(
+      <QaSynthesisWithCitations
+        text={'Fonti:\n- art. 1453 c.c.\n- dottrina'}
+        enabled
+        onSubmit={vi.fn()}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /citazione:/i }).length).toBeGreaterThan(0);
+  });
 });

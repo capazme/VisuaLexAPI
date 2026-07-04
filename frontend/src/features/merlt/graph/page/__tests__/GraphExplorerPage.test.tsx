@@ -13,11 +13,15 @@ vi.mock('../../shared/useArticleGraph', () => ({
   useArticleGraph: (...a: unknown[]) => useArticleGraphMock(...a),
 }));
 // GraphCanvas is code-split; capture the props each render so tests can assert
-// the effective hidden-types set + the sources-as-nodes highlight ids.
+// the effective hidden-types set + the sources-as-nodes highlight ids. The page's
+// imperative fit handle (React 19 ref-as-prop) is stubbed with canvasFitMock.
 let lastCanvasProps: Record<string, unknown> = {};
+const canvasFitMock = vi.fn();
 vi.mock('../../shared/GraphCanvas', () => ({
   default: (props: Record<string, unknown>) => {
     lastCanvasProps = props;
+    const ref = props.ref as { current: unknown } | undefined;
+    if (ref && typeof ref === 'object') ref.current = { fit: canvasFitMock };
     return <div data-testid="cytoscape" />;
   },
 }));
@@ -102,12 +106,16 @@ function setGraph(state: ArticleGraphState): void {
   useArticleGraphMock.mockReturnValue({ ...state, refetch: vi.fn() });
 }
 
-function renderAt(path: string, state?: unknown) {
-  return render(
+function pageAt(path: string, state?: unknown) {
+  return (
     <MemoryRouter initialEntries={[{ pathname: path.split('?')[0], search: path.includes('?') ? `?${path.split('?')[1]}` : '', state }]}>
       <GraphExplorerPage />
     </MemoryRouter>
   );
+}
+
+function renderAt(path: string, state?: unknown) {
+  return render(pageAt(path, state));
 }
 
 beforeEach(() => {
@@ -124,6 +132,7 @@ beforeEach(() => {
   sendRelationFeedbackMock.mockResolvedValue(undefined);
   qaThreadState.turns = [];
   lastCanvasProps = {};
+  canvasFitMock.mockReset();
   triggerIngestionMock.mockReset();
   triggerIngestionMock.mockResolvedValue({ jobId: 'job-1', status: 'pending' });
   useIngestionJobMock.mockReset();
@@ -758,6 +767,182 @@ describe('GraphExplorerPage', () => {
       expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
       expect(screen.getByText(/serve il consenso completo/i)).toBeInTheDocument();
       expect(sendRelationFeedbackMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Wave 1 — /grafo interaction overhaul (P1)', () => {
+    /** Two Norma nodes with distinct urns so recentering changes the center. */
+    function setTwoNodeGraph(): void {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [
+            { id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' },
+            { id: 'node-2059', type: 'Norma', label: 'Art. 2059', urn: 'urn:x~art2059' },
+          ],
+          edges: [],
+        },
+        elements: { nodes: [{ id: 'node-2043' }, { id: 'node-2059' }], edges: [] },
+      });
+    }
+
+    /** A settled turn with per-canon contributions AND joinable sources. */
+    function richTurn(): QaTurnModel {
+      const answer = {
+        trace_id: 'trace-w1',
+        synthesis: 'Sintesi.',
+        mode: 'convergent',
+        alternatives: null,
+        sources: [],
+        retrieved_sources: [
+          { urn: 'urn:x~art2043', provenance: 'seed', trust: 0.9, node_id: 'node-2043' },
+        ],
+        experts_used: ['literal', 'principles'],
+        confidence: 0.8,
+        execution_time_ms: 100,
+        expert_contributions: [
+          { expert: 'literal', thesis: 'Tesi letterale', confidence: 0.9, weight: 0.6 },
+          { expert: 'principles', thesis: 'Tesi principî', confidence: 0.8, weight: 0.4 },
+        ],
+      };
+      return {
+        id: 'turn-w1',
+        question: 'Domanda?',
+        confirmed: {},
+        state: { status: 'success', answer },
+      } as unknown as QaTurnModel;
+    }
+
+    function loadingTurn(): QaTurnModel {
+      return {
+        id: 'turn-live',
+        question: 'In corso…',
+        confirmed: {},
+        state: { status: 'loading', startedAt: 1 },
+      } as QaTurnModel;
+    }
+
+    const canvasNodeIds = (): string[] =>
+      (lastCanvasProps.nodes as Array<{ id: string }>).map((n) => n.id);
+
+    it('a canon star click opens the Dibattito tab and expands that canon thesis (defect #5)', () => {
+      qaThreadState.turns = [richTurn()];
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('canon:literal');
+      });
+
+      // NOT the empty Nodo drawer: the debate tab stays/becomes active…
+      expect(screen.getByRole('tab', { name: /dibattito/i })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: /nodo/i })).toHaveAttribute('aria-selected', 'false');
+      // …and the clicked canon's thesis is expanded.
+      const details = document.querySelector('details[data-canon="literal"]') as HTMLDetailsElement;
+      expect(details).toBeTruthy();
+      expect(details.open).toBe(true);
+    });
+
+    it('Esc deselects the node and returns to the Dibattito tab (P1.7)', () => {
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
+      });
+      expect(screen.getByRole('tab', { name: /nodo/i })).toHaveAttribute('aria-selected', 'true');
+
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(screen.getByRole('tab', { name: /dibattito/i })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('pulses the Dibattito tab when a turn settles while on Nodo, cleared on open (defect #4)', () => {
+      qaThreadState.turns = [loadingTurn()];
+      setTwoNodeGraph();
+      const view = renderAt('/grafo?urn=urn%3Ax~art2043');
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
+      });
+      expect(screen.queryByText('nuova risposta')).not.toBeInTheDocument();
+
+      // The turn settles while the user inspects the node.
+      qaThreadState.turns = [richTurn()];
+      view.rerender(pageAt('/grafo?urn=urn%3Ax~art2043'));
+      expect(screen.getByText('nuova risposta')).toBeInTheDocument();
+
+      // Opening the Dibattito tab clears the pulse.
+      fireEvent.click(screen.getByRole('tab', { name: /dibattito/i }));
+      expect(screen.queryByText('nuova risposta')).not.toBeInTheDocument();
+    });
+
+    it('scopes the deliberation to its ask-time center: recenter hides the overlay, "Torna" restores it (defect #10)', () => {
+      qaThreadState.turns = [richTurn()];
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // Ask from the header → records the scope on art2043.
+      const field = screen.getAllByLabelText('Chiedi al grafo', { selector: 'input' })[0];
+      fireEvent.change(field, { target: { value: 'Domanda scoped' } });
+      fireEvent.keyDown(field, { key: 'Enter' });
+      expect(canvasNodeIds().some((id) => id.startsWith('canon:'))).toBe(true);
+      expect(screen.queryByText(/dibattito attivo su/i)).not.toBeInTheDocument();
+
+      // Recenter on ANOTHER node (double-click) → different center.
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2059');
+      });
+      // Overlay + source emphasis are gone; the scope chip appears instead.
+      expect(canvasNodeIds().some((id) => id.startsWith('canon:'))).toBe(false);
+      expect(lastCanvasProps.highlightNodeIds ?? null).toBeNull();
+      expect(screen.getByText(/dibattito attivo su/i)).toBeInTheDocument();
+
+      // "Torna" recenters on the deliberation's own center → overlay returns.
+      fireEvent.click(screen.getByRole('button', { name: /torna/i }));
+      expect(canvasNodeIds().some((id) => id.startsWith('canon:'))).toBe(true);
+      expect(screen.queryByText(/dibattito attivo su/i)).not.toBeInTheDocument();
+    });
+
+    it('"× evidenza fonti" dismisses the sources emphasis (P1.9)', () => {
+      qaThreadState.turns = [richTurn()];
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      expect(lastCanvasProps.highlightNodeIds).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: /rimuovi evidenza fonti/i }));
+      expect(lastCanvasProps.highlightNodeIds).toBeNull();
+      // The chip disappears with the emphasis.
+      expect(screen.queryByRole('button', { name: /rimuovi evidenza fonti/i })).not.toBeInTheDocument();
+    });
+
+    it('"Adatta alla vista" calls the canvas fit handle (P1.7)', async () => {
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      await screen.findByTestId('cytoscape');
+      fireEvent.click(screen.getByRole('button', { name: /adatta alla vista/i }));
+      expect(canvasFitMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('the load ErrorState offers "Riprova" wired to refetch (P1.11)', () => {
+      const refetch = vi.fn();
+      useArticleGraphMock.mockReturnValue({ status: 'error', error: new Error('boom'), refetch });
+      renderAt('/grafo?urn=urn%3Atest');
+      expect(screen.getByText(/errore nel caricamento del grafo/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('blocks new asks while a turn is in flight (P1.10)', () => {
+      qaThreadState.turns = [loadingTurn()];
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      const field = screen.getAllByLabelText('Chiedi al grafo', { selector: 'input' })[0];
+      fireEvent.change(field, { target: { value: 'Altra domanda' } });
+      fireEvent.keyDown(field, { key: 'Enter' });
+      expect(qaAskMock).not.toHaveBeenCalled();
+      // Both submit buttons (header + column composer) are disabled together.
+      for (const btn of screen.getAllByRole('button', { name: 'Chiedi al grafo' })) {
+        expect(btn).toBeDisabled();
+      }
     });
   });
 });

@@ -8,7 +8,10 @@ import {
   prisma,
   type TestUser,
 } from '../../helpers';
-import { _resetGraphClientForTests } from '../../../src/routes/merlt/graph';
+import {
+  _resetGraphClientForTests,
+  _resetSubgraphCacheForTests,
+} from '../../../src/routes/merlt/graph';
 
 const TEST_MERLT_BASE = 'http://merlt-test.local:8000';
 const INTERNAL_SECRET = 'test-internal-secret';
@@ -26,6 +29,9 @@ beforeAll(() => {
 
 afterEach(() => {
   nock.cleanAll();
+  // The subgraph cache (P1.12) is a module-level singleton: many tests reuse
+  // the same urn/depth/limit, so a stale entry would short-circuit nock mocks.
+  _resetSubgraphCacheForTests();
 });
 
 afterAll(() => {
@@ -110,7 +116,7 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
     expect(seen.max_nodes).toBe('25');
   });
 
-  it('defaults to depth=2 max_nodes=500 when no params are given', async () => {
+  it('defaults to depth=2 max_nodes=200 when no params are given', async () => {
     await grantConsent(user, 'basic');
     const urn = 'urn:nir:stato:codice.civile:1942;2043';
 
@@ -128,7 +134,29 @@ describe('GET /api/merlt/graph/article/:urn (MERLT-2a.4)', () => {
       .set(authHeader(user));
 
     expect(seen.depth).toBe('2');
-    expect(seen.max_nodes).toBe('500');
+    expect(seen.max_nodes).toBe('200');
+  });
+
+  it('clamps limit to the MERL-T hard cap: 500 → 200 (defect #9)', async () => {
+    // MERL-T's graph_router.py silently truncates max_nodes > 200 — the BFF
+    // clamp must match so the client never believes it asked for more.
+    await grantConsent(user, 'basic');
+    const urn = 'urn:nir:stato:codice.civile:1942;2043';
+
+    let seen: Record<string, unknown> = {};
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/subgraph')
+      .query((q) => {
+        seen = q;
+        return q.root_urn === urn;
+      })
+      .reply(200, mockSubgraph(urn));
+
+    await request(app)
+      .get(`/api/merlt/graph/article/${encodeURIComponent(urn)}?limit=500`)
+      .set(authHeader(user));
+
+    expect(seen.max_nodes).toBe('200');
   });
 
   it('clamps depth below range up to the lower bound (1)', async () => {

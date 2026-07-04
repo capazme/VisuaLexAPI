@@ -487,6 +487,90 @@ def _is_openable_search_id(entity_id: Optional[str]) -> bool:
     return not entity_id.strip().lower().startswith("live:")
 
 
+# Per-label search specs for /entities/search (defect #3a). The graph carries
+# ONE :Entity node out of ~27.7k — searching only :Entity returned nothing.
+# Each spec drives a small per-label Cypher query; results are merged and
+# ranked in Python (type_rank ASC — Norma first). Fields verified against the
+# Libro IV seed: Norma has estremi/rubrica/titolo (no nome); concepts and
+# principles have nome/descrizione; AttoGiudiziario has estremi/massima.
+_SEARCH_LABEL_SPECS: List[Dict[str, Any]] = [
+    {
+        "label": "Norma",
+        "match_fields": ["estremi", "rubrica", "titolo"],
+        "name_fields": ["estremi", "rubrica", "titolo"],
+        "id_fields": ["URN", "node_id"],
+        "article_filter_field": "URN",
+        "urn_field": "URN",
+        "type_rank": 0,
+    },
+    {
+        "label": "ConcettoGiuridico",
+        "match_fields": ["nome", "descrizione"],
+        "name_fields": ["nome"],
+        "id_fields": ["node_id"],
+        "article_filter_field": None,
+        "urn_field": None,
+        "type_rank": 1,
+    },
+    {
+        "label": "PrincipioGiuridico",
+        "match_fields": ["nome", "descrizione"],
+        "name_fields": ["nome"],
+        "id_fields": ["node_id"],
+        "article_filter_field": None,
+        "urn_field": None,
+        "type_rank": 1,
+    },
+    {
+        "label": "AttoGiudiziario",
+        "match_fields": ["estremi", "massima"],
+        "name_fields": ["estremi"],
+        "id_fields": ["node_id"],
+        "article_filter_field": None,
+        "urn_field": None,
+        "type_rank": 2,
+    },
+    {
+        "label": "Entity",
+        "match_fields": ["nome", "descrizione"],
+        "name_fields": ["nome"],
+        "id_fields": ["id", "node_id"],
+        "article_filter_field": "article_urn",
+        "urn_field": "article_urn",
+        "type_rank": 3,
+        "tipo_field": "tipo",
+    },
+]
+
+
+def _build_label_search_cypher(spec: Dict[str, Any], with_article_filter: bool) -> str:
+    """Compile one _SEARCH_LABEL_SPECS entry into a per-label search query."""
+    match_clause = " OR ".join(
+        f"toLower(n.{f}) CONTAINS toLower($q)" for f in spec["match_fields"]
+    )
+    article_filter = ""
+    if with_article_filter:
+        article_filter = f"\n               AND n.{spec['article_filter_field']} CONTAINS $article_pattern"
+    id_expr = "COALESCE(" + ", ".join(f"n.{f}" for f in spec["id_fields"]) + ")"
+    nome_expr = "COALESCE(" + ", ".join(f"n.{f}" for f in spec["name_fields"]) + ")"
+    tipo_field = spec.get("tipo_field")
+    tipo_expr = f"COALESCE(n.{tipo_field}, '{spec['label']}')" if tipo_field else f"'{spec['label']}'"
+    urn_expr = f"n.{spec['urn_field']}" if spec["urn_field"] else "null"
+    return f"""
+            MATCH (n:{spec['label']})
+            WHERE ({match_clause}){article_filter}
+            RETURN
+                {id_expr} as id,
+                {nome_expr} as nome,
+                {tipo_expr} as tipo,
+                {urn_expr} as article_urn,
+                COALESCE(n.approval_score, 0.0) as approval_score,
+                COALESCE(n.validation_status, 'approved') as validation_status
+            ORDER BY COALESCE(n.approval_score, 0.0) DESC
+            LIMIT $limit
+            """
+
+
 @router.get("/entities/search")
 async def search_entities(
     q: str,
@@ -550,67 +634,59 @@ async def search_entities(
 
     all_entities = []
 
-    # === 1. Search in FalkorDB (approved entities) ===
+    # === 1. Search in FalkorDB (approved nodes, all label types — defect #3a) ===
     try:
         graph_client = FalkorDBClient()
         await graph_client.connect()
 
         try:
+            article_pattern: Optional[str] = None
             if article_urn:
                 article_pattern = article_urn.split(":")[-1] if ":" in article_urn else article_urn
-                query = """
-                MATCH (e:Entity)
-                WHERE (toLower(e.nome) CONTAINS toLower($q)
-                   OR toLower(e.descrizione) CONTAINS toLower($q))
-                   AND e.article_urn CONTAINS $article_pattern
-                RETURN
-                    e.id as id,
-                    e.nome as nome,
-                    e.tipo as tipo,
-                    e.article_urn as article_urn,
-                    COALESCE(e.approval_score, 0.0) as approval_score,
-                    COALESCE(e.validation_status, 'approved') as validation_status,
-                    COALESCE(e.llm_confidence, 0.5) as llm_confidence
-                ORDER BY e.approval_score DESC
-                LIMIT $limit
-                """
-                params = {"q": q, "limit": limit, "article_pattern": article_pattern}
-            else:
-                query = """
-                MATCH (e:Entity)
-                WHERE toLower(e.nome) CONTAINS toLower($q)
-                   OR toLower(e.descrizione) CONTAINS toLower($q)
-                RETURN
-                    e.id as id,
-                    e.nome as nome,
-                    e.tipo as tipo,
-                    e.article_urn as article_urn,
-                    COALESCE(e.approval_score, 0.0) as approval_score,
-                    COALESCE(e.validation_status, 'approved') as validation_status,
-                    COALESCE(e.llm_confidence, 0.5) as llm_confidence
-                ORDER BY e.approval_score DESC
-                LIMIT $limit
-                """
-                params = {"q": q, "limit": limit}
 
-            graph_result = await graph_client.query(query, params)
-
-            for row in graph_result:
-                if not _is_openable_search_id(row["id"]):
+            seen_graph_ids: set = set()
+            for spec in _SEARCH_LABEL_SPECS:
+                # When an article filter is requested, labels without an
+                # article-bearing field are skipped (strict-filter semantics,
+                # same as the legacy :Entity-only query).
+                if article_pattern and not spec["article_filter_field"]:
                     continue
-                result_type, result_urn = _classify_search_result(
-                    row["id"], row["tipo"], row.get("article_urn")
-                )
-                all_entities.append({
-                    "id": row["id"],
-                    "nome": row["nome"],
-                    "tipo": row["tipo"],
-                    "type": result_type,
-                    "urn": result_urn,
-                    "approval_score": row["approval_score"],
-                    "validation_status": row["validation_status"],
-                    "is_pending": False,  # In graph = not pending
-                })
+
+                query = _build_label_search_cypher(spec, with_article_filter=bool(article_pattern))
+                params: Dict[str, Any] = {"q": q, "limit": limit}
+                if article_pattern:
+                    params["article_pattern"] = article_pattern
+
+                try:
+                    graph_result = await graph_client.query(query, params)
+                except Exception as label_exc:
+                    log.warning(f"Search on label {spec['label']} failed: {label_exc}")
+                    continue
+
+                for row in graph_result:
+                    row_id = row.get("id")
+                    row_nome = row.get("nome")
+                    if not row_id or not row_nome:
+                        continue  # nodes without a usable label are noise in autocomplete
+                    if row_id in seen_graph_ids:
+                        continue
+                    if not _is_openable_search_id(row_id):
+                        continue
+                    seen_graph_ids.add(row_id)
+                    result_type, result_urn = _classify_search_result(
+                        row_id, row.get("tipo"), row.get("article_urn")
+                    )
+                    all_entities.append({
+                        "id": row_id,
+                        "nome": row_nome,
+                        "tipo": row.get("tipo"),
+                        "type": result_type,
+                        "urn": result_urn,
+                        "approval_score": row.get("approval_score") or 0.0,
+                        "validation_status": row.get("validation_status") or "approved",
+                        "is_pending": False,  # In graph = not pending
+                        "_type_rank": spec["type_rank"],
+                    })
 
         finally:
             await graph_client.close()
@@ -663,25 +739,33 @@ async def search_entities(
                         "approval_score": entity.approval_score or 0.0,
                         "validation_status": "pending",
                         "is_pending": True,
+                        # Pending rows always sort after approved (is_pending is
+                        # the first sort key), so type ranking barely matters here.
+                        "_type_rank": 3,
                     })
 
         except Exception as e:
             log.warning(f"PostgreSQL pending search failed: {e}")
 
     # === 3. Sort combined results ===
-    # Order: approved first, then by exact match, then by approval_score
+    # Order: approved first, then exact match, then type rank (Norma first),
+    # then approval_score.
     def sort_key(entity):
-        is_exact = entity["nome"].lower() == q.lower()
+        is_exact = (entity.get("nome") or "").lower() == q.lower()
         return (
             entity["is_pending"],  # False (approved) first
             0 if is_exact else 1,  # Exact match first
+            entity.get("_type_rank", 99),  # Norma → concepts/principles → atti → entity
             -entity["approval_score"],  # Higher score first
         )
 
     all_entities.sort(key=sort_key)
 
-    # Limit final results
+    # Limit final results, dropping the internal ranking key (payload shape
+    # stays id/nome/tipo/type/urn/approval_score/validation_status/is_pending).
     all_entities = all_entities[:limit]
+    for entity in all_entities:
+        entity.pop("_type_rank", None)
 
     log.info(
         "Entity search completed",
@@ -999,6 +1083,34 @@ class SubgraphMetadata(BaseModel):
     depth_reached: int
     root_node_id: str
     query_time_ms: Optional[float] = None
+    # True when the edge query hit the max_nodes LIMIT — the FE can surface
+    # "risultato troncato" instead of pretending the neighborhood is complete.
+    truncated: bool = False
+
+
+# Only scalar relationship properties are serialized into the edge DTO —
+# lists/maps (e.g. embeddings) would bloat the payload for no FE benefit.
+_EDGE_SCALAR_TYPES = (str, int, float, bool)
+
+
+def _edge_properties(raw_props: Any, hop_level: Any) -> Dict[str, Any]:
+    """Merge real relationship properties into the edge DTO (defect #8).
+
+    The subgraph RETURNs used to serialize only ``type(r)`` and hardcode
+    ``properties={hop_level}`` — dropping ``certezza``, ``fonte``,
+    ``tipo_interpretazione`` etc. that EdgeDetailsDrawer renders. ``raw_props``
+    is the map produced by ``properties(r)`` in Cypher (None when r is null).
+    """
+    properties: Dict[str, Any] = {}
+    if isinstance(raw_props, dict):
+        for key, value in raw_props.items():
+            if key.startswith("_"):
+                continue  # internal plumbing (e.g. _seed_key), not FE-facing
+            if isinstance(value, _EDGE_SCALAR_TYPES):
+                properties[key] = value
+    if isinstance(hop_level, int) and hop_level > 1:
+        properties["hop_level"] = hop_level
+    return properties
 
 
 class SubgraphResponse(BaseModel):
@@ -1273,33 +1385,92 @@ async def get_subgraph(
     await graph_client.connect()
 
     try:
-        # Build depth-aware Cypher query for multi-hop traversal
-        # depth=1: (root)-[r]-(n1)
-        # depth=2: (root)-[r]-(n1)-[r2]-(n2)
-        # depth=3: (root)-[r]-(n1)-[r2]-(n2)-[r3]-(n3)
+        # --- Root lookup, separate from the edge query. The root must ALWAYS
+        # be returned when it exists: an empty `nodes` array is the FE's
+        # "article not indexed" signal (Slice 2a gotcha #4), so relation/type
+        # filters or the LIMIT must never be able to drop it.
+        root_cypher = """
+        MATCH (root)
+        WHERE root.URN = $root_urn
+           OR root.urn = $root_urn
+           OR root.node_id = $root_urn
+        RETURN root, indegree(root) + outdegree(root) as degree
+        LIMIT 1
+        """
+        root_result = await graph_client.query(root_cypher, {"root_urn": root_urn})
 
+        if not root_result or not root_result[0].get("root"):
+            query_time = (time.time() - start_time) * 1000
+            log.info("Subgraph root not found", root_urn=root_urn, query_time_ms=query_time)
+            return SubgraphResponse(
+                nodes=[],
+                edges=[],
+                metadata=SubgraphMetadata(
+                    total_nodes=0,
+                    total_edges=0,
+                    depth_reached=0,
+                    root_node_id=root_urn,
+                    query_time_ms=round(query_time, 2),
+                    truncated=False,
+                ),
+            )
+
+        # --- Filters compiled INTO the Cypher (defect #9): filtering in Python
+        # after the LIMIT wasted the node budget on rows that were then thrown
+        # away. Both filters target the returned edge/neighbor of each row.
+        params: Dict[str, Any] = {"root_urn": root_urn, "max_nodes": max_nodes}
+        filter_clauses: List[str] = []
+        if relation_types:
+            # Case-insensitive: the live graph mixes lowercase seed types
+            # ("commenta", "contiene") with uppercase enrichment types
+            # ("DISCIPLINA"), and the legacy Python filter uppercased both sides.
+            allowed_rels = [t.strip().lower() for t in relation_types.split(",") if t.strip()]
+            if allowed_rels:
+                filter_clauses.append("toLower(type(r)) IN $allowed_rels")
+                params["allowed_rels"] = allowed_rels
+        if entity_types:
+            allowed_types = [t.strip().lower() for t in entity_types.split(",") if t.strip()]
+            if allowed_types:
+                # Norma nodes always pass (same carve-out as the old Python filter).
+                filter_clauses.append(
+                    "(toLower(labels(connected)[0]) IN $allowed_types"
+                    " OR toLower(labels(connected)[0]) = 'norma')"
+                )
+                params["allowed_types"] = allowed_types
+        where_filter = ("WHERE " + " AND ".join(filter_clauses)) if filter_clauses else ""
+
+        # --- Depth-aware edge query. Ranked deterministic truncation (F4):
+        # ORDER BY hop ASC, certezza DESC before LIMIT, so close/strong edges
+        # survive the cut first (and hop-1 rows always precede the hop-2 rows
+        # that depend on them). `properties(r)` returns the real edge props
+        # (defect #8); indegree+outdegree is FalkorDB's O(1) node degree.
         if depth == 1:
-            cypher = """
+            edge_cypher = f"""
             MATCH (root)
             WHERE root.URN = $root_urn
                OR root.urn = $root_urn
                OR root.node_id = $root_urn
             WITH root
             LIMIT 1
-            OPTIONAL MATCH (root)-[r]-(connected)
-            RETURN root, type(r) as rel_type, connected, 1 as hop_level,
-                   id(root) as source_id, id(connected) as target_id
+            MATCH (root)-[r]-(connected)
+            {where_filter}
+            WITH root, r, connected, 1 as hop
+            ORDER BY hop ASC, COALESCE(r.certezza, 0.5) DESC
             LIMIT $max_nodes
+            RETURN type(r) as rel_type, properties(r) as rel_props,
+                   connected, hop as hop_level,
+                   id(root) as source_id, id(connected) as target_id,
+                   indegree(connected) + outdegree(connected) as node_degree
             """
         elif depth == 2:
-            cypher = """
+            edge_cypher = f"""
             MATCH (root)
             WHERE root.URN = $root_urn
                OR root.urn = $root_urn
                OR root.node_id = $root_urn
             WITH root
             LIMIT 1
-            CALL {
+            CALL {{
                 WITH root
                 MATCH (root)-[r]-(n1)
                 RETURN root as src, r, n1 as dst, 1 as hop
@@ -1308,20 +1479,26 @@ async def get_subgraph(
                 MATCH (root)-[]-(n1)-[r2]-(n2)
                 WHERE n2 <> root
                 RETURN n1 as src, r2 as r, n2 as dst, 2 as hop
-            }
-            RETURN root, type(r) as rel_type, dst as connected, hop as hop_level,
-                   id(src) as source_id, id(dst) as target_id
+            }}
+            WITH src, r, dst as connected, hop
+            {where_filter}
+            WITH src, r, connected, hop
+            ORDER BY hop ASC, COALESCE(r.certezza, 0.5) DESC
             LIMIT $max_nodes
+            RETURN type(r) as rel_type, properties(r) as rel_props,
+                   connected, hop as hop_level,
+                   id(src) as source_id, id(connected) as target_id,
+                   indegree(connected) + outdegree(connected) as node_degree
             """
         else:  # depth == 3
-            cypher = """
+            edge_cypher = f"""
             MATCH (root)
             WHERE root.URN = $root_urn
                OR root.urn = $root_urn
                OR root.node_id = $root_urn
             WITH root
             LIMIT 1
-            CALL {
+            CALL {{
                 WITH root
                 MATCH (root)-[r]-(n1)
                 RETURN root as src, r, n1 as dst, 1 as hop
@@ -1335,86 +1512,83 @@ async def get_subgraph(
                 MATCH (root)-[]-(n1)-[]-(n2)-[r3]-(n3)
                 WHERE n3 <> root AND n3 <> n1
                 RETURN n2 as src, r3 as r, n3 as dst, 3 as hop
-            }
-            RETURN root, type(r) as rel_type, dst as connected, hop as hop_level,
-                   id(src) as source_id, id(dst) as target_id
+            }}
+            WITH src, r, dst as connected, hop
+            {where_filter}
+            WITH src, r, connected, hop
+            ORDER BY hop ASC, COALESCE(r.certezza, 0.5) DESC
             LIMIT $max_nodes
+            RETURN type(r) as rel_type, properties(r) as rel_props,
+                   connected, hop as hop_level,
+                   id(src) as source_id, id(connected) as target_id,
+                   indegree(connected) + outdegree(connected) as node_degree
             """
 
-        result = await graph_client.query(cypher, {"root_urn": root_urn, "max_nodes": max_nodes})
+        result = await graph_client.query(edge_cypher, params)
 
         nodes: List[SubgraphNode] = []
         edges: List[SubgraphEdge] = []
         seen_node_ids: Dict[str, str] = {}  # internal_id -> node_id
-        root_node_id = root_urn
-        root_internal_id = None
         max_hop_reached = 0  # Track actual depth reached
 
-        if result and len(result) > 0:
-            # Process root node (same in all rows)
-            first_row = result[0]
-            if first_row.get("root"):
-                root_data = first_row["root"]
-                root_props = root_data.get("properties", root_data)
-                root_internal_id = str(root_data.get("id", ""))
-                root_node_id = root_props.get("URN") or root_props.get("urn") or root_props.get("node_id") or root_urn
+        # Root node from the dedicated lookup
+        root_row = root_result[0]
+        root_data = root_row["root"]
+        root_props = root_data.get("properties", root_data)
+        root_internal_id = str(root_data.get("id", ""))
+        root_node_id = root_props.get("URN") or root_props.get("urn") or root_props.get("node_id") or root_urn
 
-                root_node = _parse_graph_node_v2(root_data, include_metadata)
-                nodes.append(root_node)
-                seen_node_ids[root_internal_id] = root_node.id
+        root_node = _parse_graph_node_v2(root_data, include_metadata)
+        root_degree = root_row.get("degree")
+        if isinstance(root_degree, (int, float)):
+            root_node.metadata["degree"] = int(root_degree)
+        nodes.append(root_node)
+        seen_node_ids[root_internal_id] = root_node.id
 
-            # Process connected nodes and edges (multi-hop aware)
-            for row in result:
-                connected = row.get("connected")
-                rel_type = row.get("rel_type")
-                hop_level = row.get("hop_level", 1)
-                source_id = row.get("source_id")
-                target_id = row.get("target_id")
+        # Connected nodes and edges (multi-hop aware)
+        for row in result or []:
+            connected = row.get("connected")
+            rel_type = row.get("rel_type")
+            hop_level = row.get("hop_level", 1)
+            source_id = row.get("source_id")
+            target_id = row.get("target_id")
 
-                # Track max depth reached
-                if hop_level and hop_level > max_hop_reached:
-                    max_hop_reached = hop_level
+            # Track max depth reached
+            if hop_level and hop_level > max_hop_reached:
+                max_hop_reached = hop_level
 
-                if connected and rel_type:
-                    conn_data = connected
-                    conn_props = conn_data.get("properties", conn_data)
-                    conn_internal_id = str(conn_data.get("id", ""))
+            if not (connected and rel_type):
+                continue
 
-                    # Add node if not seen
-                    if conn_internal_id not in seen_node_ids:
-                        node = _parse_graph_node_v2(conn_data, include_metadata)
+            conn_internal_id = str(connected.get("id", ""))
 
-                        # Filter by entity type if specified
-                        if entity_types:
-                            allowed_types = [t.strip().lower() for t in entity_types.split(",")]
-                            if node.type.lower() not in allowed_types and node.type.lower() != "norma":
-                                continue
+            # Add node if not seen
+            if conn_internal_id not in seen_node_ids:
+                node = _parse_graph_node_v2(connected, include_metadata)
+                node_degree = row.get("node_degree")
+                if isinstance(node_degree, (int, float)):
+                    node.metadata["degree"] = int(node_degree)
+                nodes.append(node)
+                seen_node_ids[conn_internal_id] = node.id
 
-                        # Filter by relation type if specified
-                        if relation_types:
-                            allowed_rels = [r.strip().upper() for r in relation_types.split(",")]
-                            if rel_type.upper() not in allowed_rels:
-                                continue
+            # Add edge using source_id/target_id from multi-hop query
+            source_key = str(source_id) if source_id is not None else root_internal_id
+            target_key = str(target_id) if target_id is not None else conn_internal_id
 
-                        nodes.append(node)
-                        seen_node_ids[conn_internal_id] = node.id
+            if source_key in seen_node_ids and target_key in seen_node_ids:
+                edge_id = f"{seen_node_ids[source_key]}-{rel_type}-{seen_node_ids[target_key]}"
+                # Avoid duplicate edges
+                if not any(e.id == edge_id for e in edges):
+                    edges.append(SubgraphEdge(
+                        id=edge_id,
+                        source=seen_node_ids[source_key],
+                        target=seen_node_ids[target_key],
+                        type=rel_type,
+                        properties=_edge_properties(row.get("rel_props"), hop_level),
+                    ))
 
-                    # Add edge using source_id/target_id from multi-hop query
-                    source_key = str(source_id) if source_id else root_internal_id
-                    target_key = str(target_id) if target_id else conn_internal_id
-
-                    if source_key in seen_node_ids and target_key in seen_node_ids:
-                        edge_id = f"{seen_node_ids[source_key]}-{rel_type}-{seen_node_ids[target_key]}"
-                        edge = SubgraphEdge(
-                            id=edge_id,
-                            source=seen_node_ids[source_key],
-                            target=seen_node_ids[target_key],
-                            type=rel_type,
-                            properties={"hop_level": hop_level} if hop_level > 1 else {},
-                        )
-                        # Avoid duplicate edges
-                        if not any(e.id == edge_id for e in edges):
-                            edges.append(edge)
+        # LIMIT hit ⇒ the neighborhood was (very likely) cut short.
+        truncated = bool(result) and len(result) >= max_nodes
 
         query_time = (time.time() - start_time) * 1000
 
@@ -1424,6 +1598,7 @@ async def get_subgraph(
             nodes_count=len(nodes),
             edges_count=len(edges),
             depth_reached=max_hop_reached or 1,
+            truncated=truncated,
             query_time_ms=query_time,
         )
 
@@ -1436,6 +1611,7 @@ async def get_subgraph(
                 depth_reached=max_hop_reached or depth,  # Actual depth reached
                 root_node_id=root_node_id,
                 query_time_ms=round(query_time, 2),
+                truncated=truncated,
             ),
         )
 

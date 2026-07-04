@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Download, EyeOff, Loader2, Network, Upload, X } from 'lucide-react';
+import { AlertCircle, Download, EyeOff, Loader2, Maximize2, Network, Upload, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useMerltFeatures } from '../../useMerltFeatures';
@@ -11,11 +11,13 @@ import { useArticleGraph } from '../shared/useArticleGraph';
 import type { GraphElements } from '../shared/graphTransform';
 import {
   buildDeliberationOverlay,
+  canonKeyFromNodeId,
   readDeliberation,
   resolveEdgeSelection,
   withDeliberationOverlay,
 } from '../shared/graphDeliberation';
 import type {
+  CanonKey,
   DisagreementConflict,
   ExpertContribution,
   GraphEdge,
@@ -36,7 +38,7 @@ import {
   type IngestionTriggerErrorKind,
 } from '../shared/graphApi';
 import type { GraphNode, GraphSearchItem } from '../shared/types';
-import type { GraphLayoutName } from '../shared/GraphCanvas';
+import type { GraphCanvasHandle, GraphLayoutName } from '../shared/GraphCanvas';
 import { Toast } from '../../../../components/ui/Toast';
 import { computeTypeCounts } from '../shared/graphFilters';
 import { GraphSearchBox } from './GraphSearchBox';
@@ -105,6 +107,34 @@ export function GraphExplorerPage(): React.ReactElement {
   const qa = useQaThread();
   // Deliberation column tab: 'dibattito' after an ask, 'nodo' after a node click.
   const [activeTab, setActiveTab] = useState<'dibattito' | 'nodo'>('dibattito');
+  // Defect #4: a turn that settles while the user is on the Nodo tab pulses the
+  // Dibattito tab. Cleared the moment the tab is opened (see switchTab).
+  const [dibattitoBadge, setDibattitoBadge] = useState(false);
+  const switchTab = useCallback((tab: 'dibattito' | 'nodo'): void => {
+    setActiveTab(tab);
+    if (tab === 'dibattito') setDibattitoBadge(false);
+  }, []);
+  // Defect #10: the deliberation is SCOPED to the center it was asked on —
+  // recorded at ask time. When the user recenters elsewhere, the overlay /
+  // source highlight / steer channels switch off and a "torna" chip appears.
+  const [askScope, setAskScope] = useState<{ urn: string; label: string; type: string | null } | null>(null);
+  // Defect #5: a canon-star click on canvas routes to the Dibattito tab and
+  // expands that canon's thesis; the nonce re-arms a repeat click.
+  const [canonFocus, setCanonFocus] = useState<{ key: CanonKey; nonce: number } | null>(null);
+  // P1.9: "× evidenza fonti" — the user dismissed the sources emphasis for the
+  // current deliberation; re-armed when a new answer (new sources) settles.
+  const [sourceFadeDismissed, setSourceFadeDismissed] = useState(false);
+  // P1.7: imperative handle into the canvas for "Adatta alla vista".
+  const canvasRef = useRef<GraphCanvasHandle | null>(null);
+
+  // Defect #4, derived during render (react-hooks/set-state-in-effect): when the
+  // count of SETTLED turns grows while the Nodo tab is active, light the badge.
+  const settledCount = qa.turns.filter((t) => t.state.status !== 'loading').length;
+  const [seenSettledCount, setSeenSettledCount] = useState(settledCount);
+  if (settledCount !== seenSettledCount) {
+    setSeenSettledCount(settledCount);
+    if (settledCount > seenSettledCount && activeTab === 'nodo') setDibattitoBadge(true);
+  }
   // Slice 4 P2b (§5 L2): the "pesa di più questo canone" upsell opens the consent
   // dialog when the jurist lacks full consent. Hosted here so the steer control can
   // route users to grant `full` without leaving the deliberation.
@@ -158,16 +188,34 @@ export function GraphExplorerPage(): React.ReactElement {
     // same state and the question is asked, never lost. The disabled AskGraphField
     // already surfaces the "serve il consenso base" hint in the meantime.
     if (!qaAskable) {
-      setActiveTab('dibattito');
+      switchTab('dibattito');
       return;
     }
     prefillConsumedRef.current = true;
-    setActiveTab('dibattito');
+    // Defect #10: the prefilled ask is scoped to the article it came from.
+    setAskScope(urn ? { urn, label: state.articleHeading ?? urn, type: centerType } : null);
+    switchTab('dibattito');
     void qa.ask(state.prefillQuery, 'convergent');
     // Strip the consumed prefill from history so reload / back does not re-fire it.
     navigate(location.pathname + location.search, { replace: true, state: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, qaAskable]);
+
+  // P1.7: global Esc — deselect node/edge and close the inspection drawer (the
+  // Nodo tab flips back to the debate). Ignored while typing in a field and while
+  // the consent dialog is open (it owns its own dismissal).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || consentDialogOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      setSelectedNodeId(null);
+      setSelectedEdge(null);
+      switchTab('dibattito');
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [consentDialogOpen, switchTab]);
 
   useEffect(() => {
     if (graph.status !== 'success' || graph.data.nodes.length > 0) return;
@@ -223,6 +271,14 @@ export function GraphExplorerPage(): React.ReactElement {
   const nodesById = useMemo(() => new Map<string, GraphNode>(nodes.map((n) => [n.id, n])), [nodes]);
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
 
+  // Defect #10: does the CURRENT center match the center recorded at ask time?
+  // An unscoped ask (no center at ask time, or a legacy thread) always matches.
+  // Version markers are stripped on both sides (gotcha #6) so `!vig=` variants
+  // of the same article stay in scope.
+  const scopeMatches =
+    askScope === null ||
+    (urn !== null && stripVersionMarker(askScope.urn) === stripVersionMarker(urn));
+
   // The most recent successful deliberation drives the sources-as-nodes highlight
   // (design §3.2). Sources present in the current subgraph light up on canvas; the
   // rest stay listed as chips in the column. Pure FE join — no missing node added.
@@ -234,9 +290,19 @@ export function GraphExplorerPage(): React.ReactElement {
     return [];
   }, [qa.turns]);
 
-  // Is there an active/pending deliberation? Drives the "nascondi giurisprudenza"
-  // default-on and the source highlight. True the moment the first turn appears.
-  const hasDeliberation = qa.turns.length > 0;
+  // P1.9: re-arm the dismissed sources emphasis when a NEW answer settles (the
+  // memo above hands back a fresh reference only when the turns change).
+  // Derived during render — no set-state-in-effect.
+  const [trackedSources, setTrackedSources] = useState<QaRetrievedSource[]>(latestSources);
+  if (latestSources !== trackedSources) {
+    setTrackedSources(latestSources);
+    if (sourceFadeDismissed) setSourceFadeDismissed(false);
+  }
+
+  // Is there an active/pending deliberation ON THIS CENTER? Drives the "nascondi
+  // giurisprudenza" default-on. True the moment the first turn appears, but only
+  // while the current center matches the deliberation's scope (defect #10).
+  const hasDeliberation = qa.turns.length > 0 && scopeMatches;
 
   // Slice 4 P2a — the debate overlay reflects ONLY the LATEST turn's answer, and
   // only while it is settled successfully. A new ask (newest turn → loading) or a
@@ -252,11 +318,12 @@ export function GraphExplorerPage(): React.ReactElement {
   // failed newest turn clears it), so the edge steer control hides exactly when
   // there is no current deliberation to teach against.
   const latestTraceId = useMemo<string | null>(() => {
+    if (!scopeMatches) return null; // defect #10: steering is scoped to its center
     const last = qa.turns[qa.turns.length - 1];
     return last?.state.status === 'success' && last.state.answer.trace_id
       ? last.state.answer.trace_id
       : null;
-  }, [qa.turns]);
+  }, [qa.turns, scopeMatches]);
 
   const deliberation = useMemo(() => readDeliberation(latestAnswer), [latestAnswer]);
   const expertContributions = useMemo<ExpertContribution[]>(
@@ -273,7 +340,7 @@ export function GraphExplorerPage(): React.ReactElement {
   // node_id (preferred) OR urn matches a node id/urn currently rendered. Uses the
   // TRANSFORMED elements' ids (same id space the canvas highlights on).
   const sourceHighlightIds = useMemo<ReadonlySet<string> | null>(() => {
-    if (latestSources.length === 0) return null;
+    if (!scopeMatches || latestSources.length === 0) return null;
     const byUrn = new Map<string, string>();
     for (const n of nodes) if (n.urn) byUrn.set(n.urn, n.id);
     const nodeIds = new Set(nodes.map((n) => n.id));
@@ -283,7 +350,11 @@ export function GraphExplorerPage(): React.ReactElement {
       else if (byUrn.has(s.urn)) hit.add(byUrn.get(s.urn)!);
     }
     return hit.size > 0 ? hit : null;
-  }, [latestSources, nodes]);
+  }, [latestSources, nodes, scopeMatches]);
+
+  // P1.9: the emphasis actually sent to the canvas — the "× evidenza fonti" chip
+  // clears it without losing the underlying join (a new answer re-arms it).
+  const effectiveSourceHighlightIds = sourceFadeDismissed ? null : sourceHighlightIds;
 
   // "Nascondi giurisprudenza": manual override wins; otherwise default-on while a
   // deliberation is active (density mitigation), off in plain exploration.
@@ -323,14 +394,16 @@ export function GraphExplorerPage(): React.ReactElement {
   // answer. Empty when there is no settled deliberation → withDeliberationOverlay
   // returns the real elements unchanged (no synthetic churn on exploration).
   const deliberationOverlay = useMemo(() => {
-    if (expertContributions.length === 0) return null;
+    // Defect #10: the debate overlay belongs to the center it was asked on —
+    // never painted over a DIFFERENT center's subgraph.
+    if (!scopeMatches || expertContributions.length === 0) return null;
     return buildDeliberationOverlay({
       contributions: expertContributions,
       conflicts,
       devilsAdvocateActive,
       centerNodeId,
     });
-  }, [expertContributions, conflicts, devilsAdvocateActive, centerNodeId]);
+  }, [expertContributions, conflicts, devilsAdvocateActive, centerNodeId, scopeMatches]);
 
   // Canvas elements = real subgraph + overlay. The export-slice and the drawer
   // read the RAW graph.data/graph.elements, never this merged set, so synthetic
@@ -360,6 +433,9 @@ export function GraphExplorerPage(): React.ReactElement {
     push({ urn: target, label });
     setSelectedNodeId(null);
     setSelectedEdge(null);
+    // Defect #4: a recenter is a fresh context — land on the debate, not on a
+    // stale Nodo drawer of the previous center.
+    switchTab('dibattito');
     const next: Record<string, string> = { urn: target, depth: String(depth), layout };
     if (type) next.type = type;
     setSearchParams(next);
@@ -387,10 +463,18 @@ export function GraphExplorerPage(): React.ReactElement {
   // A node click on the canvas selects it AND flips the column to the Nodo tab
   // so its details are visible (design §4 — click a node → inspect it). Clears
   // any edge selection so the Nodo tab shows exactly one target.
+  // Defect #5: a CANON star is not a graph node to inspect — it routes to the
+  // Dibattito tab and expands that canon's thesis instead of an empty drawer.
   const handleNodeClick = (id: string): void => {
+    const canonKey = canonKeyFromNodeId(id);
+    if (canonKey) {
+      switchTab('dibattito');
+      setCanonFocus((prev) => ({ key: canonKey, nonce: (prev?.nonce ?? 0) + 1 }));
+      return;
+    }
     setSelectedNodeId(id);
     setSelectedEdge(null);
-    setActiveTab('nodo');
+    switchTab('nodo');
   };
 
   // Real relation edges keyed by id (raw subgraph, NOT the overlaid set) so a
@@ -432,13 +516,29 @@ export function GraphExplorerPage(): React.ReactElement {
   );
 
   // Header/column "Chiedi al grafo": fire the ask and surface the Dibattito tab.
+  // Records the ask-time center (defect #10) so the resulting deliberation stays
+  // scoped to it when the user recenters elsewhere mid-flight.
   const handleAsk = useCallback(
     (question: string, mode: QaMode): void => {
-      setActiveTab('dibattito');
+      setAskScope(urn ? { urn, label: centerLabel ?? urn, type: centerType } : null);
+      switchTab('dibattito');
       void qa.ask(question, mode);
     },
-    [qa],
+    [qa, urn, centerLabel, centerType, switchTab],
   );
+
+  // P1.10: one collegial run at a time — both AskGraphField instances share this.
+  const qaBusy = qa.turns.some((t) => t.state.status === 'loading');
+
+  // Defect #10: the deliberation lives on ANOTHER center — the Dibattito tab
+  // shows a compact chip whose "Torna" recenters on the ask-time urn.
+  const scopeChip =
+    !scopeMatches && askScope && qa.turns.length > 0
+      ? {
+          label: askScope.label,
+          onReturn: () => goToCenter(askScope.urn, askScope.label, askScope.type),
+        }
+      : null;
 
   // A deliberation source chip re-centers the CANVAS (design §3.2). node_id is a
   // real graph node id → if it's in the current subgraph, just select it (no
@@ -518,6 +618,7 @@ export function GraphExplorerPage(): React.ReactElement {
             centerUrn={urn ?? undefined}
             centerLabel={centerLabel}
             disabled={!qaAskable}
+            busy={qaBusy}
             onAsk={handleAsk}
           />
         </div>
@@ -592,7 +693,7 @@ export function GraphExplorerPage(): React.ReactElement {
           ) : graph.status === 'loading' || graph.status === 'idle' ? (
             <CanvasSkeleton />
           ) : graph.status === 'error' ? (
-            <ErrorState />
+            <ErrorState onRetry={graph.refetch} />
           ) : graph.data.nodes.length === 0 ? (
             // C3: a concept center with an empty subgraph means "no neighbours /
             // not found" — NOT an article to (re-)ingest. No spinner, no
@@ -634,39 +735,45 @@ export function GraphExplorerPage(): React.ReactElement {
             )
           ) : (
             <Suspense fallback={<CanvasSkeleton />}>
-              <GraphFilterPanel
-                nodeTypes={typeCounts.nodes}
-                edgeTypes={typeCounts.edges}
-                hiddenNodeTypes={hiddenNodeTypes}
-                hiddenEdgeTypes={hiddenEdgeTypes}
-                onToggleNodeType={(t) => setHiddenNodeTypes((s) => toggleHidden(s, t))}
-                onToggleEdgeType={(t) => setHiddenEdgeTypes((s) => toggleHidden(s, t))}
-                onSetAllNodes={(hidden) =>
-                  setHiddenNodeTypes(hidden ? new Set(typeCounts.nodes.map((n) => n.type)) : new Set())
-                }
-                onSetAllEdges={(hidden) =>
-                  setHiddenEdgeTypes(hidden ? new Set(typeCounts.edges.map((e) => e.type)) : new Set())
-                }
-                onHoverType={setHighlightType}
-              />
-              {/* Primary "nascondi giurisprudenza" control (design §4/§8): the
-                  one real legibility lever, promoted out of the filter panel.
-                  Default-on while a deliberation is active. */}
-              <button
-                type="button"
-                onClick={() => setHideJurisManual(!hideJurisprudence)}
-                aria-pressed={hideJurisprudence}
-                title="Nascondi le sentenze per alleggerire il grafo"
-                className={cn(
-                  'absolute left-3 top-3 z-20 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                  hideJurisprudence
-                    ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
-                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
-                )}
-              >
-                <EyeOff size={14} /> Nascondi giurisprudenza
-              </button>
+              {/* Top-left overlay stack: the "nascondi giurisprudenza" pill and
+                  the filter panel share ONE flex column — both used to sit at
+                  the same absolute left-3/top-3 slot and collided. */}
+              <div className="absolute left-3 top-3 z-20 flex w-60 max-w-[80%] flex-col items-start gap-2">
+                {/* Primary "nascondi giurisprudenza" control (design §4/§8): the
+                    one real legibility lever, promoted out of the filter panel.
+                    Default-on while a deliberation is active. */}
+                <button
+                  type="button"
+                  onClick={() => setHideJurisManual(!hideJurisprudence)}
+                  aria-pressed={hideJurisprudence}
+                  title="Nascondi le sentenze per alleggerire il grafo"
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                    hideJurisprudence
+                      ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
+                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                  )}
+                >
+                  <EyeOff size={14} /> Nascondi giurisprudenza
+                </button>
+                <GraphFilterPanel
+                  nodeTypes={typeCounts.nodes}
+                  edgeTypes={typeCounts.edges}
+                  hiddenNodeTypes={hiddenNodeTypes}
+                  hiddenEdgeTypes={hiddenEdgeTypes}
+                  onToggleNodeType={(t) => setHiddenNodeTypes((s) => toggleHidden(s, t))}
+                  onToggleEdgeType={(t) => setHiddenEdgeTypes((s) => toggleHidden(s, t))}
+                  onSetAllNodes={(hidden) =>
+                    setHiddenNodeTypes(hidden ? new Set(typeCounts.nodes.map((n) => n.type)) : new Set())
+                  }
+                  onSetAllEdges={(hidden) =>
+                    setHiddenEdgeTypes(hidden ? new Set(typeCounts.edges.map((e) => e.type)) : new Set())
+                  }
+                  onHoverType={setHighlightType}
+                />
+              </div>
               <GraphCanvas
+                ref={canvasRef}
                 nodes={canvasElements.nodes}
                 edges={canvasElements.edges}
                 layout={layout}
@@ -674,7 +781,7 @@ export function GraphExplorerPage(): React.ReactElement {
                 hiddenNodeTypes={effectiveHiddenNodeTypes}
                 hiddenEdgeTypes={hiddenEdgeTypes}
                 highlightNodeType={highlightType}
-                highlightNodeIds={sourceHighlightIds}
+                highlightNodeIds={effectiveSourceHighlightIds}
                 onNodeClick={handleNodeClick}
                 onNodeDblClick={(id) => {
                   const n = nodesById.get(id);
@@ -682,6 +789,28 @@ export function GraphExplorerPage(): React.ReactElement {
                 }}
                 onEdgeClick={handleEdgeClick}
               />
+              {/* P1.9: dismissable "evidenza fonti" chip — the sources emphasis
+                  fades the rest of the graph, so it must be one click to clear. */}
+              {sourceHighlightIds && !sourceFadeDismissed && (
+                <button
+                  type="button"
+                  onClick={() => setSourceFadeDismissed(true)}
+                  aria-label="Rimuovi evidenza fonti"
+                  title="Rimuovi l'evidenza delle fonti consultate"
+                  className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 shadow-sm transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300 dark:hover:bg-primary-950/60"
+                >
+                  <X size={12} /> Evidenza fonti
+                </button>
+              )}
+              {/* P1.7: one-click re-fit after zoom/pan wanderings. */}
+              <button
+                type="button"
+                onClick={() => canvasRef.current?.fit()}
+                title="Adatta il grafo alla vista"
+                className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <Maximize2 size={14} /> Adatta alla vista
+              </button>
             </Suspense>
           )}
         </main>
@@ -692,7 +821,7 @@ export function GraphExplorerPage(): React.ReactElement {
         <div className="hidden w-[400px] shrink-0 md:block">
           <DeliberationColumn
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={switchTab}
             turns={qa.turns}
             onAsk={handleAsk}
             onRetry={qa.retry}
@@ -703,19 +832,25 @@ export function GraphExplorerPage(): React.ReactElement {
             selectedEdge={selectedEdge}
             expertContributions={expertContributions}
             canContribute={canContribute}
-            onPreferCanon={qa.prefer}
+            // Steering is scoped to the deliberation's own center (defect #10):
+            // off-scope the canon steer hides with the rest of the overlay.
+            onPreferCanon={scopeMatches ? qa.prefer : undefined}
             // No settled trace → undefined → the column hides the edge steer
             // entirely (steering needs a deliberation to attach to).
             onPreferRelation={latestTraceId ? handlePreferRelation : undefined}
             onOpenConsent={() => setConsentDialogOpen(true)}
             qaAskable={qaAskable}
+            askBusy={qaBusy}
+            dibattitoBadge={dibattitoBadge}
+            scopeChip={scopeChip}
+            canonFocus={canonFocus}
             nodesById={nodesById}
             edges={edges}
             onRecenter={handleRecenter}
             onCloseNode={() => {
               setSelectedNodeId(null);
               setSelectedEdge(null);
-              setActiveTab('dibattito');
+              switchTab('dibattito');
             }}
           />
         </div>
@@ -841,17 +976,19 @@ function CanvasSkeleton(): React.ReactElement {
   );
 }
 
-function ErrorState(): React.ReactElement {
-  return (
-    <CenteredText text="Errore nel caricamento del grafo." icon />
-  );
-}
-
-function CenteredText({ text, icon }: { text: string; icon?: boolean }): React.ReactElement {
+/** P1.11: load failures offer an in-place "Riprova" wired to the graph refetch. */
+function ErrorState({ onRetry }: { onRetry: () => void }): React.ReactElement {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-      {icon && <AlertCircle className="h-8 w-8 text-red-500" />}
-      <p className="text-slate-500 dark:text-slate-400">{text}</p>
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <p className="text-slate-500 dark:text-slate-400">Errore nel caricamento del grafo.</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
+        Riprova
+      </button>
     </div>
   );
 }
