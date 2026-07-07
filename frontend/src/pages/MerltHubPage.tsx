@@ -5,6 +5,7 @@ import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
 import { useConsent } from '../features/merlt/consent/useConsent';
 import { ConsentDialog } from '../features/merlt/consent/ConsentDialog';
 import { OpsTrainingButton } from '../features/merlt/ops/OpsTrainingButton';
+import { OpsConfigPanel } from '../features/merlt/ops/OpsConfigPanel';
 import { NerOpsCard } from '../features/merlt/ner/NerOpsCard';
 import {
   useHubData,
@@ -92,6 +93,12 @@ export function MerltHubPage() {
             <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
               <NerOpsCard />
             </div>
+          </HubCard>
+        )}
+
+        {features.opsVisible && (
+          <HubCard testId="hub-card-ops-config" icon={Settings} title="Regolazione motore (admin)">
+            <OpsConfigPanel />
           </HubCard>
         )}
       </div>
