@@ -58,6 +58,13 @@ export interface QaDisagreementAnalysis {
   confidence: number;
   conflicts: QaExpertPairConflict[];
   pairwise_matrix?: number[][] | null;
+  /**
+   * Wave C: provenance of the disagreement numbers. MAY be absent (older
+   * responses) — treat absence as authoritative. When present and NOT
+   * 'model-trained', the numbers are a heuristic estimate and the UI must
+   * caveat them rather than present them as ground truth.
+   */
+  source?: 'heuristic' | 'model-untrained' | 'model-trained' | null;
 }
 
 /**
@@ -82,6 +89,49 @@ export interface ExpertContribution {
   weight: number;
 }
 
+/**
+ * One hop of the systemic expert's graph walk (node→relation→node), as emitted
+ * verbatim by the BFF's `graph_traversal` field (mirrors
+ * backend/src/services/merlt/expertsClient.ts `GraphTraversalEdge`). `iteration`
+ * groups hops belonging to the same traversal round; `target_urn`/`source_urn`
+ * are graph node identifiers (Normattiva URLs, `modalita:*` / `massima_*` concept
+ * ids, or `live:*` provisional nodes) — NOT necessarily present in the currently
+ * rendered subgraph.
+ */
+export interface GraphTraversalEdge {
+  iteration: number;
+  source_urn: string;
+  relation_type: string;
+  target_urn: string;
+  target_type: string;
+}
+
+/** One tool invocation inside a canon's execution (parsed from `pipeline_trace`). */
+export interface QaToolUsage {
+  expert: string;
+  toolName: string;
+  success: boolean;
+  resultCount: number | null;
+  error: string | null;
+  durationMs: number;
+}
+
+/**
+ * One ReAct iteration inside a canon's execution (parsed from `pipeline_trace`).
+ * MERL-T runs ReAct PER canon (typically 3 iterations each) — the steps live at
+ * `stages.expert_executions[*].react_steps`, NOT at a top-level `react_steps`
+ * (that field never existed on the wire; the earlier code read the wrong level
+ * and always saw an empty array).
+ */
+export interface QaReactStep {
+  expert: string;
+  iteration: number;
+  thought: string;
+  action: string;
+  success: boolean;
+  resultsFound: number | null;
+}
+
 export interface QaAnswer {
   trace_id: string;
   synthesis: string;
@@ -97,10 +147,31 @@ export interface QaAnswer {
   pipeline_metrics?: Record<string, unknown> | null;
   /** Slice 4 P2a: full disagreement object; null when the canons converge. */
   disagreement_analysis?: QaDisagreementAnalysis | null;
+  /** Wave C: NL rationale of the divergence + art. 12 preleggi criteria; null on convergent answers. */
+  disagreement_explanation?: string | null;
   /** Slice 4 P2a: devil's-advocate marker; `expert` null until P2b. */
   devils_advocate_flag?: QaDevilsAdvocateFlag | null;
   /** Slice 4 P2a: per-canon full theses; `[]` on the degenerate no-expert path. */
   expert_contributions?: ExpertContribution[];
+  /**
+   * The systemic expert's ordered graph walk. Optional/absent on turns built
+   * before this field existed (e.g. hand-built test fixtures, the slim history
+   * DTO before hydration) — treat absence as `[]`. `[]` also when the query
+   * had no graph-resolvable seed norms. Drives "Segui il ragionamento sul grafo".
+   */
+  graphTraversal?: GraphTraversalEdge[];
+  /**
+   * Tool calls the canons fired, parsed from `pipeline_trace` (present only
+   * when the request ran with `include_trace: true`). Optional/absent (treat
+   * as `[]`) when the trace is missing or predates this field.
+   */
+  toolUsages?: QaToolUsage[];
+  /**
+   * Per-canon ReAct iterations, parsed from `pipeline_trace` (same conditions
+   * as `toolUsages`). Optional/absent (treat as `[]`) when the trace is
+   * missing, predates this field, or the canons ran single-step (no ReAct).
+   */
+  reactSteps?: QaReactStep[];
 }
 
 export type QaAnswerState =
@@ -124,8 +195,21 @@ export interface QaHistoryItem {
 
 export type ConfirmState = 'pending' | 'done' | 'error';
 
-/** How the turn's answer was requested — kept so a failed turn can be re-run in place (Riprova). */
-export type QaTurnRequest = { kind: 'ask'; mode: QaMode } | { kind: 'refine'; traceId: string };
+/**
+ * The graph "context basket" carried by a question: the nodes the jurist chose
+ * to reason WITH. Norma nodes → `normReferences` (graph urn), concept nodes →
+ * `legalConcepts` (label). The BFF maps these onto MERL-T's `context.entities`.
+ */
+export interface GraphContext {
+  normReferences?: string[];
+  legalConcepts?: string[];
+}
+
+/** How the turn's answer was requested — kept so a failed turn can be re-run in place (Riprova).
+ *  `context` (the graph context basket) is preserved so Riprova re-sends the SAME selected nodes. */
+export type QaTurnRequest =
+  | { kind: 'ask'; mode: QaMode; context?: GraphContext }
+  | { kind: 'refine'; traceId: string };
 
 export interface QaTurnModel {
   id: string;
@@ -134,6 +218,16 @@ export interface QaTurnModel {
   rating?: 1 | 5; // optimistic 👍/👎
   confirmed: Record<string, ConfirmState>; // by retrieved-source node_id
   request?: QaTurnRequest; // absent on history-loaded turns (nothing to retry)
+  /**
+   * Wave 2 (history completeness, review P2.6) — HISTORY-loaded turns only.
+   * The history DTO is slim (no retrieved_sources / expert_contributions /
+   * disagreement), so `loadHistoryTurn` re-fetches the full trace and patches
+   * the answer: 'loading' while the trace fetch is in flight, 'hydrated' once
+   * the details landed, 'unavailable' when the trace expired / was never stored
+   * (the slim turn stays, with a "dettagli non più disponibili" note).
+   * Absent on live turns.
+   */
+  historyDetail?: 'loading' | 'hydrated' | 'unavailable';
 }
 
 /**

@@ -14,14 +14,16 @@ vi.mock('../../shared/useArticleGraph', () => ({
 }));
 // GraphCanvas is code-split; capture the props each render so tests can assert
 // the effective hidden-types set + the sources-as-nodes highlight ids. The page's
-// imperative fit handle (React 19 ref-as-prop) is stubbed with canvasFitMock.
+// imperative handle (React 19 ref-as-prop) is stubbed with canvasFitMock (fit)
+// + canvasFocusNodeMock (F3 focusNode).
 let lastCanvasProps: Record<string, unknown> = {};
 const canvasFitMock = vi.fn();
+const canvasFocusNodeMock = vi.fn();
 vi.mock('../../shared/GraphCanvas', () => ({
   default: (props: Record<string, unknown>) => {
     lastCanvasProps = props;
     const ref = props.ref as { current: unknown } | undefined;
-    if (ref && typeof ref === 'object') ref.current = { fit: canvasFitMock };
+    if (ref && typeof ref === 'object') ref.current = { fit: canvasFitMock, focusNode: canvasFocusNodeMock };
     return <div data-testid="cytoscape" />;
   },
 }));
@@ -72,14 +74,16 @@ vi.mock('../../../qa/qaApi', () => ({
 }));
 
 const triggerIngestionMock = vi.fn();
+const fetchNodeNeighborhoodMock = vi.fn();
 const useIngestionJobMock = vi.fn();
 vi.mock('../../shared/graphApi', async (importOriginal) => {
   // Keep the real classifyIngestionTriggerError so the 403-vs-5xx mapping is
-  // exercised end-to-end; only the network call is mocked.
+  // exercised end-to-end; only the network calls are mocked.
   const actual = await importOriginal<typeof import('../../shared/graphApi')>();
   return {
     ...actual,
     triggerIngestion: (...a: unknown[]) => triggerIngestionMock(...a),
+    fetchNodeNeighborhood: (...a: unknown[]) => fetchNodeNeighborhoodMock(...a),
   };
 });
 vi.mock('../../shared/useIngestionJob', () => ({
@@ -133,6 +137,9 @@ beforeEach(() => {
   qaThreadState.turns = [];
   lastCanvasProps = {};
   canvasFitMock.mockReset();
+  canvasFocusNodeMock.mockReset();
+  fetchNodeNeighborhoodMock.mockReset();
+  fetchNodeNeighborhoodMock.mockResolvedValue({ nodes: [], edges: [] });
   triggerIngestionMock.mockReset();
   triggerIngestionMock.mockResolvedValue({ jobId: 'job-1', status: 'pending' });
   useIngestionJobMock.mockReset();
@@ -151,13 +158,13 @@ describe('GraphExplorerPage', () => {
   it('shows the empty-state tagline when there is no urn in the query', () => {
     renderAt('/grafo');
     expect(screen.getByText(/per iniziare/i)).toBeInTheDocument();
-    expect(useArticleGraphMock).toHaveBeenCalledWith(null, expect.any(Number));
+    expect(useArticleGraphMock).toHaveBeenCalledWith(null, expect.any(Number), expect.any(Number));
   });
 
   it('reads urn + depth from the query and fetches the graph', () => {
     setGraph({ status: 'loading' });
     renderAt('/grafo?urn=urn%3Atest&depth=3');
-    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3);
+    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 150);
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
@@ -173,7 +180,7 @@ describe('GraphExplorerPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '3' }));
     // URL depth → 3 → useArticleGraph re-invoked with the new depth (refetch).
-    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3);
+    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 150);
   });
 
   it('changing layout does not change the urn/depth passed to useArticleGraph (no refetch)', () => {
@@ -189,8 +196,83 @@ describe('GraphExplorerPage', () => {
     });
     // Every call keeps depth=2 — layout never reaches the fetch hook.
     for (const call of useArticleGraphMock.mock.calls) {
-      expect(call).toEqual(['urn:test', 2]);
+      expect(call).toEqual(['urn:test', 2, 150]);
     }
+  });
+
+  // Wave 2 payload diet: the depth default is per-center-kind (URL still wins).
+  describe('payload diet defaults (Wave 2)', () => {
+    it('defaults to depth 2 + limit 150 for an ARTICLE center', () => {
+      setGraph({ status: 'loading' });
+      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 150);
+    });
+
+    it('defaults to depth 1 for a CONCEPT center (hairball mitigation)', () => {
+      setGraph({ status: 'loading' });
+      renderAt('/grafo?urn=concetto-1&type=ConcettoGiuridico');
+      expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 1, 150);
+    });
+
+    it('an explicit ?depth= overrides the concept default (URL-as-SoT)', () => {
+      setGraph({ status: 'loading' });
+      renderAt('/grafo?urn=concetto-1&type=ConcettoGiuridico&depth=3');
+      expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 3, 150);
+    });
+  });
+
+  // Wave 2 F4: honest truncation chip + "Carica di più" limit ladder.
+  describe('truncation chip (F4)', () => {
+    function truncatedGraph(degree?: number): void {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [
+            {
+              id: 'root',
+              type: 'Norma',
+              label: 'Art. 1453',
+              urn: 'urn:x~art1453',
+              metadata: degree !== undefined ? { degree } : {},
+            },
+            { id: 'n1', type: 'ConcettoGiuridico', label: 'Risoluzione' },
+          ],
+          edges: [{ id: 'e1', source: 'root', target: 'n1', type: 'DISCIPLINA' }],
+          metadata: { truncated: true },
+        },
+        elements: { nodes: [{ id: 'root' }, { id: 'n1' }], edges: [] },
+      });
+    }
+
+    // The chip mounts inside the lazy-canvas Suspense block -> findBy* (async).
+    it('shows "Mostro N di M relazioni" when the payload is truncated', async () => {
+      truncatedGraph(42);
+      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      expect(await screen.findByText('Mostro 1 di 42 relazioni')).toBeInTheDocument();
+    });
+
+    it('"Carica di più" bumps the limit to the next ladder step and refetches', async () => {
+      truncatedGraph(42);
+      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      fireEvent.click(await screen.findByRole('button', { name: /carica più relazioni/i }));
+      // limit 150 → 200; a new limit is a new SWR key → new fetch.
+      expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 200);
+    });
+
+    it('no chip when the payload is complete', async () => {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [{ id: 'root', type: 'Norma', label: 'A', urn: 'urn:x~art1453' }],
+          edges: [],
+          metadata: { truncated: false },
+        },
+        elements: { nodes: [{ id: 'root' }], edges: [] },
+      });
+      renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
+      await screen.findByTestId('cytoscape'); // wait for the lazy canvas branch
+      expect(screen.queryByText(/Mostro \d+ di/)).toBeNull();
+    });
   });
 
   it('triggers ingestion and shows a building banner when the subgraph is empty', async () => {
@@ -395,7 +477,24 @@ describe('GraphExplorerPage', () => {
       fireEvent.change(field, { target: { value: 'Perché neminem laedere?' } });
       fireEvent.keyDown(field, { key: 'Enter' });
 
-      expect(qaAskMock).toHaveBeenCalledWith('Perché neminem laedere?', 'convergent');
+      // The ask carries the context basket, seeded with the current center (an
+      // article → the norm_references channel).
+      expect(qaAskMock).toHaveBeenCalledWith('Perché neminem laedere?', 'convergent', {
+        context: { normReferences: ['urn:x~art2043'] },
+      });
+    });
+
+    it('removing the seeded center from the basket sends an UNANCHORED ask (empty context)', () => {
+      setPopulatedGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // Remove the seeded center chip (the two instances share the page basket).
+      fireEvent.click(screen.getAllByRole('button', { name: /dal contesto/i })[0]);
+      const field = screen.getAllByLabelText('Chiedi al grafo', { selector: 'input' })[0];
+      fireEvent.change(field, { target: { value: 'Domanda generale?' } });
+      fireEvent.keyDown(field, { key: 'Enter' });
+
+      expect(qaAskMock).toHaveBeenCalledWith('Domanda generale?', 'convergent', { context: undefined });
     });
 
     it('disables asking when consent is below basic (qaAskable=false)', () => {
@@ -414,7 +513,9 @@ describe('GraphExplorerPage', () => {
         articleHeading: 'Art. 2043',
       });
       await waitFor(() =>
-        expect(qaAskMock).toHaveBeenCalledWith('Spiega la responsabilità aquiliana', 'convergent')
+        expect(qaAskMock).toHaveBeenCalledWith('Spiega la responsabilità aquiliana', 'convergent', {
+          context: { normReferences: ['urn:x~art2043'] },
+        })
       );
       // Consumed exactly once — no duplicate ask on re-render.
       expect(qaAskMock).toHaveBeenCalledTimes(1);
@@ -886,10 +987,12 @@ describe('GraphExplorerPage', () => {
       expect(canvasNodeIds().some((id) => id.startsWith('canon:'))).toBe(true);
       expect(screen.queryByText(/dibattito attivo su/i)).not.toBeInTheDocument();
 
-      // Recenter on ANOTHER node (double-click) → different center.
+      // Recenter on ANOTHER node → different center. F2 moved the recenter
+      // gesture to the drawer's explicit "Centra qui" (dblclick now expands).
       act(() => {
-        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2059');
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
       });
+      fireEvent.click(screen.getByRole('button', { name: /centra qui/i }));
       // Overlay + source emphasis are gone; the scope chip appears instead.
       expect(canvasNodeIds().some((id) => id.startsWith('canon:'))).toBe(false);
       expect(lastCanvasProps.highlightNodeIds ?? null).toBeNull();
@@ -945,4 +1048,355 @@ describe('GraphExplorerPage', () => {
       }
     });
   });
+
+  describe('Wave 2 F1 — persistent canvas (SWR + veil)', () => {
+    const oneNodeData = () => ({
+      data: {
+        nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }],
+        edges: [],
+      },
+      elements: { nodes: [{ id: 'node-2043' }], edges: [] },
+    });
+
+    it("keeps the canvas mounted with a veil during 'revalidating' (no skeleton swap)", async () => {
+      setGraph({ status: 'revalidating', ...oneNodeData() });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      // The previous graph stays live on canvas…
+      expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
+      // …under the Italian revalidation veil.
+      expect(screen.getByText(/aggiornamento del grafo/i)).toBeInTheDocument();
+    });
+
+    it('shows no veil once the fetch settles (success)', async () => {
+      setGraph({ status: 'success', ...oneNodeData() });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(await screen.findByTestId('cytoscape')).toBeInTheDocument();
+      expect(screen.queryByText(/aggiornamento del grafo/i)).not.toBeInTheDocument();
+    });
+
+    it('keeps the full skeleton strictly for the very first load (loading)', () => {
+      setGraph({ status: 'loading' });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.queryByTestId('cytoscape')).not.toBeInTheDocument();
+    });
+
+    it('threads the computed centerNodeId into the canvas (fit discipline input)', async () => {
+      setGraph({ status: 'success', ...oneNodeData() });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      await screen.findByTestId('cytoscape');
+      expect(lastCanvasProps.centerNodeId).toBe('node-2043');
+    });
+  });
+
+  describe('Wave 2 F3+F2 — selezione unificata + espansione in-place', () => {
+    function setTwoNodeGraph(): void {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [
+            { id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' },
+            { id: 'node-2059', type: 'Norma', label: 'Art. 2059', urn: 'urn:x~art2059' },
+          ],
+          edges: [],
+        },
+        elements: { nodes: [{ id: 'node-2043' }, { id: 'node-2059' }], edges: [] },
+      });
+    }
+
+    /** A settled turn with ONE retrieved source joinable to node-2043. */
+    function sourceTurn(): QaTurnModel {
+      return {
+        id: 'turn-src',
+        question: 'Domanda?',
+        confirmed: {},
+        state: {
+          status: 'success',
+          answer: {
+            trace_id: 'trace-src',
+            synthesis: 'Sintesi.',
+            mode: 'convergent',
+            alternatives: null,
+            sources: [],
+            retrieved_sources: [
+              { urn: 'urn:x~art2043', provenance: 'seed', trust: 0.9, node_id: 'node-2043' },
+            ],
+            experts_used: ['literal'],
+            confidence: 0.8,
+            execution_time_ms: 10,
+          },
+        },
+      } as QaTurnModel;
+    }
+
+    const canvasNodeIds = (): string[] =>
+      (lastCanvasProps.nodes as Array<{ id: string }>).map((n) => n.id);
+
+    const expandDelta = () => ({
+      nodes: [
+        { id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' },
+        { id: 'node-new', type: 'ConcettoGiuridico', label: 'Buona fede' },
+      ],
+      edges: [{ id: 'e-exp', source: 'node-2043', target: 'node-new', type: 'RICHIAMA' }],
+    });
+
+    it('threads the controlled selection into the canvas; Esc clears both brains', () => {
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(lastCanvasProps.selectedNodeId).toBeNull();
+
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
+      });
+      expect(lastCanvasProps.selectedNodeId).toBe('node-2059');
+
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(lastCanvasProps.selectedNodeId).toBeNull();
+      expect(screen.getByRole('tab', { name: /dibattito/i })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('threads the selected EDGE id into the canvas and a node click clears it', () => {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [
+            { id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' },
+            { id: 'node-2059', type: 'Norma', label: 'Art. 2059', urn: 'urn:x~art2059' },
+          ],
+          edges: [
+            { id: 'e1', source: 'node-2043', target: 'node-2059', type: 'DISCIPLINA', properties: {} },
+          ],
+        },
+        elements: {
+          nodes: [{ id: 'node-2043' }, { id: 'node-2059' }],
+          edges: [{ id: 'e1', source: 'node-2043', target: 'node-2059' }],
+        },
+      });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onEdgeClick as (id: string) => void)('e1');
+      });
+      expect(lastCanvasProps.selectedEdgeId).toBe('e1');
+
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2043');
+      });
+      expect(lastCanvasProps.selectedEdgeId).toBeNull();
+      expect(lastCanvasProps.selectedNodeId).toBe('node-2043');
+    });
+
+    it('a canvas background click clears selection AND the drawer', () => {
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
+      });
+      expect(screen.getByRole('tab', { name: /nodo/i })).toHaveAttribute('aria-selected', 'true');
+
+      act(() => {
+        (lastCanvasProps.onCanvasClick as () => void)();
+      });
+      expect(lastCanvasProps.selectedNodeId).toBeNull();
+      expect(screen.getByRole('tab', { name: /dibattito/i })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('a source chip for an IN-GRAPH node focuses the camera + selects — no navigation', () => {
+      qaThreadState.turns = [sourceTurn()];
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      fireEvent.click(screen.getByTitle(/centra il grafo su/i));
+
+      expect(canvasFocusNodeMock).toHaveBeenCalledWith('node-2043', { select: true });
+      expect(lastCanvasProps.selectedNodeId).toBe('node-2043');
+      expect(screen.getByRole('tab', { name: /nodo/i })).toHaveAttribute('aria-selected', 'true');
+      // NO navigation: the fetch hook never saw a different center.
+      for (const call of useArticleGraphMock.mock.calls) {
+        expect(call[0]).toBe('urn:x~art2043');
+      }
+    });
+
+    it('double-click EXPANDS in place: delta merges, center prop unchanged, no navigation', async () => {
+      fetchNodeNeighborhoodMock.mockResolvedValue(expandDelta());
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      await waitFor(() => expect(canvasNodeIds()).toContain('node-new'));
+
+      // Depth-1 fetch rooted on the node's urn.
+      expect(fetchNodeNeighborhoodMock).toHaveBeenCalledWith('urn:x~art2043', expect.any(Number));
+      // The base subgraph is intact, the delta joined it.
+      expect(canvasNodeIds()).toEqual(expect.arrayContaining(['node-2043', 'node-2059', 'node-new']));
+      // The camera contract: same center → GraphCanvas never moves the camera.
+      expect(lastCanvasProps.centerNodeId).toBe('node-2043');
+      for (const call of useArticleGraphMock.mock.calls) {
+        expect(call[0]).toBe('urn:x~art2043');
+      }
+    });
+
+    it('pulses the expanding node while its fetch is in flight', async () => {
+      let resolveFetch!: (v: unknown) => void;
+      fetchNodeNeighborhoodMock.mockReturnValue(new Promise((res) => { resolveFetch = res; }));
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      expect(lastCanvasProps.pulseNodeId).toBe('node-2043');
+
+      await act(async () => {
+        resolveFetch(expandDelta());
+      });
+      expect(lastCanvasProps.pulseNodeId).toBeNull();
+    });
+
+    it('expanding the same node twice is a no-op with an Italian toast', async () => {
+      fetchNodeNeighborhoodMock.mockResolvedValue(expandDelta());
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      await waitFor(() => expect(canvasNodeIds()).toContain('node-new'));
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      expect(screen.getByText(/nodo già espanso/i)).toBeInTheDocument();
+      expect(fetchNodeNeighborhoodMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses to expand past the node cap with the "grafo pieno" toast', () => {
+      const many = Array.from({ length: 300 }, (_, i) => ({
+        id: `n${i}`,
+        type: 'Norma',
+        label: `N${i}`,
+      }));
+      setGraph({
+        status: 'success',
+        data: { nodes: many, edges: [] },
+        elements: { nodes: many.map((n) => ({ id: n.id })), edges: [] },
+      });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('n5');
+      });
+      expect(screen.getByText(/grafo pieno/i)).toBeInTheDocument();
+      expect(fetchNodeNeighborhoodMock).not.toHaveBeenCalled();
+    });
+
+    it('an expansion with nothing new marks the node expanded and says so', async () => {
+      // Delta contains only nodes/edges already on canvas.
+      fetchNodeNeighborhoodMock.mockResolvedValue({
+        nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }],
+        edges: [],
+      });
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      await screen.findByText(/nessun nuovo collegamento/i);
+
+      // Re-expanding hits the already-expanded guard (no second fetch).
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      expect(fetchNodeNeighborhoodMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('recentering via the drawer "Centra qui" resets the expansion (per-center delta)', async () => {
+      fetchNodeNeighborhoodMock.mockResolvedValue(expandDelta());
+      setTwoNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      act(() => {
+        (lastCanvasProps.onNodeDblClick as (id: string) => void)('node-2043');
+      });
+      await waitFor(() => expect(canvasNodeIds()).toContain('node-new'));
+
+      // Recenter stays available as the drawer's explicit action (F2 item 5).
+      act(() => {
+        (lastCanvasProps.onNodeClick as (id: string) => void)('node-2059');
+      });
+      fireEvent.click(screen.getByRole('button', { name: /centra qui/i }));
+
+      // New center → the fetch hook saw the new urn AND the delta was dropped.
+      expect(useArticleGraphMock.mock.calls.some((c) => c[0] === 'urn:x~art2059')).toBe(true);
+      await waitFor(() => expect(canvasNodeIds()).not.toContain('node-new'));
+    });
+  });
+
+  describe('MARQUEE — "Segui il ragionamento sul grafo" replays on the MAIN canvas', () => {
+    function turnWithWalk(): QaTurnModel {
+      return {
+        id: 'turn-walk',
+        question: 'Qual è la ratio dell’art. 2043?',
+        confirmed: {},
+        state: {
+          status: 'success',
+          answer: {
+            trace_id: 'trace-walk',
+            synthesis: 'La ratio è il neminem laedere.',
+            mode: 'convergent',
+            alternatives: null,
+            sources: [],
+            retrieved_sources: [],
+            experts_used: ['systemic'],
+            confidence: 0.8,
+            execution_time_ms: 100,
+            graphTraversal: [
+              { iteration: 0, source_urn: 'urn:x~art2043', relation_type: 'IMPONE', target_urn: 'modalita:x', target_type: 'ModalitaGiuridica' },
+            ],
+          },
+        },
+      };
+    }
+
+    it('clicking "Segui il ragionamento sul grafo" takes over the main canvas with the walk-mode sequencer', async () => {
+      qaThreadState.turns = [turnWithWalk()];
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }], edges: [] },
+        elements: { nodes: [{ id: 'node-2043' }], edges: [] },
+      });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      fireEvent.click(screen.getByRole('button', { name: /segui il ragionamento sul grafo/i }));
+
+      // The sequencer's step caption + close control confirm the player took
+      // over the main region (not the deliberation column). Lazy-loaded
+      // (Suspense) → await the resolved DOM instead of a synchronous assert.
+      await waitFor(() => expect(screen.getByText(/passo 1\/1/i)).toBeInTheDocument());
+      expect(screen.getByRole('button', { name: /chiudi il replay del ragionamento/i })).toBeInTheDocument();
+    });
+
+    it('"Chiudi il replay" restores the normal main-canvas view', async () => {
+      qaThreadState.turns = [turnWithWalk()];
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }], edges: [] },
+        elements: { nodes: [{ id: 'node-2043' }], edges: [] },
+      });
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      fireEvent.click(screen.getByRole('button', { name: /segui il ragionamento sul grafo/i }));
+      await waitFor(() => expect(screen.getByText(/passo 1\/1/i)).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /chiudi il replay del ragionamento/i }));
+      expect(screen.queryByText(/passo 1\/1/i)).not.toBeInTheDocument();
+      // The article subgraph view is back (its canvas mounts again).
+      expect(screen.getByTestId('cytoscape')).toBeInTheDocument();
+    });
+  });
+
 });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Check, Info, Loader2, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { BookOpen, Check, Info, Loader2, Network, Scale, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
 import {
   useFloating,
   useHover,
@@ -15,7 +15,9 @@ import {
   FloatingPortal,
 } from '@floating-ui/react';
 import { cn } from '../../../lib/utils';
-import { formatRetrievedUrn, CANON_LABEL, provenanceMeta } from './format';
+import { useAppStore } from '../../../store/useAppStore';
+import { normRefToSearchParams } from '../validate/provenance';
+import { formatRetrievedUrn, CANON_LABEL, provenanceMeta, urnKind } from './format';
 import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 
 /**
@@ -130,6 +132,8 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
 }
 
 export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }: QaSourceChipProps) {
+  const navigate = useNavigate();
+  const triggerSearch = useAppStore((s) => s.triggerSearch);
   const meta = provenanceMeta(source.provenance);
   // For provisional (live:) nodes the URN is an opaque hash; prefer the
   // underlying Normattiva URL when known — it gives a readable label AND a
@@ -139,6 +143,21 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
   const label = formatRetrievedUrn(displayUrn);
   const navigable = !displayUrn.startsWith('live:');
   const confirmable = source.provenance === 'live_unconfirmed' && !!source.node_id;
+
+  // "Apri" (feature 3, quick-open): norma → the VisuaLex reader (vanilla
+  // navigate('/') + triggerSearch mechanism, same as ValidationCard); sentenza
+  // → its source_url when known, else no primary action (only the /grafo jump
+  // stays, as a secondary affordance).
+  const kind = urnKind(displayUrn);
+  const normParams = kind.kind === 'norma' ? normRefToSearchParams(displayUrn) : null;
+  const openNorma = (): void => {
+    if (!normParams) return;
+    navigate('/');
+    triggerSearch(normParams);
+  };
+  const openSentenza = (): void => {
+    if (source.source_url) window.open(source.source_url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <li className="relative flex items-start justify-between gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white py-2 pl-4 pr-3 dark:border-slate-700 dark:bg-slate-900">
@@ -163,9 +182,38 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
             <span className="text-slate-400">· affidabilità {source.trust.toFixed(2)}</span>
           )}
         </p>
+        {/* Primary quick-open: norma → the reader, sentenza → its source_url. */}
+        {normParams && (
+          <button
+            type="button"
+            onClick={openNorma}
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+          >
+            <BookOpen size={12} /> Apri la norma
+          </button>
+        )}
+        {kind.kind === 'sentenza' && source.source_url && (
+          <button
+            type="button"
+            onClick={openSentenza}
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+          >
+            <Scale size={12} /> Apri la sentenza
+          </button>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        {navigable && (
+          <Link
+            to={`/grafo?urn=${encodeURIComponent(displayUrn)}`}
+            aria-label="Apri nel grafo esplorativo"
+            title="Apri nel grafo esplorativo"
+            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          >
+            <Network size={14} />
+          </Link>
+        )}
         <SourceInfo source={source} cited={cited} />
         {onRate && (
           <>

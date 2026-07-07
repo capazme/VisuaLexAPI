@@ -71,6 +71,19 @@ export function readNodeTrust(node: Pick<GraphNode, 'properties' | 'metadata'>):
 }
 
 /**
+ * Read the FULL-graph degree of a node (Wave 1 payload: MERL-T stamps
+ * `metadata.degree` = indegree+outdegree on every subgraph node). This is the
+ * node's total connection count in the graph — NOT the count of edges present
+ * in the current (possibly truncated) subgraph. Undefined when absent.
+ */
+export function readNodeDegree(node: Pick<GraphNode, 'properties' | 'metadata'>): number | undefined {
+  const props = node.properties ?? {};
+  const meta = node.metadata ?? {};
+  const n = coerceTrust(meta.degree ?? props.degree);
+  return n !== undefined && Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/**
  * Derive the canonical provenance of a node from its raw props/metadata.
  *
  * Precedence (highest trust wins so a validated node is never dimmed to

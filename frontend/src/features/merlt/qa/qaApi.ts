@@ -1,5 +1,6 @@
 import { apiClient } from '../../../services/api';
-import type { QaAnswer, QaHistoryItem, QaMode } from './types';
+import { extractReactSteps, extractToolUsages } from './traceDetails';
+import type { GraphContext, GraphTraversalEdge, QaAnswer, QaHistoryItem, QaMode } from './types';
 
 /**
  * Typed BFF clients for the MERL-T expert Q&A routes (Loop β Phase F).
@@ -13,18 +14,68 @@ import type { QaAnswer, QaHistoryItem, QaMode } from './types';
 // first with a generic "nessuna risposta dal server".
 const QA_TIMEOUT_MS = 130000;
 
+/**
+ * Ask options. `context` is the "context basket" — the graph nodes the jurist
+ * selected to reason WITH (Norma → normReferences, concept → legalConcepts). The
+ * BFF maps it onto MERL-T's `context.entities`, the channel the orchestrator
+ * actually consumes (it anchors graph exploration + the expert prompts on them).
+ * Empty/absent = an unanchored ask.
+ */
+export interface AskQuestionOptions {
+  context?: GraphContext;
+  maxExperts?: number;
+}
+
+/** Drop a context with no references so no empty `context` key is sent. */
+function normalizeContext(context?: GraphContext): GraphContext | undefined {
+  if (!context) return undefined;
+  const normReferences = context.normReferences?.filter(Boolean) ?? [];
+  const legalConcepts = context.legalConcepts?.filter(Boolean) ?? [];
+  if (normReferences.length === 0 && legalConcepts.length === 0) return undefined;
+  return {
+    ...(normReferences.length ? { normReferences } : {}),
+    ...(legalConcepts.length ? { legalConcepts } : {}),
+  };
+}
+
+/** Raw wire shape before normalization — `graph_traversal` arrives snake_case. */
+type RawQaAnswer = Omit<QaAnswer, 'graphTraversal' | 'toolUsages' | 'reactSteps'> & {
+  graph_traversal?: GraphTraversalEdge[] | null;
+};
+
+/**
+ * Normalize the raw BFF response into `QaAnswer`: `graph_traversal` (snake_case
+ * wire field) → `graphTraversal`, and `toolUsages`/`reactSteps` parsed off
+ * `pipeline_trace` (present because every ask/refine now requests
+ * `include_trace: true` — the "Strumenti usati" panel needs
+ * `expert_executions[*].tool_calls`, and the "Passi ReAct" panel needs
+ * `expert_executions[*].react_steps`; NEITHER lives at the trace top level).
+ */
+function normalizeAnswer(raw: RawQaAnswer): QaAnswer {
+  return {
+    ...raw,
+    graphTraversal: raw.graph_traversal ?? [],
+    toolUsages: extractToolUsages(raw.pipeline_trace),
+    reactSteps: extractReactSteps(raw.pipeline_trace),
+  };
+}
+
 export async function askQuestion(
   query: string,
   mode: QaMode,
-  maxExperts?: number,
+  opts?: AskQuestionOptions,
   signal?: AbortSignal,
 ): Promise<QaAnswer> {
-  const res = await apiClient.post<QaAnswer>(
+  const res = await apiClient.post<RawQaAnswer>(
     '/merlt/experts/query',
-    { query, mode, maxExperts },
+    // undefined fields are dropped by JSON serialization — no key is sent
+    // for an unanchored ask. The BFF always forwards `include_trace: true` to
+    // MERL-T (routes/merlt/experts.ts), so `pipeline_trace.expert_executions`
+    // (tool_calls) is already populated for the "Strumenti usati" panel.
+    { query, mode, maxExperts: opts?.maxExperts, context: normalizeContext(opts?.context) },
     { timeout: QA_TIMEOUT_MS, signal },
   );
-  return res.data;
+  return normalizeAnswer(res.data);
 }
 
 export async function refineQuestion(
@@ -32,12 +83,12 @@ export async function refineQuestion(
   followUpQuery: string,
   signal?: AbortSignal,
 ): Promise<QaAnswer> {
-  const res = await apiClient.post<QaAnswer>(
+  const res = await apiClient.post<RawQaAnswer>(
     '/merlt/experts/refine',
     { traceId, followUpQuery },
     { timeout: QA_TIMEOUT_MS, signal },
   );
-  return res.data;
+  return normalizeAnswer(res.data);
 }
 
 export async function rateAnswer(traceId: string, rating: 1 | 5): Promise<void> {
@@ -80,5 +131,18 @@ export async function confirmSource(nodeId: string, entityText?: string): Promis
 
 export async function fetchHistory(limit = 20): Promise<QaHistoryItem[]> {
   const res = await apiClient.get<QaHistoryItem[]>('/merlt/experts/history', { params: { limit } });
+  return res.data;
+}
+
+/**
+ * Wave 2 (history completeness, review P2.6): fetch the FULL pipeline trace of
+ * a past deliberation (BFF GET /experts/trace/:traceId → MERL-T GET
+ * /api/v1/experts/trace/{trace_id}). The trace is loose/evolving JSON, so the
+ * transport stays `unknown` — `extractTraceDetails` (traceDetails.ts) parses
+ * it into the deliberation details. A 404 means the trace expired or was never
+ * stored: callers keep the slim history turn (graceful degradation).
+ */
+export async function fetchQaTrace(traceId: string): Promise<unknown> {
+  const res = await apiClient.get<unknown>(`/merlt/experts/trace/${encodeURIComponent(traceId)}`);
   return res.data;
 }

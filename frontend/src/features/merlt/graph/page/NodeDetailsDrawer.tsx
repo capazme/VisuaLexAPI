@@ -1,7 +1,7 @@
-import { X, Crosshair } from 'lucide-react';
+import { X, Check, Crosshair, Plus, Share2 } from 'lucide-react';
 import { NODE_TYPE_STYLE } from '../shared/graphStyles';
 import type { GraphNode, GraphEdge, NodeProvenance } from '../shared/types';
-import { deriveProvenance } from '../shared/types';
+import { deriveProvenance, readNodeDegree } from '../shared/types';
 
 export interface NodeDetailsDrawerProps {
   node: GraphNode | null;
@@ -9,6 +9,13 @@ export interface NodeDetailsDrawerProps {
   nodesById: Map<string, GraphNode>;
   onRecenter: (node: GraphNode) => void;
   onClose: () => void;
+  /**
+   * Nodes-as-context: add THIS node to the question's context basket. Absent →
+   * the affordance is hidden. `inContext` reflects whether it is already in the
+   * basket (the button flips to a subdued "Nel contesto" confirmation).
+   */
+  onAddToContext?: (node: GraphNode) => void;
+  inContext?: boolean;
 }
 
 // Prominent properties shown first, in this order, with friendly labels.
@@ -57,6 +64,8 @@ export function NodeDetailsDrawer({
   nodesById,
   onRecenter,
   onClose,
+  onAddToContext,
+  inContext = false,
 }: NodeDetailsDrawerProps): React.ReactElement | null {
   if (!node) return null;
 
@@ -66,6 +75,10 @@ export function NodeDetailsDrawer({
   const typeColor = NODE_TYPE_STYLE[node.type]?.color ?? '#94a3b8';
   const provenance = deriveProvenance(node);
   const provMeta = provenance ? PROVENANCE_META[provenance] : null;
+  // F4: FULL-graph degree (Wave-1 metadata) — the honest connection count the
+  // user sees BEFORE expanding, distinct from the in/out lists below which only
+  // cover the edges present in the current (possibly truncated) subgraph.
+  const degree = readNodeDegree(node);
 
   // Remaining primitive properties not already shown prominently.
   const extraProps = Object.entries(props)
@@ -95,6 +108,15 @@ export function NodeDetailsDrawer({
               >
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: provMeta.color }} />
                 {provMeta.label}
+              </span>
+            )}
+            {degree !== undefined && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                title="Numero totale di relazioni di questo nodo nell'intero grafo"
+              >
+                <Share2 size={10} aria-hidden="true" />
+                {degree} {degree === 1 ? 'collegamento' : 'collegamenti'} nel grafo
               </span>
             )}
           </div>
@@ -163,15 +185,35 @@ export function NodeDetailsDrawer({
         />
       </div>
 
-      <footer className="border-t border-slate-200 p-3 dark:border-slate-700">
+      <footer className="flex gap-2 border-t border-slate-200 p-3 dark:border-slate-700">
         <button
           type="button"
           onClick={() => onRecenter(node)}
-          className="flex w-full items-center justify-center gap-2 rounded bg-primary-600 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="flex flex-1 items-center justify-center gap-2 rounded bg-primary-600 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <Crosshair className="h-4 w-4" />
           Centra qui
         </button>
+        {onAddToContext &&
+          (inContext ? (
+            <span
+              className="flex flex-1 items-center justify-center gap-1.5 rounded border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-medium text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300"
+              title="Questo nodo è già nel contesto della domanda"
+            >
+              <Check className="h-4 w-4" />
+              Nel contesto
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onAddToContext(node)}
+              title="Aggiungi questo nodo al contesto della domanda"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-200 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+            >
+              <Plus className="h-4 w-4" />
+              Usa come contesto
+            </button>
+          ))}
       </footer>
     </div>
   );

@@ -1,8 +1,49 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { DeliberationColumn } from '../DeliberationColumn';
 import type { ExpertContribution, QaHistoryItem, QaTurnModel } from '../../../qa/types';
 import type { GraphEdge, GraphEdgeSelection, GraphNode } from '../../shared/types';
+
+/** A turn carrying a divergent disagreement + reasoning-trace shapes (Wave C). */
+function turnWithDissentAndTrace(): QaTurnModel {
+  return {
+    id: 'turn-dissent',
+    question: 'Qual è la ratio dell’art. 2043?',
+    confirmed: {},
+    state: {
+      status: 'success',
+      answer: {
+        trace_id: 'trace-dissent',
+        synthesis: 'Il collegio non converge su un’unica lettura.',
+        mode: 'divergent',
+        alternatives: null,
+        sources: [],
+        retrieved_sources: [],
+        experts_used: ['literal', 'principles'],
+        confidence: 0.55,
+        execution_time_ms: 4200,
+        disagreement_analysis: {
+          has_disagreement: true,
+          disagreement_type: 'interpretativo',
+          disagreement_level: 'alto',
+          intensity: 0.72,
+          resolvability: 0.3,
+          confidence: 0.6,
+          conflicts: [],
+        },
+        disagreement_explanation: 'Il canone letterale e quello sistematico divergono sul criterio ex art. 12 preleggi.',
+        pipeline_trace: {
+          stage_times_ms: { ner: 12, routing: 5, synthesis: 340 },
+          ner_result: { entities: [{ text: 'art. 2043', type: 'RIFERIMENTO' }] },
+          routing: { method: 'hybrid' },
+          experts_skipped: [{ expert: 'precedent', reason: 'timeout' }],
+          react_steps: [],
+        },
+        pipeline_metrics: { total_tokens: 1234 },
+      },
+    },
+  };
+}
 
 // QaHistoryPanel (rendered by the Dibattito "Cronologia" affordance) fetches the
 // server history on mount — mock the network so the panel is deterministic.
@@ -190,6 +231,8 @@ describe('DeliberationColumn dibattito tab', () => {
     const input = screen.getByRole('textbox', { name: /chiedi al grafo/i });
     fireEvent.change(input, { target: { value: 'nuova domanda' } });
     fireEvent.keyDown(input, { key: 'Enter' });
+    // The page owns the context basket and reads it at ask time — onAsk carries
+    // only (question, mode).
     expect(props.onAsk).toHaveBeenCalledWith('nuova domanda', 'convergent');
   });
 });
@@ -593,5 +636,474 @@ describe('DeliberationColumn relation steer (Slice 4 L3 — privilegia questa re
     );
     expect(screen.getByRole('heading', { name: /contrasto tra canoni/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2 — mobile bottom-sheet presentation (review "mobile dead-end")
+// ---------------------------------------------------------------------------
+
+/** jsdom defaults to 1024px; force a width and notify the resize subscribers. */
+function setViewportWidth(width: number): void {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width });
+  window.dispatchEvent(new Event('resize'));
+}
+
+describe('DeliberationColumn mobile bottom-sheet (Wave 2)', () => {
+  beforeEach(() => setViewportWidth(375));
+  afterEach(() => setViewportWidth(1024));
+
+  it('below md renders the "Dibattito" trigger pill (portal) instead of the docked column', () => {
+    render(<DeliberationColumn {...baseProps()} />);
+    expect(screen.getByRole('button', { name: /dibattito/i })).toBeInTheDocument();
+    // The docked tablist is NOT rendered while the sheet is closed.
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  it('the pill carries the Wave-1 pulse badge when dibattitoBadge is set', () => {
+    render(<DeliberationColumn {...baseProps()} dibattitoBadge />);
+    expect(screen.getByText('nuova risposta')).toBeInTheDocument();
+  });
+
+  it('opening the pill shows the sheet with the full column content; scrim tap dismisses', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    fireEvent.click(screen.getByRole('button', { name: /dibattito/i }));
+    // Sheet dialog with both tabs + the turn content.
+    expect(screen.getByRole('dialog', { name: /dibattito sul grafo/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /dibattito/i })).toBeInTheDocument();
+    expect(screen.getByText(/neminem laedere/i)).toBeInTheDocument();
+    // Scrim tap closes the sheet and brings the pill back.
+    fireEvent.click(screen.getByRole('button', { name: /chiudi dibattito/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dibattito/i })).toBeInTheDocument();
+  });
+
+  it('desktop width keeps the docked column (no pill, no dialog)', () => {
+    setViewportWidth(1024);
+    render(<DeliberationColumn {...baseProps()} />);
+    expect(screen.getByRole('tablist')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2 — history-turn hydration note (review P2.6)
+// ---------------------------------------------------------------------------
+
+describe('DeliberationColumn history-detail note (Wave 2 P2.6)', () => {
+  it('shows the "dettagli non più disponibili" note on an unavailable history turn', () => {
+    const turn = { ...successTurn(), historyDetail: 'unavailable' as const };
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} />);
+    expect(screen.getByText(/dettagli non più disponibili/i)).toBeInTheDocument();
+  });
+
+  it('shows a subtle loading row while the trace hydration is in flight', () => {
+    const turn = { ...successTurn(), historyDetail: 'loading' as const };
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} />);
+    expect(screen.getByText(/recupero i dettagli/i)).toBeInTheDocument();
+  });
+
+  it('renders neither note on a live turn (no historyDetail)', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    expect(screen.queryByText(/dettagli non più disponibili/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recupero i dettagli/i)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2 — steer idempotency: lifted column-level state (review P2.7)
+// ---------------------------------------------------------------------------
+
+describe('DeliberationColumn lifted steer state (Wave 2 P2.7)', () => {
+  it('canon steer confirmation survives a tab switch (rerender with activeTab nodo → dibattito)', () => {
+    const props = { ...baseProps(), turns: [turnWithContributions()], canContribute: true, onPreferCanon: vi.fn() };
+    const { rerender } = render(<DeliberationColumn {...props} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /pesa di più questo canone/i })[0]);
+    expect(screen.getByText(/terrò conto della tua preferenza/i)).toBeInTheDocument();
+
+    rerender(<DeliberationColumn {...props} activeTab="nodo" />);
+    rerender(<DeliberationColumn {...props} activeTab="dibattito" />);
+    // Still steered: the button did not re-arm.
+    expect(screen.getByText(/terrò conto della tua preferenza/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /pesa di più questo canone/i })).toHaveLength(1);
+  });
+
+  it('canon steer confirmation survives the Cronologia toggle (which unmounts the turn list)', async () => {
+    fetchHistoryMock.mockResolvedValue([historyItem()]);
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turnWithContributions()]}
+        canContribute
+        onPreferCanon={vi.fn()}
+        onLoadHistoryTurn={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getAllByRole('button', { name: /pesa di più questo canone/i })[0]);
+    expect(screen.getByText(/terrò conto della tua preferenza/i)).toBeInTheDocument();
+
+    // Open the server history (replaces the turn list → unmounts the steer)…
+    fireEvent.click(screen.getByRole('button', { name: /^cronologia$/i }));
+    await screen.findByText(/domanda passata/i);
+    // …and close it again.
+    fireEvent.click(screen.getByRole('button', { name: /chiudi cronologia/i }));
+
+    // The steer did NOT re-arm: state lives on the column, not the button.
+    expect(screen.getByText(/terrò conto della tua preferenza/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /pesa di più questo canone/i })).toHaveLength(1);
+  });
+
+  it('relation steer confirmation survives deselecting and re-selecting the same edge', () => {
+    const edge: GraphEdge = {
+      id: 'e1',
+      source: 'node-2043',
+      target: 'node-2059',
+      type: 'DISCIPLINA',
+      properties: {},
+    };
+    const selection: GraphEdgeSelection = { kind: 'relation', edge };
+    const props = {
+      ...baseProps(),
+      activeTab: 'nodo' as const,
+      canContribute: true,
+      onPreferRelation: vi.fn(),
+    };
+    const { rerender } = render(<DeliberationColumn {...props} selectedEdge={selection} />);
+    fireEvent.click(screen.getByRole('button', { name: /privilegia questa relazione/i }));
+    expect(screen.getByText(/terrò conto: privilegerò «DISCIPLINA»/i)).toBeInTheDocument();
+
+    // Deselect, then re-select the SAME edge: previously the per-edge remount
+    // re-armed the button; the lifted (traceId, relationType) key keeps it.
+    rerender(<DeliberationColumn {...props} selectedEdge={null} />);
+    rerender(<DeliberationColumn {...props} selectedEdge={selection} />);
+    expect(screen.getByText(/terrò conto: privilegerò «DISCIPLINA»/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
+  });
+
+  it('a NEW deliberation (different trace) re-arms the canon steer', () => {
+    const first = turnWithContributions();
+    const props = { ...baseProps(), canContribute: true, onPreferCanon: vi.fn() };
+    const { rerender } = render(<DeliberationColumn {...props} turns={[first]} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /pesa di più questo canone/i })[0]);
+    expect(screen.getAllByRole('button', { name: /pesa di più questo canone/i })).toHaveLength(1);
+
+    // A second turn with a different trace_id: its canons are steerable afresh.
+    const second = turnWithContributions();
+    second.id = 'turn-canon-2';
+    if (second.state.status === 'success') second.state.answer.trace_id = 'trace-canon-2';
+    rerender(<DeliberationColumn {...props} turns={[first, second]} />);
+    // 1 remaining on the first turn + 2 fresh on the second.
+    expect(screen.getAllByRole('button', { name: /pesa di più questo canone/i })).toHaveLength(3);
+  });
+});
+
+describe('DeliberationColumn collapse (Wave 2 UX — collapsible desktop column)', () => {
+  it('shows the collapse button in the tab header when onToggleCollapse is provided', () => {
+    render(<DeliberationColumn {...baseProps()} onToggleCollapse={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /comprimi il pannello/i })).toBeInTheDocument();
+  });
+
+  it('omits the collapse button when onToggleCollapse is absent (not collapsible)', () => {
+    render(<DeliberationColumn {...baseProps()} />);
+    expect(screen.queryByRole('button', { name: /comprimi il pannello/i })).not.toBeInTheDocument();
+  });
+
+  it('clicking the collapse button calls onToggleCollapse', () => {
+    const onToggleCollapse = vi.fn();
+    render(<DeliberationColumn {...baseProps()} onToggleCollapse={onToggleCollapse} />);
+    fireEvent.click(screen.getByRole('button', { name: /comprimi il pannello/i }));
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+  });
+
+  it('when collapsed, renders the expand rail instead of the tabs and composer', () => {
+    render(<DeliberationColumn {...baseProps()} collapsed onToggleCollapse={vi.fn()} />);
+    // The rail is the only affordance: an "Espandi" button — no tablist, no
+    // in-column composer (that role belongs to the header field while collapsed).
+    expect(screen.getByRole('button', { name: /espandi il pannello/i })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /dibattito/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /chiedi al grafo/i })).not.toBeInTheDocument();
+  });
+
+  it('clicking the expand rail calls onToggleCollapse', () => {
+    const onToggleCollapse = vi.fn();
+    render(<DeliberationColumn {...baseProps()} collapsed onToggleCollapse={onToggleCollapse} />);
+    fireEvent.click(screen.getByRole('button', { name: /espandi il pannello/i }));
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave C — surfacing deliberation signals already computed but never shown
+// ---------------------------------------------------------------------------
+
+describe('DeliberationColumn inline feedback (Wave C gap C1 — rate/detailed)', () => {
+  it('calls onRate with (turnId, traceId, rating) when 👍/👎 is clicked, gated on qaAskable', () => {
+    const onRate = vi.fn();
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onRate={onRate} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /risposta utile/i }));
+    expect(onRate).toHaveBeenCalledWith('turn-1', 'trace-1', 5);
+    fireEvent.click(screen.getByRole('button', { name: /risposta non utile/i }));
+    expect(onRate).toHaveBeenCalledWith('turn-1', 'trace-1', 1);
+  });
+
+  it('reflects turn.rating optimistically on the pressed button', () => {
+    const turn = { ...successTurn(), rating: 5 as const };
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} qaAskable onRate={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /risposta utile/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /risposta non utile/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('hides the rate control when onRate is absent', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable />);
+    expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
+  });
+
+  it('hides the rate control when asking is not unlocked (qaAskable false)', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable={false} onRate={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
+  });
+
+  it('submits the detailed 3-dimension assessment via onDetailed(traceId, scores)', () => {
+    const onDetailed = vi.fn();
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onDetailed={onDetailed} />,
+    );
+    fireEvent.click(screen.getByText(/valutazione dettagliata/i));
+    // Three dimensions, each with 3 grade buttons — grade all "adeguato" (0.6).
+    fireEvent.click(screen.getAllByRole('button', { name: /^adeguato$/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^adeguato$/i })[1]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^adeguato$/i })[2]);
+    fireEvent.click(screen.getByRole('button', { name: /invia valutazione/i }));
+    expect(onDetailed).toHaveBeenCalledWith('trace-1', {
+      retrievalScore: 0.6,
+      reasoningScore: 0.6,
+      synthesisScore: 0.6,
+    });
+    expect(screen.getByText(/grazie, valutazione registrata/i)).toBeInTheDocument();
+  });
+
+  it('disables the "Invia valutazione" button until all three dimensions are graded', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onDetailed={vi.fn()} />);
+    fireEvent.click(screen.getByText(/valutazione dettagliata/i));
+    expect(screen.getByRole('button', { name: /invia valutazione/i })).toBeDisabled();
+  });
+
+  it('hides the entire feedback row when neither onRate nor onDetailed is wired', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable />);
+    expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/valutazione dettagliata/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('DeliberationColumn confirm-source (Wave C gap C1 — ricorda nel grafo)', () => {
+  it('shows "Ricorda nel grafo" only for live_unconfirmed sources with a node_id', () => {
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} onConfirmSource={vi.fn()} />,
+    );
+    // successTurn() has one `seed` source (node-2043, no confirm) and one
+    // `live_unconfirmed` source with node_id null (also no confirm — no node_id).
+    expect(screen.queryByRole('button', { name: /ricorda nel grafo/i })).not.toBeInTheDocument();
+  });
+
+  it('calls onConfirmSource(turnId, source) for a live_unconfirmed source WITH a node_id', () => {
+    const onConfirmSource = vi.fn();
+    const turn = successTurn();
+    if (turn.state.status === 'success') {
+      turn.state.answer.retrieved_sources = [
+        { urn: 'live:abc123', provenance: 'live_unconfirmed', trust: 0.4, node_id: 'live-node-1' },
+      ];
+    }
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} onConfirmSource={onConfirmSource} />);
+    const btn = screen.getByRole('button', { name: /ricorda nel grafo/i });
+    fireEvent.click(btn);
+    expect(onConfirmSource).toHaveBeenCalledTimes(1);
+    expect(onConfirmSource).toHaveBeenCalledWith(
+      turn.id,
+      expect.objectContaining({ node_id: 'live-node-1' }),
+    );
+  });
+
+  it('reflects confirmState on the confirm button (pending/done)', () => {
+    const turn = successTurn();
+    if (turn.state.status === 'success') {
+      turn.state.answer.retrieved_sources = [
+        { urn: 'live:abc123', provenance: 'live_unconfirmed', trust: 0.4, node_id: 'live-node-1' },
+      ];
+    }
+    turn.confirmed = { 'live-node-1': 'done' };
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} onConfirmSource={vi.fn()} />);
+    expect(screen.getByText(/ricordata/i)).toBeInTheDocument();
+  });
+
+  it('does not show the confirm-source action when onConfirmSource is absent', () => {
+    const turn = successTurn();
+    if (turn.state.status === 'success') {
+      turn.state.answer.retrieved_sources = [
+        { urn: 'live:abc123', provenance: 'live_unconfirmed', trust: 0.4, node_id: 'live-node-1' },
+      ];
+    }
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} />);
+    expect(screen.queryByRole('button', { name: /ricorda nel grafo/i })).not.toBeInTheDocument();
+  });
+
+  it('calls onRateSource(traceId, urn, relevant) from the per-source rating buttons', () => {
+    const onRateSource = vi.fn();
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} onRateSource={onRateSource} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /segna .* come pertinente/i })[0]);
+    expect(onRateSource).toHaveBeenCalledWith('trace-1', 'urn:x~art2043', true);
+  });
+});
+
+describe('DeliberationColumn reasoning-trace disclosure (Wave C gap C2 — come ha ragionato)', () => {
+  it('is closed by default', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
+    const details = screen.getByText(/come ha ragionato/i).closest('details');
+    expect(details).not.toBeNull();
+    expect((details as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it('shows routing method, stage timings, NER entities, skipped experts and total tokens', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
+    fireEvent.click(screen.getByText(/come ha ragionato/i));
+    expect(screen.getByText(/hybrid/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/art\. 2043/).length).toBeGreaterThan(0);
+    expect(screen.getByText('1234')).toBeInTheDocument();
+    expect(screen.getByText('Precedente')).toBeInTheDocument();
+    expect(screen.getByText('timeout')).toBeInTheDocument();
+  });
+
+  it('shows the degraded-engine note when react_steps is empty', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
+    fireEvent.click(screen.getByText(/come ha ragionato/i));
+    expect(screen.getByText(/ragionamento a passo singolo \(react non attivo\)/i)).toBeInTheDocument();
+  });
+
+  it('renders REAL per-canon ReAct iterations and never the "non attivo" note when they are populated (bug fix: react_steps lives under expert_executions, not at the trace top level)', () => {
+    const turn = turnWithDissentAndTrace();
+    if (turn.state.status !== 'success') throw new Error('fixture must be success');
+    turn.state.answer.reactSteps = [
+      { expert: 'literal', iteration: 0, thought: 'Verifico il tenore letterale dell’art. 2043.', action: 'definitions_lookup', success: true, resultsFound: 3 },
+      { expert: 'literal', iteration: 1, thought: 'Confronto con la massima citata.', action: 'case_law_search', success: false, resultsFound: null },
+      { expert: 'systemic', iteration: 0, thought: 'Esploro il grafo per relazioni sistematiche.', action: 'graph_search', success: true, resultsFound: 5 },
+    ];
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} />);
+    fireEvent.click(screen.getByText(/come ha ragionato/i));
+
+    // Per-canon grouping with an "N iterazioni" count.
+    expect(screen.getByText(/2 iterazioni/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 iterazione\b/i)).toBeInTheDocument();
+    // Each iteration's action tool + thought text is visible.
+    expect(screen.getByText('definitions_lookup')).toBeInTheDocument();
+    expect(screen.getByText('case_law_search')).toBeInTheDocument();
+    expect(screen.getByText('graph_search')).toBeInTheDocument();
+    expect(screen.getByText(/tenore letterale dell.art\. 2043/i)).toBeInTheDocument();
+    // The false "ReAct non attivo" note must be ABSENT — this is the bug's regression guard.
+    expect(screen.queryByText(/ragionamento a passo singolo/i)).not.toBeInTheDocument();
+  });
+
+  it('renders no disclosure when the answer carries neither pipeline_trace nor pipeline_metrics', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    expect(screen.queryByText(/come ha ragionato/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('DeliberationColumn "Segui il ragionamento sul grafo" (MARQUEE — moved to the main canvas)', () => {
+  function turnWithWalk(): QaTurnModel {
+    return {
+      id: 'turn-walk',
+      question: 'Qual è la ratio dell’art. 2043?',
+      confirmed: {},
+      state: {
+        status: 'success',
+        answer: {
+          trace_id: 'trace-walk',
+          synthesis: 'La ratio è il neminem laedere.',
+          mode: 'convergent',
+          alternatives: null,
+          sources: [],
+          retrieved_sources: [],
+          experts_used: ['systemic'],
+          confidence: 0.8,
+          execution_time_ms: 100,
+          graphTraversal: [
+            { iteration: 0, source_urn: 'urn:x~art2043', relation_type: 'IMPONE', target_urn: 'modalita:x', target_type: 'ModalitaGiuridica' },
+          ],
+        },
+      },
+    };
+  }
+
+  it('is disabled with an explanatory tooltip when the turn carries no walk', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    const btn = screen.getByRole('button', { name: /segui il ragionamento sul grafo/i });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('title', 'Nessuna traversata sul grafo per questa risposta');
+  });
+
+  it('calls onFollowReasoning with the turn edges instead of rendering an inline player', () => {
+    const onFollowReasoning = vi.fn();
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithWalk()]} onFollowReasoning={onFollowReasoning} />);
+    const btn = screen.getByRole('button', { name: /segui il ragionamento sul grafo/i });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    expect(onFollowReasoning).toHaveBeenCalledWith([
+      { iteration: 0, source_urn: 'urn:x~art2043', relation_type: 'IMPONE', target_urn: 'modalita:x', target_type: 'ModalitaGiuridica' },
+    ]);
+    // No inline player mounts in the column anymore — the replay lives on the
+    // page's main canvas (GraphExplorerPage), not here.
+    expect(screen.queryByLabelText(/chiudi il replay del ragionamento/i)).not.toBeInTheDocument();
+  });
+
+  it('is a harmless no-op when onFollowReasoning is not wired (default)', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithWalk()]} />);
+    const btn = screen.getByRole('button', { name: /segui il ragionamento sul grafo/i });
+    expect(() => fireEvent.click(btn)).not.toThrow();
+  });
+});
+
+describe('DeliberationColumn dissent banner (Wave C gap C3 — il collegio ha dissentito)', () => {
+  it('renders the banner with intensity/type/level/resolvability when has_disagreement is true', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
+    expect(screen.getByText(/il collegio ha dissentito/i)).toBeInTheDocument();
+    expect(screen.getByText(/intensità 0\.72/i)).toBeInTheDocument();
+    expect(screen.getByText(/tipo interpretativo/i)).toBeInTheDocument();
+    expect(screen.getByText(/livello alto/i)).toBeInTheDocument();
+    expect(screen.getByText(/risolvibilità 0\.30/i)).toBeInTheDocument();
+  });
+
+  it('shows the NL explanation (art. 12 preleggi rationale) behind a disclosure', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
+    fireEvent.click(screen.getByText(/perché il collegio dissente/i));
+    expect(screen.getByText(/criterio ex art\. 12 preleggi/i)).toBeInTheDocument();
+  });
+
+  it('renders no banner when has_disagreement is false or the field is absent', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    expect(screen.queryByText(/il collegio ha dissentito/i)).not.toBeInTheDocument();
+  });
+
+  it('caveats the numbers with "(stima)" when source is present and not model-trained', () => {
+    const turn = turnWithDissentAndTrace();
+    if (turn.state.status === 'success' && turn.state.answer.disagreement_analysis) {
+      turn.state.answer.disagreement_analysis.source = 'heuristic';
+    }
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} />);
+    expect(screen.getByText(/intensità 0\.72 \(stima\)/i)).toBeInTheDocument();
+  });
+
+  it('does NOT caveat when source is model-trained', () => {
+    const turn = turnWithDissentAndTrace();
+    if (turn.state.status === 'success' && turn.state.answer.disagreement_analysis) {
+      turn.state.answer.disagreement_analysis.source = 'model-trained';
+    }
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} />);
+    expect(screen.getByText(/intensità 0\.72$/i)).toBeInTheDocument();
+  });
+
+  it('does NOT caveat when source is absent (defensive default: treat as authoritative)', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
+    expect(screen.getByText(/intensità 0\.72$/i)).toBeInTheDocument();
   });
 });

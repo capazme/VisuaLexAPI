@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { transformSubgraphResponse } from '../graphTransform';
+import { mergeElements, transformSubgraphResponse } from '../graphTransform';
 import type { SubgraphResponse } from '../types';
 
 function resp(partial: Partial<SubgraphResponse>): SubgraphResponse {
@@ -146,5 +146,71 @@ describe('transformSubgraphResponse (G6 GraphData)', () => {
     );
     expect((out.nodes[0].data as { provenance?: string }).provenance).toBe('community_validated');
     expect((out.nodes[0].data as { trust?: number }).trust).toBe(1);
+  });
+});
+
+describe('mergeElements (F2 — expand-in-place merge)', () => {
+  const base = () =>
+    transformSubgraphResponse(
+      resp({
+        nodes: [
+          { id: 'a', type: 'Norma', label: 'A' },
+          { id: 'b', type: 'Norma', label: 'B' },
+        ],
+        edges: [{ id: 'e1', source: 'a', target: 'b', type: 'DISCIPLINA' }],
+      })
+    );
+
+  it('appends new nodes tagged expanded and keeps existing node references', () => {
+    const current = base();
+    const out = mergeElements(current, {
+      nodes: [
+        { id: 'a', type: 'Norma', label: 'A (dup)' }, // duplicate → dropped
+        { id: 'c', type: 'ConcettoGiuridico', label: 'C' },
+      ],
+      edges: [{ id: 'e2', source: 'a', target: 'c', type: 'ESPRIME_PRINCIPIO' }],
+    });
+
+    expect(out.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c']);
+    // Existing nodes keep their OBJECT IDENTITY (positions carried on them).
+    expect(out.nodes[0]).toBe(current.nodes[0]);
+    // The duplicate delta node did not overwrite the existing label.
+    expect(out.nodes[0].data?.label).toBe('A');
+    // New nodes carry the expanded tag; originals do not.
+    expect(out.nodes[2].data?.expanded).toBe(true);
+    expect(out.nodes[0].data?.expanded).toBeUndefined();
+    expect(out.edges.map((e) => e.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('keeps a delta edge pointing at a PRE-EXISTING node (union dangling check)', () => {
+    const out = mergeElements(base(), {
+      nodes: [],
+      // Both endpoints already in `current` — a lone transform would keep it
+      // too, but the point is the union check: no delta nodes needed.
+      edges: [{ source: 'b', target: 'a', type: 'RINVIA_A' }],
+    });
+    // Id synthesized from source/type/target.
+    expect(out.edges.map((e) => e.id)).toEqual(['e1', 'b-RINVIA_A-a']);
+  });
+
+  it('drops delta edges dangling against the merged node set and dedupes by id', () => {
+    const out = mergeElements(base(), {
+      nodes: [{ id: 'c', type: 'Norma', label: 'C' }],
+      edges: [
+        { id: 'e1', source: 'a', target: 'b', type: 'DISCIPLINA' }, // dup id → dropped
+        { id: 'e-ghost', source: 'c', target: 'ghost', type: 'X' }, // dangling → dropped
+        { id: 'e2', source: 'c', target: 'a', type: 'X' },
+      ],
+    });
+    expect(out.edges.map((e) => e.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('returns the SAME reference when the delta adds nothing (no canvas churn)', () => {
+    const current = base();
+    const out = mergeElements(current, {
+      nodes: [{ id: 'a', type: 'Norma', label: 'A' }],
+      edges: [{ id: 'e1', source: 'a', target: 'b', type: 'DISCIPLINA' }],
+    });
+    expect(out).toBe(current);
   });
 });

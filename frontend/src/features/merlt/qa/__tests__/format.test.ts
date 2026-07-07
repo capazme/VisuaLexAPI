@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { confirmSourceEntityText, formatRetrievedUrn } from '../format';
+import { confirmSourceEntityText, formatRetrievedUrn, urnKind } from '../format';
 
 describe('confirmSourceEntityText (B3 — human name for "ricorda nel grafo")', () => {
   it('prefers the underlying source_url for a provisional live: node', () => {
@@ -44,5 +44,41 @@ describe('confirmSourceEntityText (B3 — human name for "ricorda nel grafo")', 
 describe('formatRetrievedUrn', () => {
   it('renders a provisional live: node as a placeholder', () => {
     expect(formatRetrievedUrn('live:abc')).toBe('Fonte provvisoria');
+  });
+});
+
+describe('urnKind (feature 3 — "Apri" quick-open classification)', () => {
+  it('classifies a Normattiva URL as norma', () => {
+    expect(urnKind('https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043')).toEqual({
+      kind: 'norma',
+    });
+  });
+
+  it('classifies a bare urn:nir: string as norma', () => {
+    expect(urnKind('urn:nir:stato:legge:1990-08-07;241~art1')).toEqual({ kind: 'norma' });
+  });
+
+  it('classifies a ~artN marker (no normattiva.it host) as norma', () => {
+    expect(urnKind('some-graph-node~art1453')).toEqual({ kind: 'norma' });
+  });
+
+  it('classifies a massima_cassazione_* node as sentenza', () => {
+    expect(urnKind('massima_cassazione_civile_4022_2018')).toEqual({ kind: 'sentenza' });
+  });
+
+  it('classifies a bare massima_* node as sentenza', () => {
+    expect(urnKind('massima_12345')).toEqual({ kind: 'sentenza' });
+  });
+
+  it('classifies a live: provisional node as unknown (never openable)', () => {
+    expect(urnKind('live:abc')).toEqual({ kind: 'unknown' });
+  });
+
+  it('classifies a concept node (modalita:*) as unknown', () => {
+    expect(urnKind('modalita:diritto_di_chiedere_il_risarcimento_del_danno')).toEqual({ kind: 'unknown' });
+  });
+
+  it('classifies an empty string as unknown', () => {
+    expect(urnKind('')).toEqual({ kind: 'unknown' });
   });
 });

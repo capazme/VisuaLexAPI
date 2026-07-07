@@ -42,6 +42,39 @@ describe('NodeDetailsDrawer', () => {
     expect(screen.getByText(/Risarcimento per fatto illecito/)).toBeInTheDocument();
   });
 
+  // Wave 2 F4: FULL-graph degree ("N collegamenti nel grafo") so the user sees
+  // the node's real connectivity BEFORE expanding — distinct from the in/out
+  // lists, which only cover the (possibly truncated) current subgraph.
+  it('shows the full-graph degree chip when metadata carries it', () => {
+    render(
+      <NodeDetailsDrawer
+        node={{ ...NODE, metadata: { degree: 17 } }}
+        edges={EDGES}
+        nodesById={NODES_BY_ID}
+        onRecenter={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByText('17 collegamenti nel grafo')).toBeInTheDocument();
+  });
+
+  it('uses the singular for a single connection and hides the chip without degree', () => {
+    const { rerender } = render(
+      <NodeDetailsDrawer
+        node={{ ...NODE, metadata: { degree: 1 } }}
+        edges={[]}
+        nodesById={NODES_BY_ID}
+        onRecenter={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByText('1 collegamento nel grafo')).toBeInTheDocument();
+    rerender(
+      <NodeDetailsDrawer node={NODE} edges={[]} nodesById={NODES_BY_ID} onRecenter={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.queryByText(/collegament[oi] nel grafo/)).toBeNull();
+  });
+
   it('lists outgoing and incoming relations by connected node label', () => {
     render(
       <NodeDetailsDrawer node={NODE} edges={EDGES} nodesById={NODES_BY_ID} onRecenter={vi.fn()} onClose={vi.fn()} />
@@ -119,5 +152,46 @@ describe('NodeDetailsDrawer', () => {
       <NodeDetailsDrawer node={validated} edges={[]} nodesById={new Map()} onRecenter={vi.fn()} onClose={vi.fn()} />
     );
     expect(screen.getByText('Validato dalla comunità')).toBeInTheDocument();
+  });
+
+  describe('nodes-as-context ("Usa come contesto")', () => {
+    it('hides the affordance when onAddToContext is absent', () => {
+      render(
+        <NodeDetailsDrawer node={NODE} edges={[]} nodesById={NODES_BY_ID} onRecenter={vi.fn()} onClose={vi.fn()} />
+      );
+      expect(screen.queryByRole('button', { name: /usa come contesto/i })).toBeNull();
+    });
+
+    it('adds the node to the context on click', () => {
+      const onAddToContext = vi.fn();
+      render(
+        <NodeDetailsDrawer
+          node={NODE}
+          edges={[]}
+          nodesById={NODES_BY_ID}
+          onRecenter={vi.fn()}
+          onClose={vi.fn()}
+          onAddToContext={onAddToContext}
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: /usa come contesto/i }));
+      expect(onAddToContext).toHaveBeenCalledWith(NODE);
+    });
+
+    it('shows a subdued "Nel contesto" state when already in the basket', () => {
+      render(
+        <NodeDetailsDrawer
+          node={NODE}
+          edges={[]}
+          nodesById={NODES_BY_ID}
+          onRecenter={vi.fn()}
+          onClose={vi.fn()}
+          onAddToContext={vi.fn()}
+          inContext
+        />
+      );
+      expect(screen.getByText(/nel contesto/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /usa come contesto/i })).toBeNull();
+    });
   });
 });

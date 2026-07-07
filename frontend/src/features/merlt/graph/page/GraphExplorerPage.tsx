@@ -2,16 +2,19 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Download, EyeOff, Loader2, Maximize2, Network, Upload, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
+import type { SearchParams } from '../../../../types';
+import { useAppStore } from '../../../../store/useAppStore';
 import { isMerltGraphEnabled } from '../featureFlag';
 import { useMerltFeatures } from '../../useMerltFeatures';
 import { useQaThread } from '../../qa/useQaThread';
 import { sendRelationFeedback } from '../../qa/qaApi';
-import type { QaMode, QaPrefillState, QaRetrievedSource } from '../../qa/types';
+import type { GraphContext, GraphTraversalEdge, QaMode, QaPrefillState, QaRetrievedSource } from '../../qa/types';
 import { useArticleGraph } from '../shared/useArticleGraph';
-import type { GraphElements } from '../shared/graphTransform';
+import { mergeElements, type GraphElements } from '../shared/graphTransform';
 import {
   buildDeliberationOverlay,
   canonKeyFromNodeId,
+  isDeliberationElementId,
   readDeliberation,
   resolveEdgeSelection,
   withDeliberationOverlay,
@@ -23,7 +26,7 @@ import type {
   GraphEdge,
   GraphEdgeSelection,
 } from '../shared/types';
-import { CANON_LABEL } from '../../qa/format';
+import { CANON_LABEL, formatRetrievedUrn } from '../../qa/format';
 import {
   buildSnapshot,
   parseSnapshot,
@@ -34,6 +37,9 @@ import {
 import { useIngestionJob } from '../shared/useIngestionJob';
 import {
   classifyIngestionTriggerError,
+  defaultGraphDepth,
+  fetchNodeNeighborhood,
+  PAGE_GRAPH_LIMIT_DEFAULT,
   triggerIngestion,
   type IngestionTriggerErrorKind,
 } from '../shared/graphApi';
@@ -42,8 +48,10 @@ import type { GraphCanvasHandle, GraphLayoutName } from '../shared/GraphCanvas';
 import { Toast } from '../../../../components/ui/Toast';
 import { computeTypeCounts } from '../shared/graphFilters';
 import { GraphSearchBox } from './GraphSearchBox';
-import { AskGraphField } from './AskGraphField';
+import { GraphTruncationChip } from './GraphTruncationChip';
+import { AskGraphField, type ContextChip } from './AskGraphField';
 import { DeliberationColumn } from './DeliberationColumn';
+import { GraphTraversalPlayer } from './GraphTraversalPlayer';
 import { ConsentDialog } from '../../consent/ConsentDialog';
 import { BreadcrumbHistory } from './BreadcrumbHistory';
 import { DepthSelector } from './DepthSelector';
@@ -61,9 +69,78 @@ const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
  */
 const JURISPRUDENCE_TYPES: readonly string[] = ['AttoGiudiziario', 'Caso'];
 
-function clampDepth(raw: string | null): number {
+/** F2: hard node budget for the merged view — beyond it, expansion refuses. */
+const MAX_GRAPH_NODES = 300;
+/** F2: edge budget of a single expand-in-place fetch (depth 1 around a node). */
+const EXPAND_FETCH_LIMIT = 40;
+
+/** F2: accumulated expand-in-place delta (RAW BFF shapes, deduped on append). */
+interface ExpansionDelta {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+const EMPTY_EXPANSION: ExpansionDelta = { nodes: [], edges: [] };
+const EMPTY_ELEMENTS: GraphElements = { nodes: [], edges: [] };
+
+/** Nodes-as-context: cap on the question's context basket (keeps the prompt focused). */
+const MAX_CONTEXT_ITEMS = 8;
+
+/**
+ * One node pinned to the question's context basket. `kind` routes it to the
+ * MERL-T channel: Norma nodes → `norm_references` (their graph urn), everything
+ * else → `legal_concepts` (their label). `id` is the graph node id (dedup key).
+ */
+interface ContextItem {
+  id: string;
+  label: string;
+  kind: 'norm' | 'concept';
+  ref: string;
+}
+
+/** Basket item for a graph node (Norma → norm ref, else concept by label). */
+function toContextItem(node: GraphNode): ContextItem {
+  const isNorm = Boolean(node.urn);
+  return {
+    id: node.id,
+    label: node.label,
+    kind: isNorm ? 'norm' : 'concept',
+    ref: isNorm ? stripVersionMarker(node.urn as string) : node.label,
+  };
+}
+
+/**
+ * Seed item for the current center, built from the URL (no GraphNode needed).
+ * When the center is a not-yet-indexed article (a deeplink with no breadcrumb
+ * label), the caller's label falls back to the raw urn — derive a readable
+ * "art. N" from it instead of showing the full Normattiva URL on the chip. The
+ * `ref` (sent to MERL-T) always stays the urn/label, unaffected by the display.
+ */
+function centerContextItem(urn: string, label: string | undefined, isArticle: boolean): ContextItem {
+  const display = label && label !== urn ? label : formatRetrievedUrn(urn);
+  return {
+    id: urn,
+    label: display,
+    kind: isArticle ? 'norm' : 'concept',
+    ref: isArticle ? stripVersionMarker(urn) : display,
+  };
+}
+
+/** Map the basket to the MERL-T-bound context (norm urns + concept labels). */
+function basketToContext(items: ContextItem[]): GraphContext | undefined {
+  const normReferences = items.filter((i) => i.kind === 'norm').map((i) => i.ref);
+  const legalConcepts = items.filter((i) => i.kind === 'concept').map((i) => i.ref);
+  if (normReferences.length === 0 && legalConcepts.length === 0) return undefined;
+  return {
+    ...(normReferences.length ? { normReferences } : {}),
+    ...(legalConcepts.length ? { legalConcepts } : {}),
+  };
+}
+
+// URL-as-SoT: `?depth=` is always the override; `fallback` is only the default
+// when the param is absent (payload diet: 2 for article centers, 1 for concepts).
+function clampDepth(raw: string | null, fallback: number): number {
   const n = raw ? Number.parseInt(raw, 10) : NaN;
-  if (Number.isNaN(n)) return 2;
+  if (Number.isNaN(n)) return fallback;
   return Math.min(3, Math.max(1, n));
 }
 
@@ -83,28 +160,78 @@ export function GraphExplorerPage(): React.ReactElement {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const triggerSearch = useAppStore((s) => s.triggerSearch);
   const enabled = isMerltGraphEnabled();
   const { qaAskable, canContribute } = useMerltFeatures();
   const urn = searchParams.get('urn');
   const centerType = searchParams.get('type'); // C1: threaded so it survives refresh/deeplink
-  const depth = clampDepth(searchParams.get('depth'));
-  const layout = parseLayout(searchParams.get('layout'));
   // C2: only Norma/article centers are lazy-ingestable; concepts are not.
   const centerIsArticle = isArticleCenter(centerType, urn);
+  // Payload diet (Wave 2): concept centers default to depth 1 (a hub concept at
+  // depth 2 is a hairball); articles keep 2. `?depth=` always overrides.
+  const depth = clampDepth(searchParams.get('depth'), defaultGraphDepth(centerIsArticle));
+  const layout = parseLayout(searchParams.get('layout'));
+  // F4: page edge budget, bumped by the truncation chip's "Carica di più"
+  // ladder (25→50→100→200). Part of the SWR cache key → a bump refetches.
+  const [limit, setLimit] = useState<number>(PAGE_GRAPH_LIMIT_DEFAULT);
   // Hooks must run unconditionally; pass null urn when disabled so no fetch fires.
-  const graph = useArticleGraph(enabled ? urn : null, depth);
+  const graph = useArticleGraph(enabled ? urn : null, depth, limit);
   const { entries, push } = useBreadcrumbHistory();
+
+  // Human label of the current center → drives the AskGraphField basket seed and
+  // the scope chip. Computed up here so the basket seed below can read it.
+  const centerLabel = urn ? labelFor(urn, entries) : undefined;
+
+  // Nodes-as-context: the question's context basket. Seeded with the current
+  // center on every center change (a new center = a new focus), then mutated by
+  // "Usa come contesto" in the node drawer. Reset via the derive-during-render
+  // tracked-prop pattern (gotcha #11) — never a synchronous in-effect setState.
+  const [contextBasket, setContextBasket] = useState<ContextItem[]>(() =>
+    urn ? [centerContextItem(urn, centerLabel, centerIsArticle)] : [],
+  );
+  const [trackedCenterForBasket, setTrackedCenterForBasket] = useState<string | null>(urn);
+  if (urn !== trackedCenterForBasket) {
+    setTrackedCenterForBasket(urn);
+    setContextBasket(urn ? [centerContextItem(urn, centerLabel, centerIsArticle)] : []);
+  }
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   // Slice 4 P2a: a clicked edge (real relation or synthetic contrast arc). Lives
   // beside the node selection; a node click clears it and vice versa so the Nodo
   // tab shows exactly one inspection target.
   const [selectedEdge, setSelectedEdge] = useState<GraphEdgeSelection | null>(null);
+  // F3: the CANVAS id of the selected edge (real OR synthetic) — the controlled
+  // 'selected' state the canvas paints. Kept beside selectedEdge because the
+  // resolved GraphEdgeSelection does not carry the synthetic arc id.
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+
+  // F3: one clearing gesture for both brains — React state here, G6 'selected'
+  // state via the controlled selectedNodeId/selectedEdgeId props.
+  const clearGraphSelection = useCallback((): void => {
+    setSelectedNodeId(null);
+    setSelectedEdge(null);
+    setSelectedEdgeId(null);
+  }, []);
+
+  // F2: expand-in-place state — accumulated delta, per-node "already expanded"
+  // guard, the node whose fetch is in flight (pulsed on canvas), and an epoch
+  // that invalidates in-flight expansions when the center changes.
+  const [expansion, setExpansion] = useState<ExpansionDelta>(EMPTY_EXPANSION);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<ReadonlySet<string>>(new Set());
+  const [pendingExpandId, setPendingExpandId] = useState<string | null>(null);
+  const expandEpochRef = useRef(0);
 
   // Slice 4 P1: the page OWNS the Q&A thread (useQaThread lifted here); the
   // header field + deliberation column are presentational and receive turns +
   // handlers. `ask`/`retry`/`cancel` are stable callbacks (useCallback in the
   // hook), so passing them down does not thrash the column.
   const qa = useQaThread();
+  // MARQUEE feature: "Segui il ragionamento sul grafo" — which turn's walk (if
+  // any) is being replayed on the MAIN canvas. Lifted here (not in
+  // DeliberationColumn) because the replay takes over the main region, not the
+  // column — the column only holds the trigger button. Only one walk active at
+  // a time: activating a new turn's walk replaces whatever was showing.
+  const [activeWalk, setActiveWalk] = useState<GraphTraversalEdge[] | null>(null);
   // Deliberation column tab: 'dibattito' after an ask, 'nodo' after a node click.
   const [activeTab, setActiveTab] = useState<'dibattito' | 'nodo'>('dibattito');
   // Defect #4: a turn that settles while the user is on the Nodo tab pulses the
@@ -127,13 +254,47 @@ export function GraphExplorerPage(): React.ReactElement {
   // P1.7: imperative handle into the canvas for "Adatta alla vista".
   const canvasRef = useRef<GraphCanvasHandle | null>(null);
 
+  // Wave 2 UX: the docked deliberation column collapses to a thin rail to reclaim
+  // canvas width. Persisted so the preference survives reloads. Single-composer
+  // rule (design decision): when collapsed the header "Chiedi al grafo" field
+  // re-appears (the column's own composer is hidden with the column); any gesture
+  // that produces column content — asking, or inspecting a node/edge — re-expands
+  // it so the result is never hidden behind the rail.
+  const [columnCollapsed, setColumnCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('merlt-grafo-column-collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setColumnCollapsedPersist = useCallback((next: boolean): void => {
+    setColumnCollapsed(next);
+    try {
+      localStorage.setItem('merlt-grafo-column-collapsed', next ? '1' : '0');
+    } catch {
+      /* private mode — the preference just won't persist */
+    }
+  }, []);
+  const revealColumn = useCallback((): void => {
+    setColumnCollapsedPersist(false);
+  }, [setColumnCollapsedPersist]);
+  const toggleColumnCollapsed = useCallback((): void => {
+    const next = !columnCollapsed;
+    setColumnCollapsedPersist(next);
+    // Expanding = the jurist is looking at the debate again → clear the pulse.
+    if (!next) setDibattitoBadge(false);
+  }, [columnCollapsed, setColumnCollapsedPersist]);
+
   // Defect #4, derived during render (react-hooks/set-state-in-effect): when the
   // count of SETTLED turns grows while the Nodo tab is active, light the badge.
   const settledCount = qa.turns.filter((t) => t.state.status !== 'loading').length;
   const [seenSettledCount, setSeenSettledCount] = useState(settledCount);
   if (settledCount !== seenSettledCount) {
     setSeenSettledCount(settledCount);
-    if (settledCount > seenSettledCount && activeTab === 'nodo') setDibattitoBadge(true);
+    // Pulse when the answer landed unseen: on the Nodo tab, OR while the whole
+    // column was collapsed (the rail carries the same pulse dot).
+    if (settledCount > seenSettledCount && (activeTab === 'nodo' || columnCollapsed))
+      setDibattitoBadge(true);
   }
   // Slice 4 P2b (§5 L2): the "pesa di più questo canone" upsell opens the consent
   // dialog when the jurist lacks full consent. Hosted here so the steer control can
@@ -169,8 +330,18 @@ export function GraphExplorerPage(): React.ReactElement {
     setHiddenEdgeTypes(new Set());
     setHighlightType(null);
     setSelectedEdge(null);
+    setSelectedEdgeId(null);
     // Re-arm the derived default for "nascondi giurisprudenza" on the new center.
     setHideJurisManual(null);
+    // F4: the "Carica di più" ladder is per-center — a new center starts back
+    // at the default budget.
+    setLimit(PAGE_GRAPH_LIMIT_DEFAULT);
+    // F2: expansions belong to the center they were made on — a new center
+    // starts clean, and the epoch bump discards any in-flight expansion fetch.
+    expandEpochRef.current += 1;
+    setExpansion(EMPTY_EXPANSION);
+    setExpandedNodeIds(new Set());
+    setPendingExpandId(null);
   }, [urn]);
 
   // QA-PREFILL CONTRACT (qa/types.ts): the in-article "Chiedi su questo articolo"
@@ -195,7 +366,14 @@ export function GraphExplorerPage(): React.ReactElement {
     // Defect #10: the prefilled ask is scoped to the article it came from.
     setAskScope(urn ? { urn, label: state.articleHeading ?? urn, type: centerType } : null);
     switchTab('dibattito');
-    void qa.ask(state.prefillQuery, 'convergent');
+    // The prefill always travels WITH its article as context (a Norma → the
+    // norm_references channel; a concept center → legal_concepts).
+    const prefillContext: GraphContext | undefined = urn
+      ? centerIsArticle
+        ? { normReferences: [stripVersionMarker(urn)] }
+        : { legalConcepts: [state.articleHeading ?? urn] }
+      : undefined;
+    void qa.ask(state.prefillQuery, 'convergent', prefillContext ? { context: prefillContext } : undefined);
     // Strip the consumed prefill from history so reload / back does not re-fire it.
     navigate(location.pathname + location.search, { replace: true, state: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,19 +381,19 @@ export function GraphExplorerPage(): React.ReactElement {
 
   // P1.7: global Esc — deselect node/edge and close the inspection drawer (the
   // Nodo tab flips back to the debate). Ignored while typing in a field and while
-  // the consent dialog is open (it owns its own dismissal).
+  // the consent dialog is open (it owns its own dismissal). F3: the controlled
+  // selection props propagate the clear to the G6 'selected' state too.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape' || consentDialogOpen) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      setSelectedNodeId(null);
-      setSelectedEdge(null);
+      clearGraphSelection();
       switchTab('dibattito');
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [consentDialogOpen, switchTab]);
+  }, [consentDialogOpen, switchTab, clearGraphSelection]);
 
   useEffect(() => {
     if (graph.status !== 'success' || graph.data.nodes.length > 0) return;
@@ -263,13 +441,49 @@ export function GraphExplorerPage(): React.ReactElement {
   // stable payload instead: `data`/`elements` are only new references when a
   // fetch settles, so the derived joins below stay reference-stable between
   // renders that don't refetch. (`graphData`/`graphElements` are `undefined`
-  // outside the success branch — a stable sentinel the memos treat as "empty".)
-  const graphData = graph.status === 'success' ? graph.data : undefined;
-  const graphElements = graph.status === 'success' ? graph.elements : undefined;
-  const nodes = useMemo(() => graphData?.nodes ?? [], [graphData]);
-  const edges = useMemo(() => graphData?.edges ?? [], [graphData]);
+  // outside the data-bearing branches — a stable sentinel the memos treat as
+  // "empty".) F1: 'revalidating' carries the PREVIOUS graph — the canvas keeps
+  // rendering it under a veil while the new center loads (no skeleton swap).
+  const graphHasData = graph.status === 'success' || graph.status === 'revalidating';
+  const graphData = graphHasData ? graph.data : undefined;
+  const graphElements = graphHasData ? graph.elements : undefined;
+  // F2: the VIEW = base subgraph + accumulated expansion delta, deduped by id
+  // (base wins, so a revalidation refresh never duplicates an expanded node).
+  // Reference-stable: with no expansion the base arrays pass through untouched.
+  const baseNodes = graphData?.nodes;
+  const baseEdges = graphData?.edges;
+  const nodes = useMemo<GraphNode[]>(() => {
+    const base = baseNodes ?? [];
+    if (expansion.nodes.length === 0) return base;
+    const seen = new Set(base.map((n) => n.id));
+    const extra = expansion.nodes.filter((n) => !seen.has(n.id));
+    return extra.length > 0 ? [...base, ...extra] : base;
+  }, [baseNodes, expansion]);
+  const edges = useMemo<GraphEdge[]>(() => {
+    const base = baseEdges ?? [];
+    if (expansion.edges.length === 0) return base;
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const seen = new Set(base.map(rawEdgeKey));
+    const extra = expansion.edges.filter(
+      (e) => !seen.has(rawEdgeKey(e)) && nodeIds.has(e.source) && nodeIds.has(e.target)
+    );
+    return extra.length > 0 ? [...base, ...extra] : base;
+  }, [baseEdges, expansion, nodes]);
   const nodesById = useMemo(() => new Map<string, GraphNode>(nodes.map((n) => [n.id, n])), [nodes]);
   const selectedNode = selectedNodeId ? nodesById.get(selectedNodeId) ?? null : null;
+
+  // F2: latest merged ids for the ASYNC expand handler (a closure over `nodes`
+  // could be stale by the time the fetch settles). Synced in an effect.
+  const mergedIdsRef = useRef<{ nodes: ReadonlySet<string>; edges: ReadonlySet<string> }>({
+    nodes: new Set(),
+    edges: new Set(),
+  });
+  useEffect(() => {
+    mergedIdsRef.current = {
+      nodes: new Set(nodes.map((n) => n.id)),
+      edges: new Set(edges.map(rawEdgeKey)),
+    };
+  }, [nodes, edges]);
 
   // Defect #10: does the CURRENT center match the center recorded at ask time?
   // An unscoped ask (no center at ask time, or a legacy thread) always matches.
@@ -360,13 +574,17 @@ export function GraphExplorerPage(): React.ReactElement {
   // deliberation is active (density mitigation), off in plain exploration.
   const hideJurisprudence = hideJurisManual ?? hasDeliberation;
 
-  // Human label of the current center → prefills the AskGraphField placeholder.
-  const centerLabel = urn ? labelFor(urn, entries) : undefined;
 
-  const typeCounts = useMemo(
-    () => (graphElements ? computeTypeCounts(graphElements) : { nodes: [], edges: [] }),
-    [graphElements]
-  );
+  // F2: transformed elements incl. the expansion delta (mergeElements dedupes by
+  // id, drops dangling edges and tags new nodes `expanded`). Returns the base
+  // reference untouched when there is nothing to add — no canvas churn.
+  const expandedElements = useMemo<GraphElements>(() => {
+    const base = graphElements ?? EMPTY_ELEMENTS;
+    if (expansion.nodes.length === 0 && expansion.edges.length === 0) return base;
+    return mergeElements(base, expansion);
+  }, [graphElements, expansion]);
+
+  const typeCounts = useMemo(() => computeTypeCounts(expandedElements), [expandedElements]);
 
   // Merge the jurisprudence toggle into the per-type visibility set the canvas
   // consumes — a superset of the filter panel's manual hides.
@@ -405,12 +623,13 @@ export function GraphExplorerPage(): React.ReactElement {
     });
   }, [expertContributions, conflicts, devilsAdvocateActive, centerNodeId, scopeMatches]);
 
-  // Canvas elements = real subgraph + overlay. The export-slice and the drawer
-  // read the RAW graph.data/graph.elements, never this merged set, so synthetic
-  // elements never pollute an export or a node/edge lookup.
+  // Canvas elements = real subgraph + expansion delta + overlay. The export
+  // slice reads the RAW graph.data, so synthetic overlay elements never pollute
+  // an export; the drawer reads the MERGED nodes/edges (expanded nodes are real
+  // graph nodes and must be inspectable).
   const canvasElements = useMemo<GraphElements>(
-    () => withDeliberationOverlay(graphElements ?? { nodes: [], edges: [] }, deliberationOverlay),
-    [graphElements, deliberationOverlay],
+    () => withDeliberationOverlay(expandedElements, deliberationOverlay),
+    [expandedElements, deliberationOverlay],
   );
 
   const importedElements = useMemo(
@@ -431,8 +650,7 @@ export function GraphExplorerPage(): React.ReactElement {
   // survives a refresh / shared deeplink instead of only living in click state.
   const goToCenter = (target: string, label: string, type?: string | null): void => {
     push({ urn: target, label });
-    setSelectedNodeId(null);
-    setSelectedEdge(null);
+    clearGraphSelection();
     // Defect #4: a recenter is a fresh context — land on the debate, not on a
     // stale Nodo drawer of the previous center.
     switchTab('dibattito');
@@ -466,6 +684,7 @@ export function GraphExplorerPage(): React.ReactElement {
   // Defect #5: a CANON star is not a graph node to inspect — it routes to the
   // Dibattito tab and expands that canon's thesis instead of an empty drawer.
   const handleNodeClick = (id: string): void => {
+    revealColumn(); // a node click routes to the column — reveal it if collapsed
     const canonKey = canonKeyFromNodeId(id);
     if (canonKey) {
       switchTab('dibattito');
@@ -474,7 +693,60 @@ export function GraphExplorerPage(): React.ReactElement {
     }
     setSelectedNodeId(id);
     setSelectedEdge(null);
+    setSelectedEdgeId(null);
     switchTab('nodo');
+  };
+
+  // F3: click on the empty canvas background — clear the selection AND the
+  // inspection drawer with one gesture (mirror of Esc).
+  const handleCanvasClick = useCallback((): void => {
+    clearGraphSelection();
+    switchTab('dibattito');
+  }, [clearGraphSelection, switchTab]);
+
+  // F2: double-click = EXPAND IN PLACE (the graph-explorer gesture; recentering
+  // remains the drawer's explicit "Centra qui"). Fetches the node's depth-1
+  // neighborhood and merges it into the view — the camera never moves (the
+  // canvas applies pure additions via incremental addData, gotcha-free).
+  const handleNodeExpand = (id: string): void => {
+    if (isDeliberationElementId(id)) return; // synthetic canon/contrast elements
+    if (pendingExpandId) return; // one expansion at a time
+    const node = nodesById.get(id);
+    if (!node) return;
+    if (expandedNodeIds.has(id)) {
+      setToast({ message: 'Nodo già espanso.', type: 'info' });
+      return;
+    }
+    if (nodes.length >= MAX_GRAPH_NODES) {
+      setToast({ message: 'Grafo pieno — nascondi qualcosa o ricentra.', type: 'info' });
+      return;
+    }
+    const epoch = expandEpochRef.current;
+    setPendingExpandId(id);
+    fetchNodeNeighborhood(node.urn ?? node.id, EXPAND_FETCH_LIMIT)
+      .then((delta) => {
+        if (expandEpochRef.current !== epoch) return; // center changed mid-flight
+        setPendingExpandId(null);
+        const known = mergedIdsRef.current;
+        const freshNodes = delta.nodes.filter((n) => !known.nodes.has(n.id));
+        const freshEdges = delta.edges.filter((e) => !known.edges.has(rawEdgeKey(e)));
+        if (known.nodes.size + freshNodes.length > MAX_GRAPH_NODES) {
+          setToast({ message: 'Grafo pieno — nascondi qualcosa o ricentra.', type: 'info' });
+          return;
+        }
+        setExpandedNodeIds((prev) => new Set(prev).add(id));
+        if (freshNodes.length === 0 && freshEdges.length === 0) {
+          setToast({ message: 'Nessun nuovo collegamento da aggiungere.', type: 'info' });
+          return;
+        }
+        setExpansion((prev) => appendExpansion(prev, delta));
+      })
+      .catch((err: unknown) => {
+        console.error('GraphExplorerPage: node expansion failed:', err);
+        if (expandEpochRef.current !== epoch) return;
+        setPendingExpandId(null);
+        setToast({ message: 'Espansione non riuscita — riprova.', type: 'info' });
+      });
   };
 
   // Real relation edges keyed by id (raw subgraph, NOT the overlaid set) so a
@@ -496,7 +768,9 @@ export function GraphExplorerPage(): React.ReactElement {
       canonLabel: (key) => CANON_LABEL[key] ?? key,
     });
     if (!selection) return;
+    revealColumn(); // an edge click opens the Nodo tab — reveal the column if collapsed
     setSelectedEdge(selection);
+    setSelectedEdgeId(edgeId); // F3: the canvas paints 'selected' on this id
     setSelectedNodeId(null);
     setActiveTab('nodo');
   };
@@ -515,16 +789,50 @@ export function GraphExplorerPage(): React.ReactElement {
     [latestTraceId],
   );
 
+  // Nodes-as-context: add the inspected node to the basket (drawer button), and
+  // remove one (chip ×). Add is deduped and capped; the toast only fires when the
+  // cap blocks a genuinely new node (read basket in render scope, not in the
+  // updater, so a StrictMode double-invoke can't double-toast).
+  const handleAddToContext = useCallback(
+    (node: GraphNode): void => {
+      if (contextBasket.length >= MAX_CONTEXT_ITEMS && !contextBasket.some((it) => it.id === node.id)) {
+        setToast({ message: `Contesto pieno (max ${MAX_CONTEXT_ITEMS}) — rimuovi qualcosa.`, type: 'info' });
+        return;
+      }
+      setContextBasket((prev) =>
+        prev.some((it) => it.id === node.id) ? prev : [...prev, toContextItem(node)],
+      );
+    },
+    [contextBasket],
+  );
+  const handleRemoveContext = useCallback((id: string): void => {
+    setContextBasket((prev) => prev.filter((it) => it.id !== id));
+  }, []);
+
+  // The basket, projected for the two consumers: chips for the AskGraphField, an
+  // id set for the drawer's "Nel contesto" state.
+  const contextChips = useMemo<ContextChip[]>(
+    () => contextBasket.map((i) => ({ id: i.id, label: i.label })),
+    [contextBasket],
+  );
+  const contextIds = useMemo<ReadonlySet<string>>(
+    () => new Set(contextBasket.map((i) => i.id)),
+    [contextBasket],
+  );
+
   // Header/column "Chiedi al grafo": fire the ask and surface the Dibattito tab.
-  // Records the ask-time center (defect #10) so the resulting deliberation stays
-  // scoped to it when the user recenters elsewhere mid-flight.
+  // Records the ask-time center (defect #10) so the deliberation stays scoped to
+  // it when the user recenters elsewhere mid-flight. The context basket (the
+  // selected nodes) travels to MERL-T as `context.entities`; an empty basket is
+  // an unanchored ask.
   const handleAsk = useCallback(
     (question: string, mode: QaMode): void => {
       setAskScope(urn ? { urn, label: centerLabel ?? urn, type: centerType } : null);
       switchTab('dibattito');
-      void qa.ask(question, mode);
+      revealColumn(); // an ask from the collapsed header must reveal its answer
+      void qa.ask(question, mode, { context: basketToContext(contextBasket) });
     },
-    [qa, urn, centerLabel, centerType, switchTab],
+    [qa, urn, centerLabel, centerType, switchTab, revealColumn, contextBasket],
   );
 
   // P1.10: one collegial run at a time — both AskGraphField instances share this.
@@ -541,26 +849,41 @@ export function GraphExplorerPage(): React.ReactElement {
       : null;
 
   // A deliberation source chip re-centers the CANVAS (design §3.2). node_id is a
-  // real graph node id → if it's in the current subgraph, just select it (no
-  // navigation); otherwise navigate by urn. Falls back to navigation for urns.
+  // real graph node id → if it's in the current subgraph, animate the camera to
+  // it and select it (F3 focusNode — NO navigation: center, subgraph and debate
+  // stay put); otherwise navigate by urn.
   const handleSourceCenter = (nodeIdOrUrn: string): void => {
-    const local = nodesById.get(nodeIdOrUrn);
+    const local = nodesById.get(nodeIdOrUrn) ?? nodes.find((n) => n.urn === nodeIdOrUrn);
     if (local) {
       setSelectedNodeId(local.id);
       setSelectedEdge(null);
+      setSelectedEdgeId(null);
       setActiveTab('nodo');
-      return;
-    }
-    const byUrn = nodes.find((n) => n.urn === nodeIdOrUrn);
-    if (byUrn) {
-      setSelectedNodeId(byUrn.id);
-      setSelectedEdge(null);
-      setActiveTab('nodo');
+      canvasRef.current?.focusNode(local.id, { select: true });
       return;
     }
     // Not in the current subgraph → treat as a urn and re-center the graph.
     goToCenter(nodeIdOrUrn, labelFor(nodeIdOrUrn, entries));
   };
+
+  // "Apri" (feature 3, quick-open): open a cited/consulted norma in the
+  // VisuaLex reader — the vanilla navigate('/') + triggerSearch mechanism
+  // (same as ValidationPage/ValidationCard), distinct from handleSourceCenter's
+  // canvas re-center.
+  const handleOpenNorm = useCallback(
+    (params: SearchParams): void => {
+      navigate('/');
+      triggerSearch(params);
+    },
+    [navigate, triggerSearch],
+  );
+
+  // MARQUEE feature: "Segui il ragionamento sul grafo" — the column's per-turn
+  // button hands the walk UP here; the main canvas takes it over (replacing
+  // the article subgraph / empty state) until "Chiudi il replay" clears it.
+  const handleFollowReasoning = useCallback((edges: GraphTraversalEdge[]): void => {
+    setActiveWalk(edges);
+  }, []);
 
   // #7: export the current subgraph to a local JSON the user keeps off-server.
   const handleExportSlice = (): void => {
@@ -583,7 +906,7 @@ export function GraphExplorerPage(): React.ReactElement {
     try {
       const snap = parseSnapshot(await file.text());
       setImportedSlice(snap);
-      setSelectedNodeId(null);
+      clearGraphSelection();
     } catch (err) {
       setToast({
         message: err instanceof SnapshotParseError ? err.message : 'Slice non valido.',
@@ -612,11 +935,14 @@ export function GraphExplorerPage(): React.ReactElement {
           <GraphSearchBox onSelect={handleSelect} />
         </div>
         {/* Distinct "Chiedi al grafo" ask affordance (design §3): message icon,
-            prefilled with the current center. Presentational — page owns useQaThread. */}
-        <div className="sm:max-w-sm sm:flex-1">
+            prefilled with the current center. Single-composer rule: on desktop it
+            shows ONLY when the column is collapsed (otherwise the column's own
+            bottom composer is the ask surface — no duplication). Below md it always
+            shows: the docked column is replaced by the mobile bottom-sheet. */}
+        <div className={cn('sm:max-w-sm sm:flex-1', !columnCollapsed && 'md:hidden')}>
           <AskGraphField
-            centerUrn={urn ?? undefined}
-            centerLabel={centerLabel}
+            contextItems={contextChips}
+            onRemoveContext={handleRemoveContext}
             disabled={!qaAskable}
             busy={qaBusy}
             onAsk={handleAsk}
@@ -661,7 +987,16 @@ export function GraphExplorerPage(): React.ReactElement {
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-h-0 flex-1">
-          {importedElements ? (
+          {activeWalk ? (
+            // MARQUEE feature (moved to the main canvas per user feedback: the
+            // docked column's ~170px slot was too cramped for a 60+ edge walk).
+            // Takes over the WHOLE main region — same precedence as the
+            // imported-slice view below — restoring the article subgraph /
+            // empty state on close.
+            <Suspense fallback={<CanvasSkeleton />}>
+              <GraphTraversalPlayer walk={activeWalk} onClose={() => setActiveWalk(null)} />
+            </Suspense>
+          ) : importedElements ? (
             <div className="relative h-full">
               <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 shadow dark:bg-amber-950/40 dark:text-amber-300">
                 Slice locale (sola lettura)
@@ -691,6 +1026,9 @@ export function GraphExplorerPage(): React.ReactElement {
           ) : !urn ? (
             <EmptyState />
           ) : graph.status === 'loading' || graph.status === 'idle' ? (
+            // F1: 'loading' only happens when NOTHING was ever rendered (the
+            // hook hands back 'revalidating' + previous elements otherwise), so
+            // the full skeleton is strictly a first-load affair.
             <CanvasSkeleton />
           ) : graph.status === 'error' ? (
             <ErrorState onRetry={graph.refetch} />
@@ -778,17 +1116,33 @@ export function GraphExplorerPage(): React.ReactElement {
                 edges={canvasElements.edges}
                 layout={layout}
                 height="100%"
+                centerNodeId={centerNodeId}
                 hiddenNodeTypes={effectiveHiddenNodeTypes}
                 hiddenEdgeTypes={hiddenEdgeTypes}
                 highlightNodeType={highlightType}
                 highlightNodeIds={effectiveSourceHighlightIds}
+                selectedNodeId={selectedNodeId}
+                selectedEdgeId={selectedEdgeId}
+                pulseNodeId={pendingExpandId}
+                onCanvasClick={handleCanvasClick}
                 onNodeClick={handleNodeClick}
-                onNodeDblClick={(id) => {
-                  const n = nodesById.get(id);
-                  if (n) handleRecenter(n);
-                }}
+                onNodeDblClick={handleNodeExpand}
                 onEdgeClick={handleEdgeClick}
               />
+              {/* F1: revalidation veil — the previous graph stays live under a
+                  thin progress bar + corner chip while the new data loads. */}
+              {graph.status === 'revalidating' && (
+                <>
+                  <div className="absolute inset-x-0 top-0 z-20 h-0.5 animate-pulse bg-primary-500/80" />
+                  <div
+                    role="status"
+                    className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-white/85 px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:bg-slate-900/85 dark:text-slate-300"
+                  >
+                    <Loader2 size={12} className="animate-spin text-primary-500" />
+                    Aggiornamento del grafo…
+                  </div>
+                </>
+              )}
               {/* P1.9: dismissable "evidenza fonti" chip — the sources emphasis
                   fades the rest of the graph, so it must be one click to clear. */}
               {sourceHighlightIds && !sourceFadeDismissed && (
@@ -802,6 +1156,8 @@ export function GraphExplorerPage(): React.ReactElement {
                   <X size={12} /> Evidenza fonti
                 </button>
               )}
+              {/* F4 honest truncation: "Mostro N di M relazioni" + Carica di più. */}
+              <GraphTruncationChip data={graphData} centerNodeId={centerNodeId} limit={limit} loading={graph.status === 'revalidating'} onLoadMore={setLimit} />
               {/* P1.7: one-click re-fit after zoom/pan wanderings. */}
               <button
                 type="button"
@@ -818,16 +1174,33 @@ export function GraphExplorerPage(): React.ReactElement {
         {/* Docked deliberation column (design §4): the canvas is `flex-1`, so a
             fixed-width sibling reflows it to `calc(100% − 400px)` — no imperative
             padding. Dual-tab: Dibattito (the absorbed Q&A) / Nodo (details). */}
-        <div className="hidden w-[400px] shrink-0 md:block">
+        <div
+          className={cn(
+            'hidden shrink-0 overflow-hidden transition-[width] duration-200 md:block',
+            columnCollapsed ? 'w-11' : 'w-[400px]',
+          )}
+        >
           <DeliberationColumn
             activeTab={activeTab}
             onTabChange={switchTab}
+            collapsed={columnCollapsed}
+            onToggleCollapse={toggleColumnCollapsed}
             turns={qa.turns}
             onAsk={handleAsk}
+            contextItems={contextChips}
+            onRemoveContext={handleRemoveContext}
+            onAddToContext={handleAddToContext}
+            contextIds={contextIds}
             onRetry={qa.retry}
             onCancel={qa.cancel}
             onSourceCenter={handleSourceCenter}
+            onOpenNorm={handleOpenNorm}
+            onFollowReasoning={handleFollowReasoning}
             onLoadHistoryTurn={qa.loadHistoryTurn}
+            onRate={qa.rate}
+            onRateSource={qa.rateSrc}
+            onDetailed={qa.detailed}
+            onConfirmSource={qa.confirm}
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
             expertContributions={expertContributions}
@@ -848,8 +1221,7 @@ export function GraphExplorerPage(): React.ReactElement {
             edges={edges}
             onRecenter={handleRecenter}
             onCloseNode={() => {
-              setSelectedNodeId(null);
-              setSelectedEdge(null);
+              clearGraphSelection();
               switchTab('dibattito');
             }}
           />
@@ -879,6 +1251,24 @@ export function GraphExplorerPage(): React.ReactElement {
 /** Best-known label for a breadcrumb urn (falls back to the urn itself). */
 function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>['entries']): string {
   return entries.find((e) => e.urn === urn)?.label ?? urn;
+}
+
+/** Stable key of a RAW BFF edge (same synthesis rule as graphTransform). */
+function rawEdgeKey(e: GraphEdge): string {
+  return e.id ?? `${e.source}-${e.type}-${e.target}`;
+}
+
+/** F2: append a fetched delta to the accumulated expansion, deduped by id. */
+function appendExpansion(
+  prev: ExpansionDelta,
+  delta: Pick<ExpansionDelta, 'nodes' | 'edges'>
+): ExpansionDelta {
+  const nodeIds = new Set(prev.nodes.map((n) => n.id));
+  const edgeIds = new Set(prev.edges.map(rawEdgeKey));
+  return {
+    nodes: [...prev.nodes, ...delta.nodes.filter((n) => !nodeIds.has(n.id))],
+    edges: [...prev.edges, ...delta.edges.filter((e) => !edgeIds.has(rawEdgeKey(e)))],
+  };
 }
 
 /**

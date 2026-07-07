@@ -6,6 +6,9 @@ const refineQuestion = vi.fn();
 const rateAnswer = vi.fn();
 const rateSource = vi.fn();
 const confirmSource = vi.fn();
+// Wave 2 P2.6: loadHistoryTurn hydrates details via fetchQaTrace — default to a
+// pending promise so history tests stay focused unless they override it.
+const fetchQaTrace = vi.fn<(...a: unknown[]) => Promise<unknown>>(() => new Promise(() => {}));
 
 vi.mock('../qaApi', () => ({
   askQuestion: (...a: unknown[]) => askQuestion(...a),
@@ -15,6 +18,7 @@ vi.mock('../qaApi', () => ({
   preferExpert: vi.fn(),
   rateDetailed: vi.fn(),
   confirmSource: (...a: unknown[]) => confirmSource(...a),
+  fetchQaTrace: (...a: unknown[]) => fetchQaTrace(...a),
 }));
 
 import { useQaThread } from '../useQaThread';
@@ -53,6 +57,34 @@ describe('useQaThread', () => {
       await result.current.ask('art 1453?', 'convergent');
     });
     await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+  });
+
+  it('ask() forwards the context basket and Riprova re-sends the same context', async () => {
+    askQuestion.mockRejectedValueOnce({ status: 503, message: 'down' });
+    askQuestion.mockResolvedValueOnce(answer);
+    const context = { normReferences: ['urn:x~art1453'], legalConcepts: ['risoluzione'] };
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('art 1453?', 'convergent', { context });
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('error'));
+    expect(askQuestion.mock.calls[0][2]).toEqual({ context });
+    // The context is preserved on the turn request → retry re-sends it.
+    await act(async () => {
+      await result.current.retry(result.current.turns[0].id);
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+    expect(askQuestion.mock.calls[1][2]).toEqual({ context });
+  });
+
+  it('ask() without opts sends an unanchored request (no context)', async () => {
+    askQuestion.mockResolvedValue(answer);
+    const { result } = renderHook(() => useQaThread());
+    await act(async () => {
+      await result.current.ask('domanda generale?', 'convergent');
+    });
+    await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+    expect(askQuestion.mock.calls[0][2]).toEqual({ context: undefined });
   });
 
   it('ask() error → error state', async () => {
@@ -179,6 +211,94 @@ describe('useQaThread', () => {
     // dedupe: loading the same trace again is a no-op
     act(() => result.current.loadHistoryTurn(item));
     expect(result.current.turns).toHaveLength(1);
+  });
+
+  // Wave 2 (history completeness, P2.6): the slim history turn is hydrated with
+  // the FULL trace (retrieved_sources + expert_contributions + disagreement) so
+  // the overlay/theses work on reopened debates.
+  describe('loadHistoryTurn() trace hydration', () => {
+    const item = {
+      trace_id: 'hist-full',
+      query: 'art 2043?',
+      synthesis: 'Sintesi slim.',
+      mode: 'divergent',
+      confidence: 0.5,
+      experts_used: ['literal', 'principles'],
+      sources: [],
+      created_at: '2026-06-01T10:00:00Z',
+    };
+    const traceJson = {
+      trace_id: 'hist-full',
+      stages: {
+        expert_executions: [
+          {
+            expert_type: 'literal',
+            confidence: 0.82,
+            output: { interpretation_preview: 'Tesi letterale…' },
+            retrieval_trace: { top_sources: ['urn:x~art2043', { urn: 'urn:x~art2059' }] },
+          },
+          {
+            expert_type: 'principles',
+            confidence: 0.71,
+            output: { interpretation_preview: 'Tesi per principî…' },
+            retrieval_trace: { top_sources: ['urn:x~art2043'] },
+          },
+        ],
+        gating: { weights: { literal: 0.42, principles: 0.58 } },
+        synthesis: {
+          mode: 'divergent',
+          confidence: 0.5,
+          disagreement_analysis: {
+            has_disagreement: true,
+            intensity: 0.7,
+            resolvability: 0.3,
+            confidence: 0.8,
+            conflicts: [{ expert_a: 'literal', expert_b: 'principles', conflict_score: 0.6 }],
+          },
+        },
+      },
+    };
+
+    it('hydrates the turn with sources, contributions and disagreement from the trace', async () => {
+      fetchQaTrace.mockResolvedValue(traceJson);
+      const { result } = renderHook(() => useQaThread());
+      act(() => result.current.loadHistoryTurn(item));
+      await waitFor(() => expect(result.current.turns[0].historyDetail).toBe('hydrated'));
+      expect(fetchQaTrace).toHaveBeenCalledWith('hist-full');
+
+      const turn = result.current.turns[0];
+      if (turn.state.status !== 'success') throw new Error('expected success state');
+      const a = turn.state.answer;
+      // Slim fields preserved…
+      expect(a.synthesis).toBe('Sintesi slim.');
+      // …details recovered from the trace (urn-only sources, deduped).
+      expect(a.retrieved_sources.map((s) => s.urn)).toEqual(['urn:x~art2043', 'urn:x~art2059']);
+      expect(a.expert_contributions).toEqual([
+        { expert: 'literal', thesis: 'Tesi letterale…', confidence: 0.82, weight: 0.42 },
+        { expert: 'principles', thesis: 'Tesi per principî…', confidence: 0.71, weight: 0.58 },
+      ]);
+      expect(a.disagreement_analysis?.has_disagreement).toBe(true);
+      expect(a.disagreement_analysis?.conflicts).toHaveLength(1);
+    });
+
+    it('keeps the slim turn and marks it unavailable when the trace expired (404)', async () => {
+      fetchQaTrace.mockRejectedValue({ status: 404, message: 'Trace not found' });
+      const { result } = renderHook(() => useQaThread());
+      act(() => result.current.loadHistoryTurn(item));
+      await waitFor(() => expect(result.current.turns[0].historyDetail).toBe('unavailable'));
+
+      const turn = result.current.turns[0];
+      if (turn.state.status !== 'success') throw new Error('expected success state');
+      expect(turn.state.answer.synthesis).toBe('Sintesi slim.');
+      expect(turn.state.answer.retrieved_sources).toEqual([]);
+    });
+
+    it('marks the turn unavailable when the trace yields no details (empty payload)', async () => {
+      fetchQaTrace.mockResolvedValue({ trace_id: 'hist-full', stages: {} });
+      const { result } = renderHook(() => useQaThread());
+      act(() => result.current.loadHistoryTurn(item));
+      await waitFor(() => expect(result.current.turns[0].historyDetail).toBe('unavailable'));
+    });
   });
 
   it('cancel() aborts the in-flight ask → recoverable "annullata" error, question preserved', async () => {

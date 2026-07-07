@@ -64,3 +64,26 @@ export function provenanceMeta(provenance: string | null | undefined): Provenanc
     }
   );
 }
+
+/**
+ * Discriminated classification of a graph urn/node-id for the "Apri" quick-open
+ * action on a consulted/cited source (feature 3). `norma` covers Normattiva
+ * URLs and `~artN` / `art_*_cc` style urns (opens in the VisuaLex reader via
+ * `normRefToSearchParams` + `triggerSearch`); `sentenza` covers case-law node
+ * ids (`massima_cassazione_*` / `massima_*`, opened via their `source_url` when
+ * known, else a fallback search); everything else is `unknown` (no "Apri").
+ */
+export type UrnKind =
+  | { kind: 'norma' }
+  | { kind: 'sentenza' }
+  | { kind: 'unknown' };
+
+export function urnKind(urn: string): UrnKind {
+  if (!urn) return { kind: 'unknown' };
+  if (urn.startsWith('live:')) return { kind: 'unknown' };
+  if (/massima_cassazione_|^massima_/i.test(urn)) return { kind: 'sentenza' };
+  if (/normattiva\.it/i.test(urn) || urn.startsWith('urn:nir:') || /~art[0-9a-z-]+/i.test(urn) || /art_.*_cc/i.test(urn)) {
+    return { kind: 'norma' };
+  }
+  return { kind: 'unknown' };
+}

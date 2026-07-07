@@ -205,7 +205,10 @@ function RailBody({
   onNavigateExplore,
   onNodeNavigate,
 }: RailBodyProps): React.ReactElement {
-  if (graph.status === 'loading' || graph.status === 'idle') {
+  // F1: 'revalidating' carries the PREVIOUS article's neighbourhood — in the
+  // rail that would render A's graph under B's header, so show the skeleton
+  // instead (cache hits still serve instantly as 'success').
+  if (graph.status === 'loading' || graph.status === 'idle' || graph.status === 'revalidating') {
     return <Skeleton label="Caricamento grafo…" />;
   }
 

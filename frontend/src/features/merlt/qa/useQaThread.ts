@@ -7,10 +7,12 @@ import {
   preferExpert,
   rateDetailed,
   confirmSource,
+  fetchQaTrace,
 } from './qaApi';
 import { loadThread, saveThread, clearThread } from './qaThreadStorage';
+import { extractTraceDetails, isEmptyTraceDetails } from './traceDetails';
 import { confirmSourceEntityText } from './format';
-import type { QaMode, QaTurnModel, QaRetrievedSource, QaAnswer, QaHistoryItem } from './types';
+import type { GraphContext, QaMode, QaTurnModel, QaRetrievedSource, QaAnswer, QaHistoryItem } from './types';
 
 // Module-level counter. On reload it resets to 0 while the persisted thread
 // keeps its `turn-N` ids, so a new turn would reuse `turn-1` and collide with a
@@ -66,7 +68,12 @@ export function useQaThread() {
   // Hydrate the completed thread from localStorage so a reload doesn't lose
   // past answers (Loop β #1 option A). Lazy initializer → runs once.
   const [turns, setTurns] = useState<QaTurnModel[]>(() => {
-    const loaded = loadThread();
+    // A turn persisted mid-hydration ('loading') has no live trace fetch to
+    // resume after a reload — degrade it to 'unavailable' instead of showing
+    // an eternal "Recupero i dettagli…" spinner.
+    const loaded = loadThread().map((t): QaTurnModel =>
+      t.historyDetail === 'loading' ? { ...t, historyDetail: 'unavailable' } : t,
+    );
     hydrateSeq(loaded); // continue ids past the restored max — no turn-1 reuse
     return loaded;
   });
@@ -112,14 +119,18 @@ export function useQaThread() {
     [patch],
   );
 
+  // Context-anchored ask: `opts.context` (the graph context basket at ask time)
+  // travels to the BFF and is stored on the turn's request so Riprova re-sends
+  // the SAME selected nodes. Omitted / empty = unanchored ask.
   const ask = useCallback(
-    async (question: string, mode: QaMode): Promise<void> => {
+    async (question: string, mode: QaMode, opts?: { context?: GraphContext }): Promise<void> => {
       const id = nextId();
+      const context = opts?.context;
       setTurns((prev) => [
         ...prev,
-        { id, question, state: { status: 'loading', startedAt: Date.now() }, confirmed: {}, request: { kind: 'ask', mode } },
+        { id, question, state: { status: 'loading', startedAt: Date.now() }, confirmed: {}, request: { kind: 'ask', mode, context } },
       ]);
-      await run(id, (signal) => askQuestion(question, mode, undefined, signal));
+      await run(id, (signal) => askQuestion(question, mode, { context }, signal));
     },
     [run],
   );
@@ -147,7 +158,7 @@ export function useQaThread() {
       patch(turnId, (t) => ({ ...t, state: { status: 'loading', startedAt: Date.now() } }));
       await run(turnId, (signal) =>
         req.kind === 'ask'
-          ? askQuestion(turn.question, req.mode, undefined, signal)
+          ? askQuestion(turn.question, req.mode, { context: req.context }, signal)
           : refineQuestion(req.traceId, turn.question, signal),
       );
     },
@@ -208,27 +219,78 @@ export function useQaThread() {
   }, []);
 
   // Load a past turn (from the server history) into the thread as a read-only
-  // completed turn. Skips if it's already present. retrieved_sources aren't
-  // persisted server-side, so the provenance panel is empty for history turns.
-  const loadHistoryTurn = useCallback((item: QaHistoryItem): void => {
-    const answer: QaAnswer = {
-      trace_id: item.trace_id,
-      synthesis: item.synthesis,
-      mode: item.mode,
-      alternatives: null,
-      sources: item.sources,
-      retrieved_sources: [],
-      experts_used: item.experts_used,
-      confidence: item.confidence ?? 0,
-      execution_time_ms: 0,
-    };
-    setTurns((prev) => {
-      if (prev.some((t) => t.state.status === 'success' && t.state.answer.trace_id === item.trace_id)) {
-        return prev;
-      }
-      return [...prev, { id: nextId(), question: item.query, state: { status: 'success', answer }, confirmed: {} }];
-    });
-  }, []);
+  // completed turn. Skips if it's already present. The history DTO is SLIM
+  // (Wave 2 P2.6): the turn lands immediately with the synthesis, then the
+  // FULL trace is fetched to hydrate retrieved_sources + expert_contributions
+  // + disagreement so the overlay/theses work on reopened debates. When the
+  // trace expired (404) or yields nothing, the slim turn stays with a
+  // "dettagli non più disponibili" note.
+  const loadHistoryTurn = useCallback(
+    (item: QaHistoryItem): void => {
+      const isDup = (t: QaTurnModel): boolean =>
+        t.state.status === 'success' && t.state.answer.trace_id === item.trace_id;
+      // Early return via the render-scoped turns (fresh: deps include turns);
+      // the updater re-checks so a StrictMode double-call stays a single turn.
+      if (turns.some(isDup)) return;
+      const answer: QaAnswer = {
+        trace_id: item.trace_id,
+        synthesis: item.synthesis,
+        mode: item.mode,
+        alternatives: null,
+        sources: item.sources,
+        retrieved_sources: [],
+        experts_used: item.experts_used,
+        confidence: item.confidence ?? 0,
+        execution_time_ms: 0,
+        // The slim history DTO carries neither the walk nor the trace — all
+        // hydrate below from fetchQaTrace, same as retrieved_sources/contributions.
+        graphTraversal: [],
+        toolUsages: [],
+        reactSteps: [],
+      };
+      const id = nextId();
+      setTurns((prev) => {
+        if (prev.some(isDup)) return prev;
+        return [
+          ...prev,
+          { id, question: item.query, state: { status: 'success', answer }, confirmed: {}, historyDetail: 'loading' },
+        ];
+      });
+      void fetchQaTrace(item.trace_id)
+        .then((trace) => {
+          const details = extractTraceDetails(trace);
+          if (isEmptyTraceDetails(details)) {
+            patch(id, (t) => ({ ...t, historyDetail: 'unavailable' }));
+            return;
+          }
+          patch(id, (t) =>
+            t.state.status === 'success'
+              ? {
+                  ...t,
+                  historyDetail: 'hydrated',
+                  state: {
+                    status: 'success',
+                    answer: {
+                      ...t.state.answer,
+                      retrieved_sources: details.retrievedSources,
+                      expert_contributions: details.expertContributions,
+                      disagreement_analysis: details.disagreement,
+                      graphTraversal: details.graphTraversal,
+                      toolUsages: details.toolUsages,
+                      reactSteps: details.reactSteps,
+                    },
+                  },
+                }
+              : t,
+          );
+        })
+        .catch(() => {
+          // Expired/unreachable trace: keep the slim turn, note the gap.
+          patch(id, (t) => ({ ...t, historyDetail: 'unavailable' }));
+        });
+    },
+    [turns, patch],
+  );
 
   return { turns, ask, refine, retry, cancel, rate, rateSrc, prefer, detailed, confirm, clear, loadHistoryTurn };
 }
