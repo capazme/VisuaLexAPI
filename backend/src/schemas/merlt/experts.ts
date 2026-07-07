@@ -6,10 +6,30 @@ import { z } from 'zod';
  * user_id from the JWT.
  */
 
+/**
+ * Graph-context for a question (the "context basket"): the selected nodes the
+ * jurist wants the collegio to reason WITH. Norma nodes ride as `normReferences`
+ * (their graph urn), concept nodes as `legalConcepts` (their label). The route
+ * maps these onto MERL-T's `context.entities.{norm_references,legal_concepts}` —
+ * the channel the orchestrator actually consumes (the old `contextUrn` was never
+ * read upstream; it is kept below only for backward compatibility). Capped so a
+ * runaway selection can't bloat the expert prompt / graph exploration.
+ */
+export const graphContextSchema = z.object({
+  normReferences: z.array(z.string().trim().min(1).max(500)).max(12).optional(),
+  legalConcepts: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
+});
+
 export const expertQueryRequestSchema = z.object({
   query: z.string().min(5).max(2000),
   mode: z.enum(['convergent', 'divergent']).optional(),
   maxExperts: z.number().int().min(1).max(4).optional(),
+  // Structured graph context (the context basket) — the real anchoring channel.
+  context: graphContextSchema.optional(),
+  // Legacy single anchor (Wave 2). Kept for backward compatibility only: MERL-T
+  // never read `context_urn`, so old clients sending it are unaffected, and the
+  // new FE sends `context` instead. Deliberately an open string.
+  contextUrn: z.string().trim().min(1).max(500).optional(),
 });
 
 export const inlineFeedbackRequestSchema = z.object({

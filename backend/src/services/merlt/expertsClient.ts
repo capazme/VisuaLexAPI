@@ -73,6 +73,11 @@ export interface DisagreementAnalysis {
   confidence: number;
   conflicts: ExpertPairConflict[];
   pairwise_matrix?: number[][] | null;
+  /**
+   * Wave C: provenance of the disagreement numbers. MAY be absent (older
+   * responses) — treat absence as authoritative/model-trained-equivalent.
+   */
+  source?: 'heuristic' | 'model-untrained' | 'model-trained' | null;
 }
 
 export interface DevilsAdvocateFlag {
@@ -87,6 +92,19 @@ export interface ExpertContribution {
   weight: number;
 }
 
+/**
+ * One ordered edge of the systemic reasoning walk over the graph
+ * (SystemicExpert). `source_urn --[relation_type]--> target_urn`. Emitted by
+ * MERL-T so the FE can replay the reasoning on the graph canvas.
+ */
+export interface GraphTraversalEdge {
+  iteration: number;
+  source_urn: string;
+  relation_type: string;
+  target_urn: string;
+  target_type: string;
+}
+
 export interface ExpertQueryResponse {
   trace_id: string;
   synthesis: string;
@@ -98,7 +116,12 @@ export interface ExpertQueryResponse {
   confidence: number;
   execution_time_ms: number;
   pipeline_trace?: Record<string, unknown> | null;
+  pipeline_metrics?: Record<string, unknown> | null;
+  /** Ordered node→relation→node walk of the systemic reasoning; empty when no graph-resolvable seed norms. */
+  graph_traversal?: GraphTraversalEdge[];
   disagreement_analysis?: DisagreementAnalysis | null;
+  /** NL explanation of the divergence + art. 12 preleggi criteria; null on convergent answers. */
+  disagreement_explanation?: string | null;
   devils_advocate_flag?: DevilsAdvocateFlag | null;
   expert_contributions?: ExpertContribution[];
 }
@@ -207,6 +230,33 @@ export class ExpertsClient {
   history(userId: string, limit = 20): Promise<ExpertHistoryItem[]> {
     const qs = new URLSearchParams({ user_id: userId, limit: String(limit) }).toString();
     return this.request('GET', `/api/v1/experts/history?${qs}`);
+  }
+  /**
+   * Wave 2 (history completeness): fetch the FULL pipeline trace of a past
+   * deliberation (MERL-T GET /api/v1/experts/trace/{trace_id}). The upstream
+   * applies consent-based redaction from `caller_consent` (min with the
+   * ask-time stored level). MERL-T already strips the nested RLCF
+   * `execution_trace`; we ALSO drop `query_embedding` (PipelineTrace.to_dict
+   * can carry it) and re-drop `execution_trace` here as defence in depth —
+   * embeddings are server-internal and bloat the payload. 404 (unknown/expired
+   * trace) surfaces as MerltBadRequestError for the route to pass through.
+   */
+  async getTrace(
+    traceId: string,
+    callerConsent?: 'anonymous' | 'basic' | 'full'
+  ): Promise<Record<string, unknown>> {
+    const qs = callerConsent
+      ? `?${new URLSearchParams({ caller_consent: callerConsent }).toString()}`
+      : '';
+    const raw = await this.request<Record<string, unknown>>(
+      'GET',
+      `/api/v1/experts/trace/${encodeURIComponent(traceId)}${qs}`
+    );
+    if (raw && typeof raw === 'object') {
+      delete raw.query_embedding;
+      delete raw.execution_trace;
+    }
+    return raw;
   }
 
   private async request<T>(

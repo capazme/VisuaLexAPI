@@ -30,6 +30,19 @@ export interface TrainingStartResponse {
   message?: string;
 }
 
+/** One tunable inference lever (merlt/api/admin_router.py ConfigItem). */
+export interface RuntimeConfigItem {
+  key: string;
+  kind: 'float' | 'int' | 'bool' | string;
+  value: number | boolean;
+  default: number | boolean;
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+  description: string;
+  requires_restart: boolean;
+}
+
 export class OpsClient {
   constructor(private readonly config: OpsClientConfig) {}
 
@@ -38,10 +51,30 @@ export class OpsClient {
     return this.request('POST', '/api/v1/rlcf/training/start', config);
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  /** Read the runtime-tunable inference config (admin panel). */
+  async getConfig(): Promise<{ params: RuntimeConfigItem[] }> {
+    return this.request('GET', '/api/v1/admin/config');
+  }
+
+  /** Set one runtime config lever (validated + applied live by MERL-T). */
+  async setConfig(key: string, value: number | boolean): Promise<RuntimeConfigItem> {
+    return this.request('PUT', `/api/v1/admin/config/${encodeURIComponent(key)}`, { value });
+  }
+
+  /**
+   * Rebuild the Expert System from the current config — applies construction-time
+   * flags (tools / ReAct / neural routing) WITHOUT a container restart. Longer
+   * timeout: the rebuild re-wires tools + checkpoints (models are already cached
+   * singletons, so a few seconds, not a cold boot).
+   */
+  async reinitEngine(): Promise<{ reinitialized: boolean; engine: Record<string, unknown> }> {
+    return this.request('POST', '/api/v1/admin/engine/reinitialize', undefined, 30000);
+  }
+
+  private async request<T>(method: string, path: string, body?: unknown, timeoutMs?: number): Promise<T> {
     const url = `${this.config.baseUrl}${path}`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs ?? this.config.timeoutMs);
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.config.apiKey) headers['X-API-Key'] = this.config.apiKey;

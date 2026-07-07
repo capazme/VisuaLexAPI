@@ -141,6 +141,133 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.body.retrieved_sources[0].provenance).toBe('seed');
   });
 
+  // Wave 2 context-anchored ask: contextUrn rides to MERL-T inside
+  // context.context_urn (snake_case), next to the existing mode.
+  it('forwards contextUrn inside context.context_urn (anchored ask)', async () => {
+    await grantBasic(user);
+    let sentContext: Record<string, unknown> | undefined;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/query', (b) => {
+        sentContext = (b as { context?: Record<string, unknown> }).context;
+        return true;
+      })
+      .reply(200, QUERY_OK);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({
+        query: 'art 1453 risoluzione',
+        mode: 'convergent',
+        contextUrn: 'urn:nir:stato:codice.civile:1942-03-16;262~art1453',
+      });
+    expect(res.status).toBe(200);
+    expect(sentContext).toEqual({
+      mode: 'convergent',
+      context_urn: 'urn:nir:stato:codice.civile:1942-03-16;262~art1453',
+    });
+  });
+
+  // Nodes-as-context: the FE context basket → MERL-T context.entities (the
+  // channel the orchestrator actually consumes). Norma nodes → norm_references,
+  // concept nodes → legal_concepts; both deduped.
+  it('maps the context basket to context.entities (norm_references + legal_concepts, deduped)', async () => {
+    await grantBasic(user);
+    let sentContext: Record<string, unknown> | undefined;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/query', (b) => {
+        sentContext = (b as { context?: Record<string, unknown> }).context;
+        return true;
+      })
+      .reply(200, QUERY_OK);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({
+        query: 'come opera il beneficio di escussione?',
+        mode: 'convergent',
+        context: {
+          normReferences: [
+            'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1944',
+            'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1944',
+          ],
+          legalConcepts: ['fideiussione'],
+        },
+      });
+    expect(res.status).toBe(200);
+    expect(sentContext).toEqual({
+      mode: 'convergent',
+      entities: {
+        norm_references: [
+          'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1944',
+        ],
+        legal_concepts: ['fideiussione'],
+      },
+    });
+  });
+
+  it('an empty context basket sends NO entities', async () => {
+    await grantBasic(user);
+    let sentContext: Record<string, unknown> | undefined;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/query', (b) => {
+        sentContext = (b as { context?: Record<string, unknown> }).context;
+        return true;
+      })
+      .reply(200, QUERY_OK);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'domanda generale?', mode: 'convergent', context: { normReferences: [], legalConcepts: [] } });
+    expect(res.status).toBe(200);
+    expect(sentContext).toEqual({ mode: 'convergent' });
+    expect(sentContext).not.toHaveProperty('entities');
+  });
+
+  it('an unanchored ask (chip removed) sends NO context_urn', async () => {
+    await grantBasic(user);
+    let sentContext: Record<string, unknown> | undefined;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/query', (b) => {
+        sentContext = (b as { context?: Record<string, unknown> }).context;
+        return true;
+      })
+      .reply(200, QUERY_OK);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'art 1453 risoluzione', mode: 'convergent' });
+    expect(res.status).toBe(200);
+    expect(sentContext).toEqual({ mode: 'convergent' });
+    expect(sentContext).not.toHaveProperty('context_urn');
+  });
+
+  it('no mode + no contextUrn → context stays undefined (legacy shape)', async () => {
+    await grantBasic(user);
+    let sentBody: Record<string, unknown> | undefined;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/query', (b) => {
+        sentBody = b as Record<string, unknown>;
+        return true;
+      })
+      .reply(200, QUERY_OK);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'art 1453 risoluzione' });
+    expect(res.status).toBe(200);
+    expect(sentBody).not.toHaveProperty('context');
+  });
+
+  it('400 on a blank contextUrn', async () => {
+    await grantBasic(user);
+    const res = await request(app)
+      .post('/api/merlt/experts/query')
+      .set(authHeader(user))
+      .send({ query: 'art 1453 risoluzione', contextUrn: '   ' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toBe('invalid_body');
+  });
+
   it('503 when MERL-T is unavailable (5xx)', async () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE).post('/api/v1/experts/query').reply(502, 'down');
