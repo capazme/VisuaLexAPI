@@ -9,6 +9,7 @@ References:
     RLCF.md Section 3.6 - Dynamic Task Handler System
 """
 
+import os
 import aiohttp
 import asyncio
 import json
@@ -17,6 +18,13 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 log = structlog.get_logger()
+
+# Default completion budget for the live async LLM path. Was hardcoded 128000,
+# which makes OpenRouter reserve the full budget upfront and return HTTP 402
+# ("requires more credits, or fewer max_tokens") on low-balance keys — blocking
+# every Q&A answer before generation. 4096 fits any expert answer / synthesis and
+# stays well under a modest balance. Env-overridable for tuning.
+_DEFAULT_MAX_TOKENS = int(os.getenv("MERLT_LLM_MAX_TOKENS", "4096"))
 
 
 @dataclass
@@ -338,7 +346,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
         system_prompt: Optional[str] = None,
         model: str = "google/gemini-2.5-flash",
         temperature: float = 0.1,
-        max_tokens: int = 128000,
+        max_tokens: int = _DEFAULT_MAX_TOKENS,
         api_key: Optional[str] = None,
         response_format: Optional[Dict[str, Any]] = None
     ) -> str:
@@ -445,7 +453,7 @@ Please provide a concise legal summary highlighting key points, obligations, and
         prompt: str,
         model: str = "google/gemini-2.5-flash",
         temperature: float = 0.7,
-        max_tokens: int = 128000,
+        max_tokens: int = _DEFAULT_MAX_TOKENS,
         system_prompt: Optional[str] = None,
         response_format: Optional[Dict[str, Any]] = None
     ) -> str:

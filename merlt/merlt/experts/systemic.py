@@ -194,6 +194,11 @@ class SystemicExpert(BaseExpert, ReActMixin):
         # RLCF: Inizializza ExecutionTrace per tracciare azioni
         self._init_trace(context)
 
+        # Ordered node→relation→node walk of this analysis (for the FE graph view
+        # + RLCF traversal training). Reset per call; populated by
+        # _expand_systemic_relations from the real graph_search edges.
+        self._systemic_walk = []
+
         log.info(
             f"SystemicExpert analyzing",
             query=context.query_text[:50],
@@ -215,6 +220,16 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 sources=len(all_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
+            # The ReAct loop is LLM-driven and favours semantic_search, so it
+            # skips the deterministic systematic graph traversal. Run it here too
+            # so the node→relation→node walk is always produced + recorded
+            # (add_graph_traversal) — this is what powers "segui il ragionamento
+            # sul grafo" and feeds the traversal head. Fail-open.
+            try:
+                systemic_sources = await self._expand_systemic_relations(context, all_sources)
+                all_sources = all_sources + systemic_sources
+            except Exception as e:
+                log.warning(f"SystemicExpert graph traversal under ReAct failed: {e}")
         else:
             # Standard mode: fixed tool sequence
             retrieved_sources = await self._retrieve_sources(context)
@@ -479,6 +494,8 @@ class SystemicExpert(BaseExpert, ReActMixin):
         - URN da context.norm_references (dal query_analyzer)
         """
         expanded = []
+        if not hasattr(self, "_systemic_walk"):
+            self._systemic_walk = []
 
         graph_tool = self._tool_registry.get("graph_search")
         if not graph_tool:
@@ -503,7 +520,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
             urns=list(urns_to_expand)[:3]
         )
 
-        for urn in list(urns_to_expand)[:5]:
+        for iteration, urn in enumerate(list(urns_to_expand)[:5]):
             try:
                 result = await graph_tool(
                     start_node=urn,
@@ -513,19 +530,42 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 )
                 if result.success:
                     graph_nodes = result.data.get("nodes", [])
+                    graph_edges = result.data.get("edges", [])
+                    # Real relation types traversed from this seed (from the
+                    # graph, not a generic label). One seed can fan out over
+                    # several relation types; the first is the representative
+                    # edge label for the walk.
+                    edge_types = [
+                        (e.get("type") or e.get("relation"))
+                        for e in graph_edges
+                        if (e.get("type") or e.get("relation"))
+                    ]
+                    rel_label = edge_types[0] if edge_types else "systemic"
                     log.debug(
                         f"Systemic expansion for {urn[:50]}...",
-                        nodes_found=len(graph_nodes)
+                        nodes_found=len(graph_nodes),
+                        edges_found=len(graph_edges),
                     )
                     for node in graph_nodes:
+                        target_urn = node.get("urn", "")
+                        target_type = node.get("type", "")
                         expanded.append({
                             "text": node.get("properties", {}).get("testo", ""),
-                            "urn": node.get("urn", ""),
-                            "type": node.get("type", ""),
+                            "urn": target_urn,
+                            "type": target_type,
                             "source": "systemic_expansion",
-                            "relation": "systemic",
+                            "relation": rel_label,
                             "source_urn": urn
                         })
+                        # Record the ordered node→relation→node edge for the walk.
+                        if target_urn and target_urn != urn:
+                            self._systemic_walk.append({
+                                "iteration": iteration,
+                                "source_urn": urn,
+                                "relation_type": rel_label,
+                                "target_urn": target_urn,
+                                "target_type": target_type,
+                            })
             except Exception as e:
                 log.warning(f"Failed to expand {urn}: {e}")
 

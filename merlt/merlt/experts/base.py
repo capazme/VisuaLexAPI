@@ -502,6 +502,10 @@ class BaseExpert(ABC):
         self.prompt_template = self.config.get("prompt_template", self._get_default_prompt())
         self.temperature = self.config.get("temperature", 0.3)
         self.model = self.config.get("model", "google/gemini-2.5-flash")
+        # experts.yaml max_tokens is now a real per-expert lever (was dead config:
+        # the LLM call inherited the 128000 async default instead). 4096 fits any
+        # single-canon answer and keeps cost/latency bounded.
+        self.max_tokens = int(self.config.get("max_tokens", 4096))
 
     def _get_default_prompt(self) -> str:
         """
@@ -1040,6 +1044,16 @@ CHECKLIST:
             "total_relation_traversals": sum(r.usage_count for r in relation_usage.values()),
         }
 
+    def get_graph_traversal(self) -> List[Dict[str, Any]]:
+        """
+        Ordered node→relation→node walk performed by this expert in the last
+        analyze() call (currently only the SystemicExpert populates it via
+        _expand_systemic_relations). Empty for experts that don't traverse the
+        graph. Consumed by the orchestrator to expose the reasoning walk in the
+        pipeline trace / API response so the FE can replay it on the graph.
+        """
+        return getattr(self, '_systemic_walk', [])
+
     def get_relation_usage(self) -> Dict[str, "RelationUsage"]:
         """
         Ottiene tracking uso relazioni per RLCF traversal weight learning.
@@ -1447,10 +1461,14 @@ class ExpertWithTools(BaseExpert):
 
         for attempt in range(max_retries):
             try:
+                from merlt.config.runtime_config import get_runtime_config
                 response = await self.ai_service.generate_response_async(
                     prompt=f"{system_prompt}\n\n{user_prompt}",
                     model=self.model,
                     temperature=self.temperature,
+                    # Admin-tunable at runtime (RuntimeConfig), falling back to the
+                    # per-expert experts.yaml value.
+                    max_tokens=get_runtime_config().get_int("llm_max_tokens", getattr(self, "max_tokens", 4096)),
                     response_format={"type": "json_object"}  # Garantisce JSON valido
                 )
 

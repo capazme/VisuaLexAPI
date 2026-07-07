@@ -245,6 +245,11 @@ class DisagreementAnalysis:
     confidence: float = 0.0
     conflicting_pairs: List[ExpertPairConflict] = field(default_factory=list)
     pairwise_matrix: Optional[List[List[float]]] = None
+    # B3 (honesty): provenance of these numbers. 'heuristic' = deterministic
+    # variance/overlap fallback; 'model-trained' = neural detector with a loaded
+    # trained checkpoint; 'model-untrained' = neural heads without a checkpoint
+    # (random — must be caveated in the UI, never shown as authoritative).
+    source: str = "heuristic"
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializza in dizionario per JSON/storage."""
@@ -257,6 +262,7 @@ class DisagreementAnalysis:
             "confidence": self.confidence,
             "conflicting_pairs": [p.to_dict() for p in self.conflicting_pairs],
             "pairwise_matrix": self.pairwise_matrix,
+            "source": self.source,
         }
 
     @classmethod
@@ -279,6 +285,7 @@ class DisagreementAnalysis:
             confidence=data.get("confidence", 0.0),
             conflicting_pairs=pairs,
             pairwise_matrix=data.get("pairwise_matrix"),
+            source=data.get("source", "heuristic"),
         )
 
     @property

@@ -160,6 +160,21 @@ services:
       # exactly the legacy static traversal.
       MERLT_NEURAL_TRAVERSAL_ENABLED: "${MERLT_NEURAL_TRAVERSAL_ENABLED:-true}"
 
+      # Full-brain inference (remediation Wave B). Each is fail-open: a missing
+      # dependency degrades gracefully and is logged at boot, never a 503.
+      #  - REACT: iterative Thought-Action-Observation reasoning per expert (uses
+      #    the wired tools). Costs MORE LLM calls — watch the OpenRouter balance.
+      #  - SEMANTIC_SEARCH: SemanticSearchTool over Qdrant (loads the cached
+      #    e5-large embedding model at boot).
+      #  - ADVANCED_ROUTING: wires the PolicyManager (traversal head) + an
+      #    embedding_service so process() computes the query embedding the head
+      #    needs. The head only bites with a trained checkpoint on the
+      #    merlt_checkpoints volume; without one it falls back to the static
+      #    curated relation floor (startup log shows traversal_head=false).
+      MERLT_REACT_ENABLED: "${MERLT_REACT_ENABLED:-true}"
+      MERLT_SEMANTIC_SEARCH_ENABLED: "${MERLT_SEMANTIC_SEARCH_ENABLED:-true}"
+      MERLT_ADVANCED_ROUTING_ENABLED: "${MERLT_ADVANCED_ROUTING_ENABLED:-true}"
+
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"
       FALKORDB_PORT: "6379"
@@ -262,6 +277,21 @@ services:
       # Slice 4 L3: keep the worker in lockstep with the api (any worker task
       # that runs expert pipelines must see the same traversal behaviour).
       MERLT_NEURAL_TRAVERSAL_ENABLED: "${MERLT_NEURAL_TRAVERSAL_ENABLED:-true}"
+
+      # Full-brain inference (remediation Wave B). Each is fail-open: a missing
+      # dependency degrades gracefully and is logged at boot, never a 503.
+      #  - REACT: iterative Thought-Action-Observation reasoning per expert (uses
+      #    the wired tools). Costs MORE LLM calls — watch the OpenRouter balance.
+      #  - SEMANTIC_SEARCH: SemanticSearchTool over Qdrant (loads the cached
+      #    e5-large embedding model at boot).
+      #  - ADVANCED_ROUTING: wires the PolicyManager (traversal head) + an
+      #    embedding_service so process() computes the query embedding the head
+      #    needs. The head only bites with a trained checkpoint on the
+      #    merlt_checkpoints volume; without one it falls back to the static
+      #    curated relation floor (startup log shows traversal_head=false).
+      MERLT_REACT_ENABLED: "${MERLT_REACT_ENABLED:-true}"
+      MERLT_SEMANTIC_SEARCH_ENABLED: "${MERLT_SEMANTIC_SEARCH_ENABLED:-true}"
+      MERLT_ADVANCED_ROUTING_ENABLED: "${MERLT_ADVANCED_ROUTING_ENABLED:-true}"
 
       # FalkorDB
       FALKORDB_HOST: "merlt-falkordb"

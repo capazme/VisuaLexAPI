@@ -26,6 +26,7 @@ Esempio:
     >>> print(result.synthesis)
 """
 
+import os
 import structlog
 import time
 from typing import Dict, Any, Optional, List
@@ -519,6 +520,17 @@ class AdaptiveSynthesizer:
         if len(responses) < 2:
             return self._heuristic_disagreement(responses)
 
+        # Honesty gate (B3): run the NEURAL detector only when explicitly enabled
+        # with a trained checkpoint. Its classification heads are randomly
+        # initialized until trained, so by default they would emit meaningless
+        # intensity/type/level/pairwise/resolvability that ALSO feed the final
+        # confidence + the convergent/divergent mode decision. Default OFF → the
+        # deterministic variance/overlap heuristic (honestly tagged 'heuristic').
+        # Admin-tunable at runtime (RuntimeConfig).
+        from merlt.config.runtime_config import get_runtime_config
+        if not get_runtime_config().get_bool("disagreement_model_enabled", False):
+            return self._heuristic_disagreement(responses)
+
         if self.detector is None:
             return self._heuristic_disagreement(responses)
 
@@ -533,7 +545,8 @@ class AdaptiveSynthesizer:
                 expert_responses=expert_responses,
                 query=query,
             )
-
+            # Operator asserted a trained checkpoint by enabling the flag.
+            analysis.source = "model-trained"
             return analysis
 
         except Exception as e:
@@ -860,6 +873,7 @@ class AdaptiveSynthesizer:
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
                 temperature=0.3,
+                max_tokens=int(os.getenv("MERLT_SYNTHESIS_MAX_TOKENS", "6144")),
             )
             return result.get("content", str(result)) if isinstance(result, dict) else str(result)
         except Exception as e:
@@ -887,6 +901,7 @@ class AdaptiveSynthesizer:
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
                 temperature=0.3,
+                max_tokens=int(os.getenv("MERLT_SYNTHESIS_MAX_TOKENS", "6144")),
             )
             return result.get("content", str(result)) if isinstance(result, dict) else str(result)
         except Exception as e:

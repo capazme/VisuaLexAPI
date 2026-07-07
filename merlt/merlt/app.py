@@ -68,6 +68,7 @@ from merlt.api import (
     api_keys_router,
     ner_router,
 )
+from merlt.api.admin_router import router as admin_router
 
 
 @asynccontextmanager
@@ -108,32 +109,15 @@ async def lifespan(app: FastAPI):
         # Initialize Expert System (MultiExpertOrchestrator)
         try:
             from merlt.rlcf.ai_service import OpenRouterService
-            from merlt.experts.synthesizer import AdaptiveSynthesizer, SynthesisConfig
-            from merlt.experts.orchestrator import MultiExpertOrchestrator, OrchestratorConfig
             from merlt.api.experts_router import initialize_expert_system
+            from merlt.api.engine_bootstrap import build_orchestrator
 
+            # The engine build lives in engine_bootstrap so the SAME construction
+            # runs at boot AND on the admin "Riavvia motore" reinitialize (it reads
+            # tools/ReAct/routing flags from RuntimeConfig — one source of truth).
             ai_service = OpenRouterService()
-            synthesizer = AdaptiveSynthesizer(
-                config=SynthesisConfig(
-                    convergent_threshold=0.5,
-                    resolvability_weight=0.3,
-                    include_disagreement_explanation=True,
-                    max_alternatives=3,
-                ),
-                ai_service=ai_service,
-            )
-            orchestrator = MultiExpertOrchestrator(
-                synthesizer=synthesizer,
-                tools=[],
-                ai_service=ai_service,
-                config=OrchestratorConfig(
-                    max_experts=4,
-                    timeout_seconds=60,
-                    parallel_execution=True,
-                ),
-            )
+            orchestrator = await build_orchestrator(ai_service)
             initialize_expert_system(orchestrator)
-            log.info("✅ Expert System initialized")
         except Exception as e:
             log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
             log.warning("Expert System endpoints will return 503 errors")
@@ -213,6 +197,7 @@ app.include_router(ingestion_router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(feedback_router, prefix="/api/v1", tags=["feedback"])
 app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(experts_router, prefix="/api/v1", tags=["experts"])
+app.include_router(admin_router, prefix="/api/v1", tags=["admin"])
 app.include_router(enrichment_router, prefix="/api/v1", tags=["enrichment"])
 app.include_router(document_router, prefix="/api/v1", tags=["documents"])
 app.include_router(amendments_router, prefix="/api/v1", tags=["amendments"])

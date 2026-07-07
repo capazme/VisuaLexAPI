@@ -182,6 +182,8 @@ class ExpertExecution:
     tool_calls: List[Dict[str, Any]] = field(default_factory=list)
     retrieval_trace: Optional[Dict[str, Any]] = None
     react_steps: List[Dict[str, Any]] = field(default_factory=list)
+    # Ordered node→relation→node walk over the graph (SystemicExpert only).
+    graph_traversal: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -208,6 +210,8 @@ class ExpertExecution:
             result["retrieval_trace"] = self.retrieval_trace
         if self.react_steps:
             result["react_steps"] = self.react_steps
+        if self.graph_traversal:
+            result["graph_traversal"] = self.graph_traversal
         return result
 
 

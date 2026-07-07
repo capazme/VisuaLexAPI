@@ -155,7 +155,8 @@ class MultiExpertOrchestrator:
         hybrid_router: Optional["HybridExpertRouter"] = None,
         gating_policy: Optional[Any] = None,
         embedding_service: Optional[Any] = None,
-        tool_selector: Optional[Any] = None
+        tool_selector: Optional[Any] = None,
+        policy_manager: Optional[Any] = None,
     ):
         """
         Inizializza l'orchestratore.
@@ -179,6 +180,18 @@ class MultiExpertOrchestrator:
         # Loop β E.3: optional tool-gating policy (ToolSelector). When None the
         # experts call all curated live tools (A.3 behavior, unchanged).
         self.tool_selector = tool_selector
+        # B2: the shared PolicyManager (traversal head) threaded into every
+        # expert so the RLCF-trained TraversalPolicy can score graph relations at
+        # inference (needs a query_embedding — supplied by the embedding_service /
+        # hybrid_router routing stage). None → static curated relation floor.
+        self.policy_manager = policy_manager
+        # B4: engage the ReAct (Thought-Action-Observation) reasoning loop at
+        # inference. Off by default (single-shot LLM). Meaningful only WITH tools
+        # (B1) — a ReAct loop with an empty tool registry has nothing to act on.
+        # Read from RuntimeConfig (defaults from MERLT_REACT_ENABLED) so the admin
+        # "Riavvia motore" reinitialize applies a toggled value.
+        from merlt.config.runtime_config import get_runtime_config
+        self._expert_use_react = get_runtime_config().get_bool("react_enabled", False)
         # Loop β C.2: strong refs to in-flight sedimentation tasks so fire-and-forget
         # background writes aren't garbage-collected before they complete.
         self._sediment_tasks: set = set()
@@ -247,9 +260,15 @@ class MultiExpertOrchestrator:
                 t.clone() for t in self.tools
                 if t.name not in all_mcp or t.name in allowed_mcp
             ]
+            # B4/B2: thread the ReAct toggle and the shared PolicyManager
+            # (traversal head) into every expert. `config` merges over the YAML
+            # (instance config wins) in _load_config, so use_react activates the
+            # ReAct loop while temperature/model/max_tokens stay from experts.yaml.
             self._experts[expert_type] = expert_class(
                 tools=expert_tools,
-                ai_service=self.ai_service
+                ai_service=self.ai_service,
+                config={"use_react": self._expert_use_react},
+                policy_manager=self.policy_manager,
             )
 
     async def _sediment_live_sources(self, live_sources: List[Dict[str, Any]]) -> None:
@@ -548,7 +567,8 @@ class MultiExpertOrchestrator:
         retrieved_chunks: Optional[List[Dict[str, Any]]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         return_trace: bool = False,
-        include_trace: bool = False
+        include_trace: bool = False,
+        max_experts: Optional[int] = None,
     ) -> SynthesisResult:
         """
         Processa una query attraverso il sistema multi-expert.
@@ -591,6 +611,17 @@ class MultiExpertOrchestrator:
         ) if include_trace else None
 
         pipeline_metrics = PipelineMetrics() if include_trace else None
+
+        # A per-request max_experts can only REDUCE the configured cap (never
+        # exceed it), so a "give me a faster N-expert answer" request is honoured
+        # while staying inside the routing/quality envelope. None → full cap. The
+        # base cap is admin-tunable at runtime (RuntimeConfig), defaulting to the
+        # orchestrator config.
+        from merlt.config.runtime_config import get_runtime_config
+        base_cap = get_runtime_config().get_int("max_experts", self.config.max_experts)
+        effective_max_experts = base_cap
+        if max_experts is not None:
+            effective_max_experts = max(1, min(int(max_experts), base_cap))
 
         log.info(f"Processing query", query=query[:50], trace_id=trace_id)
 
@@ -657,19 +688,27 @@ class MultiExpertOrchestrator:
             pipeline_trace.stage_times_ms["ner"] = ner_time_ms
             pipeline_metrics.ner_time_ms = ner_time_ms
 
-        # Step 2: Costruisci context con entità estratte
-        merged_entities = entities or {}
+        # Step 2: Costruisci context con entità estratte.
+        # The FE "context basket" (the nodes the jurist selected as context)
+        # arrives in `entities`; UNION it with the query-derived references
+        # instead of overwriting, so a node chosen as context is honoured even
+        # when the question ALSO names a norm/concept (nodes-as-context feature).
+        # `dict(...)` copies so the caller's dict is never mutated.
+        merged_entities = dict(entities or {})
+        user_norms = list(merged_entities.get("norm_references") or [])
+        user_concepts = list(merged_entities.get("legal_concepts") or [])
         # Prefer VisuaLex-derived URNs (correct act type); fall back to regex.
         norm_urns = [r["urn"] for r in legal_references if r.get("urn")]
-        if norm_urns:
-            merged_entities["norm_references"] = norm_urns
-        elif query_analysis.norm_references:
-            merged_entities["norm_references"] = query_analysis.norm_references
+        query_norms = norm_urns or query_analysis.norm_references or []
+        merged_norms = list(dict.fromkeys(user_norms + list(query_norms)))
+        if merged_norms:
+            merged_entities["norm_references"] = merged_norms
         # Human display references for the reference-keyed live tools (cite_law…).
         if legal_references:
             merged_entities["legal_references"] = legal_references
-        if query_analysis.legal_concepts:
-            merged_entities["legal_concepts"] = query_analysis.legal_concepts
+        merged_concepts = list(dict.fromkeys(user_concepts + list(query_analysis.legal_concepts or [])))
+        if merged_concepts:
+            merged_entities["legal_concepts"] = merged_concepts
         if query_analysis.article_numbers:
             merged_entities["article_numbers"] = query_analysis.article_numbers
 
@@ -699,6 +738,22 @@ class MultiExpertOrchestrator:
             },
             trace_id=trace_id
         )
+
+        # B2: compute the query embedding up front when an embedding_service is
+        # wired, so the RLCF-trained TraversalPolicy can score graph relations
+        # even under regex routing — systemic._select_traversal_relations and
+        # base.py gate on context.query_embedding being present. Best-effort: any
+        # embedding failure just leaves the static curated relation floor.
+        if self.embedding_service is not None and getattr(context, "query_embedding", None) is None:
+            try:
+                _enc = getattr(self.embedding_service, "encode_query", None) or getattr(self.embedding_service, "encode", None)
+                if _enc is not None:
+                    _emb = _enc(query)
+                    if asyncio.iscoroutine(_emb):
+                        _emb = await _emb
+                    context.query_embedding = _emb.tolist() if hasattr(_emb, "tolist") else list(_emb)
+            except Exception as _e:
+                log.warning("query embedding failed — traversal head stays static", error=str(_e))
 
         # Step 3: Routing - strategia basata su configurazione
         routing_t0 = time.perf_counter()
@@ -762,7 +817,7 @@ class MultiExpertOrchestrator:
 
             selected_experts = routing_decision.get_selected_experts(
                 threshold=self.config.selection_threshold
-            )[:self.config.max_experts]
+            )[:effective_max_experts]
 
         elif self._routing_strategy == "neural_policy" and self.gating_policy and self.embedding_service:
             weights = await self._apply_gating_policy(context, trace)
@@ -788,7 +843,7 @@ class MultiExpertOrchestrator:
                 (expert_type, weight)
                 for expert_type, weight in weights.items()
                 if weight >= self.config.selection_threshold
-            ][:self.config.max_experts]
+            ][:effective_max_experts]
 
             if not selected_experts:
                 top_expert = max(weights.items(), key=lambda x: x[1])
@@ -817,7 +872,7 @@ class MultiExpertOrchestrator:
 
             selected_experts = routing_decision.get_selected_experts(
                 threshold=self.config.selection_threshold
-            )[:self.config.max_experts]
+            )[:effective_max_experts]
 
             if not selected_experts:
                 selected_experts = [(exp, 1.0 / len(self._experts)) for exp in self._experts.keys()]
@@ -906,6 +961,7 @@ class MultiExpertOrchestrator:
                     tool_calls=expert_traces.get("tool_calls", []),
                     retrieval_trace=retrieval_trace,
                     react_steps=expert_traces.get("react_steps", []),
+                    graph_traversal=expert.get_graph_traversal(),
                 )
                 expert_executions.append(exec_entry.to_dict())
                 total_tokens += exec_entry.tokens_used

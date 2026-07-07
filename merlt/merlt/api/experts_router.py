@@ -155,6 +155,15 @@ class DisagreementAnalysisDTO(BaseModel):
     pairwise_matrix: Optional[List[List[float]]] = Field(
         None, description="Full expert×expert conflict matrix, when available."
     )
+    source: str = Field(
+        "heuristic",
+        description=(
+            "Provenance of these numbers (B3): 'heuristic' (deterministic "
+            "variance/overlap fallback), 'model-trained' (neural detector w/ a "
+            "trained checkpoint), or 'model-untrained'. The FE caveats non-"
+            "'model-trained' values instead of showing them as authoritative."
+        ),
+    )
 
 
 class DevilsAdvocateFlag(BaseModel):
@@ -205,6 +214,14 @@ class ExpertQueryResponse(BaseModel):
         default_factory=list,
         description="Sources the engine consulted, with real FalkorDB provenance/trust/node_id (Loop β F.0).",
     )
+    graph_traversal: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Ordered node→relation→node walk the systemic reasoning performed over "
+            "the graph (source_urn/relation_type/target_urn/target_type/iteration). "
+            "Empty when the query had no graph-resolvable seed norms."
+        ),
+    )
     # Slice 4 P2a ("il dibattito visibile", Decision D): surface the debate the
     # engine already computes. All three are additive + backward-compatible.
     disagreement_analysis: Optional[DisagreementAnalysisDTO] = Field(
@@ -226,6 +243,15 @@ class ExpertQueryResponse(BaseModel):
         description=(
             "Per-canon full theses with confidence + routing weight. Empty when "
             "the engine produced no per-expert contributions."
+        ),
+    )
+    disagreement_explanation: Optional[str] = Field(
+        None,
+        description=(
+            "Natural-language explanation of the interpretive divergence, naming "
+            "the conflict type and the art.12 preleggi resolution criteria (lex "
+            "posterior/specialis, interpretazione sistematica…). Computed by the "
+            "synthesizer in divergent mode; null on convergent answers."
         ),
     )
 
@@ -253,6 +279,7 @@ def _build_disagreement_analysis(result: Any) -> Optional[DisagreementAnalysisDT
             for pair in data.get("conflicting_pairs", [])
         ],
         pairwise_matrix=data.get("pairwise_matrix"),
+        source=data.get("source", "heuristic"),
     )
 
 
@@ -300,6 +327,27 @@ def _build_expert_contributions(result: Any) -> List[ExpertContribution]:
             )
         )
     return contributions
+
+
+def _build_graph_traversal(result: Any) -> List[Dict[str, Any]]:
+    """Flatten the SystemicExpert node→relation→node walk out of the pipeline
+    trace so the FE can replay the reasoning on the graph.
+
+    Read from ``metadata['pipeline_trace'].stages.expert_executions[*].graph_traversal``
+    — always present (independent of include_trace), so the walk ships even when
+    the caller doesn't ask for the full trace. Order = expert-execution order,
+    then per-expert edge order; each edge is
+    {iteration, source_urn, relation_type, target_urn, target_type}.
+    """
+    pt = (getattr(result, "metadata", None) or {}).get("pipeline_trace") or {}
+    stages = pt.get("stages") or {}
+    execs = stages.get("expert_executions") or []
+    walk: List[Dict[str, Any]] = []
+    for ex in execs:
+        for edge in (ex.get("graph_traversal") or []):
+            if isinstance(edge, dict) and edge.get("target_urn"):
+                walk.append(edge)
+    return walk
 
 
 def _to_source_reference(legal_source: Any) -> SourceReference:
@@ -894,7 +942,8 @@ async def query_experts(
             entities=request.context.get("entities") if request.context else None,
             retrieved_chunks=request.context.get("retrieved_chunks") if request.context else None,
             metadata={"user_id": request.user_id, "consent_level": request.consent_level},
-            include_trace=request.include_trace
+            include_trace=request.include_trace,
+            max_experts=request.max_experts,
         )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -984,10 +1033,12 @@ async def query_experts(
             pipeline_trace=pipeline_trace_data,
             pipeline_metrics=pipeline_metrics_data,
             retrieved_sources=retrieved_sources,
+            graph_traversal=_build_graph_traversal(result),
             # Slice 4 P2a: surface the deliberation (copied from `result`, no recompute).
             disagreement_analysis=_build_disagreement_analysis(result),
             devils_advocate_flag=_build_devils_advocate_flag(result),
             expert_contributions=_build_expert_contributions(result),
+            disagreement_explanation=getattr(result, "explanation", None),
         )
 
     except Exception as e:
@@ -1621,14 +1672,19 @@ async def submit_refine_feedback(
         if not original_trace:
             raise HTTPException(status_code=404, detail=f"Original trace {request.trace_id} not found")
 
-        # Re-run orchestrator with follow-up query
+        # Re-run orchestrator with follow-up query. include_trace=True is
+        # LOAD-BEARING: _build_retrieved_sources reads result.metadata['pipeline_trace'],
+        # which the orchestrator only populates when include_trace is truthy. Without
+        # it every follow-up shipped retrieved_sources=[] — losing the sources panel
+        # AND the confirm-source ('ricorda nel grafo') affordance mid-conversation.
         result = await orchestrator.process(
             query=request.follow_up_query,
             metadata={
                 "user_id": request.user_id,
                 "refine_from": request.trace_id,
                 "original_query": original_trace.query
-            }
+            },
+            include_trace=True
         )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -1639,6 +1695,11 @@ async def submit_refine_feedback(
         # Extract sources (same LegalSource shape as the main query path)
         sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
         retrieved_sources = await _build_retrieved_sources(result)
+        # Carry the deliberation trace on follow-ups too (mirror /query).
+        pipeline_trace_data = result.metadata.get("pipeline_trace")
+        pipeline_metrics_data = result.metadata.get("pipeline_metrics")
+        if pipeline_trace_data:
+            pipeline_trace_data["trace_id"] = new_trace_id
 
         experts_used = list(result.expert_contributions.keys())
 
@@ -1690,11 +1751,14 @@ async def submit_refine_feedback(
             experts_used=experts_used,
             confidence=result.confidence,
             execution_time_ms=execution_time_ms,
+            pipeline_trace=pipeline_trace_data,
+            pipeline_metrics=pipeline_metrics_data,
             retrieved_sources=retrieved_sources,
             # Slice 4 P2a: keep the debate visible on follow-ups too (same shape).
             disagreement_analysis=_build_disagreement_analysis(result),
             devils_advocate_flag=_build_devils_advocate_flag(result),
             expert_contributions=_build_expert_contributions(result),
+            disagreement_explanation=getattr(result, "explanation", None),
         )
 
     except HTTPException:
