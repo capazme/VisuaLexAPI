@@ -15,6 +15,22 @@ import { formatRetrievedUrn } from '../../qa/format';
  * `w<iteration>:<source>-<relation_type>-<target>` (stable, unique even when
  * the SAME relation type repeats across iterations between different nodes)
  * so `highlightEdgeIds` / step-sequencing can address one exact hop.
+ *
+ * Radial-replay annotations (user decision: NO aggregation, every hop stays a
+ * distinct node+edge — rings by graph distance from the seed instead):
+ *  - `data.isSeed` — the walk's origin, the node with the max OUT-degree
+ *    across the hops (fallback: the first step's source). Anchors the radial
+ *    layout's center (`GraphCanvas`'s `layoutFocusNodeId`).
+ *  - `data.iteration` — the round a node was first REACHED as a target (0 for
+ *    the seed and any other source-only node) — mirrors the ring index once
+ *    laid out radially, since graph distance from the seed equals the round
+ *    in this walk shape.
+ *  - `data.walkNode` — set on every node the walk produced, so
+ *    `graphStyles.nodeStyleMapper` can gate its walk-only sizing/label rules
+ *    without touching the main subgraph canvas (which never sets this flag).
+ *  - `data.walkLeaf` — leaf concept nodes (ModalitaGiuridica / ConcettoGiuridico,
+ *    excluding the seed) — the dense outer fan whose persistent label is
+ *    suppressed on canvas (kept on hover/selection).
  */
 
 export interface GraphTraversalStep {
@@ -32,6 +48,9 @@ export interface GraphTraversalElements {
   /** One entry per input edge, IN ORDER — the sequencer walks this array. */
   steps: GraphTraversalStep[];
 }
+
+/** Leaf concept types whose persistent label is suppressed in the radial replay (see `data.walkLeaf` above). */
+const LEAF_NODE_TYPES = new Set(['ModalitaGiuridica', 'ConcettoGiuridico']);
 
 /** Best-effort node "type" guess from a urn, for canvas styling (graphStyles' NODE_TYPE_STYLE). */
 function guessNodeType(urn: string, targetType?: string): string {
@@ -55,6 +74,10 @@ export function graphTraversalToElements(walk: GraphTraversalEdge[]): GraphTrave
   const edges: EdgeData[] = [];
   const steps: GraphTraversalStep[] = [];
   const seenEdgeIds = new Set<string>();
+  // Seed detection: out-degree per node (source-side hop count).
+  const outDegree = new Map<string, number>();
+  // Round a node was first REACHED as a target — the basis for `data.iteration`.
+  const targetFirstIteration = new Map<string, number>();
 
   for (const hop of walk) {
     if (!hop.source_urn || !hop.target_urn) continue;
@@ -63,6 +86,10 @@ export function graphTraversalToElements(walk: GraphTraversalEdge[]): GraphTrave
     }
     if (!nodesById.has(hop.target_urn)) {
       nodesById.set(hop.target_urn, toNode(hop.target_urn, guessNodeType(hop.target_urn, hop.target_type)));
+    }
+    outDegree.set(hop.source_urn, (outDegree.get(hop.source_urn) ?? 0) + 1);
+    if (!targetFirstIteration.has(hop.target_urn)) {
+      targetFirstIteration.set(hop.target_urn, hop.iteration);
     }
 
     let edgeId = `w${hop.iteration}:${hop.source_urn}-${hop.relation_type}-${hop.target_urn}`;
@@ -88,6 +115,32 @@ export function graphTraversalToElements(walk: GraphTraversalEdge[]): GraphTrave
       targetId: hop.target_urn,
       relationType: hop.relation_type,
     });
+  }
+
+  // Seed = max out-degree (first-inserted id wins ties — Map iteration order
+  // mirrors first-encounter order); falls back to the first step's source for
+  // the (practically unreachable, since every step's source counts toward
+  // outDegree) case where no out-degree entry exists.
+  let seedId: string | undefined;
+  let seedDegree = -1;
+  for (const [id, degree] of outDegree) {
+    if (degree > seedDegree) {
+      seedDegree = degree;
+      seedId = id;
+    }
+  }
+  if (seedId === undefined) seedId = steps[0]?.sourceId;
+
+  for (const [id, node] of nodesById) {
+    const type = (node.data as { type?: string } | undefined)?.type;
+    const isSeed = id === seedId;
+    node.data = {
+      ...node.data,
+      isSeed,
+      walkNode: true,
+      iteration: targetFirstIteration.get(id) ?? 0,
+      walkLeaf: !isSeed && !!type && LEAF_NODE_TYPES.has(type),
+    };
   }
 
   return { nodes: [...nodesById.values()], edges, steps };

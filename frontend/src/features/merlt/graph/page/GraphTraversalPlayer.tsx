@@ -41,6 +41,13 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
   const total = steps.length;
   const current = total > 0 ? steps[Math.min(stepIndex, total - 1)] : null;
 
+  // Radial layout center: the walk's seed (max out-degree — see
+  // graphTraversalToElements), falling back to the first step's source.
+  const seedId = useMemo<string | undefined>(() => {
+    const seedNode = nodes.find((n) => (n.data as { isSeed?: boolean } | undefined)?.isSeed === true);
+    return (seedNode?.id as string | undefined) ?? steps[0]?.sourceId;
+  }, [nodes, steps]);
+
   const goTo = useCallback(
     (index: number): void => {
       const clamped = Math.max(0, Math.min(total - 1, index));
@@ -87,7 +94,8 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
           nodes={nodes}
           edges={edges}
           height="100%"
-          layout="dagre"
+          layout="radial"
+          layoutFocusNodeId={seedId}
           highlightNodeIds={highlightNodeIds}
           highlightEdgeIds={highlightEdgeIds}
         />

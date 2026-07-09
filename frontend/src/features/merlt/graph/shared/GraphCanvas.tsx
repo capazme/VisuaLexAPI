@@ -48,7 +48,8 @@ export type GraphLayoutName =
   | 'dagre'
   | 'breadthfirst'
   | 'concentric'
-  | 'circle';
+  | 'circle'
+  | 'radial';
 
 /**
  * Imperative handle exposed via the `ref` prop (React 19 ref-as-prop, no
@@ -72,6 +73,12 @@ export interface GraphCanvasProps {
   edges: EdgeData[];
   layout?: GraphLayoutName;
   height?: number | string;
+  /**
+   * `'radial'` layout only: the node the rings are centered on (G6's
+   * `focusNode` radial option). Ignored by every other layout. Omit to fall
+   * back to the layout's own default (the first node in the data).
+   */
+  layoutFocusNodeId?: string;
   /**
    * Id of the node the view is centered on (F1 fit discipline). When it CHANGES
    * across a data update, the camera animates to it (if it survived from the
@@ -125,7 +132,10 @@ export interface GraphCanvasProps {
   onEdgeClick?: (edgeId: string) => void;
 }
 
-function layoutConfig(name: GraphLayoutName, opts?: { quickSettle?: boolean }): LayoutOptions {
+function layoutConfig(
+  name: GraphLayoutName,
+  opts?: { quickSettle?: boolean; focusNodeId?: string }
+): LayoutOptions {
   switch (name) {
     case 'dagre':
       return { type: 'antv-dagre', rankdir: 'TB', nodesep: 28, ranksep: 60 };
@@ -135,6 +145,23 @@ function layoutConfig(name: GraphLayoutName, opts?: { quickSettle?: boolean }): 
       return { type: 'concentric', nodeSize: 34 };
     case 'circle':
       return { type: 'circular' };
+    case 'radial':
+      // G6 v5 / @antv/layout 2.x radial: rings by graph distance from
+      // `focusNode`, i.e. the walk's seed — exactly "rings by reasoning round"
+      // for this walk shape (distance from seed == round). `unitRadius` /
+      // `linkDistance` widened well past the defaults (50) so a dense fan of
+      // leaf concepts spreads instead of collapsing into an unreadable strip;
+      // `preventOverlap` needs a `nodeSize` (walk nodes range ~20-54px, see
+      // graphStyles.walkNodeSize — 50 is a representative collision radius).
+      return {
+        type: 'radial',
+        focusNode: opts?.focusNodeId ?? null,
+        unitRadius: 160,
+        linkDistance: 160,
+        preventOverlap: true,
+        nodeSize: 62,
+        nodeSpacing: 30,
+      };
     case 'cose-bilkent':
     default:
       return {
@@ -381,6 +408,7 @@ export default function GraphCanvas({
   edges,
   layout = 'cose-bilkent',
   height = 300,
+  layoutFocusNodeId,
   centerNodeId,
   hiddenNodeTypes,
   hiddenEdgeTypes,
@@ -438,7 +466,7 @@ export default function GraphCanvas({
       data: { nodes, edges },
       node: { style: nodeStyleMapper, state: NODE_STATE },
       edge: { type: 'quadratic', style: edgeStyleMapper, state: EDGE_STATE },
-      layout: layoutConfig(layout),
+      layout: layoutConfig(layout, { focusNodeId: layoutFocusNodeId }),
       behaviors: [
         'zoom-canvas',
         'drag-canvas',
@@ -525,7 +553,7 @@ export default function GraphCanvas({
 
       // Quick-settle the force layout when positions carried over (no-op for
       // the deterministic layouts, which ignore initial positions anyway).
-      g.setLayout(layoutConfig(layout, { quickSettle: survivors > 0 }));
+      g.setLayout(layoutConfig(layout, { quickSettle: survivors > 0, focusNodeId: layoutFocusNodeId }));
       if (additive && prevIds) {
         g.addData({
           nodes: positionedNodes.filter((n) => n.id != null && !prevIds.nodes.has(String(n.id))),
@@ -569,7 +597,7 @@ export default function GraphCanvas({
         if (graphRef.current === g) g.setElementVisibility(visibility);
       })
       .catch(() => {});
-  }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes, centerNodeId, layout]);
+  }, [nodes, edges, hiddenNodeTypes, hiddenEdgeTypes, centerNodeId, layout, layoutFocusNodeId]);
 
   // Legend hover (type) OR deliberation sources (id-set) → emphasize the match,
   // fade the rest (no relayout). The id-set wins when both are set. F3/F2: the
@@ -596,9 +624,9 @@ export default function GraphCanvas({
       .catch(() => {});
   }, [highlightNodeType, highlightNodeIds, selectedNodeId, selectedEdgeId, pulseNodeId, highlightEdgeIds, nodes, edges]);
 
-  // Re-run layout when the layout NAME changes (no data refetch). Skipped on
-  // mount — the constructor already laid out with this config, and an extra
-  // layout() pass would discard the initial fit for nothing.
+  // Re-run layout when the layout NAME or its focus node changes (no data
+  // refetch). Skipped on mount — the constructor already laid out with this
+  // config, and an extra layout() pass would discard the initial fit for nothing.
   const layoutMountedRef = useRef(false);
   useEffect(() => {
     if (!layoutMountedRef.current) {
@@ -607,10 +635,10 @@ export default function GraphCanvas({
     }
     const g = graphRef.current;
     if (!g) return;
-    g.setLayout(layoutConfig(layout));
+    g.setLayout(layoutConfig(layout, { focusNodeId: layoutFocusNodeId }));
     // layout() also rejects if the instance is destroyed mid-flight.
     void g.layout().catch(() => {});
-  }, [layout]);
+  }, [layout, layoutFocusNodeId]);
 
   // P1.7 "Adatta alla vista": fit chained on the latest render so it never runs
   // against a graph that hasn't laid out yet; guarded against a destroyed instance.

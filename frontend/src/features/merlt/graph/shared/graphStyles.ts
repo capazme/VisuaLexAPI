@@ -81,6 +81,27 @@ const DEFAULT_NODE_COLOR = '#94a3b8';
 const DEFAULT_EDGE_COLOR = '#cbd5e1';
 
 /**
+ * Radial-replay walk-mode sizing (GraphTraversalPlayer / graphTraversalElements —
+ * gated on `data.walkNode`, so the main subgraph canvas is never affected).
+ * Fixed dark ring for the seed anchor — distinct from every type hue so the
+ * origin of the walk reads unambiguously regardless of its semantic type.
+ */
+const SEED_RING_COLOR = '#0f172a';
+const WALK_LEAF_SIZE = 20;
+const WALK_LARGE_TYPES = new Set(['Norma', 'Comma', 'AttoGiudiziario', 'Caso']);
+const WALK_MEDIUM_TYPES = new Set(['PrincipioGiuridico', 'DefinizioneLegale']);
+const WALK_DEFAULT_SIZE = 30;
+const WALK_SEED_SIZE = 54;
+
+function walkNodeSize(type: string | undefined, isSeed: boolean, isLeaf: boolean): number {
+  if (isSeed) return WALK_SEED_SIZE;
+  if (isLeaf) return WALK_LEAF_SIZE;
+  if (type && WALK_LARGE_TYPES.has(type)) return 46;
+  if (type && WALK_MEDIUM_TYPES.has(type)) return 30;
+  return WALK_DEFAULT_SIZE;
+}
+
+/**
  * Border treatment keyed on node provenance (Slice 4 P1).
  *
  * The border, NOT the fill, encodes provenance so the type hue (fill) stays
@@ -152,6 +173,9 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     weight?: number;
     provenance?: NodeProvenance;
     trust?: number;
+    isSeed?: boolean;
+    walkNode?: boolean;
+    walkLeaf?: boolean;
   };
   if (data.kind === 'canon') return canonNodeStyle(data);
   const color = (data.type && NODE_TYPE_STYLE[data.type]?.color) || DEFAULT_NODE_COLOR;
@@ -162,7 +186,8 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     typeof data.trust === 'number'
       ? Math.min(0.32, Math.max(0.1, 0.1 + 0.22 * data.trust))
       : 0.18;
-  return {
+
+  const base: Record<string, unknown> = {
     // Soft tinted fill + saturated border in the type hue → readable, not garish.
     // Provenance overrides the border (ring / dashed amber), never the fill hue.
     fill: color,
@@ -185,6 +210,24 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     labelBackgroundOpacity: 0.72,
     labelBackgroundRadius: 3,
     labelPadding: [1, 3],
+  };
+
+  // Radial-replay overrides (GraphTraversalPlayer only — gated on `walkNode`,
+  // set exclusively by graphTraversalToElements; the main subgraph canvas
+  // never sets this flag, so its nodes fall through unchanged above).
+  if (data.walkNode !== true) return base;
+
+  const isSeed = data.isSeed === true;
+  const isLeaf = data.walkLeaf === true;
+  return {
+    ...base,
+    fillOpacity: isSeed ? Math.min(0.55, fillOpacity + 0.24) : fillOpacity,
+    stroke: isSeed ? SEED_RING_COLOR : base.stroke,
+    lineWidth: isSeed ? 3 : base.lineWidth,
+    size: walkNodeSize(data.type, isSeed, isLeaf),
+    // Leaves (the dense outer fan) lose their persistent label — the seed and
+    // every other walk node keep the full label as before.
+    ...(isLeaf ? { labelText: '', labelOpacity: 0, labelMaxLines: 1 } : {}),
   };
 }
 

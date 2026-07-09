@@ -87,4 +87,89 @@ describe('graphTraversalToElements (walk-mode self-contained mini-graph)', () =>
     expect(source?.data).toMatchObject({ urn: source?.id });
     expect((source?.data as { label?: string })?.label).toContain('2043');
   });
+
+  describe('radial-replay annotations (isSeed / iteration / walkLeaf)', () => {
+    function nodeData(nodes: ReturnType<typeof graphTraversalToElements>['nodes'], id: string) {
+      return nodes.find((n) => n.id === id)?.data as
+        | { isSeed?: boolean; iteration?: number; walkLeaf?: boolean; walkNode?: boolean; type?: string }
+        | undefined;
+    }
+
+    it('marks every node with walkNode', () => {
+      const out = graphTraversalToElements([edge({ source_urn: 'urn:a', target_urn: 'urn:b' })]);
+      expect(nodeData(out.nodes, 'urn:a')?.walkNode).toBe(true);
+      expect(nodeData(out.nodes, 'urn:b')?.walkNode).toBe(true);
+    });
+
+    it('picks the seed as the node with the max out-degree', () => {
+      // urn:a fans out to 3 targets (out-degree 3); urn:b only fans out once.
+      const out = graphTraversalToElements([
+        edge({ iteration: 0, source_urn: 'urn:a', target_urn: 'urn:x', target_type: 'ModalitaGiuridica' }),
+        edge({ iteration: 0, source_urn: 'urn:a', target_urn: 'urn:y', target_type: 'ModalitaGiuridica' }),
+        edge({ iteration: 0, source_urn: 'urn:a', target_urn: 'urn:z', target_type: 'ModalitaGiuridica' }),
+        edge({ iteration: 1, source_urn: 'urn:z', target_urn: 'urn:b', target_type: 'ConcettoGiuridico' }),
+      ]);
+      expect(nodeData(out.nodes, 'urn:a')?.isSeed).toBe(true);
+      expect(nodeData(out.nodes, 'urn:x')?.isSeed).toBe(false);
+      expect(nodeData(out.nodes, 'urn:z')?.isSeed).toBe(false);
+      expect(nodeData(out.nodes, 'urn:b')?.isSeed).toBe(false);
+    });
+
+    it('falls back to the first step source when no out-degree entry exists', () => {
+      const out = graphTraversalToElements([edge({ source_urn: 'urn:a', target_urn: 'urn:b' })]);
+      // urn:a is the only source, so it wins on out-degree already — this also
+      // covers the fallback path degenerating to the same answer.
+      expect(nodeData(out.nodes, 'urn:a')?.isSeed).toBe(true);
+    });
+
+    it('flags a leaf concept target (ModalitaGiuridica/ConcettoGiuridico) as walkLeaf, never the seed', () => {
+      const out = graphTraversalToElements([
+        edge({ source_urn: 'urn:a', target_urn: 'urn:b', target_type: 'ModalitaGiuridica' }),
+        edge({ iteration: 1, source_urn: 'urn:a', target_urn: 'urn:c', target_type: 'ConcettoGiuridico' }),
+      ]);
+      expect(nodeData(out.nodes, 'urn:b')?.walkLeaf).toBe(true);
+      expect(nodeData(out.nodes, 'urn:c')?.walkLeaf).toBe(true);
+      expect(nodeData(out.nodes, 'urn:a')?.walkLeaf).toBe(false); // seed, even though its guessed type defaults to ConcettoGiuridico
+    });
+
+    it('does not flag a non-leaf type (e.g. a normattiva-guessed Norma) as walkLeaf', () => {
+      const out = graphTraversalToElements([
+        edge({
+          source_urn: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:...~art2043',
+          target_urn: 'urn:b',
+          target_type: 'ModalitaGiuridica',
+        }),
+      ]);
+      // urn:b is the leaf target, the normattiva source is the seed.
+      const source = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:...~art2043';
+      expect(nodeData(out.nodes, source)?.walkLeaf).toBe(false);
+    });
+
+    it('sets iteration to the round a node is first REACHED as a target', () => {
+      const out = graphTraversalToElements([
+        edge({ iteration: 0, source_urn: 'urn:a', target_urn: 'urn:b' }),
+        edge({ iteration: 1, source_urn: 'urn:b', target_urn: 'urn:c' }),
+        edge({ iteration: 2, source_urn: 'urn:c', target_urn: 'urn:d' }),
+      ]);
+      expect(nodeData(out.nodes, 'urn:b')?.iteration).toBe(0);
+      expect(nodeData(out.nodes, 'urn:c')?.iteration).toBe(1);
+      expect(nodeData(out.nodes, 'urn:d')?.iteration).toBe(2);
+    });
+
+    it('defaults iteration to 0 for source-only nodes (including the seed)', () => {
+      const out = graphTraversalToElements([
+        edge({ iteration: 5, source_urn: 'urn:seed', target_urn: 'urn:b' }),
+      ]);
+      // urn:seed never appears as a target anywhere in the walk.
+      expect(nodeData(out.nodes, 'urn:seed')?.iteration).toBe(0);
+    });
+
+    it('keeps the FIRST occurrence iteration when a node is reached again later', () => {
+      const out = graphTraversalToElements([
+        edge({ iteration: 0, source_urn: 'urn:a', target_urn: 'urn:shared' }),
+        edge({ iteration: 3, source_urn: 'urn:x', target_urn: 'urn:shared' }), // reached again, later
+      ]);
+      expect(nodeData(out.nodes, 'urn:shared')?.iteration).toBe(0);
+    });
+  });
 });
