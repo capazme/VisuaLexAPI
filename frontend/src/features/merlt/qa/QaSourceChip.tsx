@@ -17,7 +17,7 @@ import {
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { normRefToSearchParams } from '../validate/provenance';
-import { formatRetrievedUrn, CANON_LABEL, provenanceMeta, urnKind } from './format';
+import { sourceLabel, CANON_LABEL, provenanceMeta, urnKind } from './format';
 import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 
 /**
@@ -140,7 +140,7 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
   // navigable /grafo target. A bare live: hash with no source_url isn't
   // navigable, so we render it as plain text (no broken link).
   const displayUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
-  const label = formatRetrievedUrn(displayUrn);
+  const label = sourceLabel(source);
   const navigable = !displayUrn.startsWith('live:');
   const confirmable = source.provenance === 'live_unconfirmed' && !!source.node_id;
 

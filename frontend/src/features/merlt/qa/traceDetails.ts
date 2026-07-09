@@ -236,7 +236,9 @@ export function extractTraceDetails(trace: unknown): QaTraceDetails {
   const stages = asRecord(asRecord(trace)?.stages);
   const weights = asRecord(asRecord(stages?.gating)?.weights);
 
-  const urns: string[] = [];
+  // urn → title (null when the trace's top_sources entry carries none). Order
+  // preserved via insertion order, first-seen wins on a duplicate urn.
+  const sourceTitles = new Map<string, string | null>();
   const contributions: ExpertContribution[] = [];
   const toolUsages: QaToolUsage[] = [];
   const reactSteps: QaReactStep[] = [];
@@ -264,15 +266,17 @@ export function extractTraceDetails(trace: unknown): QaTraceDetails {
     }
 
     for (const s of asArray(asRecord(exec.retrieval_trace)?.top_sources)) {
-      const urn = typeof s === 'string' ? s : asString(asRecord(s)?.urn);
-      if (urn && !urns.includes(urn)) urns.push(urn);
+      const rec = asRecord(s);
+      const urn = typeof s === 'string' ? s : asString(rec?.urn);
+      if (urn && !sourceTitles.has(urn)) sourceTitles.set(urn, rec ? asString(rec.title) : null);
     }
   }
 
   return {
     // Provenance/trust/node_id are live FalkorDB enrichments the trace does not
-    // store — the chips render urn-only for reopened debates.
-    retrievedSources: urns.map((urn) => ({ urn })),
+    // store — the chips render urn(+title, when the trace carries one)-only
+    // for reopened debates.
+    retrievedSources: [...sourceTitles.entries()].map(([urn, title]) => (title ? { urn, title } : { urn })),
     expertContributions: contributions,
     disagreement: parseDisagreement(asRecord(stages?.synthesis)?.disagreement_analysis),
     toolUsages,

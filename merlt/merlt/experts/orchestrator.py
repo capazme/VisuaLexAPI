@@ -1261,6 +1261,7 @@ class MultiExpertOrchestrator:
         total_after_reranking = 0
         all_top_sources: list = []
         seen_sources: set = set()
+        source_labels: dict = {}
 
         for tc in semantic_calls:
             meta = tc.get("result_metadata", {})
@@ -1268,6 +1269,7 @@ class MultiExpertOrchestrator:
                 alpha_used = meta["retrieval_alpha"]
             total_candidates += meta.get("total_candidates", 0)
             total_after_reranking += meta.get("chunks_after_reranking", 0) or (tc.get("result_count", 0) or 0)
+            source_labels.update(meta.get("top_source_labels", {}) or {})
             for urn in meta.get("top_source_urns", []):
                 if urn not in seen_sources:
                     seen_sources.add(urn)
@@ -1280,6 +1282,9 @@ class MultiExpertOrchestrator:
             "chunks_after_reranking": total_after_reranking,
             "alpha_used": round(alpha_used, 3),
             "top_sources": all_top_sources[:10],
+            # urn -> human-readable label, so retrieved_sources never surface an
+            # opaque id (provisional live:<hash>) with no valence for feedback.
+            "source_labels": source_labels,
         }
 
     async def process_with_routing(

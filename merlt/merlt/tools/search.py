@@ -63,6 +63,43 @@ class SearchResultItem:
         }
 
 
+def _is_tool_error_text(text: str) -> bool:
+    """A chunk whose text is a failed tool response (e.g. a provisional node
+    sedimented from a ``cite_law`` miss: ``**Errore**: atto '...' non
+    riconosciuto``). These are index pollution — never a valid source to cite."""
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    return (
+        t.startswith("**errore")
+        or t.startswith("errore:")
+        or "non riconosciuto" in t
+    )
+
+
+def _readable_source_label(result: Dict[str, Any]) -> str:
+    """Human-readable identity for a retrieved source so the FE never shows an
+    opaque id (e.g. a provisional ``live:<hash>`` that resolves to nothing).
+    Prefers a normative reference (art. N + act), then a case-law / text snippet
+    — always something the jurist can recognize to give meaningful feedback."""
+    meta = result.get("metadata") or {}
+    art = str(meta.get("numero_articolo") or "").strip()
+    tipo = str(meta.get("tipo_atto") or "").strip()
+    source_type = str(meta.get("source_type") or "").strip().lower()
+    text = " ".join(str(result.get("text") or "").split()).strip()
+
+    def _snippet(s: str, n: int = 80) -> str:
+        return s[:n] + ("…" if len(s) > n else "")
+
+    if source_type in {"massima", "sentenza", "giurisprudenza"} and text:
+        return "Massima — " + _snippet(text, 70)
+    if art:
+        return f"art. {art} {tipo}".strip()
+    if text:
+        return _snippet(text)
+    return ""
+
+
 class SemanticSearchTool(BaseTool):
     """
     Tool per ricerca semantica ibrida nel knowledge graph.
@@ -264,6 +301,11 @@ class SemanticSearchTool(BaseTool):
                         metadata=r.metadata
                     ).to_dict())
 
+            # Drop index-pollution chunks whose body is a failed tool response
+            # (e.g. a provisional node sedimented from a cite_law miss) — not
+            # citable content, and they must not ground the experts either.
+            results = [r for r in results if not _is_tool_error_text(r.get("text", ""))]
+
             log.info(
                 f"semantic_search completed - "
                 f"query='{query[:30]}...', "
@@ -279,6 +321,7 @@ class SemanticSearchTool(BaseTool):
                 getattr(self.retriever, 'config', None), 'over_retrieve_factor', 3
             )
             top_source_urns = []
+            top_source_labels: Dict[str, str] = {}
             seen_urns = set()
             for r in results[:5]:
                 urn = (
@@ -288,6 +331,9 @@ class SemanticSearchTool(BaseTool):
                 if urn and urn not in seen_urns:
                     seen_urns.add(urn)
                     top_source_urns.append(urn)
+                    label = _readable_source_label(r)
+                    if label:
+                        top_source_labels[urn] = label
 
             tool_result = ToolResult.ok(
                 data={
@@ -307,6 +353,7 @@ class SemanticSearchTool(BaseTool):
                 total_candidates=top_k * over_retrieve_factor,
                 chunks_after_reranking=len(results),
                 top_source_urns=top_source_urns,
+                top_source_labels=top_source_labels,
             )
 
             # Store in shared cache

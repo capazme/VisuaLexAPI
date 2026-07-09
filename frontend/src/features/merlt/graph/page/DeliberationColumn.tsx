@@ -10,7 +10,7 @@ import { EdgeDetailsDrawer } from './EdgeDetailsDrawer';
 import { QaHistoryPanel } from '../../qa/QaHistoryPanel';
 import { QaSynthesisWithCitations } from '../../ner/QaSynthesisWithCitations';
 import { normRefToSearchParams } from '../../validate/provenance';
-import { CANON_LABEL, formatRetrievedUrn, provenanceMeta, urnKind } from '../../qa/format';
+import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind } from '../../qa/format';
 import type {
   ConfirmState,
   GraphTraversalEdge,
@@ -1670,7 +1670,7 @@ function DeliberationSourceChip({
 }): React.ReactElement {
   const meta = provenanceMeta(source.provenance);
   const displayUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
-  const label = formatRetrievedUrn(displayUrn);
+  const label = sourceLabel(source);
   const target = source.node_id ?? source.urn;
   const confirmable = source.provenance === 'live_unconfirmed' && Boolean(source.node_id) && Boolean(onConfirm);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { confirmSourceEntityText, formatRetrievedUrn, urnKind } from '../format';
+import { confirmSourceEntityText, formatRetrievedUrn, sourceLabel, urnKind } from '../format';
 
 describe('confirmSourceEntityText (B3 — human name for "ricorda nel grafo")', () => {
   it('prefers the underlying source_url for a provisional live: node', () => {
@@ -44,6 +44,83 @@ describe('confirmSourceEntityText (B3 — human name for "ricorda nel grafo")', 
 describe('formatRetrievedUrn', () => {
   it('renders a provisional live: node as a placeholder', () => {
     expect(formatRetrievedUrn('live:abc')).toBe('Fonte provvisoria');
+  });
+
+  it('formats a codice civile article as "art. N c.c."', () => {
+    expect(
+      formatRetrievedUrn(
+        'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453',
+      ),
+    ).toBe('art. 1453 c.c.');
+  });
+
+  it('formats a non-codice-civile article as plain "art. N"', () => {
+    expect(formatRetrievedUrn('urn:nir:stato:legge:1990-08-07;241~art1')).toBe('art. 1');
+  });
+
+  it('formats a Cassazione civile massima as "Cass. civ. N/YYYY"', () => {
+    expect(formatRetrievedUrn('massima_cassazione_civile_4022_2018')).toBe('Cass. civ. 4022/2018');
+  });
+
+  it('formats a generic massima_<branch>_<num>_<year> shape', () => {
+    expect(formatRetrievedUrn('massima_penale_1234_2020')).toBe('Cass. pen. 1234/2020');
+  });
+
+  it('defaults the branch abbreviation to "civ" for a bare massima_<num>_<year>', () => {
+    expect(formatRetrievedUrn('massima_9999_2021')).toBe('Cass. civ. 9999/2021');
+  });
+
+  it('humanizes a concetto: node id', () => {
+    expect(formatRetrievedUrn('concetto:diritto_di_recesso')).toBe('Diritto di recesso');
+  });
+
+  it('humanizes a modalita: node id', () => {
+    expect(formatRetrievedUrn('modalita:diritto_di_chiedere_il_risarcimento_del_danno')).toBe(
+      'Diritto di chiedere il risarcimento del danno',
+    );
+  });
+});
+
+describe('sourceLabel (server title takes priority over urn humanization)', () => {
+  it('prefers a non-empty title over the urn shape', () => {
+    expect(
+      sourceLabel({
+        urn: 'https://www.normattiva.it/...~art1618',
+        title: 'Art. 1618. (Inadempimenti dell’affittuario)',
+      }),
+    ).toBe('Art. 1618. (Inadempimenti dell’affittuario)');
+  });
+
+  it('trims a title with surrounding whitespace', () => {
+    expect(sourceLabel({ urn: 'urn:nir:..~art1453', title: '  art. 1453 codice civile  ' })).toBe(
+      'art. 1453 codice civile',
+    );
+  });
+
+  it('falls back to urn humanization when title is null', () => {
+    expect(sourceLabel({ urn: 'urn:nir:..~art1453', title: null })).toBe('art. 1453');
+  });
+
+  it('falls back to urn humanization when title is an empty string', () => {
+    expect(sourceLabel({ urn: 'urn:nir:..~art1453', title: '' })).toBe('art. 1453');
+  });
+
+  it('falls back to urn humanization when title is absent', () => {
+    expect(sourceLabel({ urn: 'massima_cassazione_civile_4022_2018' })).toBe('Cass. civ. 4022/2018');
+  });
+
+  it('prefers source_url over the opaque live: hash when no title is known', () => {
+    expect(
+      sourceLabel({
+        urn: 'live:abc',
+        node_id: 'live:abc',
+        source_url: 'https://www.normattiva.it/...~art467',
+      }),
+    ).toBe('art. 467');
+  });
+
+  it('falls back to "Fonte provvisoria" for a live: node with no title and no source_url', () => {
+    expect(sourceLabel({ urn: 'live:deadbeef', node_id: 'live:deadbeef' })).toBe('Fonte provvisoria');
   });
 });
 

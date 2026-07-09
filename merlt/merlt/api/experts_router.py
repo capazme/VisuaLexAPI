@@ -106,6 +106,10 @@ class RetrievedSource(BaseModel):
     # the underlying Normattiva URL (when known) gives the UI a readable label
     # and a navigable /grafo target.
     source_url: Optional[str] = None
+    # Human-readable identity resolved at retrieval time from the chunk
+    # (normative reference or a text snippet) so the UI never shows an opaque
+    # id with no valence for feedback. Falls back to null when unknown.
+    title: Optional[str] = None
 
 
 # ----------------------------------------------------------------------------
@@ -482,8 +486,11 @@ async def _build_retrieved_sources(result: Any) -> List[RetrievedSource]:
         pt = (getattr(result, "metadata", None) or {}).get("pipeline_trace") or {}
         execs = (pt.get("stages") or {}).get("expert_executions") or []
         urns: List[str] = []
+        labels: Dict[str, str] = {}
         for ex in execs:
-            for u in ((ex.get("retrieval_trace") or {}).get("top_sources") or []):
+            rt = ex.get("retrieval_trace") or {}
+            labels.update(rt.get("source_labels") or {})
+            for u in (rt.get("top_sources") or []):
                 urn = u if isinstance(u, str) else (u.get("urn") if isinstance(u, dict) else None)
                 if urn and urn not in urns:
                     urns.append(urn)
@@ -495,6 +502,7 @@ async def _build_retrieved_sources(result: Any) -> List[RetrievedSource]:
                 trust=(enr.get(urn) or {}).get("trust"),
                 node_id=(enr.get(urn) or {}).get("node_id"),
                 source_url=(enr.get(urn) or {}).get("source_url"),
+                title=labels.get(urn) or None,
             )
             for urn in urns
         ]

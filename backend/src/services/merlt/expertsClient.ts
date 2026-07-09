@@ -40,6 +40,8 @@ export interface ExpertRetrievedSource {
   trust?: number | null;
   node_id?: string | null;
   source_url?: string | null;
+  /** Human-readable identity (normative ref or text snippet) resolved at retrieval time; null when unknown. */
+  title?: string | null;
 }
 
 /**

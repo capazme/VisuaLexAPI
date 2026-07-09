@@ -10,27 +10,67 @@ export const CANON_LABEL: Record<string, string> = {
   combined: 'Combinato',
 };
 
-/** Best-effort readable label for a graph URN / node id. */
+/** The codice civile's date+number marker (R.D. 16 marzo 1942, n. 262), independent of the act-type label used in the urn ("codice.civile:" vs "regio.decreto:"). */
+const CODICE_CIVILE_MARKER = '1942-03-16;262';
+
+function isCodiceCivileUrn(urn: string): boolean {
+  return urn.includes(CODICE_CIVILE_MARKER);
+}
+
+function capitalizeFirst(s: string): string {
+  return s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+/** `concetto:foo_bar_baz` / `modalita:foo_bar` → "Foo bar baz" (strip prefix, underscores → spaces, capitalize). */
+function humanizeConceptId(id: string, prefix: string): string {
+  return capitalizeFirst(id.slice(prefix.length).replace(/_/g, ' ').trim());
+}
+
+/** Best-effort readable label for a graph URN / node id (no server-resolved title). */
 export function formatRetrievedUrn(urn: string): string {
   if (urn.startsWith('live:')) return 'Fonte provvisoria';
-  const massima = urn.match(/massima_cassazione_([a-z]+)_(\d+)_(\d{4})/i);
-  if (massima) return `Cass. ${massima[1].slice(0, 3)}. ${massima[2]}/${massima[3]}`;
+  // Generic massima_* shape: optional "cassazione_" segment, optional branch
+  // word (civile/penale/…, abbreviated to 3 letters; defaults to "civ" when
+  // absent, e.g. a bare massima_<num>_<year>), then <num>_<year>.
+  const massima = urn.match(/massima_(?:cassazione_)?(?:([a-z]+)_)?(\d+)_(\d{4})/i);
+  if (massima) {
+    const branch = massima[1] ? massima[1].slice(0, 3) : 'civ';
+    return `Cass. ${branch}. ${massima[2]}/${massima[3]}`;
+  }
   const art = urn.match(/~art([0-9a-z-]+)/i);
-  if (art) return `art. ${art[1].replace(/-/g, ' ')}`;
+  if (art) {
+    const num = art[1].replace(/-/g, ' ');
+    return isCodiceCivileUrn(urn) ? `art. ${num} c.c.` : `art. ${num}`;
+  }
+  if (urn.startsWith('concetto:')) return humanizeConceptId(urn, 'concetto:');
+  if (urn.startsWith('modalita:')) return humanizeConceptId(urn, 'modalita:');
   return urn.length > 60 ? `${urn.slice(0, 57)}…` : urn;
 }
 
 /**
+ * Human-readable label for a consulted source: server-resolved `title` first
+ * (retrieval-time identity, e.g. "Art. 1618. (Inadempimenti dell'affittuario)…"),
+ * else the urn/url humanized via {@link formatRetrievedUrn} — for provisional
+ * (`live:`) nodes preferring the underlying `source_url` (readable "art. N")
+ * before the opaque hash, and "Fonte provvisoria" only as the last resort.
+ */
+export function sourceLabel(source: QaRetrievedSource): string {
+  const title = source.title?.trim();
+  if (title) return title;
+  const readableUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
+  return formatRetrievedUrn(readableUrn);
+}
+
+/**
  * Human-readable entity name for a consulted source, for the "ricorda nel grafo"
- * (confirm-source) teaching channel. Mirrors {@link QaSourceChip}'s displayed
- * label: for provisional (`live:`) nodes the URN is an opaque hash, so we prefer
- * the underlying Normattiva URL (which yields a readable "art. N") before falling
- * back. NEVER returns the raw `live:` node id — the BFF rejects a name that starts
+ * (confirm-source) teaching channel. Mirrors {@link sourceLabel}: a good server
+ * title makes the best entity name; otherwise falls back to urn humanization
+ * (for provisional `live:` nodes preferring the underlying Normattiva URL).
+ * NEVER returns the raw `live:` node id — the BFF rejects a name that starts
  * with the provisional id, since a raw id must not become an entity name.
  */
 export function confirmSourceEntityText(source: QaRetrievedSource): string {
-  const readableUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
-  return formatRetrievedUrn(readableUrn);
+  return sourceLabel(source);
 }
 
 /** Visual descriptor for a source's provenance (colored stripe + chip label). */

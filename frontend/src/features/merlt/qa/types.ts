@@ -20,6 +20,12 @@ export interface QaRetrievedSource {
   trust?: number | null;
   node_id?: string | null;
   source_url?: string | null;
+  /**
+   * Human-readable identity resolved at retrieval time (e.g. "Art. 1618. (…)"
+   * or "art. 1453 codice civile"), null when unknown. Takes priority over any
+   * urn-humanization in the label helpers (`format.ts`'s `sourceLabel`).
+   */
+  title?: string | null;
 }
 
 /** A divergent-mode per-canon interpretation (synthesizer shape). */
