@@ -119,6 +119,18 @@ class RuntimeConfig:
                     "heads emit random intensity/type/level)."
                 ),
             ),
+            ParamSpec(
+                key="tool_gating_ab_ratio",
+                kind="float",
+                default=_env_float("MERLT_TOOL_GATING_AB_RATIO", 0.0),
+                minimum=0.0, maximum=1.0, step=0.05,
+                description=(
+                    "Fraction of queries in the tool-gating TREATMENT arm (the "
+                    "ToolGatingMLP prunes each expert's tools). 0.0 = pure shadow "
+                    "(all tools fire, records data, zero quality risk); raise once "
+                    "the head is trained to let it actually steer tool selection."
+                ),
+            ),
             # ---- read-only engine state (needs a restart to change) ----
             ParamSpec(
                 key="react_enabled", kind="bool",
@@ -136,6 +148,18 @@ class RuntimeConfig:
                 key="advanced_routing_enabled", kind="bool",
                 default=_env_bool("MERLT_ADVANCED_ROUTING_ENABLED", False),
                 description="Neural gating router + traversal head + embeddings (construction-time).",
+                requires_restart=True,
+            ),
+            ParamSpec(
+                key="tool_gating_enabled", kind="bool",
+                default=_env_bool("MERLT_TOOL_GATING_ENABLED", True),
+                description="Wire the ToolSelector: records tool_use for RLCF tool-gating training + per-query tool selection (construction-time).",
+                requires_restart=True,
+            ),
+            ParamSpec(
+                key="mcp_legal_tools_enabled", kind="bool",
+                default=_env_bool("MERLT_MCP_LEGAL_TOOLS_ENABLED", True),
+                description="Wire the live mcp-legal-it tools (cite_law, giurisprudenza, brocardi, ...) into the experts (construction-time).",
                 requires_restart=True,
             ),
         ]

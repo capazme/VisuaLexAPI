@@ -792,8 +792,14 @@ class MultiExpertOrchestrator:
                 log_prob=-0.1 if routing_decision.neural_used else -0.5,
             ))
 
-            # Register expert_selection actions for RLCF training
-            if routing_decision.neural_used and routing_decision.query_embedding is not None:
+            # Register expert_selection actions for RLCF training. NB: record on the
+            # llm_fallback path too (not only neural_used) — the hybrid router still
+            # populates query_embedding + expert_log_probs there, and without these
+            # actions the gating head STARVES: it under-trains → stays under threshold →
+            # always falls back → never trains (the same vicious cycle the tool-gating
+            # embedding fix broke). The recorded weights are the experts that actually
+            # ran; REINFORCE credits them with the answer reward.
+            if routing_decision.query_embedding is not None:
                 if not routing_decision.expert_log_probs:
                     log.warning(
                         "expert_log_probs missing from routing decision, "

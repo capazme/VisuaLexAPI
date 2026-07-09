@@ -625,7 +625,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 expert_type=self.expert_type,
                 interpretation="Non è stato possibile completare l'analisi sistematica in forma strutturata per questa domanda.",
                 confidence=0.0,
-                limitations=str(e),
+                limitations=f"structured_analysis_failed: {str(e)}",
                 trace_id=context.trace_id
             )
 

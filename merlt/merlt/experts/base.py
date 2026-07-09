@@ -189,6 +189,25 @@ class RelationUsage:
         )
 
 
+def _as_float(value: Any, default: float, lo: Optional[float] = None, hi: Optional[float] = None) -> float:
+    """Coerce an LLM-supplied value to float. response_format=json_object guarantees
+    valid JSON, NOT field types — a model can emit "confidence": "0.8" (str) or null,
+    both of which would later crash round()/numeric comparisons (some OUTSIDE the
+    expert's try, in the pipeline-trace build). Fall back to `default` on any failure,
+    optionally clamping to [lo, hi]."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    if v != v:  # NaN
+        return default
+    if lo is not None:
+        v = max(lo, v)
+    if hi is not None:
+        v = min(hi, v)
+    return v
+
+
 @dataclass
 class ConfidenceFactors:
     """
@@ -207,13 +226,12 @@ class ConfidenceFactors:
     definition_coverage: float = 0.5
 
     def __post_init__(self):
-        # The LLM can emit explicit nulls (e.g. "norm_clarity": null); a dict.get(k, 0.5)
-        # in _build_response then returns None (key present, not missing), and round(
-        # None, 3) below would crash. Coerce any None factor back to the neutral 0.5.
+        # The LLM can emit a factor as null OR as a string ("alta", "0.8"); dict.get(k,
+        # 0.5) keeps the present-but-null/str value, and round() below would then crash.
+        # Coerce robustly to a [0,1] float, neutral 0.5 on failure.
         for _name in ("norm_clarity", "jurisprudence_alignment", "contextual_ambiguity",
                       "source_availability", "definition_coverage"):
-            if getattr(self, _name) is None:
-                setattr(self, _name, 0.5)
+            setattr(self, _name, _as_float(getattr(self, _name), 0.5, 0.0, 1.0))
 
     def to_dict(self) -> Dict[str, float]:
         return {
@@ -308,13 +326,12 @@ class ExpertResponse:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        # confidence can arrive as an explicit null from the LLM JSON (data.get(
-        # "confidence", 0.5) returns None when the key is present-but-null); round(
-        # None, 3) in to_dict() would crash. Coerce None numerics to their defaults.
-        if self.confidence is None:
-            self.confidence = 0.5
-        if self.execution_time_ms is None:
-            self.execution_time_ms = 0.0
+        # confidence can arrive as null OR a string from the LLM JSON (data.get(
+        # "confidence", 0.5) keeps a present-but-null/str value); round()/comparisons
+        # downstream — some OUTSIDE the expert's try (orchestrator, pipeline_trace) —
+        # would crash. Coerce robustly.
+        self.confidence = _as_float(self.confidence, 0.5, 0.0, 1.0)
+        self.execution_time_ms = _as_float(self.execution_time_ms, 0.0)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializza in dizionario."""
