@@ -206,6 +206,15 @@ class ConfidenceFactors:
     source_availability: float = 0.5
     definition_coverage: float = 0.5
 
+    def __post_init__(self):
+        # The LLM can emit explicit nulls (e.g. "norm_clarity": null); a dict.get(k, 0.5)
+        # in _build_response then returns None (key present, not missing), and round(
+        # None, 3) below would crash. Coerce any None factor back to the neutral 0.5.
+        for _name in ("norm_clarity", "jurisprudence_alignment", "contextual_ambiguity",
+                      "source_availability", "definition_coverage"):
+            if getattr(self, _name) is None:
+                setattr(self, _name, 0.5)
+
     def to_dict(self) -> Dict[str, float]:
         return {
             "norm_clarity": round(self.norm_clarity, 3),
@@ -297,6 +306,15 @@ class ExpertResponse:
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     feedback_hook: Optional[FeedbackHook] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        # confidence can arrive as an explicit null from the LLM JSON (data.get(
+        # "confidence", 0.5) returns None when the key is present-but-null); round(
+        # None, 3) in to_dict() would crash. Coerce None numerics to their defaults.
+        if self.confidence is None:
+            self.confidence = 0.5
+        if self.execution_time_ms is None:
+            self.execution_time_ms = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializza in dizionario."""

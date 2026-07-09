@@ -333,13 +333,40 @@ class LiteralExpert(BaseExpert, ReActMixin):
         user_prompt = self._format_context_for_llm(context)
 
         try:
-            # Delegate to the shared robust path (_call_llm): enforces
-            # response_format=json_object + runtime max_tokens + retry on invalid JSON,
-            # so a truncated / non-JSON completion no longer leaks a parse error to the UI.
-            result = await self._call_llm(system_prompt, user_prompt)
-            data = json.loads(result["content"])
+            from merlt.config.runtime_config import get_runtime_config
+            # Structured output: force response_format=json_object (+ runtime max_tokens)
+            # on _traced_llm_call so the completion is valid JSON, instead of prose that
+            # breaks json.loads and used to leak the parse error into the UI. NOTE: the
+            # robust _call_llm lives on ExpertWithTools, NOT on BaseExpert — the canon
+            # experts extend BaseExpert, so _traced_llm_call is the call available here.
+            response = await self._traced_llm_call(
+                prompt=f"{system_prompt}\n\n{user_prompt}",
+                model=self.model,
+                temperature=self.temperature,
+                max_tokens=get_runtime_config().get_int("llm_max_tokens", getattr(self, "max_tokens", 4096)),
+                response_format={"type": "json_object"},
+            )
 
-            return self._build_response(data, context, result["tokens_used"])
+            if isinstance(response, dict):
+                content = response.get("content", str(response))
+                tokens = response.get("usage", {}).get("total_tokens", 0)
+            else:
+                content = str(response)
+                tokens = 0
+            if tokens == 0 and hasattr(self.ai_service, 'get_last_usage'):
+                tokens = self.ai_service.get_last_usage().get("total_tokens", 0)
+
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            elif content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+
+            data = json.loads(content)
+            return self._build_response(data, context, tokens)
 
         except Exception as e:
             log.error(f"LLM analysis failed: {e}")
