@@ -352,6 +352,8 @@ Rispondi con: {{"type": "<tipo>", "confidence": <0.0-1.0>}}"""
                 prompt=prompt,
                 model=self.classification_model,
                 temperature=0.0,
+                max_tokens=200,
+                response_format={"type": "json_object"},  # structured output: the classifier emits {type, confidence}
             )
 
             text = response.get("content", str(response)) if isinstance(response, dict) else str(response)

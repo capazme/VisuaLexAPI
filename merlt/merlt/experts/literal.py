@@ -333,47 +333,21 @@ class LiteralExpert(BaseExpert, ReActMixin):
         user_prompt = self._format_context_for_llm(context)
 
         try:
-            # Call LLM (traced)
-            response = await self._traced_llm_call(
-                prompt=f"{system_prompt}\n\n{user_prompt}",
-                model=self.model,
-                temperature=self.temperature
-            )
+            # Delegate to the shared robust path (_call_llm): enforces
+            # response_format=json_object + runtime max_tokens + retry on invalid JSON,
+            # so a truncated / non-JSON completion no longer leaks a parse error to the UI.
+            result = await self._call_llm(system_prompt, user_prompt)
+            data = json.loads(result["content"])
 
-            # Parse response
-            if isinstance(response, dict):
-                content = response.get("content", str(response))
-                tokens = response.get("usage", {}).get("total_tokens", 0)
-            else:
-                content = str(response)
-                tokens = 0
-            # Fallback: read usage from ai_service
-            if tokens == 0 and hasattr(self.ai_service, 'get_last_usage'):
-                svc_usage = self.ai_service.get_last_usage()
-                tokens = svc_usage.get("total_tokens", 0)
-
-            # Clean markdown
-            content = content.strip()
-            if content.startswith("```json"):
-                content = content[7:]
-            elif content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            content = content.strip()
-
-            # Parse JSON
-            data = json.loads(content)
-
-            return self._build_response(data, context, tokens)
+            return self._build_response(data, context, result["tokens_used"])
 
         except Exception as e:
             log.error(f"LLM analysis failed: {e}")
             return ExpertResponse(
                 expert_type=self.expert_type,
-                interpretation=f"Errore nell'analisi: {str(e)}",
+                interpretation="Non è stato possibile completare l'analisi letterale in forma strutturata per questa domanda.",
                 confidence=0.0,
-                limitations=str(e),
+                limitations=f"structured_analysis_failed: {str(e)}",
                 trace_id=context.trace_id
             )
 
