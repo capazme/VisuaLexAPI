@@ -128,6 +128,22 @@ def _extract_source_url(source: Dict[str, Any]) -> str:
     return ""
 
 
+def _looks_like_tool_error(text: str) -> bool:
+    """A live "source" whose body is a failed tool response (e.g. a ``cite_law``
+    miss: ``**Errore**: atto '...' non riconosciuto``). Sedimenting it pollutes
+    the index with a node that has no citable content and later surfaces as an
+    unreadable "Fonte provvisoria"; mirror of ``tools.search._is_tool_error_text``
+    kept local to avoid importing the tool layer here."""
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    return (
+        t.startswith("**errore")
+        or t.startswith("errore:")
+        or "non riconosciuto" in t
+    )
+
+
 def _derive_node_id(source: Dict[str, Any], source_url: str) -> Optional[str]:
     """Deterministic node id: ``live:<sha256(source_id|url|text-digest)[:24]>``.
 
@@ -463,6 +479,12 @@ async def write_provisional_source(
         text = (source.get("text") or "").strip()
         if not text:
             log.debug("provisional_writer.skip_empty_text", source_id=source.get("source_id"))
+            return None
+
+        # Never sediment a failed tool response (e.g. a cite_law miss) — it has no
+        # citable content and would surface later as an unreadable provisional node.
+        if _looks_like_tool_error(text):
+            log.debug("provisional_writer.skip_tool_error", source_id=source.get("source_id"))
             return None
 
         source_url = _extract_source_url(source)

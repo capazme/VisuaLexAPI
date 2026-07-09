@@ -59,7 +59,7 @@ async def _build_tools() -> list:
             from merlt.tools import SemanticSearchTool
             from merlt.storage.vectors.embeddings import EmbeddingService
             from merlt.storage.retriever import GraphAwareRetriever, RetrieverConfig
-            from merlt.storage.bridge import BridgeTable
+            from merlt.storage.bridge import BridgeTable, BridgeTableConfig
             from merlt.rlcf.policy_manager import get_policy_manager
 
             qdrant = QdrantClient(
@@ -74,7 +74,17 @@ async def _build_tools() -> list:
                 or os.getenv("MERLT_SEED_COLLECTION")
                 or "merl_t_legal_chunks"
             )
-            bridge = BridgeTable()
+            # BridgeTableConfig defaults to localhost:5433/rlcf_dev, which is
+            # unreachable inside the container network (the bridge silently failed
+            # to connect → zero graph enrichment). Point it at the enrichment DB
+            # (merlt-postgres:5432/merlt) where the chunk→node bridge_table lives.
+            bridge = BridgeTable(BridgeTableConfig(
+                host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
+                port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
+                database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
+                user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
+                password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
+            ))
             await bridge.connect()
             retriever = GraphAwareRetriever(
                 vector_db=qdrant,
