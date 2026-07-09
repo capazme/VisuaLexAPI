@@ -176,6 +176,52 @@ def _build_neural(rc) -> Dict[str, Any]:
                 log.info("No gating checkpoint — expert selection stays regex")
         except Exception as e:
             log.warning("HybridExpertRouter unavailable — expert selection stays regex", error=str(e))
+
+    # Loop β E.3: activate the tool-gating selector at inference. It was NEVER
+    # wired (tool_selector stayed None) → the ToolSelector never ran → no
+    # `tool_use` actions were recorded, so the ToolGatingMLP had ZERO training
+    # data AND no per-query tool selection ran. Wiring it closes the whole loop:
+    # ToolSelector records tool_use actions (log_prob + called + A/B arm) that
+    # ToolPolicyTrainer.update_from_feedback trains on, using the answer-level
+    # reward. Bootstrap with a warm-start MLP when no checkpoint exists (else it
+    # can never gather its first data). Default ab_ratio=0.0 = pure SHADOW: the
+    # selector records data with all tools still firing (zero answer-quality
+    # risk); an admin raises it (live, register_apply) to let the policy actually
+    # prune tools once it has trained. Failure-isolated.
+    if out["policy_manager"] is not None and rc.get_bool("tool_gating_enabled", True):
+        try:
+            from merlt.experts.neural_gating.tool_selector import ToolSelector
+            from merlt.experts.neural_gating.tool_neural import ToolGatingMLP, ToolGatingConfig
+            from merlt.experts.orchestrator import MultiExpertOrchestrator
+
+            tool_policy = out["policy_manager"]._load_tool_policy()
+            if tool_policy is None:
+                tool_policy = ToolGatingMLP(ToolGatingConfig(input_dim=1024))
+                tool_policy.requires_grad_(False)
+                tool_policy.eval()
+                _has_ckpt = False
+            else:
+                _has_ckpt = True
+
+            selector = ToolSelector(
+                policy=tool_policy,
+                expert_tool_map=MultiExpertOrchestrator.EXPERT_MCP_TOOLS,
+                enabled=True,
+                ab_ratio=rc.get_float("tool_gating_ab_ratio", 0.0),
+            )
+            out["tool_selector"] = selector
+            rc.register_apply(
+                "tool_gating_ab_ratio",
+                lambda v, _s=selector: setattr(_s, "ab_ratio", max(0.0, min(1.0, float(v)))),
+            )
+            log.info(
+                "✅ ToolSelector wired (tool-gating records at inference)",
+                ab_ratio=selector.ab_ratio,
+                has_checkpoint=_has_ckpt,
+                experts=list(selector.expert_tool_map.keys()),
+            )
+        except Exception as e:
+            log.warning("ToolSelector unavailable — tool selection stays static per-canon", error=str(e))
     return out
 
 

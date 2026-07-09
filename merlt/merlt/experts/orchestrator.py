@@ -416,7 +416,13 @@ class MultiExpertOrchestrator:
         if self.tool_selector is None:
             return
         try:
-            query_embedding = self._resolve_query_embedding(trace)
+            # The embedding lives in an expert_selection action ONLY on the neural
+            # routing path; under llm_fallback (the common case while the gating
+            # head is under-trained) that action is absent, so also read
+            # context.query_embedding (set up-front by the B2 best-effort encode).
+            # Without this fallback, tool-gating never recorded a single tool_use
+            # action → the ToolGatingMLP could never accumulate training data.
+            query_embedding = self._resolve_query_embedding(trace) or getattr(context, "query_embedding", None)
             expert_types = [e[0] for e in selected_experts]
             selection = self.tool_selector.select_and_trace(
                 query_embedding=query_embedding,
