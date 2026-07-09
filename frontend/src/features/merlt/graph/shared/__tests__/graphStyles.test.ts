@@ -119,6 +119,25 @@ describe('graphStyles (G6)', () => {
       expect(sharp.lineWidth as number).toBeGreaterThan(faint.lineWidth as number);
     });
 
+    it('audit item 1: the contrast arc line width floor/ceiling is raised for visibility (~2.5px → ~7px)', () => {
+      const faint = edgeStyleMapper({
+        id: 'contrast:a--b',
+        source: 'a',
+        target: 'b',
+        data: { kind: 'contrast', conflictScore: 0, devilsAdvocate: false },
+      });
+      const sharp = edgeStyleMapper({
+        id: 'contrast:c--d',
+        source: 'c',
+        target: 'd',
+        data: { kind: 'contrast', conflictScore: 1, devilsAdvocate: false },
+      });
+      expect(faint.lineWidth as number).toBeGreaterThanOrEqual(2.5);
+      expect(sharp.lineWidth as number).toBeCloseTo(7, 5);
+      // Base label stays hidden — the shared hover 'active' state reveals it.
+      expect(faint.labelOpacity).toBe(0);
+    });
+
     it('a devil\'s-advocate contrast arc gets the distinct violet styling', () => {
       const devil = edgeStyleMapper({
         id: 'contrast:a--b',

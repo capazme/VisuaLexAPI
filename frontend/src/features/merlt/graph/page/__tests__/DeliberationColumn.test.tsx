@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { DeliberationColumn } from '../DeliberationColumn';
 import type { ExpertContribution, QaHistoryItem, QaTurnModel } from '../../../qa/types';
 import type { GraphEdge, GraphEdgeSelection, GraphNode } from '../../shared/types';
@@ -1148,5 +1148,76 @@ describe('DeliberationColumn dissent banner (Wave C gap C3 — il collegio ha di
   it('does NOT caveat when source is absent (defensive default: treat as authoritative)', () => {
     render(<DeliberationColumn {...baseProps()} turns={[turnWithDissentAndTrace()]} />);
     expect(screen.getByText(/intensità 0\.72$/i)).toBeInTheDocument();
+  });
+});
+
+describe('DeliberationColumn past turns collapsed (audit item 5)', () => {
+  /** Only the PastTurnRow disclosures — excludes "Fonti consultate", canon theses, etc. */
+  const pastTurnDetails = (): HTMLDetailsElement[] =>
+    [...document.querySelectorAll('details[data-past-turn]')] as HTMLDetailsElement[];
+
+  it('renders the sole (== last) turn directly, with no collapse wrapper', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    expect(pastTurnDetails()).toHaveLength(0);
+  });
+
+  it('collapses every NON-last turn into a <details> compact by default; the last turn stays expanded', () => {
+    const first = successTurn();
+    const second = { ...successTurn(), id: 'turn-2', question: 'Seconda domanda?' };
+    render(<DeliberationColumn {...baseProps()} turns={[first, second]} />);
+
+    // Exactly one collapse wrapper — for the first (non-last) turn.
+    const details = pastTurnDetails();
+    expect(details).toHaveLength(1);
+    expect(details[0].open).toBe(false);
+
+    // The last turn's question renders directly — no <details> ancestor.
+    expect(screen.getByText('Seconda domanda?').closest('details')).toBeNull();
+  });
+
+  it('the collapsed summary shows the question and a confidence chip', () => {
+    const first = successTurn(); // confidence 0.8 → "alta"
+    const second = { ...successTurn(), id: 'turn-2', question: 'Seconda domanda?' };
+    render(<DeliberationColumn {...baseProps()} turns={[first, second]} />);
+
+    const summary = pastTurnDetails()[0].querySelector('summary')!;
+    expect(within(summary).getByText(first.question)).toBeInTheDocument();
+    expect(within(summary).getByText(/^alta$/i)).toBeInTheDocument();
+  });
+
+  it('expanding a past turn (click the summary) opens the native disclosure', () => {
+    const first = successTurn();
+    const second = { ...successTurn(), id: 'turn-2', question: 'Seconda domanda?' };
+    render(<DeliberationColumn {...baseProps()} turns={[first, second]} />);
+
+    const [pastDetails] = pastTurnDetails();
+    const summary = pastDetails.querySelector('summary')!;
+    fireEvent.click(summary);
+    expect(pastDetails.open).toBe(true);
+  });
+
+  it('a loading past turn summarises as in-progress (spinner + question, no confidence chip)', () => {
+    const first: QaTurnModel = { id: 'turn-loading', question: 'Domanda in corso?', confirmed: {}, state: { status: 'loading' } };
+    const second = successTurn();
+    render(<DeliberationColumn {...baseProps()} turns={[first, second]} />);
+
+    const summary = pastTurnDetails()[0].querySelector('summary')!;
+    expect(within(summary).getByText('Domanda in corso?')).toBeInTheDocument();
+    expect(within(summary).queryByText(/^alta$|^media$|^bassa$/i)).not.toBeInTheDocument();
+  });
+
+  it('an errored past turn summarises with an "errore" marker instead of a confidence chip', () => {
+    const first: QaTurnModel = {
+      id: 'turn-err-past',
+      question: 'Domanda fallita?',
+      confirmed: {},
+      state: { status: 'error', error: 'Motore non raggiungibile.' },
+    };
+    const second = successTurn();
+    render(<DeliberationColumn {...baseProps()} turns={[first, second]} />);
+
+    const summary = pastTurnDetails()[0].querySelector('summary')!;
+    expect(within(summary).getByText('Domanda fallita?')).toBeInTheDocument();
+    expect(within(summary).getByText(/errore/i)).toBeInTheDocument();
   });
 });

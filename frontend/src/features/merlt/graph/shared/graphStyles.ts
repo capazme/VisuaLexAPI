@@ -205,10 +205,12 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
   const prov = data.provenance ? PROVENANCE_STYLE[data.provenance] : undefined;
   // Trust nudges fill saturation so a solid seed reads denser than a faint
   // provisional source; clamped so nothing disappears or over-saturates.
+  // Audit item 4: the floor is raised (was 0.1/0.18) — a low-trust tinted fill
+  // washed out to near-invisible against a dark canvas background.
   const fillOpacity =
     typeof data.trust === 'number'
-      ? Math.min(0.32, Math.max(0.1, 0.1 + 0.22 * data.trust))
-      : 0.18;
+      ? Math.min(0.32, Math.max(0.22, 0.22 + 0.1 * data.trust))
+      : 0.26;
 
   const base: Record<string, unknown> = {
     // Soft tinted fill + saturated border in the type hue → readable, not garish.
@@ -276,11 +278,17 @@ function contrastEdgeStyle(data: {
   return {
     stroke: color,
     strokeOpacity: 0.85,
-    lineWidth: 1.5 + 5 * score, // 1.5px (faint) → 6.5px (sharp contrast)
+    // Audit item 1: the contrast arc is the most valuable deliberation signal
+    // (WHERE the canons disagree) — the previous 1.5-6.5px range read as a
+    // near-invisible hairline at low conflict scores. Raised floor + ceiling.
+    lineWidth: 2.5 + 4.5 * score, // 2.5px (faint) → 7px (sharp contrast)
     lineDash: devil ? [2, 3] : [6, 4],
     endArrow: false,
     startArrow: false,
     labelText: data.label ?? 'contrasto',
+    // Base label stays hidden (dense-graph hygiene); the shared EDGE_STATE
+    // 'active' state (GraphCanvas's hover-activate behavior) raises this to 1
+    // on hover/select, exactly like a real relation edge's label reveal.
     labelOpacity: 0,
     labelFontSize: 9,
     labelFill: color,

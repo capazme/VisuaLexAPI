@@ -44,7 +44,7 @@ import { canonRingPosition, isDeliberationElementId } from './graphDeliberation'
  */
 
 export type GraphLayoutName =
-  | 'cose-bilkent'
+  | 'force'
   | 'dagre'
   | 'breadthfirst'
   | 'concentric'
@@ -162,12 +162,17 @@ function layoutConfig(
         nodeSize: 62,
         nodeSpacing: 30,
       };
-    case 'cose-bilkent':
+    case 'force':
     default:
       return {
         type: 'd3-force',
-        link: { distance: 130, strength: 0.4 },
-        collide: { radius: 44, strength: 0.9 },
+        // Audit item 6 (main-graph label collision, NOT the walk — the walk
+        // always uses 'radial', see above): both widened from 130/44 so the
+        // 2-line, bottom-placed legal labels (~130px wide) have room to breathe
+        // instead of colliding at the tighter spacing the default force layout
+        // used, which only accounted for the node glyph, not its label.
+        link: { distance: 170, strength: 0.4 },
+        collide: { radius: 70, strength: 0.9 },
         manyBody: { strength: -320 },
         center: {},
         // F1: when positions carry over, start the simulation cooler and decay
@@ -177,8 +182,16 @@ function layoutConfig(
   }
 }
 
+/**
+ * Audit item 4 — selection accent. The previous dark-slate stroke (#0f172a)
+ * was near-invisible against a dark canvas background; this vivid orange has
+ * no collision with any NODE_TYPE_STYLE/EDGE_TYPE_STYLE hue (graphStyles.ts)
+ * and reads with strong contrast on both a white and a dark-slate canvas.
+ */
+const SELECTION_ACCENT = '#f97316';
+
 const NODE_STATE = {
-  selected: { lineWidth: 3, stroke: '#0f172a', fillOpacity: 0.32 },
+  selected: { lineWidth: 3, stroke: SELECTION_ACCENT, fillOpacity: 0.4 },
   active: { lineWidth: 3, fillOpacity: 0.3 },
   inactive: { opacity: 0.18 },
 };
@@ -186,7 +199,7 @@ const EDGE_STATE = {
   active: { strokeOpacity: 1, lineWidth: 2.5, labelOpacity: 1 },
   inactive: { strokeOpacity: 0.06, labelOpacity: 0 },
   // F3: controlled edge selection (mirrors NODE_STATE.selected).
-  selected: { stroke: '#0f172a', strokeOpacity: 1, lineWidth: 3, labelOpacity: 1 },
+  selected: { stroke: SELECTION_ACCENT, strokeOpacity: 1, lineWidth: 3, labelOpacity: 1 },
 };
 
 function dataSignature(nodes: NodeData[], edges: EdgeData[]): string {
@@ -446,7 +459,7 @@ export default function GraphCanvas({
   ref,
   nodes,
   edges,
-  layout = 'cose-bilkent',
+  layout = 'force',
   height = 300,
   layoutFocusNodeId,
   centerNodeId,
@@ -717,5 +730,15 @@ export default function GraphCanvas({
     [],
   );
 
-  return <div ref={containerRef} style={{ width: '100%', height }} />;
+  // Audit item 4: an explicit theme-aware background — without it the G6
+  // canvas painted on whatever showed through (transparent), so a selected
+  // element's low fillOpacity tint blended unpredictably with the page behind
+  // it instead of a consistent, theme-matched surface.
+  return (
+    <div
+      ref={containerRef}
+      className="bg-white dark:bg-slate-900"
+      style={{ width: '100%', height }}
+    />
+  );
 }

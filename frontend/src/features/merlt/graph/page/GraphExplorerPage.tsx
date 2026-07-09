@@ -14,17 +14,20 @@ import { mergeElements, type GraphElements } from '../shared/graphTransform';
 import {
   buildDeliberationOverlay,
   canonKeyFromNodeId,
+  CANON_STYLE,
   isDeliberationElementId,
   readDeliberation,
   resolveEdgeSelection,
   withDeliberationOverlay,
 } from '../shared/graphDeliberation';
-import type {
-  CanonKey,
-  DisagreementConflict,
-  ExpertContribution,
-  GraphEdge,
-  GraphEdgeSelection,
+import { CONTRAST_ARC_COLOR } from '../shared/graphStyles';
+import {
+  CANON_KEYS,
+  type CanonKey,
+  type DisagreementConflict,
+  type ExpertContribution,
+  type GraphEdge,
+  type GraphEdgeSelection,
 } from '../shared/types';
 import { CANON_LABEL, formatRetrievedUrn, sourceLabel } from '../../qa/format';
 import { MAX_EMPTY_STATE_SOURCES, pickEmptyStateSources } from './emptyStateSources';
@@ -67,7 +70,7 @@ import { DepthSelector } from './DepthSelector';
 import { GraphFilterPanel } from './GraphFilterPanel';
 import { LAYOUT_OPTIONS } from './graphLayouts';
 import { useBreadcrumbHistory } from './useBreadcrumbHistory';
-import { isArticleCenter } from './graphCenter';
+import { isArticleCenter, resolveCenterNodeId } from './graphCenter';
 
 const GraphCanvas = lazy(() => import('../shared/GraphCanvas'));
 
@@ -155,7 +158,7 @@ function clampDepth(raw: string | null, fallback: number): number {
 
 function parseLayout(raw: string | null): GraphLayoutName {
   const allowed = LAYOUT_OPTIONS.map((o) => o.value);
-  return allowed.includes(raw as GraphLayoutName) ? (raw as GraphLayoutName) : 'cose-bilkent';
+  return allowed.includes(raw as GraphLayoutName) ? (raw as GraphLayoutName) : 'force';
 }
 
 /**
@@ -666,17 +669,17 @@ export function GraphExplorerPage(): React.ReactElement {
   }, [hiddenNodeTypes, hideJurisprudence]);
 
   // Center node the canons attach to: the rendered node whose urn matches the
-  // page urn (exact, else version-marker-stripped per gotcha #6), else the first
-  // node. Best-effort — canons float when there is no center (overlay handles it).
-  const centerNodeId = useMemo<string | null>(() => {
-    if (nodes.length === 0) return null;
-    if (!urn) return nodes[0].id;
-    const bare = stripVersionMarker(urn);
-    const exact = nodes.find((n) => n.urn === urn);
-    if (exact) return exact.id;
-    const byBare = nodes.find((n) => n.urn && stripVersionMarker(n.urn) === bare);
-    return (byBare ?? nodes[0]).id;
-  }, [nodes, urn]);
+  // page urn (exact, else version-marker-stripped per gotcha #6). Audit item 3:
+  // when the urn matches NO node, resolveCenterNodeId returns null (a floating
+  // corona) instead of an arbitrary nodes[0] fallback.
+  const centerNodeId = useMemo<string | null>(
+    () => resolveCenterNodeId(nodes, urn, stripVersionMarker),
+    [nodes, urn]
+  );
+  // Audit item 3 (optional note): the urn WAS resolvable to a subgraph (nodes
+  // present) and IS an explicit center, but matched no node — the corona is
+  // floating rather than silently anchored on the wrong article.
+  const centerUnresolved = Boolean(urn) && nodes.length > 0 && centerNodeId === null;
 
   // The debate overlay (canon nodes + contrast arcs), derived from the latest
   // answer. Empty when there is no settled deliberation → withDeliberationOverlay
@@ -1196,6 +1199,10 @@ export function GraphExplorerPage(): React.ReactElement {
                   }
                   onHoverType={setHighlightType}
                 />
+                {/* Audit item 2: on-canvas caption for the deliberation overlay —
+                    the canon corona's colours otherwise have no legend anywhere
+                    on the page. Hidden when there is no active deliberation. */}
+                {deliberationOverlay && <CanonLegend unresolvedCenter={centerUnresolved} />}
               </div>
               <GraphCanvas
                 ref={canvasRef}
@@ -1453,6 +1460,47 @@ function EmptyState({
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Audit item 2 — "il collegio dei canoni" caption pinned in the canvas's
+ * top-left overlay stack, mounted only while a deliberation overlay is on
+ * canvas. Reuses {@link CANON_STYLE} so the swatches never drift from the
+ * actual canon-node colours, plus one dashed sample for the contrast arc.
+ */
+function CanonLegend({ unresolvedCenter }: { unresolvedCenter: boolean }): React.ReactElement {
+  return (
+    <div className="w-full rounded-md border border-slate-200 bg-white/90 px-2.5 py-2 text-xs text-slate-600 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-300">
+      <p className="mb-1 font-semibold text-slate-500 dark:text-slate-400">Il collegio dei canoni</p>
+      <ul className="space-y-0.5">
+        {CANON_KEYS.map((key) => (
+          <li key={key} className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: CANON_STYLE[key].color }}
+              aria-hidden="true"
+            />
+            {CANON_STYLE[key].label}
+          </li>
+        ))}
+        <li className="flex items-center gap-1.5">
+          <span
+            className="h-0 w-3 shrink-0 border-t-2 border-dashed"
+            style={{ borderColor: CONTRAST_ARC_COLOR }}
+            aria-hidden="true"
+          />
+          contrasto
+        </li>
+      </ul>
+      {/* Audit item 3 (optional note): the corona is floating — say so instead
+          of leaving the jurist to wonder why nothing seems anchored. */}
+      {unresolvedCenter && (
+        <p className="mt-1.5 border-t border-slate-100 pt-1.5 italic text-slate-400 dark:border-slate-800 dark:text-slate-500">
+          centro non individuato
+        </p>
       )}
     </div>
   );

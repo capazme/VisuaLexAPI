@@ -273,7 +273,7 @@ function RailBody({
           <GraphCanvas
             nodes={graph.elements.nodes}
             edges={graph.elements.edges}
-            layout="cose-bilkent"
+            layout="force"
             height="100%"
             onNodeClick={(id) => {
               const urn = nodeUrnById.get(id);

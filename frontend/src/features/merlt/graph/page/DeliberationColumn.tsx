@@ -193,6 +193,80 @@ function confidenceLabel(c: number): string {
   return 'bassa';
 }
 
+/** Chip colour matching {@link confidenceLabel}'s three bands. */
+function confidenceChipClass(c: number): string {
+  if (c >= 0.75) return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
+  if (c >= 0.5) return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
+  return 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300';
+}
+
+/**
+ * Audit item 5 — compact one-line summary of a PAST (non-last) turn's status,
+ * shown in the {@link PastTurnRow} `<summary>` (always visible regardless of
+ * the disclosure's open state, native `<details>` semantics).
+ */
+function PastTurnSummary({ turn }: { turn: QaTurnModel }): React.ReactElement {
+  if (turn.state.status === 'loading') {
+    return (
+      <span className="flex min-w-0 items-center gap-2">
+        <Loader2 size={13} className="shrink-0 animate-spin text-slate-400" aria-hidden="true" />
+        <span className="truncate text-sm text-slate-600 dark:text-slate-300">{turn.question}</span>
+      </span>
+    );
+  }
+  if (turn.state.status === 'error') {
+    return (
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm text-slate-600 dark:text-slate-300">{turn.question}</span>
+        <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400">errore</span>
+      </span>
+    );
+  }
+  const { synthesis, confidence } = turn.state.answer;
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{turn.question}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400">{synthesis}</span>
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+            confidenceChipClass(confidence),
+          )}
+        >
+          {confidenceLabel(confidence)}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Audit item 5 — a PAST turn collapses to a compact question + one-line
+ * synthesis + confidence chip, expandable on click/keyboard (native
+ * `<details>`/`<summary>`, same idiom as the rest of this column — e.g.
+ * "Fonti consultate", "Come ha ragionato"). Only the LAST turn (rendered
+ * directly by the caller, never wrapped here) stays expanded by default.
+ */
+function PastTurnRow({ turn, children }: { turn: QaTurnModel; children: React.ReactNode }): React.ReactElement {
+  return (
+    <details
+      data-past-turn={turn.id}
+      className="group rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+    >
+      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500">
+        <PastTurnSummary turn={turn} />
+        <ChevronDown
+          size={14}
+          className="shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <div className="border-t border-slate-100 p-3 dark:border-slate-800">{children}</div>
+    </details>
+  );
+}
+
 /** Fixed art. 12 preleggi order; extra experts (rare) keep their reported order last. */
 const CANON_ORDER = ['literal', 'systemic', 'principles', 'precedent'];
 
@@ -649,33 +723,44 @@ function DibattitoTab({
             Nessuna deliberazione. Chiedi al grafo per aprire il dibattito sul nodo al centro.
           </p>
         ) : (
-          turns.map((turn) => (
-            <DeliberationTurn
-              key={turn.id}
-              turn={turn}
-              onRetry={() => onRetry(turn.id)}
-              onCancel={() => onCancel(turn.id)}
-              onSourceCenter={onSourceCenter}
-              onSourceHover={onSourceHover}
-              selectedNode={selectedNode}
-              onOpenNorm={onOpenNorm}
-              onFollowReasoning={onFollowReasoning}
-              onRate={onRate}
-              onRateSource={onRateSource}
-              onDetailed={onDetailed}
-              onConfirmSource={onConfirmSource}
-              qaAskable={qaAskable}
-              canContribute={canContribute}
-              onPreferCanon={onPreferCanon}
-              onOpenConsent={onOpenConsent}
-              steeredKeys={steeredKeys}
-              onMarkSteered={onMarkSteered}
-              // The `expertContributions` prop is the CURRENT deliberation's set
-              // — only the latest turn falls back to it when its own answer lacks
-              // per-canon contributions (a history-loaded turn keeps its own/none).
-              fallbackContributions={turn.id === lastTurnId ? expertContributions : undefined}
-            />
-          ))
+          turns.map((turn) => {
+            const body = (
+              <DeliberationTurn
+                turn={turn}
+                onRetry={() => onRetry(turn.id)}
+                onCancel={() => onCancel(turn.id)}
+                onSourceCenter={onSourceCenter}
+                onSourceHover={onSourceHover}
+                selectedNode={selectedNode}
+                onOpenNorm={onOpenNorm}
+                onFollowReasoning={onFollowReasoning}
+                onRate={onRate}
+                onRateSource={onRateSource}
+                onDetailed={onDetailed}
+                onConfirmSource={onConfirmSource}
+                qaAskable={qaAskable}
+                canContribute={canContribute}
+                onPreferCanon={onPreferCanon}
+                onOpenConsent={onOpenConsent}
+                steeredKeys={steeredKeys}
+                onMarkSteered={onMarkSteered}
+                // The `expertContributions` prop is the CURRENT deliberation's set
+                // — only the latest turn falls back to it when its own answer lacks
+                // per-canon contributions (a history-loaded turn keeps its own/none).
+                fallbackContributions={turn.id === lastTurnId ? expertContributions : undefined}
+              />
+            );
+            // Audit item 5: every NON-last turn renders compact by default (the
+            // latest turn drives the graph overlay/highlights and stays fully
+            // expanded); a past turn expands on click via native <details>.
+            return turn.id === lastTurnId ? (
+              <div key={turn.id}>{body}</div>
+            ) : (
+              <PastTurnRow key={turn.id} turn={turn}>
+                {body}
+              </PastTurnRow>
+            );
+          })
         )}
       </div>
 

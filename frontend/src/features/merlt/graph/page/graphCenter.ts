@@ -36,3 +36,32 @@ export function isArticleCenter(
 export function isOpenableResult(item: GraphSearchItem): boolean {
   return !(item.id ?? '').toLowerCase().startsWith('live:');
 }
+
+/** Minimal node shape {@link resolveCenterNodeId} needs — decoupled from GraphNode. */
+export interface CenterCandidateNode {
+  id: string;
+  urn?: string | null;
+}
+
+/**
+ * Audit item 3 — resolve the node the deliberation canon corona anchors to.
+ * Returns `null` (a floating corona — `buildDeliberationOverlay` already
+ * supports an unanchored center) when the page urn matches NO node, even
+ * after stripping the NIR version marker (`!vig=`, gotcha #6), instead of
+ * falling back to `nodes[0]` — an arbitrary, unrelated node the corona would
+ * otherwise orbit. With no urn at all there is no center concept to resolve
+ * against, so the first node stays the (pre-existing) best-effort anchor.
+ */
+export function resolveCenterNodeId(
+  nodes: readonly CenterCandidateNode[],
+  urn: string | null | undefined,
+  stripVersionMarker: (u: string) => string
+): string | null {
+  if (nodes.length === 0) return null;
+  if (!urn) return nodes[0].id;
+  const exact = nodes.find((n) => n.urn === urn);
+  if (exact) return exact.id;
+  const bare = stripVersionMarker(urn);
+  const byBare = nodes.find((n) => n.urn && stripVersionMarker(n.urn) === bare);
+  return byBare ? byBare.id : null;
+}
