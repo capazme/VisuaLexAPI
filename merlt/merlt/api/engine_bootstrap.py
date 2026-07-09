@@ -100,6 +100,28 @@ async def _build_tools() -> list:
             log.info("✅ SemanticSearchTool wired (retriever + Qdrant grounding)", collection=collection)
         except Exception as e:
             log.warning("SemanticSearchTool unavailable — semantic search off", error=str(e), exc_info=True)
+
+    # Loop β A.1: live legal grounding via the mcp-legal-it sidecar (FastMCP over
+    # HTTP at MCP_LEGAL_IT_URL). build_mcp_legal_tools lists the remote tools and
+    # wraps each; keep ONLY the curated LIVE_LEGAL_TOOLS (norm text + jurisprudence
+    # + doctrine) so the ~180 calculator tools never enter the registry (the
+    # per-expert filter in orchestrator._init_experts keeps non-mcp tools for all
+    # experts, so an un-curated calculator would otherwise reach every expert).
+    # Failure-isolated: build_mcp_legal_tools returns [] if the sidecar is down.
+    if get_runtime_config().get_bool("mcp_legal_tools_enabled", True):
+        try:
+            from merlt.tools.mcp_legal_adapter import build_mcp_legal_tools
+            from merlt.experts.base import BaseExpert
+            curated = set(BaseExpert.LIVE_LEGAL_TOOLS)
+            mcp_tools = [t for t in await build_mcp_legal_tools() if t.name in curated]
+            tools.extend(mcp_tools)
+            log.info(
+                "✅ mcp-legal-it live tools wired",
+                count=len(mcp_tools),
+                names=[t.name for t in mcp_tools],
+            )
+        except Exception as e:
+            log.warning("mcp-legal-it tools unavailable — live legal grounding off", error=str(e))
     return tools
 
 
