@@ -36,7 +36,7 @@ describe('graphDeliberation — overlay construction', () => {
       `${CANON_NODE_PREFIX}principles`,
     ]);
     const literal = overlay.nodes[0];
-    expect(literal.data).toMatchObject({ kind: 'canon', canon: 'literal', label: 'Letterale', weight: 0.6 });
+    expect(literal.data).toMatchObject({ kind: 'canon', canon: 'literal', label: 'Canone: Letterale', weight: 0.6 });
     // No center → canons float (no anchor edges).
     expect(overlay.edges).toHaveLength(0);
   });

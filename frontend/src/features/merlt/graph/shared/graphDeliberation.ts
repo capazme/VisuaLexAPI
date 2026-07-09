@@ -170,7 +170,9 @@ export function buildDeliberationOverlay(input: DeliberationOverlayInput): Delib
       data: {
         kind: 'canon',
         canon: key,
-        label: style?.label ?? key,
+        // "Canone: …" prefix so a collegio voice is never mistaken for a corpus
+        // PrincipioGiuridico node (which is also a star) in a principles debate.
+        label: style?.label ? `Canone: ${style.label}` : key,
         color: style?.color ?? '#475569',
         weight,
       },

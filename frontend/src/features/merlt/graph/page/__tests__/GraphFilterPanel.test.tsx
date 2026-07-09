@@ -22,10 +22,31 @@ function setup(overrides: Partial<Parameters<typeof GraphFilterPanel>[0]> = {}) 
     ...overrides,
   };
   render(<GraphFilterPanel {...props} />);
+  // The panel is collapsed by default now; open it so the type rows are queryable.
+  fireEvent.click(screen.getByRole('button', { name: /filtri/i }));
   return props;
 }
 
 describe('GraphFilterPanel', () => {
+  it('is collapsed by default (rows hidden until the header is toggled)', () => {
+    render(
+      <GraphFilterPanel
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        hiddenNodeTypes={new Set<string>()}
+        hiddenEdgeTypes={new Set<string>()}
+        onToggleNodeType={vi.fn()}
+        onToggleEdgeType={vi.fn()}
+        onSetAllNodes={vi.fn()}
+        onSetAllEdges={vi.fn()}
+        onHoverType={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Norma')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /filtri/i }));
+    expect(screen.getByText('Norma')).toBeInTheDocument();
+  });
+
   it('lists node and edge types with their counts', () => {
     setup();
     expect(screen.getByText('Norma')).toBeInTheDocument();

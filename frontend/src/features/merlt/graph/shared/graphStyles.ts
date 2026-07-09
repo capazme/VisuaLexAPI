@@ -149,6 +149,12 @@ function canonNodeStyle(data: {
     stroke: color,
     strokeOpacity: opacity,
     lineWidth: 2.5,
+    // A luminous halo ring — a silhouette NO corpus node type carries — so a
+    // canon "voice" is unmistakable next to a corpus PrincipioGiuridico star.
+    halo: true,
+    haloStroke: color,
+    haloLineWidth: 6,
+    haloStrokeOpacity: 0.2 + 0.3 * w,
     size,
     labelText: data.label ?? '',
     labelFill: color,

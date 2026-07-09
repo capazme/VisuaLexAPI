@@ -36,7 +36,10 @@ export function GraphFilterPanel({
   onSetAllEdges,
   onHoverType,
 }: GraphFilterPanelProps): React.ReactElement {
-  const [open, setOpen] = useState(true);
+  // Collapsed by default: the panel sits over the centre-left of the canvas
+  // (where the centred article + canon corona live) and the jurist rarely opens
+  // it, so it should not cover the reasoning until explicitly toggled.
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
@@ -60,6 +63,7 @@ export function GraphFilterPanel({
             items={nodeTypes}
             hidden={hiddenNodeTypes}
             colorOf={(t) => NODE_TYPE_STYLE[t]?.color ?? '#94a3b8'}
+            shapeOf={(t) => NODE_TYPE_STYLE[t]?.g6Type ?? null}
             onToggle={onToggleNodeType}
             onHover={onHoverType}
             onSetAll={onSetAllNodes}
@@ -87,6 +91,8 @@ interface SectionProps {
   items: TypeCount[];
   hidden: ReadonlySet<string>;
   colorOf: (type: string) => string;
+  /** Real node silhouette for the legend swatch (nodes only; edges omit it). */
+  shapeOf?: (type: string) => string | null;
   onToggle: (type: string) => void;
   onSetAll: (hidden: boolean) => void;
   onHover?: (type: string | null) => void;
@@ -94,11 +100,58 @@ interface SectionProps {
   noneLabel: string;
 }
 
+/** Legend swatch drawn in the node type's REAL g6 silhouette, so the shape
+ * encoding (rect=Norma, star=Principio, diamond=giurisprudenza, hexagon=fatto…)
+ * is actually explained. Falls back to a filled square (edges / unknown). */
+function TypeSwatch({ color, shape }: { color: string; shape: string | null }): React.ReactElement {
+  if (!shape || shape === 'rect' || shape === 'ellipse') {
+    return (
+      <span
+        className="h-3 w-3 shrink-0 rounded-sm border border-black/10"
+        style={{ backgroundColor: color }}
+      />
+    );
+  }
+  const stroke = 'rgba(0,0,0,0.15)';
+  let node: React.ReactElement;
+  switch (shape) {
+    case 'circle':
+      node = <circle cx="7" cy="7" r="5.5" fill={color} stroke={stroke} />;
+      break;
+    case 'diamond':
+      node = <polygon points="7,1 13,7 7,13 1,7" fill={color} stroke={stroke} />;
+      break;
+    case 'triangle':
+      node = <polygon points="7,1.5 13,12.5 1,12.5" fill={color} stroke={stroke} />;
+      break;
+    case 'hexagon':
+      node = <polygon points="4,1.5 10,1.5 13,7 10,12.5 4,12.5 1,7" fill={color} stroke={stroke} />;
+      break;
+    case 'star':
+      node = (
+        <polygon
+          points="7,1 8.6,5.2 13,5.2 9.5,8 10.8,12.3 7,9.7 3.2,12.3 4.5,8 1,5.2 5.4,5.2"
+          fill={color}
+          stroke={stroke}
+        />
+      );
+      break;
+    default:
+      node = <rect x="1.5" y="1.5" width="11" height="11" rx="2" fill={color} stroke={stroke} />;
+  }
+  return (
+    <svg viewBox="0 0 14 14" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+      {node}
+    </svg>
+  );
+}
+
 function Section({
   title,
   items,
   hidden,
   colorOf,
+  shapeOf,
   onToggle,
   onSetAll,
   onHover,
@@ -151,10 +204,7 @@ function Section({
                   isHidden ? 'opacity-45 hover:opacity-70' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
-                <span
-                  className="h-3 w-3 shrink-0 rounded-sm border border-black/10"
-                  style={{ backgroundColor: colorOf(type) }}
-                />
+                <TypeSwatch color={colorOf(type)} shape={shapeOf?.(type) ?? null} />
                 <span className="flex-1 truncate text-slate-700 dark:text-slate-200">{type}</span>
                 <span className="shrink-0 tabular-nums text-slate-400">{count}</span>
               </div>

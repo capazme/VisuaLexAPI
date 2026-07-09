@@ -76,8 +76,10 @@ export function searchGraph(q: string, limit = 10): Promise<GraphSearchItem[]> {
  * its own tighter budget (depth 1, limit 25) in ArticleGraphSideRail. *
  * ------------------------------------------------------------------ */
 
-/** Default subgraph edge budget for the /grafo page fetch. */
-export const PAGE_GRAPH_LIMIT_DEFAULT = 150;
+/** Default subgraph edge budget for the /grafo page fetch. Kept on the
+ * "carica di più" ladder (50 → 100 → 200) so a well-connected article opens
+ * legibly instead of as an immediate hairball; the user expands on demand. */
+export const PAGE_GRAPH_LIMIT_DEFAULT = 50;
 
 /**
  * Max limit — aligned with the BFF clamp (`limit` ∈ [1,200] in

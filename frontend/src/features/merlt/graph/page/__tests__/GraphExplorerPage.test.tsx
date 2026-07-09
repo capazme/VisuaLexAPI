@@ -164,7 +164,7 @@ describe('GraphExplorerPage', () => {
   it('reads urn + depth from the query and fetches the graph', () => {
     setGraph({ status: 'loading' });
     renderAt('/grafo?urn=urn%3Atest&depth=3');
-    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 150);
+    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 50);
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
@@ -180,7 +180,7 @@ describe('GraphExplorerPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '3' }));
     // URL depth → 3 → useArticleGraph re-invoked with the new depth (refetch).
-    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 150);
+    expect(useArticleGraphMock).toHaveBeenCalledWith('urn:test', 3, 50);
   });
 
   it('changing layout does not change the urn/depth passed to useArticleGraph (no refetch)', () => {
@@ -196,28 +196,28 @@ describe('GraphExplorerPage', () => {
     });
     // Every call keeps depth=2 — layout never reaches the fetch hook.
     for (const call of useArticleGraphMock.mock.calls) {
-      expect(call).toEqual(['urn:test', 2, 150]);
+      expect(call).toEqual(['urn:test', 2, 50]);
     }
   });
 
   // Wave 2 payload diet: the depth default is per-center-kind (URL still wins).
   describe('payload diet defaults (Wave 2)', () => {
-    it('defaults to depth 2 + limit 150 for an ARTICLE center', () => {
+    it('defaults to depth 2 + limit 50 for an ARTICLE center', () => {
       setGraph({ status: 'loading' });
       renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
-      expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 150);
+      expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 50);
     });
 
     it('defaults to depth 1 for a CONCEPT center (hairball mitigation)', () => {
       setGraph({ status: 'loading' });
       renderAt('/grafo?urn=concetto-1&type=ConcettoGiuridico');
-      expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 1, 150);
+      expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 1, 50);
     });
 
     it('an explicit ?depth= overrides the concept default (URL-as-SoT)', () => {
       setGraph({ status: 'loading' });
       renderAt('/grafo?urn=concetto-1&type=ConcettoGiuridico&depth=3');
-      expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 3, 150);
+      expect(useArticleGraphMock).toHaveBeenCalledWith('concetto-1', 3, 50);
     });
   });
 
@@ -255,8 +255,8 @@ describe('GraphExplorerPage', () => {
       truncatedGraph(42);
       renderAt('/grafo?urn=urn%3Ax~art1453&type=Norma');
       fireEvent.click(await screen.findByRole('button', { name: /carica più relazioni/i }));
-      // limit 150 → 200; a new limit is a new SWR key → new fetch.
-      expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 200);
+      // limit 50 → 100 (next ladder step); a new limit is a new SWR key → new fetch.
+      expect(useArticleGraphMock).toHaveBeenCalledWith('urn:x~art1453', 2, 100);
     });
 
     it('no chip when the payload is complete', async () => {

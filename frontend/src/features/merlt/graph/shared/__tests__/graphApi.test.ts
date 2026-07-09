@@ -47,8 +47,8 @@ describe('graph fetch-size defaults', () => {
     expect(nextGraphLimit(25)).toBe(50);
     expect(nextGraphLimit(50)).toBe(100);
     expect(nextGraphLimit(100)).toBe(200);
-    // From the page default (150) the next honest step is the cap.
-    expect(nextGraphLimit(PAGE_GRAPH_LIMIT_DEFAULT)).toBe(200);
+    // From the page default (50) the next ladder step is 100.
+    expect(nextGraphLimit(PAGE_GRAPH_LIMIT_DEFAULT)).toBe(100);
   });
 
   it('nextGraphLimit returns null once the ladder is exhausted', () => {

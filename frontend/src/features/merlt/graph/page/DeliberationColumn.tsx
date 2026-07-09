@@ -837,10 +837,13 @@ function DeliberationTurn({
               </div>
 
               {hasSources && (
-                <div className="mt-3">
-                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                // Closed by default: with 8-15 two-line source chips the expanded
+                // list is taller than a viewport and buries the feedback controls
+                // below. The summary keeps the count visible; feedback stays reachable.
+                <details className="mt-3">
+                  <summary className="mb-1.5 cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-300">
                     Fonti consultate ({a.retrieved_sources.length})
-                  </p>
+                  </summary>
                   <ul className="space-y-1.5">
                     {a.retrieved_sources.map((s) => (
                       <DeliberationSourceChip
@@ -854,7 +857,7 @@ function DeliberationTurn({
                       />
                     ))}
                   </ul>
-                </div>
+                </details>
               )}
 
               {/* MARQUEE: "Segui il ragionamento sul grafo" — hands the walk UP
