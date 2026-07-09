@@ -107,6 +107,39 @@ export function contrastEdgeId(a: string, b: string): string {
   return `${CONTRAST_EDGE_PREFIX}${x}--${y}`;
 }
 
+/**
+ * Fixed angle (radians, canvas convention: 0=E, π/2=S, π=O, -π/2=N) for each of
+ * the 4 preleggi canons — a deterministic corona around the centered article
+ * instead of leaving the force layout to scatter/overlap/push them off-screen
+ * (audit item 5). GraphCanvas pins the corona to this ring in a post-layout
+ * placement pass (see `repositionCanonNodes`).
+ */
+export const CANON_RING_ANGLE: Record<CanonKey, number> = {
+  literal: -Math.PI / 2, // N
+  systemic: 0, // E
+  principles: Math.PI / 2, // S
+  precedent: Math.PI, // O
+};
+
+/** Radius (px) of the canon corona around the center node. */
+export const CANON_RING_RADIUS = 150;
+
+/**
+ * Deterministic position for a canon node on its fixed-angle ring around the
+ * center. An unknown/extra canon key (beyond the 4 preleggi — the engine may
+ * report more) falls back to an evenly-spaced diagonal slot keyed by `index`,
+ * so it never collides with N/E/S/O nor with another extra.
+ */
+export function canonRingPosition(
+  canonKey: string,
+  center: { x: number; y: number },
+  index: number,
+  radius: number = CANON_RING_RADIUS
+): { x: number; y: number } {
+  const angle = CANON_RING_ANGLE[canonKey as CanonKey] ?? index * (Math.PI / 4) + Math.PI / 4;
+  return { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) };
+}
+
 /** Weight per canon from the contributions (0 when a canon wasn't consulted). */
 function weightByCanon(contributions: ExpertContribution[]): Map<string, number> {
   const map = new Map<string, number>();

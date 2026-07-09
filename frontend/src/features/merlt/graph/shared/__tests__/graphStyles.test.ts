@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import type { EdgeData } from '@antv/g6';
 import {
   NODE_TYPE_STYLE,
   EDGE_TYPE_STYLE,
   PROVENANCE_STYLE,
   CONTRAST_ARC_COLOR,
   DEVILS_ADVOCATE_ARC_COLOR,
+  incidentEdgeIds,
   nodeG6Type,
   nodeStyleMapper,
   edgeStyleMapper,
@@ -139,5 +141,32 @@ describe('graphStyles (G6)', () => {
       expect(anchor.labelText).toBe('');
       expect(anchor.strokeOpacity as number).toBeLessThan(0.5);
     });
+  });
+});
+
+describe('incidentEdgeIds (audit item 1)', () => {
+  const edges: EdgeData[] = [
+    { id: 'e1', source: 'a', target: 'b', data: {} },
+    { id: 'e2', source: 'b', target: 'c', data: {} },
+    { id: 'e3', source: 'c', target: 'a', data: {} },
+  ];
+
+  it('returns every edge touching the node, on either endpoint', () => {
+    const ids = incidentEdgeIds(edges, 'a');
+    expect([...ids].sort()).toEqual(['e1', 'e3']);
+  });
+
+  it('returns an empty set for a null/undefined node id', () => {
+    expect(incidentEdgeIds(edges, null).size).toBe(0);
+    expect(incidentEdgeIds(edges, undefined).size).toBe(0);
+  });
+
+  it('returns an empty set for a node with no edges', () => {
+    expect(incidentEdgeIds(edges, 'z').size).toBe(0);
+  });
+
+  it('skips edges without an id (cannot be promoted to a G6 state)', () => {
+    const withoutId: EdgeData[] = [{ source: 'a', target: 'b', data: {} }];
+    expect(incidentEdgeIds(withoutId, 'a').size).toBe(0);
   });
 });

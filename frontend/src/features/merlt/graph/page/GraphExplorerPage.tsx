@@ -26,7 +26,16 @@ import type {
   GraphEdge,
   GraphEdgeSelection,
 } from '../shared/types';
-import { CANON_LABEL, formatRetrievedUrn } from '../../qa/format';
+import { CANON_LABEL, formatRetrievedUrn, sourceLabel } from '../../qa/format';
+import { MAX_EMPTY_STATE_SOURCES, pickEmptyStateSources } from './emptyStateSources';
+import { resolveLocalSourceNode } from './sourceGraphLink';
+import {
+  clampColumnWidth,
+  COLUMN_WIDTH_MAX,
+  COLUMN_WIDTH_MIN,
+  COLUMN_WIDTH_STORAGE_KEY,
+  readStoredColumnWidth,
+} from './columnWidth';
 import {
   buildSnapshot,
   parseSnapshot,
@@ -284,6 +293,67 @@ export function GraphExplorerPage(): React.ReactElement {
     // Expanding = the jurist is looking at the debate again → clear the pulse.
     if (!next) setDibattitoBadge(false);
   }, [columnCollapsed, setColumnCollapsedPersist]);
+
+  // Audit item 4: the docked column's width is a draggable splitter, clamped to
+  // [COLUMN_WIDTH_MIN, COLUMN_WIDTH_MAX] and persisted the same way the collapse
+  // preference is. `isResizingColumn` drops the width transition WHILE dragging
+  // (the CSS transition would otherwise lag every mousemove) and re-enables it
+  // once the drag ends.
+  const [columnWidth, setColumnWidth] = useState<number>(() => readStoredColumnWidth());
+  const [isResizingColumn, setIsResizingColumn] = useState(false);
+  const columnDragCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => columnDragCleanupRef.current?.(), []);
+  const handleSplitterMouseDown = useCallback(
+    (e: React.MouseEvent): void => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = columnWidth;
+      let latestWidth = startWidth;
+      setIsResizingColumn(true);
+      const onMove = (ev: MouseEvent): void => {
+        const delta = ev.clientX - startX; // splitter sits LEFT of the column: moving left widens it
+        latestWidth = clampColumnWidth(startWidth - delta);
+        setColumnWidth(latestWidth);
+      };
+      const onUp = (): void => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        columnDragCleanupRef.current = null;
+        setIsResizingColumn(false);
+        try {
+          localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, String(latestWidth));
+        } catch {
+          /* private mode — the preference just won't persist */
+        }
+      };
+      columnDragCleanupRef.current = onUp;
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [columnWidth],
+  );
+  const persistColumnWidth = useCallback((next: number): void => {
+    setColumnWidth(next);
+    try {
+      localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, String(next));
+    } catch {
+      /* private mode — the preference just won't persist */
+    }
+  }, []);
+  const handleSplitterKeyDown = useCallback(
+    (e: React.KeyboardEvent): void => {
+      if (e.target !== e.currentTarget) return;
+      // Splitter sits LEFT of the column: ArrowLeft widens it, ArrowRight narrows it.
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        persistColumnWidth(clampColumnWidth(columnWidth + 16));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        persistColumnWidth(clampColumnWidth(columnWidth - 16));
+      }
+    },
+    [columnWidth, persistColumnWidth],
+  );
 
   // Defect #4, derived during render (react-hooks/set-state-in-effect): when the
   // count of SETTLED turns grows while the Nodo tab is active, light the badge.
@@ -853,7 +923,7 @@ export function GraphExplorerPage(): React.ReactElement {
   // it and select it (F3 focusNode — NO navigation: center, subgraph and debate
   // stay put); otherwise navigate by urn.
   const handleSourceCenter = (nodeIdOrUrn: string): void => {
-    const local = nodesById.get(nodeIdOrUrn) ?? nodes.find((n) => n.urn === nodeIdOrUrn);
+    const local = resolveLocalSourceNode(nodeIdOrUrn, nodesById, nodes);
     if (local) {
       setSelectedNodeId(local.id);
       setSelectedEdge(null);
@@ -865,6 +935,23 @@ export function GraphExplorerPage(): React.ReactElement {
     // Not in the current subgraph → treat as a urn and re-center the graph.
     goToCenter(nodeIdOrUrn, labelFor(nodeIdOrUrn, entries));
   };
+
+  // Audit item 3a: hovering a source chip pulses the matching canvas node
+  // WITHOUT navigating, selecting, or switching tabs — the explicit re-center
+  // click (handleSourceCenter above) stays the only destructive action. A
+  // source not currently on canvas is a no-op (resolveLocalSourceNode → null).
+  const [hoveredSourceId, setHoveredSourceId] = useState<string | null>(null);
+  const handleSourceHover = useCallback(
+    (nodeIdOrUrn: string | null): void => {
+      if (!nodeIdOrUrn) {
+        setHoveredSourceId(null);
+        return;
+      }
+      const local = resolveLocalSourceNode(nodeIdOrUrn, nodesById, nodes);
+      setHoveredSourceId(local?.id ?? null);
+    },
+    [nodesById, nodes],
+  );
 
   // "Apri" (feature 3, quick-open): open a cited/consulted norma in the
   // VisuaLex reader — the vanilla navigate('/') + triggerSearch mechanism
@@ -1024,7 +1111,7 @@ export function GraphExplorerPage(): React.ReactElement {
               </Suspense>
             </div>
           ) : !urn ? (
-            <EmptyState />
+            <EmptyState sources={latestSources} onSelectSource={handleSourceCenter} />
           ) : graph.status === 'loading' || graph.status === 'idle' ? (
             // F1: 'loading' only happens when NOTHING was ever rendered (the
             // hook hands back 'revalidating' + previous elements otherwise), so
@@ -1123,7 +1210,7 @@ export function GraphExplorerPage(): React.ReactElement {
                 highlightNodeIds={effectiveSourceHighlightIds}
                 selectedNodeId={selectedNodeId}
                 selectedEdgeId={selectedEdgeId}
-                pulseNodeId={pendingExpandId}
+                pulseNodeId={pendingExpandId ?? hoveredSourceId}
                 onCanvasClick={handleCanvasClick}
                 onNodeClick={handleNodeClick}
                 onNodeDblClick={handleNodeExpand}
@@ -1171,14 +1258,35 @@ export function GraphExplorerPage(): React.ReactElement {
           )}
         </main>
 
+        {/* Audit item 4: draggable splitter between the canvas and the docked
+            column. Hidden on mobile (bottom-sheet instead) and while collapsed
+            (the thin rail is the extreme of the resize range). */}
+        {!columnCollapsed && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ridimensiona il pannello del dibattito"
+            aria-valuenow={columnWidth}
+            aria-valuemin={COLUMN_WIDTH_MIN}
+            aria-valuemax={COLUMN_WIDTH_MAX}
+            tabIndex={0}
+            onMouseDown={handleSplitterMouseDown}
+            onKeyDown={handleSplitterKeyDown}
+            className="hidden w-1.5 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-primary-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:block"
+          />
+        )}
+
         {/* Docked deliberation column (design §4): the canvas is `flex-1`, so a
-            fixed-width sibling reflows it to `calc(100% − 400px)` — no imperative
-            padding. Dual-tab: Dibattito (the absorbed Q&A) / Nodo (details). */}
+            fixed-width sibling reflows it to `calc(100% − columnWidth)` — no
+            imperative padding. Dual-tab: Dibattito (the absorbed Q&A) / Nodo
+            (details). Width is draggable (audit item 4), clamped + persisted. */}
         <div
           className={cn(
-            'hidden shrink-0 overflow-hidden transition-[width] duration-200 md:block',
-            columnCollapsed ? 'w-11' : 'w-[400px]',
+            'hidden shrink-0 overflow-hidden md:block',
+            !isResizingColumn && 'transition-[width] duration-200',
+            columnCollapsed && 'w-11',
           )}
+          style={columnCollapsed ? undefined : { width: columnWidth }}
         >
           <DeliberationColumn
             activeTab={activeTab}
@@ -1194,6 +1302,7 @@ export function GraphExplorerPage(): React.ReactElement {
             onRetry={qa.retry}
             onCancel={qa.cancel}
             onSourceCenter={handleSourceCenter}
+            onSourceHover={handleSourceHover}
             onOpenNorm={handleOpenNorm}
             onFollowReasoning={handleFollowReasoning}
             onLoadHistoryTurn={qa.loadHistoryTurn}
@@ -1305,13 +1414,46 @@ function sliceToElements(snap: GraphSliceSnapshot): GraphElements {
   };
 }
 
-function EmptyState(): React.ReactElement {
+/**
+ * Audit item 2: when the last Q&A answer consulted sources, surface them as
+ * clickable chips so the jurist can jump straight into the graph from the
+ * conversation instead of re-searching. Falls back to the plain copy when
+ * there is no recent answer (or it carried no sources).
+ */
+function EmptyState({
+  sources,
+  onSelectSource,
+}: {
+  sources: QaRetrievedSource[];
+  onSelectSource: (nodeIdOrUrn: string) => void;
+}): React.ReactElement {
+  const chips = pickEmptyStateSources(sources, MAX_EMPTY_STATE_SOURCES);
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
       <Network className="h-10 w-10 text-slate-300 dark:text-slate-600" />
       <p className="max-w-sm text-slate-500 dark:text-slate-400">
         Cerca un articolo o un concetto per iniziare a esplorare il grafo.
       </p>
+      {chips.length > 0 && (
+        <div className="flex max-w-md flex-col items-center gap-1.5">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Fonti dell&apos;ultima domanda
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-1.5">
+            {chips.map((s) => (
+              <button
+                key={s.node_id ?? s.urn}
+                type="button"
+                onClick={() => onSelectSource(s.node_id ?? s.urn)}
+                title={`Apri ${sourceLabel(s)} nel grafo`}
+                className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+              >
+                {sourceLabel(s)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

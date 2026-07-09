@@ -124,6 +124,23 @@ export const PROVENANCE_STYLE: Record<NodeProvenance, ProvenanceStyle> = {
   live_unconfirmed: { lineWidth: 2, lineDash: [4, 3], strokeOverride: PROVISIONAL_AMBER },
 };
 
+/**
+ * Ids of edges incident to `nodeId` (either endpoint) — audit item 1: when a
+ * node is selected, its incident edges are promoted to the 'active' G6 state
+ * so EDGE_STATE.active's `labelOpacity: 1` reveals their relation labels
+ * (normally hidden until hover). Empty for a null/absent node — no-op, never
+ * throws. Used by GraphCanvas's `buildElementStates`.
+ */
+export function incidentEdgeIds(edges: EdgeData[], nodeId: string | null | undefined): ReadonlySet<string> {
+  const ids = new Set<string>();
+  if (!nodeId) return ids;
+  for (const e of edges) {
+    if (e.id == null) continue;
+    if (String(e.source) === nodeId || String(e.target) === nodeId) ids.add(String(e.id));
+  }
+  return ids;
+}
+
 /** Render shape for a semantic node type (fallback: circle). */
 export function nodeG6Type(semanticType: string | undefined): G6NodeShape {
   return (semanticType && NODE_TYPE_STYLE[semanticType]?.g6Type) || 'circle';

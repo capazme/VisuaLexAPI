@@ -237,6 +237,49 @@ describe('DeliberationColumn dibattito tab', () => {
   });
 });
 
+describe('DeliberationColumn source ↔ graph link (audit item 3)', () => {
+  it('hovering a source chip pulses the graph WITHOUT re-centering or switching tabs', () => {
+    const props = { ...baseProps(), onSourceHover: vi.fn() };
+    render(<DeliberationColumn {...props} turns={[successTurn()]} />);
+    const chip = screen.getByRole('button', { name: /art\. 2043.*fondativa/i }).closest('li')!;
+    fireEvent.mouseEnter(chip);
+    expect(props.onSourceHover).toHaveBeenCalledWith('node-2043');
+    expect(props.onSourceCenter).not.toHaveBeenCalled();
+    expect(props.onTabChange).not.toHaveBeenCalled();
+  });
+
+  it('leaving a source chip clears the hover pulse (null)', () => {
+    const props = { ...baseProps(), onSourceHover: vi.fn() };
+    render(<DeliberationColumn {...props} turns={[successTurn()]} />);
+    const chip = screen.getByRole('button', { name: /art\. 2059.*provvisoria/i }).closest('li')!;
+    fireEvent.mouseEnter(chip);
+    fireEvent.mouseLeave(chip);
+    expect(props.onSourceHover).toHaveBeenLastCalledWith(null);
+  });
+
+  it('is inert (no crash) when onSourceHover is not wired', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    const chip = screen.getByRole('button', { name: /art\. 2043.*fondativa/i }).closest('li')!;
+    expect(() => fireEvent.mouseEnter(chip)).not.toThrow();
+  });
+
+  it('marks the source chip matching the CURRENT canvas selection (aria-current)', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} selectedNode={node} />);
+    const selectedChip = screen.getByRole('button', { name: /art\. 2043.*fondativa/i }).closest('li')!;
+    const otherChip = screen.getByRole('button', { name: /art\. 2059.*provvisoria/i }).closest('li')!;
+    expect(selectedChip).toHaveAttribute('aria-current', 'true');
+    expect(otherChip).not.toHaveAttribute('aria-current');
+  });
+
+  it('is resilient (no chip marked) when the selection does not match any consulted source', () => {
+    const unrelated: GraphNode = { id: 'node-9999', urn: 'urn:unrelated', type: 'Norma', label: 'Unrelated' };
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} selectedNode={unrelated} />);
+    for (const el of screen.getAllByRole('listitem')) {
+      expect(el).not.toHaveAttribute('aria-current');
+    }
+  });
+});
+
 describe('DeliberationColumn history (Decision A — server chat history in the column)', () => {
   it('exposes the Cronologia affordance in the Dibattito tab when onLoadHistoryTurn is provided', () => {
     render(<DeliberationColumn {...baseProps()} onLoadHistoryTurn={vi.fn()} />);

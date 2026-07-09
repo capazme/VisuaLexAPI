@@ -35,6 +35,17 @@ vi.mock('@antv/g6', () => {
     layout = vi.fn(() => Promise.resolve());
     setElementVisibility = vi.fn();
     setElementState = vi.fn();
+    getElementPosition = vi.fn((id: string) => {
+      const n = this.nodes.find((nn) => String(nn.id) === id);
+      return [n?.style?.x ?? 0, n?.style?.y ?? 0];
+    });
+    translateElementTo = vi.fn((positions: Record<string, [number, number]>) => {
+      this.nodes = this.nodes.map((n) => {
+        const p = n.id != null ? positions[String(n.id)] : undefined;
+        return p ? { ...n, style: { ...n.style, x: p[0], y: p[1] } } : n;
+      });
+      return Promise.resolve();
+    });
     on = vi.fn();
     destroy = vi.fn();
     constructor(options: { data?: { nodes?: MockNode[] } } & Record<string, unknown>) {
@@ -59,6 +70,8 @@ interface MockGraph {
   layout: ReturnType<typeof vi.fn>;
   setElementVisibility: ReturnType<typeof vi.fn>;
   setElementState: ReturnType<typeof vi.fn>;
+  getElementPosition: ReturnType<typeof vi.fn>;
+  translateElementTo: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
 }
@@ -360,5 +373,90 @@ describe('GraphCanvas (F2 — expand pulse)', () => {
     const map = lastStateMap(g);
     expect(map['a']).toContain('active');
     expect(map['b']).toEqual([]);
+  });
+});
+
+describe('GraphCanvas (audit item 1 — reveal labels of the selected node\'s edges)', () => {
+  it("promotes edges incident to the selected node to 'active' (reveals their labels)", async () => {
+    renderComponent(
+      <GraphCanvas
+        nodes={[nd('a'), nd('b'), nd('c')]}
+        edges={[ed('e1', 'a', 'b'), ed('e2', 'b', 'c')]}
+        selectedNodeId="a"
+      />
+    );
+    const g = lastGraph();
+    await flush();
+    const map = lastStateMap(g);
+    // e1 touches the selected node 'a' → promoted; e2 (b-c) does not → untouched.
+    expect(map['e1']).toContain('active');
+    expect(map['e2']).toEqual([]);
+  });
+
+  it('does not promote any edge when nothing is selected', async () => {
+    renderComponent(
+      <GraphCanvas nodes={[nd('a'), nd('b')]} edges={[ed('e1', 'a', 'b')]} selectedNodeId={null} />
+    );
+    const g = lastGraph();
+    await flush();
+    expect(lastStateMap(g)['e1']).toEqual([]);
+  });
+
+  it('an edge incident to BOTH the selected node and the pulsed/actual selection stays selected, not just active', async () => {
+    renderComponent(
+      <GraphCanvas
+        nodes={[nd('a'), nd('b')]}
+        edges={[ed('e1', 'a', 'b')]}
+        selectedNodeId="a"
+        selectedEdgeId="e1"
+      />
+    );
+    const g = lastGraph();
+    await flush();
+    expect(lastStateMap(g)['e1']).toContain('selected');
+  });
+});
+
+describe('GraphCanvas (audit item 5 — deterministic canon corona)', () => {
+  const canonNode = (key: string): NodeData => ({
+    id: `canon:${key}`,
+    type: 'star',
+    data: { kind: 'canon', canon: key, label: `Canone: ${key}`, weight: 0.5 },
+  });
+
+  it('pins newly-arrived canon nodes to a fixed ring around the settled center', async () => {
+    const { rerender } = renderComponent(<GraphCanvas nodes={[nd('a')]} edges={[]} centerNodeId="a" />);
+    const g = lastGraph();
+    await waitFor(() => expect(g.fitView).toHaveBeenCalledTimes(1));
+    layOut(g, () => ({ x: 500, y: 500 }));
+
+    rerender(
+      <GraphCanvas
+        nodes={[nd('a'), canonNode('literal')]}
+        edges={[ed('canon:anchor:literal', 'a', 'canon:literal')]}
+        centerNodeId="a"
+      />
+    );
+    await flush();
+
+    expect(g.translateElementTo).toHaveBeenCalledTimes(1);
+    const [positions, animation] = g.translateElementTo.mock.calls[0];
+    expect(animation).toBe(false);
+    const [x, y] = positions['canon:literal'];
+    // literal → north of the (500,500) center: same x, strictly smaller y.
+    expect(x).toBeCloseTo(500, 5);
+    expect(y).toBeLessThan(500);
+  });
+
+  it('does nothing when there are no canon nodes in the update', async () => {
+    const { rerender } = renderComponent(<GraphCanvas nodes={[nd('a')]} edges={[]} centerNodeId="a" />);
+    const g = lastGraph();
+    await waitFor(() => expect(g.fitView).toHaveBeenCalledTimes(1));
+    layOut(g, () => ({ x: 500, y: 500 }));
+
+    rerender(<GraphCanvas nodes={[nd('a'), nd('b')]} edges={[ed('e1', 'a', 'b')]} centerNodeId="a" />);
+    await flush();
+
+    expect(g.translateElementTo).not.toHaveBeenCalled();
   });
 });

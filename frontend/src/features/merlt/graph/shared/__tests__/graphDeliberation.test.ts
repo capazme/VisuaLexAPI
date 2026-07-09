@@ -3,7 +3,10 @@ import {
   buildDeliberationOverlay,
   canonKeyFromNodeId,
   canonNodeVisual,
+  canonRingPosition,
   CANON_NODE_PREFIX,
+  CANON_RING_ANGLE,
+  CANON_RING_RADIUS,
   CONTRAST_EDGE_PREFIX,
   contrastEdgeId,
   isDeliberationElementId,
@@ -229,5 +232,54 @@ describe('graphDeliberation — readDeliberation (defensive off QaAnswer)', () =
   it('tolerates a null/undefined answer', () => {
     expect(readDeliberation(null)).toEqual({});
     expect(readDeliberation(undefined)).toEqual({});
+  });
+});
+
+describe('canonRingPosition (audit item 5 — deterministic canon corona)', () => {
+  const center = { x: 500, y: 500 };
+
+  it('places literal to the north (same x, smaller y)', () => {
+    const p = canonRingPosition('literal', center, 0);
+    expect(p.x).toBeCloseTo(center.x, 5);
+    expect(p.y).toBeLessThan(center.y);
+    expect(center.y - p.y).toBeCloseTo(CANON_RING_RADIUS, 5);
+  });
+
+  it('places systemic to the east (larger x, same y)', () => {
+    const p = canonRingPosition('systemic', center, 1);
+    expect(p.x).toBeGreaterThan(center.x);
+    expect(p.y).toBeCloseTo(center.y, 5);
+  });
+
+  it('places principles to the south (same x, larger y)', () => {
+    const p = canonRingPosition('principles', center, 2);
+    expect(p.x).toBeCloseTo(center.x, 5);
+    expect(p.y).toBeGreaterThan(center.y);
+  });
+
+  it('places precedent to the west (smaller x, same y)', () => {
+    const p = canonRingPosition('precedent', center, 3);
+    expect(p.x).toBeLessThan(center.x);
+    expect(p.y).toBeCloseTo(center.y, 5);
+  });
+
+  it('honors a custom radius', () => {
+    const p = canonRingPosition('literal', center, 0, 300);
+    expect(center.y - p.y).toBeCloseTo(300, 5);
+  });
+
+  it('assigns an unknown/extra canon key a slot that does not collide with N/E/S/O', () => {
+    const p = canonRingPosition('combined', center, 4);
+    for (const known of Object.keys(CANON_RING_ANGLE)) {
+      const known_p = canonRingPosition(known, center, 0);
+      expect(Math.hypot(p.x - known_p.x, p.y - known_p.y)).toBeGreaterThan(1);
+    }
+  });
+
+  it('every fixed preleggi canon sits exactly CANON_RING_RADIUS from the center', () => {
+    for (const key of Object.keys(CANON_RING_ANGLE)) {
+      const p = canonRingPosition(key, center, 0);
+      expect(Math.hypot(p.x - center.x, p.y - center.y)).toBeCloseTo(CANON_RING_RADIUS, 5);
+    }
   });
 });

@@ -1,8 +1,8 @@
 import { useEffect, useImperativeHandle, useRef } from 'react';
 import { Graph } from '@antv/g6';
-import type { NodeData, EdgeData, LayoutOptions } from '@antv/g6';
-import { nodeStyleMapper, edgeStyleMapper } from './graphStyles';
-import { isDeliberationElementId } from './graphDeliberation';
+import type { NodeData, EdgeData, LayoutOptions, Point } from '@antv/g6';
+import { nodeStyleMapper, edgeStyleMapper, incidentEdgeIds } from './graphStyles';
+import { canonRingPosition, isDeliberationElementId } from './graphDeliberation';
 
 /**
  * Shared G6 v5 graph canvas for both the article side rail and the /grafo page.
@@ -300,6 +300,9 @@ function buildElementStates(
   if (inputs.highlightEdgeIds) {
     for (const id of inputs.highlightEdgeIds) promote(id, 'active');
   }
+  // Audit item 1: reveal the relation labels of every edge touching the
+  // selected node — scoped to just that node's edges, the rest stay quiet.
+  for (const id of incidentEdgeIds(edges, inputs.selectedNodeId)) promote(id, 'active');
   return map;
 }
 
@@ -400,6 +403,43 @@ function carryOverPositions(
     }),
     survivors,
   };
+}
+
+/**
+ * Audit item 5 — pin the canon corona (the deliberation overlay's `canon:*`
+ * nodes) to a deterministic ring around the center, right after the force
+ * layout has settled. `g.render()` only resolves once the d3-force simulation
+ * hits its 'end' event (@antv/layout's D3ForceLayout resolves `layout()` from
+ * `simulation.on('end', ...)`), so nothing will drift these positions again
+ * until the NEXT data change re-runs the layout — a one-shot post-layout pass
+ * is enough, no per-node "pin" API is needed (G6 v5 exposes no public per-node
+ * fixed-position hook on `Graph`; the internal d3-force `setFixedPosition` is
+ * reached only through the layout's private context, not worth the coupling).
+ * `translateElementTo` is a pure canvas-position move (`updateNodeData` under
+ * the hood) — it does not re-trigger layout, so it cannot re-scatter siblings.
+ * No-op when there is no center to anchor the ring on (canons keep floating,
+ * same as before this change) or when the data carries no canon nodes.
+ */
+function repositionCanonNodes(g: Graph, nodes: NodeData[], centerId: string | null): void {
+  const canonNodes = nodes.filter(
+    (n) => n.id != null && (n.data as { kind?: string } | undefined)?.kind === 'canon'
+  );
+  if (canonNodes.length === 0 || !centerId) return;
+  let centerPos: Point | undefined;
+  try {
+    centerPos = g.getElementPosition(centerId);
+  } catch {
+    return; // center not (yet) on canvas — leave the force layout in charge
+  }
+  if (!centerPos) return;
+  const [cx, cy] = centerPos;
+  const positions: Record<string, Point> = {};
+  canonNodes.forEach((n, i) => {
+    const canonKey = (n.data as { canon?: string } | undefined)?.canon ?? String(n.id);
+    const pos = canonRingPosition(canonKey, { x: cx, y: cy }, i);
+    positions[String(n.id)] = [pos.x, pos.y];
+  });
+  void g.translateElementTo(positions, false).catch(() => {});
 }
 
 export default function GraphCanvas({
@@ -572,7 +612,11 @@ export default function GraphCanvas({
       const centerChanged = nextCenter !== prevCenter;
 
       renderRef.current = g.render().then(() => {
-        if (graphRef.current !== g) return;
+        if (graphRef.current !== g) return undefined;
+        // Audit item 5: pin any canon corona to its deterministic ring — must run
+        // AFTER render() so the force layout has fully settled (see the function
+        // doc for why this is the correct, non-racy place for the pass).
+        repositionCanonNodes(g, positionedNodes, nextCenter);
         if (centerChanged) {
           if (nextCenter && prevPositions.has(nextCenter)) {
             return g.focusElement(nextCenter, { duration: 400 });

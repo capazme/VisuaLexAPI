@@ -24,6 +24,7 @@ import type {
   QaTurnModel,
 } from '../../qa/types';
 import { CANON_STYLE } from '../shared/graphDeliberation';
+import { sourceMatchesNode } from './sourceGraphLink';
 import type {
   ExpertContribution,
   GraphEdge,
@@ -68,6 +69,13 @@ export interface DeliberationColumnProps {
   onCancel: (turnId: string) => void;
   /** Re-center the canvas on a consulted source (node_id preferred, else urn). */
   onSourceCenter: (nodeIdOrUrn: string) => void;
+  /**
+   * Audit item 3a: hovering a source chip pulses the matching canvas node
+   * WITHOUT navigating or switching tabs (non-destructive companion to
+   * `onSourceCenter`'s explicit click). `null` clears the pulse on mouse-leave.
+   * Absent → the chips render without hover wiring (no dead handler calls).
+   */
+  onSourceHover?: (nodeIdOrUrn: string | null) => void;
   /**
    * "Apri" (feature 3, quick-open): open a cited/consulted norma in the
    * VisuaLex reader (navigate('/') + triggerSearch — the page owns Router/store
@@ -226,6 +234,7 @@ export function DeliberationColumn({
   onRetry,
   onCancel,
   onSourceCenter,
+  onSourceHover,
   onOpenNorm,
   onFollowReasoning,
   onLoadHistoryTurn,
@@ -334,6 +343,7 @@ export function DeliberationColumn({
           onRetry={onRetry}
           onCancel={onCancel}
           onSourceCenter={onSourceCenter}
+          onSourceHover={onSourceHover}
           onOpenNorm={onOpenNorm}
           onFollowReasoning={onFollowReasoning}
           onLoadHistoryTurn={onLoadHistoryTurn}
@@ -351,6 +361,7 @@ export function DeliberationColumn({
           canonFocus={canonFocus}
           steeredKeys={steeredKeys}
           onMarkSteered={markSteered}
+          selectedNode={selectedNode ?? null}
         />
       </div>
       <div
@@ -488,6 +499,7 @@ function DibattitoTab({
   onRetry,
   onCancel,
   onSourceCenter,
+  onSourceHover,
   onOpenNorm,
   onFollowReasoning,
   onLoadHistoryTurn,
@@ -505,6 +517,7 @@ function DibattitoTab({
   canonFocus,
   steeredKeys,
   onMarkSteered,
+  selectedNode,
 }: {
   turns: QaTurnModel[];
   onAsk: (question: string, mode: QaMode) => void;
@@ -513,6 +526,7 @@ function DibattitoTab({
   onRetry: (turnId: string) => void;
   onCancel: (turnId: string) => void;
   onSourceCenter: (nodeIdOrUrn: string) => void;
+  onSourceHover?: (nodeIdOrUrn: string | null) => void;
   onOpenNorm?: (params: SearchParams) => void;
   onFollowReasoning?: (edges: GraphTraversalEdge[]) => void;
   onLoadHistoryTurn?: (item: QaHistoryItem) => void;
@@ -533,6 +547,9 @@ function DibattitoTab({
   canonFocus?: { key: string; nonce: number } | null;
   steeredKeys: ReadonlySet<string>;
   onMarkSteered: (key: string) => void;
+  /** Audit item 3b: the CURRENT canvas node selection — drives the reverse
+   *  selection→source link (scroll + highlight the matching chip below). */
+  selectedNode?: GraphNode | null;
 }): React.ReactElement {
   const lastTurnId = turns.length > 0 ? turns[turns.length - 1].id : null;
   // "Cronologia" toggle: reveals the server-backed QaHistoryPanel over the thread
@@ -560,6 +577,27 @@ function DibattitoTab({
       target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [canonFocus]);
+
+  // Audit item 3b: selecting a node on the canvas that resolves to a consulted
+  // source scrolls that source's chip into view (the persistent ring highlight
+  // itself is prop-driven — see DeliberationSourceChip's `isSelected`). No-op
+  // when the selection has no matching chip currently rendered (resilient to a
+  // node not on canvas / not a consulted source).
+  useEffect(() => {
+    if (!selectedNode) return;
+    const root = turnsRef.current;
+    if (!root) return;
+    const matches = root.querySelectorAll<HTMLElement>('[data-source-node-id],[data-source-urn]');
+    const target = [...matches].find(
+      (el) =>
+        (selectedNode.id && el.dataset.sourceNodeId === selectedNode.id) ||
+        (selectedNode.urn && el.dataset.sourceUrn === selectedNode.urn),
+    );
+    if (!target) return;
+    if (typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedNode]);
 
   const handleSelectHistory = (item: QaHistoryItem): void => {
     onLoadHistoryTurn?.(item);
@@ -618,6 +656,8 @@ function DibattitoTab({
               onRetry={() => onRetry(turn.id)}
               onCancel={() => onCancel(turn.id)}
               onSourceCenter={onSourceCenter}
+              onSourceHover={onSourceHover}
+              selectedNode={selectedNode}
               onOpenNorm={onOpenNorm}
               onFollowReasoning={onFollowReasoning}
               onRate={onRate}
@@ -677,6 +717,8 @@ function DeliberationTurn({
   onRetry,
   onCancel,
   onSourceCenter,
+  onSourceHover,
+  selectedNode,
   onOpenNorm,
   onFollowReasoning,
   onRate,
@@ -695,6 +737,8 @@ function DeliberationTurn({
   onRetry: () => void;
   onCancel: () => void;
   onSourceCenter: (nodeIdOrUrn: string) => void;
+  onSourceHover?: (nodeIdOrUrn: string | null) => void;
+  selectedNode?: GraphNode | null;
   onOpenNorm?: (params: SearchParams) => void;
   onFollowReasoning?: (edges: GraphTraversalEdge[]) => void;
   onRate?: (turnId: string, traceId: string, rating: 1 | 5) => void;
@@ -850,6 +894,8 @@ function DeliberationTurn({
                         key={s.node_id ?? s.urn}
                         source={s}
                         onCenter={onSourceCenter}
+                        onHover={onSourceHover}
+                        isSelected={sourceMatchesNode(s, selectedNode)}
                         onOpenNorm={onOpenNorm}
                         onRate={onRateSource ? (relevant) => onRateSource(a.trace_id, s.urn, relevant) : undefined}
                         onConfirm={onConfirmSource ? () => onConfirmSource(turn.id, s) : undefined}
@@ -1652,6 +1698,8 @@ function formatCanonPct(weight: number): string {
 function DeliberationSourceChip({
   source,
   onCenter,
+  onHover,
+  isSelected = false,
   onRate,
   onConfirm,
   confirmState,
@@ -1659,6 +1707,10 @@ function DeliberationSourceChip({
 }: {
   source: QaRetrievedSource;
   onCenter: (nodeIdOrUrn: string) => void;
+  /** Audit item 3a: non-destructive hover pulse (see DeliberationColumnProps.onSourceHover). */
+  onHover?: (nodeIdOrUrn: string | null) => void;
+  /** Audit item 3b: this chip's source resolves to the CURRENT canvas selection. */
+  isSelected?: boolean;
   onRate?: (relevant: boolean) => void;
   onConfirm?: () => void;
   confirmState?: ConfirmState;
@@ -1693,7 +1745,19 @@ function DeliberationSourceChip({
   const showOpen = Boolean(normParams) || (kind.kind === 'sentenza' && Boolean(source.source_url));
 
   return (
-    <li className="relative overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+    <li
+      data-source-node-id={source.node_id ?? ''}
+      data-source-urn={source.urn}
+      aria-current={isSelected ? 'true' : undefined}
+      onMouseEnter={() => onHover?.(target)}
+      onMouseLeave={() => onHover?.(null)}
+      className={cn(
+        'relative overflow-hidden rounded-lg border bg-white transition-shadow dark:bg-slate-900',
+        isSelected
+          ? 'border-primary-300 ring-2 ring-primary-400 dark:border-primary-700 dark:ring-primary-500'
+          : 'border-slate-200 dark:border-slate-700',
+      )}
+    >
       <span className={cn('absolute inset-y-0 left-0 w-1', meta.stripe)} aria-hidden="true" />
       <button
         type="button"

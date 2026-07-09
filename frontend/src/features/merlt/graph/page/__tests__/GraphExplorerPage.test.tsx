@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GraphExplorerPage } from '../GraphExplorerPage';
 import type { ArticleGraphState } from '../../shared/useArticleGraph';
@@ -145,6 +145,7 @@ beforeEach(() => {
   useIngestionJobMock.mockReset();
   useIngestionJobMock.mockReturnValue({ status: null, error: null, nodesCreated: null });
   sessionStorage.clear(); // breadcrumb history is sessionStorage-backed
+  localStorage.removeItem('merlt-grafo-column-width'); // audit item 4 draggable splitter
   setGraph({ status: 'idle' });
 });
 
@@ -1399,4 +1400,149 @@ describe('GraphExplorerPage', () => {
     });
   });
 
+  describe('audit item 2 — empty-state cited-source chips', () => {
+    function turnWithSources(): QaTurnModel {
+      return {
+        id: 'turn-1',
+        question: 'Qual è la ratio dell’art. 2043?',
+        confirmed: {},
+        state: {
+          status: 'success',
+          answer: {
+            trace_id: 'trace-1',
+            synthesis: 'La ratio è il neminem laedere.',
+            mode: 'convergent',
+            alternatives: null,
+            sources: [],
+            retrieved_sources: [
+              { urn: 'urn:x~art2043', provenance: 'seed', trust: 0.9, node_id: 'node-2043' },
+            ],
+            experts_used: ['literal'],
+            confidence: 0.8,
+            execution_time_ms: 100,
+          },
+        },
+      };
+    }
+
+    it('renders the latest answer\'s sources as clickable chips when there is no urn', () => {
+      qaThreadState.turns = [turnWithSources()];
+      renderAt('/grafo');
+      const main = within(screen.getByRole('main'));
+      expect(main.getByText(/per iniziare/i)).toBeInTheDocument();
+      expect(main.getByRole('button', { name: /art\. 2043/i })).toBeInTheDocument();
+    });
+
+    it('clicking a chip centers the graph on that source (goToCenter)', () => {
+      qaThreadState.turns = [turnWithSources()];
+      renderAt('/grafo');
+      const main = within(screen.getByRole('main'));
+      fireEvent.click(main.getByRole('button', { name: /art\. 2043/i }));
+      // node-2043 is not in the (empty) current subgraph → treated as a urn/id
+      // to re-center on, driving a fresh fetch for it.
+      expect(useArticleGraphMock).toHaveBeenLastCalledWith('node-2043', expect.any(Number), expect.any(Number));
+    });
+
+    it('falls back to the plain copy with no chips when there is no recent answer', () => {
+      renderAt('/grafo');
+      const main = within(screen.getByRole('main'));
+      expect(main.getByText(/per iniziare/i)).toBeInTheDocument();
+      expect(main.queryByRole('button', { name: /art\./i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('audit item 3a — hovering a source chip pulses the canvas', () => {
+    it('hover on a source chip sets the canvas pulseNodeId to the resolved local node', () => {
+      setGraph({
+        status: 'success',
+        data: {
+          nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }],
+          edges: [],
+        },
+        elements: { nodes: [{ id: 'node-2043' }], edges: [] },
+      });
+      qaThreadState.turns = [
+        {
+          id: 'turn-1',
+          question: 'domanda?',
+          confirmed: {},
+          state: {
+            status: 'success',
+            answer: {
+              trace_id: 'trace-1',
+              synthesis: 'sintesi',
+              mode: 'convergent',
+              alternatives: null,
+              sources: [],
+              retrieved_sources: [{ urn: 'urn:x~art2043', provenance: 'seed', trust: 0.9, node_id: 'node-2043' }],
+              experts_used: ['literal'],
+              confidence: 0.8,
+              execution_time_ms: 100,
+            },
+          },
+        },
+      ];
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+
+      const chip = screen.getByRole('button', { name: /art\. 2043.*fondativa/i }).closest('li')!;
+      fireEvent.mouseEnter(chip);
+      expect(lastCanvasProps.pulseNodeId).toBe('node-2043');
+
+      fireEvent.mouseLeave(chip);
+      expect(lastCanvasProps.pulseNodeId).toBeNull();
+    });
+  });
+
+  describe('audit item 4 — draggable splitter between canvas and column', () => {
+    it('renders the splitter at the default width', () => {
+      renderAt('/grafo');
+      const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
+      expect(separator).toHaveAttribute('aria-valuenow', '400');
+    });
+
+    it('dragging the splitter left widens the column and persists the width', () => {
+      renderAt('/grafo');
+      const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
+      const columnWrapper = separator.nextElementSibling as HTMLElement;
+      expect(columnWrapper.style.width).toBe('400px');
+
+      fireEvent.mouseDown(separator, { clientX: 500 });
+      fireEvent.mouseMove(window, { clientX: 400 }); // moved 100px left → +100 width
+      fireEvent.mouseUp(window);
+
+      expect(columnWrapper.style.width).toBe('500px');
+      expect(localStorage.getItem('merlt-grafo-column-width')).toBe('500');
+    });
+
+    it('clamps the drag to COLUMN_WIDTH_MAX', () => {
+      renderAt('/grafo');
+      const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
+      const columnWrapper = separator.nextElementSibling as HTMLElement;
+
+      fireEvent.mouseDown(separator, { clientX: 500 });
+      fireEvent.mouseMove(window, { clientX: -9999 }); // way past the max
+      fireEvent.mouseUp(window);
+
+      expect(columnWrapper.style.width).toBe('640px');
+    });
+
+    it('ArrowLeft/ArrowRight on the focused splitter resize by a fixed step', () => {
+      renderAt('/grafo');
+      const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
+      const columnWrapper = separator.nextElementSibling as HTMLElement;
+
+      fireEvent.keyDown(separator, { key: 'ArrowLeft' });
+      expect(columnWrapper.style.width).toBe('416px');
+
+      fireEvent.keyDown(separator, { key: 'ArrowRight' });
+      fireEvent.keyDown(separator, { key: 'ArrowRight' });
+      expect(columnWrapper.style.width).toBe('384px');
+    });
+
+    it('hides the splitter when the column is collapsed', () => {
+      renderAt('/grafo');
+      fireEvent.click(screen.getByRole('button', { name: /comprimi il pannello/i }));
+      expect(screen.queryByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).not.toBeInTheDocument();
+    });
+  });
 });
