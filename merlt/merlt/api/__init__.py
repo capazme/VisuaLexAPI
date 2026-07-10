@@ -74,6 +74,7 @@ from merlt.api.regression_router import router as regression_router
 from merlt.api.schedule_router import router as schedule_router
 from merlt.api.quarantine_router import router as quarantine_router
 from merlt.api.api_keys_router import router as api_keys_router
+from merlt.api.ingestion_mechanical_router import router as ingestion_mechanical_router
 
 __all__ = [
     "ingestion_router",
@@ -107,4 +108,5 @@ __all__ = [
     "schedule_router",
     "quarantine_router",
     "api_keys_router",
+    "ingestion_mechanical_router",
 ]

@@ -67,6 +67,7 @@ from merlt.api import (
     quarantine_router,
     api_keys_router,
     ner_router,
+    ingestion_mechanical_router,
 )
 from merlt.api.admin_router import router as admin_router
 
@@ -225,6 +226,7 @@ app.include_router(schedule_router, prefix="/api/v1", tags=["ingestion-schedules
 app.include_router(quarantine_router, prefix="/api/v1", tags=["feedback-quarantine"])
 app.include_router(api_keys_router, prefix="/api/v1", tags=["api-keys"])
 app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
+app.include_router(ingestion_mechanical_router, prefix="/api/v1", tags=["ingestion-mechanical"])
 
 
 # Health check endpoint

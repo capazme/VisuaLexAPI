@@ -25,8 +25,8 @@ Usage:
         await session.commit()
 """
 
-from datetime import datetime
-from typing import Optional, List
+import uuid
+from datetime import datetime, timedelta
 from sqlalchemy import (
     Column,
     Integer,
@@ -314,7 +314,78 @@ class ExtractionCandidate(Base):
 
 
 # ====================================================
-# 4c. TRACKING EVENTS (RLCF signal persistence — loop-closure A1)
+# 4c. MERLT INGESTION BATCH (mechanical ingestion governance)
+# ====================================================
+PENDING_REVIEW_TTL_DAYS = 14
+
+
+def _default_batch_id() -> str:
+    return str(uuid.uuid4())
+
+
+def _default_batch_expires_at() -> datetime:
+    return datetime.utcnow() + timedelta(days=PENDING_REVIEW_TTL_DAYS)
+
+
+class MerltIngestionBatch(Base):
+    """
+    Staged batch of deterministic (zero-LLM) graph facts, awaiting admin review.
+
+    Mechanical ingestion (Norma nodes, hierarchy, RINVIA cross-references) is
+    admin-gated *per batch*, unlike the interpretative layer (concepts,
+    principles) which goes through community RLCF quorum on individual
+    pending_* rows. A batch never touches FalkorDB until an admin promotes it
+    (design doc: docs/merlt/slices/ingestion-governance/design.md).
+
+    Lifecycle: parsing -> pending_review -> (promoting -> promoted) | rejected | failed.
+    `nodes`/`edges` carry the seed-JSON shape ({labels, properties} / {start,
+    end, type, properties}) so promotion can reuse the seed loader's
+    idempotent MERGE helpers unmodified. `conflict_report` is computed
+    read-only against the live graph before staging (see
+    pipeline/mechanical_ingestion/conflict_report.py) and re-checked at
+    promote time since the graph may have moved during the review window.
+    """
+
+    __tablename__ = "merlt_ingestion_batches"
+
+    id = Column(String(36), primary_key=True, default=_default_batch_id)
+
+    source = Column(String(50), nullable=False, index=True)  # visualex_tree | italia_corpus
+    source_ref = Column(Text, nullable=False)
+    scope_label = Column(String(300), nullable=False)
+
+    status = Column(String(20), nullable=False, default="parsing", index=True)
+
+    nodes = Column(JSON, default=list)
+    edges = Column(JSON, default=list)
+    conflict_report = Column(JSON)
+    stats = Column(JSON)
+
+    created_at = Column(DateTime, default=func.now(), index=True)
+    created_by = Column(String(100))
+    reviewed_by = Column(String(100))
+    promoted_at = Column(DateTime)
+    rejected_at = Column(DateTime)
+    error = Column(Text)
+    expires_at = Column(DateTime, default=_default_batch_expires_at, index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('visualex_tree','italia_corpus')",
+            name="check_batch_source",
+        ),
+        CheckConstraint(
+            "status IN ('pending_review','parsing','promoting','promoted','rejected','failed')",
+            name="check_batch_status",
+        ),
+    )
+
+    def __repr__(self):
+        return f"<MerltIngestionBatch(id={self.id}, source={self.source}, status={self.status})>"
+
+
+# ====================================================
+# 4d. TRACKING EVENTS (RLCF signal persistence — loop-closure A1)
 # ====================================================
 class TrackingEventRecord(Base):
     """
@@ -808,4 +879,9 @@ __all__ = [
     "EntityIssueVote",
     "RelationIssueReport",
     "RelationIssueVote",
+    "ExtractionCandidate",
+    "TrackingEventRecord",
+    "NERFeedback",
+    "MerltIngestionBatch",
+    "PENDING_REVIEW_TTL_DAYS",
 ]
