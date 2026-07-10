@@ -15,12 +15,15 @@ batch by URN without a separate id-assignment pass.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any, Optional, Protocol
 
 import structlog
 import yaml
+
+from merlt.clients import get_visualex_client
 
 log = structlog.get_logger()
 
@@ -115,6 +118,128 @@ def _article_urn(base_urn: str, numero: str) -> str:
     return f"{base_urn}~art{_urn_article_suffix(numero)}"
 
 
+# ---------------------------------------------------------------------------
+# VisuaLex tree adapter helpers
+# ---------------------------------------------------------------------------
+
+# Words dropped when deriving a code's dotted abbreviation from its act_type
+# name ("codice di procedura civile" -> drop "di" -> "c.p.c."). Not an
+# Italian-grammar stopword list in general — scoped to what appears in
+# NORMATTIVA_URN_CODICI act names.
+_CODE_ABBREV_STOPWORDS = {"di", "del", "della", "dello", "dei", "degli", "delle"}
+
+
+def _code_abbreviation(act_type: str) -> str:
+    """`"codice civile"` -> `"c.c."`, `"codice di procedura civile"` ->
+    `"c.p.c."` — first letter of each significant word, dotted. Deterministic
+    and generic (no hardcoded per-code table): verified against the real seed
+    (`estremi: "Art. 1982 c.c."`) for `codice civile`/`codice penale`.
+    """
+    words = [
+        w
+        for w in re.split(r"\s+", act_type.strip().lower())
+        if w and w not in _CODE_ABBREV_STOPWORDS
+    ]
+    if not words:
+        return act_type.strip()
+    return "".join(f"{w[0]}." for w in words)
+
+
+def _parse_visualex_source_ref(source_ref: str) -> tuple[str, Optional[str]]:
+    """`source_ref` is a small JSON object `{"act_type": "...", "articles": "..."}`.
+
+    `articles` is optional (a range/list scoping the batch for cheap testing;
+    absent means "the whole act"). Raises ValueError on anything else so a
+    malformed batch request fails fast with a clear reason (mirrors the
+    italia_corpus adapter's `ValueError` contract).
+    """
+    try:
+        data = json.loads(source_ref)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ValueError(
+            f"visualex_tree: source_ref must be a JSON object, got {source_ref!r}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"visualex_tree: source_ref must be a JSON object, got {source_ref!r}")
+
+    act_type = data.get("act_type")
+    if not act_type or not isinstance(act_type, str):
+        raise ValueError(
+            "visualex_tree: source_ref JSON must include a non-empty 'act_type' string"
+        )
+
+    articles = data.get("articles")
+    if articles is not None and not isinstance(articles, str):
+        raise ValueError("visualex_tree: source_ref 'articles' must be a string if present")
+
+    return act_type, (articles or None)
+
+
+_SCOPE_RANGE_RE = re.compile(r"^(\d+)-(\d+)$")
+
+
+def _expand_scope(scope: Optional[str]) -> Optional[set[str]]:
+    """Expand an optional `"2043-2059"` / `"2043,2044,2050-2059"` scope string
+    into a set of wanted article tokens (plain numbers and/or normalized
+    "N-suffix" forms). `None` means "no scoping" (the whole act).
+    """
+    if not scope or not scope.strip():
+        return None
+    wanted: set[str] = set()
+    for part in scope.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        m = _SCOPE_RANGE_RE.match(part)
+        if m:
+            start, end = int(m.group(1)), int(m.group(2))
+            for n in range(start, end + 1):
+                wanted.add(str(n))
+        else:
+            wanted.add(_normalize_article_number(part))
+    return wanted
+
+
+def _scope_includes(numero_normalized: str, wanted: Optional[set[str]]) -> bool:
+    if wanted is None:
+        return True
+    if numero_normalized in wanted:
+        return True
+    base_match = re.match(r"^(\d+)", numero_normalized)
+    return bool(base_match and base_match.group(1) in wanted)
+
+
+# First parenthesized group right after the "Art. N." heading line, e.g.
+# "Art. 1982. \n\n (Riparto). \n\n I creditori...". Anchored to the START of
+# the scraped text (`.match`, not `.search`) so a parenthetical mentioned
+# later in the article body is never mistaken for the rubrica. Best-effort:
+# many older CC articles carry no rubrica at all, and the scraper's exact
+# whitespace layout can vary across the 4 extraction scenarios in
+# `NormattivaScraper` — a non-match degrades to an empty rubrica, never a
+# crash (mirrors the italia_corpus adapter's optional-rubrica handling).
+_RUBRICA_RE = re.compile(
+    r"^\s*Art\.?\s*\S*\.?\s*\n+\s*\((?P<rubrica>[^()\n]{1,200})\)\.?\s*(?:\n|$)",
+    re.IGNORECASE,
+)
+
+
+def _extract_rubrica(text: str) -> str:
+    m = _RUBRICA_RE.match(text or "")
+    return f"({m.group('rubrica').strip()})." if m else ""
+
+
+# Articles per `/fetch_article_text` call. The endpoint fetches every article
+# in the batch concurrently server-side (`asyncio.gather`), so this bounds
+# per-request server load rather than client-side concurrency — chunks are
+# issued sequentially by this adapter (design doc §8: mechanical, bulk, not
+# meant to hammer the scraper faster than a single reasonable batch).
+_FETCH_CHUNK_SIZE = 40
+
+
+def _chunked(items: list[str], size: int) -> list[list[str]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
 class MechanicalSourceAdapter(Protocol):
     """A source-specific parser: `source_ref` -> seed-JSON batch shape."""
 
@@ -133,18 +258,187 @@ class ItaliaCorpusAdapter:
 
 
 class VisualexTreeAdapter:
-    """Placeholder for the VisuaLex tree-extractor adapter (CC/CP).
+    """VisuaLex tree-extractor adapter for consolidated codes (CC/CP) — the
+    ONLY adapter that may ingest the Codice Civile/Codice Penale (design doc
+    §8/§10): it queries VisuaLex's `/fetch_tree` against the consolidated
+    act, so the emitted URNs are aligned with the graph seed (`1942;262`) by
+    construction, unlike italia-corpus's pre-consolidation origin decrees.
 
-    Deliberately out of scope for this piece (design doc §9 step 2, "primo,
-    per l'obiettivo 'ingerire la CC'" — a separate follow-up). Raising here
-    keeps `POST /run` honest: a batch requested with `source=visualex_tree`
-    fails fast with status=failed rather than silently producing an empty batch.
+    `source_ref` is a JSON object `{"act_type": "codice civile", "articles":
+    "2043-2059"}` — `articles` is optional (a range/list to scope a cheap
+    test run; absent means the whole act).
+
+    Never writes to FalkorDB — same contract as every other adapter in this
+    module. Per-article fetch/parse failures are isolated (logged + skipped)
+    so one bad article never aborts the whole batch; a hard failure (no base
+    URN, tree fetch error, malformed source_ref) raises and fails the batch.
     """
 
+    def __init__(self, client: Optional[Any] = None):
+        self._client = client
+
+    def _get_client(self) -> Any:
+        return self._client if self._client is not None else get_visualex_client()
+
     async def parse(self, source_ref: str) -> dict[str, list]:
-        raise NotImplementedError(
-            "visualex_tree adapter not implemented yet (design doc §9 step 2)"
+        act_type, scope = _parse_visualex_source_ref(source_ref)
+        wanted = _expand_scope(scope)
+        client = self._get_client()
+
+        # 1. Resolve the act's base URN + default annex from a single
+        # minimal fetch_norma_data call (article "1" always exists for a
+        # consolidated code) — never call it once per article.
+        norma_list = await client.fetch_norma_data(act_type=act_type, article="1")
+        if not norma_list:
+            raise ValueError(
+                f"visualex_tree: fetch_norma_data returned no result for act_type={act_type!r}"
+            )
+        nv = norma_list[0]
+        act_base_url = nv.norma.url
+        if not act_base_url:
+            raise ValueError(f"visualex_tree: could not resolve base URN for act_type={act_type!r}")
+        allegato = nv.allegato
+        base_urn = f"{act_base_url}:{allegato}" if allegato else act_base_url
+
+        tipo_atto_reale = getattr(nv.norma, "tipo_atto_reale", None)
+        autorita_emanante = tipo_atto_reale.title() if tipo_atto_reale else None
+        abbrev = _code_abbreviation(act_type)
+
+        # 2. Full article list. `fetch_tree` is called on the BASE url (no
+        # annex) — that's the page that carries the complete navigable tree
+        # (dispositivo + every allegato), classifying each article via its
+        # own `allegato` field; this mirrors the existing "smart lookup" in
+        # `create_norma_visitata_from_data` (VisuaLex-side), which relies on
+        # the same base-url tree fetch to auto-detect annex membership.
+        tree = await client.fetch_tree(
+            urn=act_base_url, link=False, details=False, return_metadata=True
         )
+        if tree.error:
+            raise ValueError(f"visualex_tree: fetch_tree failed for {act_base_url!r}: {tree.error}")
+
+        target_allegato = str(allegato) if allegato is not None else None
+        numeri_in_scope: list[str] = []
+        seen_numeri: set[str] = set()
+        for art in tree.articles:
+            if not isinstance(art, dict):
+                continue  # defensive: tree endpoints may interleave section-header strings
+            raw_numero = art.get("numero")
+            if not raw_numero:
+                continue
+            art_allegato = art.get("allegato")
+            art_allegato = str(art_allegato) if art_allegato is not None else None
+            if art_allegato != target_allegato:
+                continue  # not part of the consolidated code itself (e.g. the enacting decree)
+            numero = _normalize_article_number(raw_numero)
+            if not _scope_includes(numero, wanted):
+                continue
+            if numero in seen_numeri:
+                continue
+            seen_numeri.add(numero)
+            numeri_in_scope.append(numero)
+
+        if not numeri_in_scope:
+            raise ValueError(
+                f"visualex_tree: no articles found for act_type={act_type!r} "
+                f"(annex={target_allegato!r}, scope={scope!r})"
+            )
+
+        # 3. Batch-fetch article text (chunked — never one request per
+        # article) and build Norma nodes + RINVIA edges.
+        nodes: list[dict[str, Any]] = []
+        edges: list[dict[str, Any]] = []
+        seen_edge_keys: set[tuple[str, str]] = set()
+        built = 0
+        failed: list[str] = []
+
+        for chunk in _chunked(numeri_in_scope, _FETCH_CHUNK_SIZE):
+            try:
+                results = await client.fetch_article_text(
+                    act_type=act_type, article=",".join(chunk), annex=target_allegato
+                )
+            except Exception as exc:  # noqa: BLE001 — one bad chunk must not abort the whole batch
+                log.warning(
+                    "visualex_tree.chunk_fetch_failed",
+                    act_type=act_type,
+                    chunk_size=len(chunk),
+                    error=str(exc),
+                )
+                failed.extend(chunk)
+                continue
+
+            by_numero = {r.norma_data.get("numero_articolo"): r for r in results if r.norma_data}
+            for numero in chunk:
+                result = by_numero.get(numero)
+                if result is None or result.error or not result.text:
+                    log.warning(
+                        "visualex_tree.article_fetch_failed",
+                        act_type=act_type,
+                        numero_articolo=numero,
+                        error=(result.error if result else "missing from response"),
+                    )
+                    failed.append(numero)
+                    continue
+
+                urn = _article_urn(base_urn, numero)
+                text = result.text
+                rubrica = _extract_rubrica(text)
+                estremi = f"Art. {numero} {abbrev}"
+                props: dict[str, Any] = {
+                    "URN": urn,
+                    "node_id": urn,
+                    "url": urn,
+                    "tipo_documento": "articolo",
+                    "estremi": estremi,
+                    "numero_articolo": numero,
+                    "rubrica": rubrica,
+                    "testo_vigente": text,
+                    "titolo": estremi,
+                    "fonte": "VisualexAPI",
+                    "vigenza": "vigente",
+                    "stato": "vigente",
+                    "efficacia": "permanente",
+                    "ambito_territoriale": "nazionale",
+                }
+                if autorita_emanante:
+                    props["autorita_emanante"] = autorita_emanante
+
+                nodes.append({"id": urn, "labels": ["Norma"], "properties": props})
+                built += 1
+
+                for citation in await client.extract_citations(text, context_act_type=act_type):
+                    cited_article = citation.get("article")
+                    cited_act_type = citation.get("act_type")
+                    if not cited_article or not cited_act_type:
+                        continue
+                    if cited_act_type.strip().lower() != act_type.strip().lower():
+                        # Cross-act citation: resolving its base URN would need
+                        # a network round-trip per citation. Out of scope for
+                        # this mechanical pass (skip, per design doc §8 — a
+                        # citation that doesn't resolve to a URN is dropped,
+                        # never turned into a stub node).
+                        continue
+                    target_numero = _normalize_article_number(cited_article)
+                    target_urn = _article_urn(base_urn, target_numero)
+                    if target_urn == urn:
+                        continue
+                    edge_key = (urn, target_urn)
+                    if edge_key in seen_edge_keys:
+                        continue
+                    seen_edge_keys.add(edge_key)
+                    edges.append(
+                        {"start": urn, "end": target_urn, "type": "RINVIA", "properties": {}}
+                    )
+
+        log.info(
+            "visualex_tree.parsed",
+            act_type=act_type,
+            nodes=len(nodes),
+            edges=len(edges),
+            articles_in_scope=len(numeri_in_scope),
+            articles_built=built,
+            articles_failed=len(failed),
+        )
+        return {"nodes": nodes, "edges": edges}
 
 
 def get_adapter(source: str) -> MechanicalSourceAdapter:

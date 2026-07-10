@@ -250,16 +250,9 @@ def test_get_adapter_returns_italia_corpus_adapter():
     assert isinstance(adapter, ItaliaCorpusAdapter)
 
 
-def test_get_adapter_visualex_tree_not_yet_implemented():
+def test_get_adapter_returns_visualex_tree_adapter():
     adapter = get_adapter("visualex_tree")
     assert isinstance(adapter, VisualexTreeAdapter)
-
-
-@pytest.mark.asyncio
-async def test_visualex_tree_adapter_raises_not_implemented():
-    adapter = get_adapter("visualex_tree")
-    with pytest.raises(NotImplementedError):
-        await adapter.parse("codice civile")
 
 
 def test_get_adapter_unknown_source_raises_value_error():
