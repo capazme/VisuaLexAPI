@@ -1,7 +1,7 @@
 import type { GraphData, NodeData, EdgeData } from '@antv/g6';
 import type { SubgraphResponse, GraphNode, GraphNodeData } from './types';
 import { deriveProvenance, readNodeTrust } from './types';
-import { nodeG6Type } from './graphStyles';
+import { nodeG6Type, humanizeEdgeType } from './graphStyles';
 
 export type GraphElements = Required<Pick<GraphData, 'nodes' | 'edges'>>;
 
@@ -54,7 +54,7 @@ export function transformSubgraphResponse(response: SubgraphResponse): GraphElem
       id,
       source: edge.source,
       target: edge.target,
-      data: { label: edge.type, type: edge.type },
+      data: { label: humanizeEdgeType(edge.type), type: edge.type },
     });
   }
 
@@ -103,7 +103,7 @@ export function mergeElements(
       id,
       source: edge.source,
       target: edge.target,
-      data: { label: edge.type, type: edge.type },
+      data: { label: humanizeEdgeType(edge.type), type: edge.type },
     });
   }
 

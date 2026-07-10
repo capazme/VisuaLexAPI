@@ -167,14 +167,14 @@ function Section({
           <button
             type="button"
             onClick={() => onSetAll(false)}
-            className="rounded px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-slate-800"
+            className="rounded px-1.5 py-0.5 text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800"
           >
             {allLabel}
           </button>
           <button
             type="button"
             onClick={() => onSetAll(true)}
-            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="rounded px-1.5 py-0.5 text-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800"
           >
             {noneLabel}
           </button>

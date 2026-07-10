@@ -10,6 +10,27 @@ export const CANON_LABEL: Record<string, string> = {
   combined: 'Combinato',
 };
 
+/**
+ * "Strumenti usati" chips (DeliberationColumn) printed the raw tool name
+ * verbatim (`graph_traversal`, `cerca_giurisprudenza`, …) — a human label per
+ * known tool, with a de-underscore + capitalize fallback for anything new.
+ */
+const TOOL_LABEL: Record<string, string> = {
+  graph_traversal: 'Traversata sul grafo',
+  cerca_giurisprudenza: 'Ricerca giurisprudenza',
+  cite_law: 'Testo di legge',
+  semantic_search: 'Ricerca semantica',
+  graph_search: 'Ricerca sul grafo',
+};
+
+/** Human label for a tool name, falling back to underscore→space + capitalized. */
+export function toolLabel(toolName: string): string {
+  const known = TOOL_LABEL[toolName];
+  if (known) return known;
+  const spaced = toolName.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 /** The codice civile's date+number marker (R.D. 16 marzo 1942, n. 262), independent of the act-type label used in the urn ("codice.civile:" vs "regio.decreto:"). */
 const CODICE_CIVILE_MARKER = '1942-03-16;262';
 

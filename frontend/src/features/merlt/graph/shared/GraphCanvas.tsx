@@ -1,6 +1,6 @@
 import { useEffect, useImperativeHandle, useRef } from 'react';
 import { Graph } from '@antv/g6';
-import type { NodeData, EdgeData, LayoutOptions, Point } from '@antv/g6';
+import type { NodeData, EdgeData, LayoutOptions, Point as G6Point } from '@antv/g6';
 import { nodeStyleMapper, edgeStyleMapper, incidentEdgeIds } from './graphStyles';
 import { canonRingPosition, isDeliberationElementId } from './graphDeliberation';
 
@@ -191,8 +191,8 @@ function layoutConfig(
 const SELECTION_ACCENT = '#f97316';
 
 const NODE_STATE = {
-  selected: { lineWidth: 3, stroke: SELECTION_ACCENT, fillOpacity: 0.4 },
-  active: { lineWidth: 3, fillOpacity: 0.3 },
+  selected: { lineWidth: 3, stroke: SELECTION_ACCENT, fillOpacity: 0.4, labelOpacity: 1 },
+  active: { lineWidth: 3, fillOpacity: 0.3, labelOpacity: 1 },
   inactive: { opacity: 0.18 },
 };
 const EDGE_STATE = {
@@ -438,7 +438,7 @@ function repositionCanonNodes(g: Graph, nodes: NodeData[], centerId: string | nu
     (n) => n.id != null && (n.data as { kind?: string } | undefined)?.kind === 'canon'
   );
   if (canonNodes.length === 0 || !centerId) return;
-  let centerPos: Point | undefined;
+  let centerPos: G6Point | undefined;
   try {
     centerPos = g.getElementPosition(centerId);
   } catch {
@@ -446,7 +446,7 @@ function repositionCanonNodes(g: Graph, nodes: NodeData[], centerId: string | nu
   }
   if (!centerPos) return;
   const [cx, cy] = centerPos;
-  const positions: Record<string, Point> = {};
+  const positions: Record<string, G6Point> = {};
   canonNodes.forEach((n, i) => {
     const canonKey = (n.data as { canon?: string } | undefined)?.canon ?? String(n.id);
     const pos = canonRingPosition(canonKey, { x: cx, y: cy }, i);
@@ -489,6 +489,12 @@ export default function GraphCanvas({
   // Latest render() promise — all imperative ops (visibility/state) chain on it
   // so they never run before the in-flight render resolves (G6 requirement).
   const renderRef = useRef<Promise<unknown>>(Promise.resolve());
+  // Audit item 5: label-pill theme (mirrors the DOM `.dark` class Layout.tsx
+  // toggles). Read once at construction time — the theme-observer effect below
+  // keeps it current and re-applies the mappers on every toggle.
+  const isDarkRef = useRef(
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  );
 
   // Keep handlers in refs so the once-attached listeners never go stale.
   const clickRef = useRef(onNodeClick);
@@ -517,8 +523,8 @@ export default function GraphCanvas({
       // blow past legibility (G6 default is [0.01, 10]).
       zoomRange: [0.15, 4],
       data: { nodes, edges },
-      node: { style: nodeStyleMapper, state: NODE_STATE },
-      edge: { type: 'quadratic', style: edgeStyleMapper, state: EDGE_STATE },
+      node: { style: (d: NodeData) => nodeStyleMapper(d, isDarkRef.current), state: NODE_STATE },
+      edge: { type: 'quadratic', style: (d: EdgeData) => edgeStyleMapper(d, isDarkRef.current), state: EDGE_STATE },
       layout: layoutConfig(layout, { focusNodeId: layoutFocusNodeId }),
       behaviors: [
         'zoom-canvas',
@@ -571,6 +577,38 @@ export default function GraphCanvas({
       graphRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Audit item 5 — theme observer: Layout.tsx toggles the `.dark` class on
+  // <html> (no React context reaches this canvas), so a MutationObserver on
+  // `document.documentElement` is the only signal available here. On a real
+  // toggle, re-bind the node/edge style mappers to the new theme and `draw()`
+  // (style-only repaint — no `render()`, so the layout/positions/zoom/pan the
+  // user built up are never disturbed).
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      const next = root.classList.contains('dark');
+      if (next === isDarkRef.current) return;
+      isDarkRef.current = next;
+      const g = graphRef.current;
+      if (!g) return;
+      void renderRef.current
+        .then(() => {
+          if (graphRef.current !== g) return;
+          g.setNode({ style: (d: NodeData) => nodeStyleMapper(d, isDarkRef.current), state: NODE_STATE });
+          g.setEdge({
+            type: 'quadratic',
+            style: (d: EdgeData) => edgeStyleMapper(d, isDarkRef.current),
+            state: EDGE_STATE,
+          });
+          return g.draw();
+        })
+        .catch(() => {});
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
   }, []);
 
   // Data OR filter change. Relayout only when the node/edge set actually changed;

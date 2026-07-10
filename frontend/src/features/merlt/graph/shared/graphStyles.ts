@@ -81,12 +81,25 @@ const DEFAULT_NODE_COLOR = '#94a3b8';
 const DEFAULT_EDGE_COLOR = '#cbd5e1';
 
 /**
+ * Audit item 5 — label-pill theme awareness. The canvas background switches
+ * `bg-white` / `dark:bg-slate-900` (GraphCanvas), but label pills were a
+ * hard-coded white sticker regardless of theme. Callers thread `isDark`
+ * (mirrored from the DOM `.dark` class — see GraphCanvas's theme observer) so
+ * the pill + its default text resolve to a dark-slate/light-slate pairing
+ * that matches the surrounding canvas instead of floating as a white box.
+ */
+function labelPillFill(isDark: boolean): string {
+  return isDark ? '#1e293b' : '#ffffff';
+}
+
+/**
  * Radial-replay walk-mode sizing (GraphTraversalPlayer / graphTraversalElements —
  * gated on `data.walkNode`, so the main subgraph canvas is never affected).
- * Fixed dark ring for the seed anchor — distinct from every type hue so the
- * origin of the walk reads unambiguously regardless of its semantic type.
+ * Fixed amber ring for the seed anchor — distinct from every type hue AND high
+ * contrast against both canvas backgrounds (bg-white / dark:bg-slate-900), so
+ * the origin of the walk reads unambiguously regardless of theme or semantic type.
  */
-const SEED_RING_COLOR = '#0f172a';
+const SEED_RING_COLOR = '#f59e0b';
 const WALK_LEAF_SIZE = 20;
 const WALK_LARGE_TYPES = new Set(['Norma', 'Comma', 'AttoGiudiziario', 'Caso']);
 const WALK_MEDIUM_TYPES = new Set(['PrincipioGiuridico', 'DefinizioneLegale']);
@@ -147,15 +160,51 @@ export function nodeG6Type(semanticType: string | undefined): G6NodeShape {
 }
 
 /**
+ * Human-readable Italian label for the ~15 known relation types (audit item
+ * 8) — nodes already render human labels, edges rendered the raw
+ * ALL_CAPS_SNAKE_CASE (or lowercase) type verbatim. Unknown types fall back to
+ * underscore→space + sentence case so nothing renders as raw SNAKE_CASE.
+ */
+const EDGE_TYPE_LABEL: Record<string, string> = {
+  DISCIPLINA: 'Disciplina',
+  interpreta: 'Interpreta',
+  APPLICA_A: 'Si applica a',
+  contiene: 'Contiene',
+  IMPONE: 'Impone',
+  commenta: 'Commenta',
+  ESPRIME_PRINCIPIO: 'Esprime principio',
+  ATTRIBUISCE_RESPONSABILITA: 'Attribuisce responsabilità',
+  PREVEDE: 'Prevede',
+  DEFINISCE: 'Definisce',
+  STABILISCE_TERMINE: 'Stabilisce termine',
+  PREVEDE_SANZIONE: 'Prevede sanzione',
+  modifica: 'Modifica',
+  abroga: 'Abroga',
+  inserisce: 'Inserisce',
+};
+
+/** Humanize a raw relation type into an Italian sentence-case label. */
+export function humanizeEdgeType(type: string | undefined | null): string {
+  if (!type) return '';
+  const known = EDGE_TYPE_LABEL[type];
+  if (known) return known;
+  const spaced = type.replace(/_/g, ' ').toLowerCase();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
  * Slice 4 P2a — canon-node styling. A synthetic canon node (`data.kind:'canon'`)
  * carries its own colour + routing weight; size/opacity scale with the weight so
  * a consulted canon reads bold and a not-consulted one stays a dim hint.
  */
-function canonNodeStyle(data: {
-  label?: string;
-  color?: string;
-  weight?: number;
-}): Record<string, unknown> {
+function canonNodeStyle(
+  data: {
+    label?: string;
+    color?: string;
+    weight?: number;
+  },
+  isDark: boolean
+): Record<string, unknown> {
   const color = data.color ?? '#475569';
   const w = typeof data.weight === 'number' ? Math.max(0, Math.min(1, data.weight)) : 0;
   const size = 26 + Math.round(28 * w); // 26px (dim) → 54px (dominant canon)
@@ -178,16 +227,24 @@ function canonNodeStyle(data: {
     labelFontSize: 12,
     labelFontWeight: 700,
     labelPlacement: 'bottom',
+    labelMaxWidth: 130,
+    labelWordWrap: true,
+    labelMaxLines: 2,
     labelBackground: true,
-    labelBackgroundFill: '#ffffff',
+    labelBackgroundFill: labelPillFill(isDark),
     labelBackgroundOpacity: 0.85,
     labelBackgroundRadius: 3,
     labelPadding: [1, 4],
   };
 }
 
-/** G6 node style mapper — reads the semantic type/label from `datum.data`. */
-export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
+/**
+ * G6 node style mapper — reads the semantic type/label from `datum.data`.
+ * `isDark` (default `false`) drives the label-pill theme (audit item 5) —
+ * GraphCanvas re-binds this with the live theme and re-applies it via
+ * `graph.setNode()` + `graph.draw()` on every theme toggle.
+ */
+export function nodeStyleMapper(datum: NodeData, isDark = false): Record<string, unknown> {
   const data = (datum.data ?? {}) as {
     kind?: string;
     type?: string;
@@ -200,7 +257,7 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     walkNode?: boolean;
     walkLeaf?: boolean;
   };
-  if (data.kind === 'canon') return canonNodeStyle(data);
+  if (data.kind === 'canon') return canonNodeStyle(data, isDark);
   const color = (data.type && NODE_TYPE_STYLE[data.type]?.color) || DEFAULT_NODE_COLOR;
   const prov = data.provenance ? PROVENANCE_STYLE[data.provenance] : undefined;
   // Trust nudges fill saturation so a solid seed reads denser than a faint
@@ -223,7 +280,7 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     size: 30,
     radius: 6,
     labelText: data.label ?? '',
-    labelFill: '#0f172a',
+    labelFill: isDark ? '#f1f5f9' : '#0f172a',
     labelFontSize: 10,
     labelFontWeight: 500,
     labelPlacement: 'bottom',
@@ -231,7 +288,7 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     labelWordWrap: true,
     labelMaxLines: 2,
     labelBackground: true,
-    labelBackgroundFill: '#ffffff',
+    labelBackgroundFill: labelPillFill(isDark),
     labelBackgroundOpacity: 0.72,
     labelBackgroundRadius: 3,
     labelPadding: [1, 3],
@@ -250,9 +307,10 @@ export function nodeStyleMapper(datum: NodeData): Record<string, unknown> {
     stroke: isSeed ? SEED_RING_COLOR : base.stroke,
     lineWidth: isSeed ? 3 : base.lineWidth,
     size: walkNodeSize(data.type, isSeed, isLeaf),
-    // Leaves (the dense outer fan) lose their persistent label — the seed and
-    // every other walk node keep the full label as before.
-    ...(isLeaf ? { labelText: '', labelOpacity: 0, labelMaxLines: 1 } : {}),
+    // Leaves (the dense outer fan) hide their label by default — the text
+    // stays set (not cleared) so NODE_STATE.active/selected in GraphCanvas can
+    // raise labelOpacity back to 1 on hover, revealing it on demand.
+    ...(isLeaf ? { labelOpacity: 0, labelMaxLines: 1 } : {}),
   };
 }
 
@@ -267,11 +325,14 @@ export const DEVILS_ADVOCATE_ARC_COLOR = '#7c3aed';
  * violet with a tighter dash so a deliberate challenge reads apart from an
  * organic split.
  */
-function contrastEdgeStyle(data: {
-  conflictScore?: number;
-  devilsAdvocate?: boolean;
-  label?: string;
-}): Record<string, unknown> {
+function contrastEdgeStyle(
+  data: {
+    conflictScore?: number;
+    devilsAdvocate?: boolean;
+    label?: string;
+  },
+  isDark: boolean
+): Record<string, unknown> {
   const score = typeof data.conflictScore === 'number' ? Math.max(0, Math.min(1, data.conflictScore)) : 0;
   const devil = data.devilsAdvocate === true;
   const color = devil ? DEVILS_ADVOCATE_ARC_COLOR : CONTRAST_ARC_COLOR;
@@ -293,14 +354,17 @@ function contrastEdgeStyle(data: {
     labelFontSize: 9,
     labelFill: color,
     labelBackground: true,
-    labelBackgroundFill: '#ffffff',
+    labelBackgroundFill: labelPillFill(isDark),
     labelBackgroundOpacity: 0.9,
     labelBackgroundRadius: 2,
   };
 }
 
-/** G6 edge style mapper — reads the relation type/label from `datum.data`. */
-export function edgeStyleMapper(datum: EdgeData): Record<string, unknown> {
+/**
+ * G6 edge style mapper — reads the relation type/label from `datum.data`.
+ * `isDark` (default `false`) mirrors `nodeStyleMapper`'s theme param.
+ */
+export function edgeStyleMapper(datum: EdgeData, isDark = false): Record<string, unknown> {
   const data = (datum.data ?? {}) as {
     kind?: string;
     type?: string;
@@ -308,7 +372,7 @@ export function edgeStyleMapper(datum: EdgeData): Record<string, unknown> {
     conflictScore?: number;
     devilsAdvocate?: boolean;
   };
-  if (data.kind === 'contrast') return contrastEdgeStyle(data);
+  if (data.kind === 'contrast') return contrastEdgeStyle(data, isDark);
   if (data.kind === 'canon-anchor') {
     // Structural tether canon→center: faint, arrow-less, unlabeled; it only
     // guides the layout, never a relation the jurist inspects.

@@ -201,9 +201,16 @@ export function QaTurn({
             )}
 
             {/* Confidence */}
-            <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+            <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span>confidenza {confidenceLabel(a.confidence)}</span>
-              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <span
+                role="meter"
+                aria-label="Livello di confidenza"
+                aria-valuenow={Math.round(a.confidence * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+              >
                 <span
                   className={cn(
                     'block h-full rounded-full',
@@ -212,7 +219,7 @@ export function QaTurn({
                   style={{ width: `${Math.round(a.confidence * 100)}%` }}
                 />
               </span>
-              <span className="text-slate-400">{a.confidence.toFixed(2)}</span>
+              <span className="text-slate-400 dark:text-slate-500">{a.confidence.toFixed(2)}</span>
             </div>
 
             {/* Sources always visible (§3.5, "non-negotiable"): rendered directly

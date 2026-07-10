@@ -20,18 +20,21 @@ export function BreadcrumbHistory({ entries, onNavigate }: BreadcrumbHistoryProp
         return (
           <span key={`${entry.urn}-${i}`} className="flex items-center gap-1">
             {i > 0 && <ChevronRight className="h-3 w-3 text-slate-300" />}
-            <button
-              type="button"
-              onClick={() => onNavigate(entry.urn)}
-              aria-current={isCurrent ? 'page' : undefined}
-              className={
-                isCurrent
-                  ? 'max-w-[160px] truncate font-medium text-slate-700 dark:text-slate-200'
-                  : 'max-w-[140px] truncate text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500'
-              }
-            >
-              {entry.label}
-            </button>
+            {isCurrent ? (
+              // Truly inert — the current center isn't a navigation target, so
+              // it renders as plain text (not a dead, unfocusable-looking button).
+              <span aria-current="page" className="max-w-[160px] truncate font-medium text-slate-700 dark:text-slate-200">
+                {entry.label}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onNavigate(entry.urn)}
+                className="max-w-[140px] truncate text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {entry.label}
+              </button>
+            )}
           </span>
         );
       })}

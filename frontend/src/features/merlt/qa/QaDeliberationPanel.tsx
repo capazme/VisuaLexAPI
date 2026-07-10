@@ -51,7 +51,7 @@ export function QaDeliberationPanel({ answer, onDetailed, canContribute }: QaDel
 
   return (
     <details className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 dark:text-slate-300">
+      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-300">
         Come ci sono arrivato
       </summary>
       <div className="space-y-4 border-t border-slate-200 p-3 dark:border-slate-700">
@@ -100,7 +100,8 @@ export function QaDeliberationPanel({ answer, onDetailed, canContribute }: QaDel
                   type="button"
                   disabled={!allGraded}
                   onClick={submitDetailed}
-                  className="mt-1 text-sm font-medium text-primary-600 disabled:text-slate-300 dark:text-primary-400"
+                  title={allGraded ? undefined : 'Valuta tutte e tre le dimensioni'}
+                  className="mt-1 text-sm font-medium text-primary-600 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-primary-400 dark:disabled:text-slate-600"
                 >
                   Invia valutazione
                 </button>

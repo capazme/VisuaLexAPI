@@ -189,7 +189,7 @@ export function NodeDetailsDrawer({
         <button
           type="button"
           onClick={() => onRecenter(node)}
-          className="flex flex-1 items-center justify-center gap-2 rounded bg-primary-600 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="flex flex-1 items-center justify-center gap-2 rounded bg-primary-600 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
         >
           <Crosshair className="h-4 w-4" />
           Centra qui
@@ -255,7 +255,7 @@ function RelationGroup({
                 type="button"
                 disabled={!other}
                 onClick={() => other && onRecenter(other)}
-                className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-slate-800"
+                className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-default disabled:opacity-50 disabled:text-slate-400 disabled:hover:bg-transparent dark:hover:bg-slate-800"
               >
                 <span className="truncate text-slate-700 dark:text-slate-200">{other?.label ?? otherId}</span>
                 <span className="shrink-0 text-[10px] text-slate-400">{e.type}</span>

@@ -83,6 +83,15 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, []);
 
+  // Keyboard nav (arrow keys) moves `highlighted` without scrolling the list —
+  // keep the active option in view, mirroring native combobox behaviour.
+  useEffect(() => {
+    if (highlighted < 0) return;
+    const el = document.getElementById(`graph-opt-${highlighted}`);
+    // jsdom (tests) doesn't implement scrollIntoView — guard defensively.
+    el?.scrollIntoView?.({ block: 'nearest' });
+  }, [highlighted]);
+
   const results = state.phase === 'success' ? state.items : [];
 
   const choose = (item: GraphSearchItem): void => {
@@ -121,6 +130,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
           aria-expanded={open}
           aria-controls="graph-search-listbox"
           aria-autocomplete="list"
+          aria-activedescendant={highlighted >= 0 ? `graph-opt-${highlighted}` : undefined}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
@@ -147,6 +157,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
           {results.map((item, i) => (
             <li
               key={item.id}
+              id={`graph-opt-${i}`}
               role="option"
               aria-selected={i === highlighted}
               onMouseEnter={() => setHighlighted(i)}

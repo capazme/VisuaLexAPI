@@ -19,6 +19,12 @@ import { nextGraphLimit } from '../shared/graphApi';
  * Positions itself bottom-center of the canvas (the bottom corners are taken
  * by the "Evidenza fonti" chip and "Adatta alla vista"). Renders null when the
  * subgraph is not truncated, so the page can mount it unconditionally.
+ *
+ * Below `md` (768px) the docked deliberation column becomes
+ * {@link MobileDeliberationSheet}'s fixed bottom-center "Dibattito" pill — same
+ * horizontal anchor, so the chip is raised (`bottom-16`) to sit above it
+ * instead of visually stacking; `md:bottom-3` restores the original position
+ * once the pill no longer renders.
  */
 export interface GraphTruncationChipProps {
   /** Current subgraph payload (undefined outside the data-bearing states). */
@@ -53,7 +59,7 @@ export function GraphTruncationChip({
   return (
     <div
       role="status"
-      className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300"
+      className="absolute bottom-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-1 rounded-full border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300 md:bottom-3"
     >
       <Scissors size={12} aria-hidden="true" className="shrink-0" />
       <span>

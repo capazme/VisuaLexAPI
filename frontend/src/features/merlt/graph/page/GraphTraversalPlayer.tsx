@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ChevronLeft, ChevronRight, Pause, Play, Route, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { graphTraversalToElements } from '../shared/graphTraversalElements';
+import { humanizeEdgeType } from '../shared/graphStyles';
 import type { GraphCanvasHandle } from '../shared/GraphCanvas';
 import type { GraphTraversalEdge } from '../../qa/types';
 import { formatRetrievedUrn } from '../../qa/format';
@@ -105,7 +106,7 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
           region; the sequencer sits ON TOP, bottom-anchored, so it never
           shrinks the graph). */}
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-3">
-        <div className="pointer-events-auto flex max-w-full flex-col items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-4 py-2.5 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+        <div className="pointer-events-auto flex max-w-full flex-col items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
           <p className="max-w-xl truncate text-xs text-slate-500 dark:text-slate-400">
             <Route size={12} className="mr-1 inline-block shrink-0 text-primary-600" aria-hidden="true" />
             passo {stepIndex + 1}/{total}
@@ -116,7 +117,9 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
                   {formatRetrievedUrn(current.sourceId)}
                 </span>
                 {' —['}
-                <span className="text-primary-600 dark:text-primary-400">{current.relationType}</span>
+                <span className="text-primary-600 dark:text-primary-400">
+                  {humanizeEdgeType(current.relationType)}
+                </span>
                 {']→ '}
                 <span className="font-medium text-slate-700 dark:text-slate-200">
                   {formatRetrievedUrn(current.targetId)}
@@ -140,7 +143,13 @@ export function GraphTraversalPlayer({ walk, onClose }: GraphTraversalPlayerProp
               onClick={() => setPlaying((p) => !p)}
               disabled={atLastStep && !playing}
               aria-label={playing && !atLastStep ? 'Pausa' : 'Riproduci'}
-              title={playing && !atLastStep ? 'Pausa' : 'Riproduci'}
+              title={
+                atLastStep && !playing
+                  ? 'Replay concluso — usa ← per rivedere'
+                  : playing
+                    ? 'Pausa'
+                    : 'Riproduci'
+              }
               className={cn(
                 'rounded-md border p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-40',
                 playing && !atLastStep

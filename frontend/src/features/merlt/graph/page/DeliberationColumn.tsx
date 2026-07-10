@@ -10,7 +10,7 @@ import { EdgeDetailsDrawer } from './EdgeDetailsDrawer';
 import { QaHistoryPanel } from '../../qa/QaHistoryPanel';
 import { QaSynthesisWithCitations } from '../../ner/QaSynthesisWithCitations';
 import { normRefToSearchParams } from '../../validate/provenance';
-import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind } from '../../qa/format';
+import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind, toolLabel } from '../../qa/format';
 import type {
   ConfirmState,
   GraphTraversalEdge,
@@ -24,6 +24,7 @@ import type {
   QaTurnModel,
 } from '../../qa/types';
 import { CANON_STYLE } from '../shared/graphDeliberation';
+import { humanizeEdgeType } from '../shared/graphStyles';
 import { sourceMatchesNode } from './sourceGraphLink';
 import type {
   ExpertContribution,
@@ -850,7 +851,7 @@ function DeliberationTurn({
       </div>
 
       {turn.state.status === 'loading' && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-2">
             <Loader2 className="animate-spin" size={15} /> Il collegio sta deliberando…
           </span>
@@ -952,9 +953,16 @@ function DeliberationTurn({
                 <DissentBanner disagreement={a.disagreement_analysis} explanation={a.disagreement_explanation} />
               )}
 
-              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+              <div className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span>confidenza {confidenceLabel(a.confidence)}</span>
-                <span className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <span
+                  role="meter"
+                  aria-label="Livello di confidenza"
+                  aria-valuenow={Math.round(a.confidence * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+                >
                   <span
                     className={cn(
                       'block h-full rounded-full',
@@ -963,6 +971,7 @@ function DeliberationTurn({
                     style={{ width: `${Math.round(a.confidence * 100)}%` }}
                   />
                 </span>
+                <span className="text-slate-400 dark:text-slate-500">{a.confidence.toFixed(2)}</span>
               </div>
 
               {hasSources && (
@@ -1054,7 +1063,7 @@ function DissentBanner({
       </div>
       {explanation && (
         <details className="mt-1.5">
-          <summary className="cursor-pointer select-none text-xs font-medium text-amber-700 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-200">
+          <summary className="cursor-pointer select-none text-xs font-medium text-amber-700 hover:text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-amber-400 dark:hover:text-amber-200">
             Perché il collegio dissente
           </summary>
           <p className="mt-1 whitespace-pre-wrap text-xs text-amber-800 dark:text-amber-300">{explanation}</p>
@@ -1097,10 +1106,11 @@ function GraphTraversalControl({
         onClick={() => onFollowReasoning?.(walk)}
         disabled={!hasWalk}
         title={hasWalk ? undefined : 'Nessuna traversata sul grafo per questa risposta'}
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:border-slate-700 dark:disabled:bg-slate-800/40 dark:disabled:text-slate-500 dark:disabled:hover:bg-slate-800/40"
       >
         <Route size={13} className="shrink-0" aria-hidden="true" />
         Segui il ragionamento sul grafo
+        {!hasWalk && <span className="text-[11px] font-normal italic">(nessun cammino)</span>}
       </button>
     </div>
   );
@@ -1138,7 +1148,7 @@ function ReasoningTraceDisclosure({
 
   return (
     <details className="mt-3 rounded-lg border border-slate-200 dark:border-slate-700">
-      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-slate-200">
         Come ha ragionato
       </summary>
       <div className="space-y-3 border-t border-slate-200 p-3 text-xs dark:border-slate-700">
@@ -1269,7 +1279,12 @@ function ToolUsagesSection({ toolUsages }: { toolUsages: QaToolUsage[] }): React
                     : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
                 )}
               >
-                {u.toolName}
+                {u.success ? (
+                  <Check size={10} className="shrink-0" aria-hidden="true" />
+                ) : (
+                  <X size={10} className="shrink-0" aria-hidden="true" />
+                )}
+                {toolLabel(u.toolName)}
                 {u.success && u.resultCount !== null && <span className="text-emerald-500 dark:text-emerald-400">· {u.resultCount}</span>}
               </span>
             ))}
@@ -1458,7 +1473,8 @@ function TurnFeedback({
                   type="button"
                   disabled={!allGraded}
                   onClick={submitDetailed}
-                  className="text-xs font-medium text-primary-600 disabled:text-slate-300 dark:text-primary-400"
+                  title={allGraded ? undefined : 'Valuta tutte e tre le dimensioni'}
+                  className="text-xs font-medium text-primary-600 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-primary-400 dark:disabled:text-slate-600"
                 >
                   Invia valutazione
                 </button>
@@ -1739,7 +1755,7 @@ function RelationSteer({
     return (
       <p className="flex shrink-0 items-center gap-1.5 border-t border-slate-200 px-3 py-2.5 text-xs text-emerald-600 dark:border-slate-800 dark:text-emerald-400">
         <Check size={13} className="shrink-0" aria-hidden="true" />
-        Terrò conto: privilegerò «{relationType}».
+        Terrò conto: privilegerò «{humanizeEdgeType(relationType)}».
       </p>
     );
   }
@@ -1752,7 +1768,7 @@ function RelationSteer({
       <button
         type="button"
         onClick={onPrefer}
-        title={`Indica al collegio di privilegiare la relazione ${relationType} nell'esplorazione del grafo`}
+        title={`Indica al collegio di privilegiare la relazione ${humanizeEdgeType(relationType)} nell'esplorazione del grafo`}
         className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
       >
         <Route size={13} className="shrink-0" aria-hidden="true" />
@@ -1862,7 +1878,7 @@ function DeliberationSourceChip({
         <Info size={13} className="mt-0.5 shrink-0 text-slate-300 dark:text-slate-600" aria-hidden="true" />
       </button>
       {(onRate || confirmable || showOpen) && (
-        <div className="flex items-center gap-1 border-t border-slate-100 px-3 py-1 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-1 gap-y-1 border-t border-slate-100 px-3 py-1 dark:border-slate-800">
           {normParams && (
             <button
               type="button"

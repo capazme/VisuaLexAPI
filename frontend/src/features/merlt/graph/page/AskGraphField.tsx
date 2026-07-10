@@ -147,7 +147,7 @@ export function AskGraphField({
           disabled={!value.trim() || busy}
           aria-label="Chiedi al grafo"
           title={busy ? 'Attendi la deliberazione in corso…' : undefined}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:disabled:bg-slate-700"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:disabled:bg-slate-700 dark:focus-visible:ring-offset-slate-900"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Chiedi
         </button>

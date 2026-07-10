@@ -1,5 +1,5 @@
 import { ArrowRight, Crosshair, X } from 'lucide-react';
-import { EDGE_TYPE_STYLE } from '../shared/graphStyles';
+import { EDGE_TYPE_STYLE, humanizeEdgeType } from '../shared/graphStyles';
 import type { GraphEdge, GraphNode } from '../shared/types';
 
 export interface EdgeDetailsDrawerProps {
@@ -69,7 +69,7 @@ export function EdgeDetailsDrawer({
             style={{ backgroundColor: `${typeColor}22` }}
           >
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: typeColor }} />
-            {edge.type}
+            {humanizeEdgeType(edge.type)}
           </span>
         </div>
         <button
@@ -163,7 +163,7 @@ function EndpointButton({
       type="button"
       onClick={() => onRecenter(node)}
       title={`Centra su ${node.label}`}
-      className="flex min-w-0 flex-1 items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-slate-700 hover:bg-white dark:text-slate-200 dark:hover:bg-slate-900/60"
+      className="flex min-w-0 flex-1 items-center gap-1 rounded px-1.5 py-1 text-left text-xs text-slate-700 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-900/60"
     >
       <Crosshair className="h-3 w-3 shrink-0 text-slate-400" />
       <span className="truncate">{node.label}</span>

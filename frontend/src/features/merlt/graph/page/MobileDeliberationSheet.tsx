@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MessageSquare, X } from 'lucide-react';
 
@@ -33,6 +33,7 @@ export function MobileDeliberationSheet({
   children,
 }: MobileDeliberationSheetProps): React.ReactElement | null {
   const [open, setOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   // Derived during render (react-hooks/set-state-in-effect): when the settled
   // count grows while the sheet is closed, light the pill badge. Same tracker
   // pattern as the page's dibattitoBadge.
@@ -51,6 +52,14 @@ export function MobileDeliberationSheet({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
+  // Basic focus-move-into-dialog (a11y): the "Chiudi" button is the first
+  // interactive element, so it doubles as the sheet's initial focus target —
+  // not a full focus trap, but keyboard users landing on Escape/Tab start
+  // inside the dialog instead of wherever the trigger click left focus.
+  useEffect(() => {
+    if (open) closeButtonRef.current?.focus();
   }, [open]);
 
   const handleOpen = (): void => {
@@ -79,6 +88,7 @@ export function MobileDeliberationSheet({
           <div className="relative flex shrink-0 items-center justify-center px-3 pt-2 pb-1">
             <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden="true" />
             <button
+              ref={closeButtonRef}
               type="button"
               aria-label="Chiudi"
               onClick={() => setOpen(false)}

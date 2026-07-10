@@ -39,7 +39,9 @@ describe('transformSubgraphResponse (G6 GraphData)', () => {
 
     expect(out.edges).toHaveLength(1);
     expect(out.edges[0]).toMatchObject({ id: 'e1', source: 'a', target: 'b' });
-    expect(out.edges[0].data).toMatchObject({ type: 'ESPRIME_PRINCIPIO', label: 'ESPRIME_PRINCIPIO' });
+    // Audit item 8: the label is humanized for display (canvas + walk caption);
+    // `type` stays the raw wire value for style lookups (EDGE_TYPE_STYLE, etc).
+    expect(out.edges[0].data).toMatchObject({ type: 'ESPRIME_PRINCIPIO', label: 'Esprime principio' });
   });
 
   it('drops edges whose source or target node is absent', () => {

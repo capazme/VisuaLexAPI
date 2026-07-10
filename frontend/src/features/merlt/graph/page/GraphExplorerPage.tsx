@@ -1016,7 +1016,7 @@ export function GraphExplorerPage(): React.ReactElement {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
-      <header className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
+      <header className="flex flex-col flex-wrap gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
           <Network className="h-5 w-5 text-primary-600" />
           <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Grafo giuridico</h1>
@@ -1150,7 +1150,7 @@ export function GraphExplorerPage(): React.ReactElement {
                 <button
                   type="button"
                   onClick={graph.refetch}
-                  className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
                   Riprova
                 </button>
@@ -1540,7 +1540,7 @@ function IngestionErrorState({
       <button
         type="button"
         onClick={onRetry}
-        className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
         Riprova
       </button>
@@ -1565,7 +1565,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }): React.ReactElement {
       <button
         type="button"
         onClick={onRetry}
-        className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
         Riprova
       </button>
