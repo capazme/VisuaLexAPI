@@ -4,6 +4,7 @@ import eventsRouter from './events';
 import graphRouter from './graph';
 import contribRouter from './contrib';
 import validateRouter from './validate';
+import ingestionRouter from './ingestion';
 import opsRouter from './ops';
 import expertsRouter from './experts';
 import nerRouter from './ner';
@@ -23,6 +24,11 @@ import profileRouter from './profile';
  *  - /graph/article/:urn, /graph/ingest, /graph/jobs/:jobId/status (auth)
  *  - /internal/job-callback (internalAuth, NO JWT)
  *
+ * Phase 2 endpoints (ingestionRouter): VisuaLex user knowledge → MERL-T
+ * ExternalIngestionPipeline.
+ *  - /ingestion/preview, /ingestion/process, /ingestion/validate (auth + contributionGuard)
+ *  - /ingestion/pending (auth only, read)
+ *
  * graphRouter MUST be registered BEFORE every router that applies a pathless
  * `router.use(authenticate)` (consent, profile, events all do). A sub-router
  * mounted on '/' runs its pathless middleware for ANY request flowing through
@@ -39,6 +45,7 @@ router.use('/', healthRouter);
 router.use('/', graphRouter);
 router.use('/', contribRouter);
 router.use('/', validateRouter);
+router.use('/', ingestionRouter);
 router.use('/', opsRouter);
 // Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the
 // catch-all auth routers (gotcha #1).
