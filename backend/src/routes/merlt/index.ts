@@ -6,6 +6,7 @@ import contribRouter from './contrib';
 import validateRouter from './validate';
 import ingestionRouter from './ingestion';
 import opsRouter from './ops';
+import opsIngestionRouter from './opsIngestion';
 import expertsRouter from './experts';
 import nerRouter from './ner';
 import healthRouter from './health';
@@ -29,6 +30,12 @@ import profileRouter from './profile';
  *  - /ingestion/preview, /ingestion/process, /ingestion/validate (auth + contributionGuard)
  *  - /ingestion/pending (auth only, read)
  *
+ * Admin mechanical ingestion endpoints (opsIngestionRouter) — deterministic,
+ * zero-LLM corpus→graph batches, admin-reviewed before promotion. NOT the
+ * same pipeline as ingestionRouter above (that one is community/interpretive).
+ *  - /ops/ingestion/run, /ops/ingestion/batches[/:batchId][/promote|/reject]
+ *    (auth + requireAdmin)
+ *
  * graphRouter MUST be registered BEFORE every router that applies a pathless
  * `router.use(authenticate)` (consent, profile, events all do). A sub-router
  * mounted on '/' runs its pathless middleware for ANY request flowing through
@@ -47,6 +54,7 @@ router.use('/', contribRouter);
 router.use('/', validateRouter);
 router.use('/', ingestionRouter);
 router.use('/', opsRouter);
+router.use('/', opsIngestionRouter);
 // Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the
 // catch-all auth routers (gotcha #1).
 router.use('/', expertsRouter);
