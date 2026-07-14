@@ -10,6 +10,8 @@ import type { AdminUserResponse } from '../types/api';
 import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminSharedEnvironment } from '../services/adminService';
 import type { SharedEnvironmentReport, ReportStatus } from '../types';
 import { getErrorMessage } from '../utils/errors';
+import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
+import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAdminPanel';
 import {
   Users,
   UserPlus,
@@ -37,14 +39,16 @@ import {
   Download,
   Heart,
   Flag,
+  Database,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type AdminTab = 'users' | 'feedback' | 'environments' | 'reports';
+type AdminTab = 'users' | 'feedback' | 'environments' | 'reports' | 'ingestion';
 
 export function AdminPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { opsVisible } = useMerltFeatures();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -450,6 +454,20 @@ export function AdminPage() {
                   <Flag size={16} />
                   Segnalazioni
                 </button>
+                {opsVisible && (
+                  <button
+                    onClick={() => setActiveTab('ingestion')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                      activeTab === 'ingestion'
+                        ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    )}
+                  >
+                    <Database size={16} />
+                    Ingestione
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 relative z-50">
@@ -1136,6 +1154,9 @@ export function AdminPage() {
             </div>
           </>
         )}
+
+        {/* ==================== INGESTION TAB ==================== */}
+        {activeTab === 'ingestion' && opsVisible && <IngestionAdminPanel />}
       </main>
 
       {/* Create User Modal */}
