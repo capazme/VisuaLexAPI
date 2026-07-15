@@ -622,6 +622,11 @@ export function GraphExplorerPage(): React.ReactElement {
     [deliberation],
   );
   const devilsAdvocateActive = deliberation.devils_advocate_flag?.active === true;
+  // Scope the badge/arc marker to the specific canon MERL-T names (Slice 4
+  // gap-closure — the flag now carries `expert`); undefined falls back to the
+  // pre-attribution global marker in both buildDeliberationOverlay and
+  // resolveEdgeSelection.
+  const devilsAdvocateExpert = deliberation.devils_advocate_flag?.expert ?? null;
 
   // Join retrieved_sources to canvas node ids: a source lands on the graph iff its
   // node_id (preferred) OR urn matches a node id/urn currently rendered. Uses the
@@ -692,9 +697,10 @@ export function GraphExplorerPage(): React.ReactElement {
       contributions: expertContributions,
       conflicts,
       devilsAdvocateActive,
+      devilsAdvocateExpert,
       centerNodeId,
     });
-  }, [expertContributions, conflicts, devilsAdvocateActive, centerNodeId, scopeMatches]);
+  }, [expertContributions, conflicts, devilsAdvocateActive, devilsAdvocateExpert, centerNodeId, scopeMatches]);
 
   // Canvas elements = real subgraph + expansion delta + overlay. The export
   // slice reads the RAW graph.data, so synthetic overlay elements never pollute
@@ -838,6 +844,7 @@ export function GraphExplorerPage(): React.ReactElement {
       edgesById,
       conflicts,
       devilsAdvocateActive,
+      devilsAdvocateExpert,
       canonLabel: (key) => CANON_LABEL[key] ?? key,
     });
     if (!selection) return;

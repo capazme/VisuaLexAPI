@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from merlt.rlcf.ai_service import OpenRouterService
     from merlt.pipeline.enrichment.models import EnrichmentContent
 
+from merlt.pipeline.enrichment.models import RelationType
+
 logger = logging.getLogger(__name__)
 
 # Allowed relation types for free-text notes (a conservative, legal-domain set).
@@ -44,6 +46,42 @@ ALLOWED_RELATION_TYPES = {
     "CORRELATO_A",
 }
 _DEFAULT_RELATION_TYPE = "CORRELATO_A"
+
+# The 9 free-text relation types above are the extractor's own conservative
+# vocabulary; they do NOT line up with `RelationType` (the 65-value canonical
+# enum in merlt.pipeline.enrichment.models, validated by the propose-relation
+# endpoint via pydantic — api/models/enrichment_models.py's
+# `RelationProposalRequest.tipo_relazione: RelationType`). Only DEFINISCE,
+# PRESUPPONE and ESPRIME_PRINCIPIO happen to match verbatim; every other
+# extractor type 422s the promote call unless normalized first. This map is
+# the single source of truth for that normalization; apply it where the
+# candidate is CREATED (see `document_parser.py::_extract_relations_from_chunks`)
+# so the value is already canonical by the time it reaches promote.
+_EXTRACTOR_TO_CANONICAL_RELATION: Dict[str, str] = {
+    "RINVIA": RelationType.CITA.value,  # explicit textual reference/renvoi
+    "DEROGA": RelationType.DEROGA_A.value,
+    "MODIFICA": RelationType.CORRELATO.value,  # no generic "modifica" member; the
+    # enum's modification relations (SOSTITUISCE/INTEGRA/ABROGA_*/...) are more
+    # specific than free-text notes can reliably disambiguate
+    "DEFINISCE": RelationType.DEFINISCE.value,
+    "PRESUPPONE": RelationType.PRESUPPONE.value,
+    "ESPRIME_PRINCIPIO": RelationType.ESPRIME_PRINCIPIO.value,
+    "IN_CONTRASTO_CON": RelationType.INCOMPATIBILE_CON.value,
+    "SI_APPLICA_A": RelationType.APPLICA_A.value,
+    "CORRELATO_A": RelationType.CORRELATO.value,
+}
+
+
+def canonical_relation_type(extractor_relation_type: str) -> str:
+    """Normalize a `RelationExtractor` output type to the canonical `RelationType`
+    enum value expected by the propose-relation endpoint.
+
+    Falls back to `RelationType.CORRELATO.value` for anything outside
+    `ALLOWED_RELATION_TYPES` (defensive; callers only ever pass one of those).
+    """
+    return _EXTRACTOR_TO_CANONICAL_RELATION.get(
+        extractor_relation_type, RelationType.CORRELATO.value
+    )
 
 
 @dataclass

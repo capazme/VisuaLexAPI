@@ -135,17 +135,67 @@ describe('CandidateCard', () => {
     expect(screen.queryByTestId('promotion-checklist')).not.toBeInTheDocument();
   });
 
-  it('labels the relation path as "in arrivo" (extractor produces entities only)', () => {
-    const relation = { ...candidate, candidate_type: 'relation' as const };
+  it('renders a readable source → relation_type → target title for relation candidates', () => {
+    const relation = {
+      ...candidate,
+      candidate_type: 'relation' as const,
+      entity_text: undefined,
+      source_node_urn: 'urn:nir:stato:codice.civile:1942;262~art1453',
+      relation_type: 'DISCIPLINA',
+      target_entity_id: 'ent:risoluzione',
+    };
     render(<CandidateCard candidate={relation} articleUrn="" onPromoted={() => {}} />);
-    expect(screen.getByTestId('relation-coming-soon')).toHaveTextContent(/in arrivo/i);
+    const card = screen.getByTestId(`candidate-${relation.id}`);
+    expect(card).toHaveTextContent('urn:nir:stato:codice.civile:1942;262~art1453');
+    expect(card).toHaveTextContent('DISCIPLINA');
+    expect(card).toHaveTextContent('ent:risoluzione');
     // the relation checklist also demands a reference norma
     expect(screen.getByTestId('promotion-checklist')).toHaveTextContent(/norma di riferimento/i);
   });
 
-  it('does not label an entity card as "in arrivo"', () => {
-    render(<CandidateCard candidate={candidate} articleUrn="urn:test" onPromoted={() => {}} />);
-    expect(screen.queryByTestId('relation-coming-soon')).not.toBeInTheDocument();
+  it('promotes a relation candidate with the source/target/relation-type payload', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        recognized: true,
+        urn: 'urn:nir:stato:codice.civile:1942;262~art1453',
+        display: 'Art. 1453 — codice civile',
+      }),
+    }) as unknown as typeof fetch;
+    const relation = {
+      ...candidate,
+      candidate_type: 'relation' as const,
+      source_node_urn: 'urn:nir:stato:codice.civile:1942;262~art1453',
+      relation_type: 'DISCIPLINA',
+      target_entity_id: 'ent:risoluzione',
+    };
+    const onPromoted = vi.fn();
+    render(<CandidateCard candidate={relation} articleUrn="" onPromoted={onPromoted} />);
+    fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+    fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+      target: { value: 'La risoluzione estingue il contratto.' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(screen.getByLabelText(/norma di riferimento/i), {
+      target: { value: 'urn:nir:stato:codice.civile:1942;262~art1453' },
+    });
+    const apply = await screen.findByTestId('norma-picker-apply');
+    fireEvent.click(apply);
+    await act(async () => {
+      fireEvent.click(promoteBtn());
+    });
+    expect(promote).toHaveBeenCalledWith(
+      relation.id,
+      expect.objectContaining({
+        candidateType: 'relation',
+        sourceUrn: 'urn:nir:stato:codice.civile:1942;262~art1453',
+        targetEntityId: 'ent:risoluzione',
+        tipoRelazione: 'DISCIPLINA',
+        fonte: 'Torrente p.120',
+        attested: true,
+      }),
+    );
+    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(relation.id));
   });
 
   it('shows a dedup hint when potential_duplicate_of is set', () => {

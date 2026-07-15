@@ -176,7 +176,10 @@ export interface DisagreementAnalysis {
 /** Devil's-advocate flag — a deliberate challenge, not an organic split. */
 export interface DevilsAdvocateFlag {
   active: boolean;
-  /** Which canon played devil's advocate; null today (attribution deferred). */
+  /**
+   * Which canon played devil's advocate (heuristic minority-canon derivation
+   * upstream); null when no attribution could be derived (or no dissent).
+   */
   expert?: string | null;
 }
 
@@ -207,6 +210,13 @@ export type GraphEdgeSelection =
       expertBLabel: string;
       /** True when the devil's-advocate flag marks this a deliberate challenge. */
       isDevilsAdvocate: boolean;
+      /**
+       * Readable label of the specific canon that played devil's advocate,
+       * when MERL-T derives one AND it is one of this conflict's two
+       * endpoints. Undefined when no per-canon attribution is available —
+       * the badge falls back to the generic (unscoped) wording.
+       */
+      devilsAdvocateExpertLabel?: string;
     };
 
 export interface SubgraphResponse {

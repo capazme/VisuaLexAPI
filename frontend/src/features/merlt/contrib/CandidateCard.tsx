@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, Clock, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { promoteCandidate } from './contribApi';
 import { NormaPicker } from './NormaPicker';
@@ -150,18 +150,20 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
             {candidate.candidate_type === 'entity' ? 'Entità' : 'Relazione'}
             {typeof candidate.llm_confidence === 'number' && ` · conf. ${candidate.llm_confidence.toFixed(2)}`}
           </span>
-          {/* The extractor produces entities only; the relation path is wired
-              but not yet fed by the pipeline — label it honestly (§3.8). */}
-          {candidate.candidate_type === 'relation' && (
-            <span
-              data-testid="relation-coming-soon"
-              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-            >
-              <Clock size={12} /> in arrivo
-            </span>
-          )}
         </div>
-        <span className="font-medium text-slate-900 dark:text-white">{candidate.entity_text}</span>
+        {candidate.candidate_type === 'relation' ? (
+          <span className="flex min-w-0 flex-wrap items-center justify-end gap-1 text-sm font-medium text-slate-900 dark:text-white">
+            <span className="truncate">{candidate.source_node_urn || '—'}</span>
+            <ArrowRight size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {candidate.relation_type || '—'}
+            </span>
+            <ArrowRight size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
+            <span className="truncate">{candidate.target_entity_id || '—'}</span>
+          </span>
+        ) : (
+          <span className="font-medium text-slate-900 dark:text-white">{candidate.entity_text}</span>
+        )}
       </div>
 
       {candidate.potential_duplicate_of && (

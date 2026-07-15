@@ -380,6 +380,26 @@ describe('DeliberationColumn nodo tab', () => {
     expect(screen.getByText(/il principio prevale/i)).toBeInTheDocument();
   });
 
+  it('names the specific canon in the deliberate-challenge badge when scoped', () => {
+    const selection: GraphEdgeSelection = {
+      kind: 'contrast',
+      conflict: {
+        expert_a: 'literal',
+        expert_b: 'principles',
+        conflict_score: 0.68,
+        contention_point: 'La lettera esclude ciò che la ratio impone.',
+      },
+      expertALabel: 'Letterale',
+      expertBLabel: 'Principî',
+      isDevilsAdvocate: true,
+      devilsAdvocateExpertLabel: 'Principî',
+    };
+    render(
+      <DeliberationColumn {...baseProps()} activeTab="nodo" selectedEdge={selection} />,
+    );
+    expect(screen.getByText(/sfida deliberata di principî/i)).toBeInTheDocument();
+  });
+
   it('shows the empty inspection hint when nothing is selected', () => {
     render(<DeliberationColumn {...baseProps()} activeTab="nodo" />);
     expect(screen.getByText(/seleziona un nodo o una relazione/i)).toBeInTheDocument();

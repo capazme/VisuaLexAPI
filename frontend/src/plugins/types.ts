@@ -5,19 +5,13 @@
  * Plugins register components against a slot and the host renders all of
  * them at runtime (filtered by feature flag).
  *
- * Slice 1 only uses `article_content_after`; the others are placeholders
- * for Slice 2+ extension surfaces (graph viewer, admin, etc.).
+ * Only the slots actually registered/mounted are declared here — no
+ * speculative placeholders for future extension surfaces (add a slot when a
+ * plugin is built for it, not before).
  */
 export type PluginSlotName =
-    | 'article_toolbar'
     | 'article_sidebar'
-    | 'content_overlay'
     | 'article_content_after'
-    | 'graph_view'
-    | 'profile_tabs'
-    | 'admin_dashboard'
-    | 'dossier_actions'
-    | 'bulletin_community'
     // 'global' is mounted once in Layout — used for app-wide side-effect
     // components (e.g. forum-signal tracker) that listen to the merltEventBus
     // independent of any specific article or page.

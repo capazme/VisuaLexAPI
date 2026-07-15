@@ -106,9 +106,10 @@ async def _run_extract(document_id: int, user_id: str, bff_job_id: Optional[str]
             log.error("Document extraction failed", document_id=document_id, exc=str(e))
             raise
 
-    await _callback_extraction(bff_job_id, "completed", candidates_created=result.entities_count)
-    log.info("Document extraction completed", document_id=document_id, candidates=result.entities_count)
-    return {"document_id": document_id, "status": "completed", "candidates_created": result.entities_count}
+    candidates_created = result.entities_count + result.relations_count
+    await _callback_extraction(bff_job_id, "completed", candidates_created=candidates_created)
+    log.info("Document extraction completed", document_id=document_id, candidates=candidates_created)
+    return {"document_id": document_id, "status": "completed", "candidates_created": candidates_created}
 
 
 def extract_to_staging(document_id: int, user_id: str, bff_job_id: str | None = None) -> dict:

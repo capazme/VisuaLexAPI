@@ -97,6 +97,31 @@ describe('graphDeliberation — overlay construction', () => {
     expect((arc.data as { devilsAdvocate: boolean }).devilsAdvocate).toBe(true);
   });
 
+  it('scopes the devil\'s-advocate marker to arcs touching the named canon', () => {
+    const overlay = buildDeliberationOverlay({
+      contributions: [contribution('literal', 0.6), contribution('principles', 0.4), contribution('systemic', 0.3)],
+      conflicts: [conflict('literal', 'principles', 0.5), conflict('literal', 'systemic', 0.4)],
+      devilsAdvocateActive: true,
+      devilsAdvocateExpert: 'principles',
+    });
+    const arcs = overlay.edges.filter((e) => e.id?.startsWith(CONTRAST_EDGE_PREFIX));
+    const literalPrinciples = arcs.find((e) => e.source.endsWith('principles') || e.target.endsWith('principles'));
+    const literalSystemic = arcs.find((e) => e.source.endsWith('systemic') || e.target.endsWith('systemic'));
+    expect((literalPrinciples!.data as { devilsAdvocate: boolean }).devilsAdvocate).toBe(true);
+    expect((literalSystemic!.data as { devilsAdvocate: boolean }).devilsAdvocate).toBe(false);
+  });
+
+  it('falls back to marking every active arc when no devilsAdvocateExpert is derivable', () => {
+    const overlay = buildDeliberationOverlay({
+      contributions: [contribution('literal', 0.6), contribution('principles', 0.4), contribution('systemic', 0.3)],
+      conflicts: [conflict('literal', 'principles', 0.5), conflict('literal', 'systemic', 0.4)],
+      devilsAdvocateActive: true,
+      devilsAdvocateExpert: null,
+    });
+    const arcs = overlay.edges.filter((e) => e.id?.startsWith(CONTRAST_EDGE_PREFIX));
+    expect(arcs.every((e) => (e.data as { devilsAdvocate: boolean }).devilsAdvocate === true)).toBe(true);
+  });
+
   it('drops a conflict whose endpoint canon was not consulted', () => {
     const overlay = buildDeliberationOverlay({
       contributions: [contribution('literal', 0.6)],
@@ -181,6 +206,43 @@ describe('graphDeliberation — resolveEdgeSelection', () => {
       expertALabel: 'Letterale',
       expertBLabel: 'Principî',
       isDevilsAdvocate: true,
+    });
+  });
+
+  it('sets devilsAdvocateExpertLabel and scopes isDevilsAdvocate when the flag names a NON-endpoint canon', () => {
+    const id = contrastEdgeId('canon:literal', 'canon:principles');
+    const sel = resolveEdgeSelection(id, {
+      edgesById,
+      conflicts,
+      devilsAdvocateActive: true,
+      devilsAdvocateExpert: 'systemic', // neither endpoint of this conflict
+      canonLabel,
+    });
+    expect(sel).toEqual({
+      kind: 'contrast',
+      conflict: conflicts[0],
+      expertALabel: 'Letterale',
+      expertBLabel: 'Principî',
+      isDevilsAdvocate: false,
+    });
+  });
+
+  it('sets devilsAdvocateExpertLabel when the flag names one of this conflict\'s endpoints', () => {
+    const id = contrastEdgeId('canon:literal', 'canon:principles');
+    const sel = resolveEdgeSelection(id, {
+      edgesById,
+      conflicts,
+      devilsAdvocateActive: true,
+      devilsAdvocateExpert: 'principles',
+      canonLabel,
+    });
+    expect(sel).toEqual({
+      kind: 'contrast',
+      conflict: conflicts[0],
+      expertALabel: 'Letterale',
+      expertBLabel: 'Principî',
+      isDevilsAdvocate: true,
+      devilsAdvocateExpertLabel: 'Principî',
     });
   });
 

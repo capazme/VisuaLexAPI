@@ -161,6 +161,13 @@ export interface DeliberationOverlayInput {
   contributions: ExpertContribution[];
   conflicts: DisagreementConflict[];
   devilsAdvocateActive: boolean;
+  /**
+   * Canon that played devil's advocate (`devils_advocate_flag.expert`), when
+   * MERL-T derives one. A contrast arc is marked only when it touches THIS
+   * canon; when absent/null (no derivation, or organic disagreement) every
+   * active arc is marked, matching the pre-attribution global behaviour.
+   */
+  devilsAdvocateExpert?: string | null;
   /** Real node id the canons attach to (the centered article), if present. */
   centerNodeId?: string | null;
 }
@@ -177,7 +184,7 @@ export interface DeliberationOverlay {
  * canon is absent (defensive: the arc needs both nodes present to render).
  */
 export function buildDeliberationOverlay(input: DeliberationOverlayInput): DeliberationOverlay {
-  const { contributions, conflicts, devilsAdvocateActive, centerNodeId } = input;
+  const { contributions, conflicts, devilsAdvocateActive, devilsAdvocateExpert, centerNodeId } = input;
   const weights = weightByCanon(contributions);
 
   const nodes: NodeData[] = [];
@@ -229,6 +236,11 @@ export function buildDeliberationOverlay(input: DeliberationOverlayInput): Delib
     if (seenContrast.has(id)) continue;
     seenContrast.add(id);
     const score = typeof c.conflict_score === 'number' ? Math.max(0, Math.min(1, c.conflict_score)) : 0;
+    // Scope the marker to the dissenting canon when one is derivable; fall
+    // back to marking every active arc when it isn't (see interface doc).
+    const devil =
+      devilsAdvocateActive &&
+      (!devilsAdvocateExpert || devilsAdvocateExpert === c.expert_a || devilsAdvocateExpert === c.expert_b);
     contrastEdges.push({
       id,
       source: `${CANON_NODE_PREFIX}${c.expert_a}`,
@@ -236,7 +248,7 @@ export function buildDeliberationOverlay(input: DeliberationOverlayInput): Delib
       data: {
         kind: 'contrast',
         conflictScore: score,
-        devilsAdvocate: devilsAdvocateActive,
+        devilsAdvocate: devil,
         label: c.contention_point ?? 'contrasto',
       },
     });
@@ -273,6 +285,8 @@ export function resolveEdgeSelection(
     edgesById: Map<string, GraphEdge>;
     conflicts: DisagreementConflict[];
     devilsAdvocateActive: boolean;
+    /** See {@link DeliberationOverlayInput.devilsAdvocateExpert}. */
+    devilsAdvocateExpert?: string | null;
     canonLabel: (key: string) => string;
   }
 ): GraphEdgeSelection | null {
@@ -283,12 +297,23 @@ export function resolveEdgeSelection(
         contrastEdgeId(`${CANON_NODE_PREFIX}${c.expert_a}`, `${CANON_NODE_PREFIX}${c.expert_b}`) === edgeId
     );
     if (!conflict) return null;
+    // The specific dissenting canon, only when it is one of THIS conflict's
+    // two endpoints — otherwise leave it undefined so the badge falls back
+    // to the generic (unscoped) wording.
+    const scopedExpert =
+      opts.devilsAdvocateExpert &&
+      (opts.devilsAdvocateExpert === conflict.expert_a || opts.devilsAdvocateExpert === conflict.expert_b)
+        ? opts.devilsAdvocateExpert
+        : undefined;
+    const isDevilsAdvocate =
+      opts.devilsAdvocateActive && (!opts.devilsAdvocateExpert || scopedExpert !== undefined);
     return {
       kind: 'contrast',
       conflict,
       expertALabel: opts.canonLabel(conflict.expert_a),
       expertBLabel: opts.canonLabel(conflict.expert_b),
-      isDevilsAdvocate: opts.devilsAdvocateActive,
+      isDevilsAdvocate,
+      ...(scopedExpert !== undefined ? { devilsAdvocateExpertLabel: opts.canonLabel(scopedExpert) } : {}),
     };
   }
   const edge = opts.edgesById.get(edgeId);

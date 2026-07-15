@@ -517,7 +517,10 @@ class DocumentParserService:
             log.warning("LLM service not available, skipping relation extraction")
             return 0
 
-        from merlt.pipeline.enrichment.extractors.relation import RelationExtractor
+        from merlt.pipeline.enrichment.extractors.relation import (
+            RelationExtractor,
+            canonical_relation_type,
+        )
         from merlt.pipeline.enrichment.models import EnrichmentContent
 
         extractor = RelationExtractor(self.llm_service)
@@ -544,12 +547,17 @@ class DocumentParserService:
             snippet = chunk[:500] if len(chunk) > 500 else chunk
 
             for rel in relations:
+                # Normalize the extractor's 9-value free-text vocabulary onto
+                # the canonical RelationType enum here, at creation time, so
+                # both persist targets already carry a promote-safe value
+                # (see relation.py::canonical_relation_type docstring).
+                rel_type = canonical_relation_type(rel.relation_type)
                 if persist_target == "staging":
                     row = ExtractionCandidate(
                         document_id=document_id,
                         contributor_id=user_id,
                         candidate_type="relation",
-                        relation_type=rel.relation_type,
+                        relation_type=rel_type,
                         source_node_urn=rel.source,
                         target_entity_id=rel.target,
                         article_urn="user_document",
@@ -562,10 +570,10 @@ class DocumentParserService:
                     )
                 else:
                     row = PendingRelation(
-                        relation_id=f"{rel.relation_type}:{uuid4().hex[:8]}",
+                        relation_id=f"{rel_type}:{uuid4().hex[:8]}",
                         article_urn="user_document",
                         source_type="user_document",
-                        relation_type=rel.relation_type,
+                        relation_type=rel_type,
                         source_node_urn=rel.source,
                         target_entity_id=rel.target,
                         relation_description=rel.descrizione or "",

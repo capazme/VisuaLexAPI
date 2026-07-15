@@ -59,12 +59,6 @@ describe('getSlotComponents', () => {
     expect(getSlotComponents('article_content_after')).toHaveLength(0);
   });
 
-  it('returns an empty array for slots with no registrations', () => {
-    expect(getSlotComponents('graph_view')).toEqual([]);
-    expect(getSlotComponents('profile_tabs')).toEqual([]);
-    expect(getSlotComponents('admin_dashboard')).toEqual([]);
-  });
-
   it('registers the graph side rail on article_sidebar gated by VITE_FEATURE_MERLT_GRAPH', () => {
     const components = getSlotComponents('article_sidebar');
     expect(components).toHaveLength(1);
@@ -79,13 +73,6 @@ describe('getSlotComponents', () => {
 });
 
 describe('PluginSlot', () => {
-  it('renders nothing when no components match (slot unused)', () => {
-    const { container } = render(
-      <PluginSlot slot="graph_view" props={{}} />
-    );
-    expect(container.innerHTML).toBe('');
-  });
-
   it('renders nothing when feature flag is off', () => {
     vi.stubEnv('VITE_FEATURE_MERLT', 'false');
     const { container } = render(

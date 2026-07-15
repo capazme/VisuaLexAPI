@@ -2069,7 +2069,7 @@ function ContrastConflictView({
   selection: Extract<GraphEdgeSelection, { kind: 'contrast' }>;
   onClose: () => void;
 }): React.ReactElement {
-  const { conflict, expertALabel, expertBLabel, isDevilsAdvocate } = selection;
+  const { conflict, expertALabel, expertBLabel, isDevilsAdvocate, devilsAdvocateExpertLabel } = selection;
   const colorA = (CANON_STYLE as Record<string, { color: string } | undefined>)[conflict.expert_a]?.color ?? '#475569';
   const colorB = (CANON_STYLE as Record<string, { color: string } | undefined>)[conflict.expert_b]?.color ?? '#475569';
   const score = Number.isFinite(conflict.conflict_score)
@@ -2086,7 +2086,7 @@ function ContrastConflictView({
           </h2>
           {isDevilsAdvocate && (
             <span className="mt-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-950/40 dark:text-red-400">
-              Sfida deliberata (avvocato del diavolo)
+              Sfida deliberata{devilsAdvocateExpertLabel ? ` di ${devilsAdvocateExpertLabel}` : ''} (avvocato del diavolo)
             </span>
           )}
         </div>

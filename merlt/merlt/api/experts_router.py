@@ -287,18 +287,62 @@ def _build_disagreement_analysis(result: Any) -> Optional[DisagreementAnalysisDT
     )
 
 
+def _derive_devils_advocate_expert(result: Any) -> Optional[str]:
+    """Heuristically derive the canon that played devil's advocate.
+
+    DESIGN HEURISTIC, not a recorded ground-truth attribution: the synthesizer
+    only derives the `devils_advocate_flag` bool from `has_disagreement`
+    (synthesizer.py:345) and never attributes a canon. We approximate it as the
+    minority canon (lowest routing/gating `weight`, falling back to `confidence`
+    when `weight` is absent) within the pairwise conflict with the highest
+    `conflict_score` — i.e. the canon least trusted by the synthesis inside the
+    sharpest disagreement, standing in for "the one that dissented".
+
+    Returns None whenever this can't be derived, notably: no
+    `disagreement_analysis`, no `conflicting_pairs` (the default heuristic
+    disagreement path — synthesizer.py's `_heuristic_disagreement` — never
+    populates them; only the opt-in neural detector does via
+    disagreement/detector.py's `_extract_conflicts`), or fewer than two of the
+    top pair's canons present in `expert_contributions`.
+    """
+    analysis = getattr(result, "disagreement_analysis", None)
+    conflicting_pairs = getattr(analysis, "conflicting_pairs", None) if analysis else None
+    if not conflicting_pairs:
+        return None
+
+    top_pair = max(conflicting_pairs, key=lambda p: getattr(p, "conflict_score", 0.0) or 0.0)
+
+    contributions = getattr(result, "expert_contributions", None) or {}
+    candidates = [
+        canon
+        for canon in (top_pair.expert_a, top_pair.expert_b)
+        if canon in contributions
+    ]
+    if len(candidates) < 2:
+        return None
+
+    def _trust_score(canon: str) -> float:
+        entry = contributions.get(canon) or {}
+        weight = entry.get("weight")
+        if weight is not None:
+            return float(weight)
+        return float(entry.get("confidence", 0.0) or 0.0)
+
+    return min(candidates, key=_trust_score)
+
+
 def _build_devils_advocate_flag(result: Any) -> Optional[DevilsAdvocateFlag]:
     """Copy `SynthesisResult.devils_advocate_flag` onto the DTO (Slice 4 P2a).
 
-    The synthesizer derives the bool from `has_disagreement` (synthesizer.py:345)
-    and does NOT record which canon played it — `expert` stays null (no recompute).
+    `expert` is derived heuristically by `_derive_devils_advocate_expert` (see
+    its docstring) — it stays null whenever no conflicting pair is available.
     Returns null only when the attribute is entirely absent (defensive).
     """
     if not hasattr(result, "devils_advocate_flag"):
         return None
     return DevilsAdvocateFlag(
         active=bool(getattr(result, "devils_advocate_flag", False)),
-        expert=None,
+        expert=_derive_devils_advocate_expert(result),
     )
 
 

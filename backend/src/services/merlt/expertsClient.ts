@@ -53,7 +53,8 @@ export interface ExpertRetrievedSource {
  *  - disagreement_analysis ← SynthesisResult.disagreement_analysis.to_dict()
  *    (disagreement/types.py:249-260; null on convergent responses)
  *  - devils_advocate_flag ← SynthesisResult.devils_advocate_flag (synthesizer.py:345);
- *    `expert` is always null today (per-canon attribution deferred to P2b)
+ *    `expert` now carries the dissenting canon (heuristic minority-canon derivation
+ *    upstream); this client is a pure passthrough of whatever MERL-T sends
  *  - expert_contributions ← per-canon full thesis + confidence + routing weight
  *    (synthesizer.py:624-631,680-703); canon-node size ∝ weight, [] when degenerate
  */
