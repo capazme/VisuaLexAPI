@@ -10,7 +10,7 @@ import type { AdminUserResponse } from '../types/api';
 import type { AdminFeedback, FeedbackStats, FeedbackStatus, FeedbackType, AdminSharedEnvironment } from '../services/adminService';
 import type { SharedEnvironmentReport, ReportStatus } from '../types';
 import { getErrorMessage } from '../utils/errors';
-import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
+import { isMerltEnabled } from '../features/merlt/featureFlag';
 import { IngestionAdminPanel } from '../features/merlt/ops/ingestion/IngestionAdminPanel';
 import {
   Users,
@@ -47,8 +47,12 @@ type AdminTab = 'users' | 'feedback' | 'environments' | 'reports' | 'ingestion';
 
 export function AdminPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const { opsVisible } = useMerltFeatures();
+  const { user, logout, isAdmin } = useAuth();
+  // opsVisible mirrors useMerltFeatures().opsVisible (merltEnabled && isAdmin) but is
+  // derived here WITHOUT useConsent: AdminPage renders OUTSIDE the ConsentProvider
+  // (App.tsx wraps only <Layout> with it), so calling useMerltFeatures — which calls
+  // useConsent — would throw "useConsent must be used within a ConsentProvider".
+  const opsVisible = isMerltEnabled() && isAdmin;
 
   // Tab state
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
