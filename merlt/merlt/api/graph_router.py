@@ -40,17 +40,7 @@ from merlt.pipeline.enrichment.models import EntityType
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
 from merlt.utils.urn_labels import build_node_label, article_label_from_urn
-
-# TODO: Implement full URN generation locally
-# For now, generate_urn returns None and callers handle it gracefully
-def generate_urn(*args, **kwargs):
-    """
-    Placeholder for URN generation.
-
-    Full implementation requires visualex-api HTTP call.
-    TODO: Add HTTP endpoint to visualex-api for URN generation.
-    """
-    return None
+from merlt.utils.urngenerator import generate_urn
 
 log = structlog.get_logger()
 

@@ -1,8 +1,8 @@
 """
 MERL-T Sources - Local Module
 
-This module re-exports scraping functionality and models from merlt.clients.
-Utilities (URNGenerator, TreeExtractor, text_op) will be implemented locally.
+This module re-exports scraping functionality and models from merlt.clients,
+plus the text/URN utilities now implemented locally in merlt.utils.
 """
 
 try:
@@ -14,10 +14,16 @@ try:
         NormaVisitata,
     )
 
-    # TODO: Copy or implement these utilities from visualex-api
-    # from merlt.utils.urngenerator import generate_urn, URNGenerator
-    # from merlt.utils.treextractor import TreeExtractor
-    # from merlt.utils.text_op import normalize_text, clean_text
+    # Utilities now implemented locally in merlt.utils
+    from merlt.utils.urngenerator import generate_urn
+    from merlt.utils.text_op import nospazi, normalize_act_type
+
+    # Not implemented locally: URNGenerator (class-based API; only the
+    # generate_urn() function was ported) and TreeExtractor (no local
+    # equivalent exists in merlt.utils — tree extraction still requires
+    # the visualex-api HTTP client). There is also no function named
+    # normalize_text/clean_text in merlt.utils; nospazi() and
+    # normalize_act_type() above are the closest real equivalents.
 
     __all__ = [
         "NormattivaScraper",
@@ -25,11 +31,11 @@ try:
         # "EurlexScraper",  # TODO: Implement HTTP-based EurlexScraper
         "Norma",
         "NormaVisitata",
-        # "generate_urn",  # TODO: Implement locally
-        # "URNGenerator",  # TODO: Implement locally
-        # "TreeExtractor",  # TODO: Implement locally
-        # "normalize_text",  # TODO: Implement locally
-        # "clean_text",  # TODO: Implement locally
+        "generate_urn",
+        "nospazi",
+        "normalize_act_type",
+        # "URNGenerator",  # Not implemented locally (class-based API absent from merlt.utils)
+        # "TreeExtractor",  # Not implemented locally (no equivalent in merlt.utils)
     ]
 
 except ImportError as e:
