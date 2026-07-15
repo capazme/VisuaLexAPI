@@ -202,13 +202,16 @@ export const sharedEnvironmentService = {
   /**
    * Take a suggestion item (owner only). Returns { item, created } or
    * throws 409 with { error: 'alias_trigger_conflict', ... } payload.
+   * `triggerOverride` renames an alias item's trigger before creation —
+   * used by the AliasConflictDialog "Rename" flow.
    */
-  async takeSuggestionItem(suggestionId: string, itemId: string): Promise<{
+  async takeSuggestionItem(suggestionId: string, itemId: string, triggerOverride?: string): Promise<{
     item: { id: string; status: 'taken' };
     created: unknown;
   }> {
     const response = await apiClient.post(
-      `/shared-environments-suggestions/${suggestionId}/items/${itemId}/take`
+      `/shared-environments-suggestions/${suggestionId}/items/${itemId}/take`,
+      triggerOverride !== undefined ? { triggerOverride } : undefined
     );
     return response.data;
   },

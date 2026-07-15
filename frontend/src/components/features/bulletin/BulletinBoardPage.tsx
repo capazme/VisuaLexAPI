@@ -542,18 +542,32 @@ export function BulletinBoardPage() {
                 await customAliasService.delete(aliasConflict.existingAliasId);
                 await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId);
               } else if (choice.action === 'rename') {
-                // Rename is MVP-deferred — see Task 10 Step 8 rationale.
-                // Replace + Skip cover the main flows; Rename requires a
-                // backend query-param override (Task 12 nice-to-have).
-                setToast({ type: 'info', message: 'Funzione Rinomina non ancora implementata — usa Sostituisci o Salta.' });
+                await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId, choice.newTrigger);
+                // MERLT-1.10: forum_suggestion_accepted — same shape as handleTakeItem.
+                publishMerltEvent({
+                  interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
+                  metadata: {
+                    suggestion_id: reviewingSuggestion.id,
+                    shared_env_id: reviewingSuggestion.id,
+                    original_author_id: reviewingSuggestion.suggester?.id ?? null,
+                  },
+                });
               }
               await fetchSuggestions();
-            } catch (err) {
+              setToast({ type: 'success', message: 'Item preso.' });
+            } catch (err: unknown) {
+              const maybeAxios = err as { response?: { status?: number; data?: { error?: string; suggestedTrigger?: string; existingAliasId?: string } } };
+              if (choice.action === 'rename' && maybeAxios.response?.status === 409 && maybeAxios.response.data?.error === 'alias_trigger_conflict') {
+                const body = maybeAxios.response.data as { suggestedTrigger: string; existingAliasId?: string };
+                setAliasConflict({ itemId: aliasConflict.itemId, suggestedTrigger: body.suggestedTrigger, existingAliasId: body.existingAliasId });
+                return;
+              }
               const msg = err instanceof Error ? err.message : 'Errore';
               setToast({ type: 'error', message: msg });
-            } finally {
               setAliasConflict(null);
+              return;
             }
+            setAliasConflict(null);
           }}
           onClose={() => setAliasConflict(null)}
         />
