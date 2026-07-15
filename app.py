@@ -70,6 +70,15 @@ def count_tokens(data):
 # Storage per il rate limiting
 request_counts = defaultdict(lambda: {'count': 0, 'time': time()})
 
+# CORS allowed origins: comma-separated list via env var, falling back to the
+# current dev defaults (Node BFF on :3001 + Vite frontend on :5173).
+_default_allowed_origins = ["http://localhost:3001", "http://localhost:5173"]
+_allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if _allowed_origins_env:
+    ALLOWED_ORIGINS = [origin.strip() for origin in _allowed_origins_env.split(",") if origin.strip()]
+else:
+    ALLOWED_ORIGINS = _default_allowed_origins
+
 
 def add_to_history(data: dict):
     """Aggiunge ricerca alla history con persistenza."""
@@ -142,7 +151,7 @@ class RateLimitedTaskQueue:
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
-        self.app = cors(self.app, allow_origin="http://localhost:3001")
+        self.app = cors(self.app, allow_origin=ALLOWED_ORIGINS)
         self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
         
         # Middleware per registrare il tempo di inizio della richiesta
@@ -330,7 +339,7 @@ class NormaController:
         return jsonify({
             "service": "VisuaLex API",
             "status": "running",
-            "docs": "/api/docs" if hasattr(self, 'swagger_ui') else None,
+            "docs": None,  # Swagger is not implemented on this root app (see visualex_api/app.py for the prefixed variant)
             "frontend": "http://localhost:5173",
         })
 
