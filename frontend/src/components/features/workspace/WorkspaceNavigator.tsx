@@ -1,22 +1,29 @@
 import { useState } from 'react';
 import {
   Layers,
-  X,
-  Maximize2,
-  Minimize2,
-  FileText,
-  Folder,
-  File,
   ChevronUp,
   ChevronDown,
-  Eye,
-  EyeOff
 } from 'lucide-react';
-import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../../../lib/utils';
 import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { SortableWorkspaceTab } from './SortableWorkspaceTab';
 
 interface WorkspaceNavigatorProps {
   className?: string;
@@ -28,7 +35,6 @@ interface WorkspaceNavigatorProps {
  */
 export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
 
   const {
     workspaceTabs,
@@ -36,6 +42,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     removeTab,
     toggleTabMinimize,
     toggleTabVisibility,
+    reorderWorkspaceTabs,
     commandPaletteOpen,
   } = useAppStore(useShallow(s => ({
     workspaceTabs: s.workspaceTabs,
@@ -43,6 +50,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     removeTab: s.removeTab,
     toggleTabMinimize: s.toggleTabMinimize,
     toggleTabVisibility: s.toggleTabVisibility,
+    reorderWorkspaceTabs: s.reorderWorkspaceTabs,
     commandPaletteOpen: s.commandPaletteOpen,
   })));
 
@@ -52,51 +60,27 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
   // Hide dock when heavy overlays are active
   const shouldHide = isCompareOpen || commandPaletteOpen;
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = workspaceTabs.findIndex(t => t.id === active.id);
+    const to = workspaceTabs.findIndex(t => t.id === over.id);
+    if (from < 0 || to < 0) return;
+    reorderWorkspaceTabs(from, to);
+  };
+
   if (workspaceTabs.length === 0 || shouldHide) return null;
 
-  // Sort by zIndex (most recent on top)
-  const sortedTabs = [...workspaceTabs].sort((a, b) => b.zIndex - a.zIndex);
-
-  // Get content summary for a tab
-  const getTabSummary = (tab: WorkspaceTab) => {
-    const normaCount = tab.content.filter(c => c.type === 'norma').length;
-    const looseCount = tab.content.filter(c => c.type === 'loose-article').length;
-    const collectionCount = tab.content.filter(c => c.type === 'collection').length;
-
-    const parts: string[] = [];
-    if (normaCount > 0) parts.push(`${normaCount} norma${normaCount > 1 ? 'e' : ''}`);
-    if (looseCount > 0) parts.push(`${looseCount} articol${looseCount > 1 ? 'i' : 'o'}`);
-    if (collectionCount > 0) parts.push(`${collectionCount} raccolt${collectionCount > 1 ? 'e' : 'a'}`);
-
-    return parts.length > 0 ? parts.join(', ') : 'Vuota';
-  };
-
-  // Get content icons for a tab
-  const getContentIcons = (tab: WorkspaceTab) => {
-    const types = new Set(tab.content.map(c => c.type));
-    return (
-      <div className="flex gap-1">
-        {types.has('norma') && <FileText size={10} className="text-primary-500" />}
-        {types.has('loose-article') && <File size={10} className="text-amber-500" />}
-        {types.has('collection') && <Folder size={10} className="text-purple-500" />}
-      </div>
-    );
-  };
-
-  // Get article count for a tab
-  const getArticleCount = (tab: WorkspaceTab) => {
-    let count = 0;
-    tab.content.forEach(item => {
-      if (item.type === 'norma') {
-        count += item.articles.length;
-      } else if (item.type === 'loose-article') {
-        count += 1;
-      } else if (item.type === 'collection') {
-        count += item.articles.length;
-      }
-    });
-    return count;
-  };
+  // The tab with the highest zIndex is the one currently "in front" — used to
+  // highlight the active chip. Rendering order now follows `workspaceTabs`
+  // (array order = drag order) instead of a zIndex sort, otherwise a reorder
+  // wouldn't change what the user sees.
+  const activeTabId = [...workspaceTabs].sort((a, b) => b.zIndex - a.zIndex)[0]?.id ?? null;
 
   return (
     <div
@@ -144,102 +128,28 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
           </div>
 
           {/* Tab list */}
-          <div className="flex gap-3 p-4 max-w-[90vw] overflow-x-auto custom-scrollbar">
-            {sortedTabs.map((tab, index) => (
-              <div
-                key={tab.id}
-                className={cn(
-                  "relative group flex flex-col min-w-[150px] max-w-[180px] p-3 rounded-xl border transition-all cursor-pointer select-none",
-                  index === 0 && !tab.isHidden
-                    ? "bg-primary-50/50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 shadow-sm ring-1 ring-primary-500/10"
-                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md",
-                  tab.isHidden && "opacity-50 grayscale"
-                )}
-                onClick={() => bringTabToFront(tab.id)}
-                onMouseEnter={() => setHoveredTab(tab.id)}
-                onMouseLeave={() => setHoveredTab(null)}
-              >
-                {/* Tab header */}
-                <div className="flex items-center gap-2 mb-2">
-                  {tab.isHidden && (
-                    <EyeOff size={10} className="text-slate-400" />
-                  )}
-                  {tab.isMinimized && (
-                    <Minimize2 size={10} className="text-amber-500" />
-                  )}
-                  <span className={cn(
-                    "text-xs font-bold truncate flex-1",
-                    index === 0 ? "text-primary-700 dark:text-primary-300" : "text-slate-700 dark:text-slate-300"
-                  )}>
-                    {tab.label}
-                  </span>
-                  {getContentIcons(tab)}
-                </div>
-
-                {/* Content summary */}
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate font-medium">
-                  {getTabSummary(tab)}
-                </div>
-
-                {/* Article count badge */}
-                <div className={cn(
-                  "absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center text-[10px] font-bold rounded-full px-1 shadow-sm border border-white dark:border-slate-800",
-                  index === 0 ? "bg-primary-600 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                )}>
-                  {getArticleCount(tab)}
-                </div>
-
-                {/* Quick actions on hover */}
-                {hoveredTab === tab.id && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 p-1 animate-in fade-in zoom-in-95 duration-150 z-10">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTabVisibility(tab.id);
-                      }}
-                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 hover:text-primary-600"
-                      title={tab.isHidden ? "Mostra tab" : "Nascondi tab"}
-                    >
-                      {tab.isHidden ? (
-                        <EyeOff size={12} />
-                      ) : (
-                        <Eye size={12} />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTabMinimize(tab.id);
-                      }}
-                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors text-slate-500 hover:text-amber-600"
-                      title={tab.isMinimized ? "Espandi" : "Minimizza"}
-                    >
-                      {tab.isMinimized ? (
-                        <Maximize2 size={12} />
-                      ) : (
-                        <Minimize2 size={12} />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeTab(tab.id);
-                      }}
-                      className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full transition-colors text-slate-500 hover:text-red-500"
-                      title="Chiudi"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={workspaceTabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
+              <div className="flex gap-3 p-4 max-w-[90vw] overflow-x-auto custom-scrollbar">
+                {workspaceTabs.map((tab) => (
+                  <SortableWorkspaceTab
+                    key={tab.id}
+                    tab={tab}
+                    isActive={tab.id === activeTabId}
+                    onBringToFront={bringTabToFront}
+                    onToggleVisibility={toggleTabVisibility}
+                    onToggleMinimize={toggleTabMinimize}
+                    onRemove={removeTab}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
 
           {/* Keyboard hint */}
           <div className="px-4 py-1.5 border-t border-slate-200/60 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-              Click per portare in primo piano • Drag per riordinare (coming soon)
+              Click per portare in primo piano • Trascina per riordinare
             </span>
           </div>
         </div>

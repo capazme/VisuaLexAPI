@@ -252,6 +252,7 @@ interface AppState {
     toggleTabVisibility: (id: string) => void;
     toggleNormaCollapse: (tabId: string, normaId: string) => void;
     setTabLabel: (id: string, label: string) => void;
+    reorderWorkspaceTabs: (fromIndex: number, toIndex: number) => void;
 
     // Drag & Drop Actions
     moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => void;
@@ -748,6 +749,16 @@ const appStore = createStore<AppState>()(
                     // Manual rename reserves the tab from R3 auto-merge.
                     tab.labelIsCustom = true;
                 }
+            }),
+
+            // Workspace tabs are UI-only (persisted via localStorage, not the
+            // server), so unlike reorderDossierItems this is a pure local
+            // splice with no API call.
+            reorderWorkspaceTabs: (fromIndex, toIndex) => set((state) => {
+                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+                    fromIndex >= state.workspaceTabs.length || toIndex >= state.workspaceTabs.length) return;
+                const [moved] = state.workspaceTabs.splice(fromIndex, 1);
+                state.workspaceTabs.splice(toIndex, 0, moved);
             }),
 
             focusArticleInTab: (tabId, articleId) => set((state) => {
