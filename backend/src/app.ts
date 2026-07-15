@@ -20,6 +20,7 @@ import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
 import merltRoutes from './routes/merlt';
+import { merltKillSwitch } from './middleware/merlt/featureGate';
 
 const app = express();
 
@@ -73,7 +74,11 @@ app.get('/api/health', (_req, res) => {
 // Express applies authenticate to ANY /api/* request entering them.
 // Mount-order (not specificity) wins in Express; merltRoutes/{health,...}
 // must claim /api/merlt/* first.
-app.use('/api/merlt', merltRoutes);
+// merltKillSwitch is the global MERLT_ENABLED gate (Wave 1 cleanup — this
+// flag was previously read but never checked anywhere). It runs BEFORE
+// merltRoutes and 404s the whole namespace when disabled; mount order here
+// is unchanged so the gotcha above still holds when enabled.
+app.use('/api/merlt', merltKillSwitch, merltRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);

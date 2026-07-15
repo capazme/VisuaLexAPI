@@ -42,15 +42,25 @@ export const config = {
   },
 
   merlt: {
-    enabled: readBoolean(process.env.MERLT_ENABLED, false),
+    // `enabled` and `flags.*` are getters, not frozen booleans: they are
+    // read live from process.env on every access rather than once at module
+    // import time. This is what lets `featureGate` (middleware/merlt/
+    // featureGate.ts) and integration tests toggle MERLT_*_ENABLED between
+    // requests without reloading the whole config/app module graph.
+    // All default to `true` when the env var is absent — Wave 1 cleanup
+    // wires these flags to an actual kill-switch for the first time (they
+    // were previously read but never gated on anywhere); flipping the
+    // resting default to `false` would silently disable MERL-T for every
+    // existing deployment that doesn't explicitly set these vars.
+    get enabled(): boolean { return readBoolean(process.env.MERLT_ENABLED, true); },
     apiUrl: process.env.MERLT_API_URL || 'http://localhost:8000',
     apiKey: process.env.MERLT_API_KEY || '',
     timeoutMs: parseInt(process.env.MERLT_TIMEOUT_MS || '60000', 10),
     flags: {
-      contribution: readBoolean(process.env.MERLT_CONTRIBUTION_ENABLED, false),
-      validation: readBoolean(process.env.MERLT_VALIDATION_ENABLED, false),
-      graph: readBoolean(process.env.MERLT_GRAPH_ENABLED, true),
-      ops: readBoolean(process.env.MERLT_OPS_ENABLED, false),
+      get contribution(): boolean { return readBoolean(process.env.MERLT_CONTRIBUTION_ENABLED, true); },
+      get validation(): boolean { return readBoolean(process.env.MERLT_VALIDATION_ENABLED, true); },
+      get graph(): boolean { return readBoolean(process.env.MERLT_GRAPH_ENABLED, true); },
+      get ops(): boolean { return readBoolean(process.env.MERLT_OPS_ENABLED, true); },
     },
   },
 };

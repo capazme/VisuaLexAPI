@@ -11,6 +11,7 @@ import expertsRouter from './experts';
 import nerRouter from './ner';
 import healthRouter from './health';
 import profileRouter from './profile';
+import { featureGate } from '../../middleware/merlt/featureGate';
 
 /**
  * Mount point for all MERL-T BFF routes.
@@ -44,22 +45,35 @@ import profileRouter from './profile';
  * authenticate. Mount order wins in Express (gotcha #1). graphRouter applies
  * auth per-route, so it is safe to place first (after the no-auth health
  * router). Its own routes 404 cleanly when the path doesn't match.
+ *
+ * Wave 1 cleanup — per-group feature flags (config.merlt.flags.*, see
+ * middleware/merlt/featureGate.ts): each flag gates a whole router group by
+ * the path prefixes that group owns. health/consent/profile/events are base
+ * infrastructure and stay ungated (only the global MERLT_ENABLED kill switch
+ * in app.ts applies to them). expertsRouter (Q&A) is likewise left ungated —
+ * no sub-flag was designated for it.
+ *  - flags.graph          → graphRouter (/graph, /internal/job-callback)
+ *  - flags.contribution   → contribRouter (/contrib, /internal/extraction-callback)
+ *                            + ingestionRouter (/ingestion, community/interpretive)
+ *  - flags.validation     → validateRouter (/validate)
+ *  - flags.ops            → opsRouter (/ops) + opsIngestionRouter (/ops, mechanical
+ *                            ingestion) + nerRouter (/ner)
  */
 const router = Router();
 
 // Mounted at /api/merlt in app.ts — no extra prefix here.
 router.use('/', healthRouter);
-router.use('/', graphRouter);
-router.use('/', contribRouter);
-router.use('/', validateRouter);
-router.use('/', ingestionRouter);
-router.use('/', opsRouter);
-router.use('/', opsIngestionRouter);
+router.use('/', featureGate('graph', ['/graph', '/internal/job-callback']), graphRouter);
+router.use('/', featureGate('contribution', ['/contrib', '/internal/extraction-callback']), contribRouter);
+router.use('/', featureGate('validation', ['/validate']), validateRouter);
+router.use('/', featureGate('contribution', ['/ingestion']), ingestionRouter);
+router.use('/', featureGate('ops', ['/ops']), opsRouter);
+router.use('/', featureGate('ops', ['/ops']), opsIngestionRouter);
 // Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the
 // catch-all auth routers (gotcha #1).
 router.use('/', expertsRouter);
 // Loop β #2 — NER feedback. Per-route auth → order-safe; before catch-all (gotcha #1).
-router.use('/', nerRouter);
+router.use('/', featureGate('ops', ['/ner']), nerRouter);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);
