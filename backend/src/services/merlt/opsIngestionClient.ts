@@ -7,11 +7,9 @@
  * (NOT Authorization: Bearer), and REUSES merltClient's typed error hierarchy
  * (do not redefine).
  *
- * Do not confuse with ingestionClient.ts — that one proxies the INTERPRETIVE
- * community ingestion pipeline (consent-gated, non-admin). This client proxies
- * the deterministic, admin-governed batch pipeline that turns a corpus source
- * (VisuaLex article tree / italia-corpus) into staged graph batches subject to
- * admin review before promotion.
+ * Proxies the deterministic, admin-governed batch pipeline that turns a corpus
+ * source (VisuaLex article tree / italia-corpus) into staged graph batches
+ * subject to admin review before promotion.
  */
 
 import {

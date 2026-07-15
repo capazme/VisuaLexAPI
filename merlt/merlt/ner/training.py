@@ -47,10 +47,10 @@ class NERTrainer:
 
     Example:
         >>> from merlt.ner import LegalNERModel, NERTrainer
-        >>> from merlt.rlcf.ner_feedback_buffer import get_ner_feedback_buffer
+        >>> from merlt.ner.ner_feedback_buffer import NERFeedbackBuffer
         >>>
         >>> model = LegalNERModel()
-        >>> buffer = get_ner_feedback_buffer()
+        >>> buffer = await NERFeedbackBuffer.from_db(session)
         >>> trainer = NERTrainer(model, buffer)
         >>>
         >>> # Training con authority weights (default)

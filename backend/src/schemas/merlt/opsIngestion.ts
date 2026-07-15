@@ -9,9 +9,6 @@ import { z } from 'zod';
  * the route injects them server-side from req.user. Trusting a
  * client-supplied identity here would let a request forge attribution on an
  * irreversible graph-promotion action.
- *
- * Do not confuse with schemas/merlt/ingestion.ts — that one is the
- * INTERPRETIVE community ingestion pipeline, unrelated to this admin surface.
  */
 
 export const runIngestionBodySchema = z.object({

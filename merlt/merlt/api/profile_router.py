@@ -85,9 +85,9 @@ TIER_THRESHOLDS = {
 def _domain_from_urn(article_urn: str) -> Optional[str]:
     """Best-effort legal-domain guess from an article URN.
 
-    Mirrors `NERRLCFIntegration._extract_domain` (rlcf/ner_rlcf_integration.py)
-    but is duplicated here on purpose: profile_router now reads NER feedback
-    directly from the `ner_feedback` Postgres table (this module's own
+    Mirrored `NERRLCFIntegration._extract_domain` (formerly rlcf/ner_rlcf_integration.py,
+    removed as dead code) but is duplicated here on purpose: profile_router reads
+    NER feedback directly from the `ner_feedback` Postgres table (this module's own
     enrichment session) instead of going through the legacy RLCF integration,
     which was reading from a database the modern frontend never writes to.
     """
@@ -356,11 +356,12 @@ async def get_ner_feedback_stats(session: AsyncSession, user_id: str) -> dict:
     Query NER feedback stats per utente dalla tabella Postgres `ner_feedback`
     (stessa sessione enrichment usata da tutte le altre query di questo modulo).
 
-    Prima leggeva `NERRLCFIntegration.get_user_ner_history`, che interroga
-    Feedback/LegalTask/Response (schema RLCF legacy) popolato SOLO dal path
-    `/enrichment/ner-feedback*`. Il frontend moderno scrive invece
-    direttamente su `ner_feedback` via `/api/v1/ner/feedback` (ner_router.py),
-    quindi quelle stats risultavano sempre vuote in produzione.
+    Prima leggeva `NERRLCFIntegration.get_user_ner_history` (rlcf/ner_rlcf_integration.py,
+    rimosso come dead code), che interroga Feedback/LegalTask/Response (schema RLCF
+    legacy) popolato SOLO dal path `/enrichment/ner-feedback*` (anch'esso rimosso).
+    Il frontend moderno scrive invece direttamente su `ner_feedback` via
+    `/api/v1/ner/feedback` (ner_router.py), quindi quelle stats risultavano
+    sempre vuote in produzione.
 
     Returns:
         dict con total, confirmations, corrections, annotations, accuracy

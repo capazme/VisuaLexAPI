@@ -4,7 +4,6 @@ import eventsRouter from './events';
 import graphRouter from './graph';
 import contribRouter from './contrib';
 import validateRouter from './validate';
-import ingestionRouter from './ingestion';
 import opsRouter from './ops';
 import opsIngestionRouter from './opsIngestion';
 import expertsRouter from './experts';
@@ -26,14 +25,8 @@ import { featureGate } from '../../middleware/merlt/featureGate';
  *  - /graph/article/:urn, /graph/ingest, /graph/jobs/:jobId/status (auth)
  *  - /internal/job-callback (internalAuth, NO JWT)
  *
- * Phase 2 endpoints (ingestionRouter): VisuaLex user knowledge → MERL-T
- * ExternalIngestionPipeline.
- *  - /ingestion/preview, /ingestion/process, /ingestion/validate (auth + contributionGuard)
- *  - /ingestion/pending (auth only, read)
- *
  * Admin mechanical ingestion endpoints (opsIngestionRouter) — deterministic,
- * zero-LLM corpus→graph batches, admin-reviewed before promotion. NOT the
- * same pipeline as ingestionRouter above (that one is community/interpretive).
+ * zero-LLM corpus→graph batches, admin-reviewed before promotion.
  *  - /ops/ingestion/run, /ops/ingestion/batches[/:batchId][/promote|/reject]
  *    (auth + requireAdmin)
  *
@@ -54,7 +47,6 @@ import { featureGate } from '../../middleware/merlt/featureGate';
  * no sub-flag was designated for it.
  *  - flags.graph          → graphRouter (/graph, /internal/job-callback)
  *  - flags.contribution   → contribRouter (/contrib, /internal/extraction-callback)
- *                            + ingestionRouter (/ingestion, community/interpretive)
  *  - flags.validation     → validateRouter (/validate)
  *  - flags.ops            → opsRouter (/ops) + opsIngestionRouter (/ops, mechanical
  *                            ingestion) + nerRouter (/ner)
@@ -66,7 +58,6 @@ router.use('/', healthRouter);
 router.use('/', featureGate('graph', ['/graph', '/internal/job-callback']), graphRouter);
 router.use('/', featureGate('contribution', ['/contrib', '/internal/extraction-callback']), contribRouter);
 router.use('/', featureGate('validation', ['/validate']), validateRouter);
-router.use('/', featureGate('contribution', ['/ingestion']), ingestionRouter);
 router.use('/', featureGate('ops', ['/ops']), opsRouter);
 router.use('/', featureGate('ops', ['/ops']), opsIngestionRouter);
 // Loop β Phase F — experts Q&A. Per-route auth → order-safe; before the

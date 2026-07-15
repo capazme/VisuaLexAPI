@@ -36,7 +36,6 @@ log.info("Environment variables loaded", env_file=str(env_file))
 from merlt.storage.enrichment import init_db, close_db, create_tables
 from merlt.api.auth import verify_api_key, optional_api_key
 from merlt.api import (
-    ingestion_router,
     feedback_router,
     auth_router,
     experts_router,
@@ -52,7 +51,6 @@ from merlt.api import (
     citation_router,
     dashboard_router,
     profile_router,
-    statistics_router,
     rlcf_router,
     expert_metrics_router,
     ws_router,
@@ -63,7 +61,6 @@ from merlt.api import (
     audit_router,
     circuit_breaker_router,
     regression_router,
-    schedule_router,
     quarantine_router,
     api_keys_router,
     ner_router,
@@ -194,7 +191,6 @@ app.add_middleware(
 )
 
 # Register routers
-app.include_router(ingestion_router, prefix="/api/v1", tags=["ingestion"])
 app.include_router(feedback_router, prefix="/api/v1", tags=["feedback"])
 app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(experts_router, prefix="/api/v1", tags=["experts"])
@@ -211,7 +207,6 @@ app.include_router(validity_router, prefix="/api/v1", tags=["validity"])
 app.include_router(citation_router, prefix="/api/v1", tags=["citations"])
 app.include_router(dashboard_router, prefix="/api/v1", tags=["dashboard"])
 app.include_router(profile_router, prefix="/api/v1", tags=["profile"])
-app.include_router(statistics_router, prefix="/api/v1", tags=["statistics"])
 app.include_router(rlcf_router, prefix="/api/v1", tags=["rlcf"])
 app.include_router(expert_metrics_router, prefix="/api/v1", tags=["expert-metrics"])
 app.include_router(ws_router, prefix="/api/v1", tags=["websocket"])
@@ -222,7 +217,6 @@ app.include_router(devils_advocate_router, prefix="/api/v1", tags=["devils-advoc
 app.include_router(audit_router, prefix="/api/v1", tags=["audit"])
 app.include_router(circuit_breaker_router, prefix="/api/v1", tags=["circuit-breaker"])
 app.include_router(regression_router, prefix="/api/v1", tags=["regression"])
-app.include_router(schedule_router, prefix="/api/v1", tags=["ingestion-schedules"])
 app.include_router(quarantine_router, prefix="/api/v1", tags=["feedback-quarantine"])
 app.include_router(api_keys_router, prefix="/api/v1", tags=["api-keys"])
 app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
@@ -303,7 +297,6 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "endpoints": {
-            "ingestion": "/api/v1/ingestion",
             "feedback": "/api/v1/feedback",
             "auth": "/api/v1/auth",
             "experts": "/api/v1/experts",
@@ -318,7 +311,6 @@ async def root():
             "citations": "/api/v1/citations",
             "dashboard": "/api/v1/dashboard",
             "profile": "/api/v1/profile",
-            "statistics": "/api/v1/statistics",
             "rlcf": "/api/v1/rlcf",
             "expert-metrics": "/api/v1/expert-metrics",
             "policy-evolution": "/api/v1/policy-evolution",
@@ -327,7 +319,6 @@ async def root():
             "audit": "/api/v1/audit",
             "circuit-breaker": "/api/v1/circuit-breaker",
             "regression": "/api/v1/regression",
-            "ingestion-schedules": "/api/v1/ingestion/schedules",
             "feedback-quarantine": "/api/v1/feedback",
             "api-keys": "/api/v1/api-keys",
         },

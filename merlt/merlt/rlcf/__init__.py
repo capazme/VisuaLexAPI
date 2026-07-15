@@ -146,12 +146,6 @@ __all__ = [
     # External Integration
     "authority_sync",
     "external_feedback",
-    # NER Feedback Integration
-    "ner_feedback_buffer",
-    "ner_rlcf_integration",
-    "NERFeedbackBuffer",
-    "NERRLCFIntegration",
-    "get_ner_rlcf_integration",
     # Advanced Training
     "replay_buffer",
     "curriculum_learning",
@@ -204,14 +198,4 @@ def __getattr__(name):
     if name == "get_scheduler":
         from merlt.rlcf.training_scheduler import get_scheduler
         return get_scheduler
-    # NER RLCF Integration
-    if name == "NERFeedbackBuffer":
-        from merlt.rlcf.ner_feedback_buffer import NERFeedbackBuffer
-        return NERFeedbackBuffer
-    if name == "NERRLCFIntegration":
-        from merlt.rlcf.ner_rlcf_integration import NERRLCFIntegration
-        return NERRLCFIntegration
-    if name == "get_ner_rlcf_integration":
-        from merlt.rlcf.ner_rlcf_integration import get_ner_rlcf_integration
-        return get_ner_rlcf_integration
     raise AttributeError(f"module 'merlt.rlcf' has no attribute '{name}'")
