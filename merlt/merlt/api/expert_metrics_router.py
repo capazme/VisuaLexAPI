@@ -438,16 +438,57 @@ async def get_recent_queries(
         return RecentQueriesResponse()
 
 
+def _build_contributions_from_full_trace(full_trace: dict) -> List[ExpertContribution]:
+    """
+    Ricostruisce i contributi per-expert dal `full_trace` JSONB già persistito
+    su `qa_traces` (nessuna tabella dedicata al trace: viene scritto da
+    experts_router.py ad ogni `/experts/query` quando `include_trace=True`).
+
+    Legge `full_trace["stages"]["expert_executions"][*]` — stessa struttura
+    letta da `_build_graph_traversal`/`_build_retrieved_sources` in
+    experts_router.py:346-348,486-487 — dove ogni entry è la serializzazione
+    di `ExpertExecution.to_dict()` (pipeline_types.py) e il suo `output` è
+    la serializzazione di `ExpertResponse.to_dict()` (experts/base.py).
+    """
+    stages = (full_trace or {}).get("stages") or {}
+    execs = stages.get("expert_executions") or []
+    contributions: List[ExpertContribution] = []
+    for ex in execs:
+        if not isinstance(ex, dict):
+            continue
+        output = ex.get("output") or {}
+        expert_name = ex.get("expert_type") or output.get("expert_type") or "unknown"
+        confidence = float(ex.get("confidence", output.get("confidence", 0.0)) or 0.0)
+        legal_basis = output.get("legal_basis") or []
+        reasoning_steps = output.get("reasoning_steps") or []
+        key_points = [
+            rs.get("description", "") for rs in reasoning_steps if isinstance(rs, dict) and rs.get("description")
+        ][:5]
+        interpretation = output.get("interpretation") or ""
+        contributions.append(
+            ExpertContribution(
+                expert_name=expert_name,
+                confidence=confidence,
+                # `weight` (routing/gating weight) is only attached to the live
+                # SynthesisResult.expert_contributions, not persisted into
+                # full_trace's expert_executions — left at the model default.
+                sources_cited=len(legal_basis),
+                key_points=key_points,
+                excerpt=interpretation[:300] if interpretation else None,
+            )
+        )
+    return contributions
+
+
 @router.get("/trace/{trace_id}", response_model=ReasoningTrace)
 async def get_reasoning_trace(
     trace_id: str,
     api_key: ApiKey = Depends(verify_api_key),
 ) -> ReasoningTrace:
     """
-    Recupera reasoning trace completo per una query.
-
-    NOTA: Attualmente restituisce trace vuoto.
-          Per popolare i dati, implementare persistenza dei trace.
+    Recupera reasoning trace completo per una query, letto da `qa_traces`
+    (il trace è già persistito da experts_router.py ad ogni `/experts/query`;
+    nessuna tabella dedicata necessaria).
 
     Args:
         trace_id: ID del trace
@@ -456,34 +497,45 @@ async def get_reasoning_trace(
         ReasoningTrace con contributi di ogni expert
 
     Raises:
-        HTTPException: Se trace non trovato
-
-    Example:
-        >>> GET /api/v1/expert-metrics/trace/trace_abc123
-        {
-          "trace_id": "trace_abc123",
-          "query": "",
-          "contributions": [],
-          "final_confidence": 0.0
-        }
+        HTTPException: 404 se il trace non esiste
     """
     log.info("Getting reasoning trace", trace_id=trace_id)
 
-    # TODO: Implementare persistenza trace nel sistema Expert
-    # Per ora ritorna un trace vuoto con l'ID richiesto
+    from merlt.rlcf.database import get_async_session
+    from merlt.experts.models import QATrace
+    from sqlalchemy import select
+
+    async with get_async_session() as session:
+        result = await session.execute(select(QATrace).where(QATrace.trace_id == trace_id))
+        trace = result.scalar_one_or_none()
+
+    if trace is None:
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+
+    contributions = _build_contributions_from_full_trace(trace.full_trace or {})
+    if not contributions:
+        # `include_trace=False` at query time (or full_trace missing) — no
+        # per-expert pipeline detail is available; degrade to one coarse
+        # contribution per selected expert using the trace-level confidence.
+        overall_confidence = float(trace.confidence or 0.0)
+        contributions = [
+            ExpertContribution(expert_name=name, confidence=overall_confidence)
+            for name in (trace.selected_experts or [])
+        ]
+
     return ReasoningTrace(
-        trace_id=trace_id,
-        query="",
-        timestamp=datetime.now().isoformat(),
-        contributions=[],
+        trace_id=trace.trace_id,
+        query=trace.query or "",
+        timestamp=trace.created_at.isoformat() if trace.created_at else datetime.now().isoformat(),
+        contributions=contributions,
         aggregation_method="weighted_consensus",
-        final_confidence=0.0,
+        final_confidence=float(trace.confidence or 0.0),
         confidence_ci=(0.0, 0.0),
-        synthesis="",
-        mode="",
+        synthesis=trace.synthesis_text or "",
+        mode=trace.synthesis_mode or "",
         has_alternatives=False,
-        total_latency_ms=0,
-        sources_count=0,
+        total_latency_ms=trace.execution_time_ms or 0,
+        sources_count=len(trace.sources or []),
     )
 
 

@@ -672,54 +672,132 @@ class NERRLCFIntegration:
 
     async def get_ner_feedback_stats(self) -> Dict[str, Any]:
         """
-        Statistiche aggregate feedback NER.
+        Statistiche aggregate feedback NER, lette dalla tabella Postgres
+        `ner_feedback` (enrichment DB) invece che dal buffer in-memory o dallo
+        schema RLCF legacy (Feedback/LegalTask/Response).
+
+        Wave 3 GAP 3: il buffer `NERFeedbackBuffer` è alimentato SOLO dal path
+        legacy `/enrichment/ner-feedback*` (nessun caller nel BFF/FE attuale —
+        il frontend moderno scrive su `/api/v1/ner/feedback` → ner_router.py →
+        `ner_feedback`), quindi le stats risultavano sempre vuote in
+        produzione. Stessa fonte dati e stesso pattern di aggregazione di
+        `ner_router.py:132` (`ner_feedback_stats`).
+
+        `buffer_stats`/`authority_stats` restano nel dict per compatibilità
+        con l'unico consumer noto (`GET /enrichment/ner-feedback/stats`), ma
+        ora sono ricostruiti dal DB invece che dal buffer.
 
         Returns:
             Dict con statistiche:
             - total_feedback: Totale feedback
             - by_type: Count per tipo
-            - by_domain: Count per dominio
+            - by_domain: Count per dominio (derivato da article_urn)
             - avg_authority: Authority media
             - top_contributors: Top 5 contributori
+            - buffer_stats / authority_stats: shape legacy, sourced from DB
         """
-        stats = {
+        stats: Dict[str, Any] = {
             "total_feedback": 0,
             "by_type": {},
             "by_domain": {},
             "avg_authority": 0.0,
             "top_contributors": [],
             "buffer_stats": {},
+            "authority_stats": {},
         }
 
-        # Get buffer stats
-        stats["buffer_stats"] = await self.buffer.get_buffer_stats()
-        stats["authority_stats"] = await self.buffer.get_authority_stats()
-
         try:
-            async with get_async_session() as session:
-                # Count total NER feedback
-                count_result = await session.execute(
-                    select(func.count(Feedback.id))
-                    .join(Response, Feedback.response_id == Response.id)
-                    .join(LegalTask, Response.task_id == LegalTask.id)
-                    .where(LegalTask.task_type == TaskType.NER.value)
-                )
-                stats["total_feedback"] = count_result.scalar() or 0
+            from merlt.storage.enrichment.database import get_db_session
+            from merlt.storage.enrichment.models import NERFeedback
 
-                # Count by domain
-                domain_result = await session.execute(
+            async with get_db_session() as session:
+                total = (await session.execute(
+                    select(func.count(NERFeedback.id))
+                )).scalar() or 0
+                stats["total_feedback"] = total
+
+                by_type_rows = (await session.execute(
+                    select(NERFeedback.feedback_type, func.count(NERFeedback.id))
+                    .group_by(NERFeedback.feedback_type)
+                )).all()
+                stats["by_type"] = {ft: c for ft, c in by_type_rows}
+
+                by_surface_rows = (await session.execute(
+                    select(NERFeedback.source_surface, func.count(NERFeedback.id))
+                    .group_by(NERFeedback.source_surface)
+                )).all()
+                by_surface = {s: c for s, c in by_surface_rows}
+
+                # Domain has no dedicated column on NERFeedback; derive it
+                # from article_urn (same heuristic as `_extract_domain`).
+                urn_rows = (await session.execute(
+                    select(NERFeedback.article_urn, func.count(NERFeedback.id))
+                    .group_by(NERFeedback.article_urn)
+                )).all()
+                by_domain: Dict[str, int] = {}
+                for urn, count in urn_rows:
+                    domain = self._extract_domain(urn or "") or "unknown"
+                    by_domain[domain] = by_domain.get(domain, 0) + count
+                stats["by_domain"] = by_domain
+
+                # Per-user aggregates power both top_contributors and the
+                # authority distribution (mirrors buffer.get_authority_stats).
+                per_user_rows = (await session.execute(
                     select(
-                        Feedback.legal_domain,
-                        func.count(Feedback.id)
+                        NERFeedback.user_id,
+                        func.count(NERFeedback.id),
+                        func.avg(NERFeedback.user_authority),
                     )
-                    .join(Response, Feedback.response_id == Response.id)
-                    .join(LegalTask, Response.task_id == LegalTask.id)
-                    .where(LegalTask.task_type == TaskType.NER.value)
-                    .group_by(Feedback.legal_domain)
+                    .group_by(NERFeedback.user_id)
+                )).all()
+                per_user_rows = sorted(per_user_rows, key=lambda r: r[1], reverse=True)
+
+                avg_authority_overall = (await session.execute(
+                    select(func.avg(NERFeedback.user_authority))
+                )).scalar()
+                stats["avg_authority"] = (
+                    round(float(avg_authority_overall), 3) if avg_authority_overall is not None else 0.0
                 )
-                stats["by_domain"] = {
-                    domain or "unknown": count
-                    for domain, count in domain_result.all()
+
+                top_contributors = [
+                    {
+                        "user_id": uid,
+                        "feedback_count": count,
+                        "avg_authority": round(float(avg or 0.0), 3),
+                    }
+                    for uid, count, avg in per_user_rows[:5]
+                ]
+                stats["top_contributors"] = top_contributors
+
+                distribution = {"low": 0, "medium": 0, "high": 0, "expert": 0}
+                for _, _, avg in per_user_rows:
+                    a = float(avg or 0.0)
+                    if a < 0.3:
+                        distribution["low"] += 1
+                    elif a < 0.5:
+                        distribution["medium"] += 1
+                    elif a < 0.7:
+                        distribution["high"] += 1
+                    else:
+                        distribution["expert"] += 1
+
+                threshold = self.buffer._training_threshold
+                untrained = (await session.execute(
+                    select(func.count(NERFeedback.id)).where(NERFeedback.used_in_training.is_(False))
+                )).scalar() or 0
+
+                stats["buffer_stats"] = {
+                    "size": total,
+                    "training_ready": untrained >= threshold,
+                    "training_threshold": threshold,
+                    "feedback_types": stats["by_type"],
+                    "sources": by_surface,
+                }
+                stats["authority_stats"] = {
+                    "total_users": len(per_user_rows),
+                    "avg_authority": stats["avg_authority"],
+                    "authority_distribution": distribution,
+                    "top_contributors": top_contributors,
                 }
 
         except Exception as e:

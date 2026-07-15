@@ -45,6 +45,8 @@ from merlt.storage.enrichment.models import (
     PendingRelation,
     RelationVote,
     UserDomainAuthority,
+    NERFeedback,
+    MerltUser,
 )
 
 log = structlog.get_logger()
@@ -78,6 +80,57 @@ TIER_THRESHOLDS = {
     "esperto": {"min": 0.6, "max": 0.8},
     "autorita": {"min": 0.8, "max": 1.0},
 }
+
+
+def _domain_from_urn(article_urn: str) -> Optional[str]:
+    """Best-effort legal-domain guess from an article URN.
+
+    Mirrors `NERRLCFIntegration._extract_domain` (rlcf/ner_rlcf_integration.py)
+    but is duplicated here on purpose: profile_router now reads NER feedback
+    directly from the `ner_feedback` Postgres table (this module's own
+    enrichment session) instead of going through the legacy RLCF integration,
+    which was reading from a database the modern frontend never writes to.
+    """
+    urn_lower = (article_urn or "").lower()
+    if "codice.civile" in urn_lower or "cc" in urn_lower:
+        return "civile"
+    elif "codice.penale" in urn_lower or "cp" in urn_lower:
+        return "penale"
+    elif "procedura.civile" in urn_lower or "cpc" in urn_lower:
+        return "procedura_civile"
+    elif "procedura.penale" in urn_lower or "cpp" in urn_lower:
+        return "procedura_penale"
+    elif "costituzione" in urn_lower:
+        return "costituzionale"
+    elif "amministrativo" in urn_lower or "cpa" in urn_lower:
+        return "amministrativo"
+    return None
+
+
+async def _get_user_baseline(session: AsyncSession, user_id: str) -> float:
+    """Read the persisted B_u baseline for a user, defaulting for unknown users."""
+    result = await session.execute(
+        select(MerltUser.baseline_bu).where(MerltUser.user_id == user_id)
+    )
+    value = result.scalar_one_or_none()
+    return value if value is not None else DEFAULT_BASELINE
+
+
+async def _upsert_merlt_user(session: AsyncSession, user_id: str, **fields) -> MerltUser:
+    """Create-or-update the `merlt_users` row for `user_id`, setting only the
+    provided fields (None values are skipped so PATCH semantics hold for
+    partial requests)."""
+    result = await session.execute(select(MerltUser).where(MerltUser.user_id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = MerltUser(user_id=user_id)
+        session.add(user)
+    for key, value in fields.items():
+        if value is not None:
+            setattr(user, key, value)
+    await session.commit()
+    await session.refresh(user)
+    return user
 
 
 def get_tier_from_score(score: float) -> str:
@@ -298,27 +351,39 @@ def normalize_domain(raw_domain: str | None) -> str | None:
     return domain_map.get(normalized, normalized)
 
 
-async def get_ner_feedback_stats(user_id: str) -> dict:
+async def get_ner_feedback_stats(session: AsyncSession, user_id: str) -> dict:
     """
-    Query NER feedback stats per utente dal sistema RLCF.
+    Query NER feedback stats per utente dalla tabella Postgres `ner_feedback`
+    (stessa sessione enrichment usata da tutte le altre query di questo modulo).
+
+    Prima leggeva `NERRLCFIntegration.get_user_ner_history`, che interroga
+    Feedback/LegalTask/Response (schema RLCF legacy) popolato SOLO dal path
+    `/enrichment/ner-feedback*`. Il frontend moderno scrive invece
+    direttamente su `ner_feedback` via `/api/v1/ner/feedback` (ner_router.py),
+    quindi quelle stats risultavano sempre vuote in produzione.
 
     Returns:
-        dict con total, confirmations, corrections, annotations
+        dict con total, confirmations, corrections, annotations, accuracy
     """
     try:
-        from merlt.rlcf.ner_rlcf_integration import get_ner_rlcf_integration
+        query = (
+            select(NERFeedback.feedback_type, func.count(NERFeedback.id))
+            .where(NERFeedback.user_id == user_id)
+            .group_by(NERFeedback.feedback_type)
+        )
+        result = await session.execute(query)
+        counts = {ft: c for ft, c in result.all()}
 
-        integration = get_ner_rlcf_integration()
-        history = await integration.get_user_ner_history(user_id, limit=1000)
+        confirmations = counts.get("confirmation", 0)
+        corrections = counts.get("correction", 0)
+        # ner_feedback's feedback_type vocabulary is confirmation/correction/
+        # false_positive/missed (no "annotation"); fold the latter two into
+        # the "annotations" bucket so downstream (calculate_authority, the
+        # response's ContributionStatsSimple) keeps its existing 3-bucket
+        # shape and 0.8-weight treatment.
+        annotations = counts.get("false_positive", 0) + counts.get("missed", 0)
+        total = confirmations + corrections + annotations
 
-        total = len(history)
-        confirmations = sum(1 for h in history if h.feedback_type == "confirmation")
-        corrections = sum(1 for h in history if h.feedback_type == "correction")
-        annotations = sum(1 for h in history if h.feedback_type == "annotation")
-
-        # Accuracy: confirmations are "correct" (user validates existing),
-        # corrections/annotations are valuable training data
-        # For track record, count confirmations as high-accuracy, corrections as moderate
         if total > 0:
             # Simplified: confirmations = 100% correct, corrections/annotations = 80% valuable
             accuracy = (confirmations * 1.0 + (corrections + annotations) * 0.8) / total
@@ -349,26 +414,31 @@ async def get_recent_activity(
     """Query attività recente dell'utente (voti, proposte, e NER feedback)."""
     activities = []
 
-    # Get recent NER feedback from RLCF database
+    # Get recent NER feedback from the enrichment `ner_feedback` table (same
+    # session as the rest of this module — see get_ner_feedback_stats's
+    # docstring for why the legacy RLCF-integration history read was dropped).
     try:
-        from merlt.rlcf.ner_rlcf_integration import get_ner_rlcf_integration
-
-        integration = get_ner_rlcf_integration()
-        ner_history = await integration.get_user_ner_history(user_id, limit=limit)
-
-        for item in ner_history:
+        ner_query = (
+            select(NERFeedback)
+            .where(NERFeedback.user_id == user_id)
+            .order_by(NERFeedback.created_at.desc())
+            .limit(limit)
+        )
+        ner_result = await session.execute(ner_query)
+        for item in ner_result.scalars().all():
             # Map feedback_type to outcome
             outcome = "approved" if item.feedback_type == "confirmation" else "pending"
+            selected_text = item.selected_text or ""
 
             activities.append(
                 ProfileActivityEntry(
                     id=f"ner-{item.feedback_id}",
                     type="ner_feedback",
-                    item_name=f"Citazione: {item.selected_text[:40]}..." if len(item.selected_text) > 40 else f"Citazione: {item.selected_text}",
+                    item_name=f"Citazione: {selected_text[:40]}..." if len(selected_text) > 40 else f"Citazione: {selected_text}",
                     item_type="citation",
                     outcome=outcome,
-                    timestamp=item.created_at,
-                    domain=normalize_domain(integration._extract_domain(item.article_urn)),
+                    timestamp=item.created_at or datetime.now(timezone.utc),
+                    domain=normalize_domain(_domain_from_urn(item.article_urn or "")),
                     track_record_delta=0.001 if item.feedback_type == "confirmation" else 0.005,
                     item_id=item.feedback_id,
                 )
@@ -602,7 +672,7 @@ async def get_full_profile(
         vote_stats = await get_vote_stats(session, user_id)
 
         # Query NER feedback stats
-        ner_stats = await get_ner_feedback_stats(user_id)
+        ner_stats = await get_ner_feedback_stats(session, user_id)
 
         # Query domain stats dettagliati
         domains = await get_domain_stats_detailed(session, user_id)
@@ -610,8 +680,8 @@ async def get_full_profile(
         # Query recent activity
         recent_activity = await get_recent_activity(session, user_id, limit=10)
 
-        # Calcola authority (baseline = default per ora, da sostituire con tabella users)
-        baseline = DEFAULT_BASELINE
+        # Calcola authority (baseline persistito in merlt_users, default per utenti nuovi)
+        baseline = await _get_user_baseline(session, user_id)
         authority_score, breakdown = calculate_authority(
             baseline, entity_stats, relation_stats, vote_stats, ner_stats
         )
@@ -799,19 +869,24 @@ async def update_qualification(
     )
 
     try:
-        log.warning(
-            "update_qualification: data not persisted - users table not yet implemented",
-            user_id=user_id,
-        )
-        response.headers["X-MERLT-Warning"] = "Data not persisted - users table not yet implemented"
-
         new_baseline = QUALIFICATION_BASELINE.get(request.qualification, DEFAULT_BASELINE)
+
+        await _upsert_merlt_user(
+            session,
+            user_id,
+            qualification=request.qualification.value,
+            specializations=(
+                [d.value for d in request.specializations] if request.specializations else None
+            ),
+            years_experience=request.years_experience,
+            baseline_bu=new_baseline,
+        )
 
         # Refetch stats from database
         entity_stats = await get_entity_contribution_stats(session, user_id)
         relation_stats = await get_relation_contribution_stats(session, user_id)
         vote_stats = await get_vote_stats(session, user_id)
-        ner_stats = await get_ner_feedback_stats(user_id)
+        ner_stats = await get_ner_feedback_stats(session, user_id)
         domains = await get_domain_stats_detailed(session, user_id)
         recent_activity = await get_recent_activity(session, user_id, limit=10)
 
@@ -894,6 +969,7 @@ async def update_notifications(
     request: UpdateNotificationsRequest,
     response: Response,
     user_id: str = Query(..., description="User ID from auth context"),
+    session: AsyncSession = Depends(get_db_session_dependency),
     api_key: ApiKey = Depends(verify_api_key),
 ) -> NotificationPreferences:
     """Aggiorna preferenze notifiche."""
@@ -904,16 +980,18 @@ async def update_notifications(
     )
 
     try:
-        log.warning(
-            "update_notifications: data not persisted - users table not yet implemented",
-            user_id=user_id,
+        user = await _upsert_merlt_user(
+            session,
+            user_id,
+            email_on_validation=request.email_on_validation,
+            email_on_authority_change=request.email_on_authority_change,
+            email_weekly_summary=request.email_weekly_summary,
         )
-        response.headers["X-MERLT-Warning"] = "Data not persisted - users table not yet implemented"
 
         prefs = NotificationPreferences(
-            email_on_validation=request.email_on_validation if request.email_on_validation is not None else True,
-            email_on_authority_change=request.email_on_authority_change if request.email_on_authority_change is not None else True,
-            email_weekly_summary=request.email_weekly_summary if request.email_weekly_summary is not None else False,
+            email_on_validation=user.email_on_validation if user.email_on_validation is not None else True,
+            email_on_authority_change=user.email_on_authority_change if user.email_on_authority_change is not None else True,
+            email_weekly_summary=user.email_weekly_summary if user.email_weekly_summary is not None else False,
         )
 
         log.info("Notification preferences updated", preferences=prefs.model_dump())

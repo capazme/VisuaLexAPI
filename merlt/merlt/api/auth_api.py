@@ -18,6 +18,8 @@ Esempio:
     >>> app.include_router(router, prefix="/api/v1")
 """
 
+import os
+import json
 import structlog
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
@@ -213,9 +215,6 @@ class AuthorityResponseModel(BaseModel):
 # Service singleton
 _service: Optional[AuthoritySyncService] = None
 
-# Cache authority in-memory (in produzione: Redis)
-_authority_cache: Dict[str, Dict[str, Any]] = {}
-
 
 def get_service() -> AuthoritySyncService:
     """Dependency injection per service."""
@@ -223,6 +222,104 @@ def get_service() -> AuthoritySyncService:
     if _service is None:
         _service = AuthoritySyncService()
     return _service
+
+
+# =============================================================================
+# AUTHORITY CACHE (Redis, fail-open)
+# =============================================================================
+# Wave 3 GAP 4: the previous in-memory `_authority_cache: Dict` had no TTL and
+# evaporated on every API restart/multi-worker deploy. Redis connection reuses
+# the same fail-open pattern as `api/rate_limit.py::_get_redis` — any Redis
+# outage degrades to a cache-miss (never raises), so `/auth/*` keeps working
+# without authority persistence rather than 500ing.
+
+_AUTHORITY_CACHE_PREFIX = "authority:"
+_AUTHORITY_CACHE_TTL_SECONDS = int(os.environ.get("AUTHORITY_CACHE_TTL_SECONDS", "86400"))
+
+_redis_client = None
+_redis_checked = False
+
+
+async def _get_redis():
+    """Get or create the Redis async client. Returns None if unavailable."""
+    global _redis_client, _redis_checked
+
+    if _redis_checked and _redis_client is None:
+        return None
+
+    if _redis_client is not None:
+        return _redis_client
+
+    _redis_checked = True
+    try:
+        import redis.asyncio as aioredis
+
+        redis_url = os.environ.get("REDIS_URL")
+        if redis_url:
+            client = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2)
+        else:
+            client = aioredis.Redis(
+                host=os.environ.get("REDIS_HOST", "localhost"),
+                port=int(os.environ.get("REDIS_PORT", "6379")),
+                db=int(os.environ.get("REDIS_AUTHORITY_DB", "0")),
+                decode_responses=True,
+                socket_connect_timeout=2,
+            )
+        await client.ping()
+        _redis_client = client
+        log.info("Authority cache Redis connected")
+        return _redis_client
+    except Exception as e:
+        log.warning("Authority cache Redis unavailable, falling back to cache-miss", error=str(e))
+        _redis_client = None
+        return None
+
+
+async def _get_cached_authority(user_id: str) -> Optional[Dict[str, Any]]:
+    """Fail-open read: Redis miss/outage is treated as a cache-miss (`None`)."""
+    redis = await _get_redis()
+    if redis is None:
+        return None
+    try:
+        raw = await redis.get(f"{_AUTHORITY_CACHE_PREFIX}{user_id}")
+        return json.loads(raw) if raw else None
+    except Exception as e:
+        log.warning("Authority cache read failed, treating as cache-miss", error=str(e))
+        return None
+
+
+async def _set_cached_authority(user_id: str, value: Dict[str, Any]) -> None:
+    """Fail-open write: a Redis outage never blocks the caller (`sync_user`)."""
+    redis = await _get_redis()
+    if redis is None:
+        return
+    try:
+        await redis.set(
+            f"{_AUTHORITY_CACHE_PREFIX}{user_id}",
+            json.dumps(value),
+            ex=_AUTHORITY_CACHE_TTL_SECONDS,
+        )
+    except Exception as e:
+        log.warning("Authority cache write failed", error=str(e))
+
+
+async def _update_cached_authority(user_id: str, **updates: Any) -> None:
+    """GET+merge+SET (KEEPTTL), only mutating an existing entry — mirrors the
+    previous in-memory `if user_id in _authority_cache: ...` guard so a delta
+    never creates a cache entry for a user that was never synced."""
+    redis = await _get_redis()
+    if redis is None:
+        return
+    key = f"{_AUTHORITY_CACHE_PREFIX}{user_id}"
+    try:
+        raw = await redis.get(key)
+        if not raw:
+            return
+        data = json.loads(raw)
+        data.update(updates)
+        await redis.set(key, json.dumps(data), keepttl=True)
+    except Exception as e:
+        log.warning("Authority cache update failed", error=str(e))
 
 
 # =============================================================================
@@ -275,12 +372,12 @@ async def sync_user(
         # Sync
         authority, breakdown = await service.sync_user(user_data)
 
-        # Cache
-        _authority_cache[request.merlt_user_id] = {
+        # Cache (fail-open Redis; a cache-write failure never fails the sync)
+        await _set_cached_authority(request.merlt_user_id, {
             "authority": authority,
             "breakdown": breakdown.to_dict(),
             "synced_at": datetime.now(timezone.utc).isoformat(),
-        }
+        })
 
         return SyncResponseModel(
             success=True,
@@ -311,7 +408,7 @@ async def get_authority(user_id: str) -> AuthorityResponseModel:
     """Recupera authority utente dal cache."""
     log.info("API: get_authority", user_id=user_id)
 
-    cached = _authority_cache.get(user_id)
+    cached = await _get_cached_authority(user_id)
 
     if cached:
         return AuthorityResponseModel(
@@ -372,9 +469,8 @@ async def apply_delta(
 
         new_authority = max(0.0, min(1.0, request.current_authority + delta))
 
-        # Aggiorna cache se presente
-        if request.user_id in _authority_cache:
-            _authority_cache[request.user_id]["authority"] = new_authority
+        # Aggiorna cache se presente (no-op se l'utente non è mai stato sincato)
+        await _update_cached_authority(request.user_id, authority=new_authority)
 
         return DeltaResponseModel(
             success=True,

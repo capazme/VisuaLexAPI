@@ -687,6 +687,40 @@ class NERFeedback(Base):
 
 
 # ====================================================
+# 8c. MERLT USERS (qualification, baseline B_u, notification prefs)
+# ====================================================
+class MerltUser(Base):
+    """
+    Persisted user profile settings (Wave 3 GAP 1).
+
+    Previously `PATCH /profile/qualification` and `PATCH /profile/notifications`
+    computed a response but never persisted anything ("users table not yet
+    implemented"), and `get_full_profile` always used `DEFAULT_BASELINE`. This
+    table closes that gap: one row per VisuaLex user id (opaque string, never
+    an FK, same convention as everywhere else in this module).
+    """
+
+    __tablename__ = "merlt_users"
+
+    user_id = Column(String(100), primary_key=True)
+    display_name = Column(String(200))
+    qualification = Column(String(50))
+    specializations = Column(JSON)
+    years_experience = Column(Integer)
+    baseline_bu = Column(Float, default=0.3)
+
+    email_on_validation = Column(Boolean, default=True)
+    email_on_authority_change = Column(Boolean, default=True)
+    email_weekly_summary = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<MerltUser(user_id={self.user_id}, qualification={self.qualification})>"
+
+
+# ====================================================
 # 9. ENTITY ISSUE REPORTS (RLCF Feedback Loop)
 # ====================================================
 class EntityIssueReport(Base):
@@ -883,5 +917,6 @@ __all__ = [
     "TrackingEventRecord",
     "NERFeedback",
     "MerltIngestionBatch",
+    "MerltUser",
     "PENDING_REVIEW_TTL_DAYS",
 ]
