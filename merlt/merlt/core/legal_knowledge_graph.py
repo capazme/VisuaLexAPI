@@ -73,11 +73,6 @@ from merlt.pipeline.multivigenza import (
     MultivigenzaPipeline,
     MultivigenzaResult,
 )
-from merlt.pipeline.enrichment import (
-    EnrichmentPipeline,
-    EnrichmentConfig,
-    EnrichmentResult,
-)
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 
 # Sources
@@ -1087,94 +1082,6 @@ class LegalKnowledgeGraph:
     #                           ENRICHMENT API
     # ═══════════════════════════════════════════════════════════════════════════
 
-    async def enrich(
-        self,
-        config: EnrichmentConfig,
-    ) -> EnrichmentResult:
-        """
-        Arricchisce il Knowledge Graph con entità strutturate.
-
-        Estrae Concetti, Principi, Definizioni e altre entità dalle fonti
-        configurate (Brocardi, manuali PDF, etc.) e le collega al backbone
-        esistente (Norma, Comma).
-
-        Questa è la funzionalità core per l'enrichment incrementale del grafo,
-        progettata per essere:
-        - **Riproducibile**: Stessa config → stesso output
-        - **Scalabile**: Da Libro IV a tutta la legislazione
-        - **Robusto**: Checkpoint, retry, gestione errori
-        - **Incrementale**: Eseguibile più volte senza duplicati
-
-        Args:
-            config: Configurazione dell'enrichment con:
-                - sources: Fonti da cui estrarre (BrocardiSource, ManualSource)
-                - entity_types: Tipi di entità da estrarre
-                - scope: Filtro articoli (libro, range, URN)
-                - llm_model: Modello LLM per estrazione
-                - checkpoint_dir: Directory per checkpoint/resume
-
-        Returns:
-            EnrichmentResult con statistiche e errori
-
-        Example:
-            >>> from merlt.pipeline.enrichment import EnrichmentConfig
-            >>> from merlt.pipeline.enrichment.sources import BrocardiSource, ManualSource
-            >>>
-            >>> config = EnrichmentConfig(
-            ...     sources=[
-            ...         BrocardiSource(),
-            ...         ManualSource(path="data/manuali/libro_iv/"),
-            ...     ],
-            ...     entity_types=["concetto", "principio", "definizione"],
-            ...     scope={"libro": "IV", "articoli": (1173, 2059)},
-            ... )
-            >>>
-            >>> result = await kg.enrich(config)
-            >>> print(f"Creati {result.stats.total_entities_created} entità")
-
-        Note:
-            - Richiede connessione attiva (chiamare connect() prima)
-            - Richiede OPENROUTER_API_KEY in env per estrazione LLM
-            - Il progress viene salvato in checkpoint per resume automatico
-        """
-        if not self._connected:
-            raise RuntimeError("Not connected. Call connect() first.")
-
-        # Lazy import per evitare circular
-        from merlt.rlcf.ai_service import OpenRouterService
-
-        log.info(
-            f"Starting enrichment: {len(config.sources)} sources, "
-            f"scope={config.scope}"
-        )
-
-        # Inizializza LLM service
-        llm_service = OpenRouterService()
-
-        try:
-            # Crea pipeline con integrazione completa:
-            # - Qdrant per storage vettoriale dei chunk
-            # - BridgeBuilder per collegamento chunk ↔ entità
-            pipeline = EnrichmentPipeline(
-                graph_client=self._falkordb,
-                embedding_service=self._embedding_service,
-                llm_service=llm_service,
-                config=config,
-                qdrant_client=self._qdrant,
-                bridge_builder=self._bridge_builder,
-                qdrant_collection=self.config.qdrant_collection,
-            )
-
-            # Esegui enrichment
-            result = await pipeline.run()
-
-            log.info(f"Enrichment completed: {result.stats.total_entities_created} entities created")
-            return result
-
-        finally:
-            # Cleanup LLM service
-            await llm_service.close()
-
     async def cleanup_dottrina(self, min_version: str = "2.0") -> int:
         """
         Cancella nodi Dottrina con schema vecchio.
@@ -1278,6 +1185,4 @@ __all__ = [
     "MerltConfig",
     "UnifiedIngestionResult",
     "InterpretationResult",
-    "EnrichmentConfig",
-    "EnrichmentResult",
 ]

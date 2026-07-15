@@ -409,12 +409,6 @@ class EnrichmentResult:
     Risultato finale di una pipeline di enrichment.
 
     Contiene statistiche, errori e informazioni sulle entità create.
-
-    Example:
-        >>> result = await kg.enrich(config)
-        >>> print(f"Creati {result.stats.total_entities_created} entità")
-        >>> if result.errors:
-        ...     print(f"Con {len(result.errors)} errori")
     """
 
     # Statistiche

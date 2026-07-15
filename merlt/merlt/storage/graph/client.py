@@ -278,54 +278,6 @@ class FalkorDBClient:
             # If nodes not found or no path exists, return None silently
             return None
 
-    async def traverse(
-        self,
-        start_node: str,
-        relation_weights: Dict[str, float],
-        max_depth: int = 3,
-        limit: int = 20
-    ) -> List[Dict[str, Any]]:
-        """
-        Weighted graph traversal for expert-specific retrieval.
-
-        Args:
-            start_node: Starting node URN
-            relation_weights: Weight per relation type (from theta_traverse)
-            max_depth: Maximum traversal depth
-            limit: Maximum results
-
-        Returns:
-            List of reachable nodes with path scores
-
-        Example:
-            nodes = await client.traverse(
-                "/eli/it/cc/1942/03/16/262/art1453/ita",
-                {"interpreta": 0.8, "disciplina": 0.6, "contiene": 0.3},
-                max_depth=2,
-                limit=10
-            )
-        """
-        # Build relation type filter for weighted traversal
-        relation_types = "|".join(relation_weights.keys())
-
-        cypher = f"""
-            MATCH path = (start:Norma {{URN: $start_urn}})-[r:{relation_types}*1..{max_depth}]-(n)
-            WITH n, r, length(path) AS depth
-            RETURN DISTINCT n.URN AS urn, n.estremi AS estremi,
-                   n.testo_vigente AS testo, depth
-            ORDER BY depth ASC
-            LIMIT {limit}
-        """
-
-        results = await self.query(cypher, {"start_urn": start_node})
-
-        # v2 TODO: Apply relation_weights to compute actual path scores
-        # For now, just return results with depth as score
-        for result in results:
-            result["score"] = 1.0 / (result.get("depth", 1) + 1)
-
-        return results
-
     async def get_related_nodes_for_article(
         self,
         article_urn: str,

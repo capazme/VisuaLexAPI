@@ -1,13 +1,12 @@
 """
-Entity Graph Writer with 3-Layer Deduplication
-===============================================
+Entity Graph Writer with Deduplication
+=======================================
 
 Writes approved entities from pending_entities to FalkorDB graph.
 
-Deduplication Strategy (3 Layers):
+Deduplication Strategy:
 1. **Mechanical**: Exact match on normalized (nome, tipo)
-2. **LLM Semantic**: Embedding similarity for near-duplicates
-3. **Peer-Reviewed**: Community validates no duplicates (via votes)
+2. **Peer-Reviewed**: Community validates no duplicates (via votes)
 
 Entity Node Schema:
     (:Entity:{EntityType} {
@@ -81,27 +80,20 @@ class EntityGraphWriter:
 
     Deduplication Layers:
     1. Mechanical: Exact match on normalized (nome, tipo)
-    2. LLM Semantic: Embedding similarity (cosine > 0.95)
-    3. Peer-Reviewed: Community flags duplicates via votes
+    2. Peer-Reviewed: Community flags duplicates via votes
     """
 
     def __init__(
         self,
         falkordb_client: FalkorDBClient,
-        embedding_service=None,  # Optional for Layer 2
-        semantic_threshold: float = 0.95,  # Cosine similarity threshold
     ):
         """
         Initialize writer.
 
         Args:
             falkordb_client: FalkorDB client
-            embedding_service: Optional EmbeddingService for semantic dedup
-            semantic_threshold: Cosine similarity threshold for duplicates
         """
         self.falkordb = falkordb_client
-        self.embedding_service = embedding_service
-        self.semantic_threshold = semantic_threshold
         self._timestamp = None
 
     async def write_entity(
@@ -145,22 +137,7 @@ class EntityGraphWriter:
                     duplicate_of=duplicate_id,
                 )
 
-            # Layer 2: LLM Semantic deduplication
-            if self.embedding_service:
-                duplicate = await self._check_duplicate_llm(entity.entity_text, entity.descrizione, entity.entity_type)
-
-                if duplicate:
-                    log.info("Layer 2: LLM semantic duplicate found", existing_id=duplicate["existing_id"], similarity=duplicate["similarity"])
-                    await self._enrich_existing_entity(duplicate["existing_id"], entity)
-                    await self._link_provisional_source(entity.entity_id, duplicate["existing_id"])
-                    return WriteResult(
-                        success=True,
-                        node_id=duplicate["existing_id"],
-                        action="enriched_existing",
-                        duplicate_of=duplicate["existing_id"],
-                    )
-
-        # Layer 3: Peer-reviewed (already handled via entity_votes 'duplicate' type)
+        # Layer 2 (peer-reviewed) already handled via entity_votes 'duplicate' type
         # If community flagged as duplicate, it shouldn't reach here (rejected in validation)
 
         # No duplicate found → Create new node
@@ -217,52 +194,6 @@ class EntityGraphWriter:
 
         if result and len(result) > 0:
             return result[0]["id"]
-
-        return None
-
-    async def _check_duplicate_llm(
-        self,
-        entity_text: str,
-        descrizione: Optional[str],
-        entity_type: str,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Layer 2: Check for semantic duplicates using embeddings.
-
-        Args:
-            entity_text: Entity name
-            descrizione: Entity description
-            entity_type: Entity type
-
-        Returns:
-            Dict with existing_id and similarity if duplicate, None otherwise
-
-        Logic:
-            - Generate embedding for (entity_text + descrizione)
-            - Query existing entities of same type
-            - Compute cosine similarity
-            - Return if similarity > threshold
-        """
-        if not self.embedding_service:
-            return None
-
-        # Combine text and description
-        combined_text = f"{entity_text}. {descrizione}" if descrizione else entity_text
-
-        # Generate embedding
-        try:
-            query_embedding = await self.embedding_service.embed_query(combined_text)
-        except Exception as e:
-            log.warning("Failed to generate embedding for dedup", error=str(e))
-            return None
-
-        # Get existing entities of same type from graph
-        # Note: We'll need to add embeddings to Entity nodes for this to work
-        # For now, fallback to text similarity (Levenshtein or similar)
-
-        # TODO: Implement proper embedding-based similarity
-        # For Phase 1, mechanical dedup is sufficient
-        # This will be enhanced in Phase 2 with vector storage
 
         return None
 

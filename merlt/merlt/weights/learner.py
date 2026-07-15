@@ -223,8 +223,6 @@ class WeightLearner:
             gradient = self._compute_retrieval_gradient(feedback, current)
         elif category == "expert_traversal":
             gradient = self._compute_traversal_gradient(feedback, current)
-        elif category == "gating":
-            gradient = self._compute_gating_gradient(feedback, current)
         else:
             log.warning(f"Unknown category for gradient: {category}")
 
@@ -358,19 +356,6 @@ class WeightLearner:
             )
 
         return gradient
-
-    def _compute_gating_gradient(
-        self,
-        feedback: RLCFFeedback,
-        current: WeightConfig
-    ) -> Dict[str, float]:
-        """
-        Calcola gradiente per pesi gating.
-
-        Aumenta prior degli expert che hanno performato bene.
-        """
-        # TODO: Implementare quando abbiamo output per-expert
-        return {}
 
     def _apply_update(
         self,
