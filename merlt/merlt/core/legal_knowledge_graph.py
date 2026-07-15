@@ -81,11 +81,15 @@ from merlt.pipeline.enrichment import (
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 
 # Sources
-from merlt.clients import NormattivaScraper, BrocardiScraper, NormaVisitata, Norma, NormTree
-
-# TODO: Implement locally or copy from visualex-api
-# from merlt.utils.urngenerator import generate_urn
-# from merlt.utils.treextractor import NormTree, get_article_position, get_hierarchical_tree
+from merlt.clients import (
+    NormattivaScraper,
+    BrocardiScraper,
+    NormaVisitata,
+    Norma,
+    NormTree,
+    get_hierarchical_tree,
+)
+from merlt.utils.urngenerator import generate_urn
 
 # Embeddings (optional, loaded lazily)
 try:
@@ -712,23 +716,19 @@ class LegalKnowledgeGraph:
 
     async def _get_cached_norm_tree(self, tipo_atto: str) -> Optional[Any]:
         """Get cached NormTree for act type, or fetch and cache it."""
-        # TODO: Implement generate_urn and get_hierarchical_tree locally
-        log.warning(f"NormTree fetch disabled - utilities not yet implemented")
-        return None
+        if tipo_atto not in self._norm_trees:
+            try:
+                # Genera URN direttamente (Norma non ha property .urn)
+                urn = generate_urn(act_type=tipo_atto, urn_flag=True)
+                if urn:
+                    tree, _count = await get_hierarchical_tree(urn)
+                    if isinstance(tree, NormTree):
+                        self._norm_trees[tipo_atto] = tree
+            except Exception as e:
+                log.warning(f"Could not fetch NormTree for {tipo_atto}: {e}")
+                return None
 
-        # if tipo_atto not in self._norm_trees:
-        #     try:
-        #         # Genera URN direttamente (Norma non ha property .urn)
-        #         urn = generate_urn(act_type=tipo_atto, urn_flag=True)
-        #         if urn:
-        #             tree, status = await get_hierarchical_tree(urn)
-        #             if status == 200 and isinstance(tree, NormTree):
-        #                 self._norm_trees[tipo_atto] = tree
-        #     except Exception as e:
-        #         log.warning(f"Could not fetch NormTree for {tipo_atto}: {e}")
-        #         return None
-        #
-        # return self._norm_trees.get(tipo_atto)
+        return self._norm_trees.get(tipo_atto)
 
     async def search(
         self,

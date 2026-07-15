@@ -12,6 +12,7 @@ Every heavy/optional piece is best-effort + fail-open: a missing dependency
 degrades to fewer capabilities and is logged — it never blocks Q&A.
 """
 
+import os
 from typing import Any, Dict, List
 
 import structlog
@@ -44,6 +45,28 @@ async def _build_tools() -> list:
         log.warning("FalkorDB connect failed — graph grounding degraded", error=str(e))
         falkordb = None
 
+    # Bridge Table (chunk↔node mapping): built once, hoisted out of the
+    # semantic_search_enabled flag so VerificationTool can use it regardless of
+    # that flag. BridgeTableConfig defaults to localhost:5433/rlcf_dev, which is
+    # unreachable inside the container network (the bridge silently failed to
+    # connect → zero graph enrichment). Point it at the enrichment DB
+    # (merlt-postgres:5432/merlt) where the chunk→node bridge_table lives.
+    bridge = None
+    try:
+        from merlt.storage.bridge import BridgeTable, BridgeTableConfig
+        bridge = BridgeTable(BridgeTableConfig(
+            host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
+            port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
+            database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
+            user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
+            password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
+        ))
+        await bridge.connect()
+        log.info("✅ BridgeTable connected (chunk↔node mapping)")
+    except Exception as e:
+        log.warning("BridgeTable unavailable — chunk verification / semantic enrichment degraded", error=str(e))
+        bridge = None
+
     if falkordb is not None:
         try:
             from merlt.tools import GraphSearchTool
@@ -52,54 +75,124 @@ async def _build_tools() -> list:
         except Exception as e:
             log.warning("GraphSearchTool unavailable — experts run without graph traversal", error=str(e))
 
-    if get_runtime_config().get_bool("semantic_search_enabled", False):
+        # Wire the remaining graph-grounded tools. Each is independently
+        # fail-open: a missing/broken tool is logged and skipped, it never
+        # aborts the rest of _build_tools.
+        _graph_tools_before = len(tools)
         try:
-            import os
-            from qdrant_client import QdrantClient
-            from merlt.tools import SemanticSearchTool
-            from merlt.storage.vectors.embeddings import EmbeddingService
-            from merlt.storage.retriever import GraphAwareRetriever, RetrieverConfig
-            from merlt.storage.bridge import BridgeTable, BridgeTableConfig
-            from merlt.rlcf.policy_manager import get_policy_manager
-
-            qdrant = QdrantClient(
-                host=os.getenv("QDRANT_HOST", "localhost"),
-                port=int(os.getenv("QDRANT_PORT", "6333")),
-            )
-            # RetrieverConfig defaults to 'merl_t_dev_chunks' — the populated
-            # collection is 'merl_t_legal_chunks' (backfill_embeddings default),
-            # so name it explicitly or vector search hits an empty collection.
-            collection = (
-                os.getenv("QDRANT_COLLECTION")
-                or os.getenv("MERLT_SEED_COLLECTION")
-                or "merl_t_legal_chunks"
-            )
-            # BridgeTableConfig defaults to localhost:5433/rlcf_dev, which is
-            # unreachable inside the container network (the bridge silently failed
-            # to connect → zero graph enrichment). Point it at the enrichment DB
-            # (merlt-postgres:5432/merlt) where the chunk→node bridge_table lives.
-            bridge = BridgeTable(BridgeTableConfig(
-                host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
-                port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
-                database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
-                user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
-                password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
-            ))
-            await bridge.connect()
-            retriever = GraphAwareRetriever(
-                vector_db=qdrant,
-                graph_db=falkordb,
-                bridge_table=bridge,
-                config=RetrieverConfig(collection_name=collection),
-                policy_manager=get_policy_manager(),
-            )
-            tools.append(SemanticSearchTool(
-                retriever=retriever,
-                embeddings=EmbeddingService.get_instance(),
-            ))
-            log.info("✅ SemanticSearchTool wired (retriever + Qdrant grounding)", collection=collection)
+            from merlt.tools import HierarchyNavigationTool
+            tools.append(HierarchyNavigationTool(graph_db=falkordb))
+            log.info("✅ HierarchyNavigationTool wired")
         except Exception as e:
-            log.warning("SemanticSearchTool unavailable — semantic search off", error=str(e), exc_info=True)
+            log.warning("HierarchyNavigationTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import HistoricalEvolutionTool
+            tools.append(HistoricalEvolutionTool(graph_db=falkordb))
+            log.info("✅ HistoricalEvolutionTool wired")
+        except Exception as e:
+            log.warning("HistoricalEvolutionTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import PrincipleLookupTool
+            tools.append(PrincipleLookupTool(graph_db=falkordb))
+            log.info("✅ PrincipleLookupTool wired")
+        except Exception as e:
+            log.warning("PrincipleLookupTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import ConstitutionalBasisTool
+            tools.append(ConstitutionalBasisTool(graph_db=falkordb))
+            log.info("✅ ConstitutionalBasisTool wired")
+        except Exception as e:
+            log.warning("ConstitutionalBasisTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import CitationChainTool
+            tools.append(CitationChainTool(graph_db=falkordb))
+            log.info("✅ CitationChainTool wired")
+        except Exception as e:
+            log.warning("CitationChainTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import TextualReferenceTool
+            tools.append(TextualReferenceTool(graph_db=falkordb))
+            log.info("✅ TextualReferenceTool wired")
+        except Exception as e:
+            log.warning("TextualReferenceTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import DefinitionLookupTool
+            tools.append(DefinitionLookupTool(graph_db=falkordb))
+            log.info("✅ DefinitionLookupTool wired")
+        except Exception as e:
+            log.warning("DefinitionLookupTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import ExternalSourceTool
+            tools.append(ExternalSourceTool(graph_db=falkordb))
+            log.info("✅ ExternalSourceTool wired")
+        except Exception as e:
+            log.warning("ExternalSourceTool unavailable", error=str(e))
+
+        try:
+            from merlt.tools import ArticleFetchTool
+            tools.append(ArticleFetchTool())
+            log.info("✅ ArticleFetchTool wired")
+        except Exception as e:
+            log.warning("ArticleFetchTool unavailable", error=str(e))
+
+        # VerificationTool uses the shared BridgeTable when available; it
+        # degrades fail-open (graph-only strict_mode) when the bridge failed.
+        try:
+            from merlt.tools import VerificationTool
+            if bridge is not None:
+                tools.append(VerificationTool(graph_db=falkordb, bridge=bridge))
+            else:
+                tools.append(VerificationTool(graph_db=falkordb))
+            log.info("✅ VerificationTool wired", with_bridge=bridge is not None)
+        except Exception as e:
+            log.warning("VerificationTool unavailable", error=str(e))
+
+        log.info("✅ graph tools wired", count=len(tools) - _graph_tools_before)
+
+    if get_runtime_config().get_bool("semantic_search_enabled", False):
+        if bridge is None:
+            log.warning("SemanticSearchTool unavailable — BridgeTable not connected")
+        else:
+            try:
+                from qdrant_client import QdrantClient
+                from merlt.tools import SemanticSearchTool
+                from merlt.storage.vectors.embeddings import EmbeddingService
+                from merlt.storage.retriever import GraphAwareRetriever, RetrieverConfig
+                from merlt.rlcf.policy_manager import get_policy_manager
+
+                qdrant = QdrantClient(
+                    host=os.getenv("QDRANT_HOST", "localhost"),
+                    port=int(os.getenv("QDRANT_PORT", "6333")),
+                )
+                # RetrieverConfig defaults to 'merl_t_dev_chunks' — the populated
+                # collection is 'merl_t_legal_chunks' (backfill_embeddings default),
+                # so name it explicitly or vector search hits an empty collection.
+                collection = (
+                    os.getenv("QDRANT_COLLECTION")
+                    or os.getenv("MERLT_SEED_COLLECTION")
+                    or "merl_t_legal_chunks"
+                )
+                retriever = GraphAwareRetriever(
+                    vector_db=qdrant,
+                    graph_db=falkordb,
+                    bridge_table=bridge,
+                    config=RetrieverConfig(collection_name=collection),
+                    policy_manager=get_policy_manager(),
+                )
+                tools.append(SemanticSearchTool(
+                    retriever=retriever,
+                    embeddings=EmbeddingService.get_instance(),
+                ))
+                log.info("✅ SemanticSearchTool wired (retriever + Qdrant grounding)", collection=collection)
+            except Exception as e:
+                log.warning("SemanticSearchTool unavailable — semantic search off", error=str(e), exc_info=True)
 
     # Loop β A.1: live legal grounding via the mcp-legal-it sidecar (FastMCP over
     # HTTP at MCP_LEGAL_IT_URL). build_mcp_legal_tools lists the remote tools and

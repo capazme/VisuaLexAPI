@@ -595,7 +595,12 @@ async def validate_pending(
                     {"id": vote.pending_id}
                 )
 
-                # TODO: Trigger ingestion effettiva
+                # Ingestion effettiva NON è wired: la pipeline di ingestion
+                # community-interpretive (#3, PendingValidation -> grafo) non è
+                # raggiungibile da nessuna UI ad oggi - solo il voto e il
+                # cambio di stato avvengono qui. La validazione community reale
+                # gira sugli endpoint /enrichment/*. Deferred finché non viene
+                # esposta una UI/trigger per questa pipeline specifica.
                 log.info(
                     "Pending validation approved",
                     pending_id=vote.pending_id,
@@ -605,8 +610,12 @@ async def validate_pending(
                 return {
                     "success": True,
                     "vote_recorded": True,
-                    "pending_status": "approved",
-                    "message": "Validation approved, ingestion will be executed",
+                    "pending_status": "approved_not_ingested",
+                    "message": "Validation approved",
+                    "note": (
+                        "Community-interpretive ingestion is not yet wired to a UI; "
+                        "approved proposals are marked but not auto-ingested."
+                    ),
                 }
 
             elif rejections >= required:

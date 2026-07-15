@@ -473,6 +473,67 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                     "source": "hierarchy_navigation"
                 })
 
+        elif "timeline" in data:
+            # HistoricalEvolutionTool format (HistoricalEvent.to_dict())
+            for event in data["timeline"]:
+                sources.append({
+                    "urn": event.get("by_urn", ""),
+                    "text": event.get("description") or event.get("by_estremi", ""),
+                    "type": event.get("event", ""),
+                    "source": "historical_evolution"
+                })
+
+        elif "principles" in data:
+            # PrincipleLookupTool format (LegalPrinciple.to_dict()) - no direct
+            # URN field, use first attuative norm URN when present
+            for principle in data["principles"]:
+                norme_urns = principle.get("norme_urns") or []
+                sources.append({
+                    "urn": norme_urns[0] if norme_urns else "",
+                    "text": principle.get("description") or principle.get("nome", ""),
+                    "type": principle.get("level", ""),
+                    "source": "principle_lookup"
+                })
+
+        elif "constitutional_basis" in data:
+            # ConstitutionalBasisTool format (ConstitutionalBasis.to_dict())
+            for basis in data["constitutional_basis"]:
+                sources.append({
+                    "urn": basis.get("norm", ""),
+                    "text": basis.get("principle") or basis.get("norm_estremi", ""),
+                    "type": basis.get("strength", ""),
+                    "source": "constitutional_basis"
+                })
+
+        elif "citation_chain" in data:
+            # CitationChainTool format (Citation.to_dict())
+            for citation in data["citation_chain"]:
+                sources.append({
+                    "urn": citation.get("to_case", ""),
+                    "text": citation.get("to_estremi", ""),
+                    "type": citation.get("relation", ""),
+                    "source": "citation_chain"
+                })
+
+        elif "references" in data:
+            # TextualReferenceTool format (NormReference.to_dict())
+            for ref in data["references"]:
+                sources.append({
+                    "urn": ref.get("to_urn", ""),
+                    "text": ref.get("excerpt") or ref.get("to_estremi", ""),
+                    "type": ref.get("reference_type", ""),
+                    "source": "textual_reference"
+                })
+
+        elif "text" in data and "urn" in data:
+            # ArticleFetchTool / ExternalSourceTool format - single article payload
+            sources.append({
+                "urn": data.get("urn", ""),
+                "text": data.get("text", ""),
+                "type": data.get("tipo_atto", ""),
+                "source": data.get("source", "article_fetch")
+            })
+
         elif "verification_results" in data:
             # VerificationTool - doesn't add sources, just verifies
             pass

@@ -922,14 +922,15 @@ async def resolve_norm(
     try:
         await graph_client.connect()
 
-        # Cerca sia per URN esatto che per entity_id
+        # Cerca per URN esatto (proprieta' node_id/URN, coerente con gli altri
+        # endpoint del file - vedi check-article ~riga 85)
         query = """
         MATCH (n)
-        WHERE n.urn = $urn OR n.id = $entity_id
-        RETURN n.id as node_id, n.urn as node_urn, labels(n) as labels
+        WHERE n.URN = $urn OR n.node_id = $urn
+        RETURN COALESCE(n.node_id, n.URN) as node_id, n.URN as node_urn, labels(n) as labels
         LIMIT 1
         """
-        result = await graph_client.query(query, {"urn": urn, "entity_id": entity_id})
+        result = await graph_client.query(query, {"urn": urn})
 
         if result and len(result) > 0:
             # Norma esiste nel grafo!
