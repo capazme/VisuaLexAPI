@@ -6,12 +6,16 @@ const useMerltFeaturesMock = vi.fn();
 const fetchPending = vi.fn();
 const voteEntityMock = vi.fn();
 const voteRelationMock = vi.fn();
+const fetchProvisionalMock = vi.fn();
+const adjudicateMock = vi.fn();
 
 vi.mock('../../useMerltFeatures', () => ({ useMerltFeatures: () => useMerltFeaturesMock() }));
 vi.mock('../validateApi', () => ({
   fetchPendingQueue: (...a: unknown[]) => fetchPending(...a),
   voteEntity: (...a: unknown[]) => voteEntityMock(...a),
   voteRelation: (...a: unknown[]) => voteRelationMock(...a),
+  fetchProvisionalReview: (...a: unknown[]) => fetchProvisionalMock(...a),
+  adjudicateProvisional: (...a: unknown[]) => adjudicateMock(...a),
 }));
 
 import { ValidationPage } from '../ValidationPage';
@@ -28,6 +32,8 @@ beforeEach(() => {
   useMerltFeaturesMock.mockReturnValue({ canValidate: true, merltEnabled: true });
   voteEntityMock.mockReset().mockResolvedValue(undefined);
   voteRelationMock.mockReset().mockResolvedValue(undefined);
+  fetchProvisionalMock.mockReset().mockResolvedValue({ items: [], count: 0 });
+  adjudicateMock.mockReset().mockResolvedValue(undefined);
   fetchPending.mockReset().mockResolvedValue({
     pending_entities: [
       {

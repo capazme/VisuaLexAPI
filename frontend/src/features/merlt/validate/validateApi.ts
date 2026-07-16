@@ -68,3 +68,41 @@ export async function voteEntity(entityId: string, vote: MerltVote, reason?: str
 export async function voteRelation(relationId: string, vote: MerltVote, reason?: string): Promise<void> {
   await apiClient.post('/merlt/validate/relation', { relationId, vote, reason });
 }
+
+/**
+ * Slice C wave 2: provisional graph nodes the hygiene sweep flagged for human
+ * review (faded but with accumulated human signal). Unlike entity/relation
+ * proposals, adjudication acts on the EXISTING node — approve promotes it in
+ * place, reject deletes it (no new node, no consensus queue).
+ */
+export interface ProvisionalReviewItem {
+  node_id: string;
+  source_url: string | null;
+  trust: number | null;
+  usage_count: number | null;
+  positive_feedback_count: number | null;
+  has_confirmed_citation: boolean | null;
+  review_reason: string | null;
+  review_flagged_at: string | null;
+  labels: string[];
+  text_preview: string;
+}
+
+export interface ProvisionalReviewResponse {
+  items: ProvisionalReviewItem[];
+  count: number;
+}
+
+export async function fetchProvisionalReview(limit = 100): Promise<ProvisionalReviewResponse> {
+  const res = await apiClient.get<ProvisionalReviewResponse>('/merlt/graph/provisional-review', {
+    params: { limit },
+  });
+  return res.data;
+}
+
+export async function adjudicateProvisional(
+  nodeId: string,
+  decision: 'approve' | 'reject',
+): Promise<void> {
+  await apiClient.post(`/merlt/graph/provisional-review/${encodeURIComponent(nodeId)}`, { decision });
+}

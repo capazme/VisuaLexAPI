@@ -7,17 +7,26 @@ import { Button } from '../../../components/ui/Button';
 import { Toast } from '../../../components/ui/Toast';
 import { useMerltFeatures } from '../useMerltFeatures';
 import { ValidationCard, type ValidationCardModel } from './ValidationCard';
+import { ProvisionalReviewSection } from './ProvisionalReviewSection';
 import {
   fetchPendingQueue,
+  fetchProvisionalReview,
+  adjudicateProvisional,
   voteEntity,
   voteRelation,
   type MerltVote,
   type PendingQueue,
+  type ProvisionalReviewItem,
 } from './validateApi';
 
 type QueueState =
   | { status: 'loading' }
   | { status: 'success'; data: PendingQueue }
+  | { status: 'error' };
+
+type ProvisionalState =
+  | { status: 'loading' }
+  | { status: 'success'; items: ProvisionalReviewItem[] }
   | { status: 'error' };
 
 interface VoteToast {
@@ -35,9 +44,12 @@ export function ValidationPage() {
   const triggerSearch = useAppStore((s) => s.triggerSearch);
   const navigate = useNavigate();
   const [queue, setQueue] = useState<QueueState>({ status: 'loading' });
+  const [provisional, setProvisional] = useState<ProvisionalState>({ status: 'loading' });
   // Items removed from view: voted (optimistic) OR skipped (deferred). Both hide
   // the card; only votes hit the server, so skip never reverts.
   const [resolved, setResolved] = useState<Set<string>>(new Set());
+  // Provisional nodes currently being adjudicated (in-flight → button spinner).
+  const [adjudicating, setAdjudicating] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<VoteToast | null>(null);
 
   // Open the source norm in the reading view — the vanilla mechanism history /
@@ -56,6 +68,13 @@ export function ValidationPage() {
       })
       .catch(() => {
         if (!cancelled) setQueue({ status: 'error' });
+      });
+    fetchProvisionalReview()
+      .then((res) => {
+        if (!cancelled) setProvisional({ status: 'success', items: res.items });
+      })
+      .catch(() => {
+        if (!cancelled) setProvisional({ status: 'error' });
       });
     return () => {
       cancelled = true;
@@ -102,6 +121,42 @@ export function ValidationPage() {
             void submitVote(kind, id, vote, reason);
           },
         },
+      });
+    }
+  };
+
+  // Adjudicate a provisional node: optimistic-on-success removal (the decision
+  // applies immediately server-side, no consensus queue). Failure surfaces a
+  // retry toast (no silent catch — repo gotcha #18) and leaves the card in view.
+  const adjudicate = async (nodeId: string, decision: 'approve' | 'reject'): Promise<void> => {
+    setAdjudicating((prev) => new Set(prev).add(nodeId));
+    try {
+      await adjudicateProvisional(nodeId, decision);
+      setProvisional((prev) =>
+        prev.status === 'success'
+          ? { status: 'success', items: prev.items.filter((i) => i.node_id !== nodeId) }
+          : prev,
+      );
+    } catch (err) {
+      console.error('ValidationPage: adjudicate failed:', err);
+      setToast({
+        message:
+          decision === 'approve'
+            ? 'Conferma del nodo non riuscita.'
+            : 'Rimozione del nodo non riuscita.',
+        action: {
+          label: 'Riprova',
+          onClick: () => {
+            setToast(null);
+            void adjudicate(nodeId, decision);
+          },
+        },
+      });
+    } finally {
+      setAdjudicating((prev) => {
+        const next = new Set(prev);
+        next.delete(nodeId);
+        return next;
       });
     }
   };
@@ -187,6 +242,14 @@ export function ValidationPage() {
             onOpenNorm={openNorm}
           />
         </div>
+      )}
+
+      {provisional.status === 'success' && provisional.items.length > 0 && (
+        <ProvisionalReviewSection
+          items={provisional.items}
+          pending={adjudicating}
+          onAdjudicate={(nodeId, decision) => void adjudicate(nodeId, decision)}
+        />
       )}
 
       {toast && (
