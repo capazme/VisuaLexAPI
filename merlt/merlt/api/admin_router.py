@@ -98,3 +98,18 @@ async def reinitialize_engine(api_key=Depends(verify_api_key)):
     state = engine_state(new_orch)
     log.info("engine reinitialized via admin", **state)
     return ReinitResponse(reinitialized=True, engine=state)
+
+
+@router.post("/graph/hygiene")
+async def run_graph_hygiene_endpoint(api_key=Depends(verify_api_key)):
+    """Slice C (graph self-correction): run ONE hygiene sweep on demand —
+    reconcile provisional/confirmed duplicates, decay stale ``live_unconfirmed``
+    nodes, prune faded ones (+ their Qdrant chunks). Admin-gated. Thresholds
+    come from RuntimeConfig (admin-editable). Returns the sweep stats
+    (``reconciled`` / ``decayed`` / ``pruned`` counts). Only ever touches
+    provisional nodes — seed/confirmed are never affected.
+    """
+    from merlt.pipeline.hygiene import run_graph_hygiene
+    stats = await run_graph_hygiene()
+    log.info("graph hygiene run via admin", **stats)
+    return {"success": True, **stats}

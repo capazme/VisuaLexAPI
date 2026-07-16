@@ -87,6 +87,7 @@ async def lifespan(app: FastAPI):
     log.info("=" * 60)
 
     ai_service = None
+    hygiene_task = None
     try:
         # Initialize enrichment database
         await init_db(echo=False)  # Set echo=True for SQL logging in dev
@@ -144,6 +145,31 @@ async def lifespan(app: FastAPI):
                 log.error("Seed loader failed", error=str(e), exc_info=True)
                 log.warning("Graph features may be limited until seed is loaded manually")
 
+        # Slice C (graph self-correction): periodic hygiene sweep, env-gated.
+        # MERLT_HYGIENE_INTERVAL_HOURS > 0 enables it (default 0 = disabled in
+        # dev); first sweep fires after one interval so a short-lived boot never
+        # sweeps. Fully failure-isolated — a sweep error never crashes the api.
+        try:
+            _hyg_interval = float(os.getenv("MERLT_HYGIENE_INTERVAL_HOURS", "0") or 0)
+        except ValueError:
+            _hyg_interval = 0.0
+        if _hyg_interval > 0:
+            import asyncio as _asyncio
+
+            async def _hygiene_loop(interval_hours: float):
+                from merlt.pipeline.hygiene import run_graph_hygiene
+                while True:
+                    try:
+                        await _asyncio.sleep(interval_hours * 3600)
+                        await run_graph_hygiene()
+                    except _asyncio.CancelledError:
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        log.warning("periodic hygiene sweep failed (non-fatal)", error=str(e))
+
+            hygiene_task = _asyncio.create_task(_hygiene_loop(_hyg_interval))
+            log.info("✅ Graph hygiene loop started", interval_hours=_hyg_interval)
+
         log.info("=" * 60)
         log.info("MERL-T API Ready")
         log.info("=" * 60)
@@ -155,6 +181,13 @@ async def lifespan(app: FastAPI):
         log.info("=" * 60)
         log.info("MERL-T API Shutting down...")
         log.info("=" * 60)
+
+        if hygiene_task is not None:
+            import contextlib
+            hygiene_task.cancel()
+            with contextlib.suppress(Exception):
+                await hygiene_task  # let the loop's CancelledError teardown finish
+            log.info("✅ Graph hygiene loop stopped")
 
         if ai_service is not None:
             await ai_service.close()

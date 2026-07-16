@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from merlt.config.runtime_config import get_runtime_config
-from merlt.pipeline.provisional_writer import PROVENANCE_LIVE_UNCONFIRMED
+from merlt.pipeline.provisional_writer import PROVENANCE_LIVE_UNCONFIRMED, PROVISIONAL_TRUST
 
 log = structlog.get_logger()
 
@@ -66,18 +66,28 @@ async def bump_usage(graph_client, article_urn: str) -> Optional[str]:
         return None
     try:
         timestamp = datetime.now(timezone.utc).isoformat()
+        # Slice C: re-retrieval also RESTORES trust decayed by the hygiene sweep
+        # back up to the provisional baseline (never lowers it — the CASE keeps a
+        # higher value, and only live_unconfirmed nodes match, so a promoted node
+        # at trust 1.0 is never touched). Keeps decay/re-use coherent: a node
+        # that stays useful never gets pruned.
         cypher = """
         MATCH (n:LiveSource)
         WHERE (n.URN = $urn OR n.node_id = $urn OR n.source_url = $urn)
           AND n.provenance = $provenance
         SET n.usage_count = coalesce(n.usage_count, 0) + 1,
-            n.last_used_at = $timestamp
+            n.last_used_at = $timestamp,
+            n.trust = CASE
+                WHEN coalesce(n.trust, 0.0) < $base THEN $base
+                ELSE n.trust
+            END
         RETURN n.node_id AS node_id
         """
         rows = await graph_client.query(cypher, {
             "urn": article_urn,
             "provenance": PROVENANCE_LIVE_UNCONFIRMED,
             "timestamp": timestamp,
+            "base": PROVISIONAL_TRUST,
         })
         node_id = rows[0].get("node_id") if rows else None
         if node_id:

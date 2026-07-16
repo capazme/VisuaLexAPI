@@ -385,6 +385,60 @@ async def _link_related_urns(
         )
 
 
+async def _confirmed_twin_exists(graph_client, source_url: str) -> bool:
+    """Slice C (dedup — prevent): True iff a NON-live (confirmed/seed) node
+    already carries the canonical URN of ``source_url``.
+
+    Used to skip sedimenting a provisional twin of an already-authoritative
+    node — creating a ``live_unconfirmed`` duplicate of an article that is
+    already ``confirmed``/``seed`` only pollutes retrieval ranking (two nodes,
+    same URN) and forces the hygiene reconcile pass to clean it up. Best-effort:
+    on any error returns False (fail-open — a rare duplicate is better than a
+    lost live source).
+    """
+    canon = _canonical_url(source_url)
+    if not canon:
+        return False
+    try:
+        rows = await graph_client.query(
+            "MATCH (c) WHERE c.URN = $urn AND NOT c:LiveSource RETURN c.node_id LIMIT 1",
+            {"urn": canon},
+        )
+        return bool(rows)
+    except Exception as exc:  # noqa: BLE001 - fail-open
+        log.debug("provisional_writer.twin_check_failed", source_url=source_url, error=str(exc))
+        return False
+
+
+async def delete_provisional_chunk(node_id: str) -> None:
+    """Slice C (hygiene): delete the Qdrant chunk of a pruned/reconciled
+    provisional node, using the SAME deterministic point id as
+    ``_embed_and_upsert_chunk`` (uuid5 of node_id). Best-effort, never raises —
+    a leftover orphan chunk is harmless (its graph node is gone, so retrieval
+    graph-enrichment drops it), just untidy.
+    """
+    if not node_id:
+        return
+    try:
+        qdrant_client = _build_qdrant_client()
+        if qdrant_client is None:
+            return
+        from qdrant_client import models as qm
+        point_id = str(uuid.uuid5(_QDRANT_POINT_NAMESPACE, node_id))
+        collection = _resolve_collection()
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: qdrant_client.delete(
+                collection_name=collection,
+                points_selector=qm.PointIdsList(points=[point_id]),
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 - best-effort
+        log.debug("provisional_writer.chunk_delete_failed", node_id=node_id, error=str(exc))
+
+
 def _upsert_chunk_sync(
     qdrant_client,
     *,
@@ -579,10 +633,18 @@ async def write_provisional_source(
             log.warning("provisional_writer.no_node_id", source_id=source.get("source_id"))
             return None
 
+        gc = await _get_graph_client(graph_client)
+
+        # Slice C (dedup — prevent): skip if the same article is already a
+        # confirmed/seed node. The authoritative version supersedes; a
+        # live_unconfirmed twin would only pollute ranking + need reconciling.
+        if await _confirmed_twin_exists(gc, source_url):
+            log.debug("provisional_writer.skip_confirmed_twin", source_url=source_url)
+            return None
+
         secondary_label, source_type = _infer_labels_and_source_type(source)
         timestamp = datetime.now(timezone.utc).isoformat()
 
-        gc = await _get_graph_client(graph_client)
         await _merge_provisional_node(
             gc,
             node_id=node_id,

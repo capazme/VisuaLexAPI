@@ -286,6 +286,57 @@ class RuntimeConfig:
                     "nel punteggio di promozione."
                 ),
             ),
+            # ---- Slice C (graph self-correction): hygiene sweep — trust decay
+            # and pruning of stale live_unconfirmed nodes. Never touches
+            # seed/confirmed nodes. ----
+            ParamSpec(
+                key="hygiene_decay_window_hours",
+                kind="int",
+                default=_env_int("MERLT_HYGIENE_DECAY_WINDOW_HOURS", 168),
+                minimum=1, maximum=8760, step=1,
+                requires_restart=False,
+                description=(
+                    "Ore di inattività (nessun ri-recupero) oltre le quali un "
+                    "nodo provvisorio 'live_unconfirmed' inizia a decadere in "
+                    "fiducia. Default 168 (7 giorni)."
+                ),
+            ),
+            ParamSpec(
+                key="hygiene_decay_factor",
+                kind="float",
+                default=_env_float("MERLT_HYGIENE_DECAY_FACTOR", 0.9),
+                minimum=0.1, maximum=1.0, step=0.05,
+                requires_restart=False,
+                description=(
+                    "Fattore moltiplicativo applicato alla fiducia di un nodo "
+                    "provvisorio inattivo a ogni passata di igiene (1.0 = nessun "
+                    "decadimento). Default 0.9."
+                ),
+            ),
+            ParamSpec(
+                key="hygiene_prune_ttl_hours",
+                kind="int",
+                default=_env_int("MERLT_HYGIENE_PRUNE_TTL_HOURS", 720),
+                minimum=1, maximum=8760, step=1,
+                requires_restart=False,
+                description=(
+                    "Età minima (dalla creazione) oltre la quale un nodo "
+                    "provvisorio decaduto sotto la soglia di fiducia può essere "
+                    "potato. Default 720 (30 giorni)."
+                ),
+            ),
+            ParamSpec(
+                key="hygiene_prune_min_trust",
+                kind="float",
+                default=_env_float("MERLT_HYGIENE_PRUNE_MIN_TRUST", 0.3),
+                minimum=0.0, maximum=1.0, step=0.05,
+                requires_restart=False,
+                description=(
+                    "Soglia di fiducia sotto la quale un nodo provvisorio "
+                    "abbastanza vecchio (oltre il TTL) viene potato dal grafo. "
+                    "Default 0.3."
+                ),
+            ),
         ]
         for s in specs:
             self._specs[s.key] = s
