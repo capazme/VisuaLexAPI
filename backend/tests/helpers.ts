@@ -2,9 +2,19 @@ import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
-import app from '../src/app';
+import expressApp from '../src/app';
 
 const prisma = new PrismaClient();
+
+// ONE persistent listening server for the whole suite. Passing the bare Express
+// app to `request(app)` makes supertest spin up (and tear down) a fresh ephemeral
+// server PER request; across the suite's thousands of requests that churn
+// occasionally races — the server closes before the response flushes ("socket
+// hang up") or a request goes out with a dropped header ("no-header" 401). A
+// single long-lived server reuses one port and removes that race. `.unref()` so
+// the listener never keeps the test process alive at teardown.
+const app = expressApp.listen(0);
+app.unref();
 
 export interface TestUser {
   id: string;
