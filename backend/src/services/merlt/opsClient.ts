@@ -33,12 +33,13 @@ export interface TrainingStartResponse {
 /** One tunable inference lever (merlt/api/admin_router.py ConfigItem). */
 export interface RuntimeConfigItem {
   key: string;
-  kind: 'float' | 'int' | 'bool' | string;
-  value: number | boolean;
-  default: number | boolean;
+  kind: 'float' | 'int' | 'bool' | 'enum' | string;
+  value: number | boolean | string;
+  default: number | boolean | string;
   min?: number | null;
   max?: number | null;
   step?: number | null;
+  choices?: string[] | null;
   description: string;
   requires_restart: boolean;
 }
@@ -57,7 +58,7 @@ export class OpsClient {
   }
 
   /** Set one runtime config lever (validated + applied live by MERL-T). */
-  async setConfig(key: string, value: number | boolean): Promise<RuntimeConfigItem> {
+  async setConfig(key: string, value: number | boolean | string): Promise<RuntimeConfigItem> {
     return this.request('PUT', `/api/v1/admin/config/${encodeURIComponent(key)}`, { value });
   }
 

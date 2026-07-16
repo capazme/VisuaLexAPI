@@ -43,10 +43,17 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() == "true"
 
 
+def _env_str(name: str, default: str) -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw
+
+
 @dataclass
 class ParamSpec:
     key: str
-    kind: str  # 'float' | 'int' | 'bool'
+    kind: str  # 'float' | 'int' | 'bool' | 'enum'
     default: Any
     description: str
     minimum: Optional[float] = None
@@ -55,6 +62,8 @@ class ParamSpec:
     requires_restart: bool = False
     # Applies the new value to the live objects when needed (e.g. router attr).
     apply: Optional[Callable[[Any], None]] = None
+    # Only meaningful for kind='enum': the allowed string values.
+    choices: Optional[List[str]] = None
 
 
 class RuntimeConfig:
@@ -80,7 +89,47 @@ class RuntimeConfig:
 
     # -- registry --------------------------------------------------------
     def _register_defaults(self) -> None:
+        model_choices = [
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-flash-lite",
+            "google/gemini-2.5-pro",
+            "anthropic/claude-haiku-4.5",
+            "anthropic/claude-sonnet-4.5",
+            "anthropic/claude-sonnet-5",
+            "anthropic/claude-opus-4.8",
+        ]
         specs = [
+            ParamSpec(
+                key="expert_model",
+                kind="enum",
+                default=_env_str("MERLT_EXPERT_MODEL", "anthropic/claude-sonnet-4.5"),
+                choices=model_choices,
+                requires_restart=False,
+                description=(
+                    "Modello LLM per l'analisi degli esperti e la sintesi (la "
+                    "qualità della risposta). Claude = più accurato, Gemini "
+                    "flash = più economico."
+                ),
+            ),
+            ParamSpec(
+                key="react_decision_model",
+                kind="enum",
+                # gemini-2.5-flash: reliable JSON output on tight max_tokens
+                # decision calls (gemini-2.5-pro preambles/burns its budget on
+                # reasoning and breaks strict json_object). Cheap on the ReAct
+                # high-frequency path; the user can raise it to Claude/Pro from
+                # the panel if they want stronger tool selection.
+                default=_env_str("MERLT_REACT_DECISION_MODEL", "google/gemini-2.5-flash"),
+                choices=model_choices,
+                requires_restart=False,
+                description=(
+                    "Modello LLM per la scelta dello strumento nel loop ReAct e "
+                    "per la classificazione query (chiamate ad alta frequenza, "
+                    "output JSON breve). Consigliato un modello 'flash' affidabile; "
+                    "salire a Pro/Claude solo se serve una selezione strumenti più "
+                    "accurata."
+                ),
+            ),
             ParamSpec(
                 key="gating_confidence_threshold",
                 kind="float",
@@ -194,6 +243,12 @@ class RuntimeConfig:
         v = self._values.get(key, fallback)
         return bool(v)
 
+    def get_str(self, key: str, fallback: str) -> str:
+        spec = self._specs.get(key)
+        if spec is None:
+            return fallback
+        return self._values.get(key, fallback)
+
     def _coerce(self, spec: ParamSpec, value: Any) -> Any:
         if spec.kind == "float":
             v = float(value)
@@ -213,6 +268,12 @@ class RuntimeConfig:
             if isinstance(value, str):
                 return value.strip().lower() == "true"
             return bool(value)
+        if spec.kind == "enum":
+            if not isinstance(value, str) or value not in (spec.choices or []):
+                raise ValueError(
+                    f"invalid value for {spec.key}: {value!r} not in {spec.choices}"
+                )
+            return value
         return value
 
     def set(self, key: str, value: Any) -> Dict[str, Any]:
@@ -238,6 +299,7 @@ class RuntimeConfig:
             "step": spec.step,
             "description": spec.description,
             "requires_restart": spec.requires_restart,
+            "choices": spec.choices,
         }
 
     def snapshot(self) -> List[Dict[str, Any]]:

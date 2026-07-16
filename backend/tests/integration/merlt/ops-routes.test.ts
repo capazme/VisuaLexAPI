@@ -98,3 +98,99 @@ describe('POST /api/merlt/ops/rlcf/training/start (loop-closure A5)', () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe('GET/PUT /api/merlt/ops/config', () => {
+  it('passes through an enum param with its choices array on GET', async () => {
+    const user = await createTestUser('ops-config-get-admin');
+    await makeAdmin(user);
+
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/admin/config')
+      .reply(200, {
+        params: [
+          {
+            key: 'synthesis_model',
+            kind: 'enum',
+            value: 'gpt-4o',
+            default: 'gpt-4o-mini',
+            choices: ['gpt-4o', 'gpt-4o-mini', 'claude-3-haiku'],
+            description: 'Model used for synthesis',
+            requires_restart: false,
+          },
+          {
+            key: 'gating_threshold',
+            kind: 'float',
+            value: 0.5,
+            default: 0.5,
+            min: 0,
+            max: 1,
+            step: 0.05,
+            description: 'Gating threshold',
+            requires_restart: false,
+          },
+        ],
+      });
+
+    const res = await request(app)
+      .get('/api/merlt/ops/config')
+      .set(authHeader(user));
+
+    expect(res.status).toBe(200);
+    expect(res.body.params[0]).toMatchObject({
+      key: 'synthesis_model',
+      kind: 'enum',
+      value: 'gpt-4o',
+      choices: ['gpt-4o', 'gpt-4o-mini', 'claude-3-haiku'],
+    });
+    expect(res.body.params[1]).toMatchObject({ key: 'gating_threshold', value: 0.5 });
+  });
+
+  it('accepts a string value for an enum key and forwards it to MERL-T', async () => {
+    const user = await createTestUser('ops-config-put-admin');
+    await makeAdmin(user);
+
+    let sentBody: unknown = null;
+    nock(TEST_MERLT_BASE)
+      .put('/api/v1/admin/config/synthesis_model', (body) => {
+        sentBody = body;
+        return true;
+      })
+      .reply(200, {
+        key: 'synthesis_model',
+        kind: 'enum',
+        value: 'claude-3-haiku',
+        default: 'gpt-4o-mini',
+        choices: ['gpt-4o', 'gpt-4o-mini', 'claude-3-haiku'],
+        description: 'Model used for synthesis',
+        requires_restart: false,
+      });
+
+    const res = await request(app)
+      .put('/api/merlt/ops/config/synthesis_model')
+      .set(authHeader(user))
+      .send({ value: 'claude-3-haiku' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.value).toBe('claude-3-haiku');
+    expect(res.body.choices).toEqual(['gpt-4o', 'gpt-4o-mini', 'claude-3-haiku']);
+    expect(sentBody).toEqual({ value: 'claude-3-haiku' });
+  });
+
+  it('400s when value is neither number, boolean, nor string', async () => {
+    const user = await createTestUser('ops-config-put-badtype-admin');
+    await makeAdmin(user);
+
+    const res = await request(app)
+      .put('/api/merlt/ops/config/some_key')
+      .set(authHeader(user))
+      .send({ value: { nested: true } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toBe('value must be a number, boolean, or string');
+  });
+
+  it('401s without authentication', async () => {
+    const res = await request(app).get('/api/merlt/ops/config');
+    expect(res.status).toBe(401);
+  });
+});

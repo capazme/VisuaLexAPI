@@ -223,7 +223,7 @@ Rispondi con: {{"type": "<tipo>", "confidence": <0.0-1.0>}}"""
         self,
         config_path: Optional[Path] = None,
         ai_service: Any = None,
-        classification_model: str = "google/gemini-2.0-flash-001",
+        classification_model: str = "google/gemini-2.5-flash",
         disable_regex: bool = False,
     ):
         """
@@ -347,10 +347,18 @@ Rispondi con: {{"type": "<tipo>", "confidence": <0.0-1.0>}}"""
         valid_types = set(self.query_weights.keys())
         prompt = self.LLM_CLASSIFY_PROMPT.format(query=query)
 
+        # Query classification is a routing/decision LLM call: use the runtime
+        # `react_decision_model` lever (admin-editable) so it stays in sync with
+        # the ReAct tool-choice model, falling back to the instance default.
+        from merlt.config.runtime_config import get_runtime_config
+        classification_model = get_runtime_config().get_str(
+            "react_decision_model", self.classification_model
+        )
+
         try:
             response = await self.ai_service.generate_response_async(
                 prompt=prompt,
-                model=self.classification_model,
+                model=classification_model,
                 temperature=0.0,
                 max_tokens=200,
                 response_format={"type": "json_object"},  # structured output: the classifier emits {type, confidence}

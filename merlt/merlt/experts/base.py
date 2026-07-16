@@ -536,7 +536,12 @@ class BaseExpert(ABC):
         # Set defaults
         self.prompt_template = self.config.get("prompt_template", self._get_default_prompt())
         self.temperature = self.config.get("temperature", 0.3)
-        self.model = self.config.get("model", "google/gemini-2.5-flash")
+        # Runtime-config lever wins over the yaml default; the yaml value is
+        # only the fallback if the param is somehow absent from RuntimeConfig.
+        from merlt.config.runtime_config import get_runtime_config
+        self.model = get_runtime_config().get_str(
+            "expert_model", self.config.get("model", "google/gemini-2.5-flash")
+        )
         # experts.yaml max_tokens is now a real per-expert lever (was dead config:
         # the LLM call inherited the 128000 async default instead). 4096 fits any
         # single-canon answer and keeps cost/latency bounded.

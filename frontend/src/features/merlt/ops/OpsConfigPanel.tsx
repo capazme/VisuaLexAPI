@@ -45,7 +45,7 @@ export function OpsConfigPanel() {
     }, 2500);
   };
 
-  const applyLocal = (key: string, value: number | boolean): void => {
+  const applyLocal = (key: string, value: number | boolean | string): void => {
     setState((prev) =>
       prev.status === 'success'
         ? { ...prev, params: prev.params.map((p) => (p.key === key ? { ...p, value } : p)) }
@@ -55,8 +55,8 @@ export function OpsConfigPanel() {
 
   const commit = async (
     key: string,
-    previous: number | boolean,
-    next: number | boolean,
+    previous: number | boolean | string,
+    next: number | boolean | string,
     requiresRestart: boolean,
   ): Promise<void> => {
     applyLocal(key, next);
@@ -178,8 +178,42 @@ function RuntimeRow({
 }: {
   param: RuntimeConfigItem;
   ack: RowAck;
-  onCommit: (next: number | boolean) => void;
+  onCommit: (next: number | boolean | string) => void;
 }) {
+  if (param.kind === 'enum') {
+    const value = typeof param.value === 'string' ? param.value : '';
+    const choices = param.choices ?? [];
+    return (
+      <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+        <label htmlFor={`ops-config-${param.key}`} className="font-mono text-xs font-medium text-slate-700 dark:text-slate-200">
+          {param.key}
+        </label>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{param.description}</p>
+        <select
+          id={`ops-config-${param.key}`}
+          value={value}
+          onChange={(e) => onCommit(e.target.value)}
+          className={cn(
+            'mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+            'dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200',
+          )}
+        >
+          {choices.map((choice) => (
+            <option key={choice} value={choice}>
+              {choice}
+            </option>
+          ))}
+        </select>
+        {ack === 'saved' && (
+          <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+            applicato — attivo dalla prossima domanda
+          </p>
+        )}
+      </div>
+    );
+  }
+
   if (param.kind === 'bool') {
     const checked = param.value === true;
     return (
@@ -281,13 +315,50 @@ function EngineStateRow({
 }: {
   param: RuntimeConfigItem;
   ack: RowAck;
-  onCommit: (next: number | boolean) => void;
+  onCommit: (next: number | boolean | string) => void;
 }) {
   const restartBadge = (
     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
       richiede riavvio
     </span>
   );
+
+  if (param.kind === 'enum') {
+    const value = typeof param.value === 'string' ? param.value : '';
+    const choices = param.choices ?? [];
+    return (
+      <div data-testid={`engine-row-${param.key}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor={`ops-config-${param.key}`} className="font-mono text-xs font-medium text-slate-600 dark:text-slate-300">
+            {param.key}
+          </label>
+          {restartBadge}
+        </div>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{param.description}</p>
+        <select
+          id={`ops-config-${param.key}`}
+          value={value}
+          onChange={(e) => onCommit(e.target.value)}
+          className={cn(
+            'mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2',
+            'dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200',
+          )}
+        >
+          {choices.map((choice) => (
+            <option key={choice} value={choice}>
+              {choice}
+            </option>
+          ))}
+        </select>
+        {ack === 'pending-restart' && (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            in attesa di riavvio — riavvia il motore per applicare
+          </p>
+        )}
+      </div>
+    );
+  }
 
   if (param.kind === 'bool') {
     const checked = param.value === true;

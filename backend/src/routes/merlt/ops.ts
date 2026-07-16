@@ -78,8 +78,8 @@ router.put(
   async (req: Request, res: Response): Promise<void> => {
     const key = req.params.key;
     const value = (req.body as { value?: unknown } | undefined)?.value;
-    if (typeof value !== 'number' && typeof value !== 'boolean') {
-      res.status(400).json({ detail: 'value must be a number or boolean' });
+    if (typeof value !== 'number' && typeof value !== 'boolean' && typeof value !== 'string') {
+      res.status(400).json({ detail: 'value must be a number, boolean, or string' });
       return;
     }
     try {

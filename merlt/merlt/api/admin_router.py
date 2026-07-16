@@ -34,6 +34,7 @@ class ConfigItem(BaseModel):
     step: Optional[float] = None
     description: str
     requires_restart: bool
+    choices: Optional[List[str]] = None
 
 
 class ConfigSnapshot(BaseModel):

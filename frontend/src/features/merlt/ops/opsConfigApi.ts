@@ -2,16 +2,17 @@ import { getMerlt, postMerlt, putMerlt } from '../../../services/merltService';
 
 /** Typed BFF client for the admin runtime-config tuning panel (Loop β ops). */
 
-export type RuntimeConfigKind = 'float' | 'int' | 'bool';
+export type RuntimeConfigKind = 'float' | 'int' | 'bool' | 'enum';
 
 export interface RuntimeConfigItem {
   key: string;
   kind: RuntimeConfigKind;
-  value: number | boolean;
-  default: number | boolean;
+  value: number | boolean | string;
+  default: number | boolean | string;
   min?: number | null;
   max?: number | null;
   step?: number | null;
+  choices?: string[] | null;
   description: string;
   requires_restart: boolean;
 }
@@ -26,7 +27,7 @@ export function getOpsConfig(): Promise<RuntimeConfigResponse> {
 }
 
 /** PUT /api/merlt/ops/config/:key — updates a single runtime-tunable param. */
-export function setOpsConfig(key: string, value: number | boolean): Promise<RuntimeConfigItem> {
+export function setOpsConfig(key: string, value: number | boolean | string): Promise<RuntimeConfigItem> {
   return putMerlt<RuntimeConfigItem>(`/merlt/ops/config/${encodeURIComponent(key)}`, { value });
 }
 

@@ -870,8 +870,10 @@ class AdaptiveSynthesizer:
         prompt = self._build_convergent_prompt(query, responses, weights, analysis)
 
         try:
+            from merlt.config.runtime_config import get_runtime_config
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
+                model=get_runtime_config().get_str("expert_model", "google/gemini-2.5-flash"),
                 temperature=0.3,
                 max_tokens=int(os.getenv("MERLT_SYNTHESIS_MAX_TOKENS", "6144")),
             )
@@ -898,8 +900,10 @@ class AdaptiveSynthesizer:
         prompt = self._build_divergent_prompt(query, responses, analysis, alternatives)
 
         try:
+            from merlt.config.runtime_config import get_runtime_config
             result = await self.ai_service.generate_response_async(
                 prompt=prompt,
+                model=get_runtime_config().get_str("expert_model", "google/gemini-2.5-flash"),
                 temperature=0.3,
                 max_tokens=int(os.getenv("MERLT_SYNTHESIS_MAX_TOKENS", "6144")),
             )

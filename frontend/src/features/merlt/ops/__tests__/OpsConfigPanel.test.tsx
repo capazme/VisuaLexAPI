@@ -11,7 +11,7 @@ vi.mock('../opsConfigApi', async () => {
   return {
     ...actual,
     getOpsConfig: () => getOpsConfig(),
-    setOpsConfig: (key: string, value: number | boolean) => setOpsConfig(key, value),
+    setOpsConfig: (key: string, value: number | boolean | string) => setOpsConfig(key, value),
     reinitEngine: () => reinitEngine(),
   };
 });
@@ -56,6 +56,15 @@ const PARAMS: RuntimeConfigItem[] = [
     default: false,
     description: 'Motore ReAct (stato del container).',
     requires_restart: true,
+  },
+  {
+    key: 'gating_model',
+    kind: 'enum',
+    value: 'balanced',
+    default: 'balanced',
+    choices: ['fast', 'balanced', 'accurate'],
+    description: 'Modello usato dalla testa gating.',
+    requires_restart: false,
   },
 ];
 
@@ -135,6 +144,22 @@ describe('OpsConfigPanel', () => {
 
     await waitFor(() => expect(setOpsConfig).toHaveBeenCalledWith('react_enabled', true));
     await waitFor(() => expect(screen.getByText(/in attesa di riavvio/i)).toBeInTheDocument());
+  });
+
+  it('renders an enum param as a select with its choices and commits the chosen value', async () => {
+    setOpsConfig.mockResolvedValue({ ...PARAMS[4], value: 'accurate' });
+
+    render(<OpsConfigPanel />);
+    await waitFor(() => expect(screen.getByText('gating_model')).toBeInTheDocument());
+
+    const select = document.getElementById('ops-config-gating_model') as HTMLSelectElement;
+    expect(select.tagName).toBe('SELECT');
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['fast', 'balanced', 'accurate']);
+
+    fireEvent.change(select, { target: { value: 'accurate' } });
+
+    await waitFor(() => expect(setOpsConfig).toHaveBeenCalledWith('gating_model', 'accurate'));
+    await waitFor(() => expect(screen.getByText(/attivo dalla prossima domanda/i)).toBeInTheDocument());
   });
 
   it('shows an error state when the initial load fails', async () => {

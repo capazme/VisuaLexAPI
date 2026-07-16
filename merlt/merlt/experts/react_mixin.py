@@ -301,9 +301,13 @@ class ReActMixin:
         )
 
         try:
+            from merlt.config.runtime_config import get_runtime_config
+            fallback_model = self.react_config.get(
+                "model", self.model if hasattr(self, 'model') else "google/gemini-2.5-flash"
+            )
             response = await self._traced_llm_call(
                 prompt=prompt,
-                model=self.react_config.get("model", self.model if hasattr(self, 'model') else "google/gemini-2.5-flash"),
+                model=get_runtime_config().get_str("react_decision_model", fallback_model),
                 temperature=self.react_config.get("temperature", 0.1),
                 response_format={"type": "json_object"}
             )
