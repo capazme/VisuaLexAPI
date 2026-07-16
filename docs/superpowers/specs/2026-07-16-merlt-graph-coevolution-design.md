@@ -83,3 +83,17 @@ Se `score ≥ soglia` → `provenance='confirmed'`, `trust→1.0` (rank pieno). 
 **Testing per slice:** unit dove i deps lo consentono (pytest non è nell'immagine di produzione — verifica funzionale via query reale + query FalkorDB/Qdrant), più i test BFF/FE (vitest) per le parti che li toccano (B: feedback→segnali; C: UX + review).
 
 **Fuori scope (esplicito):** estendere il grafo oltre il Codice Civile (ingestione di altri codici) — ortogonale; la co-evoluzione lo fa comunque crescere per le norme toccate dalle risposte, ma la copertura di base di altri codici è un lavoro separato.
+
+---
+
+## Stato: COMPLETO (16 Lug 2026, local-only)
+
+Tutte le slice implementate + verificate live + code-reviewed. Commit su `visualex-merlt-main` (mai pushati):
+
+- **Slice A** (`c17b41d`) — il grafo assorbe: cattura live sotto ReAct → sedimentazione.
+- **Slice B** (`7387d2b`) — il grafo impara: 3 segnali (feedback/usage/citation) + promozione monotòna admin-tunabile. Fix load-bearing H1 (usage per-domanda, non per-risultato) e sourcing `related_urns` da URN reali servite/traversate.
+- **Slice C wave 1** (`b6946e9`) — igiene: dedup previeni (`_confirmed_twin_exists`) + riconcilia, decadimento fiducia, potatura (vecchio+stale+bassa-fiducia+zero-segnali), ripristino fiducia su riuso. Endpoint `POST /admin/graph/hygiene` + loop lifespan env-gated. Safety a doppio strato (label `LiveSource` + `provenance`): mai tocca seed/confermati/promossi.
+- **Slice C wave 2** (`c0314f8` BE + `6b532c7` FE) — casi dubbi → review: `quarantine_doubtful` flagga i nodi svaniti-ma-con-segnale come `review_status='pending_review'` (congelati, non potati); `pipeline/review.py` list+adjudicate; endpoint MERL-T `/graph/provisional-review` + BFF proxy (validationGuard) + sezione FE in `/merlt/valida` (approva→promuove in place, rimuovi→cancella). **NON riusa `pending_entities`** (la consensus-approvazione creerebbe un'entità DUPLICATA — il nodo è già nel grafo).
+- **Slice C wave 3** (`f05577d`) — trasparenza: `provisional_candidates` sulla risposta Q&A → chip "il grafo sta assorbendo N norme" in `QaTurn`, che rimanda alla conferma esplicita per-fonte «ricorda nel grafo» (i nodi freschi non sono ancora in quarantena, quindi NON linka a `/merlt/valida`).
+
+**Confini MVP consapevoli** (vedi anche la nota Slice B): citazione fissata alla creazione; feedback copre `retrieved_sources` non `graph_traversal`; nodi promossi mantengono label `LiveSource`; `provisional_candidates` è upper-bound (pre-dedup). Restano possibili estensioni: consenso multi-voto per l'adjudication provvisoria (oggi decisione singola del revisore), copertura grafo oltre la CC.
