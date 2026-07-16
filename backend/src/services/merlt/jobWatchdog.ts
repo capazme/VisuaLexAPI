@@ -14,13 +14,27 @@ import type { PrismaClient } from '@prisma/client';
 export interface SweepResult {
   extractFlipped: number;
   ingestFlipped: number;
+  qaFlipped: number;
+  qaJobsPurged: number;
 }
 
 const TIMEOUT_MARKER = 'watchdog: callback never arrived, flipped to timeout';
 
+const DEFAULT_QA_STALE_AFTER_MS = 20 * 60 * 1000; // 20 minutes
+const DEFAULT_QA_RETENTION_DAYS = 30;
+
+/**
+ * Sweep stuck extraction/ingestion jobs on `createdAt` (unchanged, tighter
+ * 10-min net) and QA jobs on `updatedAt` (liveness — see `qaStaleAfterMs`
+ * doc below). Also purges old terminal QA jobs (`result` can carry tens/
+ * hundreds of KB of pipeline_trace per row — retention keeps the table
+ * bounded).
+ */
 export async function sweepStuckJobs(
   prisma: PrismaClient,
   staleAfterMs: number = 10 * 60 * 1000, // 10 minutes
+  qaStaleAfterMs: number = DEFAULT_QA_STALE_AFTER_MS,
+  qaRetentionDays: number = DEFAULT_QA_RETENTION_DAYS,
 ): Promise<SweepResult> {
   const cutoff = new Date(Date.now() - staleAfterMs);
   const extract = await prisma.merltExtractionJob.updateMany({
@@ -45,7 +59,41 @@ export async function sweepStuckJobs(
       completedAt: new Date(),
     },
   });
-  return { extractFlipped: extract.count, ingestFlipped: ingest.count };
+  // Async progressive Q&A jobs (qa-async-progressive-contract.md): a lost
+  // terminal callback would otherwise hang the FE poll loop forever. Swept
+  // on a SEPARATE, higher threshold against `updatedAt` (last activity),
+  // NOT `createdAt` — a heavy ReAct deliberation legitimately runs up to
+  // ~11min, and each per-expert `running` callback bumps `updatedAt`, so a
+  // job still emitting partials keeps resetting its clock. Only genuine
+  // silence (crashed MERL-T / lost callbacks) trips the sweep.
+  const qaCutoff = new Date(Date.now() - qaStaleAfterMs);
+  const qa = await prisma.merltQaJob.updateMany({
+    where: {
+      status: { in: ['pending', 'running'] },
+      updatedAt: { lt: qaCutoff },
+    },
+    data: {
+      status: 'timeout',
+      errorMessage: TIMEOUT_MARKER,
+      completedAt: new Date(),
+    },
+  });
+  // Retention: terminal QA jobs older than qaRetentionDays are purged —
+  // `result` stores the full ExpertQueryResponse (incl. pipeline_trace),
+  // unbounded growth otherwise.
+  const retentionCutoff = new Date(Date.now() - qaRetentionDays * 24 * 60 * 60 * 1000);
+  const purged = await prisma.merltQaJob.deleteMany({
+    where: {
+      status: { in: ['completed', 'failed', 'timeout'] },
+      createdAt: { lt: retentionCutoff },
+    },
+  });
+  return {
+    extractFlipped: extract.count,
+    ingestFlipped: ingest.count,
+    qaFlipped: qa.count,
+    qaJobsPurged: purged.count,
+  };
 }
 
 /**
@@ -54,15 +102,23 @@ export async function sweepStuckJobs(
  */
 export function scheduleStuckJobSweeper(
   prisma: PrismaClient,
-  options: { intervalMs?: number; staleAfterMs?: number; logger?: (msg: string, data?: unknown) => void } = {},
+  options: {
+    intervalMs?: number;
+    staleAfterMs?: number;
+    qaStaleAfterMs?: number;
+    qaRetentionDays?: number;
+    logger?: (msg: string, data?: unknown) => void;
+  } = {},
 ): NodeJS.Timeout {
   const intervalMs = options.intervalMs ?? 5 * 60 * 1000;
   const staleAfterMs = options.staleAfterMs ?? 10 * 60 * 1000;
+  const qaStaleAfterMs = options.qaStaleAfterMs ?? DEFAULT_QA_STALE_AFTER_MS;
+  const qaRetentionDays = options.qaRetentionDays ?? DEFAULT_QA_RETENTION_DAYS;
   const log = options.logger ?? ((msg: string, data?: unknown) => console.log(`[watchdog] ${msg}`, data ?? ''));
   const run = (): void => {
-    sweepStuckJobs(prisma, staleAfterMs)
+    sweepStuckJobs(prisma, staleAfterMs, qaStaleAfterMs, qaRetentionDays)
       .then((r) => {
-        if (r.extractFlipped > 0 || r.ingestFlipped > 0) {
+        if (r.extractFlipped > 0 || r.ingestFlipped > 0 || r.qaFlipped > 0 || r.qaJobsPurged > 0) {
           log('flipped stuck jobs', r);
         }
       })

@@ -7,11 +7,20 @@ import { scheduleStuckJobSweeper } from './services/merlt/jobWatchdog';
 // ever fail past that, this catches the stragglers (transitions pending/running
 // rows older than 10min → 'timeout' so the polling UI unblocks). Skipped in
 // tests (where the harness reset is sufficient).
+//
+// The async progressive Q&A jobs (qa-async-progressive-contract.md) get a
+// separate, higher threshold swept on liveness (`updatedAt`, bumped by every
+// per-expert callback) rather than age-since-submit — a heavy ReAct
+// deliberation legitimately runs up to ~11min, and sweeping on `createdAt`
+// alone would flip a live, still-progressing query to `timeout` right before
+// its real `completed` callback arrives (discarding a successful result).
 let watchdogInterval: NodeJS.Timeout | null = null;
 if (config.nodeEnv !== 'test') {
   watchdogInterval = scheduleStuckJobSweeper(prisma, {
     intervalMs: 5 * 60 * 1000,
     staleAfterMs: 10 * 60 * 1000,
+    qaStaleAfterMs: parseInt(process.env.MERLT_QA_STALE_MS || String(20 * 60 * 1000), 10),
+    qaRetentionDays: parseInt(process.env.MERLT_QA_RETENTION_DAYS || '30', 10),
   });
 }
 

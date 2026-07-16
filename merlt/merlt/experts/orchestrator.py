@@ -30,7 +30,7 @@ import structlog
 import asyncio
 import time
 import numpy as np
-from typing import Dict, Any, Optional, List, Type
+from typing import Awaitable, Callable, Dict, Any, Optional, List, Type
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -71,7 +71,6 @@ from merlt.experts.query_analyzer import (
 )
 from merlt.clients import get_visualex_client
 from merlt.tools import BaseTool
-from merlt.tools.search import SemanticSearchTool
 from merlt.rlcf.execution_trace import ExecutionTrace, Action
 
 log = structlog.get_logger()
@@ -241,8 +240,9 @@ class MultiExpertOrchestrator:
         },
     }
 
-    def _init_experts(self):
-        """Inizializza tutti gli Expert con tool instances separate.
+    def _build_experts(self) -> Dict[str, BaseExpert]:
+        """Build a FRESH `{expert_type: instance}` dict with tool instances
+        separate from any previously-built set.
 
         Each expert gets its own cloned tool instances so that
         collect_and_reset_traces() returns only that expert's traces.
@@ -252,7 +252,21 @@ class MultiExpertOrchestrator:
         Loop β A.3 (B4): the curated live mcp-legal-it tools are filtered per
         expert via EXPERT_MCP_TOOLS; all other tools are attached to every expert
         (backward-compatible when no MCP tools are present).
+
+        Concurrency fix: called ONCE at boot (via `_init_experts`, kept for
+        backward compat — admin reinit, `get_expert`/`list_experts` readers)
+        AND once per `process()` call to build a request-local expert set.
+        Experts accumulate per-run trace state on `self`
+        (`_current_trace`, `_live_sources_retrieved`, `get_graph_traversal()`),
+        so two concurrent `process()` calls sharing one instance would mix
+        RLCF trace/source data across queries — the answer text itself was
+        always fine (built from the local `responses` list), only the
+        trace-derived fields leaked. `ai_service`/`retriever`/`graph_db`/
+        `policy_manager`/embeddings stay shared read-only backends (thin
+        wrappers, no model reload per call) — only the per-expert
+        instance + its cloned tools are rebuilt.
         """
+        experts: Dict[str, BaseExpert] = {}
         all_mcp = set().union(*self.EXPERT_MCP_TOOLS.values())
         for expert_type, expert_class in self.EXPERT_CLASSES.items():
             allowed_mcp = self.EXPERT_MCP_TOOLS.get(expert_type, set())
@@ -264,12 +278,21 @@ class MultiExpertOrchestrator:
             # (traversal head) into every expert. `config` merges over the YAML
             # (instance config wins) in _load_config, so use_react activates the
             # ReAct loop while temperature/model/max_tokens stay from experts.yaml.
-            self._experts[expert_type] = expert_class(
+            experts[expert_type] = expert_class(
                 tools=expert_tools,
                 ai_service=self.ai_service,
                 config={"use_react": self._expert_use_react},
                 policy_manager=self.policy_manager,
             )
+        return experts
+
+    def _init_experts(self):
+        """Boot-time initialization of `self._experts` (backward compat: admin
+        reinit and readers like `get_expert`/`list_experts`/`run_single_expert`
+        still read this instance-level set). `process()` builds its OWN
+        request-local set via `_build_experts()` — see that method's docstring.
+        """
+        self._experts = self._build_experts()
 
     async def _sediment_live_sources(self, live_sources: List[Dict[str, Any]]) -> None:
         """Loop β C.2: write the query's live mcp-legal-it retrievals into the graph
@@ -436,7 +459,9 @@ class MultiExpertOrchestrator:
         except Exception as exc:  # noqa: BLE001 - never break the answer path
             log.warning("tool-gating apply failed (fallback to all tools)", error=str(exc))
 
-    def _merge_expert_traversal_actions(self, trace: "ExecutionTrace", responses: List[Any]) -> None:
+    def _merge_expert_traversal_actions(
+        self, trace: "ExecutionTrace", responses: List[Any], experts: Dict[str, BaseExpert]
+    ) -> None:
         """Slice 4 L3: copy the experts' ``graph_traversal`` actions (recorded by
         the systemic expert's neural relation selection) into the orchestrator's
         persisted ExecutionTrace, so the decision reaches full_trace →
@@ -444,10 +469,15 @@ class MultiExpertOrchestrator:
         "relazioni percorse". Additive: the gating trainer filters on
         ``expert_selection`` + source, the tool trainer on ``tool_use`` +
         source — extra graph_traversal actions are invisible to both.
-        Failure-isolated."""
+        Failure-isolated.
+
+        `experts` is the REQUEST-LOCAL instance set (from `_build_experts()`),
+        not `self._experts` — concurrent `process()` calls must read each
+        their own experts' trace state, never a sibling run's.
+        """
         try:
             for r in responses:
-                expert = self._experts.get(getattr(r, "expert_type", None))
+                expert = experts.get(getattr(r, "expert_type", None))
                 etrace = expert.get_current_trace() if expert else None
                 if not etrace:
                     continue
@@ -457,16 +487,22 @@ class MultiExpertOrchestrator:
         except Exception as exc:  # noqa: BLE001
             log.debug("graph_traversal action merge skipped", error=str(exc))
 
-    def _annotate_tool_use_outcomes(self, trace: "ExecutionTrace", responses: List[Any]) -> None:
+    def _annotate_tool_use_outcomes(
+        self, trace: "ExecutionTrace", responses: List[Any], experts: Dict[str, BaseExpert]
+    ) -> None:
         """Mark each ``tool_use`` action with the observed outcome — did that
         (expert, tool) actually return a live source — so the tool-policy trainer
         can credit productive tools (Loop β E.3 signal a). Must run before the
-        trace is serialized. Failure-isolated."""
+        trace is serialized. Failure-isolated.
+
+        `experts` is the REQUEST-LOCAL instance set — see
+        `_merge_expert_traversal_actions` docstring for why.
+        """
         try:
             ran_types = {r.expert_type for r in responses}
             productive: set = set()
             for et in ran_types:
-                expert = self._experts.get(et)
+                expert = experts.get(et)
                 for src in (getattr(expert, "_live_sources_retrieved", None) or []):
                     tool_name = src.get("tool_name")
                     if tool_name:
@@ -575,6 +611,7 @@ class MultiExpertOrchestrator:
         return_trace: bool = False,
         include_trace: bool = False,
         max_experts: Optional[int] = None,
+        on_expert_complete: Optional[Callable[[ExpertResponse], Awaitable[None]]] = None,
     ) -> SynthesisResult:
         """
         Processa una query attraverso il sistema multi-expert.
@@ -586,6 +623,13 @@ class MultiExpertOrchestrator:
             metadata: Metadati aggiuntivi
             return_trace: Se True, ritorna (result, trace) invece di solo result
             include_trace: Se True, popola pipeline_trace nel risultato
+            on_expert_complete: async callback invoked with the ExpertResponse
+                as soon as EACH expert finishes (success, timeout OR error
+                branch alike) — used by the async progressive Q&A path to push
+                per-canon partial results to the BFF while the rest of the
+                collegio is still deliberating. Best-effort: a callback
+                failure is swallowed and logged, never propagated (an expert
+                must never fail because progress reporting failed).
 
         Returns:
             SynthesisResult con sintesi finale (o tuple se return_trace=True)
@@ -596,8 +640,21 @@ class MultiExpertOrchestrator:
         """
         start_time = time.perf_counter()
 
-        # Clear per-pipeline retrieval cache
-        SemanticSearchTool.clear_cache()
+        # Concurrency fix: build a REQUEST-LOCAL expert set instead of reusing
+        # the shared `self._experts` singleton. Experts accumulate per-run
+        # trace state on `self` (_current_trace, _live_sources_retrieved,
+        # get_graph_traversal()), so two concurrent process() calls sharing
+        # instances would mix RLCF trace/source data across queries — the
+        # async progressive Q&A path makes concurrent in-process runs common.
+        # NOTE: intentionally NOT `SemanticSearchTool.clear_cache()` anymore —
+        # the shared class-level cache is keyed on (query, top_k, source_types)
+        # content, so it is already safe to read/write concurrently; clearing
+        # it at process() start only evicted entries a sibling in-flight query
+        # had just populated (wasted work, not corrupted data), and under
+        # concurrency amounted to nondeterministic cache-defeat. Leaving it
+        # unmanaged trades that for unbounded (but content-addressed, so still
+        # correct) growth — acceptable for a per-process cache.
+        experts = self._build_experts()
 
         trace_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
@@ -887,7 +944,7 @@ class MultiExpertOrchestrator:
             )[:effective_max_experts]
 
             if not selected_experts:
-                selected_experts = [(exp, 1.0 / len(self._experts)) for exp in self._experts.keys()]
+                selected_experts = [(exp, 1.0 / len(experts)) for exp in experts.keys()]
 
         routing_time_ms = (time.perf_counter() - routing_t0) * 1000
 
@@ -930,9 +987,13 @@ class MultiExpertOrchestrator:
         # Step 5: Esegui Expert (con tracing)
         expert_t0 = time.perf_counter()
         if self.config.parallel_execution:
-            results_with_timing = await self._run_experts_parallel(selected_experts, context)
+            results_with_timing = await self._run_experts_parallel(
+                selected_experts, context, experts, on_expert_complete=on_expert_complete
+            )
         else:
-            results_with_timing = await self._run_experts_sequential(selected_experts, context)
+            results_with_timing = await self._run_experts_sequential(
+                selected_experts, context, experts, on_expert_complete=on_expert_complete
+            )
 
         # Extract plain responses for downstream (synthesis etc.)
         responses = [r[0] for r in results_with_timing]
@@ -942,7 +1003,7 @@ class MultiExpertOrchestrator:
             expert_executions = []
             total_tokens = 0
             for (expert_type, _), (resp, started_at, completed_at, measured_duration) in zip(selected_experts, results_with_timing):
-                expert = self._experts.get(expert_type)
+                expert = experts.get(expert_type)
                 if not expert:
                     continue
 
@@ -1048,10 +1109,10 @@ class MultiExpertOrchestrator:
         # Loop β E.3: BEFORE serializing, annotate each `tool_use` action with the
         # observed outcome (did that tool actually return a live source) so the
         # tool-policy trainer can credit productive tools — must run before to_dict().
-        self._annotate_tool_use_outcomes(trace, responses)
+        self._annotate_tool_use_outcomes(trace, responses, experts)
         # Slice 4 L3: persist the experts' traversal decisions alongside the
         # routing/tool actions (must run before to_dict()).
-        self._merge_expert_traversal_actions(trace, responses)
+        self._merge_expert_traversal_actions(trace, responses, experts)
         synthesis_result.metadata["execution_trace"] = trace.to_dict()
 
         # Loop β C.2: sediment this query's LIVE retrievals into the graph —
@@ -1064,7 +1125,7 @@ class MultiExpertOrchestrator:
             seen_live: set = set()
             live_sources: List[Dict[str, Any]] = []
             for et in ran_types:
-                expert = self._experts.get(et)
+                expert = experts.get(et)
                 for src in (getattr(expert, "_live_sources_retrieved", None) or []):
                     key = (src.get("source_id"), (src.get("text") or "")[:64])
                     if key in seen_live:
@@ -1101,15 +1162,37 @@ class MultiExpertOrchestrator:
     async def _run_experts_parallel(
         self,
         selected_experts: List[tuple],
-        context: ExpertContext
+        context: ExpertContext,
+        experts: Dict[str, BaseExpert],
+        on_expert_complete: Optional[Callable[[ExpertResponse], Awaitable[None]]] = None,
     ) -> List[tuple]:
         """Esegue Expert in parallelo con circuit breaker.
+
+        `experts` is the REQUEST-LOCAL instance set built by `_build_experts()`
+        for THIS `process()` call — never `self._experts` — so concurrent
+        queries never share expert instances (and their per-run trace state).
 
         Returns:
             List of (ExpertResponse, started_at, completed_at, duration_ms) tuples.
         """
+        async def _notify(response: ExpertResponse) -> None:
+            # Best-effort per-expert progress callback (async progressive Q&A).
+            # Fired from INSIDE each gathered task so completion is reported as
+            # soon as that expert finishes, not after the whole gather barrier.
+            if on_expert_complete is None:
+                return
+            try:
+                await on_expert_complete(response)
+            except Exception as cb_err:  # noqa: BLE001
+                log.warning(
+                    "on_expert_complete callback failed (non-fatal)",
+                    expert=response.expert_type,
+                    trace_id=context.trace_id,
+                    error=str(cb_err),
+                )
+
         async def run_with_timeout(expert_type: str) -> Optional[tuple]:
-            expert = self._experts.get(expert_type)
+            expert = experts.get(expert_type)
             if not expert:
                 return None
 
@@ -1126,6 +1209,7 @@ class MultiExpertOrchestrator:
                         expert_type, context.trace_id
                     )
                     now = datetime.now()
+                    await _notify(resp)
                     return (resp, now, now, 0.0)
 
             started_at = datetime.now()
@@ -1141,6 +1225,7 @@ class MultiExpertOrchestrator:
                 if self.config.enable_circuit_breaker:
                     cb = get_expert_circuit_breaker(expert_type)
                     cb.record_success()
+                await _notify(response)
                 return (response, started_at, completed_at, duration_ms)
             except asyncio.TimeoutError:
                 duration_ms = (time.perf_counter() - t0) * 1000
@@ -1156,6 +1241,7 @@ class MultiExpertOrchestrator:
                     limitations="Timeout",
                     trace_id=context.trace_id
                 )
+                await _notify(resp)
                 return (resp, started_at, completed_at, duration_ms)
             except Exception as e:
                 duration_ms = (time.perf_counter() - t0) * 1000
@@ -1171,6 +1257,7 @@ class MultiExpertOrchestrator:
                     limitations=str(e),
                     trace_id=context.trace_id
                 )
+                await _notify(resp)
                 return (resp, started_at, completed_at, duration_ms)
 
         tasks = [run_with_timeout(exp) for exp, _ in selected_experts]
@@ -1181,17 +1268,36 @@ class MultiExpertOrchestrator:
     async def _run_experts_sequential(
         self,
         selected_experts: List[tuple],
-        context: ExpertContext
+        context: ExpertContext,
+        experts: Dict[str, BaseExpert],
+        on_expert_complete: Optional[Callable[[ExpertResponse], Awaitable[None]]] = None,
     ) -> List[tuple]:
         """Esegue Expert in sequenza con circuit breaker.
+
+        `experts` is the REQUEST-LOCAL instance set — see
+        `_run_experts_parallel` docstring for why.
 
         Returns:
             List of (ExpertResponse, started_at, completed_at, duration_ms) tuples.
         """
+        async def _notify(response: ExpertResponse) -> None:
+            # Best-effort per-expert progress callback (async progressive Q&A).
+            if on_expert_complete is None:
+                return
+            try:
+                await on_expert_complete(response)
+            except Exception as cb_err:  # noqa: BLE001
+                log.warning(
+                    "on_expert_complete callback failed (non-fatal)",
+                    expert=response.expert_type,
+                    trace_id=context.trace_id,
+                    error=str(cb_err),
+                )
+
         results = []
 
         for expert_type, _ in selected_experts:
-            expert = self._experts.get(expert_type)
+            expert = experts.get(expert_type)
             if not expert:
                 continue
 
@@ -1208,6 +1314,7 @@ class MultiExpertOrchestrator:
                         expert_type, context.trace_id
                     )
                     now = datetime.now()
+                    await _notify(resp)
                     results.append((resp, now, now, 0.0))
                     continue
 
@@ -1223,6 +1330,7 @@ class MultiExpertOrchestrator:
                 if self.config.enable_circuit_breaker:
                     cb = get_expert_circuit_breaker(expert_type)
                     cb.record_success()
+                await _notify(response)
                 results.append((response, started_at, completed_at, duration_ms))
             except asyncio.TimeoutError:
                 duration_ms = (time.perf_counter() - t0) * 1000
@@ -1237,6 +1345,7 @@ class MultiExpertOrchestrator:
                     confidence=0.0,
                     trace_id=context.trace_id
                 )
+                await _notify(resp)
                 results.append((resp, started_at, completed_at, duration_ms))
             except Exception as e:
                 duration_ms = (time.perf_counter() - t0) * 1000
@@ -1252,6 +1361,7 @@ class MultiExpertOrchestrator:
                     limitations=str(e),
                     trace_id=context.trace_id
                 )
+                await _notify(resp)
                 results.append((resp, started_at, completed_at, duration_ms))
 
         return results

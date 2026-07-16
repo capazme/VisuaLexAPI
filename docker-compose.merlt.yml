@@ -196,6 +196,15 @@ services:
       # compose network; the Streamable HTTP transport is served at /mcp.
       MCP_LEGAL_IT_URL: "http://mcp-legal-it:8011/mcp"
 
+      # Async progressive Q&A (submit+poll): the work runs IN-PROCESS on the
+      # api (asyncio.create_task, warm orchestrator singleton — NOT the RQ
+      # worker), so unlike BFF_CALLBACK_URL / BFF_EXTRACTION_CALLBACK_URL
+      # (worker-side, ingestion/extraction) this callback URL + the shared
+      # secret belong on merlt-api. Same host/interpolation form as the
+      # worker's BFF_CALLBACK_URL, only the path differs.
+      BFF_QA_CALLBACK_URL: "${MERLT_BFF_QA_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/qa-callback}"
+      MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:-dev-internal-secret}"
+
       # Slice 2a — Seed loader (Libro IV CC). MERLT_DATA_DIR points at the
       # mounted data/ directory; MERLT_SKIP_SEED=true disables boot loading.
       # MERLT_SKIP_EMBEDDINGS=true (DEFAULT) skips the slow embedding step:

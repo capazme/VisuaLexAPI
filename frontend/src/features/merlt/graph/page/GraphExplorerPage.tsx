@@ -360,7 +360,8 @@ export function GraphExplorerPage(): React.ReactElement {
 
   // Defect #4, derived during render (react-hooks/set-state-in-effect): when the
   // count of SETTLED turns grows while the Nodo tab is active, light the badge.
-  const settledCount = qa.turns.filter((t) => t.state.status !== 'loading').length;
+  // 'partial' (async progressive Q&A) is still in-flight, not settled.
+  const settledCount = qa.turns.filter((t) => t.state.status === 'success' || t.state.status === 'error').length;
   const [seenSettledCount, setSeenSettledCount] = useState(settledCount);
   if (settledCount !== seenSettledCount) {
     setSeenSettledCount(settledCount);
@@ -591,13 +592,22 @@ export function GraphExplorerPage(): React.ReactElement {
   // while the current center matches the deliberation's scope (defect #10).
   const hasDeliberation = qa.turns.length > 0 && scopeMatches;
 
-  // Slice 4 P2a — the debate overlay reflects ONLY the LATEST turn's answer, and
-  // only while it is settled successfully. A new ask (newest turn → loading) or a
-  // failed turn clears the overlay, so synthetic canon/contrast elements never
-  // linger over a stale or in-flight deliberation (lifecycle: §3).
+  // Slice 4 P2a — the debate overlay reflects ONLY the LATEST turn's answer.
+  // Async progressive Q&A (qa-async-progressive-contract.md): a 'partial' turn
+  // lights up the canvas progressively too — `readDeliberation` reads a plain
+  // `expert_contributions` field structurally, so a synthetic `{
+  // expert_contributions: partials }` shape feeds the SAME overlay pipeline as
+  // a settled answer WITHOUT synthesis/dissent/confidence (those stay
+  // terminal-only per the contract — `readDeliberation` never sees them here,
+  // since the synthetic object carries nothing else). A new ask (newest turn →
+  // loading) or a failed turn clears the overlay, so synthetic canon/contrast
+  // elements never linger over a stale in-flight deliberation (lifecycle: §3).
   const latestAnswer = useMemo<unknown>(() => {
     const last = qa.turns[qa.turns.length - 1];
-    return last?.state.status === 'success' ? last.state.answer : null;
+    if (!last) return null;
+    if (last.state.status === 'success') return last.state.answer;
+    if (last.state.status === 'partial') return { expert_contributions: last.state.partials };
+    return null;
   }, [qa.turns]);
 
   // Slice 4 L3 — the LATEST settled deliberation's trace_id: the handle every
@@ -916,7 +926,8 @@ export function GraphExplorerPage(): React.ReactElement {
   );
 
   // P1.10: one collegial run at a time — both AskGraphField instances share this.
-  const qaBusy = qa.turns.some((t) => t.state.status === 'loading');
+  // 'partial' (async progressive Q&A) is still an in-flight deliberation.
+  const qaBusy = qa.turns.some((t) => t.state.status === 'loading' || t.state.status === 'partial');
 
   // Defect #10: the deliberation lives on ANOTHER center — the Dibattito tab
   // shows a compact chip whose "Torna" recenters on the ask-time urn.

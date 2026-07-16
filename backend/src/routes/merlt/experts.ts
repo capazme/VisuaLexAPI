@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
+import { internalAuth } from '../../middleware/internalAuth';
 import { consentGuard } from '../../services/merlt/consentGuard';
 import { contributionGuard } from '../../services/merlt/contributionGuard';
 import {
   expertQueryRequestSchema,
+  expertQueryAsyncRequestSchema,
+  qaCallbackSchema,
+  type QaPartialExpert,
+  type QaCallbackPartialExpert,
   inlineFeedbackRequestSchema,
   sourceFeedbackRequestSchema,
   detailedFeedbackRequestSchema,
@@ -36,6 +42,56 @@ function uniqueStrings(list: string[] | undefined): string[] {
     }
   }
   return out;
+}
+
+/**
+ * Assemble the opaque `context` dict MERL-T's orchestrator consumes: `mode`,
+ * the legacy `context_urn` single anchor, and `entities.{norm_references,
+ * legal_concepts}` (the channel that actually seeds graph exploration + the
+ * expert prompt — see schemas/merlt/experts.ts:graphContextSchema). Shared by
+ * the sync /experts/query and the async /experts/query/async submit route so
+ * both build the exact same MERL-T-facing shape.
+ */
+function buildExpertContext(data: {
+  mode?: string;
+  contextUrn?: string;
+  context?: { normReferences?: string[]; legalConcepts?: string[] };
+}): Record<string, unknown> | undefined {
+  const normReferences = uniqueStrings(data.context?.normReferences);
+  const legalConcepts = uniqueStrings(data.context?.legalConcepts);
+  const entities: Record<string, string[]> = {};
+  if (normReferences.length) entities.norm_references = normReferences;
+  if (legalConcepts.length) entities.legal_concepts = legalConcepts;
+  const hasEntities = Object.keys(entities).length > 0;
+  return data.mode || data.contextUrn || hasEntities
+    ? {
+        ...(data.mode ? { mode: data.mode } : {}),
+        ...(data.contextUrn ? { context_urn: data.contextUrn } : {}),
+        ...(hasEntities ? { entities } : {}),
+      }
+    : undefined;
+}
+
+// Canon order per art. 12 preleggi (letterale → sistematico → principî →
+// precedente) — qa-async-progressive-contract.md gotcha "Ordine canoni".
+const CANON_ORDER: readonly string[] = ['literal', 'systemic', 'principles', 'precedent'];
+
+function sortPartials(partials: QaPartialExpert[]): QaPartialExpert[] {
+  return [...partials].sort((a, b) => CANON_ORDER.indexOf(a.expert) - CANON_ORDER.indexOf(b.expert));
+}
+
+/** Review fix: the callback's `partialExpert.expert` is an open string at the
+ * Zod layer (see qaCallbackPartialExpertSchema) so a non-canonical value
+ * doesn't 400 the whole callback. This is the runtime canon check. */
+function isCanonExpert(expert: string): expert is QaPartialExpert['expert'] {
+  return (CANON_ORDER as readonly string[]).includes(expert);
+}
+
+/** Upsert-by-expert into the accumulated partials array, then reorder by canon order. */
+function mergePartial(existing: unknown, incoming: QaPartialExpert): QaPartialExpert[] {
+  const list: QaPartialExpert[] = Array.isArray(existing) ? (existing as QaPartialExpert[]) : [];
+  const withoutIncoming = list.filter((p) => p.expert !== incoming.expert);
+  return sortPartials([...withoutIncoming, incoming]);
 }
 
 /**
@@ -134,20 +190,7 @@ router.post('/experts/query', authenticate, consentGuard, async (req: Request, r
   // legal_concepts feed the prompt). `mode` and the legacy `context_urn` ride in
   // the same opaque `context` dict (Dict[str, Any] on the Pydantic side — extra
   // keys are fine); `context_urn` stays for backward compatibility only.
-  const normReferences = uniqueStrings(parsed.data.context?.normReferences);
-  const legalConcepts = uniqueStrings(parsed.data.context?.legalConcepts);
-  const entities: Record<string, string[]> = {};
-  if (normReferences.length) entities.norm_references = normReferences;
-  if (legalConcepts.length) entities.legal_concepts = legalConcepts;
-  const hasEntities = Object.keys(entities).length > 0;
-  const context =
-    parsed.data.mode || parsed.data.contextUrn || hasEntities
-      ? {
-          ...(parsed.data.mode ? { mode: parsed.data.mode } : {}),
-          ...(parsed.data.contextUrn ? { context_urn: parsed.data.contextUrn } : {}),
-          ...(hasEntities ? { entities } : {}),
-        }
-      : undefined;
+  const context = buildExpertContext(parsed.data);
   try {
     const result = await getExpertsClient().query({
       query: parsed.data.query,
@@ -161,6 +204,95 @@ router.post('/experts/query', authenticate, consentGuard, async (req: Request, r
   } catch (err) {
     handleMerltError(err, res);
   }
+});
+
+/**
+ * POST /api/merlt/experts/query/async (qa-async-progressive-contract.md §1)
+ *
+ * Submit path of the async progressive Q&A: create a pending MerltQaJob row,
+ * then best-effort ask MERL-T to run the deliberation in-process
+ * (asyncio.create_task), threading job.id as bff_job_id. The enqueue is
+ * best-effort — same pattern as ensureIngestionJob (Slice 2a): a failure is
+ * logged but never thrown, the row is left pending, and the jobWatchdog
+ * sweeper is the safety net that eventually flips it to timeout. The FE
+ * starts polling GET /experts/jobs/:jobId/status regardless.
+ */
+router.post('/experts/query/async', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+  const parsed = expertQueryAsyncRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+  const pref = await prisma.merltUserPreference.findUnique({
+    where: { userId: req.user.id },
+    select: { consentLevel: true },
+  });
+  const job = await prisma.merltQaJob.create({
+    data: {
+      userId: req.user.id,
+      query: parsed.data.query,
+      mode: parsed.data.mode,
+      // Captured at submit — no downgrade post-hoc (mirrors the sync /query
+      // redaction rule and the contract's consentLevel field).
+      consentLevel: pref?.consentLevel ?? 'none',
+      status: 'pending',
+    },
+  });
+
+  const context = buildExpertContext(parsed.data);
+  try {
+    await getExpertsClient().startQueryAsync(
+      {
+        query: parsed.data.query,
+        user_id: req.user.id,
+        consent_level: mapConsentLevel(pref?.consentLevel),
+        max_experts: parsed.data.maxExperts,
+        context,
+        include_trace: true,
+      },
+      job.id
+    );
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `merlt qa async: failed to enqueue MERL-T job jobId=${job.id}:`,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+
+  res.status(202).json({ jobId: job.id, status: 'pending' });
+});
+
+/**
+ * GET /api/merlt/experts/jobs/:jobId/status (qa-async-progressive-contract.md §2)
+ *
+ * Owner-scoped poll target. 404 if the job does not exist or belongs to
+ * another user (no IDOR). `partials`/`result`/`error` default to the
+ * contract's empty-state shapes ([] / null / null).
+ */
+router.get('/experts/jobs/:jobId/status', authenticate, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+  const job = await prisma.merltQaJob.findFirst({
+    where: { id: req.params.jobId, userId: req.user.id },
+  });
+  if (!job) {
+    res.status(404).json({ detail: 'job_not_found' });
+    return;
+  }
+  res.status(200).json({
+    jobId: job.id,
+    status: job.status,
+    partials: job.partials ?? [],
+    result: job.result ?? null,
+    error: job.errorMessage ?? null,
+  });
 });
 
 router.get('/experts/history', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
@@ -394,6 +526,90 @@ router.post('/experts/confirm-source', authenticate, contributionGuard, async (r
   } catch (err) {
     handleMerltError(err, res);
   }
+});
+
+/**
+ * POST /api/merlt/internal/qa-callback (qa-async-progressive-contract.md §4)
+ *
+ * Called by MERL-T's in-process asyncio task (internalAuth, NOT JWT — mirrors
+ * /internal/job-callback in routes/merlt/graph.ts). Per-expert callbacks
+ * (`status: 'running'` + `partialExpert`) upsert-by-expert into `partials` and
+ * reorder by canon order (art. 12 preleggi). Terminal callbacks
+ * (`completed`/`failed`/`timeout`) stamp `completedAt` and set `result` or
+ * `errorMessage`. Unknown or already-terminal jobs are acknowledged as a
+ * no-op — the callback is best-effort from MERL-T's side and a duplicate or
+ * late-arriving callback (e.g. after the watchdog already timed the job out)
+ * must not surface as an error.
+ *
+ * Review fix: a `running` callback whose `partialExpert.expert` is outside
+ * the 4-canon enum is degraded gracefully — the merge is skipped (with a
+ * warn log) but the callback still returns 200. The terminal
+ * (`completed`/`failed`/`timeout`) path stays strict; it is the only unblock
+ * mechanism for the FE poll loop and must never be weakened by a malformed
+ * partial riding alongside it (partials never arrive on a terminal callback
+ * per the contract, but the guard costs nothing to keep explicit).
+ */
+router.post('/internal/qa-callback', internalAuth, async (req: Request, res: Response): Promise<void> => {
+  const parsed = qaCallbackSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+    return;
+  }
+  const { bffJobId, status, partialExpert, result, error } = parsed.data;
+
+  const job = await prisma.merltQaJob.findUnique({ where: { id: bffJobId } });
+  const TERMINAL = ['completed', 'failed', 'timeout'];
+  if (!job || TERMINAL.includes(job.status)) {
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  if (status === 'running') {
+    let nextPartials: QaPartialExpert[] | undefined;
+    if (partialExpert) {
+      if (isCanonExpert(partialExpert.expert)) {
+        nextPartials = mergePartial(job.partials, partialExpert as QaPartialExpert);
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `merlt qa callback: unknown expert_type "${(partialExpert as QaCallbackPartialExpert).expert}" for job ${bffJobId}, skipping partial merge`
+        );
+      }
+    }
+    await prisma.merltQaJob.update({
+      where: { id: bffJobId },
+      data: {
+        status: 'running',
+        startedAt: job.startedAt ?? new Date(),
+        ...(nextPartials ? { partials: nextPartials } : {}),
+      },
+    });
+  } else if (status === 'completed') {
+    // Review fix: populate traceId from the terminal result so the column
+    // is no longer always null — non-fatal if MERL-T omits trace_id.
+    const traceId = typeof result?.trace_id === 'string' ? result.trace_id : undefined;
+    await prisma.merltQaJob.update({
+      where: { id: bffJobId },
+      data: {
+        status: 'completed',
+        result: (result ?? undefined) as Prisma.InputJsonValue | undefined,
+        completedAt: new Date(),
+        ...(traceId ? { traceId } : {}),
+      },
+    });
+  } else {
+    // failed | timeout
+    await prisma.merltQaJob.update({
+      where: { id: bffJobId },
+      data: {
+        status,
+        errorMessage: error ?? undefined,
+        completedAt: new Date(),
+      },
+    });
+  }
+
+  res.status(200).json({ ok: true });
 });
 
 export default router;

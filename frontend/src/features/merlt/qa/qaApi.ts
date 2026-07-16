@@ -1,6 +1,6 @@
 import { apiClient } from '../../../services/api';
 import { extractReactSteps, extractToolUsages } from './traceDetails';
-import type { GraphContext, GraphTraversalEdge, QaAnswer, QaHistoryItem, QaMode } from './types';
+import type { GraphContext, GraphTraversalEdge, QaAnswer, QaHistoryItem, QaJobStatus, QaMode, QaPartialExpert } from './types';
 
 /**
  * Typed BFF clients for the MERL-T expert Q&A routes (Loop β Phase F).
@@ -13,6 +13,12 @@ import type { GraphContext, GraphTraversalEdge, QaAnswer, QaHistoryItem, QaMode 
 // 502/504 reaches the client with real status copy instead of the FE aborting
 // first with a generic "nessuna risposta dal server".
 const QA_TIMEOUT_MS = 130000;
+
+// qa-async-progressive-contract.md §1/§2 — submit and poll are both short,
+// near-instant BFF round-trips (submit only creates the job row and
+// best-effort enqueues; poll only reads it) — nothing like the up-to-120s
+// synchronous deliberation, so a much shorter client timeout suffices.
+const QA_ASYNC_TIMEOUT_MS = 15000;
 
 /**
  * Ask options. `context` is the "context basket" — the graph nodes the jurist
@@ -76,6 +82,62 @@ export async function askQuestion(
     { timeout: QA_TIMEOUT_MS, signal },
   );
   return normalizeAnswer(res.data);
+}
+
+export interface StartQueryAsyncResult {
+  jobId: string;
+  status: QaJobStatus;
+}
+
+/**
+ * POST /api/merlt/experts/query/async (qa-async-progressive-contract.md §1) —
+ * submit path of the async progressive Q&A. Returns immediately (202) with a
+ * `jobId` to poll via {@link fetchQaJobStatus}; the deliberation itself keeps
+ * running server-side. `askQuestion` above stays available as the SYNC
+ * fallback (unused by the default ask/retry path — see useQaThread) for any
+ * caller that still wants a single blocking round-trip.
+ */
+export async function startQueryAsync(
+  query: string,
+  mode: QaMode,
+  opts?: AskQuestionOptions,
+  signal?: AbortSignal,
+): Promise<StartQueryAsyncResult> {
+  const res = await apiClient.post<StartQueryAsyncResult>(
+    '/merlt/experts/query/async',
+    { query, mode, maxExperts: opts?.maxExperts, context: normalizeContext(opts?.context) },
+    { timeout: QA_ASYNC_TIMEOUT_MS, signal },
+  );
+  return res.data;
+}
+
+export interface QaJobStatusResponse {
+  jobId: string;
+  status: QaJobStatus;
+  partials: QaPartialExpert[];
+  result: QaAnswer | null;
+  error: string | null;
+}
+
+/** Raw wire shape of GET /experts/jobs/:jobId/status — `result` is the same
+ *  raw (snake_case `graph_traversal`) shape /experts/query returns, or null
+ *  until the job completes. */
+type RawQaJobStatusResponse = Omit<QaJobStatusResponse, 'result'> & {
+  result: RawQaAnswer | null;
+};
+
+/**
+ * GET /api/merlt/experts/jobs/:jobId/status (qa-async-progressive-contract.md
+ * §2) — poll target for a job started via {@link startQueryAsync}. `result`
+ * is normalized the same way as the sync path (only valorized on
+ * `status: 'completed'`).
+ */
+export async function fetchQaJobStatus(jobId: string, signal?: AbortSignal): Promise<QaJobStatusResponse> {
+  const res = await apiClient.get<RawQaJobStatusResponse>(
+    `/merlt/experts/jobs/${encodeURIComponent(jobId)}/status`,
+    { timeout: QA_ASYNC_TIMEOUT_MS, signal },
+  );
+  return { ...res.data, result: res.data.result ? normalizeAnswer(res.data.result) : null };
 }
 
 export async function refineQuestion(

@@ -223,6 +223,17 @@ function PastTurnSummary({ turn }: { turn: QaTurnModel }): React.ReactElement {
       </span>
     );
   }
+  // Async progressive Q&A: in practice only the LAST turn is ever 'partial'
+  // (rendered directly by the caller, never wrapped in PastTurnRow) — this
+  // branch exists purely so the type-narrow below is exhaustive.
+  if (turn.state.status === 'partial') {
+    return (
+      <span className="flex min-w-0 items-center gap-2">
+        <Loader2 size={13} className="shrink-0 animate-spin text-slate-400" aria-hidden="true" />
+        <span className="truncate text-sm text-slate-600 dark:text-slate-300">{turn.question}</span>
+      </span>
+    );
+  }
   const { synthesis, confidence } = turn.state.answer;
   return (
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -366,7 +377,9 @@ export function DeliberationColumn({
   const lastTurn = turns.length > 0 ? turns[turns.length - 1] : undefined;
   const latestTraceId = lastTurn?.state.status === 'success' ? lastTurn.state.answer.trace_id : null;
 
-  const settledCount = turns.filter((t) => t.state.status !== 'loading').length;
+  // 'partial' is still an in-flight deliberation (no synthesis/confidence yet)
+  // — only 'success'/'error' count as settled for the "new turn while closed" pulse.
+  const settledCount = turns.filter((t) => t.state.status === 'success' || t.state.status === 'error').length;
 
   const inner = (
     <>
@@ -864,6 +877,61 @@ function DeliberationTurn({
           </button>
         </div>
       )}
+
+      {turn.state.status === 'partial' &&
+        (() => {
+          const partials = turn.state.partials;
+          return (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="animate-spin" size={15} /> Il collegio sta deliberando…
+                </span>
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  Annulla
+                </button>
+              </div>
+              {/* Per-canon arrival checklist (contract §"Ordine canoni"): a
+                  compact art. 12 preleggi progress readout, live-announced so
+                  a screen reader hears each canon land without re-reading the
+                  whole row. */}
+              <p
+                aria-live="polite"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 dark:text-slate-500"
+              >
+                {CANON_ORDER.map((key, i) => {
+                  const arrived = partials.some((p) => p.expert === key);
+                  return (
+                    <span key={key} className="flex items-center gap-1">
+                      {i > 0 && <span aria-hidden="true">·</span>}
+                      <span className={arrived ? 'font-medium text-slate-600 dark:text-slate-300' : undefined}>
+                        {CANON_LABEL[key] ?? key}
+                      </span>
+                      {arrived ? (
+                        <Check size={11} className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                      ) : (
+                        <span aria-hidden="true">…</span>
+                      )}
+                    </span>
+                  );
+                })}
+              </p>
+              {partials.length > 0 && (
+                <CanonTheses
+                  contributions={partials}
+                  traceId=""
+                  canContribute={canContribute}
+                  steeredKeys={steeredKeys}
+                  onMarkSteered={onMarkSteered}
+                />
+              )}
+            </div>
+          );
+        })()}
 
       {turn.state.status === 'error' && (
         <div

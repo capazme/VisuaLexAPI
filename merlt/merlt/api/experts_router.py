@@ -16,16 +16,20 @@ Usage:
     app.include_router(experts_router)
 """
 
+import asyncio
 import json
+import os
 import structlog
 import time
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
+from merlt.experts.base import ExpertResponse
 from merlt.experts.orchestrator import MultiExpertOrchestrator
 from merlt.experts.synthesizer import SynthesisMode
 from merlt.experts.models import QATrace, QAFeedback, ApiKey
@@ -555,6 +559,123 @@ async def _build_retrieved_sources(result: Any) -> List[RetrievedSource]:
         return []
 
 
+async def build_and_persist_query_response(
+    result: Any,
+    *,
+    user_id: str,
+    query: str,
+    consent_level: str,
+    include_trace: bool,
+    execution_time_ms: int,
+    session: AsyncSession,
+    trace_id: Optional[str] = None,
+) -> ExpertQueryResponse:
+    """
+    Build the `ExpertQueryResponse` DTO from a `SynthesisResult` AND persist
+    its `QATrace` row. Pure extraction of the sync `/query` handler's
+    response-building block (async progressive Q&A contract, "Refactor sync
+    = pura estrazione") so BOTH the sync `/query` path and the new async
+    progressive path (`run_query_progressive`) share ONE code path — behavior
+    for the sync caller is bit-for-bit unchanged.
+
+    `trace_id` is generated here when omitted (matching the original sync
+    behavior). The async submit handler pre-generates one so the immediate
+    202 response and the terminal callback's `result.trace_id` agree.
+    """
+    if trace_id is None:
+        # Generate trace ID
+        trace_id = f"trace_{uuid4().hex[:12]}"
+
+    # Extract sources from combined_legal_basis
+    sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
+
+    # Loop β F.0 (Option A): the consulted sources, with real FalkorDB
+    # provenance (the LLM-cited `sources` above lose it).
+    retrieved_sources = await _build_retrieved_sources(result)
+
+    # Extract experts used from expert_contributions
+    experts_used = list(result.expert_contributions.keys())
+
+    # Extract pipeline trace from result metadata
+    pipeline_trace_data = result.metadata.get("pipeline_trace") if include_trace else None
+    pipeline_metrics_data = result.metadata.get("pipeline_metrics") if include_trace else None
+    # Loop β Bug-4 0.3: the orchestrator always attaches the ExecutionTrace
+    # (query_id + RLCF actions w/ query_embedding) to metadata, regardless of
+    # include_trace. Persist it (nested in full_trace) so feedback can feed
+    # REINFORCE; it is stripped from the client-facing trace GET path.
+    execution_trace_data = result.metadata.get("execution_trace")
+
+    # Inject trace_id into pipeline_trace for correlation
+    if pipeline_trace_data:
+        pipeline_trace_data["trace_id"] = trace_id
+
+    # Stored full_trace = pipeline trace (when requested) + nested RLCF
+    # execution_trace (always, when present). dict() copy keeps the response's
+    # pipeline_trace_data clean of the nested embedding payload.
+    full_trace_data = dict(pipeline_trace_data) if pipeline_trace_data else {}
+    if execution_trace_data:
+        full_trace_data["execution_trace"] = execution_trace_data
+    full_trace_data = full_trace_data or None
+
+    # Extract routing metadata for new fields
+    routing_method = None
+    query_type = None
+    if pipeline_trace_data:
+        routing_info = pipeline_trace_data.get("routing", {})
+        routing_method = routing_info.get("method")
+        query_type = routing_info.get("query_type")
+
+    # Save trace to database with new consent-aware fields
+    trace = QATrace(
+        trace_id=trace_id,
+        user_id=user_id,
+        query=query,
+        selected_experts=experts_used,
+        synthesis_mode=result.mode.value,
+        synthesis_text=result.synthesis,
+        sources=[s.model_dump() for s in sources],  # Store as JSONB
+        execution_time_ms=execution_time_ms,
+        full_trace=full_trace_data,
+        # New consent-aware fields (Story 5-1)
+        consent_level=consent_level,
+        query_type=query_type,
+        confidence=result.confidence,
+        routing_method=routing_method,
+    )
+    session.add(trace)
+    await session.commit()
+
+    log.info(
+        "Expert query completed",
+        trace_id=trace_id,
+        mode=result.mode.value,
+        experts_count=len(experts_used),
+        sources_count=len(sources),
+        execution_time_ms=execution_time_ms,
+        has_trace=pipeline_trace_data is not None
+    )
+
+    return ExpertQueryResponse(
+        trace_id=trace_id,
+        synthesis=result.synthesis,
+        mode=result.mode.value,
+        alternatives=result.alternatives if result.mode == SynthesisMode.DIVERGENT else None,
+        sources=sources,
+        experts_used=experts_used,
+        confidence=result.confidence,
+        execution_time_ms=execution_time_ms,
+        pipeline_trace=pipeline_trace_data,
+        pipeline_metrics=pipeline_metrics_data,
+        retrieved_sources=retrieved_sources,
+        graph_traversal=_build_graph_traversal(result),
+        # Slice 4 P2a: surface the deliberation (copied from `result`, no recompute).
+        disagreement_analysis=_build_disagreement_analysis(result),
+        devils_advocate_flag=_build_devils_advocate_flag(result),
+        expert_contributions=_build_expert_contributions(result),
+        disagreement_explanation=getattr(result, "explanation", None),
+    )
+
+
 class InlineFeedbackRequest(BaseModel):
     """Quick thumbs feedback."""
     trace_id: str
@@ -1000,102 +1121,254 @@ async def query_experts(
 
         execution_time_ms = int((time.time() - start_time) * 1000)
 
-        # Generate trace ID
-        trace_id = f"trace_{uuid4().hex[:12]}"
-
-        # Extract sources from combined_legal_basis
-        sources = [_to_source_reference(ls) for ls in result.combined_legal_basis]
-
-        # Loop β F.0 (Option A): the consulted sources, with real FalkorDB
-        # provenance (the LLM-cited `sources` above lose it).
-        retrieved_sources = await _build_retrieved_sources(result)
-
-        # Extract experts used from expert_contributions
-        experts_used = list(result.expert_contributions.keys())
-
-        # Extract pipeline trace from result metadata
-        pipeline_trace_data = result.metadata.get("pipeline_trace") if request.include_trace else None
-        pipeline_metrics_data = result.metadata.get("pipeline_metrics") if request.include_trace else None
-        # Loop β Bug-4 0.3: the orchestrator always attaches the ExecutionTrace
-        # (query_id + RLCF actions w/ query_embedding) to metadata, regardless of
-        # include_trace. Persist it (nested in full_trace) so feedback can feed
-        # REINFORCE; it is stripped from the client-facing trace GET path.
-        execution_trace_data = result.metadata.get("execution_trace")
-
-        # Inject trace_id into pipeline_trace for correlation
-        if pipeline_trace_data:
-            pipeline_trace_data["trace_id"] = trace_id
-
-        # Stored full_trace = pipeline trace (when requested) + nested RLCF
-        # execution_trace (always, when present). dict() copy keeps the response's
-        # pipeline_trace_data clean of the nested embedding payload.
-        full_trace_data = dict(pipeline_trace_data) if pipeline_trace_data else {}
-        if execution_trace_data:
-            full_trace_data["execution_trace"] = execution_trace_data
-        full_trace_data = full_trace_data or None
-
-        # Extract routing metadata for new fields
-        routing_method = None
-        query_type = None
-        if pipeline_trace_data:
-            routing_info = pipeline_trace_data.get("routing", {})
-            routing_method = routing_info.get("method")
-            query_type = routing_info.get("query_type")
-
-        # Save trace to database with new consent-aware fields
-        trace = QATrace(
-            trace_id=trace_id,
+        # Return response (build_and_persist_query_response also saves the
+        # QATrace row — extracted so the async progressive path below can
+        # reuse the exact same response-building logic, see contract
+        # "Refactor sync = pura estrazione").
+        return await build_and_persist_query_response(
+            result,
             user_id=request.user_id,
             query=request.query,
-            selected_experts=experts_used,
-            synthesis_mode=result.mode.value,
-            synthesis_text=result.synthesis,
-            sources=[s.model_dump() for s in sources],  # Store as JSONB
-            execution_time_ms=execution_time_ms,
-            full_trace=full_trace_data,
-            # New consent-aware fields (Story 5-1)
             consent_level=request.consent_level,
-            query_type=query_type,
-            confidence=result.confidence,
-            routing_method=routing_method,
-        )
-        session.add(trace)
-        await session.commit()
-
-        log.info(
-            "Expert query completed",
-            trace_id=trace_id,
-            mode=result.mode.value,
-            experts_count=len(experts_used),
-            sources_count=len(sources),
+            include_trace=request.include_trace,
             execution_time_ms=execution_time_ms,
-            has_trace=pipeline_trace_data is not None
-        )
-
-        # Return response
-        return ExpertQueryResponse(
-            trace_id=trace_id,
-            synthesis=result.synthesis,
-            mode=result.mode.value,
-            alternatives=result.alternatives if result.mode == SynthesisMode.DIVERGENT else None,
-            sources=sources,
-            experts_used=experts_used,
-            confidence=result.confidence,
-            execution_time_ms=execution_time_ms,
-            pipeline_trace=pipeline_trace_data,
-            pipeline_metrics=pipeline_metrics_data,
-            retrieved_sources=retrieved_sources,
-            graph_traversal=_build_graph_traversal(result),
-            # Slice 4 P2a: surface the deliberation (copied from `result`, no recompute).
-            disagreement_analysis=_build_disagreement_analysis(result),
-            devils_advocate_flag=_build_devils_advocate_flag(result),
-            expert_contributions=_build_expert_contributions(result),
-            disagreement_explanation=getattr(result, "explanation", None),
+            session=session,
         )
 
     except Exception as e:
         log.error("Expert query failed", error=str(e), query=request.query[:50])
         raise HTTPException(status_code=500, detail=f"Expert query failed: {str(e)}")
+
+
+class ExpertQueryAsyncRequest(ExpertQueryRequest):
+    """
+    Request for the ASYNC progressive Q&A path (submit+poll, see
+    docs/merlt/qa-async-progressive-contract.md §1/§3). Additive subclass of
+    `ExpertQueryRequest` — the sync `/query` request model is untouched.
+    """
+    bff_job_id: str = Field(..., description="BFF-side MerltQaJob id, threaded through every progress callback")
+
+
+# Background asyncio.create_task() handles for the in-process progressive
+# Q&A runs. A bare `asyncio.create_task(...)` result MUST be held onto —
+# otherwise the event loop is free to garbage-collect it mid-execution
+# (a well-known asyncio footgun). Mirrors orchestrator.py's `_sediment_tasks`.
+_background_qa_tasks: set = set()
+
+
+def _to_partial(resp: ExpertResponse) -> Dict[str, Any]:
+    """Map an `ExpertResponse` onto the wire `QaPartialExpert` shape (contract
+    §Tipi condivisi). `weight` falls back to `confidence` — the real
+    gating/routing weight lives on the orchestrator side (selected_experts),
+    not on the response itself, and isn't available at per-expert-completion
+    time (weights are only known once routing has picked the whole collegio).
+
+    `confidence` is cast to `float(...)`: some retrieval/scoring paths can
+    hand back a numpy scalar (e.g. `np.float32`), which `json.dumps` (used by
+    httpx to serialize this dict — it is NOT a Pydantic model) cannot encode,
+    silently dropping the 'running' callback for that expert.
+    """
+    confidence = float(resp.confidence) if resp.confidence is not None else resp.confidence
+    return {
+        "expert": resp.expert_type,
+        "thesis": resp.interpretation,
+        "confidence": confidence,
+        "weight": confidence,
+    }
+
+
+_TERMINAL_STATUSES = frozenset({"completed", "failed", "timeout"})
+
+# Retry schedule for TERMINAL callbacks only (contract §4 fix). 3 attempts,
+# with the delay applied BEFORE the 2nd/3rd retry (0.5s, then 1s — 2s is
+# unused headroom, kept as a documented ceiling should the attempt count
+# grow). Per-expert 'running' callbacks stay single-shot — they're frequent
+# and best-effort; a lost one is superseded by the next expert's callback.
+_TERMINAL_CALLBACK_BACKOFFS_S = (0.5, 1.0, 2.0)
+
+
+async def _post_qa_callback(
+    bff_job_id: Optional[str],
+    status: str,
+    *,
+    partial_expert: Optional[Dict[str, Any]] = None,
+    result: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
+    terminal: Optional[bool] = None,
+) -> None:
+    """
+    POST a progress/terminal status update to the BFF (contract §4). Mirrors
+    `merlt/worker/tasks.py::_callback_bff` / `extraction_tasks.py::_callback_extraction`
+    — best-effort, NEVER raises: a lost callback must not crash the in-process
+    background task. The terminal callback ('completed'/'failed'/'timeout') is
+    what unblocks the BFF poll loop; the BFF's job watchdog is the fallback
+    safety net if even that is lost.
+
+    `terminal` gates a small retry-with-backoff (up to 3 attempts total) so a
+    transient BFF hiccup doesn't silently strand the job — the FE poll would
+    otherwise hang until the watchdog sweep. Defaults to inferring from
+    `status` (`_TERMINAL_STATUSES`) when omitted.
+    """
+    if not bff_job_id:
+        return  # nothing to call back to
+    url = os.getenv("BFF_QA_CALLBACK_URL")
+    if not url:
+        log.warning("BFF_QA_CALLBACK_URL not set, skipping qa callback", bff_job_id=bff_job_id, status=status)
+        return
+    is_terminal = status in _TERMINAL_STATUSES if terminal is None else terminal
+    # camelCase keys: the BFF is Node/Zod (MerltQaJob fields).
+    payload: Dict[str, Any] = {"bffJobId": bff_job_id, "status": status}
+    if partial_expert is not None:
+        payload["partialExpert"] = partial_expert
+    if result is not None:
+        payload["result"] = result
+    if error is not None:
+        payload["error"] = error
+    secret = os.getenv("MERLT_INTERNAL_SECRET", "")
+    headers = {"X-Internal-Secret": secret}
+
+    attempts = len(_TERMINAL_CALLBACK_BACKOFFS_S) if is_terminal else 1
+    for attempt in range(1, attempts + 1):
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+            return
+        except Exception as e:
+            log.error(
+                "BFF qa callback failed",
+                bff_job_id=bff_job_id,
+                status=status,
+                attempt=attempt,
+                max_attempts=attempts,
+                exc=str(e),
+            )
+            if attempt >= attempts:
+                return  # exhausted retries — best-effort, never raise
+            await asyncio.sleep(_TERMINAL_CALLBACK_BACKOFFS_S[attempt - 1])
+
+
+async def run_query_progressive(
+    request: ExpertQueryAsyncRequest,
+    orchestrator: MultiExpertOrchestrator,
+    *,
+    trace_id: str,
+) -> None:
+    """
+    Background worker for the async progressive Q&A path (contract §1-§4).
+
+    Runs the SAME `orchestrator.process()` the sync `/query` endpoint calls,
+    but:
+      - wires `on_expert_complete` so each finished `ExpertResponse` is
+        pushed to the BFF immediately (`status='running'`, `partialExpert`),
+        instead of waiting for the `asyncio.gather` barrier in
+        `_run_experts_parallel`;
+      - opens its OWN `AsyncSession` via `get_async_session()` — the
+        request-scoped session from the submit handler's `Depends()` is
+        already closed by the time this coroutine runs (the handler returns
+        202 immediately after scheduling the task);
+      - ALWAYS emits exactly one terminal callback ('completed' or 'failed'),
+        even on an unexpected exception, so the BFF poll never hangs forever
+        waiting on a job that silently died (the watchdog sweep is the
+        secondary safety net, not the primary mechanism).
+    """
+    bff_job_id = request.bff_job_id
+    start_time = time.time()
+
+    async def on_expert_complete(resp: ExpertResponse) -> None:
+        await _post_qa_callback(bff_job_id, "running", partial_expert=_to_partial(resp))
+
+    try:
+        result = await orchestrator.process(
+            query=request.query,
+            entities=request.context.get("entities") if request.context else None,
+            retrieved_chunks=request.context.get("retrieved_chunks") if request.context else None,
+            metadata={"user_id": request.user_id, "consent_level": request.consent_level},
+            include_trace=request.include_trace,
+            max_experts=request.max_experts,
+            on_expert_complete=on_expert_complete,
+        )
+
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        async with get_async_session() as session:
+            response = await build_and_persist_query_response(
+                result,
+                user_id=request.user_id,
+                query=request.query,
+                consent_level=request.consent_level,
+                include_trace=request.include_trace,
+                execution_time_ms=execution_time_ms,
+                session=session,
+                trace_id=trace_id,
+            )
+
+        # mode="json": guarantees every field is JSON-native (numpy scalars,
+        # datetimes, etc. get coerced) before httpx serializes this dict with
+        # stdlib json — a plain model_dump() can leave a non-JSON-native value
+        # in place, raising a TypeError inside _post_qa_callback and silently
+        # dropping the terminal callback (the exact failure this fix targets).
+        await _post_qa_callback(bff_job_id, "completed", result=response.model_dump(mode="json"))
+
+    except Exception as e:
+        log.error(
+            "Expert query (async) failed",
+            error=str(e),
+            query=request.query[:50],
+            bff_job_id=bff_job_id,
+            trace_id=trace_id,
+        )
+        await _post_qa_callback(bff_job_id, "failed", error=str(e))
+
+
+@router.post("/query/async", status_code=202)
+async def query_experts_async(
+    request: ExpertQueryAsyncRequest,
+    orchestrator: MultiExpertOrchestrator = Depends(get_orchestrator),
+    api_key: ApiKey = Depends(verify_api_key),
+    _rate_limit: None = Depends(check_rate_limit),
+) -> Dict[str, Any]:
+    """
+    Submit query for ASYNC PROGRESSIVE processing (submit+poll — see
+    docs/merlt/qa-async-progressive-contract.md).
+
+    Returns immediately with 202 + a trace_id. The actual work runs
+    IN-PROCESS via `asyncio.create_task` — NOT an RQ worker job — so the
+    warm orchestrator singleton (loaded models, checkpoints, etc.) is reused
+    with zero cold-start. Progress (one callback per finished expert) and the
+    terminal result/error are reported to the BFF via
+    `POST /api/merlt/internal/qa-callback`; the FE polls the BFF, never
+    MERL-T directly.
+
+    Example:
+        POST /api/experts/query/async
+        {
+            "query": "Cos'è la legittima difesa?",
+            "user_id": "user123",
+            "bff_job_id": "b7f1..."
+        }
+
+        Response (202):
+        {"accepted": true, "trace_id": "trace_abc123"}
+    """
+    trace_id = f"trace_{uuid4().hex[:12]}"
+
+    log.info(
+        "Expert query (async) accepted",
+        query=request.query[:50],
+        user_id=request.user_id,
+        max_experts=request.max_experts,
+        bff_job_id=request.bff_job_id,
+        trace_id=trace_id,
+    )
+
+    task = asyncio.create_task(
+        run_query_progressive(request, orchestrator, trace_id=trace_id)
+    )
+    _background_qa_tasks.add(task)
+    task.add_done_callback(_background_qa_tasks.discard)
+
+    return {"accepted": True, "trace_id": trace_id}
 
 
 @router.post("/feedback/inline", response_model=FeedbackResponse)

@@ -22,6 +22,8 @@ export interface ExpertsClientConfig {
   baseUrl: string;
   apiKey?: string;
   timeoutMs: number;
+  /** Short timeout for the async submit call — it only enqueues, never waits for the deliberation. */
+  asyncTimeoutMs: number;
 }
 
 export interface ExpertSourceReference {
@@ -198,6 +200,15 @@ export interface ConfirmSourceArgs {
   entity_type?: string;
   ambito?: string;
 }
+/**
+ * Async progressive Q&A (qa-async-progressive-contract.md §3): the BFF enqueues
+ * a query, threading its own job id as `bff_job_id` so MERL-T's per-expert and
+ * terminal callbacks can key back to the right MerltQaJob row.
+ */
+export interface StartQueryAsyncResult {
+  accepted: boolean;
+  trace_id?: string;
+}
 
 export class ExpertsClient {
   constructor(private readonly config: ExpertsClientConfig) {}
@@ -208,6 +219,26 @@ export class ExpertsClient {
       max_experts: 4,
       ...a,
     });
+  }
+  /**
+   * Submit path (qa-async-progressive-contract.md §3): same body assembly +
+   * consent mapping as `query()`, plus `bff_job_id` so MERL-T's callbacks
+   * (`POST /api/merlt/internal/qa-callback`) can key back to the BFF job row.
+   * Uses `asyncTimeoutMs` (short — this call only enqueues an asyncio task on
+   * the MERL-T side, it never waits for the deliberation to finish).
+   */
+  startQueryAsync(a: QueryArgs, bffJobId: string): Promise<StartQueryAsyncResult> {
+    return this.request(
+      'POST',
+      '/api/v1/experts/query/async',
+      {
+        include_trace: true,
+        max_experts: 4,
+        ...a,
+        bff_job_id: bffJobId,
+      },
+      this.config.asyncTimeoutMs
+    );
   }
   feedbackInline(a: InlineFeedbackArgs): Promise<ExpertFeedbackResponse> {
     return this.request('POST', '/api/v1/experts/feedback/inline', a);
@@ -265,11 +296,13 @@ export class ExpertsClient {
   private async request<T>(
     method: 'GET' | 'POST',
     path: string,
-    body?: unknown
+    body?: unknown,
+    timeoutMsOverride?: number
   ): Promise<T> {
     const url = `${this.config.baseUrl}${path}`;
+    const timeoutMs = timeoutMsOverride ?? this.config.timeoutMs;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.config.apiKey) headers['X-API-Key'] = this.config.apiKey;
@@ -285,7 +318,7 @@ export class ExpertsClient {
     } catch (err) {
       clearTimeout(timer);
       if (err instanceof Error && err.name === 'AbortError') {
-        throw new MerltTimeoutError(`Timeout after ${this.config.timeoutMs}ms calling ${path}`);
+        throw new MerltTimeoutError(`Timeout after ${timeoutMs}ms calling ${path}`);
       }
       throw new MerltTimeoutError(
         `Network error calling ${path}: ${err instanceof Error ? err.message : String(err)}`
@@ -323,7 +356,8 @@ export function createExpertsClient(env: NodeJS.ProcessEnv = process.env): Exper
   const baseUrl = env.MERLT_API_URL || 'http://localhost:8000';
   const apiKey = env.MERLT_API_KEY || undefined;
   const timeoutMs = Number(env.MERLT_EXPERTS_TIMEOUT_MS) || 120000;
-  return new ExpertsClient({ baseUrl, apiKey, timeoutMs });
+  const asyncTimeoutMs = Number(env.MERLT_EXPERTS_ASYNC_TIMEOUT_MS) || 10000;
+  return new ExpertsClient({ baseUrl, apiKey, timeoutMs, asyncTimeoutMs });
 }
 
 export function getExpertsClient(): ExpertsClient {

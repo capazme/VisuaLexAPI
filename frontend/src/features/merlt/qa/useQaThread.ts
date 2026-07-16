@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  askQuestion,
   refineQuestion,
   rateAnswer,
   rateSource,
@@ -8,11 +7,22 @@ import {
   rateDetailed,
   confirmSource,
   fetchQaTrace,
+  startQueryAsync,
+  fetchQaJobStatus,
 } from './qaApi';
 import { loadThread, saveThread, clearThread } from './qaThreadStorage';
 import { extractTraceDetails, isEmptyTraceDetails } from './traceDetails';
 import { confirmSourceEntityText } from './format';
-import type { GraphContext, QaMode, QaTurnModel, QaRetrievedSource, QaAnswer, QaHistoryItem } from './types';
+import { TERMINAL_QA_JOB_STATUSES } from './types';
+import type {
+  GraphContext,
+  QaMode,
+  QaTurnModel,
+  QaRetrievedSource,
+  QaAnswer,
+  QaHistoryItem,
+  QaPartialExpert,
+} from './types';
 
 // Module-level counter. On reload it resets to 0 while the persisted thread
 // keeps its `turn-N` ids, so a new turn would reuse `turn-1` and collide with a
@@ -56,6 +66,110 @@ function friendlyQaError(err: unknown): string {
   return 'Non è stato possibile ottenere una risposta. Riprova.';
 }
 
+// qa-async-progressive-contract.md §2: same cadence as the ingestion/extraction
+// job polls (useIngestionJob.ts / useExtractionJob.ts) — 2s.
+const QA_POLL_INTERVAL_MS = 2000;
+
+/**
+ * Poll a Q&A job (qa-async-progressive-contract.md §2) to a terminal state,
+ * invoking `onPartial` with the accumulated per-expert contributions on every
+ * non-terminal tick (contract: "il FE keya su `expert`, no remount a metà
+ * stream" — callers just replace their `partials` array wholesale, the BFF
+ * already returns them pre-ordered/pre-deduped). Resolves with the normalized
+ * answer on `completed`; rejects on `failed`/`timeout` (mapped through
+ * `friendlyQaError` by the caller, same as any other request failure) or the
+ * instant `signal` aborts (mirrors askQuestion/refineQuestion's own abort
+ * contract, so Annulla behaves identically for both request shapes).
+ *
+ * A transient poll error is swallowed — the job may still finish server-side;
+ * a genuine failure arrives as a terminal `failed`/`timeout` status (mirrors
+ * useIngestionJob's same swallow-and-keep-polling choice).
+ */
+function pollQaJob(
+  jobId: string,
+  signal: AbortSignal,
+  onPartial: (partials: QaPartialExpert[]) => void,
+): Promise<QaAnswer> {
+  return new Promise<QaAnswer>((resolve, reject) => {
+    let settled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const stop = (): void => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const settle = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      stop();
+      signal.removeEventListener('abort', onAbort);
+      fn();
+    };
+
+    const onAbort = (): void => {
+      settle(() => reject(new DOMException('The QA poll was aborted.', 'AbortError')));
+    };
+
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort);
+
+    const tick = async (): Promise<void> => {
+      if (settled) return;
+      try {
+        const res = await fetchQaJobStatus(jobId, signal);
+        if (settled) return;
+        if (TERMINAL_QA_JOB_STATUSES.has(res.status)) {
+          if (res.status === 'completed' && res.result) {
+            settle(() => resolve(res.result as QaAnswer));
+          } else if (res.status === 'completed') {
+            // Contract says `result` is valorized on `completed` — a missing
+            // one is a BFF/callback bug, not a user-facing network failure.
+            settle(() => reject({ status: 500, message: 'La deliberazione risulta completata ma senza risultato.' }));
+          } else {
+            // A deliberate `status: 500` (not a real HTTP status, just a value
+            // friendlyQaError doesn't special-case) steers it to its neutral
+            // default copy instead of the `status === undefined` "connessione
+            // assente" branch — this is a server-side deliberation failure
+            // (MERL-T ran and gave up), not a transport failure to the BFF.
+            settle(() =>
+              reject({ status: 500, message: res.error ?? 'La deliberazione MERL-T non è andata a buon fine.' }),
+            );
+          }
+          return;
+        }
+        if (res.partials.length > 0) onPartial(res.partials);
+      } catch {
+        // Transient poll failure — keep polling; see doc comment above.
+      }
+    };
+
+    intervalId = setInterval(() => void tick(), QA_POLL_INTERVAL_MS);
+    void tick();
+  });
+}
+
+/**
+ * Submit+poll work function for an 'ask'-kind turn (qa-async-progressive-
+ * contract.md §1+§2), the shape `run()` expects: `(signal, onPartial) =>
+ * Promise<QaAnswer>`. Shared by `ask()` and `retry()` on an 'ask' turn.
+ */
+async function askAsync(
+  question: string,
+  mode: QaMode,
+  context: GraphContext | undefined,
+  signal: AbortSignal,
+  onPartial: (partials: QaPartialExpert[]) => void,
+): Promise<QaAnswer> {
+  const { jobId } = await startQueryAsync(question, mode, { context }, signal);
+  return pollQaJob(jobId, signal, onPartial);
+}
+
 /**
  * Conversational Q&A thread over the MERL-T experts. Holds the turns, drives
  * ask/refine, and the granular feedback channels (inline / per-source /
@@ -88,17 +202,45 @@ export function useQaThread() {
     saveThread(turns);
   }, [turns]);
 
+  // Abort every in-flight turn on unmount, so a poll loop (up to ~11min per
+  // the async progressive contract) doesn't keep hitting the BFF and calling
+  // setTurns on an unmounted component after the user navigates away from
+  // /grafo. No setState here — just aborts, same as cancel().
+  useEffect(
+    () => () => {
+      for (const c of Object.values(controllers.current)) c?.abort();
+    },
+    [],
+  );
+
   const patch = useCallback((id: string, fn: (t: QaTurnModel) => QaTurnModel): void => {
     setTurns((prev) => prev.map((t) => (t.id === id ? fn(t) : t)));
   }, []);
 
+  // `work` may report interim per-expert progress via `onPartial` before
+  // settling — the 'ask' path (askAsync/pollQaJob) calls it, the 'refine'
+  // path (refineQuestion, still a single blocking round-trip per the BFF
+  // contract — no async /refine endpoint exists) never does. Every setState
+  // (partial AND terminal) re-checks the token so a superseded turn (a new
+  // ask/retry issued for the same turn id, or a stale poll tick) is a no-op —
+  // "latest-wins" per qa-async-progressive-contract.md.
   const run = useCallback(
-    async (id: string, work: (signal: AbortSignal) => Promise<QaAnswer>): Promise<void> => {
+    async (
+      id: string,
+      work: (signal: AbortSignal, onPartial: (partials: QaPartialExpert[]) => void) => Promise<QaAnswer>,
+    ): Promise<void> => {
       const token = (tokens.current[id] = (tokens.current[id] ?? 0) + 1);
+      // A same-id re-run (retry) must not leave the previous controller's poll
+      // orphaned — abort it before the new one takes its place in the map, so
+      // cancel() can always reach the live request.
+      controllers.current[id]?.abort();
       const controller = new AbortController();
       controllers.current[id] = controller;
+      const onPartial = (partials: QaPartialExpert[]): void => {
+        if (tokens.current[id] === token) patch(id, (t) => ({ ...t, state: { status: 'partial', partials } }));
+      };
       try {
-        const answer = await work(controller.signal);
+        const answer = await work(controller.signal, onPartial);
         if (tokens.current[id] === token) patch(id, (t) => ({ ...t, state: { status: 'success', answer } }));
       } catch (err) {
         // A user-initiated Annulla aborts the request: surface the dedicated
@@ -121,7 +263,8 @@ export function useQaThread() {
 
   // Context-anchored ask: `opts.context` (the graph context basket at ask time)
   // travels to the BFF and is stored on the turn's request so Riprova re-sends
-  // the SAME selected nodes. Omitted / empty = unanchored ask.
+  // the SAME selected nodes. Omitted / empty = unanchored ask. Goes through the
+  // async submit+poll path (askAsync) — see qa-async-progressive-contract.md.
   const ask = useCallback(
     async (question: string, mode: QaMode, opts?: { context?: GraphContext }): Promise<void> => {
       const id = nextId();
@@ -130,7 +273,7 @@ export function useQaThread() {
         ...prev,
         { id, question, state: { status: 'loading', startedAt: Date.now() }, confirmed: {}, request: { kind: 'ask', mode, context } },
       ]);
-      await run(id, (signal) => askQuestion(question, mode, { context }, signal));
+      await run(id, (signal, onPartial) => askAsync(question, mode, context, signal, onPartial));
     },
     [run],
   );
@@ -156,9 +299,9 @@ export function useQaThread() {
       if (!turn || turn.state.status !== 'error' || !turn.request) return;
       const req = turn.request;
       patch(turnId, (t) => ({ ...t, state: { status: 'loading', startedAt: Date.now() } }));
-      await run(turnId, (signal) =>
+      await run(turnId, (signal, onPartial) =>
         req.kind === 'ask'
-          ? askQuestion(turn.question, req.mode, { context: req.context }, signal)
+          ? askAsync(turn.question, req.mode, req.context, signal, onPartial)
           : refineQuestion(req.traceId, turn.question, signal),
       );
     },

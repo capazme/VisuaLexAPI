@@ -96,6 +96,22 @@ export interface ExpertContribution {
 }
 
 /**
+ * Async progressive Q&A (qa-async-progressive-contract.md "Tipi condivisi") —
+ * one completed expert delivered by the poll loop, BEFORE the deliberation
+ * settles. Structurally identical to {@link ExpertContribution} (the contract
+ * says so verbatim) — kept as a distinct alias so the async-specific call
+ * sites (qaApi/useQaThread) read intention-revealing, not "reusing a
+ * post-hoc DTO for a mid-flight payload".
+ */
+export type QaPartialExpert = ExpertContribution;
+
+/** Job status for the async progressive Q&A poll loop (mirrors the BFF `MerltJobStatus` enum). */
+export type QaJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'timeout';
+
+/** Terminal statuses of a Q&A job — polling stops once one of these is reached. */
+export const TERMINAL_QA_JOB_STATUSES: ReadonlySet<QaJobStatus> = new Set(['completed', 'failed', 'timeout']);
+
+/**
  * One hop of the systemic expert's graph walk (node→relation→node), as emitted
  * verbatim by the BFF's `graph_traversal` field (mirrors
  * backend/src/services/merlt/expertsClient.ts `GraphTraversalEdge`). `iteration`
@@ -184,6 +200,14 @@ export type QaAnswerState =
   // `startedAt` (epoch ms) drives the elapsed-time indicator during the wait
   // (queries can take up to 120s). Absent on turns restored from localStorage.
   | { status: 'loading'; startedAt?: number }
+  /**
+   * Async progressive Q&A: at least one canon has reported in, the
+   * deliberation is still running. `partials` accumulates (never shrinks)
+   * until the terminal `success`/`error` transition. Synthesis/dissent/
+   * confidence are terminal-only (contract invariant) — never read them off
+   * a `partial` turn.
+   */
+  | { status: 'partial'; partials: QaPartialExpert[] }
   | { status: 'success'; answer: QaAnswer }
   | { status: 'error'; error: string };
 

@@ -41,6 +41,7 @@ model User {
   merltAuthorityCache MerltUserAuthorityCache?
   merltIngestionJobs  MerltIngestionJob[]
   merltExtractionJobs MerltExtractionJob[]
+  merltQaJobs         MerltQaJob[]
 
   // Personal Environments (user-owned, not published)
   environments Environment[]
@@ -177,6 +178,40 @@ model MerltExtractionJob {
   @@index([documentId, status])
   @@index([userId])
   @@map("merlt_extraction_jobs")
+}
+
+// MERL-T async progressive Q&A job (submit → poll, `qa-async-progressive-contract.md`).
+// The BFF creates a row on submit, best-effort asks MERL-T to run the query in
+// an in-process asyncio task (threading this id through as bff_job_id), and
+// MERL-T calls back POST /api/merlt/internal/qa-callback per-expert (running)
+// and once terminally (completed/failed/timeout). `consentLevel` is captured
+// at submit time (no downgrade post-hoc — matches the sync /experts/query
+// redaction contract). Reuses the MerltJobStatus enum (value `completed`).
+model MerltQaJob {
+  id           String         @id @default(uuid())
+  userId       String         @map("user_id")
+  query        String
+  mode         String
+  consentLevel String         @map("consent_level")
+  status       MerltJobStatus @default(pending)
+  traceId      String?        @map("trace_id")
+  partials     Json?
+  result       Json?
+  errorMessage String?        @map("error_message")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  // Bumped by Prisma on every update() — including each per-expert `running`
+  // callback merge — so the watchdog can sweep on LIVENESS (last activity)
+  // rather than age-since-submit. A heavy ReAct deliberation legitimately
+  // runs up to ~11min; sweeping on createdAt alone would flip a live,
+  // still-progressing query to `timeout` (see jobWatchdog.ts qaStaleAfterMs).
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  startedAt    DateTime?      @map("started_at")
+  completedAt  DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("merlt_qa_jobs")
 }
 
 // ============================================
