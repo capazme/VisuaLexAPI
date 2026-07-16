@@ -281,6 +281,24 @@ class ReActMixin:
             total_tokens=total_tokens
         )
 
+        # Slice A (graph co-evolution): the ReAct loop bypasses the deterministic
+        # `_retrieve_live_legal_sources` path, so `_live_sources_retrieved` stayed
+        # empty under ReAct and NOTHING sedimented into the graph (0 live_unconfirmed
+        # nodes). Run it here too — deterministic (one call per live tool), fail-open,
+        # already filters junk/error bodies and sets `_live_sources_retrieved` — so
+        # live-retrieved norms are captured for the orchestrator's post-synthesis
+        # sedimentation AND usable as answer sources.
+        try:
+            if hasattr(self, "_retrieve_live_legal_sources"):
+                live = await self._retrieve_live_legal_sources(context)
+                for s in (live or []):
+                    sid = s.get("source_id") or s.get("urn") or s.get("chunk_id")
+                    if sid and sid not in seen_urns:
+                        all_sources.append(s)
+                        seen_urns.add(sid)
+        except Exception as e:
+            log.warning(f"live legal capture under ReAct failed: {e}")
+
         log.info(
             f"ReAct loop completed for {self.expert_type}",
             iterations=len(history),
