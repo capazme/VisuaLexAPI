@@ -38,6 +38,29 @@ from datetime import datetime
 log = structlog.get_logger()
 
 
+# Per-canon tool strategy (art. 12 preleggi). Each expert is steered toward the
+# instruments proper to its interpretive canon so the ReAct loop diversifies
+# instead of collapsing onto semantic_search.
+_CANON_STRATEGY: Dict[str, Dict[str, str]] = {
+    "literal": {
+        "canone": "letterale (art. 12 preleggi — senso proprio delle parole)",
+        "tools": "definition_lookup (definizioni dei concetti), article_fetch / fetch_law_article (testo dell'articolo), textual_reference (rinvii testuali), cite_law",
+    },
+    "systemic": {
+        "canone": "sistematico (collegamento con le altre norme del sistema)",
+        "tools": "graph_search e hierarchy_navigation (relazioni e struttura nel grafo), citation_chain (catena di rinvii)",
+    },
+    "principles": {
+        "canone": "teleologico / ratio legis (principî e finalità della norma)",
+        "tools": "principle_lookup (principî giuridici), constitutional_basis (base costituzionale), cerca_brocardi (dottrina e massime)",
+    },
+    "precedent": {
+        "canone": "giurisprudenziale (orientamenti e precedenti)",
+        "tools": "cerca_giurisprudenza, giurisprudenza_su_norma, leggi_sentenza, cerca_giurisprudenza_cgue, citation_chain",
+    },
+}
+
+
 @dataclass
 class ThoughtActionObservation:
     """
@@ -368,14 +391,31 @@ class ReActMixin:
         Costruisce il prompt per la decisione ReAct.
         """
         expert_type = getattr(self, 'expert_type', 'expert')
+        strategy = _CANON_STRATEGY.get(
+            expert_type, {"canone": expert_type, "tools": "gli strumenti disponibili"}
+        )
 
-        prompt = f"""Sei un {expert_type} expert per l'interpretazione giuridica italiana.
-Il tuo compito è decidere quale strumento usare per raccogliere informazioni.
+        # URNs already collected — feed these to URN-keyed tools (graph_search,
+        # citation_chain, giurisprudenza_su_norma, ...) instead of re-searching.
+        urns: List[str] = []
+        for s in current_sources:
+            u = s.get("urn") or s.get("chunk_id")
+            if u and u not in urns:
+                urns.append(u)
+        semantic_uses = sum(
+            1 for h in history if h.action.get("name") == "semantic_search"
+        )
+
+        prompt = f"""Sei l'esperto del canone {strategy['canone']} nell'interpretazione giuridica italiana.
+Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone.
 
 ## QUERY UTENTE
 {context.query_text}
 
-## TOOLS DISPONIBILI
+## STRUMENTI D'ELEZIONE DEL TUO CANONE
+{strategy['tools']}
+
+## TOOLS DISPONIBILI (schema completo)
 {json.dumps(tools_schema, indent=2, ensure_ascii=False)}
 
 ## FONTI GIÀ RECUPERATE: {len(current_sources)}
@@ -390,36 +430,53 @@ Il tuo compito è decidere quale strumento usare per raccogliere informazioni.
                 prompt += f"  {i}. [{urn[:50]}] {text_preview}...\n"
             if len(current_sources) > 5:
                 prompt += f"  ... e altre {len(current_sources) - 5} fonti\n"
+        if urns:
+            prompt += (
+                "\nURN disponibili (passali agli strumenti che richiedono un URN, "
+                "es. graph_search / citation_chain / giurisprudenza_su_norma):\n  "
+                + ", ".join(urns[:10]) + "\n"
+            )
 
         # Add history
         if history:
             prompt += "\n## AZIONI PRECEDENTI\n"
             for h in history[-3:]:  # Solo ultime 3
-                prompt += f"- Iterazione {h.iteration}: {h.action.get('name', 'unknown')} "
-                prompt += f"→ {h.observation.get('novel_sources', 0)} nuove fonti\n"
+                prompt += (
+                    f"- Iterazione {h.iteration}: {h.action.get('name', 'unknown')} "
+                    f"→ {h.observation.get('novel_sources', 0)} nuove fonti\n"
+                )
 
-        prompt += f"""
+        # Staged strategy: locate first (semantic/text search), then deepen with
+        # the canon's own instruments — do not re-run semantic_search once sources
+        # exist (that is what collapsed every expert onto vector search).
+        if not current_sources:
+            prompt += (
+                "\n## STRATEGIA — FASE 1 (LOCALIZZA)\n"
+                "Non hai ancora fonti. Parti con `semantic_search` (o una ricerca "
+                "testuale come cerca_brocardi / cerca_giurisprudenza) per individuare "
+                "le norme e le fonti rilevanti per la query.\n"
+            )
+        else:
+            prompt += (
+                "\n## STRATEGIA — FASE 2 (APPROFONDISCI)\n"
+                "Hai già delle fonti (URN sopra). NON ripetere `semantic_search`: "
+                "darebbe risultati simili a quelli che hai già. Usa ORA gli strumenti "
+                f"d'elezione del tuo canone ({strategy['tools']}) sugli URN/concetti "
+                "trovati, per collegare, verificare e approfondire secondo il tuo "
+                "canone. Cambia strumento rispetto alle iterazioni precedenti.\n"
+            )
+            if semantic_uses >= 2:
+                prompt += (
+                    "Hai già usato semantic_search più volte: passa a un "
+                    "approfondimento specialistico o concludi.\n"
+                )
 
+        prompt += """
 ## ISTRUZIONI
-Decidi cosa fare:
-
-1. Se hai ABBASTANZA fonti per rispondere alla query (almeno 3-5 fonti rilevanti):
-   Rispondi con: {{"action": "finish", "thought": "...", "reason": "..."}}
-
-2. Se ti servono PIÙ fonti:
-   Rispondi con: {{
-     "action": "tool",
-     "tool": "nome_tool",
-     "parameters": {{"param1": "value1", ...}},
-     "thought": "Spiego perché uso questo tool..."
-   }}
-
-## SUGGERIMENTI
-- semantic_search: per cercare per similarità semantica
-- graph_search: per navigare relazioni tra norme
-- definition_lookup: per cercare definizioni di concetti
-- hierarchy_navigation: per esplorare la struttura normativa
-- verify_sources: per verificare esistenza fonti
+1. Se hai ABBASTANZA fonti per l'analisi del tuo canone (almeno 3-5 rilevanti), o gli strumenti non aggiungono nulla di nuovo:
+   {"action": "finish", "thought": "...", "reason": "..."}
+2. Se ti servono più fonti, scegli lo strumento più adatto al TUO canone e alla fase attuale:
+   {"action": "tool", "tool": "nome_tool", "parameters": {...}, "thought": "perché questo strumento ora"}
 
 Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
 """
