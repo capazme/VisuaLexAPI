@@ -124,6 +124,8 @@ export interface ExpertQueryResponse {
   pipeline_metrics?: Record<string, unknown> | null;
   /** Ordered node→relation→node walk of the systemic reasoning; empty when no graph-resolvable seed norms. */
   graph_traversal?: GraphTraversalEdge[];
+  /** Slice C wave 3: live norms this answer is feeding into the graph as provisional nodes (transparency nudge). */
+  provisional_candidates?: number;
   disagreement_analysis?: DisagreementAnalysis | null;
   /** NL explanation of the divergence + art. 12 preleggi criteria; null on convergent answers. */
   disagreement_explanation?: string | null;

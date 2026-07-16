@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Lock, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Loader2, Lock, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { QaDeliberationPanel } from './QaDeliberationPanel';
 import { QaSourceChip } from './QaSourceChip';
@@ -244,6 +244,23 @@ export function QaTurn({
                     />
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* Slice C wave 3 (transparency): the graph co-evolves from this
+                answer's live retrievals. Informational nudge — the EXPLICIT
+                per-source confirm is the "ricorda nel grafo" action on the
+                provisional QaSourceChips above (fresh nodes aren't in the
+                /merlt/valida review queue yet — that only holds quarantined
+                doubtful nodes). */}
+            {(a.provisional_candidates ?? 0) > 0 && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+                <Sprout size={14} className="mt-0.5 shrink-0" />
+                <span>
+                  Il grafo sta assorbendo {a.provisional_candidates}{' '}
+                  {a.provisional_candidates === 1 ? 'norma recuperata' : 'norme recuperate'} dal vivo da
+                  questa risposta. Conferma quelle utili con «ricorda nel grafo» sulle fonti qui sopra.
+                </span>
               </div>
             )}
 

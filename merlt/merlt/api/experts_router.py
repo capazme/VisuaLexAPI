@@ -230,6 +230,15 @@ class ExpertQueryResponse(BaseModel):
             "Empty when the query had no graph-resolvable seed norms."
         ),
     )
+    provisional_candidates: int = Field(
+        0,
+        description=(
+            "Slice C wave 3: number of live norms THIS answer is feeding into the "
+            "graph as provisional nodes (upper bound — the write-time dedup guard "
+            "may skip already-confirmed ones). Powers the transparency nudge that "
+            "invites the user to review them in /merlt/valida."
+        ),
+    )
     # Slice 4 P2a ("il dibattito visibile", Decision D): surface the debate the
     # engine already computes. All three are additive + backward-compatible.
     disagreement_analysis: Optional[DisagreementAnalysisDTO] = Field(
@@ -673,6 +682,7 @@ async def build_and_persist_query_response(
         pipeline_metrics=pipeline_metrics_data,
         retrieved_sources=retrieved_sources,
         graph_traversal=_build_graph_traversal(result),
+        provisional_candidates=int((getattr(result, "metadata", None) or {}).get("provisional_candidates", 0) or 0),
         # Slice 4 P2a: surface the deliberation (copied from `result`, no recompute).
         disagreement_analysis=_build_disagreement_analysis(result),
         devils_advocate_flag=_build_devils_advocate_flag(result),
@@ -2118,6 +2128,7 @@ async def submit_refine_feedback(
             pipeline_trace=pipeline_trace_data,
             pipeline_metrics=pipeline_metrics_data,
             retrieved_sources=retrieved_sources,
+            provisional_candidates=int((getattr(result, "metadata", None) or {}).get("provisional_candidates", 0) or 0),
             # Slice 4 P2a: keep the debate visible on follow-ups too (same shape).
             disagreement_analysis=_build_disagreement_analysis(result),
             devils_advocate_flag=_build_devils_advocate_flag(result),

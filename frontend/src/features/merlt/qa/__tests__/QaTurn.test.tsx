@@ -70,6 +70,16 @@ describe('QaTurn — sources always visible (§3.5)', () => {
     // no per-source relevance buttons (they are aria-labelled "pertinente")
     expect(screen.queryByRole('button', { name: /pertinente/i })).toBeNull();
   });
+
+  it('shows the co-evolution transparency nudge when the answer fed provisional nodes', () => {
+    renderTurn({ turn: successTurn({ provisional_candidates: 2 }) });
+    expect(screen.getByText(/il grafo sta assorbendo 2 norme recuperate/i)).toBeInTheDocument();
+  });
+
+  it('does not show the transparency nudge when nothing new was fed', () => {
+    renderTurn({ turn: successTurn({ provisional_candidates: 0 }) });
+    expect(screen.queryByText(/il grafo sta assorbendo/i)).toBeNull();
+  });
 });
 
 describe('QaTurn — teaching gated on canContribute (D2)', () => {

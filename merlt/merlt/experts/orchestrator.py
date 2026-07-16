@@ -1215,6 +1215,12 @@ class MultiExpertOrchestrator:
                         continue
                     seen_live.add(key)
                     live_sources.append(src)
+            # Slice C wave 3 (transparency): expose how many live norms this
+            # answer is feeding into the graph, so the UI can nudge the user to
+            # review them (/merlt/valida). It is the count SCHEDULED for
+            # sedimentation (an upper bound — the write-time dedup guard may skip
+            # any that are already confirmed); framed as "sta assorbendo" in the UI.
+            synthesis_result.metadata["provisional_candidates"] = len(live_sources)
             if live_sources:
                 # Signal 3 (citation from confirmed): related_urns = the served
                 # URNs above. _link_related_urns keeps only NOT c:LiveSource nodes

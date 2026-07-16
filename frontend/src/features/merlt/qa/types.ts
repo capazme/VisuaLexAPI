@@ -183,6 +183,13 @@ export interface QaAnswer {
    */
   graphTraversal?: GraphTraversalEdge[];
   /**
+   * Slice C wave 3: how many live norms THIS answer is feeding into the graph
+   * as provisional nodes (upper bound; the write-time dedup guard may skip
+   * already-confirmed ones). Drives the "il grafo sta imparando" transparency
+   * nudge. Absent/0 when the answer scraped nothing new.
+   */
+  provisional_candidates?: number;
+  /**
    * Tool calls the canons fired, parsed from `pipeline_trace` (present only
    * when the request ran with `include_trace: true`). Optional/absent (treat
    * as `[]`) when the trace is missing or predates this field.
