@@ -793,6 +793,13 @@ CHECKLIST:
         # previous run's live sources on this long-lived expert instance.
         self._live_sources_retrieved: List[Dict[str, Any]] = []
 
+        # Slice B (graph co-evolution): reset the per-query buffer of REAL canonical
+        # graph-node URNs this expert served (semantic/graph tools). The orchestrator
+        # threads these for signal 3 (link a fresh provisional node to co-retrieved
+        # confirmed nodes) AND signal 2 (credit re-retrieved provisional nodes once
+        # per question). Populated at the end of react_loop.
+        self._retrieved_urns: List[str] = []
+
         log.debug(
             "ExecutionTrace initialized",
             trace_id=context.trace_id,
@@ -1093,6 +1100,15 @@ CHECKLIST:
         pipeline trace / API response so the FE can replay it on the graph.
         """
         return getattr(self, '_systemic_walk', [])
+
+    def get_retrieved_urns(self) -> List[str]:
+        """Slice B: real canonical graph-node URNs this expert served in the last
+        analyze() call (semantic/graph tools), excluding this question's freshly
+        scraped live sources. Populated at the end of react_loop; empty for a run
+        that retrieved nothing. Consumed by the orchestrator for signal 3 (link a
+        fresh provisional node to co-retrieved confirmed nodes) and signal 2
+        (credit re-retrieved provisional nodes once per question)."""
+        return getattr(self, '_retrieved_urns', [])
 
     def get_relation_usage(self) -> Dict[str, "RelationUsage"]:
         """

@@ -251,12 +251,17 @@ async def _merge_provisional_node(
 ) -> bool:
     """MERGE the provisional FalkorDB node (idempotent).
 
-    ON CREATE stamps the full provenance/trust set; ON MATCH refreshes
-    ``updated_at``/``retrieved_at`` and re-asserts the provisional provenance
-    ONLY while the node has not been promoted to a higher trust (coalesce-guard,
-    same non-downgrade pattern as EntityGraphWriter._enrich_existing_entity):
-    a node already lifted to trust>=PROVISIONAL_TRUST by a later promotion is
-    never pulled back down to live_unconfirmed.
+    ON CREATE stamps the full provenance/trust set, INCLUDING the Slice B
+    signal counters (``usage_count``, ``positive_feedback_count``,
+    ``has_confirmed_citation``, ``last_used_at``) at their zero/false initial
+    value. ON MATCH refreshes ``updated_at``/``retrieved_at`` and re-asserts
+    the provisional provenance ONLY while the node has not been promoted to a
+    higher trust (coalesce-guard, same non-downgrade pattern as
+    EntityGraphWriter._enrich_existing_entity): a node already lifted to
+    trust>=PROVISIONAL_TRUST by a later promotion is never pulled back down to
+    live_unconfirmed. ON MATCH deliberately does NOT touch the signal
+    counters — they are additive, bumped only by the dedicated signal writers
+    (``pipeline/promotion.py``), never reset by a re-sedimentation.
 
     The node carries BOTH labels (``LiveSource`` + a domain label). FalkorDB
     cannot parameterize labels, so the secondary label is interpolated from the
@@ -281,7 +286,11 @@ async def _merge_provisional_node(
         n.text = $text,
         n.retrieved_at = $timestamp,
         n.created_at = $timestamp,
-        n.updated_at = $timestamp
+        n.updated_at = $timestamp,
+        n.usage_count = 0,
+        n.positive_feedback_count = 0,
+        n.has_confirmed_citation = false,
+        n.last_used_at = $timestamp
     ON MATCH SET
         n.source_url = CASE WHEN $source_url <> '' THEN $source_url ELSE n.source_url END,
         n.text = $text,
@@ -314,6 +323,66 @@ async def _merge_provisional_node(
     if not result:
         raise RuntimeError(f"MERGE returned no row for provisional node {node_id}")
     return True
+
+
+async def _link_related_urns(
+    graph_client,
+    *,
+    node_id: str,
+    source_url: str,
+    related_urns: Optional[List[str]],
+    timestamp: str,
+) -> None:
+    """Slice B signal 3: connect a freshly-sedimented provisional node to the
+    confirmed/seed nodes retrieved in the SAME answer.
+
+    For every ``related_urn`` (canonicalized the same way as the provisional
+    node's own key — strip everything from the first ``!``, see
+    ``_canonical_url``) that resolves to an existing NON-live node, MERGE a
+    ``(confirmed)-[:CORRELATO {provenance:'live_unconfirmed'}]->(provisional)``
+    edge and flag the provisional ``has_confirmed_citation = true``. Excludes:
+
+    - the provisional's own source URL (self-loop guard — an answer's
+      combined legal basis routinely re-lists the very source we just wrote);
+    - any node ALSO carrying the ``LiveSource`` label — only a genuinely
+      confirmed/seed node counts as "citation from a confirmed node"; two
+      provisional nodes co-retrieved in the same answer never link to each
+      other via this path.
+
+    Best-effort and fully failure-isolated: any error is swallowed so a
+    linking failure never undoes the node write itself.
+    """
+    if not related_urns:
+        return
+    own = _canonical_url(source_url)
+    urns = sorted({
+        canon for u in related_urns
+        if u and (canon := _canonical_url(str(u).strip())) and canon != own
+    })
+    if not urns:
+        return
+    try:
+        cypher = """
+        UNWIND $urns AS urn
+        MATCH (c) WHERE c.URN = urn AND NOT c:LiveSource
+        MATCH (p {node_id: $node_id})
+        MERGE (c)-[r:CORRELATO]->(p)
+        ON CREATE SET r.provenance = 'live_unconfirmed', r.created_at = $timestamp
+        SET p.has_confirmed_citation = true
+        RETURN count(DISTINCT c) AS linked
+        """
+        result = await graph_client.query(cypher, {
+            "urns": urns,
+            "node_id": node_id,
+            "timestamp": timestamp,
+        })
+        linked = (result[0].get("linked") if result else 0) or 0
+        if linked:
+            log.info("provisional_writer.linked_related", node_id=node_id, linked=linked)
+    except Exception as exc:  # noqa: BLE001 - fully failure-isolated
+        log.warning(
+            "provisional_writer.link_related_failed", node_id=node_id, error=str(exc)
+        )
 
 
 def _upsert_chunk_sync(
@@ -445,6 +514,7 @@ async def write_provisional_source(
     *,
     graph_client=None,
     embeddings=None,
+    related_urns: Optional[List[str]] = None,
 ) -> Optional[str]:
     """Sediment ONE live retrieval into FalkorDB + Qdrant as a provisional node.
 
@@ -458,6 +528,9 @@ async def write_provisional_source(
            the seed payload schema (``article_urn`` = url or node id) —
            idempotent on a deterministic point id. Best-effort: a failed embed
            does NOT undo the graph write.
+        4. Link the new node to the confirmed/seed sources retrieved in the
+           SAME answer (Slice B signal 3), best-effort — see
+           ``_link_related_urns``.
 
     Args:
         source: live-source dict (see module docstring for the contract).
@@ -465,6 +538,10 @@ async def write_provisional_source(
             built+connected when omitted.
         embeddings: optional ``EmbeddingService``; the singleton is used when
             omitted.
+        related_urns: URNs of the confirmed/seed sources cited in the SAME
+            answer (e.g. ``result.combined_legal_basis`` source ids), used to
+            connect the new provisional node into the graph instead of
+            leaving it isolated.
 
     Returns:
         The provisional node id on success, or ``None`` on any failure. Fully
@@ -533,6 +610,16 @@ async def write_provisional_source(
             text=text,
         )
 
+        # Best-effort graph linking (Slice B signal 3) — never undoes the
+        # node write on failure, see _link_related_urns.
+        await _link_related_urns(
+            gc,
+            node_id=node_id,
+            source_url=source_url,
+            related_urns=related_urns,
+            timestamp=timestamp,
+        )
+
         return node_id
 
     except Exception as exc:  # noqa: BLE001 - fully failure-isolated
@@ -549,6 +636,7 @@ async def write_provisional_sources(
     *,
     graph_client=None,
     embeddings=None,
+    related_urns: Optional[List[str]] = None,
 ) -> List[str]:
     """Batch helper: sediment many live sources, sharing the clients.
 
@@ -562,6 +650,9 @@ async def write_provisional_sources(
         sources: list of live-source dicts.
         graph_client: optional shared connected ``FalkorDBClient``.
         embeddings: optional shared ``EmbeddingService``.
+        related_urns: URNs of the confirmed/seed sources cited in the SAME
+            answer, forwarded verbatim to every ``write_provisional_source``
+            call (Slice B signal 3 — see that function's docstring).
 
     Returns:
         List of provisional node ids that were written.
@@ -581,7 +672,7 @@ async def write_provisional_sources(
     seen: set = set()
     for source in sources:
         node_id = await write_provisional_source(
-            source, graph_client=gc, embeddings=emb
+            source, graph_client=gc, embeddings=emb, related_urns=related_urns
         )
         if node_id and node_id not in seen:
             seen.add(node_id)

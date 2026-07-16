@@ -479,6 +479,11 @@ def _to_source_reference(legal_source: Any) -> SourceReference:
 # per-query client would leak connections — keep one connected singleton.
 _provenance_graph_client: Any = None
 
+# Slice B (graph co-evolution) signal 1: strong refs for the fire-and-forget
+# positive-feedback-bump/promotion-check background tasks spawned by
+# submit_inline_feedback, so they aren't garbage-collected mid-flight.
+_inline_feedback_signal_tasks: set = set()
+
 
 async def _get_provenance_graph_client() -> Any:
     global _provenance_graph_client
@@ -1431,6 +1436,40 @@ async def submit_inline_feedback(
                 )
         except Exception as e:
             log.warning("Implicit affinity update failed (non-blocking)", error=str(e))
+
+        # Slice B (graph co-evolution) signal 1: a positive rating (reward >=
+        # 0.75, i.e. rating >= 4/5 — same mapping as _wire_feedback_to_training)
+        # credits every `live_unconfirmed` node this answer cited with a
+        # positive_feedback_count bump + promotion re-check. Fire-and-forget,
+        # fully failure-isolated — never blocks or fails this response.
+        inline_reward = (request.rating - 1) / 4  # 1→0, 5→1
+        if inline_reward >= 0.75:
+            source_urns = [
+                (s or {}).get("article_urn") for s in (trace.sources or [])
+            ]
+            source_urns = [u for u in source_urns if u]
+            if source_urns:
+                async def _signal_positive_feedback(urns: List[str]) -> None:
+                    try:
+                        from merlt.pipeline.promotion import (
+                            bump_positive_feedback,
+                            promote_if_ready,
+                        )
+                        client = await _get_provenance_graph_client()
+                        node_ids = await bump_positive_feedback(client, urns)
+                        for node_id in node_ids:
+                            await promote_if_ready(client, node_id)
+                    except Exception as bg_exc:  # noqa: BLE001
+                        log.debug(
+                            "inline_feedback.positive_signal_failed",
+                            error=str(bg_exc),
+                        )
+
+                _signal_task = asyncio.create_task(
+                    _signal_positive_feedback(source_urns)
+                )
+                _inline_feedback_signal_tasks.add(_signal_task)
+                _signal_task.add_done_callback(_inline_feedback_signal_tasks.discard)
 
         log.info(
             "Inline feedback saved",

@@ -208,6 +208,13 @@ class GraphAwareRetriever:
 
         top_results = enriched_results[:top_k]
 
+        # Slice B (graph co-evolution) signal 2 (re-retrieval) is credited by the
+        # ORCHESTRATOR at question granularity (see Orchestrator._schedule_usage_credit),
+        # NOT here per served result — retrieve() runs many times per question
+        # (per tool-call × expert × ReAct iteration) and per-result crediting
+        # saturated usage_cap within a single question, promoting nodes with zero
+        # human feedback. The retriever stays read-only w.r.t. usage signals.
+
         if top_results:
             avg_score = sum(r.final_score for r in top_results) / len(top_results)
             log.info(

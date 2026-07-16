@@ -55,6 +55,15 @@ Se `score ≥ soglia` → `provenance='confirmed'`, `trust→1.0` (rank pieno). 
 
 **Verifica.** Sedimentare un nodo, simulare i segnali (feedback + ri-recupero + citazione), lanciare il job → il nodo diventa `confirmed` e sale nel ranking.
 
+### Note di implementazione e confini MVP (esito review)
+
+- **Granularità del segnale 2 (ri-recupero) — decisione load-bearing.** L'accredito `usage_count` avviene **una volta per domanda**, non per risultato servito. È nell'`Orchestrator._schedule_usage_credit` (post-sintesi, fire-and-forget, dedup sulle URN servite dalla domanda), NON nel `retriever.retrieve()`. Motivo: `retrieve()` gira molte volte per domanda (per tool-call × esperto × iterazione ReAct); accreditare per-risultato saturava `usage_cap` dentro una singola domanda e faceva promuovere un nodo a `confirmed` su una sola ri-domanda con zero feedback umano — tradendo la premessa RLCF. `bump_usage` è no-op sui nodi confermati, quindi passare l'intero insieme delle URN servite accredita solo i genuini ri-recuperi provvisori.
+- **Promozione inline anziché job periodico RQ.** `promote_if_ready` è richiamato inline a ogni bump di segnale (retriever→usage, feedback→positive). Più reattivo del job periodico previsto in prima stesura; nessuna sweep persa perché ogni segnale ri-valuta. Se un segnale diventasse aggiornabile fuori-banda, servirà una sweep.
+- **Confini MVP consapevoli (documentati, non bug):**
+  - *Citazione (segnale 3) fissata alla creazione.* Gli archi `confirmed → live_unconfirmed` sono creati quando il nodo provvisorio nasce (linkato ai confermati co-recuperati in quella risposta). Un provvisorio citato da confermati in risposte **successive** non riceve nuovi archi. Copre il caso principale; il re-link continuo è enhancement futuro.
+  - *Feedback (segnale 1) copre `retrieved_sources`, non `graph_traversal`.* Un nodo `live_unconfirmed` presente SOLO come hop del cammino (mai tra le sources) non riceve il `positive_feedback_count++`. Impatto pratico ridotto: il cammino percorre nodi confermati (su cui il bump è no-op) e un live servito è quasi sempre anche una source.
+  - *I nodi promossi mantengono la label `LiveSource`.* Restano quindi esclusi come sorgente `c` in `_link_related_urns` (`NOT c:LiveSource`): scelta conservativa (solo seed/confermati genuini citano). La crescita per promozioni a catena è rimandata a Slice C insieme alla dedup provvisorio-vs-confermato per URN.
+
 ---
 
 ## Slice C — Il grafo si autocorregge *(review + UX + igiene)*

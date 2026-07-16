@@ -211,6 +211,81 @@ class RuntimeConfig:
                 description="Wire the live mcp-legal-it tools (cite_law, giurisprudenza, brocardi, ...) into the experts (construction-time).",
                 requires_restart=True,
             ),
+            # ---- Slice B (graph co-evolution): promotion of live_unconfirmed
+            # nodes to confirmed, driven by usage/feedback/citation signals ----
+            ParamSpec(
+                key="promotion_usage_weight",
+                kind="float",
+                default=_env_float("MERLT_PROMOTION_USAGE_WEIGHT", 0.4),
+                minimum=0.0, maximum=1.0, step=0.05,
+                requires_restart=False,
+                description=(
+                    "Peso del segnale 'ri-recupero' (usage_count) nel punteggio "
+                    "di promozione di un nodo provvisorio del grafo a nodo "
+                    "confermato."
+                ),
+            ),
+            ParamSpec(
+                key="promotion_feedback_weight",
+                kind="float",
+                default=_env_float("MERLT_PROMOTION_FEEDBACK_WEIGHT", 0.4),
+                minimum=0.0, maximum=1.0, step=0.05,
+                requires_restart=False,
+                description=(
+                    "Peso del segnale 'feedback positivo sulla risposta' "
+                    "(positive_feedback_count) nel punteggio di promozione di "
+                    "un nodo provvisorio del grafo a nodo confermato."
+                ),
+            ),
+            ParamSpec(
+                key="promotion_citation_weight",
+                kind="float",
+                default=_env_float("MERLT_PROMOTION_CITATION_WEIGHT", 0.2),
+                minimum=0.0, maximum=1.0, step=0.05,
+                requires_restart=False,
+                description=(
+                    "Peso del segnale 'citato da un nodo confermato' "
+                    "(has_confirmed_citation) nel punteggio di promozione di "
+                    "un nodo provvisorio del grafo a nodo confermato."
+                ),
+            ),
+            ParamSpec(
+                key="promotion_threshold",
+                kind="float",
+                default=_env_float("MERLT_PROMOTION_THRESHOLD", 0.6),
+                minimum=0.0, maximum=1.0, step=0.05,
+                requires_restart=False,
+                description=(
+                    "Soglia minima del punteggio pesato oltre la quale un nodo "
+                    "'live_unconfirmed' viene promosso automaticamente a "
+                    "'confirmed' (trust=1.0). La promozione è monotona: solo "
+                    "salita, mai discesa."
+                ),
+            ),
+            ParamSpec(
+                key="promotion_usage_cap",
+                kind="int",
+                default=_env_int("MERLT_PROMOTION_USAGE_CAP", 3),
+                minimum=1, maximum=20, step=1,
+                requires_restart=False,
+                description=(
+                    "Tetto (K) sul conteggio di ri-recupero oltre il quale il "
+                    "segnale 'usage_count' satura a 1.0 nel punteggio di "
+                    "promozione."
+                ),
+            ),
+            ParamSpec(
+                key="promotion_feedback_cap",
+                kind="int",
+                default=_env_int("MERLT_PROMOTION_FEEDBACK_CAP", 3),
+                minimum=1, maximum=20, step=1,
+                requires_restart=False,
+                description=(
+                    "Tetto (M) sul conteggio di feedback positivi oltre il "
+                    "quale il segnale 'positive_feedback_count' satura a 1.0 "
+                    "nel punteggio di promozione."
+                ),
+            ),
         ]
         for s in specs:
             self._specs[s.key] = s

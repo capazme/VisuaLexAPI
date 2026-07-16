@@ -194,6 +194,7 @@ class MultiExpertOrchestrator:
         # Loop β C.2: strong refs to in-flight sedimentation tasks so fire-and-forget
         # background writes aren't garbage-collected before they complete.
         self._sediment_tasks: set = set()
+        self._usage_tasks: set = set()
         self._ner_mining_tasks: set = set()
 
         # Router: preferisce HybridExpertRouter se disponibile
@@ -294,7 +295,11 @@ class MultiExpertOrchestrator:
         """
         self._experts = self._build_experts()
 
-    async def _sediment_live_sources(self, live_sources: List[Dict[str, Any]]) -> None:
+    async def _sediment_live_sources(
+        self,
+        live_sources: List[Dict[str, Any]],
+        related_urns: Optional[List[str]] = None,
+    ) -> None:
         """Loop β C.2: write the query's live mcp-legal-it retrievals into the graph
         as provisional ``live_unconfirmed`` nodes (+ Qdrant chunks), so re-asking
         hits the graph instead of re-scraping.
@@ -303,6 +308,11 @@ class MultiExpertOrchestrator:
         fully failure-isolated, so a graph/Qdrant/MCP problem never affects the
         user-facing response. The writer is idempotent (MERGE on a deterministic
         node id), so repeated sedimentation of the same source is a no-op.
+
+        Slice B (graph co-evolution): ``related_urns`` — the confirmed/seed
+        source ids from THIS answer's combined legal basis — is forwarded
+        verbatim so the writer can link the new provisional node(s) into the
+        graph (signal 3) instead of leaving them isolated islands.
         """
         try:
             from merlt.pipeline.provisional_writer import write_provisional_sources
@@ -310,11 +320,46 @@ class MultiExpertOrchestrator:
                 live_sources,
                 graph_client=None,  # writer self-builds an env-aware FalkorDBClient
                 embeddings=self.embedding_service,
+                related_urns=related_urns,
             )
             log.info("live sources sedimented into graph",
                      requested=len(live_sources), written=len(written))
         except Exception as exc:
             log.warning("live-source sedimentation failed (non-fatal)", error=str(exc))
+
+    def _schedule_usage_credit(self, served_urns: List[str]) -> None:
+        """Slice B (graph co-evolution) signal 2: credit each re-retrieved
+        ``live_unconfirmed`` node among the URNs THIS question served, exactly
+        ONCE per question, then re-check promotion. Fire-and-forget, off the
+        answer's critical path.
+
+        Question granularity is load-bearing: the previous per-served-result
+        crediting inside ``retriever.retrieve()`` incremented ``usage_count``
+        once per result per retrieve() call — and a single question issues many
+        retrieve() calls (per tool-call × expert × ReAct iteration), so one
+        re-ask could saturate ``usage_cap`` and promote a node to ``confirmed``
+        with zero human feedback. ``bump_usage`` is a no-op on confirmed/seed
+        URNs, so passing the full served set only ever credits genuine
+        provisional re-retrievals.
+        """
+        if not served_urns:
+            return
+
+        async def _run() -> None:
+            try:
+                from merlt.pipeline.promotion import bump_usage, promote_if_ready
+                from merlt.pipeline.provisional_writer import _get_graph_client
+                gc = await _get_graph_client(None)
+                for urn in served_urns:
+                    node_id = await bump_usage(gc, urn)
+                    if node_id:
+                        await promote_if_ready(gc, node_id)
+            except Exception as exc:  # noqa: BLE001 - fully failure-isolated
+                log.warning("usage-credit signal failed (non-fatal)", error=str(exc))
+
+        _task = asyncio.create_task(_run())
+        self._usage_tasks.add(_task)
+        _task.add_done_callback(self._usage_tasks.discard)
 
     async def _mine_ner_confirmations(
         self, user_id: str, legal_references: List[Dict[str, Any]]
@@ -1122,6 +1167,44 @@ class MultiExpertOrchestrator:
         # same question later hits the now-sedimented graph node (no 2nd live scrape).
         try:
             ran_types = {r.expert_type for r in responses}
+
+            # Slice B (graph co-evolution): the REAL graph-node URNs THIS answer
+            # served/traversed, de-duped ONCE per question. Union of each expert's
+            # retrieved URNs (semantic/graph tools) and the graph-traversal walk;
+            # both are exact FalkorDB node keys. Consumed for TWO signals below —
+            # bump_usage no-ops on confirmed URNs, _link_related_urns excludes
+            # NOT c:LiveSource — so passing the full set to each is safe.
+            served_urns_set: set = set()
+            for et in ran_types:
+                expert = experts.get(et)
+                if expert is None:
+                    continue
+                if hasattr(expert, "get_retrieved_urns"):
+                    for u in (expert.get_retrieved_urns() or []):
+                        if u:
+                            served_urns_set.add(u)
+                if hasattr(expert, "get_graph_traversal"):
+                    for edge in (expert.get_graph_traversal() or []):
+                        for k in ("source_urn", "target_urn"):
+                            u = edge.get(k)
+                            if u:
+                                served_urns_set.add(u)
+            served_urns = sorted(served_urns_set)
+
+            # Signal 2 (re-retrieval): credit each re-retrieved live_unconfirmed
+            # node exactly ONCE per question (bump_usage is a no-op on confirmed
+            # URNs). This is deliberately at QUESTION granularity — crediting
+            # per served result inside retrieve() saturated usage_cap within a
+            # single question (many tool-calls × experts × ReAct iterations),
+            # which let a node reach `confirmed` on one re-ask with zero human
+            # feedback. Fire-and-forget, off the critical path.
+            if served_urns:
+                self._schedule_usage_credit(served_urns)
+
+            # Sedimentation of NEW live scrapes (+ signal 3 linking): only when
+            # the experts pulled fresh mcp-legal-it sources this answer. Dedup by
+            # (source_id, text-prefix); the answer returns immediately and
+            # re-asking later hits the now-sedimented node (no 2nd live scrape).
             seen_live: set = set()
             live_sources: List[Dict[str, Any]] = []
             for et in ran_types:
@@ -1133,11 +1216,20 @@ class MultiExpertOrchestrator:
                     seen_live.add(key)
                     live_sources.append(src)
             if live_sources:
-                _task = asyncio.create_task(self._sediment_live_sources(live_sources))
+                # Signal 3 (citation from confirmed): related_urns = the served
+                # URNs above. _link_related_urns keeps only NOT c:LiveSource nodes
+                # and excludes the provisional's own source_url (self-loop guard),
+                # so the fresh provisional node links to the confirmed nodes
+                # co-retrieved in the SAME answer.
+                _task = asyncio.create_task(
+                    self._sediment_live_sources(live_sources, related_urns=served_urns)
+                )
                 self._sediment_tasks.add(_task)
                 _task.add_done_callback(self._sediment_tasks.discard)
                 log.info("scheduled live-source sedimentation",
-                         count=len(live_sources), trace_id=trace_id)
+                         count=len(live_sources),
+                         related_urns=len(served_urns),
+                         trace_id=trace_id)
         except Exception as sed_err:
             log.warning("failed to schedule live-source sedimentation (non-fatal)",
                         error=str(sed_err))

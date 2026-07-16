@@ -299,6 +299,36 @@ class ReActMixin:
         except Exception as e:
             log.warning(f"live legal capture under ReAct failed: {e}")
 
+        # Slice B (graph co-evolution): capture the REAL canonical graph-node URNs
+        # THIS answer served (semantic/graph tools set source["urn"] / metadata
+        # ["article_urn"] = the article URN). The orchestrator threads these for
+        # TWO signals: (3) link a freshly-sedimented provisional node to the
+        # confirmed co-retrievals, and (2) credit re-retrieved provisional nodes
+        # ONCE per question. Exclude entries carrying a TOP-LEVEL
+        # provenance='live_unconfirmed' — those are THIS question's freshly
+        # SCRAPED live sources (set by _retrieve_live_legal_sources), i.e. the
+        # nodes being CREATED now; crediting/self-linking them here would be wrong.
+        # Re-retrieved provisional nodes (from a prior sedimentation, via semantic
+        # search) carry provenance only nested under metadata, so they pass and are
+        # correctly credited. Both consumers filter by node type at the Cypher
+        # level (bump_usage: live only; _link_related_urns: NOT c:LiveSource).
+        try:
+            retrieved_urns: List[str] = []
+            seen_ret: set = set()
+            for s in all_sources:
+                if (s.get("provenance") or s.get("source_type")) == "live_unconfirmed":
+                    continue
+                urn = s.get("urn") or (s.get("metadata") or {}).get("article_urn")
+                if not urn or not isinstance(urn, str):
+                    continue
+                if urn.startswith("live:") or urn in seen_ret:
+                    continue
+                seen_ret.add(urn)
+                retrieved_urns.append(urn)
+            self._retrieved_urns = retrieved_urns
+        except Exception as e:
+            log.warning(f"served-URN capture under ReAct failed: {e}")
+
         log.info(
             f"ReAct loop completed for {self.expert_type}",
             iterations=len(history),
