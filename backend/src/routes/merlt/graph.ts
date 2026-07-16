@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { authenticate } from '../../middleware/auth';
 import { internalAuth } from '../../middleware/internalAuth';
 import { consentGuard } from '../../services/merlt/consentGuard';
+import { validationGuard } from '../../services/merlt/validationGuard';
 import { ingestRequestSchema, jobCallbackSchema } from '../../schemas/merlt/graph';
 import {
   createGraphClient,
@@ -129,6 +130,64 @@ router.get('/graph/search', authenticate, async (req: Request, res: Response): P
   try {
     const results = await graphClient().searchEntities(q, limit);
     res.status(200).json(results);
+  } catch (err) {
+    if (err instanceof MerltClientError) {
+      res.status(503).json({ detail: 'merlt_unavailable' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * GET /api/merlt/graph/provisional-review
+ *
+ * Slice C wave 2: provisional graph nodes the hygiene sweep flagged for human
+ * adjudication (faded but with accumulated human signal). authenticate +
+ * validationGuard (full consent, same gate as /validate/*). Surfaced in the
+ * /merlt/valida page so a reviewer promotes or discards them instead of the
+ * sweep auto-pruning.
+ */
+router.get('/graph/provisional-review', authenticate, validationGuard, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+  const limit = clampInt(req.query.limit, 100, 1, 200);
+  try {
+    const result = await graphClient().listProvisionalReview(limit);
+    res.status(200).json(result);
+  } catch (err) {
+    if (err instanceof MerltClientError) {
+      res.status(503).json({ detail: 'merlt_unavailable' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * POST /api/merlt/graph/provisional-review/:nodeId
+ *
+ * Body: { decision: 'approve' | 'reject' }. approve promotes the existing node
+ * in place (confirmed / trust 1.0); reject deletes it. authenticate +
+ * validationGuard. The node id is opaque (live:<hash>) so it is URL-encoded on
+ * the client; Express decodes req.params.
+ */
+router.post('/graph/provisional-review/:nodeId', authenticate, validationGuard, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ detail: 'Authentication required' });
+    return;
+  }
+  const nodeId = req.params.nodeId;
+  const decision = (req.body as { decision?: unknown } | undefined)?.decision;
+  if (decision !== 'approve' && decision !== 'reject') {
+    res.status(400).json({ detail: "decision must be 'approve' or 'reject'" });
+    return;
+  }
+  try {
+    const result = await graphClient().adjudicateProvisional(nodeId, decision);
+    res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {
       res.status(503).json({ detail: 'merlt_unavailable' });

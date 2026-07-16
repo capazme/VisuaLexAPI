@@ -49,6 +49,33 @@ export interface IngestArticleResponse {
   urn: string;
 }
 
+/** One provisional node flagged for human review (Slice C wave 2). */
+export interface ProvisionalReviewItem {
+  node_id: string;
+  source_url: string | null;
+  trust: number | null;
+  usage_count: number | null;
+  positive_feedback_count: number | null;
+  has_confirmed_citation: boolean | null;
+  review_reason: string | null;
+  review_flagged_at: string | null;
+  labels: string[];
+  text_preview: string;
+}
+
+export interface ProvisionalReviewResponse {
+  items: ProvisionalReviewItem[];
+  count: number;
+}
+
+/** Result of adjudicating a flagged provisional node. */
+export interface AdjudicateProvisionalResponse {
+  applied: boolean;
+  decision?: 'approve' | 'reject';
+  node_id: string;
+  reason?: string;
+}
+
 /**
  * Normalize a VisuaLex URN to the form indexed in the graph.
  *
@@ -111,6 +138,30 @@ export class GraphClient {
   async searchEntities(query: string, limit = 10): Promise<EntitySearchResponse> {
     const qs = new URLSearchParams({ q: query, limit: String(limit) }).toString();
     return this.request('GET', `/api/v1/graph/entities/search?${qs}`);
+  }
+
+  /**
+   * Slice C wave 2: provisional nodes the hygiene sweep flagged for human review
+   * (faded but with accumulated human signal). Surfaced in /merlt/valida.
+   */
+  async listProvisionalReview(limit = 100): Promise<ProvisionalReviewResponse> {
+    const qs = new URLSearchParams({ limit: String(limit) }).toString();
+    return this.request('GET', `/api/v1/graph/provisional-review?${qs}`);
+  }
+
+  /**
+   * Slice C wave 2: apply a human decision to a flagged provisional node —
+   * `approve` promotes it in place, `reject` deletes it.
+   */
+  async adjudicateProvisional(
+    nodeId: string,
+    decision: 'approve' | 'reject'
+  ): Promise<AdjudicateProvisionalResponse> {
+    return this.request(
+      'POST',
+      `/api/v1/graph/provisional-review/${encodeURIComponent(nodeId)}`,
+      { decision }
+    );
   }
 
   private async request<T>(

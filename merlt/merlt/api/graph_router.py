@@ -2170,6 +2170,63 @@ def _parse_graph_edge(rel_data: Any, include_metadata: bool) -> SubgraphEdge:
 
 
 # ====================================================
+# SLICE C WAVE 2 — Provisional-node review adjudication
+# ====================================================
+
+class ProvisionalAdjudicateRequest(BaseModel):
+    """Body for POST /graph/provisional-review/{node_id}."""
+    decision: str = Field(..., description="'approve' (promote in place) or 'reject' (delete)")
+
+
+@router.get("/provisional-review")
+async def list_provisional_review(
+    limit: int = 100,
+    api_key: ApiKey = Depends(verify_api_key),
+) -> Dict[str, Any]:
+    """Slice C wave 2: provisional nodes the hygiene sweep flagged for human
+    review (faded but with accumulated human signal). Surfaced in /merlt/valida
+    so a reviewer can promote or discard them instead of auto-pruning."""
+    from merlt.pipeline.review import list_pending_review
+    graph_client = FalkorDBClient()
+    await graph_client.connect()
+    try:
+        items = await list_pending_review(graph_client, limit=max(1, min(int(limit), 200)))
+        return {"items": items, "count": len(items)}
+    except Exception as e:
+        log.error(f"list provisional-review failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Graph query failed: {str(e)}")
+    finally:
+        await graph_client.close()
+
+
+@router.post("/provisional-review/{node_id}")
+async def adjudicate_provisional_review(
+    node_id: str,
+    body: ProvisionalAdjudicateRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+) -> Dict[str, Any]:
+    """Slice C wave 2: apply a human decision to a flagged provisional node —
+    ``approve`` promotes it in place (confirmed / trust 1.0), ``reject`` deletes
+    it (+ its Qdrant chunk). A node no longer ``pending_review`` is a no-op."""
+    from merlt.pipeline.review import adjudicate_provisional
+    if body.decision not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
+    graph_client = FalkorDBClient()
+    await graph_client.connect()
+    try:
+        return await adjudicate_provisional(
+            graph_client, node_id=node_id, decision=body.decision
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"adjudicate provisional failed: {e}", node_id=node_id, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Adjudication failed: {str(e)}")
+    finally:
+        await graph_client.close()
+
+
+# ====================================================
 # EXPORTS
 # ====================================================
 __all__ = [

@@ -548,3 +548,101 @@ describe('POST /api/merlt/internal/job-callback (MERLT-2a.4)', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Provisional review (Slice C wave 2)', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('review-alice');
+  });
+
+  const mockItems = {
+    items: [
+      {
+        node_id: 'live:abc123',
+        source_url: 'https://www.normattiva.it/uri-res/N2Ls?urn:x~art1',
+        trust: 0.18,
+        usage_count: 1,
+        positive_feedback_count: 2,
+        has_confirmed_citation: false,
+        review_reason: 'faded_with_positive_signal',
+        review_flagged_at: '2026-07-16T14:00:00+00:00',
+        labels: ['Norma', 'LiveSource'],
+        text_preview: 'Testo…',
+      },
+    ],
+    count: 1,
+  };
+
+  it('GET /graph/provisional-review returns 403 without full consent', async () => {
+    await grantConsent(user, 'basic');
+    const res = await request(app)
+      .get('/api/merlt/graph/provisional-review')
+      .set(authHeader(user));
+    expect(res.status).toBe(403);
+  });
+
+  it('GET /graph/provisional-review returns 200 with items (full consent) and forwards X-API-Key', async () => {
+    await grantConsent(user, 'full');
+    let sentApiKey: string | undefined;
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/provisional-review')
+      .query(() => true)
+      .reply(function () {
+        sentApiKey = this.req.headers['x-api-key'] as string | undefined;
+        return [200, mockItems];
+      });
+
+    const res = await request(app)
+      .get('/api/merlt/graph/provisional-review')
+      .set(authHeader(user));
+
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(1);
+    expect(res.body.items[0].node_id).toBe('live:abc123');
+    expect(sentApiKey).toBe('test-graph-key');
+  });
+
+  it('POST /graph/provisional-review/:nodeId proxies an approve decision', async () => {
+    await grantConsent(user, 'full');
+    let sentBody: unknown;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/graph/provisional-review/live%3Aabc123')
+      .reply(function (_uri, body) {
+        sentBody = body;
+        return [200, { applied: true, decision: 'approve', node_id: 'live:abc123' }];
+      });
+
+    const res = await request(app)
+      .post(`/api/merlt/graph/provisional-review/${encodeURIComponent('live:abc123')}`)
+      .set(authHeader(user))
+      .send({ decision: 'approve' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.applied).toBe(true);
+    expect(sentBody).toEqual({ decision: 'approve' });
+  });
+
+  it('POST /graph/provisional-review/:nodeId rejects an invalid decision with 400 (no MERL-T call)', async () => {
+    await grantConsent(user, 'full');
+    const res = await request(app)
+      .post(`/api/merlt/graph/provisional-review/${encodeURIComponent('live:abc123')}`)
+      .set(authHeader(user))
+      .send({ decision: 'maybe' });
+    expect(res.status).toBe(400);
+  });
+
+  it('maps a MERL-T 500 to 503 merlt_unavailable', async () => {
+    await grantConsent(user, 'full');
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/graph/provisional-review')
+      .query(() => true)
+      .reply(500, 'boom');
+
+    const res = await request(app)
+      .get('/api/merlt/graph/provisional-review')
+      .set(authHeader(user));
+    expect(res.status).toBe(503);
+    expect(res.body.detail).toBe('merlt_unavailable');
+  });
+});

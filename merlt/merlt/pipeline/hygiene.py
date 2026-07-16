@@ -78,6 +78,7 @@ async def decay_stale(graph_client, *, decay_cutoff_iso: str, factor: float) -> 
         """
         MATCH (n:LiveSource)
         WHERE n.provenance = $prov
+          AND coalesce(n.review_status, '') <> 'pending_review'
           AND coalesce(n.last_used_at, n.created_at, '') < $cutoff
         SET n.trust = coalesce(n.trust, $base) * $factor
         RETURN count(n) AS decayed
@@ -95,24 +96,74 @@ async def decay_stale(graph_client, *, decay_cutoff_iso: str, factor: float) -> 
     return decayed
 
 
+async def quarantine_doubtful(
+    graph_client, *, ttl_cutoff_iso: str, decay_cutoff_iso: str, min_trust: float, timestamp: str
+) -> int:
+    """Slice C wave 2: flag prune-eligible provisional nodes that carry POSITIVE
+    signals (some feedback or re-use) as ``review_status='pending_review'``
+    instead of letting ``prune_faded`` delete them.
+
+    These are the "conflicting signal" cases from the design: a node that was
+    useful to someone (``positive_feedback_count`` or ``usage_count`` > 0) yet
+    never crossed the promotion threshold and has now faded (old + stale + low
+    trust). Rather than silently discard human signal, it is frozen (decay/prune
+    skip ``pending_review`` nodes) and surfaced for human adjudication in
+    ``/merlt/valida`` (approve -> promote, reject -> prune). Returns the count
+    newly flagged.
+    """
+    rows = await graph_client.query(
+        """
+        MATCH (n:LiveSource)
+        WHERE n.provenance = $prov
+          AND coalesce(n.review_status, '') <> 'pending_review'
+          AND coalesce(n.created_at, n.first_seen_at, '') < $ttl_cutoff
+          AND coalesce(n.last_used_at, n.created_at, '') < $decay_cutoff
+          AND coalesce(n.trust, 0.0) < $min_trust
+          AND (coalesce(n.positive_feedback_count, 0) > 0 OR coalesce(n.usage_count, 0) > 0)
+        SET n.review_status = 'pending_review',
+            n.review_reason = 'faded_with_positive_signal',
+            n.review_flagged_at = $timestamp
+        RETURN count(n) AS flagged
+        """,
+        {
+            "prov": PROVENANCE_LIVE_UNCONFIRMED,
+            "ttl_cutoff": ttl_cutoff_iso,
+            "decay_cutoff": decay_cutoff_iso,
+            "min_trust": min_trust,
+            "timestamp": timestamp,
+        },
+    )
+    flagged = int((rows[0].get("flagged") if rows else 0) or 0)
+    if flagged:
+        log.info("hygiene.quarantined_doubtful", count=flagged)
+    return flagged
+
+
 async def prune_faded(
     graph_client, *, ttl_cutoff_iso: str, decay_cutoff_iso: str, min_trust: float
 ) -> List[str]:
-    """DETACH DELETE provisional nodes that are OLD, STALE and low-trust.
+    """DETACH DELETE provisional nodes that are OLD, STALE, low-trust and PURE
+    NOISE (no accumulated human signal).
 
     A node is pruned iff it is ``live_unconfirmed`` AND older than the TTL
     (``created_at < ttl_cutoff``) AND idle since before the decay window
     (``last_used_at < decay_cutoff`` — so a recently re-used node is spared even
-    if its trust decayed earlier) AND its (decayed) ``trust`` is below the floor.
+    if its trust decayed earlier) AND its (decayed) ``trust`` is below the floor
+    AND it carries NO positive signal (``positive_feedback_count`` and
+    ``usage_count`` both 0 — nodes with signal are routed to human review by
+    ``quarantine_doubtful`` instead) AND it is not already flagged for review.
     Returns the deleted node ids (caller drops their Qdrant chunks).
     """
     rows = await graph_client.query(
         """
         MATCH (n:LiveSource)
         WHERE n.provenance = $prov
+          AND coalesce(n.review_status, '') <> 'pending_review'
           AND coalesce(n.created_at, n.first_seen_at, '') < $ttl_cutoff
           AND coalesce(n.last_used_at, n.created_at, '') < $decay_cutoff
           AND coalesce(n.trust, 0.0) < $min_trust
+          AND coalesce(n.positive_feedback_count, 0) = 0
+          AND coalesce(n.usage_count, 0) = 0
         RETURN collect(n.node_id) AS ids
         """,
         {
@@ -154,10 +205,11 @@ async def _run_graph_hygiene_locked(graph_client) -> Dict[str, Any]:
     min_trust = cfg.get_float("hygiene_prune_min_trust", 0.3)
 
     now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
     decay_cutoff = (now - timedelta(hours=decay_window)).isoformat()
     ttl_cutoff = (now - timedelta(hours=ttl)).isoformat()
 
-    stats: Dict[str, Any] = {"reconciled": 0, "decayed": 0, "pruned": 0}
+    stats: Dict[str, Any] = {"reconciled": 0, "decayed": 0, "quarantined": 0, "pruned": 0}
 
     try:
         rec_ids = await reconcile_duplicates(gc)
@@ -171,6 +223,17 @@ async def _run_graph_hygiene_locked(graph_client) -> Dict[str, Any]:
         stats["decayed"] = await decay_stale(gc, decay_cutoff_iso=decay_cutoff, factor=factor)
     except Exception as exc:  # noqa: BLE001
         log.warning("hygiene.decay_failed", error=str(exc))
+
+    # Quarantine BEFORE prune: doubtful nodes (faded but with human signal) are
+    # flagged for review so the subsequent prune skips them (both filter on
+    # review_status). Pure noise falls through to prune.
+    try:
+        stats["quarantined"] = await quarantine_doubtful(
+            gc, ttl_cutoff_iso=ttl_cutoff, decay_cutoff_iso=decay_cutoff,
+            min_trust=min_trust, timestamp=now_iso,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("hygiene.quarantine_failed", error=str(exc))
 
     try:
         pruned_ids = await prune_faded(
@@ -189,6 +252,7 @@ async def _run_graph_hygiene_locked(graph_client) -> Dict[str, Any]:
 __all__ = [
     "reconcile_duplicates",
     "decay_stale",
+    "quarantine_doubtful",
     "prune_faded",
     "run_graph_hygiene",
 ]
