@@ -501,8 +501,23 @@ class SystemicExpert(BaseExpert, ReActMixin):
         if not graph_tool:
             return expanded
 
-        # Combina URN da context + URN estratti da semantic_search
+        # Combina URN da context + da semantic_search + dalle fonti raccolte in
+        # questo analyze(). Il ReAct loop popola `initial_sources` (con URN) ma NON
+        # `_extracted_urns` (solo il path non-react `_retrieve_sources` lo fa),
+        # quindi sotto ReAct la traversata restava senza seed → "No URNs to expand"
+        # → "segui il ragionamento sul grafo" sempre vuoto.
         urns_to_expand = set(context.norm_references) | getattr(self, '_extracted_urns', set())
+        for s in (initial_sources or []):
+            u = s.get("urn") or (s.get("metadata") or {}).get("article_urn")
+            if u:
+                urns_to_expand.add(u)
+        # I nodi del grafo sono seminati SENZA il marcatore di versione NIR
+        # (`...~art2043!vig=`): togliere tutto dal primo `!` per far combaciare i
+        # seed con gli URN dei nodi (stesso trap gestito lato BFF da normalizeGraphUrn).
+        urns_to_expand = {
+            u.split("!", 1)[0] if isinstance(u, str) else u for u in urns_to_expand
+        }
+        urns_to_expand.discard("")
 
         if not urns_to_expand:
             log.debug("SystemicExpert: No URNs to expand")
