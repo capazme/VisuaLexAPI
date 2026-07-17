@@ -616,8 +616,14 @@ class GraphSearchTool(BaseTool):
         # Target type filter
         target_filter = f":{target_type}" if target_type else ""
 
+        # Match the seed by URN *or* source_url: a co-evolved (live_unconfirmed)
+        # node is keyed URN=`live:<hash>` and carries the CANONICAL urn in
+        # source_url, so a URN-only match silently missed every live-retrieved
+        # norm — the traversal came back empty for anything outside the CC seed
+        # even when the node existed with real CORRELATO edges.
         query = f"""
-        MATCH (start {{URN: $start_urn}})
+        MATCH (start)
+        WHERE start.URN = $start_urn OR start.source_url = $start_urn
         MATCH path = (start){rel_pattern}(target{target_filter})
         UNWIND nodes(path) AS node
         UNWIND relationships(path) AS rel

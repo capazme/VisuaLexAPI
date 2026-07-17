@@ -67,7 +67,7 @@ from merlt.experts.principles import PrinciplesExpert
 from merlt.experts.precedent import PrecedentExpert
 from merlt.experts.query_analyzer import (
     analyze_query, enrich_context, build_legal_references,
-    legal_references_from_citations, merge_legal_references,
+    legal_references_from_citations, merge_legal_references, urn_for_ref,
 )
 from merlt.clients import get_visualex_client
 from merlt.tools import BaseTool
@@ -811,9 +811,25 @@ class MultiExpertOrchestrator:
         merged_entities = dict(entities or {})
         user_norms = list(merged_entities.get("norm_references") or [])
         user_concepts = list(merged_entities.get("legal_concepts") or [])
-        # Prefer VisuaLex-derived URNs (correct act type); fall back to regex.
-        norm_urns = [r["urn"] for r in legal_references if r.get("urn")]
-        query_norms = norm_urns or query_analysis.norm_references or []
+        # URNs that seed the graph traversal MUST carry the real act. parse_query
+        # resolves a URN, but extract_citations returns refs with urn=None, so
+        # taking only `r["urn"]` left norm_urns EMPTY and fell back to the regex
+        # list — which hard-codes the codice civile for ANY article number
+        # (build_article_urn). That seeded "art. 5 legge 241/1990" on art. 5 c.c.
+        # and walked the answer into unrelated Libro IV nodes. Build the URN from
+        # the structured fields instead, and only trust the CC-hardcoded regex
+        # list when VisuaLex gave us NO structured reference at all.
+        norm_urns = [u for u in (urn_for_ref(r) for r in legal_references) if u]
+        if not norm_urns and query_analysis.article_numbers:
+            # The regex list is NOT a safe fallback: build_article_urn binds a bare
+            # article number to the codice civile, so seeding from it would ground
+            # the answer on a norm the user never asked about. Skip the seed and say so.
+            log.warning(
+                "no act-aware URN for the cited articles — graph seeding skipped "
+                "(is the VisuaLex API reachable?)",
+                articles=query_analysis.article_numbers, trace_id=trace_id,
+            )
+        query_norms = norm_urns
         merged_norms = list(dict.fromkeys(user_norms + list(query_norms)))
         if merged_norms:
             merged_entities["norm_references"] = merged_norms

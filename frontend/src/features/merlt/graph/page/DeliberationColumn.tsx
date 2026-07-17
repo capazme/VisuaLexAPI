@@ -10,7 +10,7 @@ import { EdgeDetailsDrawer } from './EdgeDetailsDrawer';
 import { QaHistoryPanel } from '../../qa/QaHistoryPanel';
 import { QaSynthesisWithCitations } from '../../ner/QaSynthesisWithCitations';
 import { normRefToSearchParams } from '../../validate/provenance';
-import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind, toolLabel } from '../../qa/format';
+import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind, toolLabel, formatRetrievedUrn } from '../../qa/format';
 import type {
   ConfirmState,
   GraphTraversalEdge,
@@ -1074,6 +1074,15 @@ function DeliberationTurn({
                   here, disabled+tooltip when the turn carries no walk. */}
               <GraphTraversalControl walk={a.graphTraversal ?? []} onFollowReasoning={onFollowReasoning} />
 
+              {/* Reach a SPECIFIC used node fast: the distinct walk nodes as
+                  one-click chips that center it on the main canvas (jump, not
+                  animation). Fills the gap when retrieved_sources is empty. */}
+              <TraversalNodesList
+                walk={a.graphTraversal ?? []}
+                onCenter={onSourceCenter}
+                onHover={onSourceHover}
+              />
+
               {/* Wave C (gap C2): "Come ha ragionato" — pipeline_trace + metrics
                   arrive on every answer but were never rendered. Closed by default. */}
               <ReasoningTraceDisclosure answer={a} toolUsages={a.toolUsages ?? []} reactSteps={a.reactSteps ?? []} />
@@ -1181,6 +1190,90 @@ function GraphTraversalControl({
         {!hasWalk && <span className="text-[11px] font-normal italic">(nessun cammino)</span>}
       </button>
     </div>
+  );
+}
+
+/** DISTINCT nodes the walk touched, in first-seen (path) order — the seed comes
+ *  first, then each node as the reasoning reached it. */
+function distinctWalkNodes(walk: GraphTraversalEdge[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of walk) {
+    for (const n of [e.source_urn, e.target_urn]) {
+      if (n && !seen.has(n)) {
+        seen.add(n);
+        out.push(n);
+      }
+    }
+  }
+  return out;
+}
+
+const WALK_NODES_PREVIEW = 12;
+
+/**
+ * "Nodi percorsi nel grafo" — the DISTINCT nodes the systemic walk touched, each
+ * a one-click jump that CENTERS it on the main canvas (onCenter → the page's
+ * handleSourceCenter: focus if already in the subgraph, else re-center + load).
+ * Complements GraphTraversalControl (which animates the WHOLE path): this is the
+ * "reach a specific used node quickly" affordance that was missing — the answer
+ * often walks dozens of nodes while `retrieved_sources` (the only other chip
+ * surface) is empty. Rendered only when the walk is non-empty; capped with an
+ * expand toggle so a 60-node walk never floods the column.
+ */
+function TraversalNodesList({
+  walk,
+  onCenter,
+  onHover,
+}: {
+  walk: GraphTraversalEdge[];
+  onCenter: (nodeIdOrUrn: string) => void;
+  onHover?: (nodeIdOrUrn: string | null) => void;
+}): React.ReactElement | null {
+  const [expanded, setExpanded] = useState(false);
+  const nodes = distinctWalkNodes(walk);
+  if (nodes.length === 0) return null;
+  const shown = expanded ? nodes : nodes.slice(0, WALK_NODES_PREVIEW);
+  const hidden = nodes.length - shown.length;
+
+  return (
+    <details className="mt-3" open>
+      <summary className="mb-1.5 cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-300">
+        Nodi percorsi nel grafo ({nodes.length})
+      </summary>
+      <ul className="flex flex-wrap gap-1.5">
+        {shown.map((node) => {
+          const kind = urnKind(node).kind;
+          const Icon = kind === 'sentenza' ? Scale : kind === 'norma' ? BookOpen : Network;
+          return (
+            <li key={node}>
+              <button
+                type="button"
+                onClick={() => onCenter(node)}
+                onMouseEnter={onHover ? () => onHover(node) : undefined}
+                onMouseLeave={onHover ? () => onHover(null) : undefined}
+                title={`Centra «${formatRetrievedUrn(node)}» sul grafo`}
+                className="inline-flex max-w-[220px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+              >
+                <Icon size={12} className="shrink-0" aria-hidden="true" />
+                <span className="truncate">{formatRetrievedUrn(node)}</span>
+              </button>
+            </li>
+          );
+        })}
+        {hidden > 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400"
+            >
+              +{hidden} altri
+            </button>
+          </li>
+        )}
+      </ul>
+    </details>
   );
 }
 

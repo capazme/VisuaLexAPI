@@ -1241,3 +1241,53 @@ describe('DeliberationColumn past turns collapsed (audit item 5)', () => {
     expect(within(summary).getByText(/errore/i)).toBeInTheDocument();
   });
 });
+
+/** A turn whose systemic walk touched several nodes but consulted NO retrieved
+ *  source — the exact gap "Nodi percorsi" fills (reach the used nodes fast). */
+function turnWithWalk(): QaTurnModel {
+  return {
+    id: 'turn-walk',
+    question: 'Rapporto tra art. 2043 e art. 2051?',
+    confirmed: {},
+    state: {
+      status: 'success',
+      answer: {
+        trace_id: 'trace-walk',
+        synthesis: 'Le due norme concorrono.',
+        mode: 'convergent',
+        alternatives: null,
+        sources: [],
+        retrieved_sources: [],
+        experts_used: ['systemic'],
+        confidence: 0.8,
+        execution_time_ms: 100,
+        graphTraversal: [
+          { iteration: 0, source_urn: 'urn:x~art2043', relation_type: 'IMPONE', target_urn: 'modalita:responsabilita', target_type: 'ModalitaGiuridica' },
+          { iteration: 0, source_urn: 'urn:x~art2043', relation_type: 'DISCIPLINA', target_urn: 'urn:x~art2051', target_type: 'Norma' },
+        ],
+      },
+    },
+  };
+}
+
+describe('DeliberationColumn — Nodi percorsi (reach the used graph nodes)', () => {
+  it('lists the DISTINCT walk nodes even when retrieved_sources is empty', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[turnWithWalk()]} />);
+    // 3 distinct nodes: art2043 (seed, source of both edges → deduped), modalita, art2051
+    expect(screen.getByText('Nodi percorsi nel grafo (3)')).toBeInTheDocument();
+  });
+
+  it('clicking a node chip centers it on the canvas via onSourceCenter', () => {
+    const props = { ...baseProps(), onSourceCenter: vi.fn() };
+    render(<DeliberationColumn {...props} turns={[turnWithWalk()]} />);
+    const section = screen.getByText('Nodi percorsi nel grafo (3)').closest('details')!;
+    const chips = within(section).getAllByRole('button');
+    fireEvent.click(chips[0]); // first distinct node = the seed
+    expect(props.onSourceCenter).toHaveBeenCalledWith('urn:x~art2043');
+  });
+
+  it('renders no "Nodi percorsi" section when the answer carries no walk', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    expect(screen.queryByText(/Nodi percorsi nel grafo/)).not.toBeInTheDocument();
+  });
+});

@@ -15,6 +15,8 @@ import structlog
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 
+from merlt.utils.urngenerator import generate_urn
+
 log = structlog.get_logger()
 
 
@@ -187,11 +189,46 @@ def determine_query_type(query: str) -> Tuple[str, float]:
     return best_type, confidence
 
 
-def build_article_urn(article_number: str, code: str = "codice_civile") -> str:
-    """Costruisce URN per un articolo del codice civile."""
+def build_article_urn(article_number: str) -> str:
+    """URN of an article OF THE CODICE CIVILE, from its number alone.
+
+    CC-ONLY BY CONSTRUCTION: the regex analyzer sees a bare article number with no
+    act, so this assumes the codice civile. Never feed its output to the graph for
+    a query that names another act — "art. 5 legge 241/1990" would seed art. 5 c.c.
+    Use `urn_for_ref` (act-aware) whenever structured legal_references exist.
+    """
     # Formato: https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art{numero}
-    art_num = article_number.replace(" ", "").replace("bis", "bis").replace("ter", "ter")
+    art_num = article_number.replace(" ", "")
     return f"https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art{art_num}"
+
+
+def urn_for_ref(ref: Dict[str, Any]) -> Optional[str]:
+    """Canonical URN for ONE structured legal reference.
+
+    Prefers the URN VisuaLex's parse_query already resolved; otherwise BUILDS it
+    from the structured fields, because extract_citations returns refs with no URN
+    (`urn=None`) and the caller would otherwise fall back to the CC-hardcoded
+    regex list — seeding the graph on the wrong act. Returns None when the act is
+    unknown: no URN is better than a URN for a norm the user never asked about.
+    """
+    if not isinstance(ref, dict):
+        return None
+    existing = ref.get("urn")
+    if existing:
+        return existing
+    act_type = ref.get("act_type")
+    if not act_type:
+        return None
+    try:
+        return generate_urn(
+            act_type=act_type,
+            date=ref.get("date"),
+            act_number=ref.get("act_number"),
+            article=ref.get("article"),
+        )
+    except Exception as e:  # noqa: BLE001 - best-effort; a URN we cannot build is dropped
+        log.debug("urn_for_ref failed", act_type=act_type, error=str(e))
+        return None
 
 
 def _ref_from_fields(act_type, article, act_number=None, date=None, urn=None, fallback_display=None):

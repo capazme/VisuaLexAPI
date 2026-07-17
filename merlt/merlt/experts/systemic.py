@@ -123,7 +123,12 @@ class SystemicExpert(BaseExpert, ReActMixin):
     # traversed set. The TraversalPolicy can only ADD/reorder relations on
     # top of it, never remove the proven ones. Relazioni reali nel grafo
     # (verificate con: MATCH ()-[r]->() RETURN type(r), count(*)).
-    STATIC_SYSTEMIC_RELATIONS = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE"]
+    # CORRELATO is the generic "systematically related" edge the co-evolution
+    # writes for live-retrieved norms ((confirmed)-[:CORRELATO]->(provisional)).
+    # Without it in the floor, every co-evolved node stayed unreachable (the
+    # traversal relation-filter dropped it) — so a norm outside the CC seed
+    # produced 0 hops even after being sedimented with real edges.
+    STATIC_SYSTEMIC_RELATIONS = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE", "CORRELATO"]
 
     # Extra graph-native candidates the policy may promote (subset of
     # DEFAULT_TRAVERSAL_WEIGHTS keys — plausible-but-unproven relations).
