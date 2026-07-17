@@ -53,11 +53,11 @@ _CANON_STRATEGY: Dict[str, Dict[str, str]] = {
     },
     "principles": {
         "canone": "teleologico / ratio legis (principî e finalità della norma)",
-        "tools": "principle_lookup (principî giuridici), constitutional_basis (base costituzionale), cerca_brocardi (dottrina e massime)",
+        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici), constitutional_basis (base costituzionale), cerca_brocardi (dottrina e massime — solo per articoli di codici)",
     },
     "precedent": {
         "canone": "giurisprudenziale (orientamenti e precedenti)",
-        "tools": "cerca_giurisprudenza, giurisprudenza_su_norma, leggi_sentenza, cerca_giurisprudenza_cgue, citation_chain",
+        "tools": "cerca_giurisprudenza e giurisprudenza_su_norma (per CERCARE sentenze), cerca_giurisprudenza_cgue, leggi_sentenza (solo per LEGGERE una sentenza già trovata, con anno+numero)",
     },
 }
 
@@ -515,6 +515,56 @@ class ReActMixin:
             log.debug("react.reroute_numbered_act_failed", error=str(e))
             return tool_name, params
 
+    def _prune_unknown_tool_params(
+        self, tool_name: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Drop kwargs the tool does NOT declare — the LLM hallucinates extras.
+
+        e.g. giurisprudenza_su_norma declares no ``sezione`` param, but the LLM
+        adds ``sezione='L'`` → the MCP tool rejects the whole call ("Unknown
+        parameter: sezione"). The tool's declared ``parameters`` are the contract
+        (MCP forwards every kwarg and the remote validates), so any name not in
+        it is dead weight that only makes the call fail. Runs LAST, AFTER the
+        alias-remap repairs, so a remapped param (tipo_atto→act_type) survives.
+        Best-effort; a tool with no declared params is left untouched (unknown
+        schema)."""
+        try:
+            registry = getattr(self, "_tool_registry", None)
+            tool = registry.get(tool_name) if registry else None
+            if tool is None:
+                return params
+            declared = {p.name for p in (tool.parameters or [])}
+            if not declared:
+                return params  # no declared schema → don't guess
+            pruned = {k: v for k, v in params.items() if k in declared}
+            if len(pruned) != len(params):
+                log.debug(
+                    "react.pruned_unknown_params", tool=tool_name,
+                    dropped=[k for k in params if k not in declared],
+                )
+            return pruned
+        except Exception as e:  # noqa: BLE001 - best-effort, never break the call
+            log.debug("react.prune_params_failed", tool=tool_name, error=str(e))
+            return params
+
+    def _missing_required_params(self, tool_name: str, params: Dict[str, Any]) -> List[str]:
+        """Names of REQUIRED params the call omits — the LLM invoked a tool before
+        it had the inputs (e.g. ``leggi_sentenza`` without anno+numero, called to
+        SEARCH for a sentence instead of READ a known one). Executing would just
+        yield a "Missing required parameter" ✗, so the loop skips it. Best-effort:
+        an unknown schema returns []."""
+        try:
+            registry = getattr(self, "_tool_registry", None)
+            tool = registry.get(tool_name) if registry else None
+            if tool is None:
+                return []
+            return [
+                p.name for p in (tool.parameters or [])
+                if getattr(p, "required", False) and params.get(p.name) in (None, "")
+            ]
+        except Exception:  # noqa: BLE001 - best-effort
+            return []
+
     async def react_loop(
         self,
         context: Any,  # ExpertContext
@@ -581,6 +631,9 @@ class ReActMixin:
             # ThoughtActionObservation.action record the ACTUALLY executed args.
             tool_params = self._repair_norm_tool_params(tool_name, tool_params, context)
             tool_params = self._repair_graph_tool_params(tool_name, tool_params, context)
+            # Drop any param the tool doesn't declare (LLM-hallucinated extras like
+            # giurisprudenza_su_norma's 'sezione') — runs LAST so remapped aliases survive.
+            tool_params = self._prune_unknown_tool_params(tool_name, tool_params)
 
             log.debug(
                 f"ReAct iteration {iteration + 1}",
@@ -589,11 +642,23 @@ class ReActMixin:
                 params=list(tool_params.keys())
             )
 
-            try:
-                result = await self.use_tool(tool_name, **tool_params)
-            except Exception as e:
-                log.warning(f"Tool {tool_name} failed: {e}")
-                result = type('ToolResult', (), {'success': False, 'data': {}, 'error': str(e)})()
+            missing_required = self._missing_required_params(tool_name, tool_params)
+            if missing_required:
+                # The LLM called a tool before it had the inputs (e.g. leggi_sentenza
+                # without anno+numero). Don't execute — that only yields a visible
+                # "Missing required parameter" ✗; skip with a no-op result so the
+                # loop moves on. The action still lands in history (RLCF learns it).
+                log.debug("react.skipped_missing_required", tool=tool_name, missing=missing_required)
+                result = type('ToolResult', (), {
+                    'success': False, 'data': {},
+                    'error': f"skipped: missing required {missing_required}",
+                })()
+            else:
+                try:
+                    result = await self.use_tool(tool_name, **tool_params)
+                except Exception as e:
+                    log.warning(f"Tool {tool_name} failed: {e}")
+                    result = type('ToolResult', (), {'success': False, 'data': {}, 'error': str(e)})()
 
             # Step 3: OBSERVATION - Processa risultato
             new_sources = self._extract_sources_from_result(result)
@@ -943,6 +1008,9 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
 - Strumenti sul grafo/nodo (graph_search, constitutional_basis, citation_chain): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
 - Usa SOLO gli identificatori elencati nei RIFERIMENTI/URN qui sopra. (semantic_search, definition_lookup e principle_lookup accettano invece testo libero.)
 - graph_search.relation_types: ometti (esplora tutte le relazioni) oppure indica al massimo 2-3 tipi.
+- `cerca_brocardi` funziona SOLO sugli articoli dei CODICI (es. "art. 2043 codice civile"); su leggi/decreti numerati o alias (es. "Statuto dei lavoratori", "GDPR") dà "atto non riconosciuto". Per quelle norme usa `fetch_law_article` per il testo, NON cerca_brocardi.
+- `leggi_sentenza`/`leggi_*` (lettura di UNA sentenza) richiedono gli estremi completi (anno + numero) di una pronuncia GIÀ trovata: non chiamarli finché non hai quegli estremi da una ricerca (`cerca_giurisprudenza`, `giurisprudenza_su_norma`). Per CERCARE sentenze usa i tool di ricerca, non quelli di lettura.
+- Passa a ogni strumento SOLO i parametri che dichiara: non aggiungere campi extra "per sicurezza" (es. `sezione` a `giurisprudenza_su_norma`, che non lo prevede) — un parametro non previsto fa fallire l'intera chiamata.
 
 ## ISTRUZIONI
 1. Se hai ABBASTANZA fonti per l'analisi del tuo canone (almeno 3-5 rilevanti), o gli strumenti non aggiungono nulla di nuovo:

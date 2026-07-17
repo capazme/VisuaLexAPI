@@ -749,6 +749,19 @@ CHECKLIST:
             for cap in ("max_risultati", "max_results"):
                 if cap in param_names:
                     kwargs[cap] = 3
+            # Skip a tool whose REQUIRED params this norm-keyed path can't supply
+            # (e.g. leggi_sentenza needs anno+numero of a SPECIFIC ruling — it READS
+            # one sentence, it doesn't retrieve by norm). Executing would only yield
+            # a "Missing required parameter" ✗ that surfaces in "Strumenti usati".
+            try:
+                _req_missing = [
+                    p.name for p in (tool.parameters or [])
+                    if getattr(p, "required", False) and kwargs.get(p.name) in (None, "")
+                ]
+            except Exception:  # noqa: BLE001 - best-effort
+                _req_missing = []
+            if _req_missing:
+                continue
             try:
                 result = await tool(**kwargs)
             except Exception as exc:

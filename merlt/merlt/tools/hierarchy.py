@@ -211,9 +211,24 @@ class HierarchyNavigationTool(BaseTool):
             # Find the starting node
             start_info = await self._find_start_node(start_node)
             if not start_info:
-                return ToolResult.fail(
-                    error=f"Nodo non trovato: {start_node}",
-                    tool_name=self.name
+                # Node isn't in the graph (e.g. a norm outside the Libro IV seed).
+                # That's an EMPTY result, not an error — mirror graph_search's
+                # empty-success so it doesn't surface as a ✗ in "Strumenti usati"
+                # on every out-of-seed query.
+                log.info(f"hierarchy_navigation - start node not in graph: {start_node}")
+                return ToolResult.ok(
+                    data={
+                        "start_node": None,
+                        "direction": direction,
+                        "hierarchy": [],
+                        "total_nodes": 0,
+                        "path": "",
+                        "max_depth_reached": 0,
+                    },
+                    tool_name=self.name,
+                    start_node=start_node,
+                    direction=direction,
+                    nodes_found=0,
                 )
 
             # Navigate based on direction
