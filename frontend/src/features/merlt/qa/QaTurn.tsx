@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Lock, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Download, Loader2, Lock, Sprout, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { QaDeliberationPanel } from './QaDeliberationPanel';
 import { QaSourceChip } from './QaSourceChip';
@@ -7,6 +7,7 @@ import { CANON_LABEL } from './format';
 import type { QaRetrievedSource, QaTurnModel } from './types';
 import { QaSynthesisWithCitations } from '../ner/QaSynthesisWithCitations';
 import { QaProcessTrace } from './QaProcessTrace';
+import { downloadAnswerJson } from './answerExport';
 import type { NerFeedbackInput } from '../../../services/merltService';
 
 export interface QaTurnProps {
@@ -220,6 +221,17 @@ export function QaTurn({
                 />
               </span>
               <span className="text-slate-400 dark:text-slate-500">{a.confidence.toFixed(2)}</span>
+              {/* Diagnostic export: the WHOLE answer incl. pipeline_trace
+                  (tool_calls, react_steps, errors) as a shareable .json. */}
+              <button
+                type="button"
+                onClick={() => downloadAnswerJson(a, turn.question)}
+                title="Esporta la risposta completa in JSON (trace, strumenti, errori) per la diagnostica"
+                className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              >
+                <Download size={13} className="shrink-0" aria-hidden="true" />
+                Esporta JSON
+              </button>
             </div>
 
             {/* Sources always visible (§3.5, "non-negotiable"): rendered directly

@@ -1291,3 +1291,10 @@ describe('DeliberationColumn — Nodi percorsi (reach the used graph nodes)', ()
     expect(screen.queryByText(/Nodi percorsi nel grafo/)).not.toBeInTheDocument();
   });
 });
+
+describe('DeliberationColumn — diagnostic JSON export', () => {
+  it('renders an "Esporta JSON" button on a settled answer', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} />);
+    expect(screen.getByRole('button', { name: /Esporta JSON/i })).toBeInTheDocument();
+  });
+});

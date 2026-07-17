@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, Check, ChevronDown, History, Info, Loader2, Lock, MessageSquare, Network, PanelRightClose, PanelRightOpen, Route, Scale, Sprout, Swords, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, Download, History, Info, Loader2, Lock, MessageSquare, Network, PanelRightClose, PanelRightOpen, Route, Scale, Sprout, Swords, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { SearchParams } from '../../../../types';
 import { useRailMode } from '../side-rail/useRailPresentation';
@@ -10,6 +10,7 @@ import { EdgeDetailsDrawer } from './EdgeDetailsDrawer';
 import { QaHistoryPanel } from '../../qa/QaHistoryPanel';
 import { QaSynthesisWithCitations } from '../../ner/QaSynthesisWithCitations';
 import { normRefToSearchParams } from '../../validate/provenance';
+import { downloadAnswerJson } from '../../qa/answerExport';
 import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind, toolLabel, formatRetrievedUrn } from '../../qa/format';
 import type {
   ConfirmState,
@@ -1040,6 +1041,17 @@ function DeliberationTurn({
                   />
                 </span>
                 <span className="text-slate-400 dark:text-slate-500">{a.confidence.toFixed(2)}</span>
+                {/* Diagnostic export: the WHOLE answer incl. pipeline_trace
+                    (tool_calls, react_steps, errors) as a shareable .json. */}
+                <button
+                  type="button"
+                  onClick={() => downloadAnswerJson(a, turn.question)}
+                  title="Esporta la risposta completa in JSON (trace, strumenti, errori) per la diagnostica"
+                  className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <Download size={13} className="shrink-0" aria-hidden="true" />
+                  Esporta JSON
+                </button>
               </div>
 
               {hasSources && (
