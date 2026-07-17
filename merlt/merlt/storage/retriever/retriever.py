@@ -36,6 +36,20 @@ if TYPE_CHECKING:
 log = structlog.get_logger()
 
 
+def _edge_type(edge: Any) -> str:
+    """Relation-type name of a path edge. ``graph_db.shortest_path`` returns a
+    path's edges as plain relation-type STRINGS (client.py); other/legacy
+    producers may return edge dicts with a ``type`` field. Handle both shapes —
+    treating a string edge as a dict (``edge.get(...)``) was crashing
+    ``_score_path`` with "'str' object has no attribute 'get'" whenever a graph
+    path actually existed between a chunk node and a context node."""
+    if isinstance(edge, str):
+        return edge
+    if isinstance(edge, dict):
+        return edge.get("type", "") or ""
+    return ""
+
+
 class GraphAwareRetriever:
     """
     Hybrid retriever combining vector similarity and graph structure.
@@ -525,7 +539,7 @@ class GraphAwareRetriever:
         relation_bonus = 1.0
 
         # Estrai tipi di edge dal path
-        edge_types = [edge.get("type", "") for edge in path.edges if edge.get("type")]
+        edge_types = [t for t in (_edge_type(edge) for edge in path.edges) if t]
 
         # Se PolicyManager disponibile e abbiamo embedding, usa pesi neurali
         if self.policy_manager and query_embedding and edge_types:
@@ -540,7 +554,7 @@ class GraphAwareRetriever:
 
                 # Applica pesi neurali
                 for edge in path.edges:
-                    edge_type = edge.get("type", "")
+                    edge_type = _edge_type(edge)
                     if edge_type in weights_dict:
                         weight, _ = weights_dict[edge_type]
                         relation_bonus *= weight
@@ -583,7 +597,7 @@ class GraphAwareRetriever:
             weights = EXPERT_TRAVERSAL_WEIGHTS[expert_type]
 
             for edge in edges:
-                edge_type = edge.get("type", "")
+                edge_type = _edge_type(edge)
                 weight = weights.get(edge_type, weights.get("default", 0.5))
                 relation_bonus *= weight
 

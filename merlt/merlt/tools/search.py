@@ -361,7 +361,7 @@ class SemanticSearchTool(BaseTool):
             return tool_result
 
         except Exception as e:
-            log.error(f"semantic_search failed: {e}")
+            log.error(f"semantic_search failed: {e}", exc_info=True)
             return ToolResult.fail(
                 error=f"Errore durante la ricerca: {str(e)}",
                 tool_name=self.name
