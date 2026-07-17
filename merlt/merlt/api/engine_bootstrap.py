@@ -350,7 +350,12 @@ async def build_orchestrator(ai_service):
         ai_service=ai_service,
         config=OrchestratorConfig(
             max_experts=rc.get_int("max_experts", 4),
-            timeout_seconds=60,
+            # Per-expert wall-clock budget. 60s cut off the FINAL analysis of the
+            # slower experts under 4-way parallel claude-sonnet-4.5 load (they hit
+            # exactly 60s and were cancelled → "Timeout durante l'analisi"). 90s
+            # gives that analysis room; the async submit/poll Q&A tolerates the
+            # longer wall-clock. Must stay ABOVE _LLM_HTTP_TIMEOUT_S (85s).
+            timeout_seconds=int(os.getenv("MERLT_EXPERT_TIMEOUT_S", "90")),
             parallel_execution=True,
         ),
         policy_manager=neural["policy_manager"],

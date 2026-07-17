@@ -26,6 +26,15 @@ log = structlog.get_logger()
 # stays well under a modest balance. Env-overridable for tuning.
 _DEFAULT_MAX_TOKENS = int(os.getenv("MERLT_LLM_MAX_TOKENS", "4096"))
 
+# Shared-session HTTP timeout. The old 30s cut off the experts' FINAL analysis
+# calls (claude-sonnet-4.5 needs ~20-60s for a full structured legal analysis
+# under 4-way parallel load), so 2/4 experts returned empty -> json.loads('') ->
+# "analisi ... non in forma strutturata". Kept just under the orchestrator's
+# per-expert wait_for (MERLT_EXPERT_TIMEOUT_S, 90s) so a slow-but-completing
+# analysis finishes with a clean HTTP timeout as the floor rather than a hard
+# task cancellation.
+_LLM_HTTP_TIMEOUT_S = int(os.getenv("MERLT_LLM_HTTP_TIMEOUT", "85"))
+
 
 @dataclass
 class AIModelConfig:
@@ -94,7 +103,7 @@ Categorize risks by severity and likelihood.""",
         """Get or create aiohttp session."""
         if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=_LLM_HTTP_TIMEOUT_S)
             )
         return self.session
     
