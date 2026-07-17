@@ -342,10 +342,11 @@ class CitationChainTool(BaseTool):
         cypher = """
             MATCH (n:AttoGiudiziario)
             WHERE n.URN = $id
+               OR n.node_id = $id
                OR n.estremi = $id
                OR n.numero_atto = $id
             RETURN
-                n.URN AS urn,
+                COALESCE(n.URN, n.node_id) AS urn,
                 n.estremi AS estremi,
                 n.data_atto AS data,
                 n.organo AS organo
@@ -377,10 +378,11 @@ class CitationChainTool(BaseTool):
         Trova precedenti citati da questo caso.
         """
         cypher = f"""
-            MATCH path = (case:AttoGiudiziario {{URN: $urn}})-[:cita|conferma|supera*1..{max_depth}]->(cited)
+            MATCH path = (case:AttoGiudiziario)-[:cita|conferma|supera*1..{max_depth}]->(cited)
+            WHERE case.URN = $urn OR case.node_id = $urn
             RETURN
-                case.URN as from_case,
-                cited.URN as to_case,
+                COALESCE(case.URN, case.node_id) as from_case,
+                COALESCE(cited.URN, cited.node_id) as to_case,
                 cited.estremi as to_estremi,
                 cited.data_atto as cited_date,
                 [r in relationships(path) | type(r)][-1] as relation,
@@ -435,10 +437,11 @@ class CitationChainTool(BaseTool):
         Trova sentenze che citano questo caso.
         """
         cypher = f"""
-            MATCH path = (case:AttoGiudiziario {{URN: $urn}})<-[:cita|conferma|supera*1..{max_depth}]-(citing)
+            MATCH path = (case:AttoGiudiziario)<-[:cita|conferma|supera*1..{max_depth}]-(citing)
+            WHERE case.URN = $urn OR case.node_id = $urn
             RETURN
-                citing.URN as from_case,
-                case.URN as to_case,
+                COALESCE(citing.URN, citing.node_id) as from_case,
+                COALESCE(case.URN, case.node_id) as to_case,
                 citing.estremi as from_estremi,
                 citing.data_atto as citing_date,
                 [r in relationships(path) | type(r)][0] as relation,
@@ -490,11 +493,12 @@ class CitationChainTool(BaseTool):
         """
         cypher = """
             MATCH (old:AttoGiudiziario)<-[:supera]-(new:AttoGiudiziario)
-            WHERE old.URN = $urn OR new.URN = $urn
+            WHERE old.URN = $urn OR old.node_id = $urn
+               OR new.URN = $urn OR new.node_id = $urn
             RETURN
-                old.URN as old_case,
+                COALESCE(old.URN, old.node_id) as old_case,
                 old.estremi as old_estremi,
-                new.URN as new_case,
+                COALESCE(new.URN, new.node_id) as new_case,
                 new.estremi as new_estremi,
                 new.data_atto as overruling_date
             ORDER BY overruling_date DESC

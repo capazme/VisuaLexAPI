@@ -135,12 +135,14 @@ async def _build_tools() -> list:
         except Exception as e:
             log.warning("ExternalSourceTool unavailable", error=str(e))
 
-        try:
-            from merlt.tools import ArticleFetchTool
-            tools.append(ArticleFetchTool())
-            log.info("✅ ArticleFetchTool wired")
-        except Exception as e:
-            log.warning("ArticleFetchTool unavailable", error=str(e))
+        # ArticleFetchTool (native, Italian params tipo_atto/numero_articolo) is
+        # DELIBERATELY NOT wired: it duplicates the MCP `fetch_law_article`
+        # (English params act_type/article) which is the curated tool that also
+        # feeds graph co-evolution (Slice A live-source sedimentation). Exposing
+        # BOTH made the ReAct LLM cross-apply the two schemas — the root cause of
+        # the fetch_law_article "Missing/Unknown parameter" failures. Keeping only
+        # the MCP tool removes that ambiguity. (Not in the neural TOOL_VOCAB, so no
+        # gating change needed.)
 
         # VerificationTool uses the shared BridgeTable when available; it
         # degrades fail-open (graph-only strict_mode) when the bridge failed.

@@ -45,7 +45,7 @@ log = structlog.get_logger()
 _CANON_STRATEGY: Dict[str, Dict[str, str]] = {
     "literal": {
         "canone": "letterale (art. 12 preleggi — senso proprio delle parole)",
-        "tools": "definition_lookup (definizioni dei concetti), article_fetch / fetch_law_article (testo dell'articolo), textual_reference (rinvii testuali), cite_law",
+        "tools": "definition_lookup (definizioni dei concetti), fetch_law_article (testo dell'articolo), textual_reference (rinvii testuali), cite_law",
     },
     "systemic": {
         "canone": "sistematico (collegamento con le altre norme del sistema)",
@@ -470,7 +470,8 @@ class ReActMixin:
 
             # Step 2: ACTION - Esegui tool scelto
             tool_name = decision.get("tool", "")
-            tool_params = decision.get("parameters", {})
+            raw_params = decision.get("parameters", {})  # W2.3: the LLM's raw emission
+            tool_params = dict(raw_params)
             # Repair sloppy params BEFORE use_tool, so the log below and the
             # ThoughtActionObservation.action record the ACTUALLY executed args.
             tool_params = self._repair_norm_tool_params(tool_name, tool_params, context)
@@ -507,6 +508,10 @@ class ReActMixin:
                 action={
                     "name": tool_name,
                     "parameters": tool_params,
+                    # W2.3 (RLCF trace fidelity): keep the LLM's RAW emission when a
+                    # repair changed it, so the tool-policy head still learns the
+                    # "wrong form" signal instead of it being normalized away.
+                    "raw_parameters": raw_params if raw_params != tool_params else None,
                     "success": result.success if hasattr(result, 'success') else True
                 },
                 observation={
@@ -695,6 +700,29 @@ class ReActMixin:
                 "thought": "Unable to decide next action due to error"
             }
 
+    def _format_query_references(self, context: Any) -> str:
+        """W2.2: render the analyzer-parsed query references — the human form AND
+        the real graph key (``!vig=`` stripped) — so the LLM passes THESE
+        authoritative identifiers to the tools instead of inventing urns."""
+        try:
+            refs = [
+                r for r in ((getattr(context, "entities", None) or {}).get("legal_references") or [])
+                if isinstance(r, dict)
+            ]
+            lines = []
+            for r in refs[:8]:
+                disp = r.get("display")
+                if not disp and r.get("article") and r.get("act_type"):
+                    disp = f"art. {r['article']} {r['act_type']}"
+                if not disp:
+                    continue
+                urn = r.get("urn")
+                key = str(urn).split("!", 1)[0] if urn else None
+                lines.append(f"  - {disp}" + (f"   [chiave-grafo: {key}]" if key else ""))
+            return "\n".join(lines)
+        except Exception:  # noqa: BLE001 - prompt helper, never raise
+            return ""
+
     def _build_react_prompt(
         self,
         context: Any,
@@ -729,12 +757,18 @@ class ReActMixin:
             1 for h in history if h.action.get("name") == "semantic_search"
         )
 
+        refs_section = self._format_query_references(context)
+        refs_block = (
+            "\n## RIFERIMENTI DELLA QUERY (usa QUESTI — non inventare urn/id)\n"
+            + refs_section + "\n"
+        ) if refs_section else ""
+
         prompt = f"""Sei l'esperto del canone {strategy['canone']} nell'interpretazione giuridica italiana.
 Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone.
 
 ## QUERY UTENTE
 {context.query_text}
-
+{refs_block}
 ## STRUMENTI D'ELEZIONE DEL TUO CANONE
 {strategy['tools']}
 
@@ -795,6 +829,12 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
                 )
 
         prompt += """
+## REGOLE FORMATO IDENTIFICATORI (rispettale per non far fallire lo strumento)
+- Strumenti su riferimento testuale (cite_law, cerca_brocardi): passa la forma UMANA "art. N <atto>" (es. "art. 2043 codice civile"). NON passare un URL o un urn.
+- Strumenti sul grafo/nodo (graph_search, constitutional_basis, citation_chain): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
+- Usa SOLO gli identificatori elencati nei RIFERIMENTI/URN qui sopra. (semantic_search, definition_lookup e principle_lookup accettano invece testo libero.)
+- graph_search.relation_types: ometti (esplora tutte le relazioni) oppure indica al massimo 2-3 tipi.
+
 ## ISTRUZIONI
 1. Se hai ABBASTANZA fonti per l'analisi del tuo canone (almeno 3-5 rilevanti), o gli strumenti non aggiungono nulla di nuovo:
    {"action": "finish", "thought": "...", "reason": "..."}
