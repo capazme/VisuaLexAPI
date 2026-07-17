@@ -969,6 +969,34 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
 
         data = result.data if hasattr(result, 'data') else {}
 
+        # MCP legal tools (fetch_law_article, cite_law, cerca_brocardi) return a
+        # markdown STRING in result.data (mcp_legal_adapter GOTCHA B6), NOT a dict.
+        # The dict-key branches below (`"results" in data` …) would then run as
+        # SUBSTRING checks on that string and match nothing, so every fetched norm
+        # yielded 0 sources → experts concluded "impossibile interpretare" even
+        # though the article text was right there. Turn the markdown into ONE
+        # source: it IS the text; lift the canonical URN from the "**Fonte**: …
+        # <url>" header when present.
+        if isinstance(data, str):
+            md = data.strip()
+            if not md:
+                return sources
+            m = re.search(r"https?://\S+", md)
+            urn = m.group(0).rstrip(").,;") if m else ""
+            sources.append({
+                "urn": urn,
+                "text": md,
+                "type": "norma",
+                "source": (getattr(result, "metadata", None) or {}).get("tool")
+                          if isinstance(getattr(result, "metadata", None), dict) else "mcp_legal",
+            })
+            return [s for s in sources if s.get("text") or s.get("urn")]
+
+        # Anything that isn't the expected dict payload carries no extractable
+        # sources (guards the `"key" in data` checks against None/list).
+        if not isinstance(data, dict):
+            return sources
+
         # Handle different tool result formats
         if "results" in data:
             # SemanticSearchTool format
