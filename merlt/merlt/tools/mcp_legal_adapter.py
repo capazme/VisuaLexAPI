@@ -87,6 +87,33 @@ def _json_schema_to_parameters(input_schema: Optional[Dict[str, Any]]) -> List[T
     return parameters
 
 
+def _looks_like_error_body(markdown: str) -> bool:
+    """True when a norm-tool body carries a scraper error DESPITE a successful
+    MCP response (is_error=False).
+
+    A malformed article (``"art. 2051"``, ``"2043, 2051"``) makes Normattiva
+    serve its error page, which the tool wraps as::
+
+        **Fonte**: Normattiva — https://…~art. 2051
+
+        Normattiva - Errore
+        Presidenza del Consiglio dei Ministri …
+
+    The marker ``"normattiva - errore"`` (hyphen) is precise: a VALID body's
+    provenance line uses the em-dash (``"Normattiva —"``), so an article that
+    merely mentions «errore» (e.g. art. 1428 c.c. «errore essenziale») is NOT
+    flagged. Also catches the tool-level ``**Errore**:`` header. Conservative by
+    design — only clear markers, so it never mis-fails a valid body.
+    """
+    if not markdown:
+        return False
+    low = markdown.lower()
+    if "normattiva - errore" in low or "eur-lex - errore" in low:
+        return True
+    head = low.lstrip()[:40]
+    return head.startswith("**errore") or head.startswith("errore:")
+
+
 def _extract_markdown(call_result: Any) -> str:
     """Pull the markdown payload out of a FastMCP CallToolResult (GOTCHA B6).
 
@@ -169,6 +196,22 @@ class McpLegalToolAdapter(BaseTool):
         if getattr(call_result, "is_error", False):
             return ToolResult.fail(
                 markdown or f"mcp-legal-it tool '{self.name}' returned an error",
+                tool_name=self.name,
+                source="mcp-legal-it",
+            )
+
+        # A norm-tool can carry a scraper error INSIDE a "successful" response
+        # (is_error=False) — a malformed article yields a "Normattiva - Errore"
+        # page. Fail such bodies so the ReAct trace is honest (✗, retryable) and
+        # the junk never sediments as a live source.
+        if _looks_like_error_body(markdown):
+            log.info(
+                "mcp_legal_tool_error_body",
+                tool=self.name,
+                preview=markdown[:120],
+            )
+            return ToolResult.fail(
+                markdown[:300] or f"mcp-legal-it tool '{self.name}' returned an error body",
                 tool_name=self.name,
                 source="mcp-legal-it",
             )

@@ -53,7 +53,15 @@ def _is_unusable_live_result(markdown: str) -> bool:
     """
     if not markdown:
         return True
-    head = markdown.lstrip()[:200].lower()
+    low = markdown.lower()
+    # A norm-tool body can wrap a Normattiva/EUR-Lex scraper error page despite
+    # success=True (malformed article → "…~art. 2051  Normattiva - Errore…"). The
+    # hyphen marker is precise: a valid "Fonte" line uses the em-dash ("Normattiva —"),
+    # so art. 1428 c.c. («errore essenziale») is NOT flagged. Belt-and-suspenders
+    # with the MCP adapter's own _looks_like_error_body gate.
+    if "normattiva - errore" in low or "eur-lex - errore" in low:
+        return True
+    head = low.lstrip()[:200]
     if head.startswith("**errore**") or "non riconosciuto" in head:
         return True
     # Empty-result responses (Italian tool wording): "Nessun(a) … trovat(o/a/e)".

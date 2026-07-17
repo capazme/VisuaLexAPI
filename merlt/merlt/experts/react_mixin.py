@@ -29,6 +29,7 @@ Esempio:
     ...         return await self._analyze_with_llm(context, sources)
 """
 
+import re
 import structlog
 import json
 from typing import Dict, Any, Optional, List
@@ -59,6 +60,38 @@ _CANON_STRATEGY: Dict[str, Dict[str, str]] = {
         "tools": "cerca_giurisprudenza, giurisprudenza_su_norma, leggi_sentenza, cerca_giurisprudenza_cgue, citation_chain",
     },
 }
+
+# --- Norm-fetch param repair (fetch_law_article & co.) ------------------------
+# The ReAct LLM emits sloppy params for the norm-fetch tools: it OMITS the
+# required act_type (→ the visible ✗ "Missing required parameter"), and it
+# malforms the article ("art. 2051", "2043, 2051", "2043 e 2051" → a silent
+# "Normattiva - Errore" body). We repair both from the analyzer-parsed
+# legal_references already on the ExpertContext, before the tool runs.
+_ART_LABEL_RE = re.compile(r"^\s*(?:articol[oi]|artt?\.?)\s*", re.IGNORECASE)
+_MULTI_ART_SEP_RE = re.compile(r"\s*(?:,|;|\bed\b|\be\b)\s*", re.IGNORECASE)
+# Trailing act label the LLM sometimes stuffs into the article field
+# ("2051 c.c." / "2043 codice civile" / "314 c.p.") — the act belongs in act_type.
+_ART_TRAILING_ACT_RE = re.compile(
+    r"\s+(?:codice\b.*|cod\.?\s*(?:civ|pen)\w*\.?|c\.?c\.?|c\.?p\.?c\.?|c\.?p\.?p\.?|c\.?p\.?|preleggi\b.*)$",
+    re.IGNORECASE,
+)
+_DATE_LIKE_RE = re.compile(r"^\s*\d{4}(-\d{1,2}(-\d{1,2})?)?\s*$")
+
+
+def _normalize_article(raw: Any) -> Any:
+    """Strip an ``art.``/``artt.``/``articolo`` label, drop a trailing act label
+    (``"2051 c.c."`` → ``"2051"``), and reduce a multi-article string
+    (``"2043, 2051"`` / ``"2043 e 2051"``) to its FIRST article, so a norm-fetch
+    tool resolves ONE real article instead of a scraper error body. Returns the
+    input unchanged when it is not a str."""
+    if not isinstance(raw, str):
+        return raw
+    s = _ART_LABEL_RE.sub("", raw).strip()
+    if not s:
+        return raw
+    first = _MULTI_ART_SEP_RE.split(s)[0].strip()
+    first = _ART_TRAILING_ACT_RE.sub("", first).strip() or first
+    return first or s
 
 
 @dataclass
@@ -151,6 +184,85 @@ class ReActMixin:
         "model": "google/gemini-2.5-flash"
     }
 
+    def _repair_norm_tool_params(
+        self, tool_name: str, params: Dict[str, Any], context: Any
+    ) -> Dict[str, Any]:
+        """Repair the sloppy params the ReAct LLM emits for norm-fetch tools
+        (``fetch_law_article`` / ``fetch_law_annotations``) using the
+        analyzer-parsed ``context.entities['legal_references']``.
+
+        Fixes the two observed failure modes: (1) a MISSING required
+        ``act_type``/``article`` → ``validate_params`` rejects the call (the
+        visible ✗); (2) a malformed ``article`` (``"art. 2051"`` / ``"2043, 2051"``)
+        → a silent ``Normattiva - Errore`` body. Pure and best-effort: any problem
+        returns the params unchanged, so a repair bug never breaks a working call.
+        Scoped to the norm-fetch family (the only tools declaring BOTH
+        act_type+article) — a no-op for cite_law/semantic/graph/etc.
+        """
+        try:
+            registry = getattr(self, "_tool_registry", None)
+            tool = registry.get(tool_name) if registry else None
+            if tool is None:
+                return params
+            pnames = {p.name for p in (tool.parameters or [])}
+            if not ({"act_type", "article"} <= pnames):
+                return params
+
+            repaired = dict(params)
+            # (a) normalize an LLM-supplied article ("art. X" / multi → first)
+            if repaired.get("article") not in (None, ""):
+                repaired["article"] = _normalize_article(repaired["article"])
+
+            # (b) choose the best parsed reference: prefer one whose article
+            #     matches what the LLM asked AND that carries an act_type; else the
+            #     first ref with an act_type; else the first ref.
+            refs = [
+                r for r in ((getattr(context, "entities", None) or {}).get("legal_references") or [])
+                if isinstance(r, dict)
+            ]
+            chosen = None
+            if refs:
+                want = _normalize_article(repaired.get("article") or "")
+                if want:
+                    chosen = next(
+                        (r for r in refs
+                         if _normalize_article(r.get("article") or "") == want and r.get("act_type")),
+                        None,
+                    )
+                chosen = chosen or next((r for r in refs if r.get("act_type")), None) or refs[0]
+
+            # (c) fill ONLY declared + missing/blank keys from the chosen ref
+            if chosen:
+                if "act_type" in pnames and repaired.get("act_type") in (None, "") and chosen.get("act_type"):
+                    repaired["act_type"] = chosen["act_type"]
+                if "article" in pnames and repaired.get("article") in (None, "") and chosen.get("article"):
+                    repaired["article"] = _normalize_article(chosen["article"])
+                if "act_number" in pnames and repaired.get("act_number") in (None, "") and chosen.get("act_number"):
+                    repaired["act_number"] = chosen["act_number"]
+
+            # (d) keep 'date' only when it looks like a date. A CLEARLY non-date
+            #     value the LLM stuffed here ("art. 2051", free text) is dropped;
+            #     a bare 4-digit article number is indistinguishable from a year so
+            #     it survives, but the scraper ignores a stray date on a codice
+            #     fetch (verified), so it is harmless. Codici need no date; numbered
+            #     acts carry a real YYYY-MM-DD (which passes the regex).
+            if "date" in pnames:
+                d = repaired.get("date")
+                if d and not _DATE_LIKE_RE.match(str(d)):
+                    repaired.pop("date", None)
+                elif not d and chosen and _DATE_LIKE_RE.match(str(chosen.get("date") or "")):
+                    repaired["date"] = chosen["date"]
+
+            if repaired != params:
+                log.debug(
+                    "react.repaired_norm_params", tool=tool_name,
+                    after={k: repaired.get(k) for k in ("act_type", "article", "date") if k in repaired},
+                )
+            return repaired
+        except Exception as e:  # noqa: BLE001 - best-effort, never break the call
+            log.debug("react.repair_norm_params_failed", tool=tool_name, error=str(e))
+            return params
+
     async def react_loop(
         self,
         context: Any,  # ExpertContext
@@ -208,6 +320,9 @@ class ReActMixin:
             # Step 2: ACTION - Esegui tool scelto
             tool_name = decision.get("tool", "")
             tool_params = decision.get("parameters", {})
+            # Repair sloppy norm-fetch params BEFORE use_tool, so the log below and
+            # the ThoughtActionObservation.action record the ACTUALLY executed args.
+            tool_params = self._repair_norm_tool_params(tool_name, tool_params, context)
 
             log.debug(
                 f"ReAct iteration {iteration + 1}",
