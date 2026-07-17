@@ -32,7 +32,7 @@ Esempio:
 import re
 import structlog
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -126,6 +126,13 @@ _SHORT_URN_CODES = {
     "cc": "codice civile", "cp": "codice penale",
     "cpc": "codice di procedura civile", "cpp": "codice di procedura penale",
 }
+# The reference NAMES a codice / testo unico (cite_law resolves these fine, so a
+# reroute to fetch_law_article must NOT fire on them, even when the query ALSO
+# carries a numbered act).
+_CODICE_MENTION_RE = re.compile(
+    r"\bcodice\b|\bcod\.|\bc\.c\.|\bc\.p\.|\bpreleggi\b|\btesto\s+unico\b|\bt\.u\.",
+    re.IGNORECASE,
+)
 
 # --- graph_search relation_types guard --------------------------------------
 _MAX_RELATION_TYPES = 30
@@ -324,16 +331,32 @@ class ReActMixin:
                 r for r in ((getattr(context, "entities", None) or {}).get("legal_references") or [])
                 if isinstance(r, dict)
             ]
+            # When the params ALREADY name an act (e.g. after a cite_law→
+            # fetch_law_article reroute, or when the LLM supplied act_type),
+            # constrain the back-fill pool to refs of that SAME act — never weld a
+            # different act's article/date onto it. Falls back to all refs only if
+            # no consistent ref exists.
+            fixed_at = repaired.get("act_type") or None
+            fixed_an = repaired.get("act_number") or None
+            pool = refs
+            if fixed_at:
+                consistent = [
+                    r for r in refs
+                    if r.get("act_type") == fixed_at
+                    and (not fixed_an or str(r.get("act_number") or "") == str(fixed_an))
+                ]
+                if consistent:
+                    pool = consistent
             chosen = None
-            if refs:
+            if pool:
                 want = _normalize_article(repaired.get("article") or "")
                 if want:
                     chosen = next(
-                        (r for r in refs
+                        (r for r in pool
                          if _normalize_article(r.get("article") or "") == want and r.get("act_type")),
                         None,
                     )
-                chosen = chosen or next((r for r in refs if r.get("act_type")), None) or refs[0]
+                chosen = chosen or next((r for r in pool if r.get("act_type")), None) or pool[0]
 
             # (c) fill ONLY declared + missing/blank keys from the chosen ref
             if chosen:
@@ -414,6 +437,84 @@ class ReActMixin:
             log.debug("react.repair_graph_params_failed", tool=tool_name, error=str(e))
             return params
 
+    def _maybe_reroute_numbered_act(
+        self, tool_name: str, params: Dict[str, Any], context: Any
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Reroute a ``cite_law`` call on a NUMBERED act to ``fetch_law_article``.
+
+        ``cite_law``'s natural-language resolver only knows codici / famous testi
+        unici; on a numbered act (legge 241/1990, D.Lgs. 231/2001) it returns
+        "atto '<...>' non riconosciuto ... usa fetch_law_article" — a guaranteed ✗
+        no param-repair can save, because the tool itself can't resolve it. The two
+        tools are semantically equivalent (both fetch the authoritative TEXT), so
+        we substitute the call with structured params taken from the analyzer's
+        ``legal_references`` (the SAME source that makes fetch_law_article succeed).
+
+        Only ``cite_law`` is rerouted (``cerca_brocardi`` returns dottrina, a
+        different kind of result — never rerouted). Pure and best-effort: any
+        ambiguity or missing signal returns the call unchanged, so cite_law still
+        runs for the codici it handles well.
+        """
+        try:
+            if tool_name != "cite_law":
+                return tool_name, params
+            registry = getattr(self, "_tool_registry", None)
+            if not registry or registry.get("fetch_law_article") is None:
+                return tool_name, params
+            ref_str = str(params.get("reference") or params.get("riferimento") or "").strip()
+            # A reference that explicitly names a codice is cite_law's home turf.
+            if _CODICE_MENTION_RE.search(ref_str):
+                return tool_name, params
+            refs = [
+                r for r in ((getattr(context, "entities", None) or {}).get("legal_references") or [])
+                if isinstance(r, dict)
+            ]
+            numbered = [r for r in refs if r.get("act_number") and r.get("act_type")]
+            if not numbered:
+                return tool_name, params  # nothing to reroute to; leave cite_law
+            # Positively identify the numbered ref the reference NAMES: its
+            # act_number must appear as a WHOLE token in ref_str, UNIQUELY. This is
+            # the only signal strong enough to reroute — we never fall back to "the
+            # sole numbered act" (a bare "art. 2043" would hijack it) and never
+            # match on article alone (two acts can share an article number).
+            by_num = [
+                r for r in numbered
+                if re.search(rf"\b{re.escape(str(r.get('act_number')))}\b", ref_str)
+            ]
+            if len(by_num) != 1:
+                return tool_name, params  # 0 or ambiguous → leave cite_law
+            chosen = by_num[0]
+            # The article ALWAYS comes from the chosen ref itself (the analyzer's
+            # parsed article), NEVER from the reference string. Taking it from
+            # ref_str would fabricate an (act, article) pair absent from the refs
+            # whenever the article number collides with the act_number (art. 231 vs
+            # D.Lgs 231/2001, art. 190 c.p.c. vs legge 190/2012). If the chosen act
+            # carries no article, or the LLM named a DIFFERENT article than it
+            # carries, leave cite_law rather than fabricate a fetch.
+            m = _URN_ART_RE.search(ref_str)
+            want = _normalize_article(m.group(1)) if m else ""
+            ref_art = _normalize_article(chosen.get("article") or "")
+            if not ref_art:
+                return tool_name, params
+            if want and want != ref_art:
+                return tool_name, params
+            article = ref_art
+            new_params: Dict[str, Any] = {
+                "act_type": chosen["act_type"],
+                "act_number": chosen["act_number"],
+                "article": article,
+            }
+            if chosen.get("date"):
+                new_params["date"] = chosen["date"]
+            log.debug(
+                "react.rerouted_cite_law_numbered_act",
+                act_type=chosen.get("act_type"), act_number=chosen.get("act_number"), article=article,
+            )
+            return "fetch_law_article", new_params
+        except Exception as e:  # noqa: BLE001 - best-effort, never break the call
+            log.debug("react.reroute_numbered_act_failed", error=str(e))
+            return tool_name, params
+
     async def react_loop(
         self,
         context: Any,  # ExpertContext
@@ -471,7 +572,11 @@ class ReActMixin:
             # Step 2: ACTION - Esegui tool scelto
             tool_name = decision.get("tool", "")
             raw_params = decision.get("parameters", {})  # W2.3: the LLM's raw emission
+            raw_tool_name = tool_name  # capture BEFORE any reroute (RLCF trace fidelity)
             tool_params = dict(raw_params)
+            # Reroute cite_law→fetch_law_article on numbered acts (cite_law's NL
+            # resolver can't resolve them; the tools are semantically equivalent).
+            tool_name, tool_params = self._maybe_reroute_numbered_act(tool_name, tool_params, context)
             # Repair sloppy params BEFORE use_tool, so the log below and the
             # ThoughtActionObservation.action record the ACTUALLY executed args.
             tool_params = self._repair_norm_tool_params(tool_name, tool_params, context)
@@ -512,6 +617,9 @@ class ReActMixin:
                     # repair changed it, so the tool-policy head still learns the
                     # "wrong form" signal instead of it being normalized away.
                     "raw_parameters": raw_params if raw_params != tool_params else None,
+                    # Keep the LLM's ORIGINAL tool choice when a reroute changed it,
+                    # so the tool-gating head still learns "cite_law was wrong here".
+                    "raw_tool": raw_tool_name if raw_tool_name != tool_name else None,
                     "success": result.success if hasattr(result, 'success') else True
                 },
                 observation={
@@ -831,6 +939,7 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
         prompt += """
 ## REGOLE FORMATO IDENTIFICATORI (rispettale per non far fallire lo strumento)
 - Strumenti su riferimento testuale (cite_law, cerca_brocardi): passa la forma UMANA "art. N <atto>" (es. "art. 2043 codice civile"). NON passare un URL o un urn.
+- Per il TESTO di un articolo usa `fetch_law_article` (act_type + article): gestisce sia i codici sia le leggi/decreti NUMERATI (es. legge 241/1990, D.Lgs. 231/2001). `cite_law` risolve bene solo i codici e i testi unici noti — sugli atti numerati fallisce, quindi NON usarlo per leggi/decreti con un numero.
 - Strumenti sul grafo/nodo (graph_search, constitutional_basis, citation_chain): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
 - Usa SOLO gli identificatori elencati nei RIFERIMENTI/URN qui sopra. (semantic_search, definition_lookup e principle_lookup accettano invece testo libero.)
 - graph_search.relation_types: ometti (esplora tutte le relazioni) oppure indica al massimo 2-3 tipi.

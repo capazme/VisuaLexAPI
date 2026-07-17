@@ -128,12 +128,14 @@ async def _build_tools() -> list:
         except Exception as e:
             log.warning("DefinitionLookupTool unavailable", error=str(e))
 
-        try:
-            from merlt.tools import ExternalSourceTool
-            tools.append(ExternalSourceTool(graph_db=falkordb))
-            log.info("✅ ExternalSourceTool wired")
-        except Exception as e:
-            log.warning("ExternalSourceTool unavailable", error=str(e))
+        # ExternalSourceTool (native graph→normattiva→brocardi cascade) is
+        # DELIBERATELY NOT wired: it duplicates the curated tools the experts
+        # already have (graph_search + fetch_law_article/cite_law + cerca_brocardi)
+        # with a weaker, direct-scraper implementation whose query parser fails on
+        # numbered acts (legge 241/1990 → "non trovata"), producing ✗ instead of
+        # falling through to the working tools. Not in the neural TOOL_VOCAB, so no
+        # gating change. Removing it steers the systemic expert to graph_search /
+        # semantic_search / fetch_law_article, which resolve numbered acts.
 
         # ArticleFetchTool (native, Italian params tipo_atto/numero_articolo) is
         # DELIBERATELY NOT wired: it duplicates the MCP `fetch_law_article`

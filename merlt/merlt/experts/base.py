@@ -704,6 +704,20 @@ CHECKLIST:
                 param_names = set()
             has_query = "query" in param_names
             needs_ref = ("reference" in param_names) or ("riferimento" in param_names)
+            # cite_law/cerca_brocardi's NL resolver fails on NUMBERED acts
+            # (legge 241/1990, D.Lgs. 231/2001) — the tool itself replies
+            # "usa fetch_law_article". When the parsed ref is a numbered act
+            # (act_number present), skip these reference-keyed tools (which are
+            # NOT fetch_law_article, i.e. don't declare act_type); the structured
+            # fetch_law_article branch below covers the numbered act. Avoids a
+            # guaranteed ✗ on the reference tool.
+            if (
+                needs_ref
+                and "act_type" not in param_names
+                and legal_ref0
+                and legal_ref0.get("act_number")
+            ):
+                continue
             # Reference-keyed tools (cite_law, fetch_law_article, …) require a
             # real legal reference. Passing the raw query string yielded a
             # tool-level "**Errore**: atto '<query>' non riconosciuto" body that

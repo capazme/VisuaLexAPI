@@ -229,10 +229,16 @@ class MultiExpertOrchestrator:
     # the curated live legal tools are restricted per canon — precedent gets case
     # law (its unique value), principles gets doctrine, literal/systemic get norm
     # text. Tools not listed here (e.g. the ~180 calculators) reach no expert.
+    # fetch_law_article is the structured-param SIBLING of cite_law (both fetch
+    # the authoritative norm text; fetch_law_article also resolves NUMBERED acts,
+    # legge 241/1990 etc., that cite_law's NL resolver rejects). Any expert granted
+    # cite_law MUST also get fetch_law_article, else the numbered-act reroute
+    # (react_mixin._maybe_reroute_numbered_act) has no tool to reroute TO and the
+    # expert ✗ on every numbered act.
     EXPERT_MCP_TOOLS: Dict[str, set] = {
         "literal": {"cite_law", "fetch_law_article"},
-        "systemic": {"cite_law"},
-        "principles": {"cerca_brocardi", "cite_law"},
+        "systemic": {"cite_law", "fetch_law_article"},
+        "principles": {"cerca_brocardi", "cite_law", "fetch_law_article"},
         "precedent": {
             "cerca_giurisprudenza",
             "cerca_giurisprudenza_cgue",
