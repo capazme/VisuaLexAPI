@@ -147,8 +147,9 @@ class ConstitutionalBasisTool(BaseTool):
                 name="article_urn",
                 param_type=ParameterType.STRING,
                 description=(
-                    "URN o estremi della norma di partenza. "
-                    "Es: 'urn:norma:cc:art1453', 'Art. 1453 c.c.'"
+                    "Estremi o chiave-nodo della norma di partenza. "
+                    "Es: 'Art. 1453 c.c.', il numero d'articolo '1453', oppure la "
+                    "chiave-nodo completa fornita dalle fonti. NON inventare 'urn:norma:...'."
                 )
             ),
             ToolParameter(

@@ -193,8 +193,8 @@ class CitationChainTool(BaseTool):
                 name="case_urn",
                 param_type=ParameterType.STRING,
                 description=(
-                    "URN o estremi del caso giudiziario. "
-                    "Es: 'urn:giurisprudenza:cass:2024:12345', 'Cass. 12345/2024'"
+                    "Estremi reali o id-nodo del caso giudiziario. "
+                    "Es: 'Cass. 12345/2024' oppure il numero atto. NON inventare urn/uuid."
                 )
             ),
             ToolParameter(

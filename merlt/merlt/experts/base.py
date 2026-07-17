@@ -682,7 +682,12 @@ CHECKLIST:
             else None
         )
         human_ref = legal_ref0.get("display") if legal_ref0 else None
-        ref_value = human_ref or norm_ref
+        # When the parsed display is absent, `norm_ref` is often a full Normattiva
+        # URL — reference-keyed tools (cite_law/cerca_brocardi) reject that. Decode
+        # it back to the human "art. N <atto>" form (same helper the ReAct repair
+        # uses), else fall back to the raw norm_ref (unchanged behavior on miss).
+        from merlt.experts.react_mixin import _human_ref_from_machine_id
+        ref_value = human_ref or _human_ref_from_machine_id(norm_ref) or norm_ref
         # Loop β E.3: honor an optional per-expert tool selection produced by the
         # tool-gating policy (orchestrator-side). Falls back to ALL curated tools
         # when absent (control arm, flag off, or policy unavailable) → unchanged

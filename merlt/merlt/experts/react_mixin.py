@@ -75,7 +75,61 @@ _ART_TRAILING_ACT_RE = re.compile(
     r"\s+(?:codice\b.*|cod\.?\s*(?:civ|pen)\w*\.?|c\.?c\.?|c\.?p\.?c\.?|c\.?p\.?p\.?|c\.?p\.?|preleggi\b.*)$",
     re.IGNORECASE,
 )
-_DATE_LIKE_RE = re.compile(r"^\s*\d{4}(-\d{1,2}(-\d{1,2})?)?\s*$")
+# Accept ISO (YYYY[-M[-D]]) AND the Italian DD/MM/YYYY | DD-MM-YYYY forms, so a
+# numbered-act date the LLM supplies isn't silently dropped by the date-sanity step.
+_DATE_LIKE_RE = re.compile(
+    r"^\s*(?:\d{4}(?:-\d{1,2}(?:-\d{1,2})?)?|\d{1,2}[/-]\d{1,2}[/-]\d{4})\s*$"
+)
+_DDMMYYYY_RE = re.compile(r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})\s*$")
+
+
+def _to_iso_date(value: str) -> str:
+    """Normalize an Italian ``DD/MM/YYYY`` (or ``DD-MM-YYYY``) date to ISO
+    ``YYYY-MM-DD``, so the URN generator downstream (which only accepts ISO /
+    'DD nome-mese YYYY') never chokes on a repaired date. ISO / year-only pass
+    through unchanged."""
+    m = _DDMMYYYY_RE.match(value)
+    if m:
+        return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return value.strip()
+
+# Italian param aliases the LLM emits for fetch_law_article instead of the
+# schema's English names (audit: {'tipo_atto','numero_articolo'} → Missing param).
+_NORM_PARAM_ALIASES = {
+    "tipo_atto": "act_type",
+    "numero_articolo": "article",
+    "numero_atto": "act_number",
+    "data_atto": "date",
+    "data": "date",
+}
+
+# --- Reference decoder (cite_law / cerca_brocardi) ---------------------------
+# The LLM passes a full Normattiva URL or an invented urn as `reference`, but
+# these tools want the HUMAN form "art. N <atto>". Decode it from the machine id
+# ITSELF (which encodes act+article) — dictionary-free, can't bind to the wrong
+# act, works for retrieved neighbours absent from the query.
+_REFERENCE_REPAIR_TOOLS = {"cite_law", "cerca_brocardi"}
+_MACHINE_REF_RE = re.compile(r"https?://|urn:", re.IGNORECASE)
+_URN_ART_RE = re.compile(
+    r"art[.\s_]*([0-9]+(?:[-\s]?(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)",
+    re.IGNORECASE,
+)
+# Full-URL NIR act fragments → canonical act name (used by cite_law's NL resolver).
+_URN_ACT_FRAGMENTS = (
+    ("regio.decreto:1942-03-16;262", "codice civile"),
+    ("regio.decreto:1930-10-19;1398", "codice penale"),
+    ("regio.decreto:1940-10-28;1443", "codice di procedura civile"),
+    ("decreto.presidente.repubblica:1988-09-22;447", "codice di procedura penale"),
+)
+# Invented short-urn code token (urn:norma:<code>:artN) → canonical act name.
+_SHORT_URN_CODES = {
+    "cc": "codice civile", "cp": "codice penale",
+    "cpc": "codice di procedura civile", "cpp": "codice di procedura penale",
+}
+
+# --- graph_search relation_types guard --------------------------------------
+_MAX_RELATION_TYPES = 30
+_SAFE_REL_TOKEN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _normalize_article(raw: Any) -> Any:
@@ -92,6 +146,31 @@ def _normalize_article(raw: Any) -> Any:
     first = _MULTI_ART_SEP_RE.split(s)[0].strip()
     first = _ART_TRAILING_ACT_RE.sub("", first).strip() or first
     return first or s
+
+
+def _human_ref_from_machine_id(value: Any) -> Optional[str]:
+    """A full URL or ``urn:norma:<code>:artN`` → ``"art. N <act>"``. Returns None
+    (leave as-is) when ``value`` is not a machine id we can DECODE to a known code
+    — so a human ref / plain text / numbered-act URL is never rewritten into a
+    form ``cite_law`` would reject, and the act is taken from the identifier
+    itself (never guessed)."""
+    if not isinstance(value, str):
+        return None
+    v = value.strip()
+    if not v or not _MACHINE_REF_RE.search(v):
+        return None
+    m = _URN_ART_RE.search(v)
+    if not m:
+        return None
+    art = re.sub(r"\s+", " ", m.group(1).strip())
+    low = v.lower()
+    act = next((name for frag, name in _URN_ACT_FRAGMENTS if frag in low), None)
+    if act is None:
+        mc = re.match(r"urn:[a-z]+:([a-z]+):", low)
+        act = _SHORT_URN_CODES.get(mc.group(1)) if mc else None
+    if not act:
+        return None
+    return f"art. {art} {act}"
 
 
 @dataclass
@@ -187,17 +266,19 @@ class ReActMixin:
     def _repair_norm_tool_params(
         self, tool_name: str, params: Dict[str, Any], context: Any
     ) -> Dict[str, Any]:
-        """Repair the sloppy params the ReAct LLM emits for norm-fetch tools
-        (``fetch_law_article`` / ``fetch_law_annotations``) using the
-        analyzer-parsed ``context.entities['legal_references']``.
+        """Repair the sloppy params the ReAct LLM emits for the legal norm tools.
 
-        Fixes the two observed failure modes: (1) a MISSING required
-        ``act_type``/``article`` → ``validate_params`` rejects the call (the
-        visible ✗); (2) a malformed ``article`` (``"art. 2051"`` / ``"2043, 2051"``)
-        → a silent ``Normattiva - Errore`` body. Pure and best-effort: any problem
-        returns the params unchanged, so a repair bug never breaks a working call.
-        Scoped to the norm-fetch family (the only tools declaring BOTH
-        act_type+article) — a no-op for cite_law/semantic/graph/etc.
+        Two families:
+        - reference-keyed (``cite_law`` / ``cerca_brocardi``): the LLM passes a
+          full Normattiva URL or an invented urn as ``reference``; decode it back
+          to the human ``"art. N <atto>"`` form the tool actually accepts.
+        - norm-fetch (``fetch_law_article`` / ``fetch_law_annotations``, declaring
+          ``act_type``+``article``): remap Italian param aliases, normalize the
+          article, and fill missing act_type/article/date from the analyzer-parsed
+          ``context.entities['legal_references']``.
+
+        Pure and best-effort: any problem returns the params unchanged, so a
+        repair bug never breaks a working call. A no-op for semantic/graph/etc.
         """
         try:
             registry = getattr(self, "_tool_registry", None)
@@ -205,10 +286,33 @@ class ReActMixin:
             if tool is None:
                 return params
             pnames = {p.name for p in (tool.parameters or [])}
+
+            # W1.1 — reference decoder (cite_law / cerca_brocardi). Allowlist by
+            # tool name (NOT bare `reference`: download_law_pdf also has it).
+            if tool_name in _REFERENCE_REPAIR_TOOLS and "reference" in pnames:
+                human = _human_ref_from_machine_id(params.get("reference"))
+                if human and human != params.get("reference"):
+                    repaired = dict(params)
+                    repaired["reference"] = human
+                    log.debug("react.repaired_reference", tool=tool_name, after=human)
+                    return repaired
+                return params
+
             if not ({"act_type", "article"} <= pnames):
                 return params
 
             repaired = dict(params)
+            # (a0) remap Italian param aliases the LLM emits (tipo_atto→act_type…).
+            #      ALWAYS drop the unknown key; convert-only (never override a
+            #      well-formed canonical). Runs BEFORE the article-normalize so the
+            #      context-fill (b) keys off the intended article.
+            for alias, canonical in _NORM_PARAM_ALIASES.items():
+                if alias not in repaired:
+                    continue
+                val = repaired.pop(alias)
+                if canonical in pnames and repaired.get(canonical) in (None, "") and val not in (None, ""):
+                    repaired[canonical] = val
+
             # (a) normalize an LLM-supplied article ("art. X" / multi → first)
             if repaired.get("article") not in (None, ""):
                 repaired["article"] = _normalize_article(repaired["article"])
@@ -250,8 +354,10 @@ class ReActMixin:
                 d = repaired.get("date")
                 if d and not _DATE_LIKE_RE.match(str(d)):
                     repaired.pop("date", None)
-                elif not d and chosen and _DATE_LIKE_RE.match(str(chosen.get("date") or "")):
-                    repaired["date"] = chosen["date"]
+                elif d:
+                    repaired["date"] = _to_iso_date(str(d))  # DD/MM/YYYY → ISO
+                elif chosen and _DATE_LIKE_RE.match(str(chosen.get("date") or "")):
+                    repaired["date"] = _to_iso_date(str(chosen["date"]))
 
             if repaired != params:
                 log.debug(
@@ -261,6 +367,51 @@ class ReActMixin:
             return repaired
         except Exception as e:  # noqa: BLE001 - best-effort, never break the call
             log.debug("react.repair_norm_params_failed", tool=tool_name, error=str(e))
+            return params
+
+    def _repair_graph_tool_params(
+        self, tool_name: str, params: Dict[str, Any], context: Any
+    ) -> Dict[str, Any]:
+        """W1.5 — guard the ``relation_types`` arg of ``graph_search``.
+
+        The LLM sometimes hallucinates a huge (300+) relation-type list, sometimes
+        with a corrupted char, which the tool interpolates into a Cypher pattern →
+        "Invalid input". When the list is absurdly long, non-list, or holds a
+        non-identifier token, DROP the key (not ``[]``) so the traversal runs over
+        ALL relations (valid Cypher). A single string is coerced to a list. A
+        well-formed list (all safe tokens, ≤ cap) is passed through unchanged.
+        Best-effort: any error returns the params unchanged.
+        """
+        try:
+            if "relation_types" not in params:
+                return params
+            registry = getattr(self, "_tool_registry", None)
+            tool = registry.get(tool_name) if registry else None
+            if tool is None:
+                return params
+            pnames = {p.name for p in (tool.parameters or [])}
+            if "relation_types" not in pnames:
+                return params
+            rt = params.get("relation_types")
+            if rt is None:
+                return params
+            if isinstance(rt, str):
+                rt = [rt]
+            bad = (
+                not isinstance(rt, list)
+                or len(rt) > _MAX_RELATION_TYPES
+                or any((not isinstance(x, str)) or not _SAFE_REL_TOKEN_RE.match(x) for x in rt)
+            )
+            repaired = dict(params)
+            if bad:
+                repaired.pop("relation_types", None)
+                log.debug("react.dropped_relation_types", tool=tool_name,
+                          count=(len(rt) if isinstance(rt, list) else "n/a"))
+            else:
+                repaired["relation_types"] = rt
+            return repaired
+        except Exception as e:  # noqa: BLE001 - best-effort, never break the call
+            log.debug("react.repair_graph_params_failed", tool=tool_name, error=str(e))
             return params
 
     async def react_loop(
@@ -320,9 +471,10 @@ class ReActMixin:
             # Step 2: ACTION - Esegui tool scelto
             tool_name = decision.get("tool", "")
             tool_params = decision.get("parameters", {})
-            # Repair sloppy norm-fetch params BEFORE use_tool, so the log below and
-            # the ThoughtActionObservation.action record the ACTUALLY executed args.
+            # Repair sloppy params BEFORE use_tool, so the log below and the
+            # ThoughtActionObservation.action record the ACTUALLY executed args.
             tool_params = self._repair_norm_tool_params(tool_name, tool_params, context)
+            tool_params = self._repair_graph_tool_params(tool_name, tool_params, context)
 
             log.debug(
                 f"ReAct iteration {iteration + 1}",
@@ -562,9 +714,17 @@ class ReActMixin:
         # citation_chain, giurisprudenza_su_norma, ...) instead of re-searching.
         urns: List[str] = []
         for s in current_sources:
-            u = s.get("urn") or s.get("chunk_id")
-            if u and u not in urns:
-                urns.append(u)
+            # Prefer the real graph node key (urn / metadata.article_urn) over the
+            # chunk_id, and strip the NIR version marker (!vig=) so it matches the
+            # seed keys (the graph is seeded without the marker). Same rule as the
+            # Slice-B served-URN capture. Guard metadata type — this builder is NOT
+            # wrapped in try/except, so a non-dict metadata must not raise.
+            md = s.get("metadata")
+            u = s.get("urn") or (md.get("article_urn") if isinstance(md, dict) else None) or s.get("chunk_id")
+            if u:
+                u = str(u).split("!", 1)[0]
+                if u and u not in urns:
+                    urns.append(u)
         semantic_uses = sum(
             1 for h in history if h.action.get("name") == "semantic_search"
         )

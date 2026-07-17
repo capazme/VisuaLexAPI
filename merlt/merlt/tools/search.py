@@ -464,8 +464,9 @@ class GraphSearchTool(BaseTool):
                 name="start_node",
                 param_type=ParameterType.STRING,
                 description=(
-                    "URN del nodo di partenza. "
-                    "Es: 'urn:norma:cp:art52', 'urn:concetto:legittima_difesa'"
+                    "Chiave-nodo di partenza. Usa la chiave completa fornita dalle "
+                    "fonti (URL Normattiva completo) oppure un id-nodo reale (es. "
+                    "'massima_cassazione_civile_25837_2017'). NON inventare urn."
                 )
             ),
             ToolParameter(
