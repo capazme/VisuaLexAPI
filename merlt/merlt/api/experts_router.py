@@ -556,6 +556,29 @@ async def _build_retrieved_sources(result: Any) -> List[RetrievedSource]:
                 urn = u if isinstance(u, str) else (u.get("urn") if isinstance(u, dict) else None)
                 if urn and urn not in urns:
                     urns.append(urn)
+        # Only the systemic expert populates retrieval_trace.top_sources (and only
+        # for in-graph nodes), so the panel was EMPTY on every norm the experts
+        # fetched live (fetch_law_article / jurisprudence). Also surface the sources
+        # the experts actually cited (combined_legal_basis): their source_id is a
+        # navigable target (Normattiva/EUR-Lex URL, urn, or a graph node UUID).
+        # Positive filter: only ids that actually resolve to something. Excludes
+        # the placeholder ids the LLM emits when a chunk had no id (source_N /
+        # norm_N / mcp-legal-it:*) AND free-text junk (e.g. "INFORMAZIONE NON
+        # DISPONIBILE") that would render as a dead chip.
+        def _navigable_sid(sid: str) -> bool:
+            if not isinstance(sid, str) or not sid:
+                return False
+            if sid.startswith("http") or sid.startswith("urn:"):
+                return True
+            # a bare graph node UUID, e.g. 90a329d2-a167-d417-b0d3-c3625f65f5ea
+            return len(sid) == 36 and sid.count("-") == 4 and " " not in sid
+        for ls in (getattr(result, "combined_legal_basis", None) or []):
+            sid = getattr(ls, "source_id", None) or ""
+            if _navigable_sid(sid) and sid not in urns:
+                urns.append(sid)
+                cit = getattr(ls, "citation", None)
+                if cit and sid not in labels:
+                    labels[sid] = cit
         enr = await _lookup_provenance_batch(urns)
         return [
             RetrievedSource(
