@@ -28,8 +28,9 @@ lifecycle per `async with`).
 
 from __future__ import annotations
 
+import asyncio
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
 from fastmcp import Client
@@ -114,6 +115,51 @@ def _looks_like_error_body(markdown: str) -> bool:
     return head.startswith("**errore") or head.startswith("errore:")
 
 
+# --- Transient-failure retry -------------------------------------------------
+# One retry, only for failures a second attempt can plausibly fix: a dropped MCP
+# connection, or an upstream the tool couldn't reach (Italgiure/Normattiva blip).
+# NEVER retry a PERMANENT error — "atto '…' non riconosciuto" (wrong act name) or
+# a malformed-article scraper page fail identically on every attempt and would
+# just burn the expert's time budget.
+_MCP_MAX_ATTEMPTS = 2
+_MCP_RETRY_BACKOFF_S = float(os.getenv("MERLT_MCP_RETRY_BACKOFF_S", "0.75"))
+_TRANSIENT_MARKERS = (
+    # transport: what httpx/fastmcp actually raise (verified against a dead port:
+    # "Client failed to connect: All connection attempts failed")
+    "failed to connect",
+    "all connection attempts failed",
+    "disconnected",
+    "connection reset",
+    "connection refused",
+    "connection error",
+    "cannot connect",
+    "remote end closed",
+    "broken pipe",
+    "timeout",
+    "timed out",
+    # upstream the remote tool couldn't reach (e.g. "italgiure non raggiungibile")
+    "non raggiungibile",
+    "unreachable",
+    "temporarily unavailable",
+    "temporaneamente non disponibile",
+    "service unavailable",
+    "bad gateway",
+    "502",
+    "503",
+    "504",
+)
+
+
+def _is_transient_error(text: str) -> bool:
+    """True when an ERROR text (exception message or tool error body) names a
+    condition a retry can clear. Only ever consulted on a failure path, so a
+    marker word appearing in a VALID article body can't trigger it."""
+    if not text:
+        return False
+    low = text.lower()
+    return any(marker in low for marker in _TRANSIENT_MARKERS)
+
+
 def _extract_markdown(call_result: Any) -> str:
     """Pull the markdown payload out of a FastMCP CallToolResult (GOTCHA B6).
 
@@ -169,9 +215,35 @@ class McpLegalToolAdapter(BaseTool):
         return self._parameters
 
     async def execute(self, **kwargs: Any) -> ToolResult:
-        """Call the remote MCP tool and return its markdown output."""
+        """Call the remote MCP tool and return its markdown output.
+
+        Retries ONCE on a transient failure (dropped connection, upstream
+        unreachable) — those were surfacing as spurious ✗ in "Strumenti usati"
+        and cost an expert its source. Permanent errors return immediately.
+        """
         # Drop None-valued kwargs so optional params fall back to remote defaults.
         arguments = {k: v for k, v in kwargs.items() if v is not None}
+        result, transient = await self._attempt(arguments)
+        for attempt in range(1, _MCP_MAX_ATTEMPTS):
+            if not transient:
+                break
+            log.info(
+                "mcp_legal_tool_transient_retry",
+                tool=self.name,
+                attempt=attempt + 1,
+                of=_MCP_MAX_ATTEMPTS,
+                error=str(getattr(result, "error", ""))[:120],
+            )
+            await asyncio.sleep(_MCP_RETRY_BACKOFF_S)
+            result, transient = await self._attempt(arguments)
+        return result
+
+    async def _attempt(self, arguments: Dict[str, Any]) -> Tuple[ToolResult, bool]:
+        """ONE call to the remote tool.
+
+        Returns ``(result, transient)`` — ``transient`` is True only when a
+        retry could plausibly succeed (see ``_is_transient_error``).
+        """
         try:
             async with Client(self._server_url) as client:
                 call_result = await client.call_tool(
@@ -186,18 +258,21 @@ class McpLegalToolAdapter(BaseTool):
                 server_url=self._server_url,
                 error=str(exc),
             )
-            return ToolResult.fail(
-                f"mcp-legal-it call failed for '{self.name}': {exc}",
-                tool_name=self.name,
-                source="mcp-legal-it",
+            return (
+                ToolResult.fail(
+                    f"mcp-legal-it call failed for '{self.name}': {exc}",
+                    tool_name=self.name,
+                    source="mcp-legal-it",
+                ),
+                _is_transient_error(str(exc)),
             )
 
         markdown = _extract_markdown(call_result)
         if getattr(call_result, "is_error", False):
-            return ToolResult.fail(
-                markdown or f"mcp-legal-it tool '{self.name}' returned an error",
-                tool_name=self.name,
-                source="mcp-legal-it",
+            body = markdown or f"mcp-legal-it tool '{self.name}' returned an error"
+            return (
+                ToolResult.fail(body, tool_name=self.name, source="mcp-legal-it"),
+                _is_transient_error(body),
             )
 
         # A norm-tool can carry a scraper error INSIDE a "successful" response
@@ -210,17 +285,23 @@ class McpLegalToolAdapter(BaseTool):
                 tool=self.name,
                 preview=markdown[:120],
             )
-            return ToolResult.fail(
-                markdown[:300] or f"mcp-legal-it tool '{self.name}' returned an error body",
-                tool_name=self.name,
-                source="mcp-legal-it",
+            return (
+                ToolResult.fail(
+                    markdown[:300] or f"mcp-legal-it tool '{self.name}' returned an error body",
+                    tool_name=self.name,
+                    source="mcp-legal-it",
+                ),
+                _is_transient_error(markdown),
             )
 
-        return ToolResult.ok(
-            data=markdown,
-            tool_name=self.name,
-            source="mcp-legal-it",
-            content_type="markdown",
+        return (
+            ToolResult.ok(
+                data=markdown,
+                tool_name=self.name,
+                source="mcp-legal-it",
+                content_type="markdown",
+            ),
+            False,
         )
 
 
