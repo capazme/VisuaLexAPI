@@ -24,7 +24,7 @@ from visualex_api.tools.exceptions import (
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
-from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool
+from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.tools.sys_op import WebDriverManager
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
@@ -921,9 +921,14 @@ class NormaController:
         """
         try:
             data = await request.get_json()
+            if not data:
+                raise ValidationError('Request body required')
             urn = data.get('urn')
             if not urn:
                 raise ValidationError('URN missing')
+            if not is_allowed_pdf_urn(urn):
+                raise ValidationError('URN non valido: sono ammessi solo URL normattiva.it')
+            urn = urn.strip()
 
             logger.info("Received data for export_pdf", extra={"urn": urn})
             pdf_path = urn_to_filename(urn)

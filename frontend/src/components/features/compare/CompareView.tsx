@@ -8,6 +8,7 @@ import { ArticleDiff } from './ArticleDiff';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
+import { SafeHTML } from '../../../utils/sanitize';
 import type { ArticleData } from '../../../types';
 
 function stripHtml(html: string): string {
@@ -532,9 +533,9 @@ function ArticlePanel({ article, side, onRemove, scrollRef, onScroll, isFullscre
         onScroll={onScroll}
         className="flex-1 overflow-y-auto p-4 md:p-6"
       >
-        <div
+        <SafeHTML
+          html={article.article.article_text || ''}
           className="prose prose-slate dark:prose-invert prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ __html: article.article.article_text || '' }}
         />
       </div>
     </div>

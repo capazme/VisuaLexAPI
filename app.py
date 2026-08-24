@@ -23,7 +23,7 @@ from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
-from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
+from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
@@ -1005,9 +1005,14 @@ class NormaController:
     async def export_pdf(self):
         try:
             data = await request.get_json()
+            if not data:
+                return jsonify({'error': 'Request body required'}), 400
             urn = data.get('urn')
             if not urn:
                 return jsonify({'error': 'URN mancante'}), 400
+            if not is_allowed_pdf_urn(urn):
+                return jsonify({'error': 'URN non valido: sono ammessi solo URL normattiva.it'}), 400
+            urn = urn.strip()
 
             log.info("Received data for export_pdf", data=data)
             pdf_path = urn_to_filename(urn)
