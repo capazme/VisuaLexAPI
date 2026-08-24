@@ -543,15 +543,6 @@ export function BulletinBoardPage() {
                 await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId);
               } else if (choice.action === 'rename') {
                 await sharedEnvironmentService.takeSuggestionItem(reviewingSuggestion.id, aliasConflict.itemId, choice.newTrigger);
-                // MERLT-1.10: forum_suggestion_accepted — same shape as handleTakeItem.
-                publishMerltEvent({
-                  interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
-                  metadata: {
-                    suggestion_id: reviewingSuggestion.id,
-                    shared_env_id: reviewingSuggestion.id,
-                    original_author_id: reviewingSuggestion.suggester?.id ?? null,
-                  },
-                });
               }
               await fetchSuggestions();
               setToast({ type: 'success', message: 'Item preso.' });

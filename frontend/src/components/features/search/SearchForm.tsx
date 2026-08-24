@@ -3,7 +3,7 @@ import { Search, RefreshCw, Eraser, Plus, Minus, Loader2, ChevronDown } from 'lu
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SearchParams } from '../../../types';
 import { parseItalianDate } from '../../../utils/dateUtils';
-import { extractArticleIdsFromTree } from '../../../utils/treeUtils';
+import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { cn } from '../../../lib/utils';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
@@ -146,9 +146,13 @@ export function SearchForm({ onSearch, isLoading }: SearchFormProps) {
         }
 
         const treeResponse = await fetchArticleTree({ urn: urnToUse, link: false, details: false });
-        const treeData = Array.isArray(treeResponse)
+        const rawTreeData = Array.isArray(treeResponse)
           ? treeResponse
           : (treeResponse as { articles?: unknown[] }).articles ?? [];
+        const treeData = rawTreeData.filter(
+          (node): node is TreeNode =>
+            typeof node === 'string' || (typeof node === 'object' && node !== null)
+        );
         const articles = extractArticleIdsFromTree(treeData);
 
         setArticleList(articles);

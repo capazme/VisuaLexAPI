@@ -482,24 +482,14 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map((item): DossierItem =>
-                            item.item_type === 'norm'
-                                ? {
-                                    id: item.id,
-                                    type: 'norma',
-                                    data: item.content as DossierNormaData,
-                                    addedAt: item.created_at,
-                                    status: item.status,
-                                }
-                                : {
-                                    id: item.id,
-                                    type: 'note',
-                                    data: item.content as string,
-                                    addedAt: item.created_at,
-                                    status: item.status,
-                                }
-                        ),
+                        items: d.items.map(item => ({
+                            id: item.id,
+                            type: item.item_type === 'norm' ? 'norma' : 'note',
+                            data: item.content,
+                            addedAt: item.created_at,
+                        })),
                         tags: d.tags ?? [],
+                        isPinned: false,
                     }));
 
                     const environments: Environment[] = environmentsRes.map(environmentApiToStore);
