@@ -3,6 +3,7 @@ import { Modal } from './Modal';
 import { Bug, Lightbulb, HelpCircle, Send, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { submitFeedback, type FeedbackType } from '../../services/feedbackService';
+import { getErrorMessage } from '../../utils/errors';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -41,8 +42,8 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
         onSuccess?.();
         handleClose();
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || 'Errore nell\'invio del feedback');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Errore nell\'invio del feedback');
     } finally {
       setIsSubmitting(false);
     }

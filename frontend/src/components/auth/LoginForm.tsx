@@ -6,6 +6,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LogIn, Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getErrorMessage } from '../../utils/errors';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -19,7 +20,7 @@ export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || '/';
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,8 +40,8 @@ export function LoginForm() {
     try {
       await login(email, password);
       navigate(from, { replace: true });
-    } catch (error: any) {
-      setFormError(error.message || 'Login failed. Please check your credentials.');
+    } catch (error) {
+      setFormError(getErrorMessage(error) || 'Login failed. Please check your credentials.');
     }
   };
 

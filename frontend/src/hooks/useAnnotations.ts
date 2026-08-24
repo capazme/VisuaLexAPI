@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { annotationService } from '../services/annotationService';
 import type { AnnotationResponse, AnnotationCreate, AnnotationUpdate } from '../types/api';
+import { getErrorMessage } from '../utils/errors';
 
 interface UseAnnotationsReturn {
   annotations: AnnotationResponse[];
@@ -31,8 +32,8 @@ export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
     try {
       const data = await annotationService.getByNormaKey(normaKey);
       setAnnotations(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch annotations');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Failed to fetch annotations');
       console.error('Error fetching annotations:', err);
     } finally {
       setLoading(false);
@@ -51,8 +52,8 @@ export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
       const newAnnotation = await annotationService.create(data);
       setAnnotations(prev => [...prev, newAnnotation]);
       return newAnnotation;
-    } catch (err: any) {
-      setError(err.message || 'Failed to create annotation');
+    } catch (err) {
+      setError(getErrorMessage(err) || 'Failed to create annotation');
       throw err;
     }
   }, []);
@@ -67,9 +68,9 @@ export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
       const updated = await annotationService.update(id, data);
       setAnnotations(prev => prev.map(a => a.id === id ? updated : a));
       return updated;
-    } catch (err: any) {
+    } catch (err) {
       setAnnotations(previousAnnotations);
-      setError(err.message || 'Failed to update annotation');
+      setError(getErrorMessage(err) || 'Failed to update annotation');
       throw err;
     }
   }, [annotations]);
@@ -82,9 +83,9 @@ export function useAnnotations(normaKey: string | null): UseAnnotationsReturn {
 
     try {
       await annotationService.delete(id);
-    } catch (err: any) {
+    } catch (err) {
       setAnnotations(previousAnnotations);
-      setError(err.message || 'Failed to delete annotation');
+      setError(getErrorMessage(err) || 'Failed to delete annotation');
       throw err;
     }
   }, [annotations]);

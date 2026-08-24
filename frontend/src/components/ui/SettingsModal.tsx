@@ -45,6 +45,9 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
 
     useEffect(() => {
         if (isOpen && !versionInfo && !versionLoading && !versionError) {
+            // Async data-fetch on open: the loading flag gates a one-shot fetch.
+            // (CLAUDE.md gotcha #11)
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setVersionLoading(true);
             fetch('/version', { signal: AbortSignal.timeout(5000) })
                 .then(res => {

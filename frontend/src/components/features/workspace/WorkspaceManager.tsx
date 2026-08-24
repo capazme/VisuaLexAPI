@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { WorkspaceTabPanel } from './WorkspaceTabPanel';
-import type { ArticleData } from '../../../types';
+import type { ArticleData, Norma } from '../../../types';
 
 interface WorkspaceManagerProps {
   onViewPdf: (urn: string) => void;
@@ -15,14 +15,14 @@ interface DragData {
   type: 'norma' | 'loose-article';
   itemId: string;
   sourceTabId: string;
-  sourceNorma?: any; // For loose articles
+  sourceNorma?: Norma; // For loose articles
 }
 
 interface DropData {
   type: 'norma-drop-zone';
   normaId: string;
   tabId: string;
-  norma: any;
+  norma: Norma;
 }
 
 export function WorkspaceManager({

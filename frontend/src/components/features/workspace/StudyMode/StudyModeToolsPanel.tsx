@@ -131,6 +131,9 @@ export function StudyModeToolsPanel({
   // Focus note input when requested
   useEffect(() => {
     if (focusNoteInput && noteInputRef.current) {
+      // External-signal-driven (focusNoteInput) + mutates external state
+      // (onNoteInputFocused) in the same transaction. (CLAUDE.md gotcha #11)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab('notes');
       noteInputRef.current.focus();
       onNoteInputFocused();

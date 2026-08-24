@@ -48,6 +48,10 @@ export function AdvancedExportModal({
     { id: 'highlights', label: 'Evidenziazioni', icon: <Highlighter size={16} />, enabled: highlights.length > 0 },
   ]);
 
+  // React Compiler advisory: it declines to take over this component's manual
+  // memoization (the JSX-bearing lazy useState above makes it bail). The deps
+  // here are correct and the memo works at runtime — optimization hint only.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const massimeList = useMemo(() => {
     if (!brocardi_info?.Massime || !Array.isArray(brocardi_info.Massime)) return [];
     return brocardi_info.Massime

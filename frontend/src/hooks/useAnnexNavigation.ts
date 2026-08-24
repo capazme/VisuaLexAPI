@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { extractArticleIdsFromTree, normalizeArticleId } from '../utils/treeUtils';
+import { extractArticleIdsFromTree, normalizeArticleId, type TreeNode } from '../utils/treeUtils';
 import { getUniqueArticleId } from '../utils/articleIds';
 import type { Norma, ArticleData, TreeMetadata } from '../types';
 
@@ -19,7 +19,7 @@ interface UseAnnexNavigationProps {
 
 interface UseAnnexNavigationReturn {
   // Tree state
-  treeData: any[] | null;
+  treeData: TreeNode[] | null;
   treeMetadata: TreeMetadata | null;
   treeLoading: boolean;
   treeVisible: boolean;
@@ -57,7 +57,7 @@ export function useAnnexNavigation({
   const { triggerSearch, addNormaToTab } = useAppStore();
 
   // Tree state
-  const [treeData, setTreeData] = useState<any[] | null>(null);
+  const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
   const [treeMetadata, setTreeMetadata] = useState<TreeMetadata | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeVisible, setTreeVisible] = useState(false);
@@ -192,7 +192,7 @@ export function useAnnexNavigation({
 
         const data = await response.json();
         const fetchedArticles = Array.isArray(data) ? data : [data];
-        const validArticles = fetchedArticles.filter((a: any) => !a.error && a.norma_data);
+        const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
 
         if (validArticles.length > 0) {
           // Add to the same tab - addNormaToTab will handle deduplication
@@ -272,7 +272,7 @@ export function useAnnexNavigation({
 
         const data = await response.json();
         const fetchedArticles = Array.isArray(data) ? data : [data];
-        const validArticles = fetchedArticles.filter((a: any) => !a.error && a.norma_data);
+        const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
 
         if (validArticles.length > 0) {
           addNormaToTab(tabId, norma, validArticles);
