@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { PrismaClient, DossierItemType } from '@prisma/client';
+import { Prisma, PrismaClient, DossierItemType } from '@prisma/client';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 
@@ -257,14 +257,26 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  const item = await prisma.dossierItem.update({
-    where: { id: itemId },
-    data: {
-      ...(data.title !== undefined && { title: data.title }),
-      ...(data.content !== undefined && { content: data.content }),
-      ...(data.position !== undefined && { position: data.position }),
-    },
-  });
+  let item;
+  try {
+    item = await prisma.dossierItem.update({
+      // Scoped by dossierId: the ownership check above proves the dossier is
+      // ours, not that the item belongs to it. Without this an authenticated
+      // user could pass their own dossier id together with someone else's
+      // item id and mutate a row they do not own.
+      where: { id: itemId, dossierId: id },
+      data: {
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.content !== undefined && { content: data.content }),
+        ...(data.position !== undefined && { position: data.position }),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 
   res.json({
     id: item.id,
@@ -291,9 +303,16 @@ export const deleteDossierItem = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  await prisma.dossierItem.delete({
-    where: { id: itemId },
-  });
+  try {
+    await prisma.dossierItem.delete({
+      where: { id: itemId, dossierId: id },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 
   res.status(204).send();
 };
@@ -319,14 +338,21 @@ export const reorderDossierItems = async (req: Request, res: Response) => {
   }
 
   // Update positions
-  await prisma.$transaction(
-    itemIds.map((itemId, index) =>
-      prisma.dossierItem.update({
-        where: { id: itemId },
-        data: { position: index },
-      })
-    )
-  );
+  try {
+    await prisma.$transaction(
+      itemIds.map((itemId, index) =>
+        prisma.dossierItem.update({
+          where: { id: itemId, dossierId: id },
+          data: { position: index },
+        })
+      )
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 
   res.json({ message: 'Items reordered successfully' });
 };
