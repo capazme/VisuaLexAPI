@@ -90,7 +90,7 @@ BROCARDI_CODICI = {
     "Disposizioni di attuazione del codice di procedura civile(R.D. 18 dicembre 1941, n. 1368)": "https://www.brocardi.it/disposizioni-per-attuazione-codice-procedura-civile/",
     "Codice Penale(R.D. 19 ottobre 1930, n. 1398)": "https://www.brocardi.it/codice-penale/",
     "Disposizioni di coordinamento e transitorie per il codice penale(R.D. 28 maggio 1931, n. 601)": "https://www.brocardi.it/disposizioni-transitorie-codice-penale/",
-    "Codice di procedura penale(D.P.R. 22 settembre 1988, n. 477)": "https://www.brocardi.it/codice-di-procedura-penale/",
+    "Codice di procedura penale(D.P.R. 22 settembre 1988, n. 447)": "https://www.brocardi.it/codice-di-procedura-penale/",
     "Disposizioni di attuazione del codice di procedura penale(D.lgs. 28 luglio 1989, n. 271)": "https://www.brocardi.it/disposizioni-per-attuazione-codice-procedura-penale/",
     "Codice Processo Penale Minorile(D.P.R. 22 settembre 1988, n. 448)": "https://www.brocardi.it/processo-penale-minorile/",
     "Codice della strada(D.lgs. 30 aprile 1992, n. 285)": "https://www.brocardi.it/codice-della-strada/",
