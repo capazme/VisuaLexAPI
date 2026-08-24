@@ -3,8 +3,35 @@ import asyncio
 import structlog
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Download
 from typing import Optional
+from urllib.parse import urlparse
 
 log = structlog.get_logger()
+
+
+# Only Normattiva URLs may ever be handed to the browser. Without this the urn
+# travels straight into page.goto(), so any caller could aim the server-side
+# browser at an internal address (cloud metadata, localhost admin ports) and
+# have the response written to a file we then serve back — a classic SSRF.
+#
+# The host is compared exactly, not by prefix: a prefix test accepts
+# "https://www.normattiva.it.evil.com/" unless it demands a trailing slash, and
+# demanding one would reject the bare origin the URN generator also emits.
+ALLOWED_PDF_SCHEMES = ('http', 'https')
+ALLOWED_PDF_HOSTS = ('www.normattiva.it', 'normattiva.it')
+
+
+def is_allowed_pdf_urn(urn: object) -> bool:
+    """True when urn is an http(s) URL whose host is normattiva.it."""
+    if not isinstance(urn, str):
+        return False
+    try:
+        parsed = urlparse(urn.strip())
+    except ValueError:
+        return False
+    return (
+        parsed.scheme in ALLOWED_PDF_SCHEMES
+        and (parsed.hostname or '').lower() in ALLOWED_PDF_HOSTS
+    )
 
 
 class BrowserPool:
@@ -90,6 +117,11 @@ class PDFExtractor:
         Returns:
         str -- Path to the downloaded PDF file
         """
+        if not is_allowed_pdf_urn(urn):
+            log.warning("Rejected PDF extraction for non-normattiva URN", urn=urn)
+            raise ValueError('URN non valido: sono ammessi solo URL normattiva.it')
+        urn = urn.strip()
+
         log.info(f"Extracting PDF for URN: {urn} with timeout: {timeout}ms (pool: {use_pool})")
 
         download_dir = os.path.join(os.getcwd(), "download")
