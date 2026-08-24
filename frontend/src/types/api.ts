@@ -2,7 +2,7 @@
  * Type definitions for API requests and responses
  */
 
-import type { NormaVisitata, OriginalAuthor } from './index';
+import type { OriginalAuthor } from './index';
 
 // ============================================================================
 // Authentication Types
