@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableDossierItem } from './SortableDossierItem';
@@ -58,21 +58,36 @@ describe('SortableDossierItem expansion', () => {
     const row = screen.getByRole('button', { name: /espandi nota/i });
     expect(row).toHaveAttribute('aria-expanded', 'false');
     // Parent owns the state, so re-render with it flipped to see the body.
-    const onToggleExpand = vi.fn();
     rerender(
       <DndContext>
         <SortableContext items={[noteItem.id]} strategy={verticalListSortingStrategy}>
           <SortableDossierItem
             item={noteItem} isSelected={false} showCheckbox={false}
             onToggleSelect={() => {}} onRemove={() => {}} onToggleImportant={() => {}}
-            isExpanded={true} onToggleExpand={onToggleExpand}
+            isExpanded={true} onToggleExpand={() => {}}
             onOpenOnDashboard={() => {}} showToast={() => {}}
           />
         </SortableContext>
       </DndContext>,
     );
+    // The truncated preview is gone, so the full note is the only copy on screen.
     expect(screen.getByText('appunto di pratica completo')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /comprimi nota/i })).toHaveAttribute('aria-expanded', 'true');
+    const toggle = screen.getByRole('button', { name: /comprimi nota/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // The toggle must point at the region it reveals.
+    const regionId = toggle.getAttribute('aria-controls');
+    expect(regionId).toBeTruthy();
+    expect(document.getElementById(regionId as string)).toHaveTextContent('appunto di pratica completo');
+  });
+
+  it('keeps interactive controls out of the expand toggle subtree', () => {
+    // ARIA makes descendants of a role="button" presentational, so the star
+    // and the remove button must be siblings of the toggle, never children.
+    renderRow(normaItem, { isExpanded: false });
+    const toggle = screen.getByRole('button', { name: /espandi codice civile/i });
+    expect(within(toggle).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /segna come importante/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rimuovi elemento dal dossier/i })).toBeInTheDocument();
   });
 
   it('fires onToggleExpand when the row is activated', () => {

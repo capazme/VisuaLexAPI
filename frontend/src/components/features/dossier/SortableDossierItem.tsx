@@ -59,26 +59,19 @@ export function SortableDossierItem({
   const rowLabel = item.type === 'norma'
     ? `${expandVerb} ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
     : `${expandVerb} nota`;
+  const regionId = `dossier-item-content-${item.id}`;
 
   return (
+    // Plain container: the expand affordance is the header sub-div below.
+    // ARIA treats every descendant of a button as presentational, so the
+    // reader (article body, note composer, action buttons) and the star /
+    // trash controls must stay OUTSIDE it. The root keeps only the layout
+    // so the amber "important" stripe still spans the expanded height.
     <div
       ref={setNodeRef}
       style={style}
-      role="button"
-      tabIndex={0}
-      aria-label={rowLabel}
-      aria-expanded={isExpanded}
-      onClick={onToggleExpand}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onToggleExpand();
-        }
-      }}
       className={cn(
-        'relative bg-white dark:bg-slate-800 p-3 md:p-4 pl-4 md:pl-5 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+        'relative bg-white dark:bg-slate-800 p-3 md:p-4 pl-4 md:pl-5 rounded-lg border shadow-sm group hover:border-blue-300 dark:hover:border-blue-700 transition-colors',
         isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700',
       )}
     >
@@ -115,20 +108,48 @@ export function SortableDossierItem({
         <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-blue-600 flex-shrink-0">
           <FileText size={18} />
         </div>
-        <div className="flex-1 min-w-0">
-          {item.type === 'norma' ? (
-            <>
-              <h4 className="font-medium text-sm md:text-base text-slate-900 dark:text-white truncate">
-                {item.data.tipo_atto} {item.data.numero_atto}
-              </h4>
-              <p className="text-xs md:text-sm text-slate-500 truncate">Art. {item.data.numero_articolo} • {formatDateItalianLong(item.data.data || '')}</p>
-            </>
-          ) : (
-            <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 italic truncate">"{item.data}"</p>
-          )}
-          <div className="text-xs text-slate-400 mt-1 hidden md:block">
-            Aggiunto il {formatTimestampLong(item.addedAt)}
+        {/* The expand toggle wraps ONLY non-interactive content (title text
+            plus the decorative chevron), so nothing focusable is buried
+            inside a role="button" subtree. */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={rowLabel}
+          aria-expanded={isExpanded}
+          aria-controls={isExpanded ? regionId : undefined}
+          onClick={onToggleExpand}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggleExpand();
+            }
+          }}
+          className="flex-1 min-w-0 flex items-center gap-2 py-1 rounded-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+        >
+          <div className="flex-1 min-w-0">
+            {item.type === 'norma' ? (
+              <>
+                <h4 className="font-medium text-sm md:text-base text-slate-900 dark:text-white truncate">
+                  {item.data.tipo_atto} {item.data.numero_atto}
+                </h4>
+                <p className="text-xs md:text-sm text-slate-500 truncate">Art. {item.data.numero_articolo} • {formatDateItalianLong(item.data.data || '')}</p>
+              </>
+            ) : (
+              // Hidden while expanded: the full note is rendered below, and
+              // the truncated preview would repeat its first line.
+              !isExpanded && (
+                <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 italic truncate">"{item.data}"</p>
+              )
+            )}
+            <div className="text-xs text-slate-400 mt-1 hidden md:block">
+              Aggiunto il {formatTimestampLong(item.addedAt)}
+            </div>
           </div>
+          <ChevronDown
+            size={18} aria-hidden
+            className={cn('text-slate-400 transition-transform flex-shrink-0', isExpanded && 'rotate-180')}
+          />
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           {item.type === 'norma' && (
@@ -148,10 +169,6 @@ export function SortableDossierItem({
               <Star size={18} className={cn(isImportant && 'fill-amber-400')} />
             </button>
           )}
-          <ChevronDown
-            size={18} aria-hidden
-            className={cn('text-slate-400 transition-transform flex-shrink-0', isExpanded && 'rotate-180')}
-          />
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -163,20 +180,19 @@ export function SortableDossierItem({
         </div>
       </div>
       {isExpanded && (
-        item.type === 'norma' ? (
-          <DossierItemReader
-            norma={item.data}
-            onOpenOnDashboard={onOpenOnDashboard}
-            showToast={showToast}
-          />
-        ) : (
-          <p
-            onClick={(e) => e.stopPropagation()}
-            className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-sm md:text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap"
-          >
-            {item.data}
-          </p>
-        )
+        <div id={regionId}>
+          {item.type === 'norma' ? (
+            <DossierItemReader
+              norma={item.data}
+              onOpenOnDashboard={onOpenOnDashboard}
+              showToast={showToast}
+            />
+          ) : (
+            <p className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-sm md:text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+              {item.data}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

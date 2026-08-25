@@ -5,10 +5,11 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { ArticleBody } from '../search/ArticleBody';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
+import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
-import type { ArticleData, NormaVisitata } from '../../../types';
+import type { Annotation, ArticleData, NormaVisitata } from '../../../types';
 
 interface Props {
   norma: NormaVisitata;
@@ -38,17 +39,22 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
     rect: { x: number; y: number; width: number; height: number };
     anchorText: string; startOffset: number;
   } | null>(null);
+  const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
 
   const itemKey = useMemo(() => buildItemKey(norma), [norma]);
   const uniqueArticleId = useMemo(() => uniqueArticleIdFromNorma(norma), [norma]);
 
   const {
     annotations, highlights,
-    addAnnotation, addHighlight, removeHighlight,
+    addAnnotation, updateAnnotation, removeAnnotation,
+    addHighlight, removeHighlight,
     loadAnnotationsForArticle, loadHighlightsForArticle,
   } = useAppStore(useShallow((s) => ({
     annotations: s.annotations, highlights: s.highlights,
-    addAnnotation: s.addAnnotation, addHighlight: s.addHighlight,
+    addAnnotation: s.addAnnotation,
+    updateAnnotation: s.updateAnnotation,
+    removeAnnotation: s.removeAnnotation,
+    addHighlight: s.addHighlight,
     removeHighlight: s.removeHighlight,
     loadAnnotationsForArticle: s.loadAnnotationsForArticle,
     loadHighlightsForArticle: s.loadHighlightsForArticle,
@@ -77,6 +83,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   // any result that doesn't match the live request is stale, which IS the
   // loading state (see CLAUDE.md gotcha #11 on set-state-in-effect).
   const state: FetchState = result?.key === fetchKey ? result.state : { phase: 'loading' };
+  const isReady = state.phase === 'ready';
 
   useEffect(() => {
     void loadAnnotationsForArticle(itemKey, uniqueArticleId);
@@ -94,6 +101,30 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
 
   const rawText = state.phase === 'ready' ? (state.article.article_text || '') : '';
   const markedHtml = useArticleMarkers({ rawText, highlights: articleHighlights, annotations: itemAnnotations });
+
+  // Delegated click on the article body: tapping a wavy `.note-anchor`
+  // opens the compact InlineNotePopover for that single note, exactly as
+  // ArticleTabContent does on the dashboard. `isReady` is a real dependency,
+  // not a tripwire: the body (and therefore contentRef) only exists once the
+  // fetch settles, so the listener has to be attached on that transition.
+  useEffect(() => {
+    if (!isReady) return;
+    const container = contentRef.current;
+    if (!container) return;
+    const handler = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement | null)?.closest('.note-anchor') as HTMLElement | null;
+      if (!target) return;
+      const noteId = target.getAttribute('data-note-id');
+      if (!noteId) return;
+      const note = itemAnnotations.find(a => a.id === noteId);
+      if (!note) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setInlineNote({ note, anchorEl: target });
+    };
+    container.addEventListener('click', handler);
+    return () => container.removeEventListener('click', handler);
+  }, [itemAnnotations, isReady]);
 
   // Same duplicate-anchor guard as ArticleTabContent.handlePopupHighlight:
   // re-highlighting the exact same span at the same offset is a no-op with
@@ -141,7 +172,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
         <span>{state.message}</span>
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); setRetryTick(t => t + 1); }}
+          onClick={() => setRetryTick(t => t + 1)}
           className="font-semibold underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded"
         >
           Riprova
@@ -151,7 +182,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   }
 
   return (
-    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700" onClick={(e) => e.stopPropagation()}>
+    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
       <ArticleBody
         contentRef={contentRef}
         itemKey={itemKey}
@@ -176,6 +207,15 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
             showToast('Nota aggiunta', 'success');
           }}
           onClose={() => setComposer(null)}
+        />
+      )}
+      {inlineNote && (
+        <InlineNotePopover
+          note={inlineNote.note}
+          anchorEl={inlineNote.anchorEl}
+          onClose={() => setInlineNote(null)}
+          onUpdate={updateAnnotation}
+          onRemove={removeAnnotation}
         />
       )}
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
