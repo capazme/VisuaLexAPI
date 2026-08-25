@@ -20,9 +20,16 @@ vi.mock('../services/dossierService', () => ({
 // separately-exported `appStore` (see e.g. WorkspaceTabPanel.tsx, useAuth.ts),
 // so tests that need direct state access use that instead.
 import { appStore } from './useAppStore';
-import { dossierService } from '../services/dossierService';
+import { dossierService, type DossierItemApi } from '../services/dossierService';
 
 const norma = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '2043' };
+
+// Minimal but fully-typed DossierItemApi for deferred addItem() resolutions
+// (vi.mocked(...).mockReturnValueOnce needs the real return type, unlike the
+// loosely-typed inline vi.fn() factories in the vi.mock() block above).
+function fakeDossierItemApi(id: string): DossierItemApi {
+  return { id, item_type: 'norm', title: 'Nota', content: norma, position: 0, created_at: '2026-08-25T00:00:00Z' };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -66,5 +73,69 @@ describe('updateDossierItemStatus', () => {
     appStore.getState().updateDossierItemStatus('d1', 'i1', 'important');
     await vi.waitFor(() =>
       expect(appStore.getState().dossiers[0].items[0].status).toBe('unread'));
+  });
+});
+
+// Regression coverage for the review finding: starring an item before its
+// addToDossier() addItem POST has resolved must not fire a PUT against the
+// client-generated tempId (the server has never seen it, so it would
+// reject), and must not be silently dropped once the item settles.
+describe('addToDossier pending window (star set before addItem settles)', () => {
+  it('defers the PUT until the item settles, then persists with the server id', async () => {
+    let resolveAddItem!: (v: DossierItemApi) => void;
+    const deferred = new Promise<DossierItemApi>((resolve) => { resolveAddItem = resolve; });
+    vi.mocked(dossierService.addItem).mockReturnValueOnce(deferred);
+
+    appStore.setState({
+      dossiers: [{ id: 'd1', title: 'P', createdAt: '2026-08-01', items: [] }],
+    });
+
+    appStore.getState().addToDossier('d1', norma, 'norma');
+    const tempId = appStore.getState().dossiers[0].items[0].id;
+    expect(tempId).toBeTruthy();
+
+    // Star it while the addItem POST is still in flight.
+    appStore.getState().updateDossierItemStatus('d1', tempId, 'important');
+    expect(appStore.getState().dossiers[0].items[0].status).toBe('important');
+    // No PUT should have fired yet, and never against the temp id.
+    expect(dossierService.updateItem).not.toHaveBeenCalled();
+
+    resolveAddItem(fakeDossierItemApi('item-srv-9'));
+    await vi.waitFor(() =>
+      expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-9'));
+
+    await vi.waitFor(() => expect(dossierService.updateItem).toHaveBeenCalledTimes(1));
+    expect(dossierService.updateItem).toHaveBeenCalledWith(
+      'd1', 'item-srv-9', { content: { ...norma, _dossierMeta: { important: true } } },
+    );
+    expect(dossierService.updateItem).not.toHaveBeenCalledWith(
+      'd1', tempId, expect.anything(),
+    );
+  });
+
+  it('reverts the star locally and logs when the deferred persistence PUT fails', async () => {
+    let resolveAddItem!: (v: DossierItemApi) => void;
+    const deferred = new Promise<DossierItemApi>((resolve) => { resolveAddItem = resolve; });
+    vi.mocked(dossierService.addItem).mockReturnValueOnce(deferred);
+    vi.mocked(dossierService.updateItem).mockRejectedValueOnce(new Error('boom'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    appStore.setState({
+      dossiers: [{ id: 'd1', title: 'P', createdAt: '2026-08-01', items: [] }],
+    });
+
+    appStore.getState().addToDossier('d1', norma, 'norma');
+    const tempId = appStore.getState().dossiers[0].items[0].id;
+    appStore.getState().updateDossierItemStatus('d1', tempId, 'important');
+
+    resolveAddItem(fakeDossierItemApi('item-srv-10'));
+    await vi.waitFor(() =>
+      expect(appStore.getState().dossiers[0].items[0].id).toBe('item-srv-10'));
+    await vi.waitFor(() => expect(dossierService.updateItem).toHaveBeenCalledTimes(1));
+
+    await vi.waitFor(() =>
+      expect(appStore.getState().dossiers[0].items[0].status).not.toBe('important'));
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 });

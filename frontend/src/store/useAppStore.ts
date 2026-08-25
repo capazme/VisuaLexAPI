@@ -181,6 +181,16 @@ interface AppState {
      */
     loadedHighlightKeys: Record<string, true>;
     loadedAnnotationKeys: Record<string, true>;
+    /**
+     * Dossier item ids that are still client-generated tempIds awaiting the
+     * server id from their `addToDossier` `addItem` POST. Not persisted
+     * (absent from `partialize`) — it only needs to survive the in-flight
+     * window of a single session. See `updateDossierItemStatus`: a status
+     * change against a pending item is applied optimistically only (no PUT
+     * against a temp id the server has never seen); `addToDossier` persists
+     * the star itself once the id swap to the real server id happens.
+     */
+    pendingDossierItemIds: Record<string, true>;
     quickNorms: QuickNorm[];
     customAliases: CustomAlias[];
     environments: Environment[];
@@ -386,6 +396,7 @@ const appStore = createStore<AppState>()(
             highlights: [],
             loadedHighlightKeys: {},
             loadedAnnotationKeys: {},
+            pendingDossierItemIds: {},
             quickNorms: [],
             customAliases: [],
             environments: [],
@@ -1242,6 +1253,11 @@ const appStore = createStore<AppState>()(
                             addedAt: new Date().toISOString()
                         });
                     }
+                    // Mark as pending until the addItem POST below settles.
+                    // While pending, updateDossierItemStatus applies status
+                    // changes locally only (a PUT against tempId would
+                    // reject — the server has never seen this id).
+                    state.pendingDossierItemIds[tempId] = true;
                 });
 
                 // API call
@@ -1250,14 +1266,36 @@ const appStore = createStore<AppState>()(
                     title: itemData.tipo_atto || 'Nota',
                     content: itemData,
                 }).then(created => {
-                    // Update with server ID
+                    // Update with server ID; the item is now settled.
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
                         const item = dossier?.items.find(i => i.id === tempId);
                         if (item) {
                             item.id = created.id;
                         }
+                        delete state.pendingDossierItemIds[tempId];
                     });
+
+                    // The user may have starred this item while its addItem
+                    // POST was still in flight. updateDossierItemStatus saw
+                    // it as pending and only applied the optimistic status
+                    // (no PUT, since the item only had a temp id then). Now
+                    // that it has a real server id, persist that star.
+                    // Read from get() (finalized state), not the Immer draft
+                    // above — the draft's object references are revoked
+                    // proxies once the producer returns.
+                    const settledItem = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                    if (settledItem?.status === 'important') {
+                        dossierService.updateItem(dossierId, created.id, {
+                            content: packItemContent(settledItem.data, 'important'),
+                        }).catch(err => {
+                            console.error('Failed to persist dossier item status set while item was pending:', err);
+                            set((state) => {
+                                const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                                if (it) it.status = undefined;
+                            });
+                        });
+                    }
                 }).catch(err => {
                     console.error('Failed to add item to dossier:', err);
                     // Rollback
@@ -1266,6 +1304,7 @@ const appStore = createStore<AppState>()(
                         if (dossier) {
                             dossier.items = dossier.items.filter(i => i.id !== tempId);
                         }
+                        delete state.pendingDossierItemIds[tempId];
                     });
                 });
             },
@@ -1351,6 +1390,24 @@ const appStore = createStore<AppState>()(
                 const dossier = get().dossiers.find(d => d.id === dossierId);
                 const item = dossier?.items.find(i => i.id === itemId);
                 if (!dossier || !item || item.type !== 'norma') return;
+
+                // The item hasn't settled on the server yet — itemId is
+                // still the client-generated tempId from addToDossier. A PUT
+                // against it would reject (the server has never seen this
+                // id), and by the time addItem resolves, addToDossier swaps
+                // item.id to the real server id — which would silently break
+                // the revert lookup below (stale tempId never matches again).
+                // Apply the optimistic status only; addToDossier persists it
+                // once the item settles (see the `settledItem?.status ===
+                // 'important'` check in its addItem `.then()`).
+                if (get().pendingDossierItemIds[itemId]) {
+                    set((state) => {
+                        const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                        if (it) it.status = status;
+                    });
+                    return;
+                }
+
                 const previous = item.status;
 
                 // Optimistic update
