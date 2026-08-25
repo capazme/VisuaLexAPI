@@ -1,476 +1,20 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository. Everything here is meant to
+be true of the code as it stands — if you find a statement that the code
+contradicts, fix the statement in the same change that taught you.
 
 ## Project Overview
 
-VisuaLexAPI is an async web application and REST API for fetching and displaying Italian legal texts from multiple sources (Normattiva, EUR-Lex, Brocardi). Built with Quart (async Flask-like framework), it provides both a web UI and API endpoints for retrieving legal norms, article texts, Brocardi annotations, and PDF exports.
-
-The project consists of:
-- **Python API**: Quart-based async API with web scraping (port 5000)
-- **Node.js Backend**: Express + Prisma platform backend (port 3001)
-- **Frontend**: React + TypeScript SPA with Vite (port 5173)
-
-## Architecture
-
-### Python API (`/visualex_api`)
-
-Controller-service architecture for legal data retrieval:
-
-- **`app.py`** (root): Main server with UI + API endpoints
-- **`visualex_api/app.py`**: Alternative server with `/api/*` prefix + Swagger UI
-- **`visualex_api/services/`**: Scraper services
-  - `normattiva_scraper.py`: Italian state laws (Normattiva)
-  - `eurlex_scraper.py`: EU regulations/directives (EUR-Lex)
-  - `brocardi_scraper.py`: Legal annotations (Brocardi.it)
-  - `pdfextractor.py`: PDF extraction using Playwright browser pool
-- **`visualex_api/tools/`**: Utilities
-  - `norma.py`: Core data models (`Norma`, `NormaVisitata`)
-  - `urngenerator.py`: URN generation for legal documents
-  - `treextractor.py`: Article tree structures
-  - `text_op.py`: Text parsing, normalization, and date handling
-  - `config.py`: Rate limiting, cache size, Playwright browser pool, Redis config (`REDIS_ENABLED`, `REDIS_URL`)
-  - `map.py`: Act type mappings
-  - `browser_manager.py`: Playwright browser pool management (`PlaywrightManager`)
-  - `nl_parser.py` (Sprint 1): Natural language query parser — normalizes inputs like "art. 3 cc" into structured API params. Exposed at `POST /api/parse_query`.
-  - `alias_resolver.py` + `preset_aliases.yaml` (Sprint 1): Preset alias library (e.g. `gdpr` → Regolamento UE 2016/679). Runs before the NL parser.
-  - `citation_linker.py` (Sprint 1): Detects explicit and contextual citations in article text; emits `{start, end, display_text, article, act_type, date, act_number}`. Exposed at `POST /api/extract_citations`.
-  - `circuit_breaker.py` (Sprint 1): Per-source scraper circuit breaker. **State is in-memory per-instance** (registry `_breakers: Dict[str, CircuitBreaker]`) — single-instance deployment only. Redis-backed shared state is deferred tech debt if scaling becomes needed. Status endpoint: `GET /api/circuit-breakers`.
-  - `redis_cache.py` + `cache_manager.py` (Sprint 1): Redis-backed async cache with automatic filesystem fallback. Both backends implement the same async `get`/`set`/`delete`. Startup emits a warning when `REDIS_ENABLED=false` or when the redis package is missing while enabled.
-
-### Node.js Backend (`/backend`)
-
-Express server with Prisma ORM for platform features (authentication, user data).
-
-Sprint 1 additions:
-- `src/middleware/rateLimiter.ts`: `rate-limiter-flexible` based middleware. Tiers: anonymous 100/min (by IP), authenticated 300/min (by userId), writes 20/min. Uses `RateLimiterRedis` when `REDIS_ENABLED=true`, else falls back to `RateLimiterMemory` and logs a startup warning. Mounted globally in `src/index.ts`.
-- `src/utils/redis.ts`: `ioredis` client factory (`getRedisClient()`). Returns `null` if Redis is disabled. Connection errors fail open (rate limiter continues on memory).
-
-Scoped-bulk-delete endpoints (added for `applyEnvironment(replace)`):
-- `DELETE /annotations` → `annotationController.deleteAllAnnotations` — `prisma.annotation.deleteMany({ where: { userId: req.user.id } })`. Returns `{ deleted: count }`.
-- `DELETE /highlights` → `highlightController.deleteAllHighlights` — same pattern for highlights.
-- Both authenticate-gated (like every annotation/highlight route) and scoped to the current user. Intended caller is `applyEnvironment(replace)` ONLY — do not wire into end-user UI without a dedicated confirm flow (the current one lives in `EnvironmentPage`, danger-variant `ConfirmDialog` spelling out the wipe).
-
-Personal-environment CRUD (added when the environments page moved off localStorage):
-- `Environment` Prisma model with top-level columns for `name/description/author/version/category/color/tags` (searchable/indexable metadata) plus a single `content` JSON blob for `dossiers/quickNorms/customAliases/annotations/highlights`. Kept intentionally separate from `SharedEnvironment` (the community-board entity); a personal env can be promoted to shared but the tables stay distinct.
-- `environmentController` + `routes/environments.ts`: GET `/environments`, GET `/environments/:id`, POST `/environments`, PUT `/environments/:id`, DELETE `/environments/:id`. Ownership enforced via `findFirst({ userId })` on every write/read. Zod validates the metadata; `content` is passed through as opaque JSON.
-
-QuickNorm + CustomAlias CRUD (added to close the last localStorage-only slices):
-- `QuickNorm` Prisma model: `label`, `searchParams` JSON, `sourceUrl`, `usageCount`, `lastUsedAt`, `userId`. `CustomAlias` model: `trigger`, `aliasType` (new `AliasType` enum: `shortcut` | `reference`), `expandTo`, `searchParams` JSON, `description`, `usageCount`, `lastUsedAt`, `userId`. Custom aliases carry `@@unique([userId, trigger])` so duplicate-prevention happens at the DB, not only in the store; controller catches Prisma P2002 and surfaces 409.
-- Routes `/quick-norms` and `/custom-aliases` (authenticate-gated) expose list / create / update / delete, PLUS a dedicated `POST /:id/use` endpoint per entity.
-- The `POST /:id/use` endpoints exist for a reason: client code bumps the local `usageCount` instantly for UX and then fires a `.use(id)` Promise that does `prisma.update({ usageCount: { increment: 1 }, lastUsedAt: now })`. This is atomic, so concurrent clicks (or rapid-fire alias resolutions) can't race the counter, and clients don't need to read-modify-write.
-
-### Frontend Structure
-
-React SPA with component-based architecture:
-
-- **`frontend/src/App.tsx`**: Main app with routing
-- **`frontend/src/store/useAppStore.ts`**: Zustand store for global state
-- **`frontend/src/components/`**:
-  - `features/search/`: Search form, results, article display
-  - `features/workspace/`: Active workspace view
-  - `features/history/`: Search history
-  - `features/bookmarks/`: Saved articles
-  - `layout/`: Layout components (Sidebar, Layout)
-  - `ui/`: Reusable UI components (modals, PDF viewer, toasts)
-- **`frontend/src/types/index.ts`**: TypeScript type definitions
-- **`frontend/src/pages/SearchPage.tsx`**: Main search page
-
-## Development Commands
-
-### Quick Start (All Services)
-
-```bash
-./start.sh  # Starts Python API (5000), Node backend (3001), Frontend (5173)
-```
-
-### Python API
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Main server (UI + API)
-python app.py
-
-# Alternative server with /api/* prefix + Swagger
-python -m visualex_api.app
-```
-
-### Node.js Backend
-
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev      # Dev server at :5173
-npm run build    # Production build
-npm run lint     # ESLint
-npm run test     # Vitest
-npm run test:ui  # Vitest with UI
-```
-
-### PDF Export
-
-Requires Playwright browsers:
-```bash
-pip install playwright
-playwright install chromium
-```
-
-## Key API Endpoints
-
-All endpoints are POST unless specified, accepting JSON bodies.
-
-### Core Endpoints
-
-- **POST `/fetch_norma_data`**: Create norm structure from parameters (act_type, date, act_number, article)
-- **POST `/fetch_article_text`**: Fetch article text in parallel for multiple articles
-- **POST `/stream_article_text`**: Stream article results as NDJSON (one JSON object per line)
-- **POST `/fetch_brocardi_info`**: Retrieve Brocardi annotations (position, ratio, spiegazione, massime)
-- **POST `/fetch_all_data`**: Combined endpoint returning both article text and Brocardi info
-- **POST `/fetch_tree`**: Get article tree for complete URN (with optional link/details flags)
-- **GET `/history`**: Retrieve server-side search history
-- **POST `/export_pdf`**: Export document to PDF using Playwright
-
-### API Request Format
-
-```json
-{
-  "act_type": "codice civile",
-  "date": "1990-08-07",         // Optional
-  "act_number": "241",           // Optional
-  "article": "2043",             // Required: single, list "1,2", or range "3-5"
-  "version": "vigente",          // Optional: "vigente" | "originale"
-  "version_date": "2024-01-15",  // Optional: YYYY-MM-DD
-  "annex": "A"                   // Optional: allegato
-}
-```
-
-## Data Models
-
-### Core Classes (visualex_api/tools/norma.py)
-
-- **`Norma`**: Represents a legal norm
-  - Properties: `tipo_atto`, `data`, `numero_atto`, `url`, `tree`
-  - Lazy-loads URL (URN) and tree structure
-
-- **`NormaVisitata`**: Represents a specific article visit
-  - Properties: `norma`, `numero_articolo`, `versione`, `data_versione`, `allegato`, `urn`
-  - Implements hash/equality for deduplication
-  - Used throughout the API as the primary data container
-
-Both classes have `to_dict()` and `from_dict()` methods for JSON serialization.
-
-## Date Handling System
-
-The project uses a dual-approach system for date handling, optimizing between speed and accuracy:
-
-### Backend Date System (`visualex_api/tools/text_op.py`)
-
-**Sync approach (for URN generation):**
-- `complete_date_or_parse(date_str)`: Fast, synchronous function for URN generation
-  - If date is year-only (e.g., "1990"), returns "1990-01-01" for URN
-  - If date is partial (e.g., "1990-08"), queries cache first, falls back to year-only
-  - Used in `urngenerator.py` to avoid blocking on date lookup
-
-**Async approach (for accurate dates):**
-- `complete_date_or_parse_async(date_str)`: Fetches real dates from Normattiva via Playwright
-  - Uses Playwright browser to navigate Normattiva and extract actual publication date
-  - Implements manual caching in `_date_cache` dict to avoid repeated requests
-  - Returns accurate date in YYYY-MM-DD format
-  - Used in endpoints that need precise dates (version comparison, metadata display)
-
-**Low-level function:**
-- `complete_date()`: Direct Playwright-based date completion (used by async wrapper)
-
-### Frontend Date System (`frontend/src/utils/dateUtils.ts`)
-
-- `parseItalianDate(dateStr)`: Parses date strings while preserving original year (no conversion to YYYY-01-01)
-  - Returns Date object with original precision maintained
-  - Critical for avoiding artificial date standardization
-
-- `formatDateItalianLong(date)`: Formats dates to Italian extended format
-  - Example output: "7 agosto 1990" for 1990-08-07
-  - Used in: `NormaCard`, `NormaBlockComponent`, `NormeNavigator`
-  - Respects actual dates from backend (doesn't show synthetic YYYY-01-01)
-
-### When to Use Which Approach
-
-| Use Case | Backend Function | Frontend Function |
-|----------|------------------|-------------------|
-| URN Generation | `complete_date_or_parse()` | N/A |
-| Display in UI | N/A | `formatDateItalianLong()` |
-| Article Metadata | `complete_date_or_parse_async()` | `formatDateItalianLong()` |
-| Version Comparison | `complete_date_or_parse_async()` | `formatDateItalianLong()` |
-| Internal Parsing | `complete_date_or_parse()` | `parseItalianDate()` |
-
-**Key Principle**: Never force year-only dates to "YYYY-01-01" in UI display. The frontend respects backend precision.
-
-## Scraping Architecture
-
-The application uses async web scraping with intelligent source routing:
-
-1. **Source Detection**: `NormaController.get_scraper_for_norma()` routes requests based on act type
-   - EUR-Lex: TUE, TFUE, CDFUE, Regolamento UE, Direttiva UE
-   - Normattiva: All Italian state laws (legge, decreto, d.p.r., regio decreto, codici)
-   - Brocardi: Annotations only for Normattiva sources
-
-2. **Parallel Fetching**: `asyncio.gather()` fetches multiple articles concurrently
-
-3. **Streaming**: `/stream_article_text` uses Quart's `Response` generator for real-time results
-
-4. **Browser Management**: Playwright browser pool via `PlaywrightManager` singleton for efficient resource usage
-
-## Frontend State Management
-
-Uses Zustand for global state with the following slices:
-
-Server-backed (hydrated by `fetchUserData` on login/refresh, mutated via optimistic+sync actions):
-- **Bookmarks** — `bookmarkService`, table `bookmarks`
-- **Dossiers + items** — `dossierService`, tables `dossiers` / `dossier_items`
-- **Environments** — `environmentService`, table `environments`
-- **QuickNorms** — `quickNormService`, table `quick_norms` (usage counter via atomic `POST /:id/use`)
-- **CustomAliases** — `customAliasService`, table `custom_aliases` (unique `(userId, trigger)` at DB level, usage counter via atomic `POST /:id/use`)
-- **Annotations** — `annotationService`, table `annotations` (hydrated per-article by `loadAnnotationsForArticle`)
-- **Highlights** — `highlightService`, table `highlights` (hydrated per-article)
-- **History** — `/history` API
-
-UI-only (persisted in `localStorage` via Zustand `persist`, partialize list):
-- **Search Results / Workspace** — active norm cards, tabs, highest z-index
-- **Settings** — theme, API endpoint, studyMode preferences
-- **searchPanelState** — panel open/close, last parsed query
-
-The store is located in `frontend/src/store/useAppStore.ts` and uses Immer. Every user-data slice is now server-backed; the partialize intentionally keeps only UI state. See gotcha #17 for the rule every new user-owned slice must follow.
-
-### Bookmarks vs Dossiers - Conceptual Difference
-
-**Bookmarks** 📌 (Simple, Quick Access):
-- Purpose: Save individual articles for quick reference
-- Use case: Daily workflow, frequently accessed norms
-- Features:
-  - One-click save/access
-  - Tag filtering
-  - Instant norm retrieval (click → opens search)
-- Think: Browser bookmarks
-
-**Dossiers** 📁 (Advanced, Research Collections):
-- Purpose: Organize multiple articles into research projects
-- Use case: Complex legal research, study preparation, case analysis
-- Features:
-  - Multiple articles per dossier
-  - Drag & drop reordering
-  - Expandable rows: click a norma item to read the article text in place
-  - Important star (single flag, no longer a multi-status pipeline)
-  - PDF export, JSON export, sharing
-  - Bulk operations (move, delete)
-  - Import articles from norm tree
-  - Description and tags
-- Think: Research folders/projects
-
-**Both are essential** - Bookmarks for speed, Dossiers for organization.
-
-All three (History, Bookmarks, Dossiers) support instant norm retrieval via `triggerSearch()`.
-
-### Annotations (Notes) UX
-
-Notes on articles are surfaced through a **Peek popover** (desktop) / **bottom sheet** (mobile) anchored to the StickyNote toolbar button, plus a **compact inline popover** triggered by clicking the `.note-anchor` wavy underline in the article body. The previous always-visible `NotesPanel` above the article was removed because it occupied vertical space even when not needed.
-
-Files:
-- `components/features/search/NotesPeekPanel.tsx` — toolbar-anchored popover with list + inline edit + composer + "Apri in Modalità Studio" escape hatch
-- `components/features/search/InlineNotePopover.tsx` — single-note mini popover, anchored to the wavy span, for quick-look
-- `hooks/useArticleMarkers.ts:82` — renders the wavy `<span class="note-anchor" data-note-id="…">` for each anchored annotation. Click delegation is in `ArticleTabContent` (`contentRef` listener)
-
-Store actions (`useAppStore.ts`):
-- `addAnnotation` / `removeAnnotation` / `updateAnnotation(id, newText)` — all optimistic with server sync via `annotationService`. Revert on error.
-- `updateAnnotation` powers the inline edit: click a note → textarea; blur commits, Escape cancels, Cmd/Ctrl+Enter commits explicitly. Empty trimmed input reverts to original.
-
-Note lifecycle:
-- **Anchored**: created via "Aggiungi nota" from SelectionPopup → `noteAnchor` state → Peek auto-opens with composer pre-focused. On save the backend stores `anchorText + startOffset`, which the marker pipeline uses to paint the wavy underline.
-- **Free**: just open the Peek and type. No anchor, shown in the "Libere" group.
-
-Export to `.txt`: a Download icon in the Peek header dumps the article's notes (anchored + free) into a UTF-8 text file. Plumbing lives in `ArticleTabContent` (`downloadTxt` + `slugify` + `articleHeader` helpers) — shared with the highlights export so a future export consumer is a one-liner.
-
-### Highlights UX
-
-Creation of new highlights happens **only** in `SelectionPopup` (the toolbar's button is *not* a second creator — that pattern was tried and rolled back). The Highlighter button in the reading toolbar opens a small **tooltip-style action bar** (`HighlightsActionsPicker.tsx`) with two icon-only buttons:
-- **Eye / EyeOff** — toggles a `.highlights-hidden` class on the article body's contentRef. CSS overrides the `--hl-*-bg` HSL variables to alpha-0 so the inline `style="background-color: hsl(var(--hl-*-bg))"` on every `<mark>` resolves to transparent (no `!important` needed for the bg). A single targeted `color: inherit !important` on `.highlight-mark` handles the fg, since `hsl(...)` cannot accept `inherit` via a variable. The markup stays intact, re-toggling restores the colors.
-- **Download** — exports the article's highlights to `.txt`, same plumbing as notes.
-
-Both actions disabled with explanatory tooltip when count is 0. Picker style mirrors `SelectionPopup`: dark slate background, ~88px wide, two icon buttons separated by a 1px slate divider, no chrome.
-
-### Dossier UX
-
-Reading statuses (unread/reading/important/done) were replaced with a single **important star**. It is stored on the existing `DossierItem.status` field but persisted server-side via a `_dossierMeta` envelope packed into the item's `content` JSON (no backend schema change) — see `packItemContent` / `unpackItemContent` in `dossierUtils.ts`. `updateDossierItemStatus` is narrowed to `'unread' | 'important'` and defers the PUT for items still in `pendingDossierItemIds` (their `addItem` POST hasn't returned a server id yet); once it settles, the pending star write is replayed.
-
-Item rows expand in place instead of opening a modal: clicking a norma row in `DossierDetailView` renders `DossierItemReader.tsx` inline, reusing the dashboard's reading layer (markers, `SelectionPopup`, `InlineNoteComposer`/`InlineNotePopover`). "Apri su Dashboard" and "Copia citazione" live in the expanded row's footer. `ArticleViewerModal.tsx` was removed — the expandable row replaces it entirely. Article fetches go through `utils/articleFetchCache.ts`: a session-only cache with in-flight de-dup and a max of 3 concurrent fetches (errors are not cached, so "Riprova" re-fetches). Keys come from `utils/normaKeys.ts` and must stay byte-identical between the dashboard and the dossier reader or the cache silently misses.
-
-`AddToDossierPopover.tsx` is the only add-from-reading entry point (opened from the `ReadingToolbar` primary button and from `LooseArticleCard`); it lists recent dossiers plus an inline "Nuovo dossier" that waits for the server id before adding (`createDossier(): Promise<string | null>`). `DossierModal` is create-only now — it no longer doubles as an editor.
-
-`SortableDossierItem`: the expand toggle lives on a header-scoped sub-div, never nested inside the row's own `role="button"` (avoids double-activation on Enter/Space); the important-star button keeps its 44px touch target regardless of row density.
-
-## Important Implementation Notes
-
-### Avoiding Code Duplication
-
-Always check for existing utilities before implementing:
-- **URN generation**: Use `urngenerator.py` functions
-- **Text parsing**: Use `text_op.py` for normalization and parsing
-- **Tree extraction**: Use `treextractor.py` for article structures
-- **Date handling** (backend): Use `text_op.py` date functions:
-  - `complete_date_or_parse(date_str)`: Sync version for URN generation (year-only dates become YYYY-01-01)
-  - `complete_date_or_parse_async(date_str)`: Async version using Playwright to fetch real dates from Normattiva
-  - `complete_date()`: Low-level async Playwright-based date completion
-  - Manual cache in `_date_cache` dict for repeated requests
-- **Date handling** (frontend): Use `src/utils/dateUtils.ts`:
-  - `parseItalianDate(dateStr)`: Parses dates keeping year as-is (no conversion to YYYY-01-01)
-  - `formatDateItalianLong(date)`: Formats to Italian extended format (e.g., "7 agosto 1990")
-- **Article unique IDs** (frontend): Use `src/utils/articleIds.ts`:
-  - `getUniqueArticleId(article)`: canonical encoding `allN:num` for annex entries, plain `num` otherwise. Used across NormaCard, NormaBlockComponent, and `useAnnexNavigation`. Never reimplement the `all${allegato}:${num}` string inline.
-  - `filterLoadedIdsForAnnex(ids, annex)`: project a list of loaded uniqueIds down to plain article numbers in the current annex context (strips prefix). Replaces the previous ~4 inline copies.
-  - `findArticleByNormalizedId(articles, id)`: **tolerant** lookup — matches on `normalizeArticleId` so "1-bis" (tree API) and "1 bis" (scraper) resolve to the same article. Required because the two sources disagree on `-bis/-ter/-quater` formatting.
-- **Norma meta line** (frontend): Use `src/utils/normaMeta.ts`:
-  - `formatNormaMeta(norma, { variant, articleCount? })`: single source for the "alias vs date + number" subtitle. Variants are `'card-mobile'`, `'card-desktop'`, `'block'` — preserve the three historical phrasings ("Data:", "Edizione del", bare). Never duplicate the conditional JSX.
-
-### Rate Limiting
-
-Configured in `visualex_api/tools/config.py`:
-- Default: 1000 requests per 600 seconds (10 minutes) per IP
-- Middleware in `NormaController.rate_limit_middleware()`
-- Returns 429 status when limit exceeded
-
-### Scraping Fragility
-
-Web scrapers depend on HTML structure of external sites (Normattiva, EUR-Lex, Brocardi). HTML changes on these sites will break scrapers and require updates to parsing logic.
-
-### Async Patterns
-
-- All scraper methods are async (`async def get_document()`, `async def get_info()`)
-- Use `asyncio.gather()` for parallel operations
-- Use `asyncio.to_thread()` for blocking operations (file I/O, Playwright browser calls)
-- Quart routes are async by default
-- **Browser management**: Use `PlaywrightManager` singleton from `browser_manager.py` for browser pooling and resource efficiency
-- Date completion is async via Playwright: `complete_date_or_parse_async()` fetches real dates from Normattiva asynchronously
-
-### Frontend-Backend Communication
-
-- Development: Vite proxies API calls from `:5173` to `:5000`
-- CORS configured for localhost origins
-
-## Common Patterns
-
-### Adding a New Scraper
-
-1. Create new scraper class in `visualex_api/services/`
-2. Implement async `get_document(normavisitata: NormaVisitata) -> Tuple[str, str]`
-3. Add act type detection in `NormaController.get_scraper_for_norma()`
-4. Update `tools/map.py` if new act type mappings are needed
-
-### Adding a New API Endpoint
-
-1. Define route in `NormaController._setup_routes()` (or `setup_routes()` in standalone app.py)
-2. Implement async handler method in controller
-3. Use `await request.get_json()` for body parsing
-4. Return `jsonify()` for JSON responses
-5. Use structlog logger for debugging (`log.info()`, `log.error()`)
-
-### Frontend: Adding a New Component
-
-1. Create component in appropriate `components/` subdirectory
-2. Import types from `src/types/index.ts`
-3. Access global state with `useAppStore()` hook
-4. Use Tailwind CSS for styling (configured with v4)
-5. Export as default for lazy loading if needed
-
-### Frontend: UI Conventions
-
-These are non-obvious conventions baked into the codebase — respect them when adding new interactive surfaces so the app stays coherent.
-
-**Destructive confirmations**
-- Never use `window.confirm` for delete/close actions. Use `components/ui/ConfirmDialog` with `variant="danger"`; message should name the scope and clarify what is NOT touched (e.g. "Gli articoli salvati nei segnalibri e dossier non saranno toccati").
-- Currently in use by: tab close (`WorkspaceTabPanel`), norma delete (`NormaBlockComponent`), loose article delete (`LooseArticleCard`).
-
-**Keyboard-accessible collapsibles**
-- Any `<div>` with `cursor-pointer` + `onClick` that toggles a section must also have: `role="button"`, `tabIndex={0}`, `aria-expanded={isOpen}`, `aria-label` (dynamic "espandi" / "comprimi"), and `onKeyDown` handling Enter / Space with `e.preventDefault()`.
-- The `onKeyDown` must short-circuit with `if (e.target !== e.currentTarget) return;` — otherwise interactive children (close buttons, etc.) re-trigger the collapse on Enter/Space.
-- Always include `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2` on the wrapper.
-
-**Popover anchoring with `@floating-ui/react`**
-- Split positioning and animation onto **two elements**: outer `<div ref={refs.setFloating} style={floatingStyles}>` keeps floating-ui's positioning transform; inner `<div className="animate-in fade-in zoom-in-95" style={{ transformOrigin }}>` owns the entry animation. If you put them on the same element the scale transform overwrites the positioning transform and the popover visibly flies from (0,0) for ~150ms.
-- Compute `transformOrigin` from `placement` (see `getTransformOrigin` in `NotesPeekPanel.tsx`) so the popover grows from the anchor edge rather than its geometric centre.
-- Anchor using a **state** (`useState<HTMLElement | null>` + callback ref) rather than a ref object: reading `ref.current` in render triggers `react-hooks/refs` lint and can miss the initial mount.
-
-**Toggle buttons (e.g. quick norm, bookmark)**
-- When the same click both adds and removes, drive the visual from an `isPressed` selector, not a fixed colour. Idle: `text-slate-400 + hover:text-{accent}`; active: `bg-{accent}-50 text-{accent}` (plus `fill-{accent}` on the icon if it has a fillable body). Toast text must match the real action ("Aggiunto" / "Rimosso"). Always set `aria-pressed`.
-
-**Two flavours of toolbar pop-ups**
-- *Peek* (e.g. `NotesPeekPanel`) — a panel with a header, scrollable body, composer/footer. Use when the surface lists/edits content. Width ~360px, light bg matching the page theme.
-- *Action bar* (e.g. `HighlightsActionsPicker`, `SelectionPopup`) — a thin dark slate bar with 2-4 icon-only buttons separated by 1px dividers, no chrome. Use when the surface is purely "perform action X". Width auto. Both flavours share the same outer/inner split pattern from the floating-ui rule above.
-
-**Sticky filter rows inside scrollable lists**
-- `sticky top-0` alone is not enough — the row needs an **opaque background** that matches the panel's bg, otherwise content scrolls *through* it. Theme-tokenised: register a `filterBg` colour in the panel's THEME_STYLES record.
-- Use negative-margin bleed (`-mx-N -mt-N -top-N` matching the parent's `pN`) to extend the opaque bg edge-to-edge over the panel's padding. Pair with `border-b border-current/10` so the boundary is visible while scrolling.
-- Bump `z-index` to `z-20` (above any in-flow card decoration that uses `z-10`).
-
-**Beating inline `style="..."` without `!important`**
-- When markup ships with inline styles you don't control (e.g. `useArticleMarkers` emits `<mark style="background-color:hsl(var(--hl-yellow-bg))">`), a class-level CSS rule loses specificity. Two safe escape hatches in priority order:
-  1. **Override the CSS variable** in a narrower scope (e.g. `.highlights-hidden { --hl-yellow-bg: 0 0% 0% / 0; }`) so the inline `hsl(var(--…))` resolves differently. Same property, narrower scope wins, no `!important` needed.
-  2. If the inline style references no variable (or the variable can't yield the value you need), fall back to **a single, narrowly-scoped `!important`** with a code comment justifying why every other route fails. The repo rule against `!important` has this carve-out — don't sprinkle.
-
-**Card markers vs saturated backgrounds**
-- For lists that mirror something already coloured in the article body (highlights summary, etc.), prefer a **4px coloured stripe down the leading edge** of the card over re-applying the saturated background to the text inside. The colour signal is preserved, the text stays legible against any theme, and you avoid duplicating the bg the user already sees in context.
-
-### Backend: Browser Operations (Playwright)
-
-All browser automation is now async via Playwright. The `PlaywrightManager` singleton handles pooling:
-
-1. **For PDF extraction**: `pdfextractor.py` uses `PlaywrightManager` to pool browser instances
-2. **For date completion**: `text_op.py` functions `complete_date()` and `complete_date_or_parse_async()` use Playwright
-3. **Usage pattern**:
-   ```python
-   from visualex_api.tools.browser_manager import PlaywrightManager
-
-   manager = PlaywrightManager()
-   browser = await manager.get_browser()
-   page = await browser.new_page()
-   # ... do work
-   await page.close()
-   ```
-4. **Important**: All Playwright calls are async. Use `asyncio.to_thread()` only if wrapping synchronous code
-5. **Installation**: Run `playwright install chromium` before first use
-6. **Resource cleanup**: `PlaywrightManager` handles browser lifecycle - no manual cleanup needed for `get_browser()`
-
-## Debugging
-
-- Python: Logs use structlog with ISO timestamps and color output (DEBUG level)
-- Frontend: React DevTools, Zustand DevTools, browser console
-- Playwright: Check with `playwright install --dry-run`
-
-## Environment Variables
-
-Python API:
-- `HOST`: Server host (default: `0.0.0.0`)
-- `PORT`: Server port (default: `5000`)
-- `REDIS_ENABLED`: `true`/`false` (default: `false`). When `false`, the cache uses filesystem backend (per-instance). A warning is logged at startup.
-- `REDIS_URL`: Redis connection string (default: `redis://localhost:6379/0`)
-- `REDIS_CACHE_PREFIX`: Key prefix for cache entries (default: `vlx`)
-- `PERSISTENT_CACHE_TTL`: Cache TTL in seconds (default: `86400`)
-- `HTTP_MAX_CONCURRENCY`, `HTTP_TIMEOUT`, `HTTP_MAX_RETRIES`, etc.: HTTP client tuning (see `config.py`)
-- `ALLOWED_ORIGINS`: comma-separated CORS origins. **Unset means localhost only** — production must set it.
-- `RATE_LIMIT` / `RATE_LIMIT_WINDOW`: per-IP counter (defaults `1000` / `600`)
-
-See `.env.example` at the repo root for the full Python-side template.
-
-Node.js Backend: See `backend/.env.example` for required variables. `REDIS_ENABLED` defaults to `"true"` in the example to mirror production topology — set to `"false"` if running dev without a Redis instance (rate limiter will use in-memory fallback with warning log).
-
----
+VisuaLexAPI fetches and displays Italian legal texts from Normattiva, EUR-Lex and
+Brocardi. Three services:
+
+- **Python API** (`/visualex_api`, port 5000) — Quart, async scraping, PDF export
+- **Node backend** (`/backend`, port 3001) — Express + Prisma, auth and user data
+- **Frontend** (`/frontend`, port 5173) — React + TypeScript + Vite
+
+The user is a practising lawyer, not a developer. UI copy is Italian; code,
+comments and commits are English.
 
 ## Branches and Deployment
 
@@ -490,328 +34,521 @@ When backporting from `merlt`, watch for two things: commits are often mixed
 
 Deployment is a single batch script run on the server, `deploy.sh`, with no CI
 and no rollback. **Read `docs/deployment.md` before changing anything it
-touches** — it records what each step exists to prevent, what has to be updated
-in the script when the project changes, and the known gaps.
+touches** — it records what each step exists to prevent and the known gaps.
 
 Two traps worth knowing without opening that file:
 - `npm run build` (`tsc -b`) is the real frontend type-check. A bare
-  `tsc --noEmit` does not walk the project references and will report a false
-  green.
-- Step 1 pulls whatever branch the server is on. Nothing checks it is `main`.
+  `tsc --noEmit` does not walk the project references and reports a false green.
+- Step 1 pulls whatever branch the server is on; only the step-0 guard keeps that
+  honest.
 
----
-
-## Multi-Agent Workflow
-
-This project is optimized for multi-agent collaboration. Use specialized agents for different types of tasks to maximize efficiency and code quality.
-
-### Recommended Agents by Task Type
-
-| Task Type | Agent | Why |
-|-----------|-------|-----|
-| **Python API - New Endpoints** | `api-designer` | Design OpenAPI spec, then `builder` implements |
-| **Python API - Scraper Issues** | `scraper-builder` | Expert in retry logic, rate limiting, checkpointing |
-| **Python API - Async Bugs** | `debugger` | Specializes in asyncio issues, race conditions |
-| **Python API - Performance** | `performance-optimization` | Optimize without breaking existing logic |
-| **Frontend - New Components** | `frontend-builder` | React/TypeScript/Tailwind expert, follows rules |
-| **Frontend - UI/UX Review** | `ux-reviewer` | Can use Chrome DevTools for visual testing |
-| **Frontend - State Management** | `frontend-architect` | Zustand patterns, state design |
-| **Frontend - Visual Bugs** | `debugger` + `frontend-builder` | Debug + fix with browser testing |
-| **Backend - Database Schema** | `database-architect` | Prisma schema design and migrations |
-| **Backend - Auth/Security** | `security-audit` | Review auth, middleware, input validation |
-| **Documentation** | `scribe` | README, API docs, inline comments |
-| **Testing** | `validator` | Write tests, run test suites |
-| **Complex Multi-Step** | `orchestrator` | Coordinates multiple agents |
-
-### Quick Multi-Agent Commands
+## Development Commands
 
 ```bash
-# Design new API endpoint
-> Usa api-designer per progettare endpoint /api/compare_versions
+./start.sh                       # all three services
 
-# Fix scraper breakage
-> Usa scraper-builder per fixare normattiva_scraper - cambio HTML
+source .venv/bin/activate        # Python API
+python app.py                    # main server (UI + API)
+python -m visualex_api.app       # alt server with /api/* prefix + Swagger
 
-# Review frontend UX
-> Usa ux-reviewer per valutare la UX del workspace con browser testing
+cd backend && npm run dev        # Node backend
+cd backend && npm run prisma:studio
 
-# Optimize performance
-> Usa performance-optimization per ottimizzare fetch_article_text
-
-# Add new feature end-to-end
-> Usa orchestrator per implementare feature "export to Word"
+cd frontend && npm run dev       # :5173
+cd frontend && npm run build     # tsc -b && vite build — the real type-check
+cd frontend && npm run lint
+cd frontend && npm run test      # vitest (npm run test:ui for the UI)
 ```
 
-### Entry Points for Agents
+PDF export needs Playwright browsers: `playwright install chromium`.
 
-**Python API Work:**
-- Main controller: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/app.py`
-- Scrapers: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/services/*_scraper.py`
-- Models: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/norma.py`
-- Text/Date utilities: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/text_op.py`
-- Browser management: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/browser_manager.py`
-- Config: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/visualex_api/tools/config.py`
+Backend tests live in `backend/tests` (vitest + supertest). An end-to-end and
+stress harness lives in `e2e/` with its own README.
 
-**Frontend Work:**
-- App entry: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/App.tsx`
-- Store: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/store/useAppStore.ts`
-- Types: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/types/index.ts`
-- Date utilities: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/utils/dateUtils.ts`
-- Components: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/`
+## Architecture
 
-**Backend Work:**
-- Server: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/backend/src/index.ts`
-- Prisma schema: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/backend/prisma/schema.prisma`
+### Python API (`/visualex_api`)
 
-### Common Workflows
+- **`app.py`** (root): main server, UI + API. **`visualex_api/app.py`**:
+  alternative server with `/api/*` prefix and Swagger.
+- **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
+  `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool).
+- **`tools/`**:
+  - `norma.py` — core models `Norma` / `NormaVisitata` (both with
+    `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
+    the primary container across the API)
+  - `urngenerator.py` — URN generation · `treextractor.py` — article trees
+  - `text_op.py` — text parsing **and** date handling (see Date System)
+  - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
+  - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
+  - `map.py` — act-type mappings
+  - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
+    exposed at `POST /parse_query`
+  - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
+    Regolamento UE 2016/679); runs before the NL parser
+  - `citation_linker.py` — citation detection in article text, emits
+    `{start, end, display_text, article, act_type, date, act_number}`; exposed at
+    `POST /extract_citations`
+  - `circuit_breaker.py` — per-source breaker. **State is in-memory
+    per-instance** — single-instance deployment only. Status at
+    `GET /api/circuit-breakers`
+  - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
+    filesystem fallback; startup warns when Redis is disabled or missing
 
-#### 1. Add New Scraper Source
+### Node backend (`/backend`)
 
-```
-1. Use architect to research the target site structure
-2. Use scraper-builder to implement with retry/rate-limiting
-3. Use builder to integrate into NormaController.get_scraper_for_norma()
-4. Use validator to write integration tests
-```
+Express + Prisma. Auth, and the persistence for every user-owned slice.
 
-#### 2. Add New Frontend Feature
+- `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
+  authenticated 300/min (by userId), writes 20/min. `RateLimiterRedis` when
+  `REDIS_ENABLED=true`, else in-memory with a startup warning.
+- `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
+  connection errors fail open.
+- **Environments**: `Environment` model keeps searchable metadata in columns
+  (`name/description/author/version/category/color/tags`) and everything else in
+  one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
+  (the forum entity) — a personal env can be promoted, the tables stay distinct.
+- **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
+  entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
+  the controller maps Prisma P2002 to 409.
+- **Scoped bulk deletes**: `DELETE /annotations` and `DELETE /highlights`, both
+  scoped to `req.user.id`. Intended caller is `applyEnvironment(replace)` ONLY —
+  do not wire into end-user UI without a dedicated confirm flow.
+- Dossier item mutations are scoped to their dossier (IDOR fix — keep it that
+  way when adding item routes).
 
-```
-1. Use frontend-architect to design component structure and state
-2. Use frontend-builder to implement (auto-follows Tailwind/React rules)
-3. Use ux-reviewer with browser testing to validate UX
-4. Use validator to add Vitest tests
-```
+### Frontend (`/frontend/src`)
 
-#### 3. Fix Scraper Breakage
+- `App.tsx` — routing. Routes: `/` (search), `/dossier`, `/history`,
+  `/environments`, `/forum`, `/admin/*`, plus `/login` and `/register`.
+- `store/useAppStore.ts` — Zustand + Immer, the single global store.
+- `types/index.ts` — shared types. `services/` — one file per backend entity.
+- `components/features/` — `search`, `workspace`, `dossier`, `environments`,
+  `bulletin` (the Forum), `history`, `compare`, `settings`.
+- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
+- `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
+  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
+  Interaction tokens live in `constants/interactions.ts`, stacking bands in
+  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
 
-```
-1. Use debugger to identify HTML structure changes
-2. Use scraper-builder to update selectors and parsing logic
-3. Use validator to verify fix with real requests
-```
+## Key API Endpoints
 
-#### 4. Performance Issue
+POST unless noted, JSON bodies.
 
-```
-1. Use debugger to profile and identify bottleneck
-2. Use performance-optimization for idempotent optimization
-3. Use validator to ensure no regression
-```
+- `/fetch_norma_data` — build norm structure from params
+- `/fetch_article_text` — fetch article text (array response)
+- `/stream_article_text` — stream results as NDJSON, one object per line
+- `/fetch_brocardi_info` — Brocardi annotations (position, ratio, spiegazione, massime)
+- `/fetch_all_data` — article text + Brocardi in one call
+- `/fetch_tree` — article tree for a complete URN
+- `/parse_query`, `/extract_citations` — NL parsing and citation detection
+- `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
+- `GET /history` — server-side search history
 
-#### 5. Add API Endpoint
-
-```
-1. Use api-designer to design request/response schema
-2. Use builder to implement in NormaController._setup_routes()
-3. Use frontend-builder to add corresponding frontend service call
-4. Use validator to test end-to-end
-```
-
-#### 6. Fix Date Display Issues
-
-```
-Backend:
-1. For URN generation: Use sync complete_date_or_parse() in urngenerator.py
-2. For metadata endpoints: Use async complete_date_or_parse_async() to get accurate dates
-3. Always return actual dates in JSON response (not synthetic YYYY-01-01)
-
-Frontend:
-1. Replace date.toLocaleDateString() with formatDateItalianLong()
-2. Verify parseItalianDate() is used for date input parsing
-3. Test with year-only entries to ensure they display correctly (not forced to MM-01)
-4. Use ux-reviewer with browser testing to validate date display
-
-Pattern:
-- Backend: Sync (fast) for URNs, Async (accurate) for display
-- Frontend: Always use formatDateItalianLong() for display, parseItalianDate() for input
-```
-
-### Browser Testing (Frontend)
-
-When working on frontend, agents can use Chrome DevTools MCP for visual verification:
-
-**Dev Server URL:** `http://localhost:5173`
-
-**Workflow:**
-1. Start dev server: `cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend && npm run dev`
-2. Agent uses `navigate_page(http://localhost:5173)`
-3. Agent uses `take_screenshot()` for visual check
-4. Agent uses `list_console_messages()` for errors
-5. Agent uses `resize_page(375, 667)` for mobile testing
-
-**Agents with browser access:** `frontend-builder`, `ux-reviewer`, `validator`, `debugger`
-
-### Project-Specific Patterns
-
-**Async Patterns (Python):**
-- All scraper methods return `async def get_document() -> Tuple[str, str]`
-- Use `asyncio.gather()` for parallel fetching
-- Use `asyncio.to_thread()` for blocking I/O (Playwright, file ops)
-- Quart routes are async by default
-- Playwright operations are async via `PlaywrightManager` singleton
-
-**Date Handling (Python/Frontend):**
-- Backend URN generation: Use sync `complete_date_or_parse()` (fast, year-only dates → YYYY-01-01)
-- Backend metadata/comparison: Use async `complete_date_or_parse_async()` (slow, accurate dates via Playwright)
-- Frontend display: Always use `formatDateItalianLong()` to show Italian dates (respects backend precision)
-- Never display synthetic YYYY-01-01 dates in UI (use actual dates from backend)
-
-**State Management (Frontend):**
-- Zustand store in `useAppStore.ts` with Immer
-- Always use actions, never mutate state directly
-- Store structure: `searchResults`, `history`, `bookmarks`, `dossiers`, `workspace`, `settings`
-
-**Error Handling:**
-- Python: Custom exceptions in `visualex_api/tools/exceptions.py`
-- Raise `ValidationError`, `ResourceNotFoundError`, `RateLimitExceededError`
-- Global error handler in `NormaController.handle_error()`
-
-**Code Reuse:**
-- URN generation: Use `urngenerator.py` functions
-- Text parsing: Use `text_op.py` utilities (includes date functions)
-- Tree extraction: Use `treextractor.py`
-- Date utilities: Use `text_op.py` backend or `dateUtils.ts` frontend
-- Article unique IDs: Use `articleIds.ts` (getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId)
-- Norma meta line: Use `normaMeta.ts` (formatNormaMeta)
-- Browser operations: Use `PlaywrightManager` singleton
-- Never duplicate these utilities
-
-### Critical Files - DO NOT BREAK
-
-**Python:**
-- `visualex_api/app.py` - Main controller
-- `visualex_api/tools/norma.py` - Core data models
-- `visualex_api/tools/text_op.py` - Text parsing AND date handling (critical for both URN and date completion)
-- `visualex_api/tools/browser_manager.py` - Playwright browser pooling singleton
-- `visualex_api/services/*_scraper.py` - Fragile HTML parsers
-
-**Frontend:**
-- `frontend/src/store/useAppStore.ts` - Global state
-- `frontend/src/types/index.ts` - Type definitions
-- `frontend/src/services/api.ts` - API client
-- `frontend/src/utils/dateUtils.ts` - Date parsing and formatting (used in NormaCard, NormaBlockComponent, NormeNavigator)
-- `frontend/src/utils/articleIds.ts` - Article uniqueId encoding + tolerant normalized lookup (used by containers + `useAnnexNavigation`)
-- `frontend/src/utils/normaMeta.ts` - Shared alias/regular meta line formatter (used by NormaCard mobile+desktop, NormaBlockComponent)
-- `frontend/src/utils/articleFetchCache.ts` - Session-only article text cache backing the dossier expandable rows: in-flight de-dup, max 3 concurrent fetches, errors not cached (so "Riprova" re-fetches)
-- `frontend/src/hooks/useAnnexNavigation.ts` - Shared tree-fetch + annex switch + load-article hook for both containers
-- `frontend/src/components/features/search/NotesPeekPanel.tsx` - Toolbar-anchored notes popover (replaces the legacy inline NotesPanel)
-- `frontend/src/components/features/search/InlineNotePopover.tsx` - Click-on-wavy-underline mini popover (view/edit a single existing note)
-- `frontend/src/components/features/search/InlineNoteComposer.tsx` - Tooltip-style composer anchored on the text selection when the user picks "Aggiungi nota" from SelectionPopup. Uses a floating-ui VirtualElement built from the captured selection rect (the range itself gets cleared when SelectionPopup hides). Toolbar button still opens the full Peek; the Peek's anchor-composer path is now this component.
-- `frontend/src/components/features/search/HighlightsActionsPicker.tsx` - Tooltip-style action bar (toggle visibility + export .txt) — no creator, that's `SelectionPopup`'s job
-- `frontend/src/components/features/workspace/StudyMode/StudyModeSummary.tsx` - Study Mode unified list of highlights+notes with filter row + colour stripes
-- `frontend/src/components/features/workspace/StudyMode/StudyModeToolsPanel.tsx` - Study Mode side panel hosting the tabs (Riepilogo / Note / Evidenze)
-- `frontend/src/components/features/dossier/` - Dossier is split across multiple files (was a 1366-line monolith): `DossierPage.tsx` is a thin shell that routes list/detail via `?dossier=<id>`, `DossierListView.tsx` hosts the grid + card context menu + page-scoped shortcuts (`n` / `/` / `i`), `DossierDetailView.tsx` hosts the single-dossier view. Modals live one-per-file (`EditDossierModal`, `ImportDossierModal`, `MoveToDossierModal`, `TreeNavigatorModal`, `OpenOnDashboardPicker`, `AddNoteModal`) — `ArticleViewerModal` was removed, superseded by the inline expandable row. Shared helpers (`formatTimestampLong`, `computeNormaGroups`, `computeItemCounts`, `packItemContent`/`unpackItemContent`, `NormaGroup`) live in `dossierUtils.ts`. `DossierItemReader.tsx` renders the expanded row's article text (dashboard reading layer reused: markers, `SelectionPopup`, notes). `AddToDossierPopover.tsx` is the only add-from-reading entry point. The item row component is `SortableDossierItem.tsx` (renders the 4px leading-edge amber stripe when `item.status === 'important'`, and owns the expand/collapse toggle). Toolbar buttons across mobile + desktop come from `ToolbarButton.tsx` — a color-token-driven component with `pressed`/`pressedColor` for toggle behaviour (pin is the canonical toggle: `color="slateMuted" pressedColor="yellow"`). Never add new dossier features inline in `DossierPage.tsx` — it's intentionally minimal.
-- `frontend/src/components/features/environments/` - Environments split across multiple files (was a 1281-line monolith): `EnvironmentPage.tsx` is a thin shell that owns state + handlers + JSX wiring; `EnvironmentCard.tsx` is the grid card; each modal has its own file (`CreateEnvironmentModal`, `EditEnvironmentModal`, `ImportPreviewModal`, `ApplyEnvironmentModal`, `EnvironmentDetailModal`). `EnvironmentContentViewer.tsx` is the shared dossier/quickNorm/alias/annotation/highlight tree renderer (both preview + selection). Cards carry a 4px leading-edge stripe keyed by `category.color` (an `hsl(var(--category-X))` CSS variable), an inline preview of the first 3 dossiers + 2 quick norms, and a stale/fresh chip driven by `updatedAt ?? createdAt` via `date-fns` + `it` locale. Card primary is "Unisci" (direct merge, no intermediate modal); replace lives as an amber voice "Sostituisci tutto…" in the 3-dot menu and routes through the shared `ConfirmDialog variant="danger"` in the parent. Page-scoped shortcuts `n` / `/` / `i` mirror the dossier list. Delete confirmation uses the shared `ConfirmDialog` (no more `DeleteConfirmModal` — that file was removed as part of the polish round). `ApplyEnvironmentModal` remains alive and reachable from `EnvironmentDetailModal` for the "consider + choose merge/replace" path.
-- `frontend/src/components/features/bulletin/` - Forum (user-facing name) page split across multiple files (was a 914-line monolith). Folder/component names stay `bulletin` / `BulletinBoardPage` because the tech identifier aligns with the backend `SharedEnvironment` model; the URL path is `/forum` and the UI label is "Forum" (commit `ccb34cc`). `BulletinBoardPage.tsx` is a thin shell owning tab state, data fetches, modal wiring, toast, and tour trigger (`tryStartTour('forum')` on mount). The three tab bodies are dumb views: `ForumExploreView.tsx` (filters + grid + pagination + reset-filters empty state), `ForumMyEnvironmentsView.tsx` (owner-action grid), `ForumSuggestionsView.tsx` (received/sent sub-tabs). `SharedEnvironmentCard.tsx` carries a 4px leading-edge stripe driven by the hex map in `CATEGORY_STRIPE` (EnvironmentCategory has no CSS var equivalent, so inline style — same visual pattern as `SortableDossierItem` / `EnvironmentCard`), the category/version/badges/menu micro-header above the title, and an absolute-timestamp tooltip on the relative time label (prefers `updatedAt` when delta from `createdAt` is ≥1s, label "Aggiornato …" vs "Creato …"). Delete confirmation uses shared `ConfirmDialog variant="danger"` with wording spelling out the forum-level purge (all versions + likes + reports). Empty state in Explore splits into filtered (variant="search" with "Azzera filtri") vs genuine empty via shared `EmptyState` component. First card in the grid carries `tour-forum-card` / `tour-forum-actions` DOM ids via the `isFirst` prop — only Explore sets this (My tab intentionally omits to avoid duplicate ids since the tour starts on mount in Explore). Suggestion rework (Aprile 2026) added: `SuggestionReviewDialog.tsx` (owner-side per-item review modal, Flow 2), `EditSuggestionDialog.tsx` (suggester-side edit modal, Flow 3), `SuggestionItemCard.tsx` (polymorphic renderer for all 5 itemTypes — annotation/highlight/dossier/quickNorm/alias — used in both dialogs), `AliasConflictDialog.tsx` (Replace/Skip mini dialog for 409 alias conflict; Rename is MVP-deferred per gotcha #20), `AddItemsDialog.tsx` (scoped "append" picker launched from Edit dialog), `AttributionChip.tsx` (shared `da @mario` chip rendered on every taken-content surface — see gotcha #21).
-
-**Backend:**
-- `backend/prisma/schema.prisma` - Database schema (now includes `Environment`, `QuickNorm`, `CustomAlias`, `AliasType` enum)
-- `backend/src/controllers/environmentController.ts` - Personal environment CRUD (separate from `SharedEnvironment`)
-- `backend/src/controllers/quickNormController.ts` - QuickNorm CRUD + atomic `useQuickNorm`
-- `backend/src/controllers/customAliasController.ts` - CustomAlias CRUD + atomic `useCustomAlias`; maps Prisma P2002 to 409
-- `backend/src/routes/environments.ts`, `quickNorms.ts`, `customAliases.ts` - each mounts on `/api`, all routes authenticate-gated
-
-**Frontend services (server sync):**
-- `frontend/src/services/environmentService.ts` - `getAll / getById / create / update / delete`
-- `frontend/src/services/quickNormService.ts` - CRUD plus `use(id)` for atomic usage bump
-- `frontend/src/services/customAliasService.ts` - CRUD plus `use(id)` for atomic usage bump
-- `frontend/src/services/annotationService.ts`, `highlightService.ts` - include `deleteAll()` (used by `applyEnvironment(replace)`)
-
-### Testing Strategy
-
-**Python:**
-```bash
-# Manual testing
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI
-source .venv/bin/activate
-python app.py
-
-# Test endpoint
-curl -X POST http://localhost:5000/api/fetch_norma_data \
-  -H "Content-Type: application/json" \
-  -d '{"act_type": "codice civile", "article": "2043"}'
+```json
+{
+  "act_type": "codice civile",
+  "date": "1990-08-07",         // optional
+  "act_number": "241",           // optional
+  "article": "2043",             // required: single, list "1,2", or range "3-5"
+  "version": "vigente",          // optional: "vigente" | "originale"
+  "version_date": "2024-01-15",  // optional
+  "annex": "A"                   // optional (allegato)
+}
 ```
 
-**Frontend:**
-```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend
-npm run test        # Run all tests
-npm run test:ui     # Interactive test UI
-npm run lint        # Lint check
+Request fields are `act_type/act_number/date`; the `norma_data` in responses uses
+`tipo_atto/numero_atto/data`. The mismatch is real — map, don't assume.
+
+## Date System
+
+Two complementary paths, chosen by whether you need speed or truth.
+
+**Backend** (`visualex_api/tools/text_op.py`):
+- `complete_date_or_parse(date_str)` — **sync, fast, approximate**. Year-only
+  dates become `YYYY-01-01`. Used by `urngenerator.py` so URN generation never
+  blocks on a lookup.
+- `complete_date_or_parse_async(date_str)` — **async, slow, accurate**. Drives
+  Playwright to read the real publication date from Normattiva, memoised in
+  `_date_cache`. Used where the date is displayed or compared.
+- `complete_date()` — the low-level Playwright call behind the async wrapper.
+
+**Frontend** (`frontend/src/utils/dateUtils.ts`):
+- `parseItalianDate(dateStr)` — parses while preserving the original precision.
+- `formatDateItalianLong(date)` — "7 agosto 1990". Use this for every displayed
+  date; never `toLocaleDateString()`.
+
+**The principle**: synthetic `YYYY-01-01` exists for URNs only. The UI shows the
+precision the backend actually has — a year-only entry displays as a year, and
+that is correct, not a bug to normalise away.
+
+If date completion feels slow, you are probably calling the async variant in a
+loop; if a browser timeout appears, the async wrapper catches it and falls back
+to the cached or synthetic value.
+
+## Scraping Architecture
+
+1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
+   EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
+   state law, Brocardi for annotations on Normattiva sources.
+2. **Parallel fetching** via `asyncio.gather()`.
+3. **Streaming**: `/stream_article_text` uses a Quart `Response` generator.
+4. **Browsers**: always through the `PlaywrightManager` singleton.
+
+Scrapers parse third-party HTML. When one breaks, the site changed — expect to
+update selectors, not logic.
+
+### Async rules (Python)
+
+Every scraper method is async (`get_document()`, `get_info()`). Quart routes are
+async by default. Never block the loop: wrap blocking I/O in
+`asyncio.to_thread()`. Playwright is async throughout — `WebDriverManager` is a
+deprecated alias of `PlaywrightManager`; Selenium is gone.
+
+Errors use the hierarchy in `visualex_api/tools/exceptions.py`
+(`ValidationError`, `ResourceNotFoundError`, `RateLimitExceededError`), surfaced
+by `NormaController.handle_error()`. Logging is structlog.
+
+## Frontend State
+
+One Zustand store (`store/useAppStore.ts`) with Immer. Always mutate through
+actions.
+
+**Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
+synced): bookmarks, dossiers + items, environments, quickNorms, customAliases,
+annotations and highlights (these two hydrate per-article via
+`loadAnnotationsForArticle` / `loadHighlightsForArticle`), history.
+
+**UI-only** (persisted to `localStorage` through the `persist` partialize):
+workspace tabs and z-index, settings, `searchPanelState`.
+
+The partialize deliberately holds UI state only. **Every user-owned slice is
+server-backed** — see gotcha 17, which is the rule any new slice must follow.
+
+### How the collections differ
+
+- **Dossiers** (`/dossier`) — the working file for a task: many articles, read in
+  place, reorderable, exportable, shareable. This is where real work happens.
+- **Bookmarks** — a save action in the reading toolbar backed by
+  `bookmarkService`. There is **no bookmarks page or route**; the dedicated UI was
+  removed as dead code. Don't document or build against a bookmarks page without
+  first deciding to rebuild one.
+- **History** (`/history`) — server-side search history.
+
+All of them reopen a norm through `triggerSearch()`.
+
+### Reading surface
+
+The dashboard article view (`ArticleTabContent`) composes: `ArticleBody` (renders
+sanitised HTML + hosts `SelectionPopup`), `useArticleMarkers` (turns raw text into
+HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
+(`ReadingToolbar`). Keys are `buildItemKey(norma)` and
+`uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
+uses the same two functions, and they must stay byte-identical or annotations
+made on one surface stop appearing on the other.
+
+**Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
+free notes; `InlineNoteComposer` anchored on the selection when creating an
+anchored note; `InlineNotePopover` when clicking an existing wavy underline.
+Three entry points, deliberately distinct — don't collapse them.
+
+**Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
+button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
+exports to `.txt` — it is not a second creator (that was tried and rolled back).
+
+### Dossier
+
+A dossier is where the articles needed for a task are aggregated and read.
+
+- **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
+  inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
+  composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
+  expanded footer. `ArticleViewerModal` no longer exists.
+- **Fetching**: `utils/articleFetchCache.ts` — session-only cache, in-flight
+  de-dup, max 3 concurrent fetches, errors not cached so "Riprova" really
+  refetches.
+- **Important star**: reading statuses (unread/reading/done) were removed. The
+  star persists through a `_dossierMeta` envelope packed into the item's `content`
+  JSON — no backend schema change — via `packItemContent`/`unpackItemContent` in
+  `dossierUtils.ts`. `updateDossierItemStatus` writes only `'unread' | 'important'`
+  and defers the PUT while an item is still in `pendingDossierItemIds` (its
+  `addItem` POST hasn't returned a server id yet), replaying it once settled.
+  Legacy status values still hydrate and simply render as unstarred.
+- **Collection**: `AddToDossierPopover.tsx` is the only add-from-reading entry
+  point (from `ReadingToolbar` and `LooseArticleCard`). It lists recent dossiers,
+  guards duplicates, and its inline "Nuovo dossier" waits for the server id
+  before adding — `createDossier()` returns `Promise<string | null>`.
+  `DossierModal` is create-only.
+- **Rows** (`SortableDossierItem`): the expand toggle lives on a header-scoped
+  sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
+  star keeps a 44px touch target.
+
+## Shared utilities — check before writing a new one
+
+Duplicating any of these is a defect, not a shortcut.
+
+**Python**: `urngenerator.py` (URNs) · `text_op.py` (text parsing + dates) ·
+`treextractor.py` (trees) · `PlaywrightManager` (browsers).
+
+**Frontend**:
+- `utils/normaKeys.ts` — `buildItemKey(norma)`, `uniqueArticleIdFromNorma(norma)`.
+  The annotation/highlight key contract; identical across dashboard and dossier.
+- `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
+  `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
+  (**tolerant** lookup — required, see gotcha 9).
+- `utils/dateUtils.ts` — `parseItalianDate`, `formatDateItalianLong`.
+- `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
+  (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
+  copyable citation string.
+- `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
+- `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
+  `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
+  `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
+- `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
+
+## UI Conventions
+
+Non-obvious rules baked into the codebase. Follow them so new surfaces stay
+coherent.
+
+**Destructive confirmations** — never `window.confirm`. Use
+`components/ui/ConfirmDialog` with `variant="danger"`, and word the message so it
+names the scope *and* what is not touched ("Segnalibri e dossier non saranno
+toccati").
+
+**Keyboard-accessible collapsibles** — a `div` that toggles on click needs
+`role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`
+(espandi/comprimi), and `onKeyDown` for Enter/Space with `preventDefault()`. The
+handler must start with `if (e.target !== e.currentTarget) return;` or interactive
+children re-trigger the toggle. Always add
+`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`.
+Never nest interactive content inside the element carrying `role="button"` —
+scope the role to the header, as `SortableDossierItem` does.
+
+**Popovers with `@floating-ui/react`** — split positioning and animation across
+**two** elements: outer div takes `refs.setFloating` + `floatingStyles`, inner div
+owns the entry animation. On the same element the scale transform overwrites the
+positioning transform. Compute `transformOrigin` from `placement` (see
+`getTransformOrigin` in `NotesPeekPanel.tsx`). Anchor via a `useState` element,
+not a ref object, and pass it at render time (gotcha 13).
+
+**Toggle buttons** — drive the visual from an `isPressed` selector, not a fixed
+colour: idle `text-slate-400` + hover accent, active `bg-{accent}-50
+text-{accent}` (plus `fill-` when the icon has a body). Toast wording must match
+the action actually taken. Always set `aria-pressed`.
+
+**Two flavours of pop-up** — *Peek* (header, scrollable body, composer; ~360px,
+page-themed) when the surface lists or edits content; *action bar* (thin dark
+slate, 2-4 icon buttons with 1px dividers, no chrome) when it only performs
+actions. Both use the outer/inner split above.
+
+**Sticky filter rows** — `sticky top-0` alone lets content scroll through. Give
+the row an opaque background matching the panel, bleed it edge-to-edge with
+negative margins matching the parent padding, add `border-b border-current/10`,
+and raise it to `z-20`.
+
+**Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
+overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
+z-index will be honoured.
+
+**Beating inline `style="..."` without `!important`** — when markup you don't
+control ships inline styles (e.g. `useArticleMarkers` emits
+`<mark style="background-color:hsl(var(--hl-yellow-bg))">`), first try
+**redefining the CSS variable in a narrower scope** so the inline `hsl(var(--…))`
+resolves differently. Only if the inline style references no variable, fall back
+to a single narrowly-scoped `!important` with a comment justifying why every
+other route fails.
+
+**Colour markers** — for a list mirroring something already coloured in the
+article body, use a 4px stripe down the card's leading edge rather than
+re-applying a saturated background behind the text.
+
+**Mobile-first** — interactive controls keep a 44px touch target on mobile.
+`TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
+(`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
+`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
+row's star and remove buttons do.
+
+## Common Patterns
+
+**New scraper** — add the class in `services/`, implement async
+`get_document(normavisitata) -> Tuple[str, str]`, register the act type in
+`NormaController.get_scraper_for_norma()`, extend `tools/map.py` if needed.
+
+**New API endpoint** — route in `NormaController._setup_routes()`, async handler,
+`await request.get_json()`, return `jsonify()`, log with structlog.
+
+**New frontend component** — compose the `ui/` primitives and the interaction
+constants; import types from `types/index.ts`; reach state through
+`useAppStore()`; Tailwind v4 for styling.
+
+**Playwright work** —
+
+```python
+from visualex_api.tools.browser_manager import PlaywrightManager
+
+manager = PlaywrightManager()
+browser = await manager.get_browser()
+page = await browser.new_page()
+# ... work
+await page.close()
 ```
 
-**Backend:**
-```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/backend
-npm run dev         # Start dev server
-npm run prisma:studio  # Prisma database GUI
-```
+The manager owns the lifecycle; don't tear browsers down yourself.
 
-### Gotchas and Known Issues
+## Working in this repo
 
-1. **Scraper Fragility**: All scrapers depend on external HTML structure (Normattiva, EUR-Lex, Brocardi). HTML changes break parsers.
-2. **Async Context**: Python API is fully async - never use blocking operations without `asyncio.to_thread()`
-3. **Rate Limiting**: Configured in `config.py` - 1000 requests per 10 minutes per IP
-4. **Playwright**: Required for PDF extraction and date completion. Install with `playwright install chromium`. Uses `PlaywrightManager` singleton for pooling.
-5. **Date Handling**: Two complementary approaches:
-   - Sync `complete_date_or_parse()` for URN generation (fast, approximate: year-only dates become YYYY-01-01)
-   - Async `complete_date_or_parse_async()` for actual date resolution via Playwright (slower, accurate)
-   - Frontend uses `formatDateItalianLong()` for display (e.g., "7 agosto 1990"), respecting actual dates
-6. **CORS**: Frontend dev server proxies to Python API - check `vite.config.ts`
-7. **Annex Handling**: Codici have default annex in URN - see `create_norma_visitata_from_data()`
-8. **Selenium Removed**: All browser automation now uses Playwright. `WebDriverManager` is deprecated alias of `PlaywrightManager`.
-9. **Article ID formatting mismatch (-bis / -ter / -quater)**: the tree API and the scraper can disagree on suffix formatting (`"1-bis"` vs `"1 bis"`). A naive `===` comparison between a tree-sourced uniqueId and a loaded-article uniqueId will silently miss the match and fall back to the first article on arrow navigation. **Always** use `findArticleByNormalizedId` from `utils/articleIds.ts` for lookups that might cross this boundary, and canonicalize the matched article's uniqueId (`getUniqueArticleId(match)`) before writing it to component state.
-10. **Popover positioning vs. entry animation conflict**: `@floating-ui/react` positions its floating element with an inline `transform: translate(X,Y)`. Applying `animate-in zoom-in-95` on the **same** element overwrites that transform during the entry keyframes, so the popover visibly flies from (0,0) for ~150ms. Split the two: outer div = positioning, inner div = animation (see `NotesPeekPanel.tsx` / `InlineNotePopover.tsx`).
-11. **`set-state-in-effect` lint rule**: when React's `react-hooks/set-state-in-effect` flags a `setState(...)` call inside a `useEffect`, prefer deriving the value during render (see `effectiveTabId` / `effectiveActiveId` in the norma containers) instead of silencing. Only silence for effects that synchronise with an external signal AND mutate external state in the same transaction (the R2 autoFocus effect in `NormaBlockComponent` is the canonical example — always leave the justification in a trailing comment on the disable line).
-12. **Workspace tab pin removed**: the `WorkspaceTab.isPinned` flag and `toggleTabPin` action were removed (the only behavioural effect was "don't bring pinned tabs to front on click", which contradicted the word "pin" and never protected from close). **Do not reintroduce without a clear product reason**. `Dossier.isPinned` is unrelated and stays.
-13. **Popover first-paint (0,0) flash — pass reference at render time, not in a layout effect**: `@floating-ui/react` computes position asynchronously (`computePosition` returns a Promise). If the reference is registered via `refs.setReference(el)` inside a `useLayoutEffect`, the FIRST paint has no coords — the floating div renders at document (0,0) top-left, which on a scrolled article is above the viewport and looks like "the popup disappeared". Fix for DOM elements: pass it through `useFloating({ elements: { reference: anchorEl } })` — floating-ui computes synchronously during the hook call. For **virtual** elements (e.g. a rect captured from `window.getSelection()`): the `elements.reference` path is rejected at runtime with "must be a real DOM element", so use `refs.setPositionReference(virtual)` in a layout effect AND gate visibility with `isPositioned` (`style={{ ...floatingStyles, visibility: isPositioned ? 'visible' : 'hidden' }}`) to hide the first unpositioned frame. Applies to `InlineNotePopover`, `NotesPeekPanel`, `HighlightsActionsPicker` (DOM-element path) and `InlineNoteComposer` (virtual-element path).
-14. **StrictMode double-invoke + multi-step store actions**: React dev StrictMode double-invokes every `useEffect` on mount. If your effect issues two SEPARATE store mutations — e.g. `dequeueNextSearch()` then `triggerSearch(next)` where `next = searchQueue[0]` comes from the render closure — both invocations use the SAME closure value and execute the same side-effects in sequence (dequeue+trigger the SAME first item twice), losing subsequent queued items. **Fix**: collapse to a single atomic store action (`drainNextSearch`: one `set()` that checks preconditions, pops, and parks the trigger). The second StrictMode invocation finds the precondition already satisfied (e.g. `searchTrigger` non-null) and no-ops. This is the root cause we hit on the dossier "apri tutte le norme" flow — keep multi-step drains atomic.
-15. **Dossier "apri tutte le norme in una tab unica"**: `triggerSearch` overwrites `state.searchTrigger`, so firing N calls in a loop keeps only the last. The dossier open-all flow uses a `searchQueue` drained one item at a time via `drainNextSearch` (see #14). Each queued `SearchParams` carries two complementary fields: `tabLabel: dossier.title` (cosmetic, sets the tab's visible name) AND `targetTabId` (load-bearing, tells `processResult` to skip all merge heuristics and always call `addNormaToTab(targetTabId, ...)`). The destination tab is **pre-created** synchronously before `navigate('/')`: `addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true })` returns the id that gets threaded into every params. Without `targetTabId` the streaming merge logic in `processResult` might find a stale orphan custom-labeled tab in the persisted `workspaceTabs` and append into THAT instead — `targetTabId` is the unambiguous pointer. Single-norma opens also use this pattern for consistency.
-16. **SelectionPopup → downstream composer: capture selection rect eagerly**: when a SelectionPopup action (e.g. "Aggiungi nota") opens a composer that needs to anchor on the selected span, you MUST capture `window.getSelection().getRangeAt(0).getBoundingClientRect()` BEFORE calling `hidePopup()` / `window.getSelection().removeAllRanges()`. The selection is cleared immediately after those calls and `getSelection()` returns no range, so any later lookup gives you no rect. The rect travels as `{ x, y, width, height }` through the `onAddNote(text, startOffset, rect)` callback — see `InlineNoteComposer` which wraps it into a floating-ui `VirtualElement`.
-17. **Every user-owned slice is server-backed. Every creation / update / deletion MUST round-trip the backend before (or alongside) the store.** Canonical regressions were `importDossier` (file/share-link JSON import) and `applyEnvironment` (apply an environment preset) — both pushed a local `uuidv4()` straight into the store, the UI looked fine, then the first `addItem` on the "ghost" entity 404'd because the backend `findFirst({ id, userId })` found nothing. Rule: if an entity has a backend service (bookmarks, dossiers, environments, annotations, highlights, quickNorms, customAliases), every creation path goes through `service.create()` before pushing to the store, populating the store with server ids. For mutations the established pattern is optimistic+sync (apply locally, PUT, revert on non-404 error). **There is no intrinsically "client-only" user-data slice anymore** — the partialize only keeps UI state (settings, searchPanelState, workspaceTabs, highestZIndex). `applyEnvironment(replace)` additionally wipes server-side first: `dossierService.delete(each)` + `annotationService.deleteAll()` + `highlightService.deleteAll()`, otherwise server-side orphans come back on the next `fetchUserData`/article load. The replace-mode delete is gated behind a `danger`-variant `ConfirmDialog` in `EnvironmentPage` — the merge/replace split in `ApplyEnvironmentModal` is NOT enough consent for an irreversible server wipe.
-18. **Never use silent `.catch(() => fallback)` in load paths**: `fetchUserData` hid a session-level investigation for "dossiers disappear on refresh" (turned out to be the backend tsx watcher mid-restart after a controller change) because `bookmarkService.getAll().catch(() => [])` swallowed the error and the store populated an empty array with zero diagnostic. If a fallback is needed, log first: `.catch((err) => { console.error('context: what failed:', err); return fallback; })`. Any 401/CORS/ECONNREFUSED then shows up immediately in the console instead of surfacing as an empty UI.
-19. **Atomic usage counters live in dedicated `POST /:id/use` endpoints, not in PUT patches**: `QuickNorm.usageCount` and `CustomAlias.usageCount` bump every click / alias-resolution. A read-modify-write over PUT would race under rapid fire (click twice, +1 instead of +2). Each controller exposes a `/:id/use` route that runs `prisma.update({ usageCount: { increment: 1 }, lastUsedAt: new Date() })` as a single atomic op. Client pattern: (a) bump the local counter synchronously inside `set((state) => state.X.find(...).usageCount++)` for instant UX, (b) `void service.use(id).catch(...)` fire-and-forget afterwards. A failed sync isn't worth surfacing — the next `fetchUserData` restores the server counter as source of truth. Both `selectQuickNorm` and `trackAliasUsage` follow this shape; replicate it for any new counter slice instead of inventing a PUT-based variant.
-20. **SuggestionItem payload shape is per-itemType and server-trusted**: the backend stores `payload` as opaque JSON per `itemType` (see design doc §Data Model). The `take` handler trusts the payload shape — any rename/transformation must happen BEFORE the item is stored. This is why the AliasConflictDialog's Rename path is MVP-deferred: rewriting the trigger at take-time would need either a trigger override param on the endpoint OR a client-side "manually recreate then mark item taken" dance. Replace + Skip cover the pragmatic flows until a Rename endpoint is added.
-21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract, never mutate them**: when a row carries these fields, every UI surface MUST render the AttributionChip. Don't paper over them in a service method (e.g. filtering them out of a `getAll` response) — the invariant is "if the DB has an author, the UI shows the author". If the author is deleted, the fields stay null (Prisma `SetNull`) and the chip renders "@utente-rimosso" — that's the correct, by-design state from D7.
+Feature work runs as **rounds**: a short interview about real usage, a spec in
+`docs/superpowers/specs/`, a plan in `docs/superpowers/plans/`, then
+implementation task by task with a review after each. The specs and plans are the
+record of *why*; read the relevant one before reopening an area.
 
-### Date System Troubleshooting
+Verification before calling anything done: `npm run test` and `npm run build` in
+`frontend/`, plus a real browser pass for UI work (dev server at
+`http://localhost:5173`; the app requires login). Fix pre-existing errors you
+surface in files you touch rather than deferring them.
 
-**Problem**: Dates showing as "YYYY-01-01" in UI (synthetic dates)
-- **Cause**: `parseItalianDate()` or `formatDateItalianLong()` not used in component
-- **Fix**: Use `formatDateItalianLong()` instead of `date.toLocaleDateString()`
-- **Example**: `formatDateItalianLong(new Date(normVisitata.data_versione))` returns "7 agosto 1990"
+Specialised subagents live in `~/.claude/agents` — check what is actually
+available before dispatching, rather than assuming a name exists.
 
-**Problem**: Date completion is slow in backend
-- **Cause**: Using `complete_date_or_parse_async()` for high-volume requests (launches Playwright for each)
-- **Fix**: Use cache-aware approach or batch requests. Check `_date_cache` implementation in `text_op.py`
-- **For URN generation**: Use sync `complete_date_or_parse()` instead (never launches Playwright)
+`docs/archive/` holds superseded design material (the March 2026 BMAD cycle, the
+April polish audits). It is history, not guidance. `docs/design/` holds visual
+work that is decided but not yet applied. If a `docs/merlt/` directory shows up in
+your working tree, it belongs to `visualex-merlt-main`, not to `main`.
 
-**Problem**: Playwright browser timeout during date completion
-- **Cause**: Normattiva.it site slow or unresponsive, or `PlaywrightManager` browser exhausted
-- **Fix**: Increase timeout in `complete_date()`, check Playwright browser pool size in `browser_manager.py`
-- **Fallback**: `complete_date_or_parse_async()` catches timeouts and returns cached/synthetic date
+## Environment Variables
 
-**Problem**: Year-only dates not rendering in display
-- **Cause**: `parseItalianDate()` returning Date object with month/day as 01
-- **Fix**: This is expected behavior. Frontend should NOT try to "normalize" to full dates - show "1990" for year-only entries
-- **Principle**: Backend `complete_date_or_parse()` returns synthetic YYYY-01-01 for URNs only. Display layer uses actual dates from metadata.
+**Python API** — `HOST` (`0.0.0.0`), `PORT` (`5000`), `REDIS_ENABLED` (`false`;
+filesystem cache when off, warned at startup), `REDIS_URL`,
+`REDIS_CACHE_PREFIX` (`vlx`), `PERSISTENT_CACHE_TTL` (`86400`),
+`HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
+`ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
+`RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP). Template in
+`.env.example`.
 
-### Skills to Use
+**Node backend** — see `backend/.env.example`. `REDIS_ENABLED` defaults to
+`"true"` there to mirror production; set `"false"` for dev without Redis.
 
-For this project, these skills are particularly useful:
+## Critical Files
 
-**Python/Backend:**
-- `async-patterns` - For asyncio debugging and optimization
-- `fastapi-patterns` - Similar patterns apply to Quart
-- `scraping-patterns` - For scraper fixes and improvements
-- `error-handling` - For custom exception hierarchy
+Breaking one of these breaks the product. Read before editing.
 
-**Frontend:**
-- `react-patterns` - Component design and hooks
-- `ui-ux-review` - Complete UX evaluation
-- `performance-optimization` - Frontend bundle and render optimization
+**Python** — `visualex_api/app.py` (controller) · `tools/norma.py` (models) ·
+`tools/text_op.py` (parsing + dates) · `tools/browser_manager.py` (browser pool) ·
+`services/*_scraper.py` (fragile HTML parsers).
 
-**General:**
-- `code-review` - Before merging significant changes
-- `security-audit` - For auth and input validation
+**Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
+`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/dateUtils.ts` ·
+`utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `hooks/useAnnexNavigation.ts` ·
+`constants/zIndex.ts` · `constants/interactions.ts`.
+
+**Frontend features** — each of these folders was split out of a monolith and is
+meant to stay split; add new features as new files, not inside the shells:
+
+- `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
+  `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
+  `i`), `DossierDetailView.tsx`, `SortableDossierItem.tsx` (row + star + expand),
+  `DossierItemReader.tsx` (in-place article), `AddToDossierPopover.tsx`,
+  `ToolbarButton.tsx` (colour-token toolbar button with `pressed`/`pressedColor`),
+  one file per modal, shared helpers in `dossierUtils.ts`.
+- `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
+  one file per modal; `EnvironmentContentViewer.tsx` renders the shared
+  dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category
+  stripe and a stale/fresh chip; primary action is "Unisci", replace lives in the
+  3-dot menu behind a danger `ConfirmDialog`.
+- `features/bulletin/` — the Forum. Folder and component names stay `bulletin`
+  because they match the backend `SharedEnvironment` model; the route is `/forum`
+  and the UI label is "Forum". `BulletinBoardPage.tsx` is a shell over three dumb
+  views (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`).
+  The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
+  `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,
+  `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
+- `features/search/` — `ArticleTabContent.tsx` (the reading surface),
+  `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
+  `InlineNotePopover.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `SearchPanel.tsx` (streaming merge logic).
+- `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
+  `NormaBlockComponent`, `LooseArticleCard`, and `StudyMode/`.
+
+**Backend** — `prisma/schema.prisma` · `controllers/` (`environmentController`,
+`quickNormController`, `customAliasController`, `dossierController`) ·
+`routes/` (all authenticate-gated, mounted on `/api`).
+
+## Gotchas
+
+1. **Scraper fragility** — every scraper depends on third-party HTML. Breakage
+   means the site changed.
+2. **Async context** — never block the Python event loop; wrap blocking calls in
+   `asyncio.to_thread()`.
+3. **Rate limiting** — per-IP, configured in `config.py`; 429 when exceeded.
+4. **Playwright** — needed for PDF export and date completion
+   (`playwright install chromium`); always via `PlaywrightManager`.
+5. **Dates** — sync for URNs (approximate), async for display (accurate); never
+   render a synthetic `YYYY-01-01`. See Date System.
+6. **CORS/proxy** — the Vite dev server proxies to the Python API; check
+   `vite.config.ts`. `ALLOWED_ORIGINS` unset means localhost only.
+7. **Annex handling** — codici carry a default annex in the URN; see
+   `create_norma_visitata_from_data()`.
+8. **Selenium is gone** — Playwright only.
+9. **Article id formatting (`-bis` / `-ter`)** — the tree API and the scraper
+   disagree (`"1-bis"` vs `"1 bis"`). A naive `===` silently misses and falls back
+   to the first article. Always use `findArticleByNormalizedId`, then canonicalise
+   with `getUniqueArticleId(match)` before storing in state.
+10. **Popover positioning vs entry animation** — floating-ui positions with an
+    inline `transform`; an `animate-in zoom-in-95` on the *same* element
+    overwrites it and the popover flies from (0,0). Split across two elements.
+11. **`set-state-in-effect`** — prefer deriving the value during render over
+    silencing the rule. Silence only for effects synchronising with an external
+    signal *and* mutating external state in the same transaction, and always
+    leave the justification on the disable line.
+12. **Workspace tab pin was removed** — the flag only suppressed bring-to-front,
+    which contradicted the word "pin". Don't reintroduce without a product
+    reason. `Dossier.isPinned` is unrelated and stays.
+13. **Popover first paint at (0,0)** — floating-ui computes position
+    asynchronously. Registering the reference in a layout effect leaves the first
+    paint uncoordinated. For DOM anchors pass
+    `useFloating({ elements: { reference: anchorEl } })` at render time. For
+    **virtual** elements that path throws, so use `refs.setPositionReference()`
+    plus `visibility: isPositioned ? 'visible' : 'hidden'`.
+14. **StrictMode double-invoke + multi-step store actions** — an effect issuing
+    two separate mutations runs both twice against the same closure value.
+    Collapse them into one atomic store action (`drainNextSearch` is the
+    canonical example) so the second invocation finds the precondition already
+    satisfied and no-ops.
+15. **Dossier "apri tutte le norme"** — `triggerSearch` overwrites the trigger, so
+    a loop keeps only the last. The flow queues params and drains them one at a
+    time; each carries `tabLabel` (cosmetic) and `targetTabId` (load-bearing —
+    tells `processResult` to skip merge heuristics). The destination tab is
+    pre-created synchronously before `navigate('/')`. Without `targetTabId` a
+    stale orphan tab in persisted state can swallow the results.
+16. **Capture the selection rect eagerly** — before `hidePopup()` /
+    `removeAllRanges()`, because the selection is gone immediately after. The rect
+    travels through `onAddNote(text, startOffset, rect)`.
+17. **Every user-owned slice is server-backed** — every create/update/delete must
+    round-trip the backend. The canonical regressions were `importDossier` and
+    `applyEnvironment`, which pushed a local `uuidv4()` into the store; the UI
+    looked fine until the first `addItem` 404'd on a ghost entity. Creation goes
+    through `service.create()` first so the store holds server ids; mutations are
+    optimistic + sync + revert. `applyEnvironment(replace)` also wipes
+    server-side first, gated behind a danger `ConfirmDialog`.
+18. **Never silently swallow errors in load paths** — `.catch(() => [])` in
+    `fetchUserData` once hid a backend restart behind an empty UI for a whole
+    session. Log with context before any fallback.
+19. **Atomic usage counters** — `usageCount` bumps go through `POST /:id/use`
+    (`increment: 1`), never a read-modify-write PUT. Client pattern: bump locally
+    for instant feedback, then fire-and-forget `service.use(id)`; the next
+    `fetchUserData` is the source of truth.
+20. **SuggestionItem payloads are server-trusted** — the `take` handler trusts the
+    stored shape, so any rename must happen before storage. That is why the alias
+    Rename path is deferred; Replace and Skip cover the flows.
+21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract** —
+    never mutate or filter them out. If a row has an author, the UI shows the
+    `AttributionChip`; a deleted author renders "@utente-rimosso" by design.
+22. **A z-index is inert on a `static` element, and `backdrop-filter` traps its
+    descendants.** The sidebar was `lg:static` with `z-50` (never applied) *and*
+    `backdrop-blur-xl`, which creates a stacking context — so its hover tooltips
+    could not escape it no matter how high their own z-index went, and page
+    content painted over them. Before reaching for a bigger number, check that the
+    element is positioned and that no ancestor sets `backdrop-filter`, `filter`,
+    `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
+    raising the child's value does nothing.
