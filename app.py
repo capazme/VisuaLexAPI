@@ -28,6 +28,9 @@ from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
 from visualex_api.tools.map import NORMATTIVA_URN_CODICI, extract_codice_details
+from visualex_api.tools.nl_parser import parse_nl_query
+from visualex_api.tools.alias_resolver import resolve_alias
+from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
 
 # Configurazione del logging
 logging.basicConfig(
@@ -66,6 +69,15 @@ def count_tokens(data):
 
 # Storage per il rate limiting
 request_counts = defaultdict(lambda: {'count': 0, 'time': time()})
+
+# CORS allowed origins: comma-separated list via env var, falling back to the
+# current dev defaults (Node BFF on :3001 + Vite frontend on :5173).
+_default_allowed_origins = ["http://localhost:3001", "http://localhost:5173"]
+_allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+if _allowed_origins_env:
+    ALLOWED_ORIGINS = [origin.strip() for origin in _allowed_origins_env.split(",") if origin.strip()]
+else:
+    ALLOWED_ORIGINS = _default_allowed_origins
 
 
 def add_to_history(data: dict):
@@ -139,7 +151,7 @@ class RateLimitedTaskQueue:
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
-        self.app = cors(self.app, allow_origin="http://localhost:3001")
+        self.app = cors(self.app, allow_origin=ALLOWED_ORIGINS)
         self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
         
         # Middleware per registrare il tempo di inizio della richiesta
@@ -284,6 +296,18 @@ class NormaController:
     def setup_routes(self):
         self.app.add_url_rule('/', view_func=self.home)
         self.app.add_url_rule('/fetch_norma_data', view_func=self.fetch_norma_data, methods=['POST'])
+        # NL → struct + URN canonical. Used by the "Norma di riferimento" picker
+        # in the MERL-T contribution flow (FE side) so users can type
+        # "art 1453 cc" instead of pasting a NIR URN by hand. Path lives at the
+        # root (NOT under /api/) so the Vite proxy can route it to the Python
+        # server alongside the other /fetch_*, /health, /version endpoints —
+        # /api/* is reserved for the Node BFF.
+        self.app.add_url_rule('/parse_query', view_func=self.parse_query, methods=['POST'])
+        # Contextual citation linker — finds normative references embedded in free
+        # text. Used by MERL-T's query NER (Loop β #2) to detect refs inside a
+        # natural-language question. Mirrors /api/extract_citations on the prefixed
+        # server so MERL-T (which targets :5000) can reach it without the /api prefix.
+        self.app.add_url_rule('/extract_citations', view_func=self.extract_citations_endpoint, methods=['POST'])
         self.app.add_url_rule('/fetch_article_text', view_func=self.fetch_article_text, methods=['POST'])
         self.app.add_url_rule('/stream_article_text', view_func=self.stream_article_text, methods=['POST'])
         self.app.add_url_rule('/fetch_brocardi_info', view_func=self.fetch_brocardi_info, methods=['POST'])
@@ -313,7 +337,7 @@ class NormaController:
         return jsonify({
             "service": "VisuaLex API",
             "status": "running",
-            "docs": "/api/docs" if hasattr(self, 'swagger_ui') else None,
+            "docs": None,  # Swagger is not implemented on this root app (see visualex_api/app.py for the prefixed variant)
             "frontend": "http://localhost:5173",
         })
 
@@ -497,6 +521,99 @@ class NormaController:
         except Exception as e:
             log.error("Error in fetch_norma_data", error=str(e))
             return jsonify({'error': str(e)}), 500
+
+    async def parse_query(self):
+        """Parse a natural language query into structured API params + URN.
+
+        Used by the MERL-T contribution picker so the user can type
+        "art 1453 cc" instead of a NIR URN. Mirrors the parser in
+        `visualex_api/app.py` but additionally builds the canonical URN via the
+        same pipeline as `fetch_norma_data`, so the FE gets a ready-to-paste
+        URN string without a second round-trip.
+
+        Returns:
+            { recognized: bool, parsed?: {...api params}, urn?: str,
+              display?: str, source?: 'alias' | 'nl_parser' }
+        """
+        try:
+            data = await request.get_json() or {}
+            query = (data.get("query") or data.get("q") or "").strip()
+            if not query:
+                return jsonify({"error": "Missing required field: query"}), 400
+
+            # 1. Preset alias first ("gdpr" → Regolamento UE 2016/679, ecc.).
+            parsed_params = resolve_alias(query)
+            source = "alias" if parsed_params else None
+
+            # 2. Fall back to the NL parser ("art 1453 cc", "art 3 cost", ...).
+            if not parsed_params:
+                parsed = parse_nl_query(query)
+                if parsed is None:
+                    return jsonify({"parsed": None, "recognized": False})
+                parsed_params = parsed.to_api_params()
+                source = "nl_parser"
+
+            # 3. Best-effort URN: build a NormaVisitata with the same pipeline
+            # `fetch_norma_data` uses, then pick its .urn. If the URN cannot be
+            # generated (e.g. missing pieces, scraper hiccup) we still return
+            # the parsed params so the FE can prompt for the missing field.
+            urn = None
+            display = None
+            try:
+                normavisitate = await self.create_norma_visitata_from_data(parsed_params)
+                if normavisitate:
+                    nv = normavisitate[0]
+                    urn = getattr(nv, "urn", None)
+                    article = parsed_params.get("article")
+                    act = parsed_params.get("act_type")
+                    display = (
+                        f"Art. {article} — {act}" if article and act else act or query
+                    )
+            except Exception as e:
+                log.warning("parse_query URN build failed", error=str(e))
+
+            return jsonify({
+                "recognized": True,
+                "parsed": parsed_params,
+                "urn": urn,
+                "display": display,
+                "source": source,
+            })
+        except Exception as e:
+            log.error("Error in parse_query", error=str(e))
+            return jsonify({"error": str(e)}), 500
+
+    async def extract_citations_endpoint(self):
+        """Detect normative citations embedded in free text (shared linker).
+
+        Loop β #2: MERL-T's query NER calls this to find references inside a
+        natural-language question (e.g. "Cosa prevede l'art. 1218 c.c.?") with
+        char offsets. Mirrors the /api/extract_citations handler on the prefixed
+        server so the root :5000 server (the one MERL-T targets) exposes it too.
+
+        Returns: { citations: [{start, end, display_text, article, act_type,
+                   act_number, date}], count }
+        """
+        try:
+            data = await request.get_json()
+            if not data or "text" not in data:
+                return jsonify({"error": "Missing required field: text"}), 400
+            text = data["text"]
+            if not isinstance(text, str):
+                return jsonify({"error": "text must be a string"}), 400
+            if len(text) > 500_000:
+                return jsonify({"error": "Text too large (max 500KB)"}), 413
+            context_act_type = data.get("context_act_type")
+            if context_act_type is not None and not isinstance(context_act_type, str):
+                return jsonify({"error": "context_act_type must be a string"}), 400
+            citations = extract_citations_from_text(text, context_act_type=context_act_type)
+            return jsonify({
+                "citations": [c.to_dict() for c in citations],
+                "count": len(citations),
+            })
+        except Exception as e:
+            log.error("Error in extract_citations", error=str(e))
+            return jsonify({"error": str(e)}), 500
 
     async def fetch_article_text(self):
         try:

@@ -140,16 +140,14 @@ export function EnvironmentContentViewer({
     return 'count' in data ? data.count : 0;
   };
 
-  // Auto-select first non-empty tab if current tab is empty
-  useMemo(() => {
-    const currentCount = getTabCount(TABS.find(t => t.id === activeTab)!);
-    if (currentCount === 0) {
-      const nonEmpty = TABS.find(tab => getTabCount(tab) > 0);
-      if (nonEmpty) {
-        setActiveTab(nonEmpty.id);
-      }
-    }
-  }, [stats]);
+  // Derive the tab to show: if the selected tab is empty, fall back to the
+  // first non-empty one. Derived during render (no setState-in-render) — the
+  // user's explicit click still drives `activeTab`, this only picks a sensible
+  // default when the current selection has no content.
+  const effectiveActiveTab: TabType =
+    getTabCount(TABS.find(t => t.id === activeTab)!) === 0
+      ? (TABS.find(tab => getTabCount(tab) > 0)?.id ?? activeTab)
+      : activeTab;
 
   const renderCheckbox = (type: TabType, id: string) => {
     if (!selectable) return null;
@@ -396,7 +394,7 @@ export function EnvironmentContentViewer({
   };
 
   const renderContent = () => {
-    switch (activeTab) {
+    switch (effectiveActiveTab) {
       case 'dossiers': return renderDossiers();
       case 'quickNorms': return renderQuickNorms();
       case 'aliases': return renderAliases();
@@ -412,7 +410,7 @@ export function EnvironmentContentViewer({
       <div className="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 overflow-x-auto">
         {TABS.map(tab => {
           const count = getTabCount(tab);
-          const isActive = activeTab === tab.id;
+          const isActive = effectiveActiveTab === tab.id;
 
           return (
             <button

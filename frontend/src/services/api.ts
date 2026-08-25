@@ -8,13 +8,17 @@ import { isAccessTokenExpired } from './authService';
 // API base URL - uses relative path to leverage Vite proxy in development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-// Create axios instance with default config
+// Create axios instance with default config.
+//
+// NOTE: do NOT set a default `Content-Type` here. Axios 1.x already
+// auto-detects per request (plain objects → application/json, FormData →
+// multipart/form-data with the browser-generated boundary, URLSearchParams →
+// x-www-form-urlencoded). A hardcoded default wins over `postForm()` and the
+// FormData auto-detection on some builds, leaving the browser unable to send
+// the body (surfaces as ERR_TIMED_OUT on uploads).
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000, // 30 seconds
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 /**
@@ -127,7 +131,7 @@ apiClient.interceptors.response.use(
 /**
  * Generic GET request
  */
-export const get = async <T = any>(url: string, params?: any): Promise<T> => {
+export const get = async <T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> => {
   const response = await apiClient.get<T>(url, { params });
   return response.data;
 };
@@ -135,7 +139,7 @@ export const get = async <T = any>(url: string, params?: any): Promise<T> => {
 /**
  * Generic POST request
  */
-export const post = async <T = any>(url: string, data?: any): Promise<T> => {
+export const post = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
   const response = await apiClient.post<T>(url, data);
   return response.data;
 };
@@ -143,7 +147,7 @@ export const post = async <T = any>(url: string, data?: any): Promise<T> => {
 /**
  * Generic PUT request
  */
-export const put = async <T = any>(url: string, data?: any): Promise<T> => {
+export const put = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
   const response = await apiClient.put<T>(url, data);
   return response.data;
 };
@@ -151,7 +155,7 @@ export const put = async <T = any>(url: string, data?: any): Promise<T> => {
 /**
  * Generic PATCH request
  */
-export const patch = async <T = any>(url: string, data?: any): Promise<T> => {
+export const patch = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
   const response = await apiClient.patch<T>(url, data);
   return response.data;
 };
@@ -159,7 +163,7 @@ export const patch = async <T = any>(url: string, data?: any): Promise<T> => {
 /**
  * Generic DELETE request
  */
-export const del = async <T = any>(url: string): Promise<T> => {
+export const del = async <T = unknown>(url: string): Promise<T> => {
   const response = await apiClient.delete<T>(url);
   return response.data;
 };

@@ -89,6 +89,9 @@ export function highlightApiToStore(r: HighlightResponse): StoreHighlight {
     color,
     rangeSerialized: '',
     startOffset: r.startOffset,
+    // Preserve forum attribution so the AttributionChip survives reloads (gotcha #21).
+    ...(r.sourceSuggestionId !== undefined ? { sourceSuggestionId: r.sourceSuggestionId } : {}),
+    ...(r.originalAuthor !== undefined ? { originalAuthor: r.originalAuthor } : {}),
   };
 }
 
@@ -118,5 +121,8 @@ export function annotationApiToStore(r: AnnotationResponse): StoreAnnotation {
     createdAt: r.createdAt,
     ...(r.textContext ? { anchorText: r.textContext } : {}),
     ...(typeof r.position === 'number' ? { startOffset: r.position } : {}),
+    // Preserve forum attribution so the AttributionChip survives reloads (gotcha #21).
+    ...(r.sourceSuggestionId !== undefined ? { sourceSuggestionId: r.sourceSuggestionId } : {}),
+    ...(r.originalAuthor !== undefined ? { originalAuthor: r.originalAuthor } : {}),
   };
 }

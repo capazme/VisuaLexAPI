@@ -49,6 +49,27 @@ describe('forum notifications', () => {
     expect(after.body.newLikes).toBe(0);
   });
 
+  it('scopes pending suggestions to the env owner only', async () => {
+    // Bob suggests on Alice's env. Only Alice (the owner) should see it as
+    // pending — Bob, the suggester, owns no env here and must count zero.
+    await request(app)
+      .post(`/api/shared-environments/${envId}/suggestions`)
+      .set(authHeader(bob))
+      .send({ items: [{ itemType: 'annotation', payload: { articleId: 'x', text: 't' } }] });
+
+    const owner = await request(app)
+      .get('/api/notifications/forum-unread-count')
+      .set(authHeader(alice));
+    expect(owner.body.pendingSuggestions).toBe(1);
+    expect(owner.body.total).toBe(1);
+
+    const other = await request(app)
+      .get('/api/notifications/forum-unread-count')
+      .set(authHeader(bob));
+    expect(other.body.pendingSuggestions).toBe(0);
+    expect(other.body.total).toBe(0);
+  });
+
   it('mark-read does NOT clear pending suggestions count', async () => {
     await request(app)
       .post(`/api/shared-environments/${envId}/suggestions`)

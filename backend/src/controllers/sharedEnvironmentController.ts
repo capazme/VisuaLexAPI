@@ -15,6 +15,7 @@ const publishEnvironmentSchema = z.object({
   content: z.object({
     dossiers: z.array(z.any()),
     quickNorms: z.array(z.any()),
+    customAliases: z.array(z.any()).optional(),
     annotations: z.array(z.any()),
     highlights: z.array(z.any()),
   }),
@@ -1013,8 +1014,20 @@ export const getPendingSuggestionsCount = async (req: Request, res: Response) =>
 /**
  * Take a suggestion item — lands it in the owner's private workspace
  */
+// Rename-on-conflict: same trigger rules as customAliasController's
+// createCustomAliasSchema (2+ chars, alphanumeric + dash/underscore/dot).
+const TRIGGER_RE = /^[a-zA-Z0-9\-_.]+$/;
+
 export const takeSuggestionItem = async (req: Request, res: Response) => {
   const { id: suggestionId, itemId } = req.params;
+  const triggerOverride = (req.body as { triggerOverride?: string } | undefined)?.triggerOverride;
+  let normalizedTriggerOverride: string | undefined;
+  if (triggerOverride !== undefined) {
+    normalizedTriggerOverride = triggerOverride.toLowerCase().trim();
+    if (normalizedTriggerOverride.length < 2 || !TRIGGER_RE.test(normalizedTriggerOverride)) {
+      throw new AppError(400, 'Invalid triggerOverride: must be at least 2 characters, alphanumeric plus dash/underscore/dot');
+    }
+  }
 
   const item = await prisma.suggestionItem.findUnique({
     where: { id: itemId },
@@ -1047,13 +1060,22 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
   try {
     createdRow = await prisma.$transaction(async (tx) => {
       const payload = item.payload as any;
+      // The article view loads notes/highlights by the wire-encoded key
+      // `${itemKey}::art::${articleId}` (storeApiMappers.buildWireNormaKey). A
+      // raw articleId never matches that prefix query, so a taken note would be
+      // invisible in-context. Reconstruct the wire key when the payload carries
+      // both parts; fall back to the raw value for legacy payloads (no normaKey).
+      const wireNormaKey =
+        payload.normaKey && payload.articleId
+          ? `${payload.normaKey}::art::${payload.articleId}`
+          : payload.articleId ?? payload.normaKey ?? '';
       const row = await (async () => {
         switch (item.itemType) {
           case 'annotation':
             return tx.annotation.create({
               data: {
                 userId: req.user!.id,
-                normaKey: payload.articleId ?? payload.normaKey ?? '',
+                normaKey: wireNormaKey,
                 content: payload.text,
                 textContext: payload.anchorText,
                 position: payload.startOffset,
@@ -1064,7 +1086,7 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
             return tx.highlight.create({
               data: {
                 userId: req.user!.id,
-                normaKey: payload.articleId ?? payload.normaKey ?? '',
+                normaKey: wireNormaKey,
                 text: payload.anchorText ?? '',
                 color: payload.colorVar ?? 'yellow',
                 startOffset: payload.startOffset ?? 0,
@@ -1106,7 +1128,7 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
             return tx.customAlias.create({
               data: {
                 userId: req.user!.id,
-                trigger: payload.trigger,
+                trigger: normalizedTriggerOverride ?? payload.trigger,
                 aliasType: payload.aliasType,
                 expandTo: payload.expandTo,
                 searchParams: payload.searchParams,
@@ -1134,16 +1156,17 @@ export const takeSuggestionItem = async (req: Request, res: Response) => {
       (err as { code: string }).code === 'P2002' &&
       item.itemType === 'alias'
     ) {
+      const conflictingTrigger = normalizedTriggerOverride ?? (item.payload as any).trigger;
       const existing = await prisma.customAlias.findFirst({
         where: {
           userId: req.user!.id,
-          trigger: (item.payload as any).trigger,
+          trigger: conflictingTrigger,
         },
       });
       res.status(409).json({
         error: 'alias_trigger_conflict',
         existingAliasId: existing?.id,
-        suggestedTrigger: (item.payload as any).trigger,
+        suggestedTrigger: conflictingTrigger,
       });
       return;
     }

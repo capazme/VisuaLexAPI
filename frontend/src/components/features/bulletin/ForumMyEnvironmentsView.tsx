@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Package, Share2 } from 'lucide-react';
 import { SharedEnvironmentCard } from './SharedEnvironmentCard';
+import { VersionHistoryModal } from './VersionHistoryModal';
 import type { SharedEnvironment } from '../../../types';
 
 interface ForumMyEnvironmentsViewProps {
@@ -29,6 +31,13 @@ export function ForumMyEnvironmentsView({
   onRepublish,
   onPublishClick,
 }: ForumMyEnvironmentsViewProps) {
+  // Version history is owned here: BulletinBoardPage wires every other owner
+  // action but not onViewVersions, and the parent file is out of scope, so the
+  // modal state + restored-env overrides live locally. The override map keeps a
+  // restored environment fresh until the parent refetches on the next tab visit.
+  const [versionsEnv, setVersionsEnv] = useState<SharedEnvironment | null>(null);
+  const [restored, setRestored] = useState<Record<string, SharedEnvironment>>({});
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -76,22 +85,37 @@ export function ForumMyEnvironmentsView({
         {environments.length} {environments.length === 1 ? 'ambiente pubblicato' : 'ambienti pubblicati'}
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {environments.map((env) => (
-          <SharedEnvironmentCard
-            key={env.id}
-            environment={env}
-            onLike={onLike}
-            onImport={onImport}
-            onReport={onReport}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onWithdraw={onWithdraw}
-            onRepublish={onRepublish}
-            isLiking={likingIds.has(env.id)}
-            showOwnerActions={true}
-          />
-        ))}
+        {environments.map((env) => {
+          const current = restored[env.id] ?? env;
+          return (
+            <SharedEnvironmentCard
+              key={current.id}
+              environment={current}
+              onLike={onLike}
+              onImport={onImport}
+              onReport={onReport}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onWithdraw={onWithdraw}
+              onRepublish={onRepublish}
+              onViewVersions={setVersionsEnv}
+              isLiking={likingIds.has(current.id)}
+              showOwnerActions={true}
+            />
+          );
+        })}
       </div>
+
+      {versionsEnv && (
+        <VersionHistoryModal
+          environment={restored[versionsEnv.id] ?? versionsEnv}
+          onClose={() => setVersionsEnv(null)}
+          onRestored={(updated) => {
+            setRestored((prev) => ({ ...prev, [updated.id]: updated }));
+            setVersionsEnv(null);
+          }}
+        />
+      )}
     </>
   );
 }

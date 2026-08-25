@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, CheckSquare, Square, Loader2, TreeDeciduous } from 'lucide-react';
 import { parseItalianDate } from '../../../utils/dateUtils';
+import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 // Above this threshold we ask for explicit confirmation before importing —
@@ -44,19 +45,29 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
         }),
       });
       const normaData = await normaRes.json();
-      if (!normaData.urn) {
+      // /fetch_norma_data returns { norma_data: [{ urn, url, ... }] }, not a flat
+      // urn — mirror SearchForm so import-from-tree actually resolves.
+      const urnToUse = normaData.norma_data?.[0]?.urn || normaData.norma_data?.[0]?.url;
+      if (!urnToUse) {
         throw new Error('Impossibile generare URN per questa norma');
       }
 
       const treeRes = await fetch('/fetch_tree', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urn: normaData.urn, link: true }),
+        body: JSON.stringify({ urn: urnToUse, link: false, details: false }),
       });
-      const treeData = await treeRes.json();
-      if (treeData.error) throw new Error(treeData.error);
+      const treeResponse = await treeRes.json();
+      if (treeResponse.error) throw new Error(treeResponse.error);
 
-      setTree(treeData.tree || []);
+      // /fetch_tree returns { articles: [{allegato, numero}] } (no `tree` key);
+      // flatten to deduped article-id strings via the shared util like SearchForm.
+      const rawTree = Array.isArray(treeResponse) ? treeResponse : (treeResponse.articles ?? []);
+      const treeData = rawTree.filter(
+        (node: unknown): node is TreeNode =>
+          typeof node === 'string' || (typeof node === 'object' && node !== null)
+      );
+      setTree(extractArticleIdsFromTree(treeData));
       setSelectedArticles(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore nel recupero della struttura');

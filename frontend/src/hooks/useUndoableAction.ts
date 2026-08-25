@@ -188,10 +188,8 @@ export function showUndoToast<T>({
   message: string;
   duration?: number;
 }): Promise<boolean> {
-  return new Promise(async (resolve) => {
-    // Execute action first
-    const result = await action();
-
+  // Execute action first, then drive the toast countdown synchronously.
+  return Promise.resolve(action()).then((result) => new Promise<boolean>((resolve) => {
     let resolved = false;
 
     const handleUndo = async () => {
@@ -233,5 +231,5 @@ export function showUndoToast<T>({
         updateToast();
       }
     }, 100);
-  });
+  }));
 }

@@ -138,12 +138,12 @@ export interface AdminEnvironmentListResponse {
   };
 }
 
-export interface AdminEnvironmentListParams {
+export type AdminEnvironmentListParams = {
   page?: number;
   limit?: number;
   status?: 'active' | 'withdrawn' | 'all';
   search?: string;
-}
+};
 
 /**
  * Get all shared environments (admin)

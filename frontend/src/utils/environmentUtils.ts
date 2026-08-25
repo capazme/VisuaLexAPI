@@ -124,7 +124,7 @@ export async function parseEnvironmentFromFile(file: File): Promise<{ success: t
   try {
     const text = await file.text();
     return parseEnvironmentFromJSON(text);
-  } catch (e) {
+  } catch {
     return { success: false, error: 'Impossibile leggere il file' };
   }
 }
@@ -146,7 +146,7 @@ export function parseEnvironmentFromJSON(json: string): { success: true; data: E
 
     // Direct environment object
     return validateEnvironment(parsed);
-  } catch (e) {
+  } catch {
     return { success: false, error: 'JSON non valido' };
   }
 }
@@ -158,7 +158,7 @@ export function parseEnvironmentFromBase64(encoded: string): { success: true; da
   try {
     const decoded = decodeURIComponent(escape(atob(encoded)));
     return parseEnvironmentFromJSON(decoded);
-  } catch (e) {
+  } catch {
     return { success: false, error: 'Link non valido' };
   }
 }
@@ -166,10 +166,12 @@ export function parseEnvironmentFromBase64(encoded: string): { success: true; da
 /**
  * Validate an environment object has required fields
  */
-function validateEnvironment(obj: any): { success: true; data: Environment } | { success: false; error: string } {
-  if (!obj || typeof obj !== 'object') {
+function validateEnvironment(input: unknown): { success: true; data: Environment } | { success: false; error: string } {
+  if (!input || typeof input !== 'object') {
     return { success: false, error: 'Dati ambiente non validi' };
   }
+
+  const obj = input as Record<string, unknown>;
 
   if (!obj.name || typeof obj.name !== 'string') {
     return { success: false, error: 'Nome ambiente mancante' };
@@ -183,8 +185,10 @@ function validateEnvironment(obj: any): { success: true; data: Environment } | {
     return { success: false, error: 'QuickNorms mancanti o non validi' };
   }
 
-  // Ensure arrays exist (allow empty)
-  const validated: Environment = {
+  // Ensure arrays exist (allow empty). Field values come from untrusted JSON;
+  // only name + the two required arrays are validated above, the rest are
+  // coerced and the assembled object is asserted to the Environment shape.
+  const validated = {
     id: obj.id || '',
     name: obj.name,
     description: obj.description,
@@ -200,7 +204,7 @@ function validateEnvironment(obj: any): { success: true; data: Environment } | {
     tags: obj.tags || [],
     category: obj.category,
     color: obj.color,
-  };
+  } as Environment;
 
   return { success: true, data: validated };
 }

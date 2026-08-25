@@ -7,9 +7,15 @@ interface AliasConflictDialogProps {
   onClose: () => void;
 }
 
+// Same rule the BFF enforces (backend/src/controllers/sharedEnvironmentController.ts
+// TRIGGER_RE) and customAliasController's createCustomAliasSchema: 2+ chars,
+// alphanumeric plus dash/underscore/dot.
+const TRIGGER_RE = /^[a-zA-Z0-9\-_.]+$/;
+
 export function AliasConflictDialog({ suggestedTrigger, onChoose, onClose }: AliasConflictDialogProps) {
   const [renameValue, setRenameValue] = useState(`${suggestedTrigger}-2`);
   const trimmed = renameValue.trim();
+  const isValidTrigger = trimmed.length >= 2 && TRIGGER_RE.test(trimmed);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -46,12 +52,17 @@ export function AliasConflictDialog({ suggestedTrigger, onChoose, onClose }: Ali
               />
               <button
                 onClick={() => onChoose({ action: 'rename', newTrigger: trimmed })}
-                disabled={!trimmed || trimmed === suggestedTrigger}
+                disabled={!isValidTrigger || trimmed === suggestedTrigger}
                 className="px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Usa
               </button>
             </div>
+            {trimmed && !isValidTrigger && (
+              <p className="text-xs text-red-500 mt-1">
+                Il trigger deve avere almeno 2 caratteri (lettere, numeri, - _ .)
+              </p>
+            )}
           </div>
 
           <button

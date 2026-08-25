@@ -2,6 +2,8 @@
  * Type definitions for API requests and responses
  */
 
+import type { NormaVisitata, OriginalAuthor } from './index';
+
 // ============================================================================
 // Authentication Types
 // ============================================================================
@@ -143,7 +145,7 @@ export interface FolderBulkMove {
 
 export interface BookmarkCreate {
   norma_key: string;
-  norma_data: any; // JSON object
+  norma_data: NormaVisitata; // JSON object
   folder_id?: string;
   tags?: string[];
   notes?: string;
@@ -159,7 +161,7 @@ export interface BookmarkUpdate {
 export interface BookmarkResponse {
   id: string;
   normaKey: string;
-  normaData: any;
+  normaData: NormaVisitata;
   title?: string;
   folderId?: string;
   tags: string[];
@@ -206,6 +208,8 @@ export interface AnnotationResponse {
   userId: string;
   createdAt: string;
   updatedAt?: string;
+  sourceSuggestionId?: string | null;
+  originalAuthor?: OriginalAuthor | null;
 }
 
 // ============================================================================
@@ -238,6 +242,8 @@ export interface HighlightResponse {
   bookmarkId?: string;
   userId: string;
   createdAt: string;
+  sourceSuggestionId?: string | null;
+  originalAuthor?: OriginalAuthor | null;
 }
 
 // ============================================================================
@@ -247,5 +253,5 @@ export interface HighlightResponse {
 export interface APIError {
   status?: number;
   message: string;
-  data?: any;
+  data?: unknown;
 }

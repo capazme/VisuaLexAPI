@@ -9,8 +9,9 @@ HISTORY_LIMIT = 50
 HISTORY_FILE = BASE_PATH / "data" / "history.json"
 DOSSIER_FILE = BASE_PATH / "data" / "dossiers.json"
 DOSSIER_LIMIT = 100  # Max number of dossiers
-RATE_LIMIT = 1000  # Limit to 100 requests per minute
-RATE_LIMIT_WINDOW = 600  # Window size in seconds
+# Used by the root app.py's rate_limit_middleware (per-IP request counter).
+RATE_LIMIT = int(os.getenv("RATE_LIMIT", 1000))  # Max requests allowed per IP within RATE_LIMIT_WINDOW seconds
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 600))  # Window size in seconds
 
 PERSISTENT_CACHE_DIR = BASE_PATH / "download" / "cache"
 PERSISTENT_CACHE_TTL = int(os.getenv("PERSISTENT_CACHE_TTL", 86400))

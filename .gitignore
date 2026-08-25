@@ -9,11 +9,33 @@ download
 
 dist/*
 .claude
-data
+/data
+
+# Node modules (nested dirs also carry their own .gitignore)
+node_modules/
+
+# Backend runtime artifacts (dead-letter log, etc.)
+backend/logs/
+
+# E2E scratch fixtures
+test-notes-e2e.txt
+
+# MERL-T runtime dirs (codice in merlt/ è versionato; runtime no)
+merlt/uploads/
+merlt/data/
+merlt/.venv/
+merlt/merlt.egg-info/
 
 # Environment files - NEVER commit secrets
 .env
 .env.*
 !.env.example
+!.env.merlt.example
 !backend/.env.test
 *.env.local
+
+# Test coverage output
+coverage/
+
+# Brainstorming visual companion workspace
+.superpowers/

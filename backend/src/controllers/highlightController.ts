@@ -87,6 +87,9 @@ export const getHighlights = async (req: Request, res: Response) => {
         : { normaKey: normaKey! }),
     },
     orderBy: { createdAt: 'desc' },
+    // Include the original author so forum-imported highlights keep their
+    // AttributionChip across reloads (gotcha #21).
+    include: { originalAuthor: { select: { id: true, username: true } } },
   });
 
   res.json(highlights);

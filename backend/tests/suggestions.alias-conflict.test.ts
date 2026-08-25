@@ -60,4 +60,66 @@ describe('alias trigger conflict on take', () => {
     const item = await prisma.suggestionItem.findUnique({ where: { id: itemId } });
     expect(item?.status).toBe('pending');
   });
+
+  it('take with triggerOverride creates the alias under the new trigger, flips the item to taken, and preserves attribution', async () => {
+    await prisma.customAlias.create({
+      data: { userId: alice.id, trigger: 'cc', aliasType: 'shortcut', expandTo: 'civile' },
+    });
+    const create = await request(app)
+      .post(`/api/shared-environments/${envId}/suggestions`)
+      .set(authHeader(bob))
+      .send({
+        items: [{
+          itemType: 'alias',
+          payload: { trigger: 'cc', aliasType: 'reference', expandTo: 'Civil Code', description: 'mine' },
+        }],
+      });
+    const itemId = create.body.items[0].id;
+
+    const take = await request(app)
+      .post(`/api/shared-environments-suggestions/${create.body.id}/items/${itemId}/take`)
+      .set(authHeader(alice))
+      .send({ triggerOverride: 'CC-Renamed' });
+
+    expect(take.status).toBe(200);
+    expect(take.body.item.status).toBe('taken');
+    expect(take.body.created.trigger).toBe('cc-renamed');
+    expect(take.body.created.sourceSuggestionId).toBe(create.body.id);
+    expect(take.body.created.originalAuthorId).toBe(bob.id);
+
+    const item = await prisma.suggestionItem.findUnique({ where: { id: itemId } });
+    expect(item?.status).toBe('taken');
+
+    const renamed = await prisma.customAlias.findFirst({ where: { userId: alice.id, trigger: 'cc-renamed' } });
+    expect(renamed).toBeTruthy();
+    expect(renamed?.sourceSuggestionId).toBe(create.body.id);
+    expect(renamed?.originalAuthorId).toBe(bob.id);
+
+    // Original alias untouched — rename creates a second row, doesn't replace.
+    const original = await prisma.customAlias.findFirst({ where: { userId: alice.id, trigger: 'cc' } });
+    expect(original).toBeTruthy();
+  });
+
+  it('rejects an invalid triggerOverride with 400 before the transaction runs', async () => {
+    const create = await request(app)
+      .post(`/api/shared-environments/${envId}/suggestions`)
+      .set(authHeader(bob))
+      .send({
+        items: [{
+          itemType: 'alias',
+          payload: { trigger: 'cc', aliasType: 'shortcut', expandTo: 'Civil Code' },
+        }],
+      });
+    const itemId = create.body.items[0].id;
+
+    const take = await request(app)
+      .post(`/api/shared-environments-suggestions/${create.body.id}/items/${itemId}/take`)
+      .set(authHeader(alice))
+      .send({ triggerOverride: 'a!!' });
+
+    expect(take.status).toBe(400);
+
+    const item = await prisma.suggestionItem.findUnique({ where: { id: itemId } });
+    expect(item?.status).toBe('pending');
+  });
 });

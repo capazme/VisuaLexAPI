@@ -252,6 +252,7 @@ interface AppState {
     toggleTabVisibility: (id: string) => void;
     toggleNormaCollapse: (tabId: string, normaId: string) => void;
     setTabLabel: (id: string, label: string) => void;
+    reorderWorkspaceTabs: (fromIndex: number, toIndex: number) => void;
 
     // Drag & Drop Actions
     moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => void;
@@ -487,7 +488,7 @@ const appStore = createStore<AppState>()(
                             data: item.content,
                             addedAt: item.created_at,
                         })),
-                        tags: [],
+                        tags: d.tags ?? [],
                         isPinned: false,
                     }));
 
@@ -748,6 +749,16 @@ const appStore = createStore<AppState>()(
                     // Manual rename reserves the tab from R3 auto-merge.
                     tab.labelIsCustom = true;
                 }
+            }),
+
+            // Workspace tabs are UI-only (persisted via localStorage, not the
+            // server), so unlike reorderDossierItems this is a pure local
+            // splice with no API call.
+            reorderWorkspaceTabs: (fromIndex, toIndex) => set((state) => {
+                if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 ||
+                    fromIndex >= state.workspaceTabs.length || toIndex >= state.workspaceTabs.length) return;
+                const [moved] = state.workspaceTabs.splice(fromIndex, 1);
+                state.workspaceTabs.splice(toIndex, 0, moved);
             }),
 
             focusArticleInTab: (tabId, articleId) => set((state) => {
@@ -1208,6 +1219,7 @@ const appStore = createStore<AppState>()(
                 dossierService.update(id, {
                     name: updates.title,
                     description: updates.description,
+                    ...(updates.tags !== undefined && { tags: updates.tags }),
                 }).catch(err => {
                     console.error('Failed to update dossier:', err);
                 });
@@ -1297,6 +1309,12 @@ const appStore = createStore<AppState>()(
             // reload — at the cost of a new server-side id that only matters
             // if something external references it, which currently nothing does.
             restoreDossierItem: (dossierId, item, atIndex) => {
+                // The re-inserted item keeps its OLD local id, but addItem creates
+                // a NEW server row with a different id. Reconcile local id ->
+                // created.id once the server confirms (mirrors addToDossier),
+                // otherwise any later status/delete/reorder targets a stale id and
+                // 404s server-side. The old id is the reconciliation handle.
+                const localId = item.id;
                 set((state) => {
                     const dossier = state.dossiers.find(d => d.id === dossierId);
                     if (!dossier) return;
@@ -1307,6 +1325,12 @@ const appStore = createStore<AppState>()(
                     itemType: item.type === 'norma' ? 'norm' : 'note',
                     title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
                     content: item.data,
+                }).then(created => {
+                    set((state) => {
+                        const dossier = state.dossiers.find(d => d.id === dossierId);
+                        const restored = dossier?.items.find(i => i.id === localId);
+                        if (restored) restored.id = created.id;
+                    });
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);
                 });
@@ -1369,6 +1393,7 @@ const appStore = createStore<AppState>()(
                     const created = await dossierService.create({
                         name: dossier.title,
                         description: dossier.description,
+                        ...(dossier.tags && dossier.tags.length > 0 && { tags: dossier.tags }),
                     });
 
                     const itemResults = await Promise.allSettled(
@@ -2085,35 +2110,62 @@ const appStore = createStore<AppState>()(
                     await get().importDossier(d);
                 }
 
-                // ── quickNorms + customAliases (client-only).
-                set((state) => {
-                    const clonedQuickNorms = JSON.parse(JSON.stringify(filtered.quickNorms || [])).map((q: QuickNorm) => ({
-                        ...q,
-                        id: uuidv4(),
-                        usageCount: 0,
-                        lastUsedAt: undefined,
-                    }));
-                    const clonedCustomAliases = JSON.parse(JSON.stringify(filtered.customAliases || [])).map((a: CustomAlias) => ({
-                        ...a,
-                        id: uuidv4(),
-                        usageCount: 0,
-                        lastUsedAt: undefined,
-                    }));
+                // ── quickNorms + customAliases (server-backed, gotcha #17):
+                // POST each so the server owns the id; otherwise the next
+                // fetchUserData drops them. Replace-mode wipes existing server
+                // rows first; after the wipe the dedup sets are empty.
+                if (mode === 'replace') {
+                    const qnIds = get().quickNorms.map(q => q.id);
+                    const aliasIds = get().customAliases.map(a => a.id);
+                    await Promise.allSettled([
+                        ...qnIds.map(qid => quickNormService.delete(qid)),
+                        ...aliasIds.map(aid => customAliasService.delete(aid)),
+                    ]);
+                    set((state) => { state.quickNorms = []; state.customAliases = []; });
+                }
 
-                    if (mode === 'replace') {
-                        state.quickNorms = clonedQuickNorms;
-                        state.customAliases = clonedCustomAliases;
-                    } else {
-                        const existingLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
-                        const existingTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
-                        clonedQuickNorms.forEach((q: QuickNorm) => {
-                            if (!existingLabels.has(q.label.toLowerCase())) state.quickNorms.push(q);
-                        });
-                        clonedCustomAliases.forEach((a: CustomAlias) => {
-                            if (!existingTriggers.has(a.trigger.toLowerCase())) state.customAliases.push(a);
-                        });
-                    }
-                });
+                const existingQnLabels = new Set(get().quickNorms.map(q => q.label.toLowerCase()));
+                const existingAlTriggers = new Set(get().customAliases.map(a => a.trigger.toLowerCase()));
+
+                const qnImportResults = await Promise.allSettled(
+                    (filtered.quickNorms || [])
+                        .filter(q => !existingQnLabels.has(q.label.toLowerCase()))
+                        .map(async (q) => {
+                            const server = await quickNormService.create({
+                                label: q.label,
+                                searchParams: q.searchParams,
+                                sourceUrl: q.sourceUrl ?? null,
+                            });
+                            return quickNormApiToStore(server);
+                        })
+                );
+                const syncedImportQn = qnImportResults
+                    .filter((r): r is PromiseFulfilledResult<QuickNorm> => r.status === 'fulfilled')
+                    .map((r) => r.value);
+                if (syncedImportQn.length > 0) {
+                    set((state) => { state.quickNorms.push(...syncedImportQn); });
+                }
+
+                const aliasImportResults = await Promise.allSettled(
+                    (filtered.customAliases || [])
+                        .filter(a => !existingAlTriggers.has(a.trigger.toLowerCase()))
+                        .map(async (a) => {
+                            const server = await customAliasService.create({
+                                trigger: a.trigger.toLowerCase().trim(),
+                                type: a.type,
+                                expandTo: a.expandTo,
+                                searchParams: a.searchParams ?? null,
+                                description: a.description ?? null,
+                            });
+                            return customAliasApiToStore(server);
+                        })
+                );
+                const syncedImportAliases = aliasImportResults
+                    .filter((r): r is PromiseFulfilledResult<CustomAlias> => r.status === 'fulfilled')
+                    .map((r) => r.value);
+                if (syncedImportAliases.length > 0) {
+                    set((state) => { state.customAliases.push(...syncedImportAliases); });
+                }
 
                 // ── Annotations + highlights (server-backed): server wipe
                 // in replace, then create each via the same path used by
@@ -2189,37 +2241,65 @@ const appStore = createStore<AppState>()(
                     await get().importDossier(d);
                 }
 
-                // ── quickNorms + customAliases are client-only (no backend
-                // endpoint), so they stay in the store with local uuids.
-                set((state) => {
-                    const clonedQuickNorms = JSON.parse(JSON.stringify(env.quickNorms)).map((q: QuickNorm) => ({
-                        ...q,
-                        id: uuidv4(),
-                        usageCount: 0,
-                        lastUsedAt: undefined,
-                    }));
-                    const clonedCustomAliases = JSON.parse(JSON.stringify(env.customAliases || [])).map((a: CustomAlias) => ({
-                        ...a,
-                        id: uuidv4(),
-                        usageCount: 0,
-                        lastUsedAt: undefined,
-                    }));
+                // ── quickNorms + customAliases are SERVER-BACKED (gotcha #17):
+                // each must be POSTed so the server owns the id, else the next
+                // fetchUserData drops them (these slices hydrate from
+                // quickNormService/customAliasService.getAll and are excluded
+                // from localStorage). Replace-mode wipes existing server rows
+                // first (mirrors the dossier/annotation/highlight paths above);
+                // after a wipe the dedup sets are empty so every item is created.
+                if (mode === 'replace') {
+                    const qnIds = get().quickNorms.map(q => q.id);
+                    const aliasIds = get().customAliases.map(a => a.id);
+                    await Promise.allSettled([
+                        ...qnIds.map(qid => quickNormService.delete(qid)),
+                        ...aliasIds.map(aid => customAliasService.delete(aid)),
+                    ]);
+                    set((state) => { state.quickNorms = []; state.customAliases = []; });
+                }
 
-                    if (mode === 'replace') {
-                        state.quickNorms = clonedQuickNorms;
-                        state.customAliases = clonedCustomAliases;
-                    } else {
-                        const existingQuickNormLabels = new Set(state.quickNorms.map(q => q.label.toLowerCase()));
-                        const existingAliasTriggers = new Set(state.customAliases.map(a => a.trigger.toLowerCase()));
+                const existingQuickNormLabels = new Set(get().quickNorms.map(q => q.label.toLowerCase()));
+                const existingAliasTriggers = new Set(get().customAliases.map(a => a.trigger.toLowerCase()));
 
-                        clonedQuickNorms.forEach((q: QuickNorm) => {
-                            if (!existingQuickNormLabels.has(q.label.toLowerCase())) state.quickNorms.push(q);
-                        });
-                        clonedCustomAliases.forEach((a: CustomAlias) => {
-                            if (!existingAliasTriggers.has(a.trigger.toLowerCase())) state.customAliases.push(a);
-                        });
-                    }
-                });
+                const qnResults = await Promise.allSettled(
+                    (env.quickNorms || [])
+                        .filter(q => !existingQuickNormLabels.has(q.label.toLowerCase()))
+                        .map(async (q) => {
+                            const server = await quickNormService.create({
+                                label: q.label,
+                                searchParams: q.searchParams,
+                                sourceUrl: q.sourceUrl ?? null,
+                            });
+                            return quickNormApiToStore(server);
+                        })
+                );
+                const syncedQn = qnResults
+                    .filter((r): r is PromiseFulfilledResult<QuickNorm> => r.status === 'fulfilled')
+                    .map((r) => r.value);
+                if (syncedQn.length > 0) {
+                    set((state) => { state.quickNorms.push(...syncedQn); });
+                }
+
+                const aliasResults = await Promise.allSettled(
+                    (env.customAliases || [])
+                        .filter(a => !existingAliasTriggers.has(a.trigger.toLowerCase()))
+                        .map(async (a) => {
+                            const server = await customAliasService.create({
+                                trigger: a.trigger.toLowerCase().trim(),
+                                type: a.type,
+                                expandTo: a.expandTo,
+                                searchParams: a.searchParams ?? null,
+                                description: a.description ?? null,
+                            });
+                            return customAliasApiToStore(server);
+                        })
+                );
+                const syncedAliases = aliasResults
+                    .filter((r): r is PromiseFulfilledResult<CustomAlias> => r.status === 'fulfilled')
+                    .map((r) => r.value);
+                if (syncedAliases.length > 0) {
+                    set((state) => { state.customAliases.push(...syncedAliases); });
+                }
 
                 // ── Annotations: each must be POSTed so the server owns the
                 // id; otherwise a reload would drop them (loadAnnotationsForArticle
