@@ -12,6 +12,7 @@ export interface ReadingToolbarProps {
     isNotesPeekOpen: boolean;
     notesButtonRef?: Ref<HTMLButtonElement | null>;
     notesCount: number;
+    dossierButtonRef?: Ref<HTMLButtonElement | null>;
     isHighlightsPeekOpen: boolean;
     highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
@@ -35,10 +36,10 @@ export function ReadingToolbar({
     normaData,
     versionInfo,
     url,
-    articleText: _articleText,
     isNotesPeekOpen,
     notesButtonRef,
     notesCount,
+    dossierButtonRef,
     isHighlightsPeekOpen,
     highlightsButtonRef,
     highlightsCount,
@@ -109,6 +110,14 @@ export function ReadingToolbar({
                     title="Copia testo"
                 >
                     <Copy size={20} />
+                </button>
+                <button
+                    onClick={onOpenDossier}
+                    className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
+                    title="Aggiungi a dossier"
+                    aria-label="Aggiungi a dossier"
+                >
+                    <FolderPlus size={20} />
                 </button>
                 {/* Study Mode button - sempre visibile */}
                 <button
@@ -197,6 +206,15 @@ export function ReadingToolbar({
                 >
                     <Copy size={16} />
                 </button>
+                <button
+                    ref={dossierButtonRef}
+                    onClick={onOpenDossier}
+                    className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
+                    title="Aggiungi a dossier"
+                    aria-label="Aggiungi a dossier"
+                >
+                    <FolderPlus size={16} />
+                </button>
 
                 <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
 
@@ -218,16 +236,6 @@ export function ReadingToolbar({
                         <>
                             <div className={cn('fixed inset-0', Z_INDEX.dropdown)} onClick={() => onToggleMoreMenu(false)} />
                             <div className={cn('absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 py-1', Z_INDEX.dropdown)}>
-                                <button
-                                    onClick={() => {
-                                        onOpenDossier();
-                                        onToggleMoreMenu(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <FolderPlus size={14} className="text-slate-400" />
-                                    Aggiungi a dossier
-                                </button>
                                 <button
                                     onClick={() => {
                                         onShareLink();

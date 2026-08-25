@@ -4,7 +4,7 @@ import { BrocardiDisplay } from './BrocardiDisplay';
 import { ExternalLink, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { DossierModal } from '../../ui/DossierModal';
+import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
@@ -76,7 +76,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         isQuickNorm: s.isQuickNorm,
     })));
 
-    const [showDossierModal, setShowDossierModal] = useState(false);
+    const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
+    // State (not ref) so the popover re-reads the anchor when the button
+    // actually mounts — same reasoning as notesButtonEl below (gotcha #13).
+    const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);
     const [isPeekOpen, setIsPeekOpen] = useState(false);
     const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
     // State (not ref) so the popover re-reads the anchor when the button
@@ -571,7 +574,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onMobileCopy={handleMobileCopy}
                 onOpenStudyMode={onOpenStudyMode}
                 onOpenCopyModal={() => setShowCopyModal(true)}
-                onOpenDossier={() => setShowDossierModal(true)}
+                onOpenDossier={() => setDossierPopoverOpen(true)}
+                dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onOpenAdvancedExport={() => setShowAdvancedExport(true)}
                 onOpenVersionInput={() => setShowVersionInput(true)}
@@ -689,11 +693,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            <DossierModal
-                isOpen={showDossierModal}
-                onClose={() => setShowDossierModal(false)}
-                itemToAdd={norma_data}
-                itemType="norma"
+            <AddToDossierPopover
+                isOpen={dossierPopoverOpen}
+                anchorEl={dossierBtnEl}
+                onClose={() => setDossierPopoverOpen(false)}
+                norma={norma_data}
+                onAdded={(_dossierId, title) => showToast(`Aggiunto a «${title}»`, 'success')}
             />
 
             <CopyModal

@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { FileText, GripVertical, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
+import { FileText, GripVertical, ChevronRight, ChevronDown, Trash2, FolderPlus } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { useDraggable } from '@dnd-kit/core';
 import type { LooseArticle } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { StudyMode } from './StudyMode';
+import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
+import { Toast } from '../../ui/Toast';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 
@@ -26,6 +29,10 @@ export function LooseArticleCard({
   const { article, sourceNorma } = looseArticle;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [studyModeOpen, setStudyModeOpen] = useState(false);
+  const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
+  const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   // Make this loose article draggable
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -58,15 +65,21 @@ export function LooseArticleCard({
           <GripVertical size={16} className="text-amber-400" />
         </div>
 
+        {/* Add to dossier */}
+        <button
+          ref={setDossierBtnEl}
+          onClick={(e) => { e.stopPropagation(); setDossierPopoverOpen(true); }}
+          className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+          title="Aggiungi a dossier"
+          aria-label="Aggiungi a dossier"
+        >
+          <FolderPlus size={14} className="text-blue-500 opacity-70 hover:opacity-100" />
+        </button>
+
         {/* Delete button with confirmation */}
         {onRemove && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (window.confirm('Eliminare questo articolo?')) {
-                onRemove();
-              }
-            }}
+            onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
             className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
             title="Elimina articolo"
           >
@@ -132,6 +145,30 @@ export function LooseArticleCard({
           />
         )}
       </AnimatePresence>
+
+      <AddToDossierPopover
+        isOpen={dossierPopoverOpen}
+        anchorEl={dossierBtnEl}
+        onClose={() => setDossierPopoverOpen(false)}
+        norma={article.norma_data}
+        onAdded={(_dossierId, title) => setToast(`Aggiunto a «${title}»`)}
+      />
+      <Toast
+        message={toast ?? ''}
+        type="success"
+        isVisible={toast !== null}
+        onClose={() => setToast(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmRemove}
+        variant="danger"
+        title="Eliminare questo articolo?"
+        message="L'articolo viene rimosso solo da questa scheda di lavoro. Segnalibri e dossier non saranno toccati."
+        confirmLabel="Elimina"
+        onConfirm={() => { setConfirmRemove(false); onRemove?.(); }}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </div>
   );
 }
