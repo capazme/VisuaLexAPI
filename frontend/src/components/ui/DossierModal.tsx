@@ -19,7 +19,7 @@ export function DossierModal({ isOpen, onClose, itemToAdd, itemType = 'norma' }:
 
   const handleCreate = () => {
     if (!newDossierTitle.trim()) return;
-    createDossier(newDossierTitle);
+    void createDossier(newDossierTitle);
     setNewDossierTitle('');
     setIsCreating(false);
   };

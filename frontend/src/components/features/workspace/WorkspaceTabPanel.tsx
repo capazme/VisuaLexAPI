@@ -133,7 +133,7 @@ export function WorkspaceTabPanel({
   // Create new dossier and add articles
   const handleCreateAndAdd = () => {
     if (!newDossierName.trim()) return;
-    createDossier(newDossierName.trim());
+    void createDossier(newDossierName.trim());
     // Get the newly created dossier (it's the last one)
     setTimeout(() => {
       const state = appStore.getState();

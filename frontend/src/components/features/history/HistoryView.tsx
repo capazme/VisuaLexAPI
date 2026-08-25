@@ -239,7 +239,7 @@ export function HistoryView() {
         const title = newDossierTitle.trim();
         if (!title || !createDossierFor) return;
         const norma = historyToNormaVisitata(createDossierFor);
-        createDossier(title);
+        void createDossier(title);
         // Il dossier appena creato sarà l'ultimo nello store
         setTimeout(() => {
             const newDossier = appStore.getState().dossiers.slice(-1)[0];

@@ -23,6 +23,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
+import { packItemContent, unpackItemContent } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -274,7 +275,7 @@ interface AppState {
     removeBookmark: (normaKey: string) => void;
     isBookmarked: (normaKey: string) => boolean;
 
-    createDossier: (title: string, description?: string) => void;
+    createDossier: (title: string, description?: string) => Promise<string | null>;
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
@@ -481,12 +482,16 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map(item => ({
-                            id: item.id,
-                            type: item.item_type === 'norm' ? 'norma' : 'note',
-                            data: item.content,
-                            addedAt: item.created_at,
-                        })),
+                        items: d.items.map(item => {
+                            const { data, status } = unpackItemContent(item.content);
+                            return {
+                                id: item.id,
+                                type: item.item_type === 'norm' ? 'norma' : 'note',
+                                data,
+                                addedAt: item.created_at,
+                                ...(status ? { status } : {}),
+                            };
+                        }),
                         tags: [],
                         isPinned: false,
                     }));
@@ -1137,7 +1142,7 @@ const appStore = createStore<AppState>()(
                 return !!get().bookmarks.find(b => b.normaKey === key);
             },
 
-            createDossier: (title, description) => {
+            createDossier: async (title, description) => {
                 const tempId = uuidv4();
 
                 // Optimistic update
@@ -1152,10 +1157,11 @@ const appStore = createStore<AppState>()(
                 });
 
                 // API call
-                dossierService.create({
-                    name: title,
-                    description,
-                }).then(created => {
+                try {
+                    const created = await dossierService.create({
+                        name: title,
+                        description,
+                    });
                     // Update with server ID
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === tempId);
@@ -1163,13 +1169,15 @@ const appStore = createStore<AppState>()(
                             dossier.id = created.id;
                         }
                     });
-                }).catch(err => {
+                    return created.id;
+                } catch (err) {
                     console.error('Failed to create dossier:', err);
                     // Rollback
                     set((state) => {
                         state.dossiers = state.dossiers.filter(d => d.id !== tempId);
                     });
-                });
+                    return null;
+                }
             },
 
             deleteDossier: (id) => {
@@ -1306,7 +1314,7 @@ const appStore = createStore<AppState>()(
                 dossierService.addItem(dossierId, {
                     itemType: item.type === 'norma' ? 'norm' : 'note',
                     title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
-                    content: item.data,
+                    content: packItemContent(item.data, item.status),
                 }).catch(err => {
                     console.error('Failed to restore item on server:', err);
                 });
@@ -1339,15 +1347,31 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            updateDossierItemStatus: (dossierId, itemId, status) => set((state) => {
-                const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (dossier) {
-                    const item = dossier.items.find(i => i.id === itemId);
-                    if (item) {
-                        item.status = status;
-                    }
-                }
-            }),
+            updateDossierItemStatus: (dossierId, itemId, status) => {
+                const dossier = get().dossiers.find(d => d.id === dossierId);
+                const item = dossier?.items.find(i => i.id === itemId);
+                if (!dossier || !item || item.type !== 'norma') return;
+                const previous = item.status;
+
+                // Optimistic update
+                set((state) => {
+                    const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                    if (it) it.status = status;
+                });
+
+                // API call - persist the star (only 'important' is meaningfully
+                // encoded server-side via the _dossierMeta envelope; see packItemContent)
+                dossierService.updateItem(dossierId, itemId, {
+                    content: packItemContent(item.data, status),
+                }).catch(err => {
+                    console.error('Failed to persist dossier item status:', err);
+                    // Rollback
+                    set((state) => {
+                        const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                        if (it) it.status = previous;
+                    });
+                });
+            },
 
             moveToDossier: (sourceDossierId, targetDossierId, itemIds) => set((state) => {
                 const source = state.dossiers.find(d => d.id === sourceDossierId);
