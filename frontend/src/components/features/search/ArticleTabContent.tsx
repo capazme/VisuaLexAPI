@@ -23,6 +23,8 @@ import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import type { Annotation } from '../../../types';
+import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
+import { formatCitation } from '../../../utils/normaMeta';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -113,20 +115,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { showPreview, hidePreview } = citationPreviewState;
     const isHoveringPopupRef = useRef(false);
 
-    const itemKey = useMemo(() => {
-        const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
-        const parts = [norma_data.tipo_atto];
-        if (norma_data.numero_atto?.trim()) parts.push(norma_data.numero_atto);
-        if (norma_data.data?.trim()) parts.push(norma_data.data);
-        if (norma_data.allegato?.trim()) parts.push(`all${norma_data.allegato}`);
-        if (norma_data.numero_articolo?.trim()) parts.push(norma_data.numero_articolo);
-        return parts.map(part => sanitize(part || '')).join('--');
-    }, [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.allegato, norma_data.numero_articolo]);
+    const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
 
-    const uniqueArticleId = useMemo(
-        () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
-        [norma_data.allegato, norma_data.numero_articolo],
-    );
+    const uniqueArticleId = useMemo(() => uniqueArticleIdFromNorma(norma_data), [norma_data]);
 
     // Memo the four filters: without this, the full annotations/highlights
     // arrays being new-ref on every store mutation (even unrelated articles)
@@ -265,7 +256,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             }
 
             if (options.includeCitation) {
-                const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
+                const citation = `\n\n---\nTratto da: ${formatCitation(norma_data)}`;
                 textToCopy += citation;
             }
 
@@ -287,7 +278,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const handleMobileCopy = async () => {
         try {
             const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-            const citation = `\n\n---\nArt. ${norma_data.numero_articolo} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+            const citation = `\n\n---\n${formatCitation(norma_data)}`;
             await navigator.clipboard.writeText(plainText + citation);
             showToast('Testo copiato', 'success');
         } catch {
@@ -421,7 +412,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Handler for SelectionPopup copy action
     const handlePopupCopy = async (text: string) => {
         try {
-            const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
+            const citation = `\n\n---\nTratto da: ${formatCitation(norma_data)}`;
             await navigator.clipboard.writeText(text + citation);
             showToast('Testo copiato con citazione', 'success');
         } catch (err) {
