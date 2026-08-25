@@ -31,7 +31,7 @@ export function LooseArticleCard({
   const [studyModeOpen, setStudyModeOpen] = useState(false);
   const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
   const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   // Make this loose article draggable
@@ -151,11 +151,12 @@ export function LooseArticleCard({
         anchorEl={dossierBtnEl}
         onClose={() => setDossierPopoverOpen(false)}
         norma={article.norma_data}
-        onAdded={(_dossierId, title) => setToast(`Aggiunto a «${title}»`)}
+        onAdded={(_dossierId, title) => setToast({ text: `Aggiunto a «${title}»`, type: 'success' })}
+        onDuplicate={(title) => setToast({ text: `Già presente in «${title}»`, type: 'info' })}
       />
       <Toast
-        message={toast ?? ''}
-        type="success"
+        message={toast?.text ?? ''}
+        type={toast?.type ?? 'success'}
         isVisible={toast !== null}
         onClose={() => setToast(null)}
       />

@@ -39,9 +39,9 @@ beforeEach(() => {
   });
 });
 
-function renderPopover(onAdded = vi.fn()) {
+function renderPopover(onAdded = vi.fn(), onDuplicate?: (title: string) => void) {
   render(
-    <AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} norma={norma} onAdded={onAdded} />,
+    <AddToDossierPopover isOpen anchorEl={document.body} onClose={() => {}} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />,
   );
   return onAdded;
 }
@@ -65,6 +65,19 @@ describe('AddToDossierPopover', () => {
     fireEvent.click(dupRow);
     expect(appStore.getState().dossiers.find(d => d.id === 'dup')!.items).toHaveLength(1);
     expect(onAdded).not.toHaveBeenCalled();
+  });
+  it('fires onDuplicate and keeps the popover open on a duplicate pick', () => {
+    const onAdded = vi.fn();
+    const onClose = vi.fn();
+    const onDuplicate = vi.fn();
+    render(
+      <AddToDossierPopover isOpen anchorEl={document.body} onClose={onClose} norma={norma} onAdded={onAdded} onDuplicate={onDuplicate} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /con duplicato/i }));
+    expect(onDuplicate).toHaveBeenCalledWith('Con duplicato');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(appStore.getState().dossiers.find(d => d.id === 'dup')!.items).toHaveLength(1);
   });
   it('creates a dossier inline with the server id, then adds', async () => {
     const onAdded = renderPopover();

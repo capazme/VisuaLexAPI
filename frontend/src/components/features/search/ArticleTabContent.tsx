@@ -699,6 +699,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onClose={() => setDossierPopoverOpen(false)}
                 norma={norma_data}
                 onAdded={(_dossierId, title) => showToast(`Aggiunto a «${title}»`, 'success')}
+                onDuplicate={(title) => showToast(`Già presente in «${title}»`, 'info')}
             />
 
             <CopyModal

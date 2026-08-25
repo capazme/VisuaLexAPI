@@ -6,7 +6,7 @@ import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { useAppStore, appStore } from '../../../store/useAppStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
@@ -235,21 +235,19 @@ export function HistoryView() {
         setShowDossierList(null);
     };
 
-    const handleConfirmCreateDossier = () => {
+    const handleConfirmCreateDossier = async () => {
         const title = newDossierTitle.trim();
         if (!title || !createDossierFor) return;
         const norma = historyToNormaVisitata(createDossierFor);
-        void createDossier(title);
-        // Il dossier appena creato sarà l'ultimo nello store
-        setTimeout(() => {
-            const newDossier = appStore.getState().dossiers.slice(-1)[0];
-            if (newDossier) {
-                addToDossier(newDossier.id, norma, 'norma');
-                showFeedback(`Creato "${title}" e aggiunta norma`);
-            }
-        }, 0);
         setCreateDossierFor(null);
         setNewDossierTitle('');
+        const id = await createDossier(title);
+        if (id) {
+            addToDossier(id, norma, 'norma');
+            showFeedback(`Creato "${title}" e aggiunta norma`);
+        } else {
+            showFeedback('Errore nella creazione del dossier', 'error');
+        }
     };
 
     const handleClearHistory = () => {

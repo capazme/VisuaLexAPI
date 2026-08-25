@@ -1457,7 +1457,7 @@ const appStore = createStore<AppState>()(
                             const serverItem = await dossierService.addItem(created.id, {
                                 itemType: item.type === 'norma' ? 'norm' : 'note',
                                 title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
-                                content: item.data,
+                                content: packItemContent(item.data, item.status),
                             });
                             return { serverItem, original: item };
                         })

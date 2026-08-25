@@ -139,3 +139,49 @@ describe('addToDossier pending window (star set before addItem settles)', () => 
     errSpy.mockRestore();
   });
 });
+
+// Regression coverage for the review finding: importDossier (JSON file /
+// share-link import) forwarded the raw NormaVisitata as `content` instead of
+// the packed `{ ...data, _dossierMeta }` envelope, so a starred item's
+// importance silently vanished the next time fetchUserData rehydrated the
+// store from the server.
+describe('importDossier', () => {
+  it('packs starred items with the _dossierMeta envelope before sending to the server', async () => {
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('item-srv-20'));
+
+    const importedDossier = {
+      id: 'local-tmp',
+      title: 'Importata',
+      createdAt: '2026-08-25T00:00:00Z',
+      items: [
+        { id: 'local-i1', type: 'norma' as const, data: norma, addedAt: '2026-08-25T00:00:00Z', status: 'important' as const },
+      ],
+    };
+
+    const id = await appStore.getState().importDossier(importedDossier);
+
+    expect(id).toBe('srv-1');
+    expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', expect.objectContaining({
+      content: { ...norma, _dossierMeta: { important: true } },
+    }));
+  });
+
+  it('does not pack an envelope for non-starred items', async () => {
+    vi.mocked(dossierService.addItem).mockResolvedValueOnce(fakeDossierItemApi('item-srv-21'));
+
+    const importedDossier = {
+      id: 'local-tmp-2',
+      title: 'Importata 2',
+      createdAt: '2026-08-25T00:00:00Z',
+      items: [
+        { id: 'local-i2', type: 'norma' as const, data: norma, addedAt: '2026-08-25T00:00:00Z' },
+      ],
+    };
+
+    await appStore.getState().importDossier(importedDossier);
+
+    expect(dossierService.addItem).toHaveBeenCalledWith('srv-1', expect.objectContaining({
+      content: norma,
+    }));
+  });
+});
