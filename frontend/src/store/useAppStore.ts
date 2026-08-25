@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, DossierItem, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, DossierItem, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 
 // Services for API sync
@@ -105,7 +105,7 @@ function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
 interface NormaBlock {
     type: 'norma';
     id: string;
-    norma: any;
+    norma: Norma;
     articles: ArticleData[];
     isCollapsed: boolean;
     /**
@@ -122,12 +122,12 @@ interface LooseArticle {
     type: 'loose-article';
     id: string;
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 interface CollectionArticle {
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 interface ArticleCollection {
@@ -251,11 +251,11 @@ interface AppState {
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
     // Workspace Tab Actions
-    addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
-    addNormaToTab: (tabId: string, norma: any, articles: ArticleData[]) => void;
+    addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
+    addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
     consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
-    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: any) => void;
+    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: Norma) => void;
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
     removeTab: (id: string) => void;
     bringTabToFront: (id: string) => void;
@@ -275,7 +275,7 @@ interface AppState {
     // Collection Actions
     createCollection: (tabId: string, label?: string) => string;
     renameCollection: (tabId: string, collectionId: string, newLabel: string) => void;
-    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: any) => void;
+    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: Norma) => void;
     removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
     toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
     moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
@@ -289,7 +289,7 @@ interface AppState {
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
-    addToDossier: (dossierId: string, item: any, type: 'norma' | 'note') => void;
+    addToDossier: (dossierId: string, item: NormaVisitata | string, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
@@ -479,7 +479,7 @@ const appStore = createStore<AppState>()(
                     ]);
 
                     // Transform API bookmarks to local format
-                    const bookmarks: Bookmark[] = bookmarksRes.map((b: any) => ({
+                    const bookmarks: Bookmark[] = bookmarksRes.map((b) => ({
                         id: b.id,
                         normaKey: b.normaKey,
                         normaData: b.normaData,
@@ -520,11 +520,11 @@ const appStore = createStore<AppState>()(
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
                     });
-                } catch (error: any) {
+                } catch (error) {
                     console.error('Failed to fetch user data:', error);
                     set((state) => {
                         state.isLoadingData = false;
-                        state.dataError = error.message || 'Failed to load user data';
+                        state.dataError = error instanceof Error ? error.message : 'Failed to load user data';
                     });
                 }
             },
@@ -1263,7 +1263,7 @@ const appStore = createStore<AppState>()(
                 // API call
                 dossierService.addItem(dossierId, {
                     itemType: type === 'norma' ? 'norm' : 'note',
-                    title: itemData.tipo_atto || 'Nota',
+                    title: typeof itemData === 'string' ? 'Nota' : (itemData.tipo_atto || 'Nota'),
                     content: itemData,
                 }).then(created => {
                     // Update with server ID; the item is now settled.
@@ -2456,10 +2456,11 @@ const appStore = createStore<AppState>()(
 export function useAppStore(): AppState;
 export function useAppStore<T>(selector: (state: AppState) => T): T;
 export function useAppStore<T>(selector?: (state: AppState) => T) {
-    if (selector) {
-        return useStore(appStore, selector);
-    }
-    return useStore(appStore);
+    // Single unconditional useStore call — calling it conditionally (only
+    // when a selector is passed) violates react-hooks/rules-of-hooks since
+    // the number of hook calls must stay constant across renders. The
+    // identity selector reproduces the old no-arg behavior.
+    return useStore(appStore, selector ?? ((state) => state as unknown as T));
 }
 
 // Export store for direct access (e.g., appStore.getState())
