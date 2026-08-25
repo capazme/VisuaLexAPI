@@ -129,7 +129,7 @@ function MobileSheet({ onClose, norma, onAdded }: BodyProps) {
     return (
         <FloatingPortal>
             <div
-                className="fixed inset-0 bg-black/30 animate-in fade-in duration-150 z-[70]"
+                className={cn('fixed inset-0 bg-black/30 animate-in fade-in duration-150', Z_INDEX.citationPreview)}
                 onClick={onClose}
                 aria-hidden
             />
@@ -137,9 +137,10 @@ function MobileSheet({ onClose, norma, onAdded }: BodyProps) {
                 role="dialog"
                 aria-modal="true"
                 className={cn(
-                    'fixed inset-x-4 bottom-4 z-[70] flex flex-col rounded-2xl shadow-2xl',
+                    'fixed inset-x-4 bottom-4 flex flex-col rounded-2xl shadow-2xl',
                     'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800',
                     'max-h-[70vh] animate-in slide-in-from-bottom duration-200',
+                    Z_INDEX.citationPreview,
                 )}
             >
                 <PopoverBody norma={norma} onClose={onClose} onAdded={onAdded} />
@@ -234,7 +235,6 @@ function PopoverBody({ norma, onClose, onAdded }: BodyProps) {
                             <button
                                 key={d.id}
                                 type="button"
-                                role="button"
                                 aria-disabled={alreadyPresent}
                                 onClick={() => handlePick(d.id)}
                                 className={cn(

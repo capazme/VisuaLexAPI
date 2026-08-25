@@ -17,10 +17,15 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
   const { createDossier } = useAppStore();
   const [newDossierTitle, setNewDossierTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const handleCreate = () => {
-    if (!newDossierTitle.trim()) return;
-    void createDossier(newDossierTitle);
+  const handleCreate = async () => {
+    const title = newDossierTitle.trim();
+    if (!title || busy) return;
+    setBusy(true);
+    const id = await createDossier(title);
+    setBusy(false);
+    if (!id) return; // creation failed: stay open, keep the typed title
     setNewDossierTitle('');
     setIsCreating(false);
     onClose();
@@ -55,22 +60,25 @@ export function DossierModal({ isOpen, onClose }: DossierModalProps) {
               value={newDossierTitle}
               onChange={(e) => setNewDossierTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Enter') void handleCreate();
                 if (e.key === 'Escape') setIsCreating(false);
               }}
               placeholder="Nome Dossier..."
               className="flex-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
               autoFocus
+              disabled={busy}
             />
             <button
-              onClick={handleCreate}
-              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              onClick={() => void handleCreate()}
+              disabled={busy || !newDossierTitle.trim()}
+              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Crea
             </button>
             <button
               onClick={() => setIsCreating(false)}
-              className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              disabled={busy}
+              className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Annulla
             </button>
