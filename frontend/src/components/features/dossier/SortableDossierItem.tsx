@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   Trash2,
   GripVertical,
   CheckSquare,
   Square,
+  Star,
 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '../../../lib/utils';
 import { formatDateItalianLong } from '../../../utils/dateUtils';
-import { formatTimestampLong, STATUS_CONFIG, type DossierItemStatus } from './dossierUtils';
+import { formatTimestampLong } from './dossierUtils';
 import type { DossierItem } from '../../../types';
 
 interface Props {
@@ -19,7 +19,7 @@ interface Props {
   onToggleSelect: () => void;
   onView: () => void;
   onRemove: () => void;
-  onStatusChange: (status: DossierItemStatus) => void;
+  onToggleImportant: () => void;
   showCheckbox: boolean;
   // When true, drag-reorder is disabled (typically because the list is
   // filtered — dragging against absolute indexes under a filtered view is
@@ -33,31 +33,11 @@ export function SortableDossierItem({
   onToggleSelect,
   onView,
   onRemove,
-  onStatusChange,
+  onToggleImportant,
   showCheckbox,
   dragDisabled,
 }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled: dragDisabled });
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const statusWrapperRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!statusMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (statusWrapperRef.current && !statusWrapperRef.current.contains(e.target as Node)) {
-        setStatusMenuOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setStatusMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [statusMenuOpen]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -65,9 +45,7 @@ export function SortableDossierItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const status = (item.status as DossierItemStatus) || 'unread';
-  const statusConfig = STATUS_CONFIG[status] ?? STATUS_CONFIG.unread;
-  const StatusIcon = statusConfig.icon;
+  const isImportant = item.status === 'important';
 
   const rowLabel = item.type === 'norma'
     ? `Apri ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
@@ -94,10 +72,9 @@ export function SortableDossierItem({
         isSelected ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700',
       )}
     >
-      <span
-        aria-hidden
-        className={cn('absolute left-0 top-0 bottom-0 w-1 rounded-l-lg', statusConfig.stripe)}
-      />
+      {isImportant && (
+        <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-amber-400" />
+      )}
       <div className="flex items-center gap-2 md:gap-3">
         {showCheckbox && (
           <button
@@ -144,49 +121,22 @@ export function SortableDossierItem({
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <div ref={statusWrapperRef} className="relative" onClick={(e) => e.stopPropagation()}>
+          {item.type === 'norma' && (
             <button
-              type="button"
-              onClick={() => setStatusMenuOpen((v) => !v)}
-              aria-haspopup="menu"
-              aria-expanded={statusMenuOpen}
-              aria-label={`Stato: ${statusConfig.label}. Cambia stato`}
+              onClick={(e) => { e.stopPropagation(); onToggleImportant(); }}
+              aria-pressed={isImportant}
+              aria-label={isImportant ? 'Rimuovi da importanti' : 'Segna come importante'}
+              title={isImportant ? 'Importante' : 'Segna come importante'}
               className={cn(
-                'p-2 md:p-2 rounded-md transition-colors min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center',
-                'hover:bg-slate-100 dark:hover:bg-slate-700',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                statusConfig.color,
+                'p-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
+                isImportant
+                  ? 'text-amber-500'
+                  : 'text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20',
               )}
             >
-              <StatusIcon size={18} />
+              <Star size={18} className={cn(isImportant && 'fill-amber-400')} />
             </button>
-            {statusMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 mt-1 w-44 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50"
-              >
-                {(Object.entries(STATUS_CONFIG) as [DossierItemStatus, typeof STATUS_CONFIG[DossierItemStatus]][]).map(([key, config]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="menuitem"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onStatusChange(key);
-                      setStatusMenuOpen(false);
-                    }}
-                    className={cn(
-                      'w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 min-h-[44px] focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700',
-                      status === key && 'bg-slate-100 dark:bg-slate-700',
-                    )}
-                  >
-                    <config.icon size={16} className={config.color} />
-                    {config.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove(); }}

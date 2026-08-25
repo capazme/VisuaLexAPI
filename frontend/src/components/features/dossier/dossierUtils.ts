@@ -1,17 +1,13 @@
-import { Circle, BookOpen, AlertCircle, CheckCircle2, type LucideIcon } from 'lucide-react';
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import type { Dossier, DossierItem, NormaVisitata, SearchParams } from '../../../types';
 
+// Legacy 4-value status union kept for data + type compat with older dossier
+// items (server payloads and `AddItemsDialog` still reference the full type).
+// The UI now only ever writes/reads 'unread' | 'important' (see the amber
+// star in SortableDossierItem) — 'reading' and 'done' are inert leftovers.
 export type DossierItemStatus = 'unread' | 'reading' | 'important' | 'done';
-
-export const STATUS_CONFIG: Record<DossierItemStatus, { label: string; icon: LucideIcon; color: string; bg: string; stripe: string }> = {
-  unread: { label: 'Da leggere', icon: Circle, color: 'text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700', stripe: 'bg-slate-300 dark:bg-slate-500' },
-  reading: { label: 'In lettura', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', stripe: 'bg-blue-500' },
-  important: { label: 'Importante', icon: AlertCircle, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30', stripe: 'bg-orange-500' },
-  done: { label: 'Completato', icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30', stripe: 'bg-green-500' },
-};
 
 // Turn a stored timestamp (ISO string or epoch ms) into the Italian long format
 // used across the app, e.g. "7 agosto 1990". Falls back to the raw input when
@@ -56,28 +52,6 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
       }
     });
   return Array.from(groups.values());
-}
-
-// Compact per-status summary used on list cards. Returns up to `maxItems`
-// entries in priority order (important → reading → done → unread) so the
-// user sees the most actionable buckets first. `unread` is last because it
-// is the default and would otherwise crowd every card.
-export interface StatusBreakdownEntry {
-  status: DossierItemStatus;
-  count: number;
-}
-
-export function computeStatusBreakdown(items: DossierItem[], maxItems = 2): StatusBreakdownEntry[] {
-  const counts: Record<DossierItemStatus, number> = { unread: 0, reading: 0, important: 0, done: 0 };
-  items.forEach((i) => {
-    const s = (i.status as DossierItemStatus) ?? 'unread';
-    counts[s] = (counts[s] ?? 0) + 1;
-  });
-  const priority: DossierItemStatus[] = ['important', 'reading', 'done', 'unread'];
-  return priority
-    .filter((s) => counts[s] > 0)
-    .slice(0, maxItems)
-    .map((s) => ({ status: s, count: counts[s] }));
 }
 
 // Map a stored NormaVisitata back to the SearchParams shape triggerSearch()

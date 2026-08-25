@@ -293,7 +293,7 @@ interface AppState {
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
-    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'reading' | 'important' | 'done') => void;
+    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     importDossier: (dossier: Dossier) => Promise<string | null>; // returns new server-side dossier ID, null on failure
 
