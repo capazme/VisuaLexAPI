@@ -3,7 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, DossierItem, Annotation, Highlight, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
+import type { AppSettings, Bookmark, Dossier, DossierItem, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 
 // Services for API sync
@@ -23,6 +23,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
+import { packItemContent, unpackItemContent } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -104,7 +105,7 @@ function customAliasApiToStore(a: CustomAliasApi): CustomAlias {
 interface NormaBlock {
     type: 'norma';
     id: string;
-    norma: any;
+    norma: Norma;
     articles: ArticleData[];
     isCollapsed: boolean;
     /**
@@ -121,12 +122,12 @@ interface LooseArticle {
     type: 'loose-article';
     id: string;
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 interface CollectionArticle {
     article: ArticleData;
-    sourceNorma: any;
+    sourceNorma: Norma;
 }
 
 interface ArticleCollection {
@@ -180,6 +181,16 @@ interface AppState {
      */
     loadedHighlightKeys: Record<string, true>;
     loadedAnnotationKeys: Record<string, true>;
+    /**
+     * Dossier item ids that are still client-generated tempIds awaiting the
+     * server id from their `addToDossier` `addItem` POST. Not persisted
+     * (absent from `partialize`) — it only needs to survive the in-flight
+     * window of a single session. See `updateDossierItemStatus`: a status
+     * change against a pending item is applied optimistically only (no PUT
+     * against a temp id the server has never seen); `addToDossier` persists
+     * the star itself once the id swap to the real server id happens.
+     */
+    pendingDossierItemIds: Record<string, true>;
     quickNorms: QuickNorm[];
     customAliases: CustomAlias[];
     environments: Environment[];
@@ -240,11 +251,11 @@ interface AppState {
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
     // Workspace Tab Actions
-    addWorkspaceTab: (label: string, norma?: any, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
-    addNormaToTab: (tabId: string, norma: any, articles: ArticleData[]) => void;
+    addWorkspaceTab: (label: string, norma?: Norma, articles?: ArticleData[], options?: { isCustom?: boolean }) => string;
+    addNormaToTab: (tabId: string, norma: Norma, articles: ArticleData[]) => void;
     focusArticleInTab: (tabId: string, articleId: string) => void;
     consumeAutoFocusArticle: (tabId: string, normaBlockId: string) => void;
-    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: any) => void;
+    addLooseArticleToTab: (tabId: string, article: ArticleData, sourceNorma: Norma) => void;
     updateTab: (id: string, updates: Partial<WorkspaceTab>) => void;
     removeTab: (id: string) => void;
     bringTabToFront: (id: string) => void;
@@ -265,7 +276,7 @@ interface AppState {
     // Collection Actions
     createCollection: (tabId: string, label?: string) => string;
     renameCollection: (tabId: string, collectionId: string, newLabel: string) => void;
-    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: any) => void;
+    addArticleToCollection: (tabId: string, collectionId: string, article: ArticleData, sourceNorma: Norma) => void;
     removeArticleFromCollection: (tabId: string, collectionId: string, articleKey: string) => void;
     toggleCollectionCollapse: (tabId: string, collectionId: string) => void;
     moveLooseArticleToCollection: (tabId: string, looseArticleId: string, collectionId: string) => void;
@@ -275,15 +286,15 @@ interface AppState {
     removeBookmark: (normaKey: string) => void;
     isBookmarked: (normaKey: string) => boolean;
 
-    createDossier: (title: string, description?: string) => void;
+    createDossier: (title: string, description?: string) => Promise<string | null>;
     deleteDossier: (id: string) => void;
     updateDossier: (id: string, updates: { title?: string; description?: string; tags?: string[] }) => void;
     toggleDossierPin: (id: string) => void;
-    addToDossier: (dossierId: string, item: any, type: 'norma' | 'note') => void;
+    addToDossier: (dossierId: string, item: NormaVisitata | string, type: 'norma' | 'note') => void;
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
-    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'reading' | 'important' | 'done') => void;
+    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     importDossier: (dossier: Dossier) => Promise<string | null>; // returns new server-side dossier ID, null on failure
 
@@ -386,6 +397,7 @@ const appStore = createStore<AppState>()(
             highlights: [],
             loadedHighlightKeys: {},
             loadedAnnotationKeys: {},
+            pendingDossierItemIds: {},
             quickNorms: [],
             customAliases: [],
             environments: [],
@@ -468,7 +480,7 @@ const appStore = createStore<AppState>()(
                     ]);
 
                     // Transform API bookmarks to local format
-                    const bookmarks: Bookmark[] = bookmarksRes.map((b: any) => ({
+                    const bookmarks: Bookmark[] = bookmarksRes.map((b) => ({
                         id: b.id,
                         normaKey: b.normaKey,
                         normaData: b.normaData,
@@ -482,12 +494,16 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map(item => ({
-                            id: item.id,
-                            type: item.item_type === 'norm' ? 'norma' : 'note',
-                            data: item.content,
-                            addedAt: item.created_at,
-                        })),
+                        items: d.items.map(item => {
+                            const { data, status } = unpackItemContent(item.content);
+                            return {
+                                id: item.id,
+                                type: item.item_type === 'norm' ? 'norma' : 'note',
+                                data,
+                                addedAt: item.created_at,
+                                ...(status ? { status } : {}),
+                            };
+                        }),
                         tags: d.tags ?? [],
                         isPinned: false,
                     }));
@@ -505,11 +521,11 @@ const appStore = createStore<AppState>()(
                         state.isLoadingData = false;
                         state.isDataLoaded = true;
                     });
-                } catch (error: any) {
+                } catch (error) {
                     console.error('Failed to fetch user data:', error);
                     set((state) => {
                         state.isLoadingData = false;
-                        state.dataError = error.message || 'Failed to load user data';
+                        state.dataError = error instanceof Error ? error.message : 'Failed to load user data';
                     });
                 }
             },
@@ -1148,7 +1164,7 @@ const appStore = createStore<AppState>()(
                 return !!get().bookmarks.find(b => b.normaKey === key);
             },
 
-            createDossier: (title, description) => {
+            createDossier: async (title, description) => {
                 const tempId = uuidv4();
 
                 // Optimistic update
@@ -1163,10 +1179,11 @@ const appStore = createStore<AppState>()(
                 });
 
                 // API call
-                dossierService.create({
-                    name: title,
-                    description,
-                }).then(created => {
+                try {
+                    const created = await dossierService.create({
+                        name: title,
+                        description,
+                    });
                     // Update with server ID
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === tempId);
@@ -1174,13 +1191,15 @@ const appStore = createStore<AppState>()(
                             dossier.id = created.id;
                         }
                     });
-                }).catch(err => {
+                    return created.id;
+                } catch (err) {
                     console.error('Failed to create dossier:', err);
                     // Rollback
                     set((state) => {
                         state.dossiers = state.dossiers.filter(d => d.id !== tempId);
                     });
-                });
+                    return null;
+                }
             },
 
             deleteDossier: (id) => {
@@ -1246,22 +1265,49 @@ const appStore = createStore<AppState>()(
                             addedAt: new Date().toISOString()
                         });
                     }
+                    // Mark as pending until the addItem POST below settles.
+                    // While pending, updateDossierItemStatus applies status
+                    // changes locally only (a PUT against tempId would
+                    // reject — the server has never seen this id).
+                    state.pendingDossierItemIds[tempId] = true;
                 });
 
                 // API call
                 dossierService.addItem(dossierId, {
                     itemType: type === 'norma' ? 'norm' : 'note',
-                    title: itemData.tipo_atto || 'Nota',
+                    title: typeof itemData === 'string' ? 'Nota' : (itemData.tipo_atto || 'Nota'),
                     content: itemData,
                 }).then(created => {
-                    // Update with server ID
+                    // Update with server ID; the item is now settled.
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
                         const item = dossier?.items.find(i => i.id === tempId);
                         if (item) {
                             item.id = created.id;
                         }
+                        delete state.pendingDossierItemIds[tempId];
                     });
+
+                    // The user may have starred this item while its addItem
+                    // POST was still in flight. updateDossierItemStatus saw
+                    // it as pending and only applied the optimistic status
+                    // (no PUT, since the item only had a temp id then). Now
+                    // that it has a real server id, persist that star.
+                    // Read from get() (finalized state), not the Immer draft
+                    // above — the draft's object references are revoked
+                    // proxies once the producer returns.
+                    const settledItem = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                    if (settledItem?.status === 'important') {
+                        dossierService.updateItem(dossierId, created.id, {
+                            content: packItemContent(settledItem.data, 'important'),
+                        }).catch(err => {
+                            console.error('Failed to persist dossier item status set while item was pending:', err);
+                            set((state) => {
+                                const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                                if (it) it.status = undefined;
+                            });
+                        });
+                    }
                 }).catch(err => {
                     console.error('Failed to add item to dossier:', err);
                     // Rollback
@@ -1270,6 +1316,7 @@ const appStore = createStore<AppState>()(
                         if (dossier) {
                             dossier.items = dossier.items.filter(i => i.id !== tempId);
                         }
+                        delete state.pendingDossierItemIds[tempId];
                     });
                 });
             },
@@ -1324,7 +1371,7 @@ const appStore = createStore<AppState>()(
                 dossierService.addItem(dossierId, {
                     itemType: item.type === 'norma' ? 'norm' : 'note',
                     title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
-                    content: item.data,
+                    content: packItemContent(item.data, item.status),
                 }).then(created => {
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
@@ -1363,15 +1410,49 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            updateDossierItemStatus: (dossierId, itemId, status) => set((state) => {
-                const dossier = state.dossiers.find(d => d.id === dossierId);
-                if (dossier) {
-                    const item = dossier.items.find(i => i.id === itemId);
-                    if (item) {
-                        item.status = status;
-                    }
+            updateDossierItemStatus: (dossierId, itemId, status) => {
+                const dossier = get().dossiers.find(d => d.id === dossierId);
+                const item = dossier?.items.find(i => i.id === itemId);
+                if (!dossier || !item || item.type !== 'norma') return;
+
+                // The item hasn't settled on the server yet — itemId is
+                // still the client-generated tempId from addToDossier. A PUT
+                // against it would reject (the server has never seen this
+                // id), and by the time addItem resolves, addToDossier swaps
+                // item.id to the real server id — which would silently break
+                // the revert lookup below (stale tempId never matches again).
+                // Apply the optimistic status only; addToDossier persists it
+                // once the item settles (see the `settledItem?.status ===
+                // 'important'` check in its addItem `.then()`).
+                if (get().pendingDossierItemIds[itemId]) {
+                    set((state) => {
+                        const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                        if (it) it.status = status;
+                    });
+                    return;
                 }
-            }),
+
+                const previous = item.status;
+
+                // Optimistic update
+                set((state) => {
+                    const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                    if (it) it.status = status;
+                });
+
+                // API call - persist the star (only 'important' is meaningfully
+                // encoded server-side via the _dossierMeta envelope; see packItemContent)
+                dossierService.updateItem(dossierId, itemId, {
+                    content: packItemContent(item.data, status),
+                }).catch(err => {
+                    console.error('Failed to persist dossier item status:', err);
+                    // Rollback
+                    set((state) => {
+                        const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                        if (it) it.status = previous;
+                    });
+                });
+            },
 
             moveToDossier: (sourceDossierId, targetDossierId, itemIds) => set((state) => {
                 const source = state.dossiers.find(d => d.id === sourceDossierId);
@@ -1401,7 +1482,7 @@ const appStore = createStore<AppState>()(
                             const serverItem = await dossierService.addItem(created.id, {
                                 itemType: item.type === 'norma' ? 'norm' : 'note',
                                 title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
-                                content: item.data,
+                                content: packItemContent(item.data, item.status),
                             });
                             return { serverItem, original: item };
                         })
@@ -2455,10 +2536,11 @@ const appStore = createStore<AppState>()(
 export function useAppStore(): AppState;
 export function useAppStore<T>(selector: (state: AppState) => T): T;
 export function useAppStore<T>(selector?: (state: AppState) => T) {
-    if (selector) {
-        return useStore(appStore, selector);
-    }
-    return useStore(appStore);
+    // Single unconditional useStore call — calling it conditionally (only
+    // when a selector is passed) violates react-hooks/rules-of-hooks since
+    // the number of hook calls must stay constant across renders. The
+    // identity selector reproduces the old no-arg behavior.
+    return useStore(appStore, selector ?? ((state) => state as unknown as T));
 }
 
 // Export store for direct access (e.g., appStore.getState())

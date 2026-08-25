@@ -3,7 +3,7 @@ import { motion, useMotionValue, useDragControls } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { X, Edit2, FolderPlus, Check, Plus, FileText } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
-import { useAppStore, appStore, type WorkspaceTab } from '../../../store/useAppStore';
+import { useAppStore, type WorkspaceTab } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { NormaBlockComponent } from './NormaBlockComponent';
 import { LooseArticleCard } from './LooseArticleCard';
@@ -131,19 +131,19 @@ export function WorkspaceTabPanel({
   };
 
   // Create new dossier and add articles
-  const handleCreateAndAdd = () => {
-    if (!newDossierName.trim()) return;
-    createDossier(newDossierName.trim());
-    // Get the newly created dossier (it's the last one)
-    setTimeout(() => {
-      const state = appStore.getState();
-      const newDossier = state.dossiers[state.dossiers.length - 1];
-      if (newDossier) {
-        handleAddToDossier(newDossier.id);
-      }
-    }, 0);
-    setNewDossierName('');
-    setIsCreatingDossier(false);
+  const handleCreateAndAdd = async () => {
+    const title = newDossierName.trim();
+    if (!title) return;
+    const id = await createDossier(title);
+    if (id) {
+      handleAddToDossier(id);
+      setNewDossierName('');
+      setIsCreatingDossier(false);
+    } else {
+      // Keep the input open with the typed name so the user can retry;
+      // no toast infra exists in this component, so log per gotcha #18.
+      console.error('WorkspaceTabPanel: failed to create dossier for tab content add');
+    }
   };
 
   // Make this tab a drop zone

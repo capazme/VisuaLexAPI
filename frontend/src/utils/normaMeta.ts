@@ -1,4 +1,4 @@
-import type { Norma } from '../types';
+import type { Norma, NormaVisitata } from '../types';
 import { abbreviateActType, formatDateItalianLong } from './dateUtils';
 
 /**
@@ -48,4 +48,16 @@ export function formatNormaMeta(norma: Norma, options: FormatNormaMetaOptions): 
   let result = norma.data ? `${prefix}${formatDateItalianLong(norma.data)}` : fallback;
   if (articleCount !== undefined) result += ` · ${articleCount} articoli`;
   return result;
+}
+
+/**
+ * Canonical "copy to clipboard" citation string for a norm/article, e.g.
+ * "codice civile n. 262 del 1942-03-16, Art. 2043 (Allegato 2)".
+ * Single source of truth for the citation core used by the copy/export
+ * handlers in ArticleTabContent (advanced copy, mobile copy, selection copy).
+ */
+export function formatCitation(
+  norma: Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo' | 'allegato'>,
+): string {
+  return `${norma.tipo_atto}${norma.numero_atto ? ` n. ${norma.numero_atto}` : ''}${norma.data ? ` del ${norma.data}` : ''}, Art. ${norma.numero_articolo}${norma.allegato ? ` (Allegato ${norma.allegato})` : ''}`;
 }

@@ -4,7 +4,7 @@ import { BrocardiDisplay } from './BrocardiDisplay';
 import { ExternalLink, Clock } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { DossierModal } from '../../ui/DossierModal';
+import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
@@ -23,6 +23,8 @@ import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import type { Annotation } from '../../../types';
+import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
+import { formatCitation } from '../../../utils/normaMeta';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -74,7 +76,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         isQuickNorm: s.isQuickNorm,
     })));
 
-    const [showDossierModal, setShowDossierModal] = useState(false);
+    const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
+    // State (not ref) so the popover re-reads the anchor when the button
+    // actually mounts — same reasoning as notesButtonEl below (gotcha #13).
+    const [dossierBtnEl, setDossierBtnEl] = useState<HTMLButtonElement | null>(null);
     const [isPeekOpen, setIsPeekOpen] = useState(false);
     const [inlineNote, setInlineNote] = useState<{ note: Annotation; anchorEl: HTMLElement } | null>(null);
     // State (not ref) so the popover re-reads the anchor when the button
@@ -113,20 +118,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { showPreview, hidePreview } = citationPreviewState;
     const isHoveringPopupRef = useRef(false);
 
-    const itemKey = useMemo(() => {
-        const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
-        const parts = [norma_data.tipo_atto];
-        if (norma_data.numero_atto?.trim()) parts.push(norma_data.numero_atto);
-        if (norma_data.data?.trim()) parts.push(norma_data.data);
-        if (norma_data.allegato?.trim()) parts.push(`all${norma_data.allegato}`);
-        if (norma_data.numero_articolo?.trim()) parts.push(norma_data.numero_articolo);
-        return parts.map(part => sanitize(part || '')).join('--');
-    }, [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.allegato, norma_data.numero_articolo]);
+    const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
 
-    const uniqueArticleId = useMemo(
-        () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
-        [norma_data.allegato, norma_data.numero_articolo],
-    );
+    const uniqueArticleId = useMemo(() => uniqueArticleIdFromNorma(norma_data), [norma_data]);
 
     // Memo the four filters: without this, the full annotations/highlights
     // arrays being new-ref on every store mutation (even unrelated articles)
@@ -265,7 +259,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             }
 
             if (options.includeCitation) {
-                const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
+                const citation = `\n\n---\nTratto da: ${formatCitation(norma_data)}`;
                 textToCopy += citation;
             }
 
@@ -279,7 +273,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
             await navigator.clipboard.writeText(textToCopy);
             showToast('Contenuto copiato negli appunti', 'success');
-        } catch (err) {
+        } catch {
             showToast('Errore durante la copia', 'error');
         }
     };
@@ -287,7 +281,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const handleMobileCopy = async () => {
         try {
             const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-            const citation = `\n\n---\nArt. ${norma_data.numero_articolo} ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+            const citation = `\n\n---\n${formatCitation(norma_data)}`;
             await navigator.clipboard.writeText(plainText + citation);
             showToast('Testo copiato', 'success');
         } catch {
@@ -374,7 +368,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
             await navigator.clipboard.writeText(shareUrl);
             showToast('Link copiato negli appunti', 'success');
-        } catch (err) {
+        } catch {
             showToast('Errore durante la copia del link', 'error');
         }
     };
@@ -421,10 +415,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Handler for SelectionPopup copy action
     const handlePopupCopy = async (text: string) => {
         try {
-            const citation = `\n\n---\nTratto da: ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${norma_data.data ? ` del ${norma_data.data}` : ''}, Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (Allegato ${norma_data.allegato})` : ''}`;
+            const citation = `\n\n---\nTratto da: ${formatCitation(norma_data)}`;
             await navigator.clipboard.writeText(text + citation);
             showToast('Testo copiato con citazione', 'success');
-        } catch (err) {
+        } catch {
             showToast('Errore durante la copia', 'error');
         }
     };
@@ -580,7 +574,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onMobileCopy={handleMobileCopy}
                 onOpenStudyMode={onOpenStudyMode}
                 onOpenCopyModal={() => setShowCopyModal(true)}
-                onOpenDossier={() => setShowDossierModal(true)}
+                onOpenDossier={() => setDossierPopoverOpen(true)}
+                dossierButtonRef={setDossierBtnEl}
                 onShareLink={handleShareLink}
                 onOpenAdvancedExport={() => setShowAdvancedExport(true)}
                 onOpenVersionInput={() => setShowVersionInput(true)}
@@ -698,11 +693,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            <DossierModal
-                isOpen={showDossierModal}
-                onClose={() => setShowDossierModal(false)}
-                itemToAdd={norma_data}
-                itemType="norma"
+            <AddToDossierPopover
+                isOpen={dossierPopoverOpen}
+                anchorEl={dossierBtnEl}
+                onClose={() => setDossierPopoverOpen(false)}
+                norma={norma_data}
+                onAdded={(_dossierId, title) => showToast(`Aggiunto a «${title}»`, 'success')}
+                onDuplicate={(title) => showToast(`Già presente in «${title}»`, 'info')}
             />
 
             <CopyModal

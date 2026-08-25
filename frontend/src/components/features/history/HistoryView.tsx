@@ -6,7 +6,7 @@ import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { useAppStore, appStore } from '../../../store/useAppStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
@@ -46,7 +46,7 @@ function groupLabel(d: Date): string {
 }
 
 // Converte un history item in NormaVisitata
-function historyToNormaVisitata(item: any): NormaVisitata {
+function historyToNormaVisitata(item: SearchHistoryItem): NormaVisitata {
     return {
         tipo_atto: item.act_type || '',
         data: item.date || '',
@@ -57,7 +57,7 @@ function historyToNormaVisitata(item: any): NormaVisitata {
 }
 
 // Converte un history item in SearchParams
-function historyToSearchParams(item: any): SearchParams {
+function historyToSearchParams(item: SearchHistoryItem): SearchParams {
     return {
         act_type: item.act_type || '',
         act_number: item.act_number || '',
@@ -69,7 +69,7 @@ function historyToSearchParams(item: any): SearchParams {
 }
 
 // Genera una label per QuickNorm
-function generateQuickNormLabel(item: any): string {
+function generateQuickNormLabel(item: SearchHistoryItem): string {
     const parts = [`Art. ${item.article}`];
     if (item.act_type) {
         // Abbrevia il tipo atto
@@ -209,7 +209,7 @@ export function HistoryView() {
         setFeedback({ message, type });
     };
 
-    const handleAddQuickNorm = (e: React.MouseEvent, item: any) => {
+    const handleAddQuickNorm = (e: React.MouseEvent, item: SearchHistoryItem) => {
         e.stopPropagation();
         const searchParams = historyToSearchParams(item);
         const label = generateQuickNormLabel(item);
@@ -218,7 +218,7 @@ export function HistoryView() {
         setOpenMenu(null);
     };
 
-    const handleAddToDossier = (e: React.MouseEvent, item: any, dossierId: string) => {
+    const handleAddToDossier = (e: React.MouseEvent, item: SearchHistoryItem, dossierId: string) => {
         e.stopPropagation();
         const norma = historyToNormaVisitata(item);
         addToDossier(dossierId, norma, 'norma');
@@ -227,7 +227,7 @@ export function HistoryView() {
         setShowDossierList(null);
     };
 
-    const handleCreateDossierAndAdd = (e: React.MouseEvent, item: any) => {
+    const handleCreateDossierAndAdd = (e: React.MouseEvent, item: SearchHistoryItem) => {
         e.stopPropagation();
         setCreateDossierFor(item);
         setNewDossierTitle('');
@@ -235,21 +235,19 @@ export function HistoryView() {
         setShowDossierList(null);
     };
 
-    const handleConfirmCreateDossier = () => {
+    const handleConfirmCreateDossier = async () => {
         const title = newDossierTitle.trim();
         if (!title || !createDossierFor) return;
         const norma = historyToNormaVisitata(createDossierFor);
-        createDossier(title);
-        // Il dossier appena creato sarà l'ultimo nello store
-        setTimeout(() => {
-            const newDossier = appStore.getState().dossiers.slice(-1)[0];
-            if (newDossier) {
-                addToDossier(newDossier.id, norma, 'norma');
-                showFeedback(`Creato "${title}" e aggiunta norma`);
-            }
-        }, 0);
         setCreateDossierFor(null);
         setNewDossierTitle('');
+        const id = await createDossier(title);
+        if (id) {
+            addToDossier(id, norma, 'norma');
+            showFeedback(`Creato "${title}" e aggiunta norma`);
+        } else {
+            showFeedback('Errore nella creazione del dossier', 'error');
+        }
     };
 
     const handleClearHistory = () => {
@@ -279,7 +277,7 @@ export function HistoryView() {
         }
     };
 
-    const handleItemClick = (item: any) => {
+    const handleItemClick = (item: SearchHistoryItem) => {
         // Navigate to search page and trigger search
         navigate('/');
         triggerSearch({

@@ -1,34 +1,34 @@
 import { useState } from 'react';
-import { FolderPlus, Folder, Check, ChevronRight } from 'lucide-react';
+import { FolderPlus, Folder } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
-import type { NormaVisitata } from '../../types';
 
 interface DossierModalProps {
   isOpen: boolean;
   onClose: () => void;
-  itemToAdd?: NormaVisitata | unknown;
-  itemType?: 'norma' | 'note';
 }
 
-export function DossierModal({ isOpen, onClose, itemToAdd, itemType = 'norma' }: DossierModalProps) {
-  const { dossiers, createDossier, addToDossier } = useAppStore();
+// Create-only: picking an existing dossier to add an item to is now handled
+// by AddToDossierPopover (two-click collection from the reading toolbar /
+// LooseArticleCard). This modal is reached from "+ Nuovo dossier" CTAs on
+// the dossier list pages, so it only needs the creation form.
+export function DossierModal({ isOpen, onClose }: DossierModalProps) {
+  const { createDossier } = useAppStore();
   const [newDossierTitle, setNewDossierTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const handleCreate = () => {
-    if (!newDossierTitle.trim()) return;
-    createDossier(newDossierTitle);
+  const handleCreate = async () => {
+    const title = newDossierTitle.trim();
+    if (!title || busy) return;
+    setBusy(true);
+    const id = await createDossier(title);
+    setBusy(false);
+    if (!id) return; // creation failed: stay open, keep the typed title
     setNewDossierTitle('');
     setIsCreating(false);
-  };
-
-  const handleAddToDossier = (dossierId: string) => {
-    if (itemToAdd) {
-      addToDossier(dossierId, itemToAdd as never, itemType);
-      onClose();
-    }
+    onClose();
   };
 
   return (
@@ -60,68 +60,29 @@ export function DossierModal({ isOpen, onClose, itemToAdd, itemType = 'norma' }:
               value={newDossierTitle}
               onChange={(e) => setNewDossierTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Enter') void handleCreate();
                 if (e.key === 'Escape') setIsCreating(false);
               }}
               placeholder="Nome Dossier..."
               className="flex-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
               autoFocus
+              disabled={busy}
             />
             <button
-              onClick={handleCreate}
-              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              onClick={() => void handleCreate()}
+              disabled={busy || !newDossierTitle.trim()}
+              className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Crea
             </button>
             <button
               onClick={() => setIsCreating(false)}
-              className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              disabled={busy}
+              className="text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 px-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Annulla
             </button>
           </div>
-        )}
-      </div>
-
-      <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-        {dossiers.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
-              <Folder size={32} className="text-slate-400" />
-            </div>
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Nessun dossier presente</p>
-            <p className="text-slate-400 text-xs">Crea il tuo primo dossier per iniziare</p>
-          </div>
-        ) : (
-          dossiers.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => handleAddToDossier(d.id)}
-              className={cn(
-                'w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left group',
-                'border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-600',
-                'bg-white dark:bg-slate-800 hover:bg-primary-50 dark:hover:bg-primary-900/10',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background'
-              )}
-            >
-              <div className="p-3 bg-primary-50 dark:bg-primary-900/30 rounded-xl text-primary-600 dark:text-primary-400 shrink-0">
-                <Folder size={24} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-0.5 truncate">{d.title}</h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {d.items.length} {d.items.length === 1 ? 'elemento' : 'elementi'}
-                </p>
-              </div>
-              {itemToAdd ? (
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Check size={20} className="text-primary-600 dark:text-primary-400" />
-                </div>
-              ) : (
-                <ChevronRight size={20} className="text-slate-400 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" />
-              )}
-            </button>
-          ))
         )}
       </div>
     </Modal>

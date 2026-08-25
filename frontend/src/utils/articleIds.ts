@@ -1,16 +1,18 @@
 import type { ArticleData } from '../types';
 import { normalizeArticleId } from './treeUtils';
+import { uniqueArticleIdFromNorma } from './normaKeys';
 
 /**
  * Build the per-article unique identifier used throughout the app to
  * distinguish articles living in the main body from those in annexes.
  * Format: `all{allegato}:{numero}` when the article belongs to an annex,
- * plain `{numero}` otherwise.
+ * plain `{numero}` otherwise. Delegates to `normaKeys.ts` to keep one source.
  */
 export function getUniqueArticleId(article: ArticleData): string {
-  const { allegato, numero_articolo } = article.norma_data;
-  return allegato ? `all${allegato}:${numero_articolo}` : numero_articolo;
+  return uniqueArticleIdFromNorma(article.norma_data);
 }
+
+export { uniqueArticleIdFromNorma } from './normaKeys';
 
 /**
  * Project the list of loaded unique IDs down to plain article numbers
