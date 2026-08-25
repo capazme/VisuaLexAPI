@@ -5,19 +5,24 @@ import {
   CheckSquare,
   Square,
   Star,
+  ChevronDown,
 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '../../../lib/utils';
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { formatTimestampLong } from './dossierUtils';
+import { DossierItemReader } from './DossierItemReader';
 import type { DossierItem } from '../../../types';
 
 interface Props {
   item: DossierItem;
   isSelected: boolean;
   onToggleSelect: () => void;
-  onView: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onOpenOnDashboard: () => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   onRemove: () => void;
   onToggleImportant: () => void;
   showCheckbox: boolean;
@@ -31,7 +36,10 @@ export function SortableDossierItem({
   item,
   isSelected,
   onToggleSelect,
-  onView,
+  isExpanded,
+  onToggleExpand,
+  onOpenOnDashboard,
+  showToast,
   onRemove,
   onToggleImportant,
   showCheckbox,
@@ -47,9 +55,10 @@ export function SortableDossierItem({
 
   const isImportant = item.status === 'important';
 
+  const expandVerb = isExpanded ? 'Comprimi' : 'Espandi';
   const rowLabel = item.type === 'norma'
-    ? `Apri ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
-    : 'Apri nota';
+    ? `${expandVerb} ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
+    : `${expandVerb} nota`;
 
   return (
     <div
@@ -58,12 +67,13 @@ export function SortableDossierItem({
       role="button"
       tabIndex={0}
       aria-label={rowLabel}
-      onClick={onView}
+      aria-expanded={isExpanded}
+      onClick={onToggleExpand}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onView();
+          onToggleExpand();
         }
       }}
       className={cn(
@@ -138,6 +148,10 @@ export function SortableDossierItem({
               <Star size={18} className={cn(isImportant && 'fill-amber-400')} />
             </button>
           )}
+          <ChevronDown
+            size={18} aria-hidden
+            className={cn('text-slate-400 transition-transform flex-shrink-0', isExpanded && 'rotate-180')}
+          />
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -148,6 +162,22 @@ export function SortableDossierItem({
           </button>
         </div>
       </div>
+      {isExpanded && (
+        item.type === 'norma' ? (
+          <DossierItemReader
+            norma={item.data}
+            onOpenOnDashboard={onOpenOnDashboard}
+            showToast={showToast}
+          />
+        ) : (
+          <p
+            onClick={(e) => e.stopPropagation()}
+            className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 text-sm md:text-base text-slate-700 dark:text-slate-300 whitespace-pre-wrap"
+          >
+            {item.data}
+          </p>
+        )
+      )}
     </div>
   );
 }

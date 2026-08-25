@@ -16,8 +16,10 @@ function renderRow(item: DossierItem, over: Partial<Parameters<typeof SortableDo
       <SortableContext items={[item.id]} strategy={verticalListSortingStrategy}>
         <SortableDossierItem
           item={item} isSelected={false} showCheckbox={false}
-          onToggleSelect={() => {}} onView={() => {}} onRemove={() => {}}
+          onToggleSelect={() => {}} onRemove={() => {}}
           onToggleImportant={() => {}}
+          isExpanded={false} onToggleExpand={() => {}}
+          onOpenOnDashboard={() => {}} showToast={() => {}}
           {...over}
         />
       </SortableContext>
@@ -46,5 +48,37 @@ describe('SortableDossierItem star', () => {
   it('hides the star on note items', () => {
     renderRow({ id: 'n1', type: 'note', data: 'appunto di pratica', addedAt: '2026-08-01' });
     expect(screen.queryByRole('button', { name: /importante/i })).toBeNull();
+  });
+});
+
+describe('SortableDossierItem expansion', () => {
+  it('expands a note item in place on row click', () => {
+    const noteItem: DossierItem = { id: 'n1', type: 'note', data: 'appunto di pratica completo', addedAt: '2026-08-01' };
+    const { rerender } = renderRow(noteItem);
+    const row = screen.getByRole('button', { name: /espandi nota/i });
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    // Parent owns the state, so re-render with it flipped to see the body.
+    const onToggleExpand = vi.fn();
+    rerender(
+      <DndContext>
+        <SortableContext items={[noteItem.id]} strategy={verticalListSortingStrategy}>
+          <SortableDossierItem
+            item={noteItem} isSelected={false} showCheckbox={false}
+            onToggleSelect={() => {}} onRemove={() => {}} onToggleImportant={() => {}}
+            isExpanded={true} onToggleExpand={onToggleExpand}
+            onOpenOnDashboard={() => {}} showToast={() => {}}
+          />
+        </SortableContext>
+      </DndContext>,
+    );
+    expect(screen.getByText('appunto di pratica completo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /comprimi nota/i })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('fires onToggleExpand when the row is activated', () => {
+    const onToggleExpand = vi.fn();
+    renderRow(normaItem, { onToggleExpand });
+    fireEvent.click(screen.getByRole('button', { name: /espandi codice civile/i }));
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
   });
 });

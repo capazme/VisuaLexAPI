@@ -15,6 +15,8 @@ import {
   X,
   GripVertical,
   StickyNote,
+  ChevronsUpDown,
+  ChevronsDownUp,
 } from 'lucide-react';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { useNavigate } from 'react-router-dom';
@@ -40,11 +42,10 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import { SortableDossierItem } from './SortableDossierItem';
-import { formatTimestampLong, computeNormaGroups, type NormaGroup } from './dossierUtils';
+import { formatTimestampLong, computeNormaGroups, searchParamsFromNorma, type NormaGroup } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
-import { ArticleViewerModal } from './ArticleViewerModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { ToolbarButton } from './ToolbarButton';
 import { AddNoteModal } from './AddNoteModal';
@@ -75,7 +76,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   } = useAppStore();
   const navigate = useNavigate();
 
-  const [viewingItem, setViewingItem] = useState<DossierItem | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -107,6 +108,13 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   }, [dossier.items, itemSearchQuery]);
 
   const hasFilter = itemSearchQuery.trim().length > 0;
+
+  const toggleExpanded = (id: string) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allExpanded = visibleItems.length > 0 && visibleItems.every(i => expandedIds.has(i.id));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -186,21 +194,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     setMoveToModalOpen(false);
   };
 
-  const handleDossierItemClick = (item: DossierItem) => {
-    if (item.type === 'norma') {
-      navigate('/');
-      triggerSearch({
-        act_type: item.data.tipo_atto,
-        act_number: item.data.numero_atto || '',
-        date: item.data.data || '',
-        article: item.data.numero_articolo?.toString() || '',
-        version: 'vigente',
-        version_date: '',
-        show_brocardi_info: true,
-      });
-    } else {
-      setViewingItem(item);
-    }
+  // Notes are read in place (expanded row), so only norma items have a
+  // dashboard destination.
+  const openItemOnDashboard = (item: DossierItem) => {
+    if (item.type !== 'norma') return;
+    navigate('/');
+    triggerSearch(searchParamsFromNorma(item.data));
   };
 
   const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
@@ -589,6 +588,15 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               </button>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setExpandedIds(allExpanded ? new Set() : new Set(visibleItems.map(i => i.id)))}
+            className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-pressed={allExpanded}
+          >
+            {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
+            {allExpanded ? 'Comprimi tutto' : 'Espandi tutto'}
+          </button>
         </div>
       )}
 
@@ -686,7 +694,10 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                   item={item}
                   isSelected={selectedItems.has(item.id)}
                   onToggleSelect={() => toggleItemSelection(item.id)}
-                  onView={() => handleDossierItemClick(item)}
+                  isExpanded={expandedIds.has(item.id)}
+                  onToggleExpand={() => toggleExpanded(item.id)}
+                  onOpenOnDashboard={() => openItemOnDashboard(item)}
+                  showToast={showToast}
                   onRemove={() => handleRemoveSingle(item)}
                   onToggleImportant={() => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
                   showCheckbox={showBulkActions}
@@ -705,10 +716,6 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           onMove={handleMoveToDossier}
           onClose={() => setMoveToModalOpen(false)}
         />
-      )}
-
-      {viewingItem && (
-        <ArticleViewerModal item={viewingItem} onClose={() => setViewingItem(null)} />
       )}
 
       {editingDossier && (
