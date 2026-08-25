@@ -23,6 +23,7 @@ VisuaLex is an advanced web application designed to research, visualize, and stu
 | **[Frontend Setup](docs/frontend/setup.md)** | Installation & development |
 | **[Component Library](docs/frontend/component_library.md)** | Reusable UI components |
 | **[User Guide](docs/user_guide.md)** | End-user documentation |
+| **[Deployment](docs/deployment.md)** | How `deploy.sh` works, pre-deploy checklist, env vars |
 
 ---
 
@@ -110,6 +111,22 @@ VisuaLexAPI/
 
 ---
 
+## Deployment
+
+Production ships through one script, run **on the server**:
+
+```bash
+./deploy.sh --patch
+```
+
+It pulls, installs, syncs the Playwright browser, regenerates the Prisma client,
+applies pending migrations, builds both apps and restarts the services. It does
+**not** run any test — see **[Deployment](docs/deployment.md)** for the
+pre-deploy checklist, the environment variables, and the rule that the server
+must be checked out on `main` (never on the `visualex-merlt-main` experiment).
+
+---
+
 ## Troubleshooting
 
 - **"Playwright: no such driver"**: Run `playwright install chromium`
@@ -120,4 +137,8 @@ VisuaLexAPI/
 
 ## License
 
-Internal/Educational Use. Please respect the Terms of Service of source data providers (Normattiva, EUR-Lex).
+MIT — see [LICENSE](LICENSE).
+
+The licence covers this software only. The legal texts it retrieves come from
+third parties: please respect the Terms of Service of Normattiva, EUR-Lex and
+Brocardi.

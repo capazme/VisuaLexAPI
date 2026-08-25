@@ -452,8 +452,41 @@ Python API:
 - `REDIS_CACHE_PREFIX`: Key prefix for cache entries (default: `vlx`)
 - `PERSISTENT_CACHE_TTL`: Cache TTL in seconds (default: `86400`)
 - `HTTP_MAX_CONCURRENCY`, `HTTP_TIMEOUT`, `HTTP_MAX_RETRIES`, etc.: HTTP client tuning (see `config.py`)
+- `ALLOWED_ORIGINS`: comma-separated CORS origins. **Unset means localhost only** — production must set it.
+- `RATE_LIMIT` / `RATE_LIMIT_WINDOW`: per-IP counter (defaults `1000` / `600`)
+
+See `.env.example` at the repo root for the full Python-side template.
 
 Node.js Backend: See `backend/.env.example` for required variables. `REDIS_ENABLED` defaults to `"true"` in the example to mirror production topology — set to `"false"` if running dev without a Redis instance (rate limiter will use in-memory fallback with warning log).
+
+---
+
+## Branches and Deployment
+
+**`main` is the product in production ("vanilla"). `visualex-merlt-main` is the
+AI experiment and is never deployed.**
+
+Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
+through short-lived branches (`fix/…`, `feature/…`); `merlt` absorbs them with a
+periodic `git merge main`. Nothing is cherry-picked back. If you find yourself
+fixing something vanilla while on `merlt`, stop and move to `main` — that
+one-way-valve discipline is what this model exists to enforce, after 32 vanilla
+commits (four of them security fixes) sat stranded on the experiment for weeks.
+
+When backporting from `merlt`, watch for two things: commits are often mixed
+(a vanilla fix and MERL-T work in one commit), and MERL-T code can ride along —
+`publishMerltEvent` calls and types tied to schema changes `main` does not have.
+
+Deployment is a single batch script run on the server, `deploy.sh`, with no CI
+and no rollback. **Read `docs/deployment.md` before changing anything it
+touches** — it records what each step exists to prevent, what has to be updated
+in the script when the project changes, and the known gaps.
+
+Two traps worth knowing without opening that file:
+- `npm run build` (`tsc -b`) is the real frontend type-check. A bare
+  `tsc --noEmit` does not walk the project references and will report a false
+  green.
+- Step 1 pulls whatever branch the server is on. Nothing checks it is `main`.
 
 ---
 

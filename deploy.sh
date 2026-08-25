@@ -35,6 +35,8 @@ VERSION_FILE="$SCRIPT_DIR/version.txt"
 DO_PULL=true
 DO_RESTART=true
 VERSION_BUMP=""
+DEPLOY_BRANCH="main"
+ALLOW_BRANCH=false
 
 #===============================================================================
 # Functions
@@ -74,6 +76,7 @@ Options:
   --patch       Increment patch version (1.0.0 -> 1.0.1)
   --no-pull     Skip git pull
   --no-restart  Skip service restart
+  --allow-branch  Deploy from a branch other than main (refused by default)
   -h, --help    Show this help message
 
 Examples:
@@ -148,6 +151,10 @@ while [[ $# -gt 0 ]]; do
             DO_RESTART=false
             shift
             ;;
+        --allow-branch)
+            ALLOW_BRANCH=true
+            shift
+            ;;
         -h|--help)
             show_help
             ;;
@@ -174,6 +181,26 @@ if [[ -n "$VERSION_BUMP" ]]; then
 fi
 
 echo ""
+
+# Step 0: Branch guard.
+# The pull below follows whatever branch this checkout is on. `main` is the
+# product; `visualex-merlt-main` is the AI experiment and must never reach
+# production. A debugging session left on the wrong branch would otherwise ship
+# it silently. See docs/deployment.md.
+cd "$SCRIPT_DIR"
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ "$CURRENT_BRANCH" != "$DEPLOY_BRANCH" ]]; then
+    if [[ "$ALLOW_BRANCH" == true ]]; then
+        print_warning "Deploying from '$CURRENT_BRANCH', not '$DEPLOY_BRANCH' (--allow-branch)"
+    else
+        print_error "Refusing to deploy from branch '$CURRENT_BRANCH' — expected '$DEPLOY_BRANCH'."
+        echo "  Switch with: git checkout $DEPLOY_BRANCH"
+        echo "  Or, if this is deliberate, re-run with --allow-branch"
+        exit 1
+    fi
+else
+    print_success "On branch '$DEPLOY_BRANCH'"
+fi
 
 # Step 1: Git Pull
 if [[ "$DO_PULL" == true ]]; then
