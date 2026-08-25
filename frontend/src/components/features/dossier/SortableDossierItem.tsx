@@ -123,12 +123,13 @@ export function SortableDossierItem({
         <div className="flex items-center gap-1 flex-shrink-0">
           {item.type === 'norma' && (
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); onToggleImportant(); }}
               aria-pressed={isImportant}
               aria-label={isImportant ? 'Rimuovi da importanti' : 'Segna come importante'}
               title={isImportant ? 'Importante' : 'Segna come importante'}
               className={cn(
-                'p-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
+                'p-1.5 rounded-md transition-colors min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
                 isImportant
                   ? 'text-amber-500'
                   : 'text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20',
