@@ -1,9 +1,27 @@
 import { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, FileText, FolderOpen, List, Layers } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence, useDragControls, useMotionValue } from 'framer-motion';
+import { X, Check, FileText, FolderOpen, List, Layers, GripHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { useAppStore } from '../../../store/useAppStore';
+import { Z_INDEX } from '../../../constants/zIndex';
+
+/** Window geometry, also used to keep the parked position inside the viewport. */
+const WINDOW_WIDTH = 420;
+/** How much of the window must stay on screen vertically after a drag. */
+const WINDOW_MIN_VISIBLE = 160;
+
+function clampToViewport(position: { x: number; y: number }) {
+  const maxX = Math.max(0, window.innerWidth - WINDOW_WIDTH);
+  const maxY = Math.max(0, window.innerHeight - WINDOW_MIN_VISIBLE);
+  return {
+    x: Math.min(Math.max(0, position.x), maxX),
+    y: Math.min(Math.max(0, position.y), maxY),
+  };
+}
 
 // Normalize article ID for comparison (handles "3 bis" vs "3-bis")
 function normalizeArticleId(id: string): string {
@@ -33,6 +51,19 @@ export interface TreeViewPanelProps {
   annexes?: AnnexMetadata[];
   /** Currently selected annex (from loaded articles) */
   currentAnnex?: string | null;
+  /**
+   * Which shell to wear.
+   *
+   * `window` is the desktop surface: a draggable, backdrop-less window
+   * portalled to `document.body`. The portal is why this variant also checks
+   * the viewport and renders nothing on small screens — a portal escapes the
+   * `hidden md:block` wrapper it lives under, so without the check the desktop
+   * renderer would leak a window onto phones alongside the mobile drawer.
+   *
+   * `drawer` is the mobile surface: today's right-side sheet with a backdrop,
+   * not portalled, so its `md:hidden` wrapper keeps it off desktop.
+   */
+  variant?: 'window' | 'drawer';
 }
 
 // Check if a string is an article number (numeric or roman numeral)
@@ -137,13 +168,41 @@ export function TreeViewPanel({
   onArticleSelect,
   loadedArticles = [],
   annexes,
-  currentAnnex
+  currentAnnex,
+  variant = 'drawer'
 }: TreeViewPanelProps) {
   // Track which annex tab is selected in the UI
   // This is separate from currentAnnex (which reflects loaded articles)
   // Allows user to select a tab and click articles before loading completes
   const [selectedAnnex, setSelectedAnnex] = useState<string | null | undefined>(undefined);
   const { tryStartTour } = useTour();
+
+  const isDesktop = useIsDesktop();
+  const isWindow = variant === 'window';
+  const storedPosition = useAppStore(s => s.structureWindow.position);
+  const setStructureWindowPosition = useAppStore(s => s.setStructureWindowPosition);
+
+  const dragControls = useDragControls();
+  // Motion values seed from the parked position once, clamped in case the
+  // window was parked on a wider screen than the one rehydrating it.
+  const initialPosition = useMemo(() => clampToViewport(storedPosition), [storedPosition]);
+  const x = useMotionValue(initialPosition.x);
+  const y = useMotionValue(initialPosition.y);
+
+  // Drag from the header only, and never when the pointer went down on a
+  // control inside it — otherwise the close button would start a drag.
+  const startWindowDrag = (event: React.PointerEvent) => {
+    if (!isWindow) return;
+    if ((event.target as HTMLElement).closest('button')) return;
+    dragControls.start(event);
+  };
+
+  const handleWindowDragEnd = () => {
+    const next = clampToViewport({ x: x.get(), y: y.get() });
+    x.set(next.x);
+    y.set(next.y);
+    setStructureWindowPosition(next);
+  };
 
   // Start tree view tour on first open
   useEffect(() => {
@@ -285,31 +344,30 @@ export function TreeViewPanel({
     );
   };
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop with Glass effect */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100]"
-          />
-
-          {/* Sidebar Side Panel */}
-          <motion.aside
-            initial={{ x: '100%', opacity: 0.9 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0.9 }}
-            transition={{ type: 'spring', damping: 35, stiffness: 400 }}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-2xl z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
-          >
-            {/* Header with Glass-like effect */}
-            <div className="sticky top-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-5 z-10">
+  const panelBody = (
+    <>
+            {/* Header with Glass-like effect — doubles as the window drag handle */}
+            <div
+              onPointerDown={startWindowDrag}
+              // `touch-none` is load-bearing, not cosmetic: with
+              // `dragListener={false}` framer-motion drives the gesture from
+              // this handle's pointer events, and a handle left at the default
+              // `touch-action: auto` lets the browser claim the gesture for
+              // panning — the window then never moves.
+              className={cn(
+                "sticky top-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-6 py-5 z-10",
+                isWindow && "cursor-grab active:cursor-grabbing select-none touch-none",
+              )}
+            >
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
+                  {isWindow && (
+                    <GripHorizontal
+                      size={16}
+                      aria-hidden
+                      className="text-slate-300 dark:text-slate-600 shrink-0"
+                    />
+                  )}
                   <div className="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 shadow-sm border border-primary-200/50 dark:border-primary-800/50">
                     <List size={22} />
                   </div>
@@ -481,6 +539,77 @@ export function TreeViewPanel({
 
             {/* Footer shadow fade */}
             <div className="h-10 bg-gradient-to-t from-white dark:from-slate-900 to-transparent pointer-events-none sticky bottom-0" />
+    </>
+  );
+
+  if (isWindow) {
+    // Rendered on the viewport, not in place: the workspace tab panel this
+    // component lives under is transform-driven, and a transformed ancestor
+    // becomes the containing block for `fixed` descendants — a window
+    // positioned inside it would be placed against the panel rather than the
+    // screen (CLAUDE.md gotcha #22). The portal escapes that, which is also
+    // why the viewport check below is needed: a portal escapes the
+    // `hidden md:block` wrapper too, and would otherwise surface on phones.
+    if (!isDesktop) return null;
+
+    return createPortal(
+      <AnimatePresence>
+        {isOpen && (
+          <motion.aside
+            drag
+            dragListener={false}
+            dragControls={dragControls}
+            dragMomentum={false}
+            dragConstraints={{
+              left: 0,
+              top: 0,
+              right: Math.max(0, window.innerWidth - WINDOW_WIDTH),
+              bottom: Math.max(0, window.innerHeight - WINDOW_MIN_VISIBLE),
+            }}
+            onDragEnd={handleWindowDragEnd}
+            style={{ x, y, width: WINDOW_WIDTH }}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            aria-label={`${title} — finestra`}
+            className={cn(
+              "fixed top-0 left-0 max-h-[76vh] rounded-2xl overflow-hidden",
+              "bg-white dark:bg-slate-900 shadow-2xl flex flex-col",
+              "border border-slate-200 dark:border-slate-800",
+              Z_INDEX.structure,
+            )}
+          >
+            {panelBody}
+          </motion.aside>
+        )}
+      </AnimatePresence>,
+      document.body,
+    );
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop with Glass effect */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100]"
+          />
+
+          {/* Sidebar Side Panel */}
+          <motion.aside
+            initial={{ x: '100%', opacity: 0.9 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.9 }}
+            transition={{ type: 'spring', damping: 35, stiffness: 400 }}
+            className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-2xl z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
+          >
+            {panelBody}
           </motion.aside>
         </>
       )}

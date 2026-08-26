@@ -30,6 +30,12 @@ interface ArticleTabContentProps {
     data: ArticleData;
     onCrossReferenceNavigate?: (articleNumber: string, normaData: ArticleData['norma_data']) => void;
     onOpenStudyMode?: () => void;
+    /**
+     * Where this article sits in the workspace, so a citation jump can record
+     * the way back. Surfaces outside the workspace (the dossier reader) leave
+     * it undefined and simply do not push — there is no tab to return to.
+     */
+    readingOrigin?: { tabId: string; blockId: string };
 }
 
 const DICTIONARY_TERMS: Record<string, string> = {
@@ -40,8 +46,13 @@ const DICTIONARY_TERMS: Record<string, string> = {
     'ex nunc': 'Con effetti solo per il futuro.',
 };
 
-export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode }: ArticleTabContentProps) {
+export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
+    // Flattened to scalars so the citation listener effect below depends on
+    // stable values: an inline `readingOrigin` object would change identity on
+    // every render and re-attach the listeners each time.
+    const originTabId = readingOrigin?.tabId;
+    const originBlockId = readingOrigin?.blockId;
     // Subscribe only to the store slices this component actually reads.
     // Action references are already stable across store lifetimes; the
     // useShallow on the whole picked object means a change to unrelated
@@ -57,6 +68,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         removeHighlight,
         loadHighlightsForArticle,
         triggerSearch,
+        pushReadingBack,
         addQuickNorm,
         removeQuickNormByParams,
         isQuickNorm,
@@ -71,6 +83,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         removeHighlight: s.removeHighlight,
         loadHighlightsForArticle: s.loadHighlightsForArticle,
         triggerSearch: s.triggerSearch,
+        pushReadingBack: s.pushReadingBack,
         addQuickNorm: s.addQuickNorm,
         removeQuickNormByParams: s.removeQuickNormByParams,
         isQuickNorm: s.isQuickNorm,
@@ -490,6 +503,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 if (citationData) {
                     const parsed = deserializeCitation(citationData);
                     if (parsed && onCrossReferenceNavigate) {
+                        // Record where we are leaving from BEFORE jumping. This
+                        // is the single origin of both jump kinds below, which
+                        // is why one push covers them both.
+                        if (originTabId && originBlockId) {
+                            pushReadingBack({
+                                tabId: originTabId,
+                                blockId: originBlockId,
+                                articleId: uniqueArticleIdFromNorma(norma_data),
+                                label: `Art. ${norma_data.numero_articolo} — ${norma_data.tipo_atto}`,
+                            });
+                        }
                         // Navigate within same norma if possible
                         if (parsed.act_type === norma_data.tipo_atto &&
                             parsed.act_number === norma_data.numero_atto) {
@@ -550,7 +574,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             container.removeEventListener('mouseenter', handleMouseEnter, true);
             container.removeEventListener('mouseleave', handleMouseLeave, true);
         };
-    }, [onCrossReferenceNavigate, norma_data, triggerSearch, showPreview, hidePreview]);
+    }, [onCrossReferenceNavigate, norma_data, triggerSearch, showPreview, hidePreview, originTabId, originBlockId, pushReadingBack]);
 
     return (
         <div className="animate-in fade-in duration-300 relative">

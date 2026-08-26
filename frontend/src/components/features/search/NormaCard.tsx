@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, X, GitBranch, Plus, ArrowRight, ExternalLink, Loader2 } from 'lucide-react';
 import type { Norma, ArticleData } from '../../../types';
@@ -24,6 +24,11 @@ interface NormaCardProps {
   searchedArticle?: string; // Original article number requested by user
   tabId?: string; // ID of the workspace tab containing this card
   /**
+   * ID of the norma block this card renders. Together with `tabId` it lets a
+   * citation jump record the way back to this article.
+   */
+  normaBlockId?: string;
+  /**
    * When true, an inline progress bar is rendered at the top edge of the card
    * to signal that articles are still arriving for this tab.
    */
@@ -34,7 +39,15 @@ interface NormaCardProps {
   streamProgress?: { loaded: number; total?: number } | null;
 }
 
-export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId, isStreaming, streamProgress }: NormaCardProps) {
+export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossReference, isNew, searchedArticle, tabId, normaBlockId, isStreaming, streamProgress }: NormaCardProps) {
+  // Where these articles sit in the workspace, so a citation jump out of them
+  // can record the way back. Undefined when the card is rendered outside a
+  // workspace tab — then no jump is recorded, which is correct.
+  const readingOrigin = useMemo(
+    () => (tabId && normaBlockId ? { tabId, blockId: normaBlockId } : undefined),
+    [tabId, normaBlockId],
+  );
+
   // Local UI state - defined first so we can derive activeArticle
   const [isOpen, setIsOpen] = useState(true);
   // Initialize with unique ID of the first article
@@ -156,7 +169,68 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     handleLoadArticle(articleNumber, targetAnnex);
   };
 
-  if (articles.length === 0) return null;
+  /* Structure panel — the mobile surface: a drawer, not a window. Unlike the
+     desktop window it keeps local open state, because a card has no
+     norma-block id to hand the store and only one drawer can be on screen at
+     a time anyway. Held in a variable so the empty-block card below can render
+     the same panel without duplicating the invocation. */
+  const structurePanel = (
+    <TreeViewPanel
+      variant="drawer"
+      isOpen={treeVisible}
+      onClose={() => setTreeVisible(false)}
+      treeData={treeData || []}
+      urn={norma.urn || ''}
+      title="Struttura dell'Atto"
+      loadedArticles={loadedArticleIds}
+      onArticleSelect={(articleNumber, targetAnnex) => {
+        // Stays open on purpose: picking several articles in a row without
+        // reopening the index is the point of this round.
+        handleLoadArticleWithNavigation(articleNumber, targetAnnex);
+      }}
+      annexes={treeMetadata?.annexes}
+      currentAnnex={currentAnnex}
+    />
+  );
+
+  const openStructure = () => {
+    setTreeVisible(true);
+    if (!treeData) fetchTree();
+  };
+
+  // A block opened from the index starts with no articles. Rendering nothing
+  // would make the "apri l'indice" entry point a silent no-op on mobile, so
+  // show a minimal card whose only job is to get the index back on screen.
+  if (articles.length === 0) {
+    if (!norma.urn) return null;
+    return (
+      <div className="relative rounded-xl overflow-hidden mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-lg">
+        <div className="p-5 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
+            <Book size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
+              {norma.tipo_atto}
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Scegli un articolo dall'indice
+            </p>
+          </div>
+        </div>
+        <div className="px-5 pb-5">
+          <button
+            onClick={openStructure}
+            className="w-full h-11 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800/40 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <GitBranch size={14} />
+            {treeLoading ? 'Carico…' : "Apri l'indice"}
+          </button>
+        </div>
+        {structurePanel}
+      </div>
+    );
+  }
 
   const streamProgressPct = isStreaming && streamProgress && streamProgress.total
     ? Math.min(100, Math.round((streamProgress.loaded / streamProgress.total) * 100))
@@ -408,21 +482,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
         </div>
       </div>
 
-      {/* Tree View Side Panel - Now includes annex selection */}
-      <TreeViewPanel
-        isOpen={treeVisible}
-        onClose={() => setTreeVisible(false)}
-        treeData={treeData || []}
-        urn={norma.urn || ''}
-        title="Struttura dell'Atto"
-        loadedArticles={loadedArticleIds}
-        onArticleSelect={(articleNumber, targetAnnex) => {
-          handleLoadArticleWithNavigation(articleNumber, targetAnnex);
-          setTreeVisible(false);
-        }}
-        annexes={treeMetadata?.annexes}
-        currentAnnex={currentAnnex}
-      />
+      {structurePanel}
 
       {/* Content */}
       {isOpen && (
@@ -587,6 +647,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                             data={article}
                             onCrossReferenceNavigate={onCrossReference}
                             onOpenStudyMode={() => openStudyMode(article)}
+                            readingOrigin={readingOrigin}
                           />
                         </div>
                       </motion.div>
@@ -643,6 +704,7 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
                     data={activeArticle}
                     onCrossReferenceNavigate={onCrossReference}
                     onOpenStudyMode={() => openStudyMode(activeArticle)}
+                    readingOrigin={readingOrigin}
                   />
                 </motion.div>
               )}

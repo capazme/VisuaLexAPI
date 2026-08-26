@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Book, ChevronDown, ChevronRight, ExternalLink, X, GripVertical, GitBranch, Trash2, BookOpen, Loader2 } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -36,11 +36,16 @@ export function NormaBlockComponent({
   onRemoveArticle,
   onRemoveNorma
 }: NormaBlockComponentProps) {
-  const { toggleNormaCollapse, settings, consumeAutoFocusArticle } = useAppStore(useShallow(s => ({
+  const { toggleNormaCollapse, settings, consumeAutoFocusArticle, openStructureWindow, closeStructureWindow } = useAppStore(useShallow(s => ({
     toggleNormaCollapse: s.toggleNormaCollapse,
     settings: s.settings,
     consumeAutoFocusArticle: s.consumeAutoFocusArticle,
+    openStructureWindow: s.openStructureWindow,
+    closeStructureWindow: s.closeStructureWindow,
   })));
+  // Ownership of the single structure window lives in the store, so opening
+  // one block's index hands the window over instead of stacking a second one.
+  const isStructureOpen = useAppStore(s => s.structureWindow.blockId === normaBlock.id);
   const [studyModeOpen, setStudyModeOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -107,13 +112,18 @@ export function NormaBlockComponent({
   // button onClick closures below, and so the JSX reads cleaner.
   const normaUrn = normaBlock.norma.urn;
 
+  // Where these articles sit in the workspace, so a citation jump out of them
+  // can record the way back.
+  const readingOrigin = useMemo(
+    () => ({ tabId, blockId: normaBlock.id }),
+    [tabId, normaBlock.id],
+  );
+
   // Use the shared annex navigation hook - pass activeArticle for correct annex detection
   const {
     treeData,
     treeMetadata,
     treeLoading,
-    treeVisible,
-    setTreeVisible,
     currentAnnex,
     allArticleIds,
     loadingArticle,
@@ -279,7 +289,11 @@ export function NormaBlockComponent({
                 className="norma-structure-btn px-2 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-lg transition-colors flex items-center gap-1.5"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setTreeVisible(!treeVisible);
+                  if (isStructureOpen) {
+                    closeStructureWindow();
+                  } else {
+                    openStructureWindow(normaBlock.id);
+                  }
                   if (!treeData) {
                     fetchTree();
                   }
@@ -304,17 +318,20 @@ export function NormaBlockComponent({
         )}
       </div>
 
-      {/* Tree View Side Panel - Now includes annex selection */}
+      {/* Structure window — the desktop surface: a movable window that stays
+          open while articles are picked out of it. */}
       <TreeViewPanel
-        isOpen={treeVisible}
-        onClose={() => setTreeVisible(false)}
+        variant="window"
+        isOpen={isStructureOpen}
+        onClose={closeStructureWindow}
         treeData={treeData || []}
         urn={normaUrn || ''}
         title="Struttura Atto"
         loadedArticles={loadedArticleIds}
         onArticleSelect={(articleNumber, targetAnnex) => {
+          // Stays open on purpose: picking several articles in a row without
+          // reopening the index is the point of this round.
           handleLoadArticleWithNavigation(articleNumber, targetAnnex);
-          setTreeVisible(false);
         }}
         annexes={treeMetadata?.annexes}
         currentAnnex={currentAnnex}
@@ -410,6 +427,7 @@ export function NormaBlockComponent({
                     data={article}
                     onCrossReferenceNavigate={onCrossReference}
                     onOpenStudyMode={() => setStudyModeOpen(true)}
+                    readingOrigin={readingOrigin}
                   />
                 </div>
               );
@@ -495,13 +513,26 @@ export function NormaBlockComponent({
                     data={activeArticle}
                     onCrossReferenceNavigate={onCrossReference}
                     onOpenStudyMode={() => setStudyModeOpen(true)}
+                    readingOrigin={readingOrigin}
                   />
                 </motion.div>
               )}
             </AnimatePresence>
             {!activeArticle && !loadingArticle && (
-              <div className="flex items-center justify-center h-40 text-slate-400">
-                <p className="text-sm">Nessun articolo selezionato</p>
+              <div className="flex flex-col items-center justify-center h-40 gap-1 text-slate-400 px-6 text-center">
+                {/* A block opened from the index starts empty on purpose, so
+                    the copy has to say what to do next rather than state that
+                    nothing is selected. */}
+                <p className="text-sm font-medium">
+                  {normaBlock.articles.length === 0
+                    ? "Scegli un articolo dall'indice"
+                    : 'Nessun articolo selezionato'}
+                </p>
+                {normaBlock.articles.length === 0 && (
+                  <p className="text-xs opacity-70">
+                    La finestra Struttura resta aperta: puoi pescarne quanti ne servono.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -524,10 +555,14 @@ export function NormaBlockComponent({
       )}
 
       {/* Study Mode Overlay */}
+      {/* Mounted only with an article in hand: StudyMode dereferences `article`
+          in its body, and a block opened from the index legitimately has none
+          until the first pick. */}
+      {activeArticle && (
       <StudyMode
         isOpen={studyModeOpen}
         onClose={() => setStudyModeOpen(false)}
-        article={activeArticle || normaBlock.articles[0]}
+        article={activeArticle}
         articles={normaBlock.articles}
         onNavigate={(articleId) => focusArticle(articleId)}
         onCrossReferenceNavigate={onCrossReference}
@@ -535,6 +570,7 @@ export function NormaBlockComponent({
         allArticleIds={allArticleIds}
         onLoadArticle={handleLoadArticleWithNavigation}
       />
+      )}
     </div>
   );
 }
