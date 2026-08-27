@@ -17,6 +17,14 @@ interface UseAnnexNavigationProps {
   activeArticle?: ArticleData | null;
 }
 
+/** One annex's worth of article titles, as served by /fetch_rubriche. */
+export interface RubrichePart {
+  name: string;
+  keys: string[];
+  rubriche: Record<string, string>;
+  abrogati: string[];
+}
+
 interface UseAnnexNavigationReturn {
   // Tree state
   treeData: TreeNode[] | null;
@@ -24,6 +32,22 @@ interface UseAnnexNavigationReturn {
   treeLoading: boolean;
   treeVisible: boolean;
   setTreeVisible: (visible: boolean) => void;
+  /**
+   * Article rubriche keyed by article number, merged in after the tree.
+   * Empty until `/fetch_rubriche` answers — and stays empty for acts that have
+   * no rubriche at all (the Costituzione) or whose export could not be read.
+   */
+  rubriche: Record<string, string>;
+  /** Keys of the articles the act declares repealed (dominant part). */
+  abrogati: string[];
+  /**
+   * Per-annex breakdown. Every annex has its own article 1 with its own
+   * rubrica — art. 1 of the codice civile is "Capacità giuridica", art. 1 of
+   * the preleggi is "Indicazione delle fonti" — so a single flat map labels
+   * two of the three with the third's titles. Matched to an annex by article
+   * numbers, not by name.
+   */
+  rubricheParts: RubrichePart[];
 
   // Annex state
   currentAnnex: string | null;
@@ -61,6 +85,10 @@ export function useAnnexNavigation({
   const [treeMetadata, setTreeMetadata] = useState<TreeMetadata | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeVisible, setTreeVisible] = useState(false);
+  // Article rubriche, fetched separately from the tree (see fetchTree).
+  const [rubriche, setRubriche] = useState<Record<string, string>>({});
+  const [abrogati, setAbrogati] = useState<string[]>([]);
+  const [rubricheParts, setRubricheParts] = useState<RubrichePart[]>([]);
 
   // Article loading state (for workspace direct loading)
   const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
@@ -110,8 +138,19 @@ export function useAnnexNavigation({
   const fetchTree = useCallback(async () => {
     if (!norma.urn || treeData) return; // Don't refetch if already loaded
 
+    const urn = norma.urn;
+
     try {
       setTreeLoading(true);
+      // Belt and braces. The `treeData` guard above makes fetchTree a
+      // once-per-hook-instance operation, so this cannot actually fire for a
+      // second act today — tree and rubriche stay in step because neither
+      // refetches. It is here so that relaxing that guard to support act
+      // switching does not silently leave article 3 of the new act wearing
+      // article 3 of the old one's title.
+      setRubriche({});
+      setAbrogati([]);
+      setRubricheParts([]);
       const res = await fetch('/fetch_tree', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,6 +170,30 @@ export function useAnnexNavigation({
       if (payload.metadata) {
         setTreeMetadata(payload.metadata);
       }
+
+      // Rubriche live behind a separate, much slower endpoint (~5s cold for the
+      // codice civile, 20ms warm) because they come from the Akoma Ntoso export
+      // rather than the HTML tree. Deliberately NOT awaited: the index paints
+      // immediately with bare numbers and the titles merge in when they land.
+      fetch('/fetch_rubriche', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urn })
+      })
+        .then(rubricheRes => {
+          if (!rubricheRes.ok) throw new Error(`HTTP ${rubricheRes.status}`);
+          return rubricheRes.json();
+        })
+        .then(rubrichePayload => {
+          setRubriche(rubrichePayload?.rubriche ?? {});
+          setAbrogati(rubrichePayload?.abrogati ?? []);
+          setRubricheParts(rubrichePayload?.parts ?? []);
+        })
+        .catch(err => {
+          // Never swallowed silently (CLAUDE.md gotcha 18): rubriche are
+          // optional, but a backend that stopped answering must be visible.
+          console.error('Error fetching rubriche for', urn, err);
+        });
     } catch (e) {
       console.error('Error fetching tree:', e);
     } finally {
@@ -304,6 +367,9 @@ export function useAnnexNavigation({
     treeLoading,
     treeVisible,
     setTreeVisible,
+    rubriche,
+    abrogati,
+    rubricheParts,
 
     // Annex state
     currentAnnex,

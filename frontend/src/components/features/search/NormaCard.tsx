@@ -71,6 +71,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
     treeData,
     treeMetadata,
     treeLoading,
+    rubriche,
+    abrogati,
+    rubricheParts,
     treeVisible,
     setTreeVisible,
     currentAnnex,
@@ -190,6 +193,9 @@ export function NormaCard({ norma, articles, onCloseArticle, onViewPdf, onCrossR
       }}
       annexes={treeMetadata?.annexes}
       currentAnnex={currentAnnex}
+      rubriche={rubriche}
+        abrogati={abrogati}
+        rubricheParts={rubricheParts}
     />
   );
 

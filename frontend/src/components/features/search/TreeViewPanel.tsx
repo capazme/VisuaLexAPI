@@ -1,13 +1,15 @@
 import { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useDragControls, useMotionValue } from 'framer-motion';
-import { X, Check, FileText, FolderOpen, List, Layers, GripHorizontal } from 'lucide-react';
+import { X, Check, FileText, List, Layers, GripHorizontal, Search, ChevronRight } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
+import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { cleanSectionTitle } from '../../../utils/sectionTitle';
 
 /** Window geometry, also used to keep the parked position inside the viewport. */
 const WINDOW_WIDTH = 420;
@@ -28,6 +30,17 @@ function normalizeArticleId(id: string): string {
   if (!id) return id;
   return id.trim().toLowerCase().replace(/\s+/g, '-');
 }
+
+/**
+ * Fold a string for filtering: accents stripped, lowercased.
+ * A lawyer types "responsabilita" and expects "Responsabilità del debitore".
+ */
+function foldForSearch(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/** Above this many sections the index opens collapsed — the codice civile has 406. */
+const COLLAPSE_THRESHOLD = 8;
 
 // A tree node is either a section-title string or an article object carrying
 // its number and (optional) annex marker.
@@ -52,6 +65,20 @@ export interface TreeViewPanelProps {
   /** Currently selected annex (from loaded articles) */
   currentAnnex?: string | null;
   /**
+   * Article rubriche keyed by article number ("2043" → "Risarcimento per
+   * fatto illecito"). Arrives after the tree and is always partial: coverage
+   * is ~89% for the codici and 0% for acts that carry no rubriche at all.
+   * An article without one renders as a bare number.
+   */
+  rubriche?: Record<string, string>;
+  /** Keys of the articles the act declares repealed (fallback for flat acts). */
+  abrogati?: string[];
+  /**
+   * Per-annex titles. Preferred over the flat `rubriche` map when a part can
+   * be matched to the annex on screen — see `activePart`.
+   */
+  rubricheParts?: RubrichePart[];
+  /**
    * Which shell to wear.
    *
    * `window` is the desktop surface: a draggable, backdrop-less window
@@ -71,13 +98,22 @@ function isArticleString(str: string): boolean {
   if (!str || typeof str !== 'string') return false;
   const trimmed = str.trim();
 
-  // Numeric articles: "1", "2", "1-bis", "2 bis", "3-ter", "4 quater"
-  if (/^(\d+)(?:[-\s]?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?$/i.test(trimmed)) {
+  // Numeric articles: "1", "1-bis", "2 bis", "2409-octiesdecies", "669-terdecies".
+  //
+  // The suffix is ANY single lowercase word, not an enumerated list. Normattiva
+  // runs well past `decies` — art. 669-terdecies c.p.c. (reclamo cautelare),
+  // art. 2409-octiesdecies c.c., art. 25-undecies of D.Lgs. 231/2001 — and an
+  // enumerated list silently reclassified every one of them as a SECTION TITLE,
+  // dropping them from the index entirely.
+  //
+  // Staying lowercase and single-word is what keeps section headers out: those
+  // arrive uppercase and multi-word ("LIBRO PRIMO DELLE PERSONE…").
+  if (/^\d+(?:[-\s][a-z]+)?$/.test(trimmed)) {
     return true;
   }
 
-  // Roman numerals: "I", "II", "III", "I-bis", "II ter"
-  if (/^([IVXLCDM]+)(?:[-\s]?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?$/i.test(trimmed)) {
+  // Roman numerals: "I", "II", "III", "I-bis", "II terdecies"
+  if (/^[IVXLCDM]+(?:[-\s][a-z]+)?$/.test(trimmed)) {
     return true;
   }
 
@@ -169,12 +205,20 @@ export function TreeViewPanel({
   loadedArticles = [],
   annexes,
   currentAnnex,
+  rubriche,
+  abrogati,
+  rubricheParts,
   variant = 'drawer'
 }: TreeViewPanelProps) {
   // Track which annex tab is selected in the UI
   // This is separate from currentAnnex (which reflects loaded articles)
   // Allows user to select a tab and click articles before loading completes
   const [selectedAnnex, setSelectedAnnex] = useState<string | null | undefined>(undefined);
+  // Free-text filter over article numbers and rubriche
+  const [filterQuery, setFilterQuery] = useState('');
+  // Explicit expand/collapse choices, keyed by annex + section index so a tab
+  // switch cannot inherit the previous tab's open sections.
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, boolean>>({});
   const { tryStartTour } = useTour();
 
   const isDesktop = useIsDesktop();
@@ -218,6 +262,10 @@ export function TreeViewPanel({
     // changes from outside. (CLAUDE.md gotcha #11)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedAnnex(undefined);
+    // Same transaction, same justification: a new act (or a reopened panel)
+    // must not inherit the previous one's filter or open sections.
+    setFilterQuery('');
+    setSectionOverrides({});
   }, [currentAnnex, isOpen]);
 
   // The annex to use for display and article clicks
@@ -275,7 +323,6 @@ export function TreeViewPanel({
   // - Fall back to flat article list only when no section structure exists
   const useStructuredView = hasStructuredSections;
   const displayArticles = useStructuredView ? null : articlesForCurrentAnnex;
-  const useFallbackTree = !displayArticles && parsedSections;
 
   // Count stats based on what we're displaying
   const stats = useMemo(() => {
@@ -296,51 +343,179 @@ export function TreeViewPanel({
   );
   const isArticleLoaded = (id: string) => loadedSetNormalized.has(normalizeArticleId(id));
 
-  // Render article button with section index for unique keys
-  const renderArticleButton = (articleNum: string, sectionIdx: number, articleIdx: number) => {
-    // Build unique ID with current annex context to check if THIS specific article is loaded
-    // e.g., Allegato 1 Art. 1 = "all1:1", Dispositivo Art. 1 = "1"
-    const uniqueIdForContext = effectiveAnnex
-      ? `all${effectiveAnnex}:${articleNum}`
-      : articleNum;
-    const isLoaded = isArticleLoaded(uniqueIdForContext);
+  // Build unique ID with current annex context, so "Art. 1" of Allegato 1
+  // ("all1:1") is never mistaken for "Art. 1" of the dispositivo ("1").
+  const uniqueIdForContext = (articleNum: string) =>
+    effectiveAnnex ? `all${effectiveAnnex}:${articleNum}` : articleNum;
+
+  // Which set of titles belongs to the annex on screen.
+  //
+  // Every annex has its own article 1: "Capacità giuridica" in the codice
+  // civile, "Indicazione delle fonti" in the preleggi, and no rubrica at all in
+  // the Dispositivo, whose art. 1 is the enacting provision. A single flat map
+  // therefore labels two annexes out of three with the third's titles — which
+  // is exactly what the Dispositivo showed before this.
+  //
+  // Matched by ARTICLE NUMBERS rather than by name: the AKN part names
+  // ("CODICE CIVILE") and the annex labels are only sometimes the same string,
+  // while the article sets always coincide.
+  const activePart = useMemo(() => {
+    if (!rubricheParts || rubricheParts.length === 0) return null;
+
+    const annexNumbers = annexes?.find(
+      a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null)
+    )?.article_numbers;
+    if (!annexNumbers || annexNumbers.length === 0) return null;
+
+    const wanted = new Set(annexNumbers.map(normalizeArticleId));
+    let best: typeof rubricheParts[number] | null = null;
+    let bestScore = 0;
+    for (const part of rubricheParts) {
+      const overlap = part.keys.reduce(
+        (n: number, k: string) => (wanted.has(normalizeArticleId(k)) ? n + 1 : n), 0
+      );
+      if (overlap > bestScore) {
+        bestScore = overlap;
+        best = part;
+      }
+    }
+    // Require a real majority: a couple of shared numbers is coincidence
+    // (every annex has an article 1), a matching set is identification.
+    return bestScore >= Math.max(1, Math.min(wanted.size, best?.keys.length ?? 0) * 0.5)
+      ? best
+      : null;
+  }, [rubricheParts, annexes, effectiveAnnex]);
+
+  // Rubriche keyed the same way article numbers are compared, so a tree
+  // emitting "1-bis" still finds a rubrica stored under "1 bis" (gotcha 9).
+  const rubricheNormalized = useMemo(() => {
+    const source: Record<string, string> = activePart ? activePart.rubriche : (rubriche ?? {});
+    const map: Record<string, string> = {};
+    for (const [key, value] of Object.entries(source)) {
+      if (value) map[normalizeArticleId(key)] = value;
+    }
+    return map;
+  }, [rubriche, activePart]);
+  const rubricaFor = (articleNum: string) => rubricheNormalized[normalizeArticleId(articleNum)] ?? '';
+
+  // An abrogated article has no rubrica because it has no content. Saying so
+  // beats a blank row: the reader cannot otherwise tell "repealed" from "we
+  // could not find the title".
+  const abrogatiNormalized = useMemo(() => {
+    const source = activePart ? activePart.abrogati : (abrogati ?? []);
+    return new Set(source.map(normalizeArticleId));
+  }, [abrogati, activePart]);
+  const isAbrogato = (articleNum: string) => abrogatiNormalized.has(normalizeArticleId(articleNum));
+
+  // One shape for both display modes: the flat per-annex list becomes a single
+  // section, so filtering, counting and collapsing have a single code path.
+  const annexLabel = annexes?.find(
+    a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null)
+  )?.label || 'Articoli';
+
+  const displaySections = useMemo<ParsedSection[] | null>(() => {
+    if (displayArticles) return [{ title: annexLabel, articles: displayArticles }];
+    if (parsedSections && parsedSections.length > 0) return parsedSections;
+    return null;
+  }, [displayArticles, parsedSections, annexLabel]);
+
+  const normalizedQuery = foldForSearch(filterQuery.trim());
+  const isFiltering = normalizedQuery.length > 0;
+
+  // Sections carry their original index so a collapse choice survives the
+  // filter hiding the sections above it.
+  const sectionsToRender = useMemo(() => {
+    if (!displaySections) return null;
+    const indexed = displaySections.map((section, idx) => ({ ...section, idx }));
+    if (!isFiltering) return indexed;
+
+    return indexed
+      .map(section => ({
+        ...section,
+        articles: section.articles.filter(articleNum =>
+          foldForSearch(articleNum).startsWith(normalizedQuery) ||
+          foldForSearch(rubricheNormalized[normalizeArticleId(articleNum)] ?? '').includes(normalizedQuery) ||
+          (abrogatiNormalized.has(normalizeArticleId(articleNum)) && 'abrogato'.includes(normalizedQuery))
+        ),
+      }))
+      .filter(section => section.articles.length > 0);
+  }, [displaySections, isFiltering, normalizedQuery, rubricheNormalized, abrogatiNormalized]);
+
+  const totalArticleCount = useMemo(
+    () => displaySections?.reduce((sum, s) => sum + s.articles.length, 0) ?? 0,
+    [displaySections]
+  );
+  const matchedArticleCount = useMemo(
+    () => sectionsToRender?.reduce((sum, s) => sum + s.articles.length, 0) ?? 0,
+    [sectionsToRender]
+  );
+
+  // The codice civile has 406 sections; opening all of them defeats the point
+  // of an index. Below the threshold everything stays open.
+  const collapsedByDefault = (displaySections?.length ?? 0) > COLLAPSE_THRESHOLD;
+  const sectionKey = (idx: number) => `${effectiveAnnex ?? 'main'}::${idx}`;
+
+  const isSectionExpanded = (section: { idx: number; articles: string[] }) => {
+    // A filter is a request to see the matches, so it wins over every default.
+    if (isFiltering) return true;
+    const override = sectionOverrides[sectionKey(section.idx)];
+    if (override !== undefined) return override;
+    if (!collapsedByDefault) return true;
+    // Where you already are stays open.
+    return section.articles.some(articleNum => isArticleLoaded(uniqueIdForContext(articleNum)));
+  };
+
+  const toggleSection = (idx: number, expanded: boolean) => {
+    setSectionOverrides(prev => ({ ...prev, [sectionKey(idx)]: !expanded }));
+  };
+
+  // One row per article: number in a fixed leading slot, rubrica beside it.
+  const renderArticleRow = (articleNum: string, sectionIdx: number, articleIdx: number) => {
+    const isLoaded = isArticleLoaded(uniqueIdForContext(articleNum));
     const isClickable = onArticleSelect && !isLoaded;
     // Create unique key: section index + article index + article number
     const uniqueKey = `sec${sectionIdx}-art${articleIdx}-${articleNum}`;
+    const rubrica = rubricaFor(articleNum);
+    const abrogato = !rubrica && isAbrogato(articleNum);
 
     return (
-      <motion.button
+      <button
         key={uniqueKey}
         onClick={() => isClickable && onArticleSelect(articleNum, effectiveAnnex ?? null)}
-        disabled={!isClickable}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: articleIdx * 0.02, duration: 0.2 }}
-        whileHover={isClickable ? { scale: 1.05, y: -2 } : {}}
-        whileTap={isClickable ? { scale: 0.95 } : {}}
+        // aria-disabled rather than disabled: a `disabled` button is dropped
+        // from the tab order AND renders no native tooltip in Chrome or Safari.
+        // Both matter here — the rubrica is truncated to one line and `title` is
+        // the only route to the full text, and the rows a lawyer most wants to
+        // re-read are exactly the loaded ones. The click is guarded instead.
+        aria-disabled={!isClickable}
+        title={rubrica || undefined}
         className={cn(
-          "relative px-4 py-2.5 text-xs font-bold rounded-xl transition-colors border",
+          "w-full flex items-center gap-2.5 rounded-md px-2 text-left border border-transparent transition-colors",
+          variant === 'drawer' ? "min-h-[44px] py-2" : "py-1",
           isLoaded
-            ? "bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700 dark:from-emerald-900/30 dark:to-emerald-900/10 dark:border-emerald-800/50 dark:text-emerald-400 cursor-default shadow-inner"
-            : "bg-white border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 hover:border-primary-400 dark:hover:border-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/40 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer shadow-sm hover:shadow-md"
+            ? "bg-emerald-50 border-emerald-200/70 text-emerald-700 dark:bg-emerald-900/25 dark:border-emerald-800/50 dark:text-emerald-400 cursor-default"
+            : "text-slate-700 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-900/40 hover:border-primary-200 dark:hover:border-primary-800 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer"
         )}
       >
-        {articleNum}
-        <AnimatePresence>
-          {isLoaded && (
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="absolute -top-1.5 -right-1.5"
-            >
-              <div className="w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center shadow-md shadow-emerald-500/30 ring-2 ring-white dark:ring-slate-900">
-                <Check size={10} className="text-white" strokeWidth={3} />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.button>
+        {/* min-w, not a fixed w: the slot has to hold "2409-octiesdecies" as
+            well as "3". A hard 44px with shrink-0 makes a long id spill left,
+            out of the row — and the codici are full of them. */}
+        <span className="min-w-11 shrink-0 text-right text-xs font-bold tabular-nums">
+          {articleNum}
+        </span>
+        {rubrica ? (
+          <span className="flex-1 min-w-0 truncate text-xs font-normal">
+            {rubrica}
+          </span>
+        ) : abrogato ? (
+          <span className="flex-1 min-w-0 truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            Abrogato
+          </span>
+        ) : null}
+        {isLoaded && (
+          <Check size={12} strokeWidth={3} aria-hidden className="ml-auto shrink-0 text-emerald-500" />
+        )}
+      </button>
     );
   };
 
@@ -423,7 +598,16 @@ export function TreeViewPanel({
                         onClick={() => handleAnnexTabClick(annex.number)}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        layout
+                        // No `layout`. The annex list is static — nothing ever
+                        // enters, leaves or reorders — so a layout animation has
+                        // nothing to describe and only re-measures. It made the
+                        // whole row visibly shuffle on every re-render, and the
+                        // rubriche landing seconds after the tree added exactly
+                        // such a re-render: the section moved on its own while
+                        // the reader was looking at it, and a chip mid-animation
+                        // rendered blank. `whileHover`/`whileTap` stay: a scale
+                        // transform does not affect layout, so siblings hold
+                        // still.
                         className={cn(
                           "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
                           isActive
@@ -453,78 +637,104 @@ export function TreeViewPanel({
               </div>
             )}
 
-            {/* Scrollable Content */}
-            <div id="tour-tree-structure" className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-              {/* Show annex-specific articles when available */}
-              {displayArticles ? (
-                <motion.div
-                  key={effectiveAnnex || 'dispositivo'}
-                  className="pb-10"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {/* Section header for current annex */}
-                  <div className="flex items-start gap-3 mb-6">
-                    <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                      <FileText size={16} className="text-primary-600 dark:text-primary-400" />
+            {/* Scrollable Content — a dense list of rows, one article each */}
+            <div id="tour-tree-structure" className="flex-1 overflow-y-auto px-3 py-2 custom-scrollbar">
+              {sectionsToRender ? (
+                <>
+                  {/* Filter — sticky, bled edge to edge over the content padding */}
+                  <div className="sticky top-0 z-20 -mx-3 px-3 pt-1 pb-2 bg-white dark:bg-slate-900 border-b border-slate-200/70 dark:border-slate-800">
+                    <div className="relative">
+                      <Search
+                        size={14}
+                        aria-hidden
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                      />
+                      <input
+                        type="text"
+                        value={filterQuery}
+                        onChange={(e) => setFilterQuery(e.target.value)}
+                        placeholder="Filtra per numero o rubrica…"
+                        aria-label="Filtra gli articoli per numero o rubrica"
+                        className={cn(
+                          "w-full pl-8 pr-3 rounded-lg border text-xs",
+                          "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800",
+                          "text-slate-700 dark:text-slate-200 placeholder:text-slate-400",
+                          "focus:outline-none focus:ring-2 focus:ring-primary-500",
+                          variant === 'drawer' ? "min-h-[44px] py-2" : "py-1.5"
+                        )}
+                      />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                        {annexes?.find(a => a.number === effectiveAnnex || (a.number === null && effectiveAnnex === null))?.label || 'Articoli'}
-                      </h4>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-                        {displayArticles.length} articoli disponibili
+                    {isFiltering && (
+                      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 tabular-nums">
+                        {matchedArticleCount} di {totalArticleCount}
                       </p>
+                    )}
+                  </div>
+
+                  {sectionsToRender.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                      <Search size={32} className="opacity-20 mb-3" />
+                      <p className="text-xs font-medium">Nessun articolo corrisponde al filtro</p>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-1 pt-2 pb-10">
+                      {sectionsToRender.map((section) => {
+                        const expanded = isSectionExpanded(section);
 
-                  {/* Articles Grid */}
-                  <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5">
-                    {displayArticles.map((articleNum, artIdx) => renderArticleButton(articleNum, 0, artIdx))}
-                  </div>
-                </motion.div>
-              ) : useFallbackTree ? (
-                <motion.div
-                  className="space-y-8 pb-10"
-                  initial="hidden"
-                  animate="visible"
-                  variants={{
-                    visible: { transition: { staggerChildren: 0.05 } }
-                  }}
-                >
-                  {parsedSections!.map((section, idx) => (
-                    <motion.div
-                      key={idx}
-                      className="space-y-4"
-                      variants={{
-                        hidden: { opacity: 0, y: 10 },
-                        visible: { opacity: 1, y: 0 }
-                      }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      {/* Section Title */}
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                          <FolderOpen size={16} className="text-amber-600 dark:text-amber-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                            {section.title}
-                          </h4>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-                            {section.articles.length} articoli
-                          </p>
-                        </div>
-                      </div>
+                        return (
+                          <div key={section.idx}>
+                            {/* Section header — the only element carrying
+                                role="button", so no interactive child can
+                                re-trigger the toggle. */}
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              aria-expanded={expanded}
+                              aria-label={`${expanded ? 'Comprimi' : 'Espandi'} ${cleanSectionTitle(section.title)}`}
+                              onClick={() => toggleSection(section.idx, expanded)}
+                              onKeyDown={(e) => {
+                                if (e.target !== e.currentTarget) return;
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleSection(section.idx, expanded);
+                                }
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-2 rounded-md cursor-pointer select-none",
+                                "hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-colors",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                                variant === 'drawer' ? "min-h-[44px] py-2" : "py-1.5"
+                              )}
+                            >
+                              <ChevronRight
+                                size={14}
+                                aria-hidden
+                                className={cn(
+                                  "shrink-0 text-slate-400 transition-transform",
+                                  expanded && "rotate-90"
+                                )}
+                              />
+                              <span className="flex-1 min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                {cleanSectionTitle(section.title)}
+                              </span>
+                              <span className="shrink-0 text-[10px] font-semibold text-slate-400 tabular-nums">
+                                {section.articles.length}
+                              </span>
+                            </div>
 
-                      {/* Articles Grid - More compact/modern grid */}
-                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 pl-11">
-                        {section.articles.map((articleNum, artIdx) => renderArticleButton(articleNum, idx, artIdx))}
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
+                            {expanded && (
+                              <div className="pl-3">
+                                {section.articles.map((articleNum, artIdx) =>
+                                  renderArticleRow(articleNum, section.idx, artIdx)
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               ) : (
                 <motion.div
                   initial={{ opacity: 0 }}

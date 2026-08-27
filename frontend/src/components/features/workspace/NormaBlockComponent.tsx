@@ -124,6 +124,9 @@ export function NormaBlockComponent({
     treeData,
     treeMetadata,
     treeLoading,
+    rubriche,
+    abrogati,
+    rubricheParts,
     currentAnnex,
     allArticleIds,
     loadingArticle,
@@ -335,6 +338,9 @@ export function NormaBlockComponent({
         }}
         annexes={treeMetadata?.annexes}
         currentAnnex={currentAnnex}
+        rubriche={rubriche}
+        abrogati={abrogati}
+        rubricheParts={rubricheParts}
       />
 
       {/* Articles */}
