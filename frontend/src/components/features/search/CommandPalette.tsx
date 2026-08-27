@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2 } from 'lucide-react';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles } from 'lucide-react';
 import type { SearchParams, CustomAlias } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
@@ -8,6 +8,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams, type ParsedCitation } from '../../../utils/citationParser';
 import { useTour } from '../../../hooks/useTour';
 import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
+import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -23,6 +24,16 @@ interface CommandPaletteProps {
 }
 
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
+
+/** Case-insensitive, for the reason given on `selectedActLabel`: an act named
+ *  by the server ("regolamento ue") must reach the same branch as the same act
+ *  picked from the grid ("Regolamento UE"), or the palette skips the step that
+ *  collects its number and date. */
+function requiresDetails(actValue: string): boolean {
+  const wanted = (actValue || '').toLowerCase();
+  return ACT_TYPES_REQUIRING_DETAILS.some(v => v.toLowerCase() === wanted);
+}
+
 
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
@@ -52,6 +63,27 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     );
   }, [customAliases]);
   const hasAliases = sortedAliases.length > 0;
+
+  // The aliases we ship. Shown next to the user's own so it is visible what
+  // already exists and what still has to be invented — asked for directly:
+  // "così che l'utente sappia cosa ha e cosa deve inserire da solo".
+  const { catalog } = useAliasCatalog(isOpen);
+
+  const presetEntries = useMemo(() => {
+    const mine = new Set(customAliases.map(a => foldAlias(a.trigger)));
+    return Object.entries(catalog.presets)
+      // A custom alias with the same trigger wins at resolution time, so
+      // showing the preset too would advertise a shortcut that no longer runs.
+      .filter(([trigger]) => !mine.has(foldAlias(trigger)))
+      // Shortest first: an alias earns its keep by being shorter than the name
+      // it replaces, so "gdpr" and "tuir" are worth more screen than
+      // "codice dei beni culturali".
+      .sort(([a], [b]) => a.length - b.length || a.localeCompare(b));
+  }, [catalog.presets, customAliases]);
+
+  // Only a handful by default — the full 80 stay reachable by typing, since
+  // cmdk filters every rendered item.
+  const visiblePresets = inputValue.trim() ? presetEntries : presetEntries.slice(0, 6);
 
   // Smart citation parsing - include custom aliases for resolution
   // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
@@ -182,7 +214,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     setSelectedAct(actValue);
     setInputValue('');
 
-    if (ACT_TYPES_REQUIRING_DETAILS.includes(actValue)) {
+    if (requiresDetails(actValue)) {
       setStep('input_details');
     } else {
       setStep('input_article');
@@ -226,6 +258,23 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     }
   }, [trackAliasUsage, onSearch, onClose, includeBrocardi]);
 
+  const handleSelectPreset = useCallback((trigger: string) => {
+    const preset = catalog.presets[trigger];
+    if (!preset) return;
+
+    // A preset names an act, never an article, so it seeds the form rather
+    // than running a search — same branch a picked act type takes.
+    setSelectedAct(preset.act_type);
+    setActNumber(preset.act_number ?? '');
+    setActDate(preset.date ?? '');
+    setInputValue('');
+    setStep(
+      requiresDetails(preset.act_type) && !(preset.act_number && preset.date)
+        ? 'input_details'
+        : 'input_article'
+    );
+  }, [catalog.presets]);
+
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
 
@@ -251,7 +300,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
       if (parsedCitation.date) setActDate(parsedCitation.date);
       setInputValue('');
 
-      if (ACT_TYPES_REQUIRING_DETAILS.includes(parsedCitation.act_type)) {
+      if (requiresDetails(parsedCitation.act_type)) {
         if (parsedCitation.act_number && parsedCitation.date) {
           setStep('input_article');
         } else {
@@ -305,9 +354,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
     onClose();
   }, [selectedAct, actNumber, actDate, includeBrocardi, onBrowseStructure, onClose]);
 
-  if (!isOpen) return null;
+  /**
+   * The act as a human would name it.
+   *
+   * Matched case-insensitively, and falling back to the raw value, because the
+   * two vocabularies disagree: ACT_TYPES carries `Regolamento UE` while the
+   * server resolver answers `regolamento ue`. A `===` lookup missed, and the
+   * header rendered " n. 1689 del 2024" with no act name at all while
+   * "Stai consultando:" trailed off into nothing. Same trap as `codice_urn`
+   * on the backend.
+   */
+  const selectedActLabel = useMemo(() => {
+    if (!selectedAct) return '';
+    const match = ACT_TYPES.find(
+      act => act.value.toLowerCase() === selectedAct.toLowerCase()
+    );
+    return match?.label ?? selectedAct;
+  }, [selectedAct]);
 
-  const selectedActLabel = ACT_TYPES.find(act => act.value === selectedAct)?.label;
+  if (!isOpen) return null;
 
   return (
     <div className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
@@ -352,7 +417,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                 <span>Atto</span>
               </div>
 
-              {ACT_TYPES_REQUIRING_DETAILS.includes(selectedAct) && (
+              {requiresDetails(selectedAct) && (
                 <div
                   onClick={() => selectedAct && setStep('input_details')}
                   className={cn(
@@ -461,8 +526,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
               )}
 
               {step === 'input_article' && (
-                <div className="flex-1 flex gap-3">
-                  <div className="flex-1 relative">
+                <div className="flex-1 flex items-end gap-3">
+                  {/* The context line sits in the flow. It used to be
+                      `absolute -top-6`, which lifted it 24px into the
+                      breadcrumb row above and printed it straight over the
+                      ATTO / ARTICOLO chips. */}
+                  <div className="flex-1 min-w-0">
+                    {actNumber && actDate && (
+                      <span className="block mb-1.5 px-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                        {selectedActLabel} n. {actNumber} del {actDate}
+                      </span>
+                    )}
                     <input
                       type="text"
                       placeholder="N. Articolo (es. 12)"
@@ -472,11 +546,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                       autoFocus
                       onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
                     />
-                    {actNumber && actDate && (
-                      <span className="absolute -top-6 left-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        {selectedActLabel} n. {actNumber} del {actDate}
-                      </span>
-                    )}
                   </div>
                   <button
                     onClick={handleSubmitArticle}
@@ -588,7 +657,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                 <Command.Group className="mb-4">
                   <div className="flex items-center gap-2 px-3 mb-3 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
                     <Tag size={12} strokeWidth={3} />
-                    Alias
+                    I tuoi alias
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -646,6 +715,52 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                     </Command.Item>
                   </div>
                 </Command.Group>
+
+                {/* Presets — the aliases the server already understands.
+                    Its own Command.Group so cmdk hides the heading along with
+                    the items when a query filters them all out. */}
+                {presetEntries.length > 0 && (
+                  <Command.Group className="mb-4">
+                    <div className="flex items-center justify-between px-3 mb-3">
+                      <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">
+                        <Sparkles size={12} strokeWidth={3} />
+                        In dotazione ({presetEntries.length})
+                      </div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                        Già pronti · scrivi per cercarli tutti
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {visiblePresets.map(([trigger, preset]) => (
+                        <Command.Item
+                          key={trigger}
+                          value={`preset ${trigger} ${preset.act_type}`}
+                          onSelect={() => handleSelectPreset(trigger)}
+                          className={cn(
+                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                            "bg-white dark:bg-slate-900 border border-transparent",
+                            "aria-selected:bg-emerald-50 dark:aria-selected:bg-emerald-900/10 aria-selected:border-emerald-200/50 dark:aria-selected:border-emerald-800/30"
+                          )}
+                        >
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500">
+                            <Sparkles size={18} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                              {trigger}
+                            </span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                              → {[preset.act_type, preset.act_number && `n. ${preset.act_number}`, preset.date]
+                                  .filter(Boolean)
+                                  .join(' ')}
+                            </span>
+                          </div>
+                        </Command.Item>
+                      ))}
+                    </div>
+                  </Command.Group>
+                )}
 
                 {/* Unified Act Types Section */}
                 <div className="space-y-4">
