@@ -15,6 +15,7 @@ from ..tools.config import (
     HTTP_MIN_INTERVAL,
     HTTP_TIMEOUT,
 )
+from ..tools.egress import is_allowed
 from ..tools.exceptions import DocumentNotFoundError, NetworkError
 
 log = structlog.get_logger()
@@ -41,7 +42,7 @@ class ThrottledHttpClient:
         async with self._session_lock:
             if self._session is None or self._session.closed:
                 timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
-                connector = aiohttp.TCPConnector(ssl=False)
+                connector = aiohttp.TCPConnector()  # certificate verification enabled
                 self._session = aiohttp.ClientSession(connector=connector, timeout=timeout)
             return self._session
 
@@ -57,6 +58,13 @@ class ThrottledHttpClient:
         source: str = "generic",
         **kwargs,
     ) -> HttpResult:
+        if not is_allowed(url):
+            log.error("Blocked request to undeclared host", url=url[:120], source=source)
+            raise NetworkError(
+                f"Host non consentito: {url[:80]}",
+                status_code=403,
+            )
+
         attempt = 0
         async with self._semaphore:
             while attempt <= HTTP_MAX_RETRIES:

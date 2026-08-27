@@ -11,6 +11,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.cache_manager import get_cache_manager
 from ..tools.exceptions import DocumentNotFoundError, ParsingError
 from ..tools.selectors import NormattivaSelectors
+from .akn_fetch import fetch_act_article
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -45,7 +46,27 @@ class NormattivaScraper(BaseScraper):
             )
 
         if normavisitata.numero_articolo:
-            document_text = await self.estrai_da_html(html_content)
+            try:
+                document_text = await self.estrai_da_html(html_content)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("HTML extraction failed, trying the AKN export",
+                            urn=urn[:100], error=str(exc))
+                document_text = None
+
+            if not document_text or not document_text.strip():
+                # Last resort. This text differs from the HTML rendering — it
+                # transliterates accents and carries a markdown heading — so it
+                # is served only when the alternative is an error, and the
+                # caller marks it as such.
+                akn_text = await fetch_act_article(
+                    normavisitata.norma, normavisitata.numero_articolo
+                )
+                if akn_text:
+                    log.info("Served article text from the AKN export",
+                             urn=urn[:100])
+                    return akn_text, urn
+                raise ParsingError(f"Impossibile estrarre il testo dell'articolo da {urn}")
+
             return document_text, urn
         else:
             log.info("Returning full document text")
@@ -142,8 +163,14 @@ class NormattivaScraper(BaseScraper):
                 return {"testo": final_text, "link": link_dict}
             return final_text
         except Exception as e:
-            logger.error(f"Error in _estrai_testo_akn_dettagliato: {e}", exc_info=True)
-            return f"Error in _estrai_testo_akn_dettagliato: {e}"
+            # Raise, never return a sentinel string. A returned "Error in ..."
+            # is truthy, so it flows past get_document's emptiness guard and
+            # is rendered to the reader as the text of the article, with HTTP
+            # 200, and cached for 24h. Raising is what lets the AKN fallback
+            # fire for the failure it was built for: a selector break here.
+            log.error("Article extraction failed", extractor="_estrai_testo_akn_dettagliato",
+                      error=str(e), exc_info=True)
+            raise ParsingError(f"_estrai_testo_akn_dettagliato: {e}") from e
 
     def _estrai_testo_akn_semplice(self, corpo: Tag, link: bool = False) -> Union[str, Dict[str, Any]]:
         try:
@@ -170,8 +197,14 @@ class NormattivaScraper(BaseScraper):
                 return {"testo": final_text, "link": link_dict}
             return final_text
         except Exception as e:
-            logger.error(f"Error in _estrai_testo_akn_semplice: {e}", exc_info=True)
-            return f"Error in _estrai_testo_akn_semplice: {e}"
+            # Raise, never return a sentinel string. A returned "Error in ..."
+            # is truthy, so it flows past get_document's emptiness guard and
+            # is rendered to the reader as the text of the article, with HTTP
+            # 200, and cached for 24h. Raising is what lets the AKN fallback
+            # fire for the failure it was built for: a selector break here.
+            log.error("Article extraction failed", extractor="_estrai_testo_akn_semplice",
+                      error=str(e), exc_info=True)
+            raise ParsingError(f"_estrai_testo_akn_semplice: {e}") from e
 
     def _estrai_testo_allegato(self, corpo: Tag, link: bool = False) -> Union[str, Dict[str, Any]]:
         try:
@@ -197,8 +230,14 @@ class NormattivaScraper(BaseScraper):
                 return {"testo": final_text, "link": link_dict}
             return final_text
         except Exception as e:
-            logger.error(f"Error in _estrai_testo_allegato: {e}", exc_info=True)
-            return f"Error in _estrai_testo_allegato: {e}"
+            # Raise, never return a sentinel string. A returned "Error in ..."
+            # is truthy, so it flows past get_document's emptiness guard and
+            # is rendered to the reader as the text of the article, with HTTP
+            # 200, and cached for 24h. Raising is what lets the AKN fallback
+            # fire for the failure it was built for: a selector break here.
+            log.error("Article extraction failed", extractor="_estrai_testo_allegato",
+                      error=str(e), exc_info=True)
+            raise ParsingError(f"_estrai_testo_allegato: {e}") from e
 
     def _estrai_testo_fallback(self, corpo: Tag, link: bool = False) -> Union[str, Dict[str, Any]]:
         """
@@ -224,8 +263,14 @@ class NormattivaScraper(BaseScraper):
                 return {"testo": final_text, "link": link_dict}
             return final_text
         except Exception as e:
-            logger.error(f"Error in _estrai_testo_fallback: {e}", exc_info=True)
-            return f"Error in _estrai_testo_fallback: {e}"
+            # Raise, never return a sentinel string. A returned "Error in ..."
+            # is truthy, so it flows past get_document's emptiness guard and
+            # is rendered to the reader as the text of the article, with HTTP
+            # 200, and cached for 24h. Raising is what lets the AKN fallback
+            # fire for the failure it was built for: a selector break here.
+            log.error("Article extraction failed", extractor="_estrai_testo_fallback",
+                      error=str(e), exc_info=True)
+            raise ParsingError(f"_estrai_testo_fallback: {e}") from e
 
     def parse_document(self, atto: str) -> BeautifulSoup:
         return BeautifulSoup(atto, 'html.parser')

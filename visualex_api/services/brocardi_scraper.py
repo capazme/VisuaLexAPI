@@ -3,8 +3,8 @@ import re
 import os
 from typing import Optional, Tuple, Union, Dict, Any, List
 from dataclasses import dataclass
+from urllib.parse import urljoin, urlparse
 
-import requests
 from bs4 import BeautifulSoup
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
@@ -16,13 +16,46 @@ from ..tools.sys_op import BaseScraper
 from ..tools.cache_manager import get_cache_manager
 from .http_client import http_client
 from ..tools.exceptions import DocumentNotFoundError
-from ..tools.selectors import BrocardiSelectors
 
 # Configure structured logger
 log = structlog.get_logger()
 
 # Costante per il base URL
 BASE_URL: str = "https://brocardi.it"
+
+# Brocardi is referenced with and without the "www." prefix across this codebase
+# (this module uses the bare form, tools/map.py the www one). Same-site checks
+# must compare hosts against both, never a string prefix against one of them.
+_BROCARDI_HOSTS = frozenset({"brocardi.it", "www.brocardi.it"})
+
+
+def _is_brocardi_url(url: str) -> bool:
+    """Whether `url` points at Brocardi, under either spelling of the host."""
+    try:
+        return (urlparse(url).hostname or "") in _BROCARDI_HOSTS
+    except ValueError:
+        return False
+
+# Brocardi path fragment -> act name, for cross-reference links.
+# Longer keys must be tested before any shorter key they contain; with the paths
+# below there is no overlap, but keep the ordering in mind when adding one.
+_CROSS_REF_TIPI: Dict[str, str] = {
+    '/codice-civile/': 'Codice Civile',
+    '/codice-penale/': 'Codice Penale',
+    '/costituzione/': 'Costituzione',
+    # These two carried no "di-" and could never match.
+    '/codice-di-procedura-civile/': 'Codice Procedura Civile',
+    '/codice-di-procedura-penale/': 'Codice Procedura Penale',
+    '/codice-del-consumo/': 'Codice del Consumo',
+    '/codice-della-privacy/': 'Codice Privacy',
+}
+
+# Leading chrome in the breadcrumb, stripped so `Position` starts at the act name.
+# This replaces a hardcoded [17:] slice that cut 17 characters regardless of what
+# was there. "Tu sei qui:Fonti>" is what brocardi.it emits today and happens to be
+# exactly 17 characters long, which is why the slice looked correct; "Brocardi.it >"
+# is the older shape. Anything else is now left intact instead of being truncated.
+_BREADCRUMB_PREFIX = re.compile(r'^(?:Brocardi\.it|Tu sei qui:\s*Fonti)\s*>\s*')
 
 # Autorità giudiziarie italiane per parsing massime
 AUTORITA_GIUDIZIARIE = {
@@ -65,7 +98,6 @@ class BrocardiScraper(BaseScraper):
         log.info("Initializing BrocardiScraper")
         self.knowledge: List[Dict[str, Any]] = [BROCARDI_CODICI]
         self.cache = get_cache_manager().get_persistent("brocardi")
-        self.selectors = BrocardiSelectors()
 
     @staticmethod
     def _clean_text(text: str) -> str:
@@ -140,7 +172,7 @@ class BrocardiScraper(BaseScraper):
                                     footnotes.append({
                                         'numero': numero,
                                         'testo': self._clean_text(testo),
-                                        'tipo': 'nota_dispositivo'
+                                        'tipo': 'nota'
                                     })
 
             # Pattern 2 (BROCARDI alternativo): Cerca direttamente div.corpoDelTesto.nota
@@ -155,7 +187,7 @@ class BrocardiScraper(BaseScraper):
                         footnotes.append({
                             'numero': int(match.group(1)),
                             'testo': self._clean_text(match.group(2)),
-                            'tipo': 'nota_dispositivo'
+                            'tipo': 'nota'
                         })
 
             # Pattern 3 (Legacy): Superscript + div.nota generico
@@ -248,6 +280,64 @@ class BrocardiScraper(BaseScraper):
             log.warning(f"[RELATED] Error extracting related articles: {e}")
             return {}
 
+    # Brocardi pages carry a reader Q&A block whose answers are densely linked to
+    # the dictionary. Measured on the captured art. 2043 fixture: 107 of the 114
+    # /dizionario/ links on the page come from there, against 4 from the article
+    # text and 3 from its notes. Harvesting them all would label user-submitted
+    # material as the article's glossary, which for a lawyer is a provenance
+    # problem rather than a cosmetic one.
+    _GLOSSARIO_EXCLUDED_ANCESTORS = ('risposta', 'quesito')
+
+    def _is_in_reader_qa(self, link) -> bool:
+        """Whether a link sits inside the reader Q&A block rather than the article."""
+        for parent in link.parents:
+            if not hasattr(parent, 'get'):
+                continue
+            marker = ' '.join(parent.get('class', []) or []).lower()
+            if any(x in marker for x in self._GLOSSARIO_EXCLUDED_ANCESTORS):
+                return True
+        return False
+
+    def _extract_glossario(self, soup) -> List[Dict[str, str]]:
+        """Links to Brocardi's legal dictionary for terms used in the article.
+
+        Scoped to the whole page rather than to `corpo` — the dictionary links
+        are inline in the article text, which sits outside the sections
+        container — but excluding the reader Q&A block, which is not the article.
+        """
+        entries: List[Dict[str, str]] = []
+        seen = set()
+        try:
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                if '/dizionario/' not in href or '.html' not in href:
+                    continue
+                if self._is_in_reader_qa(link):
+                    continue
+                termine = self._clean_text(link.get_text())
+                if not termine:
+                    continue
+                url = href if href.startswith('http') else f"{BASE_URL}{href}"
+                if url in seen:
+                    continue
+                seen.add(url)
+                match = re.search(r'/dizionario/(\d+)\.html', href)
+                entries.append({
+                    'termine': termine,
+                    'url': url,
+                    'dizionario_id': match.group(1) if match else '',
+                })
+        except Exception as exc:  # noqa: BLE001 - one bad link must not kill the page
+            log.warning("Glossary extraction failed", error=str(exc))
+            return entries
+        return entries
+
+    def _attach_glossario(self, soup, info: Dict[str, Any]) -> None:
+        entries = self._extract_glossario(soup)
+        if entries:
+            info['Glossario'] = entries
+            log.debug("Extracted glossary entries", count=len(entries))
+
     def _extract_cross_references(self, corpo) -> List[Dict[str, str]]:
         """
         Estrae riferimenti incrociati ad altri articoli dal contenuto.
@@ -286,17 +376,10 @@ class BrocardiScraper(BaseScraper):
                             match = re.search(r'/art(\d+[a-z]*)\.html', href)
                             if match:
                                 # Estrai tipo_atto dal path
-                                tipo_atto = None
-                                if '/codice-civile/' in href:
-                                    tipo_atto = 'Codice Civile'
-                                elif '/codice-penale/' in href:
-                                    tipo_atto = 'Codice Penale'
-                                elif '/costituzione/' in href:
-                                    tipo_atto = 'Costituzione'
-                                elif '/codice-procedura-civile/' in href:
-                                    tipo_atto = 'Codice Procedura Civile'
-                                elif '/codice-procedura-penale/' in href:
-                                    tipo_atto = 'Codice Procedura Penale'
+                                tipo_atto = next(
+                                    (v for k, v in _CROSS_REF_TIPI.items() if k in href),
+                                    None,
+                                )
 
                                 cross_refs.append({
                                     'articolo': match.group(1),
@@ -431,7 +514,12 @@ class BrocardiScraper(BaseScraper):
             if norma_visitata.numero_articolo else None
         )
         if numero_articolo:
-            article_link = await self._find_article_link(soup, BASE_URL, numero_articolo)
+            # Resolve against the page we actually fetched, not the bare domain.
+            # A path-relative href ("libro-quarto/titolo-ix/art2043.html") joined
+            # to "https://brocardi.it" loses every path segment and 404s. Today
+            # Brocardi emits root-absolute hrefs, so both give the same URL —
+            # this is the difference between correct and accidentally correct.
+            article_link = await self._find_article_link(soup, link, numero_articolo)
             return article_link
         log.info("No article number provided")
         return None
@@ -441,22 +529,37 @@ class BrocardiScraper(BaseScraper):
         pattern = re.compile(rf'href=["\']([^"\']*art{re.escape(numero_articolo)}\.html)["\']')
         log.info("Searching for target link in the main page content")
 
+        # Resolve against the page we actually fetched, not the bare domain:
+        # "libro-quarto/titolo-ix/art2043.html" must keep its path segments.
+        page_url = base_url if base_url.endswith('/') else base_url + '/'
+
         # Utilizza str(soup) invece di prettify per migliorare le performance
         matches = pattern.findall(str(soup))
         if matches:
-            return requests.compat.urljoin(base_url, matches[0])
+            return urljoin(page_url, matches[0])
 
         log.info("No direct match found, searching in 'section-title' divs")
         section_titles = soup.find_all('div', class_='section-title')
         for section in section_titles:
             for a_tag in section.find_all('a', href=True):
-                sub_link = requests.compat.urljoin(base_url, a_tag.get('href', ''))
-                sub_soup = await self._fetch_soup(sub_link, cache_suffix="section", source="brocardi_section")
+                href = a_tag.get('href', '')
+                sub_url = urljoin(page_url, href)
+                # Same-site only, and never the page we are already on: without
+                # this the crawl can re-fetch the index or walk off-site.
+                # Compared by HOST, not by string prefix: Brocardi is reached as
+                # both "brocardi.it" and "www.brocardi.it" in this codebase, and
+                # a prefix test against one spelling rejects every URL in the
+                # other — which silently empties the whole sub-page crawl.
+                if not _is_brocardi_url(sub_url):
+                    continue
+                if sub_url.rstrip('/') == page_url.rstrip('/'):
+                    continue
+                sub_soup = await self._fetch_soup(sub_url, cache_suffix="section", source="brocardi_section")
                 if not sub_soup:
                     continue
                 sub_matches = pattern.findall(str(sub_soup))
                 if sub_matches:
-                    return requests.compat.urljoin(base_url, sub_matches[0])
+                    return urljoin(sub_url, sub_matches[0])
 
         log.info("No matching article found")
         return None
@@ -477,6 +580,9 @@ class BrocardiScraper(BaseScraper):
         info['Position'] = self._extract_position(soup)
         self._extract_sections(soup, info)
 
+        # Estrai il glossario (link al dizionario giuridico Brocardi)
+        self._attach_glossario(soup, info)
+
         # Estrai articoli correlati (precedente/successivo)
         related = self._extract_related_articles(soup)
         if related:
@@ -486,16 +592,21 @@ class BrocardiScraper(BaseScraper):
 
     def _extract_position(self, soup: BeautifulSoup) -> Optional[str]:
         position_tag = soup.find('div', id='breadcrumb', recursive=True)
-        if position_tag:
-            # Mantiene la logica originale di slicing
-            return position_tag.get_text(strip=False).replace('\n', '').replace('  ', '')[17:]
-        log.warning("Breadcrumb position not found")
-        return None
+        if position_tag is None:
+            log.warning("Breadcrumb position not found")
+            return None
+        text = position_tag.get_text(strip=False).replace('\n', '').replace('  ', '')
+        return _BREADCRUMB_PREFIX.sub('', text).strip()
 
     def _extract_sections(self, soup: BeautifulSoup, info: Dict[str, Any]) -> None:
-        corpo = soup.find('div', class_='panes-condensed panes-w-ads content-ext-guide content-mark', recursive=True)
-        if not corpo:
-            log.warning("Main content section not found")
+        # Substring predicate, not an exact four-class match: one class added on
+        # brocardi.it used to silently empty every section below.
+        corpo = soup.find(
+            'div',
+            class_=lambda c: c and 'panes-condensed' in c and 'content-ext-guide' in c,
+        )
+        if corpo is None:
+            log.warning("Brocardi content container not found", url=info.get('link'))
             return
 
         brocardi_sections = corpo.find_all('div', class_='brocardi-content')

@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from .act_resolver import resolve_atto
 from .map import NORMATTIVA_SEARCH
 
 # Italian month names → month number
@@ -130,9 +131,17 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
             result.date = year_date
 
     # 5. Identify act type from remaining text
-    act_type = _identify_act_type(text)
-    if act_type:
-        result.act_type = act_type
+    known = _identify_known_act(text)
+    if known:
+        result.act_type = known["tipo_atto"]
+        if known.get("numero_atto") and not result.act_number:
+            result.act_number = known["numero_atto"]
+        if known.get("data") and not result.date:
+            result.date = known["data"]
+    else:
+        act_type = _identify_act_type(text)
+        if act_type:
+            result.act_type = act_type
 
     if not result.is_valid:
         return None
@@ -242,6 +251,15 @@ def _extract_year(text: str) -> tuple[str, Optional[str]]:
             remaining = text[:m.start()] + " " + text[m.end():]
             return remaining.strip(), m.group(1)
     return text, None
+
+
+def _identify_known_act(text: str) -> Optional[dict]:
+    """Resolve a full act name to type + number + date, or None.
+
+    Runs before the substring scan so a denominato ("statuto dei lavoratori")
+    yields its number and date rather than just a type.
+    """
+    return resolve_atto(text)
 
 
 def _identify_act_type(text: str) -> Optional[str]:

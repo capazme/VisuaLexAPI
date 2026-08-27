@@ -3,7 +3,7 @@ import logging
 import asyncio
 from .config import MAX_CACHE_SIZE
 from .text_op import normalize_act_type, parse_date, estrai_data_da_denominazione
-from .map import NORMATTIVA_URN_CODICI, EURLEX
+from .map import EURLEX, codice_urn
 from .sys_op import get_playwright_manager
 from ..services.eurlex_scraper import EurlexScraper
 
@@ -93,7 +93,6 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     str -- The generated URN
     """
     logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
-    codici_urn = NORMATTIVA_URN_CODICI
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
     normalized_act_type = normalize_act_type(act_type)
     
@@ -110,12 +109,13 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
         return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number)
 
     # Handle special codes (codice civile, codice penale, etc.)
-    # IMPORTANT: Check BEFORE replacing spaces with dots, as codici_urn uses spaces
-    if normalized_act_type in codici_urn:
-        urn = codici_urn[normalized_act_type]
-        logging.info(f"URN found in codici_urn: {urn}")
+    # IMPORTANT: Check BEFORE replacing spaces with dots, as the codici table uses spaces
+    codice_fragment = codice_urn(normalized_act_type)
+    if codice_fragment:
+        urn = codice_fragment
+        logging.info(f"URN found in the codici table: {urn}")
 
-        # IMPORTANT: The URN from codici_urn may already contain an allegato suffix (e.g., ":1")
+        # IMPORTANT: The URN from the codici table may already contain an allegato suffix (e.g., ":1")
         # Pattern: "regio.decreto:1930-10-19;1398:1" where the final ":1" is the allegato
         # We need to strip this default allegato so we can control it via the `annex` parameter
         # This allows requesting dispositivo (annex=None) even for codici that default to an allegato

@@ -259,3 +259,17 @@ class TestResolveNlQuery:
         data = {"query": "gibberish text", "act_type": "legge"}
         result = ctrl._resolve_nl_query(data)
         assert result == data
+
+
+class TestResolverInNlParser:
+    def test_denominato_fills_type_number_and_date_together(self):
+        got = parse_nl_query("art. 18 statuto dei lavoratori")
+        assert got is not None
+        assert got.article == "18"
+        assert got.act_number == "300"
+        assert got.date and got.date.startswith("1970")
+
+    def test_existing_abbreviations_are_unchanged(self):
+        got = parse_nl_query("art. 2043 cc")
+        assert got.act_type == "codice civile"
+        assert got.article == "2043"
