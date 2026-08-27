@@ -54,10 +54,97 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
   // Smart citation parsing - include custom aliases for resolution
   // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
-  const parsedCitation = useMemo<ParsedCitation | null>(() => {
+  const localCitation = useMemo<ParsedCitation | null>(() => {
     if (!inputValue || inputValue.length < 2) return null;
     return parseLegalCitation(inputValue, customAliases);
   }, [inputValue, customAliases]);
+
+  // Server-side fallback for act names the client does not carry.
+  //
+  // The parser above knows the ~40 acts in constants/actTypes.ts plus the
+  // ABBREVIATION_MAP hand-copied from the backend's NORMATTIVA_SEARCH. The
+  // backend resolver knows 387 names — "statuto dei lavoratori", "legge
+  // fornero", "TUSL", "GDPR" — so a lawyer typing any of them got "Nessun
+  // risultato trovato" and an Enter that could only autocomplete, because
+  // isSearchReady needs an act_type the client had no way to produce.
+  //
+  // Rather than grow a second copy of those tables here (they would drift the
+  // first time the backend gained a name), ask the endpoint that already
+  // resolves them. Only as a FALLBACK: whatever the client recognises today
+  // still wins, so nothing that works now changes.
+  // The answer carries the query it answered, so "is this still current?" is
+  // derived at render instead of reset by a synchronous setState in the effect
+  // (CLAUDE.md gotcha 11 — derive, do not silence the rule).
+  const [serverResult, setServerResult] = useState<{ query: string; citation: ParsedCitation | null } | null>(null);
+
+  // Gated on "not search-ready", not merely "act unnamed". Both shapes reach
+  // here: "statuto dei lavoratori" the client cannot name at all, and "gdpr"
+  // it names as regolamento UE but without the number and year that
+  // isSearchReady requires — so both left the palette on ENTER COMPLETA.
+  const remoteQuery = useMemo(() => {
+    const query = inputValue.trim();
+    return query.length >= 3 && !isSearchReady(localCitation) ? query : null;
+  }, [inputValue, localCitation]);
+
+  useEffect(() => {
+    if (!remoteQuery) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch('/parse_query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: remoteQuery }),
+        signal: controller.signal,
+      })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then(payload => {
+          const parsed = payload?.recognized ? payload.parsed : null;
+          setServerResult({
+            query: remoteQuery,
+            citation: parsed?.act_type
+              ? {
+                  act_type: parsed.act_type,
+                  act_number: parsed.act_number || undefined,
+                  date: parsed.date || undefined,
+                  article: parsed.article || undefined,
+                  // Named by the server's curated tables, not guessed.
+                  confidence: 0.9,
+                }
+              : null,
+          });
+        })
+        .catch(err => {
+          if ((err as Error).name === 'AbortError') return;
+          // Never swallowed (CLAUDE.md gotcha 18): the palette degrades to
+          // local-only matching, but a backend that stopped answering is
+          // visible rather than silent.
+          console.error('Error resolving query server-side:', remoteQuery, err);
+          setServerResult({ query: remoteQuery, citation: null });
+        });
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [remoteQuery]);
+
+  const serverCitation = useMemo(
+    () => (remoteQuery && serverResult?.query === remoteQuery ? serverResult.citation : null),
+    [remoteQuery, serverResult]
+  );
+  const resolvingRemotely = Boolean(remoteQuery) && serverResult?.query !== remoteQuery;
+
+  // The client wins when its own parse is already searchable; otherwise the
+  // server fills in. Nothing that resolves locally today changes.
+  const parsedCitation = useMemo<ParsedCitation | null>(
+    () => (isSearchReady(localCitation) ? localCitation : serverCitation ?? localCitation),
+    [localCitation, serverCitation]
+  );
 
   const citationReady = useMemo(() => isSearchReady(parsedCitation), [parsedCitation]);
   const citationPreview = useMemo(() => parsedCitation ? formatParsedCitation(parsedCitation) : '', [parsedCitation]);
@@ -413,11 +500,38 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
             {step === 'select_act' && (
               <Command.List id="command-palette-results" className="p-3">
                 <Command.Empty className="px-6 py-12 text-center text-slate-400">
-                  <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-                    <X size={24} />
-                  </div>
-                  <p className="font-bold">Nessun risultato trovato</p>
-                  <p className="text-xs font-medium opacity-60 mt-1">Prova a cambiare i criteri di ricerca</p>
+                  {citationReady ? (
+                    <>
+                      {/* The act resolved, so Enter will search. Saying "nessun
+                          risultato" here describes the local suggestion list,
+                          not the query, and reads as a dead end. */}
+                      <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                        <Check size={24} className="text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <p className="font-bold text-slate-600 dark:text-slate-300">{citationPreview}</p>
+                      <p className="text-xs font-medium opacity-60 mt-1">Premi Enter per cercare</p>
+                    </>
+                  ) : resolvingRemotely ? (
+                    <>
+                      {/* The local list has nothing, but the backend resolver —
+                          387 act names against the client's ~40 — has not
+                          answered yet. Saying "nessun risultato" here would be
+                          wrong for the two hundred milliseconds it takes. */}
+                      <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                        <Search size={24} className="animate-pulse" />
+                      </div>
+                      <p className="font-bold">Cerco l'atto…</p>
+                      <p className="text-xs font-medium opacity-60 mt-1">Riconosco i nomi per esteso, non solo le sigle</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                        <X size={24} />
+                      </div>
+                      <p className="font-bold">Nessun risultato trovato</p>
+                      <p className="text-xs font-medium opacity-60 mt-1">Prova a cambiare i criteri di ricerca</p>
+                    </>
+                  )}
                 </Command.Empty>
 
                 {/* QuickNorms Section */}

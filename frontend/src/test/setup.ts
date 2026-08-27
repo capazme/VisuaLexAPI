@@ -56,3 +56,10 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
     disconnect() {}
   } as unknown as typeof ResizeObserver
 }
+
+// jsdom implements no layout, so it has no scrollIntoView. cmdk calls it on the
+// selected item every time the list changes, which makes any test that types
+// into the command palette throw before it can assert anything.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
