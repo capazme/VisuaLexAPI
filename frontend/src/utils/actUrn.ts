@@ -11,10 +11,20 @@ import type { Norma } from '../types';
  * would never match the same act arriving later from a search, and the
  * workspace would grow a duplicate tab for it.
  *
- * The endpoint still requires an `article` value, because the handler calls
- * `parse_article_input(str(data.get('article')), norma.url)`. That function
- * parses the string and does not validate it against the act, so `'1'` is a
- * safe probe. It is NOT a request for article 1 — do not "fix" it into one.
+ * The endpoint still requires an `article` value — more strictly than it used
+ * to. The handler now rejects a missing one outright (400, "Campo obbligatorio
+ * mancante: article"); before, it silently built a NormaVisitata with
+ * `numero_articolo: 'error'`. So `'1'` stays. It is NOT a request for article 1
+ * — do not "fix" it into one.
+ *
+ * What changed underneath: the article is now VALIDATED against the act, so the
+ * probe is no longer safe merely because nothing checked it. It is safe because
+ * article 1 exists in every act reachable from here — verified against the live
+ * handler for the four codici, the Costituzione, a law cited by number, and an
+ * alias-resolved act. The check fails open when the article tree cannot be
+ * fetched, so a Normattiva outage does not turn a resolve into a failure. An
+ * act whose numbering does not start at 1 would now 404 here; none is reachable
+ * from the command palette today.
  */
 
 export interface ActUrnParams {
