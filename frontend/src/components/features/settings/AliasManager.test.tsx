@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { AliasManager } from './AliasManager';
 import { appStore } from '../../../store/useAppStore';
 import type { CustomAlias } from '../../../types';
@@ -53,6 +52,16 @@ function stubCatalog(payload: unknown = CATALOG, ok = true) {
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok, status: ok ? 200 : 500, json: async () => payload })));
 }
 
+/**
+ * Text goes in with fireEvent.change, not user.type.
+ *
+ * These three assert a value DERIVED from the field (a filter, a notice), not
+ * keystroke handling — and typing character by character while the modal is
+ * still animating in drops keystrokes: 'gdpr' arrived as 'gd', the notice
+ * looked up a preset named "gd", found none, and the test failed roughly one
+ * run in five. One change event per field removes the race without weakening
+ * what is being checked.
+ */
 describe('AliasManager — what the system already recognises', () => {
   beforeEach(() => {
     appStore.setState({ aliasManagerOpen: true, customAliases: [] });
@@ -87,30 +96,35 @@ describe('AliasManager — what the system already recognises', () => {
   });
 
   it('filters both lists together, ignoring accents', async () => {
-    const user = userEvent.setup();
     render(<AliasManager />);
     await waitFor(() => expect(screen.getByText('statuto dei lavoratori')).toBeInTheDocument());
 
-    await user.type(screen.getByPlaceholderText(/Cerca fra gli alias/i), 'fornero');
+    fireEvent.change(screen.getByPlaceholderText(/Cerca fra gli alias/i), {
+      target: { value: 'fornero' },
+    });
     expect(screen.getByText('legge fornero')).toBeInTheDocument();
     expect(screen.queryByText('statuto dei lavoratori')).not.toBeInTheDocument();
   });
 
   it('warns that a trigger would take over a shipped alias', async () => {
-    const user = userEvent.setup();
     render(<AliasManager />);
     await waitFor(() => expect(screen.getByText('codice ambiente')).toBeInTheDocument());
 
-    await user.type(screen.getByPlaceholderText('es. mio-contratto'), 'gdpr');
+    const field = screen.getByPlaceholderText('es. mio-contratto');
+    fireEvent.change(field, { target: { value: 'gdpr' } });
+
+    expect(field).toHaveValue('gdpr');
     expect(screen.getByText(/lo sovrascriverà/i)).toBeInTheDocument();
   });
 
   it('warns that an alias is pointless when the name already resolves', async () => {
-    const user = userEvent.setup();
     render(<AliasManager />);
     await waitFor(() => expect(screen.getByText('legge fornero')).toBeInTheDocument());
 
-    await user.type(screen.getByPlaceholderText('es. mio-contratto'), 'legge fornero');
+    const field = screen.getByPlaceholderText('es. mio-contratto');
+    fireEvent.change(field, { target: { value: 'legge fornero' } });
+
+    expect(field).toHaveValue('legge fornero');
     expect(screen.getByText(/non serve/i)).toBeInTheDocument();
   });
 
