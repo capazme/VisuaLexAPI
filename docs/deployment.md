@@ -59,10 +59,10 @@ absence broke a deploy, which is why they read as a list of scars:
 | # | Step | Why it is there |
 |---|---|---|
 | 0 | Branch guard | Refuses to deploy from anything but `main`. See above. |
-| 1 | `git pull -r` on the current branch | Rebases onto the remote. |
+| 1 | `git pull -r` on the current branch | Rebases onto the remote. First discards the lockfile churn steps 3 and 4 leave behind (see the npm gap below), and **refuses to continue** if anything else in the tree is dirty — `git pull -r` cannot rebase over unstaged changes, and a deploy must not silently discard work it did not create. |
 | 2 | `pip install -r requirements.txt` | Runtime deps only. `requirements-dev.txt` (pytest) is deliberately **not** installed in production. Now includes `lxml` (the Akoma Ntoso parser): it ships a `cp314` wheel, so the server needs no compiler — check that before pinning a version that has none. |
 | 2b | `playwright install chromium` | `pip install` does not fetch browser binaries. Without this, PDF export and date completion break at runtime, not at build time. |
-| 3 | `npm install` in `backend/` | |
+| 3 | `npm install` in `backend/` | Not `npm ci`: the committed lockfiles are written by npm 11 and this server runs npm 10, which rejects them. See the gap below. |
 | 3b | `npx prisma generate` | A schema change pulled from git leaves `node_modules/@prisma/client` stale, and the backend build then fails on missing models. |
 | 3c | `npx prisma migrate deploy` | Idempotent. Without it a schema change ships with no matching column and the API fails on the first query that touches it. |
 | 4 | `npm install` in `frontend/` | |
@@ -167,8 +167,21 @@ finding out is most expensive.
 
 Recorded rather than fixed, so nobody rediscovers them during an incident.
 
-- **No CI.** Nothing gates a push. The pre-deploy checklist above is run by hand
-  or not at all.
+- **The server's npm is a major behind the one that writes the lockfiles.**
+  This box runs Node 20 / npm 10; the lockfiles committed to the repo are
+  written by npm 11, which represents optional platform packages differently.
+  Two consequences. `npm ci` cannot be used here — it rejects the committed
+  lockfile with "Missing: @esbuild/... from lock file" — so steps 3 and 4 use
+  `npm install`, which is not reproducible. And `npm install` rewrites the
+  lockfiles into npm-10 shape on every run, leaving the tree dirty; step 1
+  discards exactly that and nothing else. Closing this properly means bringing
+  the server's Node up to the major the lockfiles are written with, after which
+  both steps can move to `npm ci`.
+- **CI does not gate the deploy.** `.github/workflows/ci.yml` runs the Python
+  suite on 3.12 and 3.14, the three frontend gates and the backend tests on
+  every push to `main` — but `deploy.sh` consults nothing and runs no tests, so
+  a red `main` still deploys. Read the run on GitHub before deploying; the
+  pre-deploy checklist above is still run by hand or not at all.
 - **The `systemctl` path only restarts the backend.** `pm2 restart all` covers
   every registered process, but the `systemctl` fallback restarts
   `visualex-backend` alone — the Python API on :5000 keeps running the old code.

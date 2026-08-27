@@ -206,6 +206,32 @@ fi
 if [[ "$DO_PULL" == true ]]; then
     print_step "Pulling latest changes..."
     cd "$SCRIPT_DIR"
+
+    # Steps 3 and 4 run `npm install`, and npm rewrites the lockfiles as it
+    # goes: this box runs npm 10 while the committed lockfiles are written by
+    # npm 11, which represents optional platform packages differently. So every
+    # deploy ends with a dirty tree, and the NEXT one dies here — `git pull -r`
+    # refuses to rebase over unstaged changes. Each deploy broke the one after
+    # it until somebody cleaned up by hand.
+    #
+    # The lockfiles are authoritative in git, never on this machine, so that
+    # churn is discardable. Nothing else is: a local edit here is somebody's
+    # work or somebody's emergency patch, and throwing it away silently during
+    # a deploy is how you lose it.
+    if ! git diff --quiet -- '*package-lock.json'; then
+        print_warning "Discarding npm's lockfile churn from the previous deploy"
+        git checkout -- '*package-lock.json'
+    fi
+
+    if ! git diff --quiet; then
+        print_error "Working tree has local changes beyond the lockfiles:"
+        git status --short
+        echo
+        echo "  Commit or stash them, then re-run. Deliberately not discarded:"
+        echo "  a deploy must not destroy work it did not create."
+        exit 1
+    fi
+
     git pull -r origin "$(git branch --show-current)"
     print_success "Git pull completed"
 else

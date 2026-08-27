@@ -32,9 +32,11 @@ When backporting from `merlt`, watch for two things: commits are often mixed
 (a vanilla fix and MERL-T work in one commit), and MERL-T code can ride along —
 `publishMerltEvent` calls and types tied to schema changes `main` does not have.
 
-Deployment is a single batch script run on the server, `deploy.sh`, with no CI
-and no rollback. **Read `docs/deployment.md` before changing anything it
-touches** — it records what each step exists to prevent and the known gaps.
+Deployment is a single batch script run on the server, `deploy.sh`. CI gates
+`main` on GitHub, but the script consults nothing and has no rollback, so a red
+`main` still deploys — read the run before you deploy. **Read
+`docs/deployment.md` before changing anything the script touches** — it records
+what each step exists to prevent and the known gaps.
 
 Two traps worth knowing without opening that file:
 - `npm run build` (`tsc -b`) is the real frontend type-check. A bare
