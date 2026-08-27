@@ -72,18 +72,33 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   const presetEntries = useMemo(() => {
     const mine = new Set(customAliases.map(a => foldAlias(a.trigger)));
     return Object.entries(catalog.presets)
+      // 21 of the 80 presets only rename an act type — "codice appalti" IS the
+      // "Codice Contratti Pubblici" tile that already sits in the grid below,
+      // so listing them duplicated the act list without adding anything. The
+      // 59 kept here carry a number and a date ("gdpr" -> Reg. UE 679/2016),
+      // which is work the grid cannot save you.
+      .filter(([, preset]) => Boolean(preset.act_number))
       // A custom alias with the same trigger wins at resolution time, so
       // showing the preset too would advertise a shortcut that no longer runs.
       .filter(([trigger]) => !mine.has(foldAlias(trigger)))
       // Shortest first: an alias earns its keep by being shorter than the name
-      // it replaces, so "gdpr" and "tuir" are worth more screen than
-      // "codice dei beni culturali".
+      // it replaces.
       .sort(([a], [b]) => a.length - b.length || a.localeCompare(b));
   }, [catalog.presets, customAliases]);
 
-  // Only a handful by default — the full 80 stay reachable by typing, since
-  // cmdk filters every rendered item.
-  const visiblePresets = inputValue.trim() ? presetEntries : presetEntries.slice(0, 6);
+  // Nothing at rest. The header line says they exist; that is the whole point
+  // of not drawing them. They materialise once the user types, and cmdk does
+  // the matching, so the full set stays reachable without ever weighing on the
+  // idle palette.
+  const visiblePresets = inputValue.trim() ? presetEntries : [];
+
+  // Four, not three: the three shortest are all Testi Unici (tub, tuf, tus) and
+  // read as cryptic on their own. The fourth is gdpr, which makes the whole
+  // line legible at a glance.
+  const presetHint = useMemo(
+    () => presetEntries.slice(0, 4).map(([trigger]) => trigger).join(', '),
+    [presetEntries]
+  );
 
   // Smart citation parsing - include custom aliases for resolution
   // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
@@ -655,9 +670,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                     reached from the tile below, which is a Command.Item so that
                     typing "alias" finds it even when the group is scrolled away. */}
                 <Command.Group className="mb-4">
-                  <div className="flex items-center gap-2 px-3 mb-3 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
-                    <Tag size={12} strokeWidth={3} />
-                    I tuoi alias
+                  <div className="flex items-center justify-between gap-3 px-3 mb-3">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                      <Tag size={12} strokeWidth={3} />
+                      I tuoi alias
+                    </div>
+                    {/* At rest this line is the only trace the presets leave.
+                        A second grid of tiles for them duplicated the act list
+                        below it. */}
+                    {presetEntries.length > 0 && (
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
+                        +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -716,18 +741,18 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                   </div>
                 </Command.Group>
 
-                {/* Presets — the aliases the server already understands.
-                    Its own Command.Group so cmdk hides the heading along with
-                    the items when a query filters them all out. */}
-                {presetEntries.length > 0 && (
+                {/* Presets — only while the user is typing. Its own
+                    Command.Group so cmdk hides the heading along with the
+                    items when a query filters them all out. */}
+                {visiblePresets.length > 0 && (
                   <Command.Group className="mb-4">
                     <div className="flex items-center justify-between px-3 mb-3">
                       <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">
                         <Sparkles size={12} strokeWidth={3} />
-                        In dotazione ({presetEntries.length})
+                        In dotazione
                       </div>
                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                        Già pronti · scrivi per cercarli tutti
+                        Non devi crearli
                       </span>
                     </div>
 
