@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List } from 'lucide-react';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2 } from 'lucide-react';
 import type { SearchParams, CustomAlias } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
@@ -51,6 +51,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
       b.usageCount - a.usageCount || a.trigger.localeCompare(b.trigger)
     );
   }, [customAliases]);
+  const hasAliases = sortedAliases.length > 0;
 
   // Smart citation parsing - include custom aliases for resolution
   // Es. "art 5 gdpr" risolve "gdpr" in Regolamento UE 679/2016
@@ -577,50 +578,74 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                   )}
                 </Command.Group>
 
-                {/* Custom Aliases Section */}
-                {sortedAliases.length > 0 && (
-                  <Command.Group className="mb-4">
-                    <div className="flex items-center justify-between px-3 mb-3">
-                      <div className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
-                        <Tag size={12} strokeWidth={3} />
-                        Alias Personalizzati
-                      </div>
-                      <button
-                        onClick={handleOpenAliasManager}
-                        className="p-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                      >
-                        Gestisci
-                      </button>
-                    </div>
+                {/* Aliases.
+                    Rendered unconditionally, on purpose. This group used to be
+                    gated on `sortedAliases.length > 0`, which hid the only route
+                    to the alias manager behind already owning an alias — you
+                    could not discover how to make your first one. The manager is
+                    reached from the tile below, which is a Command.Item so that
+                    typing "alias" finds it even when the group is scrolled away. */}
+                <Command.Group className="mb-4">
+                  <div className="flex items-center gap-2 px-3 mb-3 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                    <Tag size={12} strokeWidth={3} />
+                    Alias
+                  </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {sortedAliases.slice(0, 8).map((alias) => (
-                        <Command.Item
-                          key={alias.id}
-                          value={`alias ${alias.trigger} ${alias.expandTo}`}
-                          onSelect={() => handleSelectAlias(alias)}
-                          className={cn(
-                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
-                            "bg-white dark:bg-slate-900 border border-transparent",
-                            "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-200/50 dark:aria-selected:border-indigo-800/30"
-                          )}
-                        >
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500">
-                            <Tag size={18} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                              {alias.trigger}
-                            </span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
-                              → {alias.expandTo}
-                            </span>
-                          </div>
-                        </Command.Item>
-                      ))}
-                    </div>
-                  </Command.Group>
-                )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {sortedAliases.slice(0, 8).map((alias) => (
+                      <Command.Item
+                        key={alias.id}
+                        value={`alias ${alias.trigger} ${alias.expandTo}`}
+                        onSelect={() => handleSelectAlias(alias)}
+                        className={cn(
+                          "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                          "bg-white dark:bg-slate-900 border border-transparent",
+                          "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-200/50 dark:aria-selected:border-indigo-800/30"
+                        )}
+                      >
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500">
+                          <Tag size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                            {alias.trigger}
+                          </span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                            → {alias.expandTo}
+                          </span>
+                        </div>
+                      </Command.Item>
+                    ))}
+
+                    {/* The door to the manager. Spans the grid when it is the
+                        only tile, so an empty alias list reads as an invitation
+                        rather than as an empty section. */}
+                    <Command.Item
+                      value="alias gestisci crea scorciatoie"
+                      onSelect={handleOpenAliasManager}
+                      className={cn(
+                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all",
+                        "border border-dashed border-indigo-300 dark:border-indigo-800",
+                        "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-500",
+                        !hasAliases && "sm:col-span-2"
+                      )}
+                    >
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500">
+                        {hasAliases ? <Settings2 size={18} /> : <Plus size={18} strokeWidth={3} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="block text-sm font-bold text-indigo-600 dark:text-indigo-400 truncate">
+                          {hasAliases ? 'Gestisci alias' : 'Crea il tuo primo alias'}
+                        </span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                          {hasAliases
+                            ? 'I tuoi, più quelli già riconosciuti'
+                            : 'Una sigla tua per una norma che apri spesso'}
+                        </span>
+                      </div>
+                    </Command.Item>
+                  </div>
+                </Command.Group>
 
                 {/* Unified Act Types Section */}
                 <div className="space-y-4">

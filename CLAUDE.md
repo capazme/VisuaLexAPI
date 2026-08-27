@@ -690,3 +690,11 @@ meant to stay split; add new features as new files, not inside the shells:
     transformed ancestor is positioned against *that ancestor*, not the viewport
     (see gotcha 22) — which is why the structure window portals at all.
 
+27. **A store flag only opens a modal that is actually mounted.** `AliasManager`
+    (and its siblings) render inside `SearchPanel`, so `aliasManagerOpen` is
+    inert on `/dossier`, `/history` or any route that is not the search page —
+    the flag flipped and nothing appeared, silently. That is why the alias
+    manager is reached from the command palette, which lives in the same subtree,
+    and why the Settings entry that used to open it was removed rather than kept
+    as a second door. Before adding a global-looking "open X" button, check where
+    X is mounted.

@@ -7,6 +7,7 @@ vi.mock('../../../hooks/useTour', () => ({
 }));
 
 import { CommandPalette } from './CommandPalette';
+import { appStore } from '../../../store/useAppStore';
 
 /**
  * The palette parses the query on the client, against the ~40 acts in
@@ -79,5 +80,53 @@ describe('CommandPalette — act names the client does not carry', () => {
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
     await waitFor(() => expect(errors.length).toBeGreaterThan(0), { timeout: 3000 });
     expect(screen.queryByText(/Enter Ricerca/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The alias section used to be gated on `sortedAliases.length > 0`. That hid
+ * the only route to the alias manager behind already owning an alias — the
+ * first one could never be created from here, and the fallback route (Settings)
+ * was two levels down AND inert outside the search page, because AliasManager
+ * is mounted inside SearchPanel. These pin the door open.
+ */
+describe('CommandPalette — reaching the alias manager', () => {
+  const ALIAS = {
+    id: 'a1',
+    trigger: 'mio-contratto',
+    type: 'reference' as const,
+    expandTo: 'Art. 1490 c.c.',
+    usageCount: 0,
+    createdAt: '2026-08-27T00:00:00.000Z',
+  };
+
+  afterEach(() => {
+    appStore.setState({ customAliases: [], aliasManagerOpen: false });
+  });
+
+  it('offers to create the first alias when the user has none', () => {
+    appStore.setState({ customAliases: [] });
+    renderPalette();
+
+    expect(screen.getByText(/Crea il tuo primo alias/i)).toBeInTheDocument();
+  });
+
+  it('opens the manager from that entry', async () => {
+    appStore.setState({ customAliases: [] });
+    const user = userEvent.setup();
+    renderPalette();
+
+    await user.click(screen.getByText(/Crea il tuo primo alias/i));
+
+    // The palette closes first, then hands over — hence the wait.
+    await waitFor(() => expect(appStore.getState().aliasManagerOpen).toBe(true));
+  });
+
+  it('keeps the entry once aliases exist, alongside them', () => {
+    appStore.setState({ customAliases: [ALIAS] });
+    renderPalette();
+
+    expect(screen.getByText('mio-contratto')).toBeInTheDocument();
+    expect(screen.getByText(/Gestisci alias/i)).toBeInTheDocument();
   });
 });
