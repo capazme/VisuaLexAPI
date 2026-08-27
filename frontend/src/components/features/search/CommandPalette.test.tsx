@@ -53,7 +53,15 @@ describe('CommandPalette — act names the client does not carry', () => {
     }, { timeout: 3000 });
 
     // Resolved: the hint flips from "completa" to "ricerca".
-    await waitFor(() => expect(screen.getByText(/Enter Ricerca/i)).toBeInTheDocument());
+    //
+    // Same 3s budget as the wait above, deliberately. This waits on the RESULT
+    // of that very round trip, and the default 1s expired roughly once every
+    // twenty full-suite runs — never when this file runs alone, which is the
+    // signature of CPU contention rather than of a real regression.
+    await waitFor(
+      () => expect(screen.getByText(/Enter Ricerca/i)).toBeInTheDocument(),
+      { timeout: 3000 },
+    );
   });
 
   it('does not ask the server for a query the client already resolved', async () => {
@@ -164,7 +172,10 @@ describe('CommandPalette — naming an act the server resolved', () => {
     await user.type(input, '{Enter}');
 
     // No article in the parse, so the palette moves on to collect one.
-    expect(await screen.findByText(/Regolamento UE n\. 1689 del 2024/i)).toBeInTheDocument();
+    // Explicit budget for the same reason as above.
+    expect(
+      await screen.findByText(/Regolamento UE n\. 1689 del 2024/i, undefined, { timeout: 3000 }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Regolamento UE')).toBeInTheDocument();
   });
 });
