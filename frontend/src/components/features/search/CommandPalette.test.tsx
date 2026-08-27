@@ -65,7 +65,9 @@ describe('CommandPalette — act names the client does not carry', () => {
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
 
     await waitFor(() => expect(screen.getByText(/Enter Ricerca/i)).toBeInTheDocument());
-    expect(fetch).not.toHaveBeenCalled();
+    // Scoped to /parse_query on purpose: the palette also fetches the alias
+    // catalog on open, and that call is unrelated to citation resolution.
+    expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
   });
 
   it('degrades to local-only when the endpoint fails, and says so', async () => {
@@ -128,5 +130,92 @@ describe('CommandPalette — reaching the alias manager', () => {
 
     expect(screen.getByText('mio-contratto')).toBeInTheDocument();
     expect(screen.getByText(/Gestisci alias/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ACT_TYPES spells the act `Regolamento UE`; the server resolver answers
+ * `regolamento ue`. A case-sensitive `===` missed, so the article step printed
+ * " n. 1689 del 2024" with no act name and "Stai consultando:" trailed off into
+ * nothing — the same trap `codice_urn` hit on the backend.
+ */
+describe('CommandPalette — naming an act the server resolved', () => {
+  const AI_ACT = {
+    recognized: true,
+    parsed: { act_type: 'regolamento ue', act_number: '1689', date: '2024' },
+  };
+
+  it('names the act even when the server spells it in lower case', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => (url === '/parse_query' ? AI_ACT : { presets: {}, known_acts: [] }),
+    })));
+
+    const user = userEvent.setup();
+    renderPalette();
+
+    const input = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(input, 'ai act');
+    await waitFor(
+      () => expect(fetch).toHaveBeenCalledWith('/parse_query', expect.anything()),
+      { timeout: 3000 },
+    );
+    await user.type(input, '{Enter}');
+
+    // No article in the parse, so the palette moves on to collect one.
+    expect(await screen.findByText(/Regolamento UE n\. 1689 del 2024/i)).toBeInTheDocument();
+    expect(screen.getByText('Regolamento UE')).toBeInTheDocument();
+  });
+});
+
+/**
+ * The presets are what the user does NOT have to invent. They were invisible
+ * from the palette, which listed only custom aliases.
+ */
+describe('CommandPalette — presets the server already understands', () => {
+  const CATALOG = {
+    presets: {
+      gdpr: { act_type: 'Regolamento UE', act_number: '679', date: '2016' },
+      tuir: { act_type: 'decreto del presidente della repubblica', act_number: '917', date: '1986' },
+    },
+    known_acts: ['statuto dei lavoratori'],
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => (url === '/fetch_alias_catalog' ? CATALOG : PARSE_QUERY_OK),
+    })));
+  });
+
+  afterEach(() => {
+    appStore.setState({ customAliases: [] });
+  });
+
+  it('lists them, separated from the ones the user made', async () => {
+    renderPalette();
+
+    expect(await screen.findByText(/In dotazione/i)).toBeInTheDocument();
+    expect(screen.getByText('gdpr')).toBeInTheDocument();
+    expect(screen.getByText('tuir')).toBeInTheDocument();
+    expect(screen.getByText(/I tuoi alias/i)).toBeInTheDocument();
+  });
+
+  it('hides a preset the user has overridden with their own trigger', async () => {
+    appStore.setState({
+      customAliases: [{
+        id: 'a1', trigger: 'GDPR', type: 'reference' as const,
+        expandTo: 'il mio GDPR', usageCount: 0, createdAt: '2026-08-27T00:00:00.000Z',
+      }],
+    });
+    renderPalette();
+
+    // The custom one resolves first, so advertising the preset would point at
+    // a shortcut that no longer runs.
+    expect(await screen.findByText('tuir')).toBeInTheDocument();
+    expect(screen.getByText('GDPR')).toBeInTheDocument();
+    expect(screen.queryByText('gdpr')).not.toBeInTheDocument();
   });
 });
