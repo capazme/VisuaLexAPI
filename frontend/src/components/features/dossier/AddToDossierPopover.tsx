@@ -17,6 +17,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { dossierRecency, dossierContainsArticle } from './dossierUtils';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { NormaVisitata } from '../../../types';
 
 export interface AddToDossierPopoverProps {
@@ -33,25 +34,6 @@ export interface AddToDossierPopoverProps {
      * stays open and no add happens.
      */
     onDuplicate?: (dossierTitle: string) => void;
-}
-
-/**
- * Minimal media query hook: `true` when viewport is desktop-sized. Mirrors
- * the identical helper in NotesPeekPanel.tsx — kept local rather than
- * shared since these two popovers are the only ones needing the desktop
- * popover vs. mobile bottom-sheet split.
- */
-function useIsDesktop(): boolean {
-    const [desktop, setDesktop] = useState(() =>
-        typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true,
-    );
-    useEffect(() => {
-        const mql = window.matchMedia('(min-width: 768px)');
-        const handler = (e: MediaQueryListEvent) => setDesktop(e.matches);
-        mql.addEventListener('change', handler);
-        return () => mql.removeEventListener('change', handler);
-    }, []);
-    return desktop;
 }
 
 export function AddToDossierPopover({ isOpen, anchorEl, onClose, norma, onAdded, onDuplicate }: AddToDossierPopoverProps) {

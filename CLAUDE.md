@@ -310,6 +310,31 @@ Three entry points, deliberately distinct — don't collapse them.
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
 
+**The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
+`'window'` on desktop — a draggable, backdrop-less window portalled to
+`document.body`, parked where the user left it — and `'drawer'` on mobile, the
+old right-side sheet. Neither closes when an article is picked: taking three
+articles out of an index without reopening it is the whole point. Ownership of
+the desktop window lives in the store as a single `structureWindow.blockId`, so
+opening one block's index hands the window over rather than stacking a second.
+The floating mechanism belongs to the *tool*, not the content — the owner's own
+framing, and the correction that shaped round 2a.
+
+**Opening an act without an article.** `fetchActUrn` (`utils/actUrn.ts`) resolves
+an act's URN structurally, with no text fetched; `addNormaIndexToTab` then drops
+an article-less block on a tab and points the window at it atomically. The
+palette's "Apri l'indice e sfoglia" is the entry point. A block with zero
+articles is a legitimate state — guard anything that dereferences the active
+article (`StudyMode` is mounted conditionally for exactly this reason).
+
+**Going back.** `readingBackStack` records **citation jumps only**. Picking from
+the index does not lose your place, and a previous/next arrow is undone by the
+opposite arrow; recording those would fill the stack with stops nobody wants.
+`ReadingBackControl` renders once for the whole app — the stack is global, so a
+per-tab copy would sit inside the very tab an entry points at. It names its
+destination, and it has no keyboard shortcut on purpose: every natural
+combination for "back" already belongs to the browser.
+
 ### Dossier
 
 A dossier is where the articles needed for a task are aggregated and read.
@@ -345,8 +370,20 @@ Duplicating any of these is a defect, not a shortcut.
 `treextractor.py` (trees) · `PlaywrightManager` (browsers).
 
 **Frontend**:
-- `utils/normaKeys.ts` — `buildItemKey(norma)`, `uniqueArticleIdFromNorma(norma)`.
-  The annotation/highlight key contract; identical across dashboard and dossier.
+- `utils/normaKeys.ts` — `buildItemKey(norma)` (norm + article),
+  `buildNormaKey(norma)` (act only, used to group streaming results),
+  `uniqueArticleIdFromNorma(norma)`. Both keys share their act-level segments so
+  they cannot drift. `buildItemKey` is the annotation/highlight key contract and
+  must stay byte-identical across dashboard and dossier.
+- `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
+  fetched. It sends `article: '1'` because the endpoint refuses to build a
+  `NormaVisitata` without one — a probe, not a request for article 1.
+- `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
+  `findLiveBackIndex` for citation-jump undo.
+- `hooks/useIsDesktop.ts` — viewport check for components that must render
+  *structurally* different markup per breakpoint (portal vs. inline). It existed
+  as two private copies before round 2a; do not make a third. For anything a CSS
+  breakpoint can express, use the CSS breakpoint.
 - `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
   `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
   (**tolerant** lookup — required, see gotcha 9).
@@ -498,8 +535,9 @@ Breaking one of these breaks the product. Read before editing.
 
 **Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
 `utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/dateUtils.ts` ·
-`utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `hooks/useAnnexNavigation.ts` ·
-`constants/zIndex.ts` · `constants/interactions.ts`.
+`utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
+`utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
+`hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
 
 **Frontend features** — each of these folders was split out of a monolith and is
 meant to stay split; add new features as new files, not inside the shells:
@@ -616,6 +654,7 @@ meant to stay split; add new features as new files, not inside the shells:
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
 
+
 23. **`article_text` is a data contract, not a string.** Highlights and anchored
     notes are pinned by `(startOffset, text)` where the offset counts characters
     in a projection of `article_text` in which only `\n` is invisible.
@@ -633,3 +672,19 @@ meant to stay split; add new features as new files, not inside the shells:
     ("Articolo N non presente in …", through `_error_response`); it fails open,
     so a Normattiva outage is never reported as "does not exist". A range where
     *some* articles exist keeps those and drops the rest.
+
+25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
+    The live workspace-tab actions are inlined in the store (`addNormaToTab` and
+    friends); nothing imports the factory in that file. Its only live export is
+    the `NormaBlock` / `LooseArticle` *types*, imported by `useGlobalSearch.ts`.
+    Editing an action there changes nothing at runtime. The file carries a header
+    saying so; relocating the types and deleting the rest is queued for round 2b.
+26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**
+    `display: none` hides descendants, but a portal re-parents to `document.body`
+    and leaves the hidden subtree behind — the desktop renderer would surface its
+    window on a phone, next to the mobile one. Anything portalled that exists in
+    only one breakpoint needs a real viewport check (`useIsDesktop`), not a
+    wrapper class. Conversely, a non-portalled `fixed` element inside a
+    transformed ancestor is positioned against *that ancestor*, not the viewport
+    (see gotcha 22) — which is why the structure window portals at all.
+

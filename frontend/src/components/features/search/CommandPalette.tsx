@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag } from 'lucide-react';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List } from 'lucide-react';
 import type { SearchParams, CustomAlias } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
@@ -15,11 +15,16 @@ interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onSearch: (params: SearchParams) => void;
+  /**
+   * Open an act's index without picking an article — the "browse a code"
+   * path. Skips the article step entirely.
+   */
+  onBrowseStructure?: (params: SearchParams) => void;
 }
 
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
 
-export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }: CommandPaletteProps) {
   const {
     quickNorms, selectQuickNorm, settings, openQuickNormsManager,
     customAliases, trackAliasUsage, openAliasManager
@@ -190,6 +195,27 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
     if (!selectedAct || !actNumber || !actDate) return;
     setStep('input_article');
   }, [selectedAct, actNumber, actDate]);
+
+  /**
+   * Leave by the other door: open the act's index instead of an article.
+   * Available from the article step, which is where the act (and its details,
+   * when required) is already known.
+   */
+  const handleBrowse = useCallback(() => {
+    if (!selectedAct || !onBrowseStructure) return;
+
+    onBrowseStructure({
+      act_type: selectedAct,
+      article: '',
+      act_number: actNumber || '',
+      date: actDate ? parseItalianDate(actDate) : '',
+      version: 'vigente',
+      version_date: '',
+      show_brocardi_info: includeBrocardi,
+    });
+
+    onClose();
+  }, [selectedAct, actNumber, actDate, includeBrocardi, onBrowseStructure, onClose]);
 
   if (!isOpen) return null;
 
@@ -542,6 +568,19 @@ export function CommandPalette({ isOpen, onClose, onSearch }: CommandPaletteProp
                   <span>Continua</span>
                   <ArrowRight size={20} strokeWidth={3} />
                 </button>
+
+                {/* The other door: leave with the act's index instead of one
+                    article. Offered on the article step, where the act (and its
+                    details, when required) is already settled. */}
+                {step === 'input_article' && onBrowseStructure && (
+                  <button
+                    onClick={handleBrowse}
+                    className="mt-3 w-full flex items-center justify-center gap-3 h-12 rounded-2xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/30 active:scale-[0.98]"
+                  >
+                    <List size={18} strokeWidth={2.5} />
+                    <span>Apri l'indice e sfoglia</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

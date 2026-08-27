@@ -1,3 +1,15 @@
+/**
+ * ⚠️ Only the TYPES below are live. The action implementations in this file
+ * are a dead duplicate.
+ *
+ * The store's real workspace-tab actions are inlined in `useAppStore.ts`
+ * (`addNormaToTab` and friends). Nothing imports the factory here — the single
+ * consumer is `hooks/useGlobalSearch.ts`, and it imports `NormaBlock` /
+ * `LooseArticle` as types only. Editing an action here changes nothing at
+ * runtime, which is exactly the kind of silent no-op that costs an afternoon.
+ *
+ * Relocating the types and deleting the rest is queued for round 2b.
+ */
 import { v4 as uuidv4 } from 'uuid';
 import type { ArticleData, Norma } from '../types';
 

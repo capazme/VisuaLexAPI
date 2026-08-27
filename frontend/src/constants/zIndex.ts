@@ -36,6 +36,13 @@ export const Z_INDEX = {
   /** Workspace dock / navigator — tabs clamp below this */
   dock: 'z-[80]',
 
+  /**
+   * Floating structure (index) window. Above the dock and every tab panel,
+   * because it is a tool held over the content it drives; below the overlay
+   * band, so modals still cover it.
+   */
+  structure: 'z-[90]',
+
   /** Floating search panel — above dock, below overlay band */
   searchPanel: 'z-[100]',
 
