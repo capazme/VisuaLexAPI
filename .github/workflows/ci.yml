@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  # main is included so its state is never unverified between deploys: deploy.sh
+  # runs no tests and has no rollback, so a red main is a production risk.
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # requirements-dev.txt pulls requirements.txt, so the runtime deps the
+      # tests import are installed too.
+      - run: pip install -r requirements-dev.txt
+      - run: pytest tests/ -q
+
+  frontend:
+    name: Frontend build, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run test -- --run
+        working-directory: frontend
+      # `tsc -b` is the real type-check: a bare `tsc --noEmit` does not walk the
+      # project references and reports a false green.
+      - run: npm run build
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    # backend/tests/setup.ts runs `prisma migrate reset --force` in beforeAll and
+    # TRUNCATEs every table in beforeEach, both against a live database, so this
+    # job needs a real Postgres or it cannot pass at all.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: visualex
+          POSTGRES_PASSWORD: visualex
+          # The name must contain "test": assertTestDatabase() in setup.ts
+          # refuses to run the destructive reset against anything else.
+          POSTGRES_DB: visualex_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U visualex -d visualex_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # `npm run test` is `dotenv -e .env.test -- vitest run`, and dotenv-cli
+      # calls dotenv.config({ override: false }) unless -o is passed, so a
+      # variable already in the environment wins over the file. That is what
+      # lets this URL replace the developer-local one in backend/.env.test
+      # without touching that file. JWT_SECRET and REDIS_ENABLED still come
+      # from .env.test.
+      DATABASE_URL: postgresql://visualex:visualex@localhost:5432/visualex_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npx prisma generate
+        working-directory: backend
+      - run: npm run test
+        working-directory: backend
