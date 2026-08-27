@@ -97,7 +97,7 @@ function parseURN(urn: string): ParseResult {
         show_brocardi_info: true
       }
     };
-  } catch (e) {
+  } catch {
     return { success: false, error: 'Errore nel parsing dell\'URN' };
   }
 }
@@ -155,7 +155,7 @@ export function parseNormattivaUrl(url: string): ParseResult {
     }
 
     return { success: false, error: 'Impossibile estrarre i parametri dall\'URL' };
-  } catch (e) {
+  } catch {
     return { success: false, error: 'URL non valido' };
   }
 }

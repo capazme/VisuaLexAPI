@@ -74,6 +74,13 @@ export interface RelatedArticles {
     next?: RelatedArticle;
 }
 
+// Glossary entry (voce del dizionario giuridico Brocardi)
+export interface GlossaryEntry {
+    termine: string;
+    url: string;
+    dizionario_id: string;
+}
+
 // Cross Reference (riferimento incrociato)
 export interface CrossReference {
     articolo: string;
@@ -101,6 +108,8 @@ export interface BrocardiInfo {
     RelatedArticles?: RelatedArticles | null;
     // Cross References (riferimenti incrociati)
     CrossReferences?: CrossReference[] | null;
+    // Brocardi legal-dictionary links for terms used in the article
+    Glossario?: GlossaryEntry[] | null;
 }
 
 export interface ArticleData {
@@ -241,6 +250,11 @@ export interface Dossier {
 export interface DossierItem {
     id: string;
     type: 'norma' | 'note';
+    // TODO: make DossierItem a discriminated union on `type` so this becomes
+    // `NormaVisitata` for 'norma' and `string` for 'note'. That is a change to a
+    // core type with call sites across the dossier feature, so it is not done
+    // inside the CI round that first surfaced this lint error.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: any; // NormaVisitata or Note content
     addedAt: string;
     status?: 'unread' | 'reading' | 'important' | 'done';

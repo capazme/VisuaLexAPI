@@ -1,3 +1,11 @@
+/* eslint-disable react-refresh/only-export-components --
+ * This module deliberately keeps the sanitizer functions and the one component
+ * that renders their output (`SafeHTML`) together: every call site imports only
+ * `SafeHTML`, and splitting would put the XSS boundary in two files.
+ * The cost is that editing this file triggers a full reload instead of a fast
+ * refresh in dev. TODO: if that becomes annoying, move `SafeHTML` into its own
+ * file and repoint the eight importers.
+ */
 /**
  * HTML sanitization utilities using DOMPurify to prevent XSS attacks
  */
