@@ -24,13 +24,22 @@ from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
+from visualex_api.services.akn_parser import normalize_article_key
+from types import SimpleNamespace
+
+from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
-from visualex_api.tools.map import NORMATTIVA_URN_CODICI, extract_codice_details
+from visualex_api.tools.map import codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.alias_resolver import resolve_alias
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
+from visualex_api.tools.exceptions import (
+    ValidationError,
+    ResourceNotFoundError,
+    RateLimitExceededError,
+)
 
 # Configurazione del logging
 logging.basicConfig(
@@ -188,7 +197,15 @@ class NormaController:
         data = await request.get_json()
         log.info("Received data for stream_article_text", data=data)
         add_to_history(data)
-        normavisitate = await self.create_norma_visitata_from_data(data)
+        # This is the endpoint the search box actually calls. Nothing caught the
+        # exceptions raised while building the NormaVisitata list, so a rejected
+        # article ("non presente in ...") or a missing act_type reached Quart's
+        # default handler and became a 500 HTML page: no JSON, no message, and
+        # not the NDJSON the frontend parses.
+        try:
+            normavisitate = await self.create_norma_visitata_from_data(data)
+        except Exception as exc:
+            return self._error_response(exc, 'stream_article_text')
         show_brocardi = data.get('show_brocardi_info', False)
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
@@ -236,7 +253,8 @@ class NormaController:
                                     'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
                                     'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
                                     'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
-                                    'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
+                                    'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None,
+                                    'Glossario': brocardi_info[1].get('Glossario') if brocardi_info[1] and 'Glossario' in brocardi_info[1] else None
                                 }
 
                 except Exception as exc:
@@ -313,6 +331,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_brocardi_info', view_func=self.fetch_brocardi_info, methods=['POST'])
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
+        self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
@@ -346,6 +365,15 @@ class NormaController:
         Crea e restituisce una lista di istanze di NormaVisitata a partire dai dati della richiesta.
         """
         log.info("Creating NormaVisitata from data", data=data)
+
+        # The root controller never validated its input: a missing act_type
+        # surfaced as a generic 500 instead of a 400. The /api twin already
+        # does this (visualex_api/app.py:309-312).
+        if 'act_type' not in data or not data.get('act_type'):
+            raise ValidationError("Campo obbligatorio mancante: act_type")
+        if 'article' not in data or data.get('article') in (None, ''):
+            raise ValidationError("Campo obbligatorio mancante: article")
+
         allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
         act_number = data.get('act_number')
@@ -386,6 +414,12 @@ class NormaController:
         articles = await parse_article_input(str(data.get('article')), norma.url)
         log.info("Articles parsed", articles=articles)
 
+        # parse_article_input returns an error DICT rather than raising. Without
+        # this guard the loop below iterates the dict's KEYS and builds one
+        # NormaVisitata with numero_articolo='error', whose URN ends in ~arterror.
+        if isinstance(articles, dict) and 'error' in articles:
+            raise ValidationError(articles['error'])
+
         # Validate and sanitize annex parameter
         annex_value = data.get('annex')
         # Track if user explicitly requested dispositivo (empty string)
@@ -411,14 +445,18 @@ class NormaController:
         if annex_value is None and not explicit_dispositivo:
             import re
             normalized_type = normalize_act_type(act_type)
+            # codice_urn() matches case-insensitively: six keys in the table
+            # carry capitals ("codice del Terzo settore") while normalize_act_type
+            # returns the table's own spelling, so a bare `in` test missed them
+            # and those codici lost their default annex.
+            codice_fragment = codice_urn(normalized_type)
             log.info("Checking for default annex", act_type=act_type, normalized_type=normalized_type,
-                     in_codici_map=normalized_type in NORMATTIVA_URN_CODICI)
-            if normalized_type in NORMATTIVA_URN_CODICI:
-                codice_urn = NORMATTIVA_URN_CODICI[normalized_type]
-                log.info("Found codice URN", codice_urn=codice_urn)
+                     in_codici_map=bool(codice_fragment))
+            if codice_fragment:
+                log.info("Found codice URN", codice_urn=codice_fragment)
                 # Extract annex from URN pattern like "regio.decreto:1942-03-16;262:2"
                 # The annex is after the last colon if there's a number;number:annex pattern
-                annex_match = re.search(r';\d+:(\d+)$', codice_urn)
+                annex_match = re.search(r';\d+:(\d+)$', codice_fragment)
                 log.info("Annex regex match", match=str(annex_match))
                 if annex_match:
                     annex_value = annex_match.group(1)
@@ -486,9 +524,18 @@ class NormaController:
         log.info("Final annex value after smart lookup", annex=annex_value)
 
         norma_visitata_list = []
+        missing_articles = []
         for article in articles:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             log.info("Processing article", article=cleaned_article)
+
+            exists = await self._article_exists_in_tree(norma, cleaned_article, annex_value)
+            if exists is False:
+                log.info("Requested article is not in the act",
+                         article=cleaned_article, norma=str(norma))
+                missing_articles.append(cleaned_article)
+                continue
+
             norma_visitata_list.append(NormaVisitata(
                 norma=norma,
                 numero_articolo=cleaned_article,
@@ -498,8 +545,76 @@ class NormaController:
             ))
             log.info("NormaVisitata instance created", norma_visitata=norma_visitata_list[-1])
 
+        # A range like "1-50" on a 32-article act still returns the 32; only a
+        # request where NOTHING exists is an error.
+        if missing_articles and not norma_visitata_list:
+            raise ResourceNotFoundError(
+                f"Articolo {', '.join(missing_articles)} non presente in {norma}"
+            )
+
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
+
+    async def _article_exists_in_tree(self, norma, article, annex):
+        """Whether `article` is in the act's article tree.
+
+        Returns True/False, or None when neither the tree nor the AKN index can
+        be consulted — a Normattiva outage must not be reported to the user as
+        "this article does not exist".
+
+        `norma` is a Norma (the AKN cross-check needs the act, not just its URL);
+        a bare act URL is also accepted, for the tree-only path.
+
+        Article numbers are canonicalised on both sides with the AKN parser's
+        `normalize_article_key`: the tree API and the scraper disagree on the
+        separator ("1-bis" vs "1 bis"). That normaliser treats the suffix as
+        "any alphabetic tail" rather than an enumerated ordinal list, which is
+        load-bearing — Normattiva goes far past `decies` ("25 undecies",
+        "25 quinquiesdecies", "25 duodevicies" in d.lgs. 231/2001,
+        "669 terdecies" c.p.c., "2409 octiesdecies" c.c.) and an enumerated
+        list would silently turn every article beyond its last entry into
+        "does not exist".
+        """
+        act_url = getattr(norma, 'url', None) or str(norma)
+        try:
+            tree_result = await get_tree(act_url, link=False, details=False,
+                                         return_metadata=True)
+            # get_tree is wrapped in @cached(serializer=JsonSerializer()), which
+            # round-trips its (articles, count, metadata) tuple through JSON: the
+            # first call in a process returns a TUPLE, every cache hit afterwards
+            # returns a LIST. Testing for `tuple` alone made the check read the
+            # 3-element envelope as the article list and report every article of
+            # every cached act as missing.
+            if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3:
+                articles = tree_result[0]
+            else:
+                articles = tree_result
+        except Exception as exc:  # noqa: BLE001 - never fail the request on a tree error
+            log.warning("Tree unavailable, skipping existence check",
+                        error=str(exc), url=str(act_url)[:100])
+            return None
+
+        # get_tree reports failures as a STRING in the articles slot.
+        if isinstance(articles, str) or not articles:
+            log_ctx = {"tree": str(articles)[:120], "url": str(act_url)[:100]}
+            index = await fetch_act_index(norma)
+            if index is not None:
+                log.info("Tree unusable, answered from the AKN index", **log_ctx)
+                wanted = normalize_article_key(article)
+                return any(normalize_article_key(k) == wanted for k in index.keys)
+            log.warning("Tree unusable and no AKN index, skipping existence check",
+                        **log_ctx)
+            return None
+
+        wanted = normalize_article_key(article)
+        for entry in articles:
+            if not isinstance(entry, dict):
+                continue  # section/annex labels are bare strings
+            if annex is not None and str(entry.get('allegato') or '') != str(annex):
+                continue
+            if normalize_article_key(entry.get('numero', '')) == wanted:
+                return True
+        return False
 
     def get_scraper_for_norma(self, normavisitata):
         act_type_normalized = normavisitata.norma.tipo_atto.lower()
@@ -508,6 +623,28 @@ class NormaController:
             return eurlex_scraper
         else:
             return normattiva_scraper
+
+    @staticmethod
+    def _error_response(exc, endpoint):
+        """Map an exception to the status its class documents.
+
+        `exceptions.py` states ValidationError -> 400 and
+        ResourceNotFoundError -> 404, and the /api twin honours that in
+        `handle_error` (visualex_api/app.py:224). The root controller returned
+        500 for every failure, so "act_type mancante" was indistinguishable
+        from a Normattiva outage for any client that branches on the status.
+        """
+        if isinstance(exc, ResourceNotFoundError):
+            status = 404
+        elif isinstance(exc, ValidationError):
+            status = 400
+        elif isinstance(exc, RateLimitExceededError):
+            status = 429
+        else:
+            status = 500
+        log.error("Request failed", endpoint=endpoint, status=status,
+                  error=str(exc), error_type=type(exc).__name__)
+        return jsonify({'error': str(exc)}), status
 
     async def fetch_norma_data(self):
         try:
@@ -519,8 +656,7 @@ class NormaController:
             log.debug("Norma data response", response=response)
             return jsonify(response)
         except Exception as e:
-            log.error("Error in fetch_norma_data", error=str(e))
-            return jsonify({'error': str(e)}), 500
+            return self._error_response(e, 'fetch_norma_data')
 
     async def parse_query(self):
         """Parse a natural language query into structured API params + URN.
@@ -653,8 +789,7 @@ class NormaController:
                     log.info("Fetched article result", result=result)
             return jsonify(processed_results)
         except Exception as e:
-            log.error("Error in fetch_article_text", error=str(e))
-            return jsonify({'error': str(e)}), 500
+            return self._error_response(e, 'fetch_article_text')
 
     async def fetch_tree(self):
         try:
@@ -702,6 +837,74 @@ class NormaController:
             log.error("Error in fetch_tree", error=str(e), exc_info=True)
             return jsonify({'error': str(e)}), 500
 
+    async def fetch_rubriche(self):
+        """Article titles for an act's index.
+
+        Deliberately a separate call from /fetch_tree rather than a key on its
+        response. The tree comes from one cached HTML page and is effectively
+        instant; the AKN export behind the rubriche is 10.6 MB for the codice
+        civile and takes seconds on a cold cache. Coupling them would make the
+        index window slowest exactly for the acts whose indexes are longest —
+        which is where the titles matter most. The client renders the numbers
+        immediately and merges the titles in when they land.
+
+        Always answers 200: an act with no rubriche and an act whose export
+        could not be fetched are both "show numbers only" for the caller.
+        """
+        try:
+            data = await request.get_json()
+            urn = (data or {}).get('urn')
+            if not urn:
+                return jsonify({'error': "Missing 'urn' in request data"}), 400
+
+            # EUR-Lex is the opposite case from Normattiva: its article titles
+            # sit in the very page the tree is parsed from (`oj-ti-art` followed
+            # by `oj-sti-art`), so they cost nothing extra — while a second
+            # visit would mean launching another browser to get past the WAF.
+            # get_tree is cached, so this reuses the fetch the index already
+            # made rather than repeating it.
+            if 'eur-lex' in str(urn):
+                try:
+                    _, _, tree_metadata = await get_tree(
+                        urn, link=False, details=True, return_metadata=True
+                    )
+                    rubriche = (tree_metadata or {}).get('rubriche') or {}
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("EUR-Lex rubriche unavailable",
+                                urn=str(urn)[:100], error=str(exc))
+                    rubriche = {}
+                log.info("Rubriche served (EUR-Lex)", urn=str(urn)[:100], count=len(rubriche))
+                return jsonify({
+                    'rubriche': rubriche,
+                    'abrogati': [],
+                    'parts': [],
+                    'count': len(rubriche),
+                })
+
+            # The AKN cache and the caricaAKN session both key off the ACT, so
+            # the article suffix has to go: ...;262:2~art2043 -> ...;262:2
+            act_url = str(urn).split('~')[0]
+
+            index = await fetch_act_index(SimpleNamespace(url=act_url))
+            if index is None:
+                log.info("No AKN index available for rubriche", urn=act_url[:100])
+                return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0})
+
+            log.info("Rubriche served", urn=act_url[:100],
+                     count=len(index.rubriche), parts=len(index.parts_detail))
+            return jsonify({
+                'rubriche': index.rubriche,
+                'abrogati': index.abrogati,
+                # Each annex has its own article 1 with its own rubrica; the
+                # caller matches a part to an annex by article numbers.
+                'parts': index.parts_detail,
+                'count': len(index.rubriche),
+            })
+        except Exception as e:
+            # Never fail the index over its decoration.
+            log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
+            return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
+
     async def fetch_brocardi_info(self):
         try:
             data = await request.get_json()
@@ -729,7 +932,8 @@ class NormaController:
                             'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
                             'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
                             'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
-                            'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
+                            'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None,
+                            'Glossario': brocardi_info[1].get('Glossario') if brocardi_info[1] and 'Glossario' in brocardi_info[1] else None
                         }
                     }
                 except Exception as exc:
@@ -745,8 +949,7 @@ class NormaController:
                     processed_results.append(result)
             return jsonify(processed_results)
         except Exception as e:
-            log.error("Error in fetch_brocardi_info", error=str(e))
-            return jsonify({'error': str(e)}), 500
+            return self._error_response(e, 'fetch_brocardi_info')
 
     async def fetch_all_data(self):
         try:
@@ -777,10 +980,10 @@ class NormaController:
                         if explicit_dispositivo and nv.allegato is None:
                             # Check if this is a codice with a default allegato
                             normalized_type = normalize_act_type(nv.norma.tipo_atto)
-                            if normalized_type in NORMATTIVA_URN_CODICI:
-                                codice_urn = NORMATTIVA_URN_CODICI[normalized_type]
+                            codice_fragment = codice_urn(normalized_type)
+                            if codice_fragment:
                                 # Codes with allegati have patterns like ":1" or ":2" at the end
-                                if re.search(r';\d+:\d+$', codice_urn):
+                                if re.search(r';\d+:\d+$', codice_fragment):
                                     should_fetch_brocardi = False
                                     log.info("Skipping Brocardi for dispositivo of codice with allegato",
                                              act_type=normalized_type, article=nv.numero_articolo)
@@ -799,7 +1002,8 @@ class NormaController:
                                     'RelazioneCostituzione': b_info[1].get('RelazioneCostituzione') if b_info[1] and 'RelazioneCostituzione' in b_info[1] else None,
                                     'Footnotes': b_info[1].get('Footnotes') if b_info[1] and 'Footnotes' in b_info[1] else None,
                                     'RelatedArticles': b_info[1].get('RelatedArticles') if b_info[1] and 'RelatedArticles' in b_info[1] else None,
-                                    'CrossReferences': b_info[1].get('CrossReferences') if b_info[1] and 'CrossReferences' in b_info[1] else None
+                                    'CrossReferences': b_info[1].get('CrossReferences') if b_info[1] and 'CrossReferences' in b_info[1] else None,
+                                    'Glossario': b_info[1].get('Glossario') if b_info[1] and 'Glossario' in b_info[1] else None
                                 }
                             except Exception as exc:
                                 log.error("Error fetching Brocardi info", error=str(exc))
@@ -831,8 +1035,7 @@ class NormaController:
                     processed_results.append({'queue_position': position, 'error': str(exc)})
             return jsonify(processed_results)
         except Exception as e:
-            log.error("Error in fetch_all_data", error=str(e))
-            return jsonify({'error': str(e)}), 500
+            return self._error_response(e, 'fetch_all_data')
 
     async def get_history(self):
         try:

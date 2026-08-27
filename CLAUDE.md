@@ -51,6 +51,11 @@ source .venv/bin/activate        # Python API
 python app.py                    # main server (UI + API)
 python -m visualex_api.app       # alt server with /api/* prefix + Swagger
 
+# The Python suite — always through the project venv, from the repo root.
+# The ambient python3 cannot import quart and fails a batch of tests for that
+# reason alone; those failures are an interpreter mistake, not a regression.
+.venv/bin/python -m pytest tests/ -q
+
 cd backend && npm run dev        # Node backend
 cd backend && npm run prisma:studio
 
@@ -63,7 +68,13 @@ cd frontend && npm run test      # vitest (npm run test:ui for the UI)
 PDF export needs Playwright browsers: `playwright install chromium`.
 
 Backend tests live in `backend/tests` (vitest + supertest). An end-to-end and
-stress harness lives in `e2e/` with its own README.
+stress harness lives in `e2e/` with its own README. `pytest.ini` sets
+`asyncio_mode = auto` and excludes the `live` marker by default (`-m live` runs
+the tests that hit real sources). `.github/workflows/` gates `main` and every PR
+into it: Python tests on 3.12 and 3.14, the three frontend gates, backend tests,
+plus a weekly `pip-audit` / `npm audit`. That is the only automated check in the
+project: `deploy.sh` consults nothing, runs no test and has no rollback, so a red
+`main` still deploys.
 
 ## Architecture
 
@@ -72,7 +83,27 @@ stress harness lives in `e2e/` with its own README.
 - **`app.py`** (root): main server, UI + API. **`visualex_api/app.py`**:
   alternative server with `/api/*` prefix and Swagger.
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
-  `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool).
+  `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool),
+  `http_client.py` (the shared throttled aiohttp client — TLS verification on).
+  - `brocardi_scraper.py` also emits `Glossario` (links to Brocardi's legal
+    dictionary, `{termine, url, dizionario_id}`). Any new `brocardi_info` key
+    must be whitelisted in **all three** wire literals in root `app.py`
+    (`stream_article_text`, `fetch_brocardi_info`, `fetch_all_data`) — a key
+    missing from any one of them never reaches the frontend.
+  - `akn_parser.py` / `akn_fetch.py` — Normattiva's Akoma Ntoso export.
+    **Structure and fallback only, never the display text**: the export
+    transliterates every accent ("attivita'", "e'"), and `article_text` is the
+    offset space every stored highlight and note is anchored to. Used to answer
+    "does this article exist" when the HTML tree is unusable
+    (`fetch_act_index`), and as a last-resort article text when HTML extraction
+    fails outright (`fetch_act_article`, from `NormattivaScraper.get_document`).
+    Only the article INDEX is cached — in memory, capped at
+    `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
+    in-flight registry so N concurrent cold requests download the act once.
+    Article texts are never cached. `AKN_ENABLED=false` disables the whole path
+    and is read at call time.
+    `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
+    article numbers and needs no network.
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -81,7 +112,23 @@ stress harness lives in `e2e/` with its own README.
   - `text_op.py` — text parsing **and** date handling (see Date System)
   - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
-  - `map.py` — act-type mappings
+  - `map.py` — act-type mappings, plus the act tables the resolver reads
+    (`ATTI_NOTI` 63 aliases, `ATTI_DENOMINATI` 200 aliases over 80 acts, built
+    from the reviewable `_ATTI_DENOMINATI_SPEC` rows) and `codice_urn(name)`,
+    the **case-insensitive** lookup into `NORMATTIVA_URN_CODICI` — six keys
+    carry capitals ("codice del Terzo settore"), so a bare `in` test missed
+    them and those codici lost their default annex
+  - `act_resolver.py` — `resolve_atto(name)` maps an act named the way a lawyer
+    writes it ("statuto dei lavoratori", "TUSL", "del D.Lgs. 231/2001") to
+    `{tipo_atto, data, numero_atto}`, over the `ATTI_NOTI` / `ATTI_DENOMINATI`
+    tables in `map.py`. It **never guesses**: an unrecognised name returns `None`
+    and `suggest_acts()` offers near misses. Chained after the exact-match paths
+    in `alias_resolver` and `nl_parser`, so nothing that resolved before changes.
+  - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
+    `ThrottledHttpClient.request`. `tests/test_egress_allowlist.py` fails the
+    build when a URL literal names an undeclared host. The runtime check covers
+    the shared HTTP client only — `SECURITY.md` lists the three paths it does
+    not cover (treextractor's own session, Playwright, redirect targets).
   - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
     exposed at `POST /parse_query`
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
@@ -144,6 +191,13 @@ POST unless noted, JSON bodies.
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
+
+Root `app.py` maps failures through `_error_response`, so the status now carries
+meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
+input), `ResourceNotFoundError` → 404 (the article is not in the act),
+`RateLimitExceededError` → 429, everything else 500. Before, every failure was a
+500 — and `stream_article_text` raised through to Quart and answered an HTML
+error page instead of NDJSON.
 
 ```json
 {
@@ -423,8 +477,13 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `REDIS_CACHE_PREFIX` (`vlx`), `PERSISTENT_CACHE_TTL` (`86400`),
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
-`RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP). Template in
-`.env.example`.
+`RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
+`AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
+call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory,
+a few tens of KB each). Template in `.env.example`.
+
+Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
+parser uses; it ships a `cp314` wheel, so `deploy.sh` needs no compiler.
 
 **Node backend** — see `backend/.env.example`. `REDIS_ENABLED` defaults to
 `"true"` there to mirror production; set `"false"` for dev without Redis.
@@ -491,9 +550,13 @@ meant to stay split; add new features as new files, not inside the shells:
    `create_norma_visitata_from_data()`.
 8. **Selenium is gone** — Playwright only.
 9. **Article id formatting (`-bis` / `-ter`)** — the tree API and the scraper
-   disagree (`"1-bis"` vs `"1 bis"`). A naive `===` silently misses and falls back
-   to the first article. Always use `findArticleByNormalizedId`, then canonicalise
-   with `getUniqueArticleId(match)` before storing in state.
+   disagree (`"1-bis"` vs `"1 bis"`). Server-side both are now canonicalised
+   through `normalize_article_key` (`services/akn_parser.py`), which treats the
+   suffix as any alphabetic tail rather than an enumerated ordinal list —
+   Normattiva goes well past `decies` ("2409 octiesdecies" c.c.). On the
+   frontend the tolerant `findArticleByNormalizedId` is still required: a naive
+   `===` silently misses and falls back to the first article. Always use it, then
+   canonicalise with `getUniqueArticleId(match)` before storing in state.
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.
@@ -552,3 +615,21 @@ meant to stay split; add new features as new files, not inside the shells:
     element is positioned and that no ancestor sets `backdrop-filter`, `filter`,
     `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
     raising the child's value does nothing.
+
+23. **`article_text` is a data contract, not a string.** Highlights and anchored
+    notes are pinned by `(startOffset, text)` where the offset counts characters
+    in a projection of `article_text` in which only `\n` is invisible.
+    `useArticleMarkers` requires exact equality between the stored text and the
+    slice at that offset and drops the marker silently on mismatch — no fuzzy
+    fallback, no log, no visual difference from "never existed". Changing the
+    scraper's output formatting by one space deletes every anchor after it, for
+    every user, with no way to detect it afterwards. Measured: AKN vs HTML is
+    0/19 identical. This is why `normattiva_scraper._estrai_testo_*` output is
+    frozen and why AKN is never the display text.
+
+24. **A missing article gets you a different one.** Normattiva answers a request
+    for a nonexistent article with the act's Art. 1 and HTTP 200. The existence
+    check in `create_norma_visitata_from_data` is what turns that into a 404
+    ("Articolo N non presente in …", through `_error_response`); it fails open,
+    so a Normattiva outage is never reported as "does not exist". A range where
+    *some* articles exist keeps those and drops the rest.

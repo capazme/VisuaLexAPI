@@ -1,5 +1,16 @@
 import re
 
+
+def codice_urn(codice_name: str) -> str | None:
+    """URN fragment for a codice, matched case-insensitively.
+
+    Six keys in NORMATTIVA_URN_CODICI carry capitals ("codice del Terzo
+    settore"), while every lookup arrives lowercased — without this index those
+    codici silently fall through to a generic, wrong URN.
+    """
+    return _URN_CODICI_LOWER.get(codice_name.lower().strip())
+
+
 def extract_codice_details(codice_name: str) -> dict | None:
     """
     Extracts date and act number from a codice URN in NORMATTIVA_URN_CODICI.
@@ -9,8 +20,7 @@ def extract_codice_details(codice_name: str) -> dict | None:
 
     Returns None if codice not found or URN doesn't contain extractable details.
     """
-    codice_name_lower = codice_name.lower().strip()
-    urn = NORMATTIVA_URN_CODICI.get(codice_name_lower)
+    urn = codice_urn(codice_name)
 
     if not urn:
         return None
@@ -42,7 +52,7 @@ NORMATTIVA_URN_CODICI = {
     "costituzione": "costituzione",
     "codice penale": "regio.decreto:1930-10-19;1398:1",
     "codice di procedura civile": "regio.decreto:1940-10-28;1443:1",
-    "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie": "regio.decreto:1941-08-25;1368:1",
+    "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie": "regio.decreto:1941-12-18;1368:1",
     "codici penali militari di pace e di guerra": "relazione.e.regio.decreto:1941-02-20;303",
     "disposizioni di coordinamento, transitorie e di attuazione dei Codici penali militari di pace e di guerra": "regio.decreto:1941-09-09;1023",
     "codice civile": "regio.decreto:1942-03-16;262:2",
@@ -78,6 +88,312 @@ NORMATTIVA_URN_CODICI = {
     "codice della protezione civile": "decreto.legislativo:2018-01-02;1",
     "codice della crisi d'impresa e dell'insolvenza": "decreto.legislativo:2019-01-12;14"
 }
+
+
+_URN_CODICI_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA_URN_CODICI.items()}
+
+
+
+# ---------------------------------------------------------------------------
+# ATTI NOTI — common names → scraper parameters
+# ---------------------------------------------------------------------------
+
+ATTI_NOTI = {
+    "gdpr": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
+    "rgpd": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
+    "regolamento privacy": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
+    "regolamento generale protezione dati": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
+    "dora": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "2554"},
+    "ai act": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "1689"},
+    "regolamento ia": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "1689"},
+    "ehds": {"tipo_atto": "regolamento ue", "data": "2025", "numero_atto": "327"},
+    "european health data space": {"tipo_atto": "regolamento ue", "data": "2025", "numero_atto": "327"},
+    "nis2": {"tipo_atto": "direttiva ue", "data": "2022", "numero_atto": "2555"},
+    "nis 2": {"tipo_atto": "direttiva ue", "data": "2022", "numero_atto": "2555"},
+    "codice privacy": {"tipo_atto": "codice in materia di protezione dei dati personali", "data": "", "numero_atto": ""},
+    "d.lgs. 196/2003": {"tipo_atto": "decreto legislativo", "data": "2003-06-30", "numero_atto": "196"},
+    "d.lgs. 231/2001": {"tipo_atto": "decreto legislativo", "data": "2001-06-08", "numero_atto": "231"},
+    "d.lgs. 81/2008": {"tipo_atto": "decreto legislativo", "data": "2008-04-09", "numero_atto": "81"},
+    "testo unico sicurezza": {"tipo_atto": "decreto legislativo", "data": "2008", "numero_atto": "81"},
+    "codice civile": {"tipo_atto": "codice civile", "data": "", "numero_atto": ""},
+    "codice penale": {"tipo_atto": "codice penale", "data": "", "numero_atto": ""},
+    "costituzione": {"tipo_atto": "costituzione", "data": "", "numero_atto": ""},
+    "cost": {"tipo_atto": "costituzione", "data": "", "numero_atto": ""},
+    "cost.": {"tipo_atto": "costituzione", "data": "", "numero_atto": ""},
+    "c.c.": {"tipo_atto": "codice civile", "data": "", "numero_atto": ""},
+    "c.p.": {"tipo_atto": "codice penale", "data": "", "numero_atto": ""},
+    "c.p.c.": {"tipo_atto": "codice di procedura civile", "data": "", "numero_atto": ""},
+    "c.p.c": {"tipo_atto": "codice di procedura civile", "data": "", "numero_atto": ""},
+    "c.p.p.": {"tipo_atto": "codice di procedura penale", "data": "", "numero_atto": ""},
+    "cds": {"tipo_atto": "codice della strada", "data": "", "numero_atto": ""},
+    "cdc": {"tipo_atto": "codice del consumo", "data": "", "numero_atto": ""},
+    "tub": {"tipo_atto": "decreto legislativo", "data": "1993", "numero_atto": "385"},
+    "tuf": {"tipo_atto": "decreto legislativo", "data": "1998", "numero_atto": "58"},
+    "tuir": {"tipo_atto": "decreto del presidente della repubblica", "data": "1986", "numero_atto": "917"},
+    "testo unico delle imposte sui redditi": {"tipo_atto": "decreto del presidente della repubblica", "data": "1986-12-22", "numero_atto": "917"},
+    "testo unico imposte sui redditi": {"tipo_atto": "decreto del presidente della repubblica", "data": "1986-12-22", "numero_atto": "917"},
+    # EU treaties — Norma.url() routes these to the fixed CELEX pages in EURLEX
+    "tue": {"tipo_atto": "TUE", "data": "", "numero_atto": ""},
+    "trattato sull'unione europea": {"tipo_atto": "TUE", "data": "", "numero_atto": ""},
+    "tfue": {"tipo_atto": "TFUE", "data": "", "numero_atto": ""},
+    "trattato sul funzionamento dell'unione europea": {"tipo_atto": "TFUE", "data": "", "numero_atto": ""},
+    "cdfue": {"tipo_atto": "CDFUE", "data": "", "numero_atto": ""},
+    "carta di nizza": {"tipo_atto": "CDFUE", "data": "", "numero_atto": ""},
+    "carta dei diritti fondamentali dell'unione europea": {"tipo_atto": "CDFUE", "data": "", "numero_atto": ""},
+    # EU compliance acts
+    "dsa": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "2065"},
+    "digital services act": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "2065"},
+    "dma": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "1925"},
+    "digital markets act": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "1925"},
+    "data act": {"tipo_atto": "regolamento ue", "data": "2023", "numero_atto": "2854"},
+    "data governance act": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "868"},
+    "dga": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "868"},
+    "eidas": {"tipo_atto": "regolamento ue", "data": "2014", "numero_atto": "910"},
+    "eidas2": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "1183"},
+    "cyber resilience act": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "2847"},
+    "cra": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "2847"},
+    "mica": {"tipo_atto": "regolamento ue", "data": "2023", "numero_atto": "1114"},
+    "machinery regulation": {"tipo_atto": "regolamento ue", "data": "2023", "numero_atto": "1230"},
+    "direttiva whistleblowing": {"tipo_atto": "direttiva ue", "data": "2019", "numero_atto": "1937"},
+    "whistleblowing": {"tipo_atto": "direttiva ue", "data": "2019", "numero_atto": "1937"},
+    "direttiva nis": {"tipo_atto": "direttiva ue", "data": "2016", "numero_atto": "1148"},
+    "nis": {"tipo_atto": "direttiva ue", "data": "2016", "numero_atto": "1148"},
+    "psd2": {"tipo_atto": "direttiva ue", "data": "2015", "numero_atto": "2366"},
+    "csrd": {"tipo_atto": "direttiva ue", "data": "2022", "numero_atto": "2464"},
+    "csddd": {"tipo_atto": "direttiva ue", "data": "2024", "numero_atto": "1760"},
+    "european accessibility act": {"tipo_atto": "direttiva ue", "data": "2019", "numero_atto": "882"},
+    "eprivacy": {"tipo_atto": "direttiva ue", "data": "2002", "numero_atto": "58"},
+    "direttiva eprivacy": {"tipo_atto": "direttiva ue", "data": "2002", "numero_atto": "58"},
+}
+
+
+
+# ---------------------------------------------------------------------------
+# ATTI DENOMINATI — acts commonly cited by name rather than by number
+# ---------------------------------------------------------------------------
+#
+# One row per act: (tipo_atto, data ISO, numero_atto, [alias...]).
+#
+# The extremes of the rows below were verified against Normattiva on 2026-08-24
+# (each URN resolves to an act whose type, date and number match the row). The
+# base was generated once from BROCARDI_CODICI via
+# scripts/generate_atti_denominati.py; the table — not that script — is the
+# source of truth, so a wrong act can be corrected here without touching a
+# display label. Run the script with --check to spot Brocardi acts missing here.
+#
+# Acts already resolvable through NORMATTIVA_URN_CODICI or ATTI_NOTI are
+# deliberately absent: those tables are consulted first.
+
+_ATTI_DENOMINATI_SPEC: list[tuple[str, str, str, list[str]]] = [
+    # --- Codici e testi coordinati non coperti da NORMATTIVA_URN_CODICI ------
+    ("regio decreto", "1942-03-30", "318", [
+        "disposizioni per l'attuazione del codice civile e disposizioni transitorie",
+        "disposizioni di attuazione del codice civile", "disp. att. cc"]),
+    ("regio decreto", "1941-12-18", "1368", [
+        "disposizioni di attuazione del codice di procedura civile", "disp. att. cpc"]),
+    ("regio decreto", "1931-05-28", "601", [
+        "disposizioni di coordinamento e transitorie per il codice penale",
+        "disposizioni transitorie codice penale"]),
+    ("decreto del presidente della repubblica", "1988-09-22", "448", [
+        "codice processo penale minorile", "processo penale minorile", "cppm", "c.p.p.m."]),
+    ("decreto legislativo", "2003-06-30", "196", ["codice della privacy"]),
+    ("decreto legislativo", "2006-04-03", "152", [
+        "codice dell'ambiente", "codice ambiente", "testo unico ambientale", "tua"]),
+    ("decreto legislativo", "2017-07-03", "117", ["codice del terzo settore"]),
+    ("decreto legislativo", "2023-03-31", "36", ["nuovo codice appalti"]),
+    ("decreto legislativo", "2006-04-12", "163", [
+        "codice degli appalti", "vecchio codice appalti", "codice appalti 2006"]),
+
+    # --- Lavoro --------------------------------------------------------------
+    ("legge", "1970-05-20", "300", [
+        "statuto dei lavoratori", "statuto lavoratori", "statuto dei diritti dei lavoratori"]),
+    ("decreto legislativo", "2001-03-30", "165", [
+        "testo unico sul pubblico impiego", "testo unico pubblico impiego",
+        "tu pubblico impiego", "tupi"]),
+    ("decreto legislativo", "2008-04-09", "81", [
+        "testo unico sulla sicurezza sul lavoro", "testo unico sicurezza sul lavoro",
+        "testo unico sicurezza", "tu sicurezza", "tusl"]),
+    ("decreto legislativo", "2015-03-04", "23", [
+        "disposizioni in materia di contratto di lavoro a tempo indeterminato a tutele crescenti",
+        "jobs act", "contratto a tutele crescenti", "tutele crescenti"]),
+    ("decreto legislativo", "2015-06-15", "81", [
+        "disciplina organica dei contratti di lavoro e revisione della normativa in tema di mansioni",
+        "jobs act contratti", "codice dei contratti di lavoro"]),
+    ("decreto legislativo", "2003-09-10", "276", [
+        "legge biagi", "decreto biagi", "riforma biagi"]),
+    ("legge", "2012-06-28", "92", ["legge fornero", "riforma fornero"]),
+    ("decreto legislativo", "2015-03-04", "22", [
+        "disposizioni per il riordino della normativa in materia di ammortizzatori sociali",
+        "ammortizzatori sociali", "decreto naspi"]),
+    ("legge", "1966-07-15", "604", [
+        "norme sui licenziamenti individuali", "legge sui licenziamenti individuali"]),
+    ("decreto legislativo", "2003-04-08", "66", [
+        "norme in materia di orario di lavoro", "orario di lavoro"]),
+    ("legge", "2017-05-22", "81", [
+        "misure per la tutela del lavoro autonomo non imprenditoriale e misure volte a favorire il lavoro agile",
+        "legge sul lavoro agile", "statuto del lavoro autonomo"]),
+    ("decreto legislativo", "2001-03-26", "151", [
+        "testo unico maternità e paternità", "testo unico in materia di tutela e sostegno della maternità e della paternità",
+        "tu maternità", "testo unico maternita e paternita"]),
+    ("decreto del presidente della repubblica", "1965-06-30", "1124", [
+        "testo unico sull'assicurazione degli infortuni sul lavoro",
+        "testo unico infortuni sul lavoro", "tu infortuni"]),
+    ("decreto legge", "2023-05-04", "48", ["decreto lavoro 2023"]),
+
+    # --- Impresa, crisi, societario -----------------------------------------
+    ("regio decreto", "1942-03-16", "267", [
+        "legge fallimentare", "l. fall.", "legge fall."]),
+    ("decreto legislativo", "2001-06-08", "231", [
+        "disciplina della responsabilità amministrativa delle persone giuridiche",
+        "responsabilità amministrativa degli enti", "decreto 231", "d.lgs 231"]),
+    ("decreto legislativo", "1993-09-01", "385", [
+        "testo unico bancario", "tu bancario"]),
+    ("decreto legislativo", "1998-02-24", "58", [
+        "testo unico delle disposizioni in materia di intermediazione finanziaria",
+        "testo unico della finanza", "tu finanza"]),
+    ("decreto legislativo", "2016-08-19", "175", [
+        "testo unico in materia di società a partecipazione pubblica",
+        "testo unico società partecipate", "tusp"]),
+
+    # --- Amministrativo ------------------------------------------------------
+    ("legge", "1990-08-07", "241", [
+        "legge sul procedimento amministrativo", "legge sul procedimento",
+        "legge 241", "legge sulla trasparenza amministrativa"]),
+    ("decreto legislativo", "2000-08-18", "267", [
+        "testo unico degli enti locali", "testo unico enti locali", "tu enti locali", "tuel"]),
+    ("decreto del presidente della repubblica", "2001-06-06", "380", [
+        "testo unico edilizia", "testo unico dell'edilizia", "tu edilizia"]),
+    ("decreto del presidente della repubblica", "2001-06-08", "327", [
+        "testo unico sulle espropriazioni per pubblica utilità",
+        "testo unico espropriazioni", "tu espropri", "tu espropriazioni"]),
+    ("decreto del presidente della repubblica", "1971-11-24", "1199", [
+        "semplificazione dei procedimenti in materia di ricorsi amministrativi",
+        "ricorsi amministrativi"]),
+    ("decreto del presidente della repubblica", "2005-02-11", "68", [
+        "regolamento posta elettronica certificata", "regolamento pec"]),
+    ("legge", "2012-11-06", "190", [
+        "legge severino", "legge anticorruzione"]),
+
+    # --- Famiglia e persone --------------------------------------------------
+    ("legge", "1970-12-01", "898", ["legge sul divorzio", "legge divorzio"]),
+    ("legge", "1983-05-04", "184", [
+        "legge sull'adozione", "legge adozione", "diritto del minore ad una famiglia"]),
+    ("legge", "2016-05-20", "76", [
+        "regolamentazione delle unioni civili tra persone dello stesso sesso e disciplina delle convivenze",
+        "legge cirinnà", "legge sulle unioni civili", "legge cirinna"]),
+    ("legge", "2006-02-08", "54", [
+        "disposizioni in materia di separazione dei genitori e affidamento condiviso dei figli",
+        "legge sull'affido condiviso", "affido condiviso"]),
+    ("legge", "2004-02-19", "40", [
+        "norme in materia di procreazione medicalmente assistita",
+        "legge sulla procreazione medicalmente assistita", "legge 40"]),
+    ("legge", "2017-12-22", "219", [
+        "legge sul biotestamento", "legge sulle dat", "consenso informato e dat"]),
+    ("legge", "1978-05-22", "194", ["legge sull'aborto", "legge 194"]),
+    ("legge", "1992-02-05", "104", ["legge 104", "legge quadro sull'handicap"]),
+
+    # --- Penale ed esecuzione penale ----------------------------------------
+    ("legge", "1975-07-26", "354", [
+        "legge sull'ordinamento penitenziario", "ordinamento penitenziario"]),
+    ("decreto del presidente della repubblica", "1990-10-09", "309", [
+        "testo unico stupefacenti", "testo unico sugli stupefacenti", "tu stupefacenti"]),
+    ("regio decreto", "1931-06-18", "773", [
+        "testo unico delle leggi di pubblica sicurezza", "testo unico di pubblica sicurezza",
+        "tulps", "tu pubblica sicurezza"]),
+
+    # --- Professioni e sanità ------------------------------------------------
+    ("legge", "2012-12-31", "247", [
+        "legge professionale forense", "legge forense", "ordinamento forense"]),
+    ("legge", "2017-03-08", "24", [
+        "responsabilità professionale del personale sanitario",
+        "legge gelli-bianco", "legge gelli", "legge gelli bianco"]),
+
+    # --- Proprietà intellettuale, locazioni, agrario -------------------------
+    ("legge", "1941-04-22", "633", [
+        "legge sulla protezione del diritto d'autore", "legge sul diritto d'autore",
+        "legge diritto d'autore", "lda"]),
+    ("decreto legislativo", "1998-12-09", "431", [
+        "legge sulle locazioni abitative", "locazioni abitative"]),
+    ("legge", "1978-07-27", "392", ["legge equo canone", "equo canone"]),
+    ("legge", "1982-05-03", "203", ["norme sui contratti agrari", "legge sui contratti agrari"]),
+    ("legge", "1965-05-26", "590", [
+        "disposizioni per lo sviluppo della proprietà coltivatrice", "proprietà coltivatrice"]),
+    ("decreto legislativo", "2001-05-18", "228", [
+        "testo unico sull'agricoltura", "orientamento e modernizzazione del settore agricolo"]),
+    ("decreto legislativo", "2018-05-21", "75", ["testo unico sulle piante officinali"]),
+
+    # --- Tributario ----------------------------------------------------------
+    ("legge", "2000-07-27", "212", [
+        "statuto del contribuente", "statuto dei diritti del contribuente"]),
+    ("decreto legislativo", "2000-03-10", "74", [
+        "legge sui reati tributari", "reati tributari"]),
+    ("decreto del presidente della repubblica", "1986-04-26", "131", [
+        "testo unico dell'imposta di registro", "testo unico imposta di registro", "tur"]),
+    ("decreto del presidente della repubblica", "1972-10-26", "633", [
+        "testo unico iva", "decreto iva"]),
+    ("decreto del presidente della repubblica", "1973-09-29", "600", [
+        "disposizioni comuni in materia di accertamento delle imposte sui redditi",
+        "decreto accertamento"]),
+    ("decreto del presidente della repubblica", "1973-09-29", "602", [
+        "disposizioni sulla riscossione delle imposte sul reddito", "decreto riscossione"]),
+    ("decreto legislativo", "1997-06-19", "218", [
+        "disposizioni in materia di accertamento con adesione e di conciliazione giudiziale",
+        "accertamento con adesione"]),
+    ("decreto legislativo", "1997-12-18", "472", [
+        "disposizioni sulle sanzioni amministrative per violazioni di norme tributarie",
+        "sanzioni amministrative tributarie"]),
+    ("decreto legislativo", "1992-12-31", "545", [
+        "ordinamento degli organi speciali di giurisdizione tributaria ed organizzazione degli uffici di collaborazione"]),
+    ("decreto legislativo", "1992-12-30", "504", [
+        "riordino della finanza degli enti territoriali"]),
+    ("decreto legge", "1994-09-30", "564", ["disposizioni urgenti in materia fiscale"]),
+    ("decreto legislativo", "1990-10-31", "346", [
+        "testo unico sulle successioni e donazioni", "testo unico successioni e donazioni",
+        "tu successioni"]),
+
+    # --- Terzo settore e no-profit -------------------------------------------
+    ("legge", "1991-08-11", "266", ["legge quadro sul volontariato", "legge sul volontariato"]),
+    ("decreto legislativo", "1997-12-04", "460", ["legge sulle onlus", "decreto onlus"]),
+    ("legge", "2000-12-07", "383", ["disciplina delle associazioni di promozione sociale"]),
+
+    # --- Immigrazione --------------------------------------------------------
+    ("decreto legislativo", "1998-07-25", "286", [
+        "testo unico sull'immigrazione", "testo unico immigrazione", "tu immigrazione"]),
+    ("legge", "2002-07-30", "189", ["legge bossi-fini", "legge bossi fini"]),
+
+    # --- Processo civile: mediazione e durata --------------------------------
+    ("decreto legislativo", "2010-03-04", "28", [
+        "mediazione finalizzata alla conciliazione delle controversie civili e commerciali",
+        "decreto mediazione", "legge sulla mediazione"]),
+    ("legge", "2001-03-24", "89", ["legge pinto", "equa riparazione"]),
+
+    # --- Diritto internazionale privato --------------------------------------
+    ("legge", "1995-05-31", "218", [
+        "riforma del sistema italiano di diritto internazionale privato",
+        "legge di diritto internazionale privato", "legge sul diritto internazionale privato"]),
+
+    # --- Decretazione d'urgenza ricorrentemente citata ------------------------
+    # Cura Italia: Brocardi indexes the conversion law (L. 27/2020), but a
+    # citation "art. N decreto Cura Italia" means the decreto-legge itself.
+    ("decreto legge", "2020-03-17", "18", ["decreto cura italia", "cura italia"]),
+    ("legge", "2020-04-24", "27", ["legge di conversione cura italia"]),
+    ("decreto legge", "2020-05-19", "34", ["decreto rilancio"]),
+    ("decreto legge", "2021-03-22", "41", ["decreto sostegni"]),
+    ("decreto legge", "2021-05-31", "77", [
+        "decreto semplificazioni bis", "decreto governance pnrr"]),
+]
+
+ATTI_DENOMINATI: dict[str, dict] = {}
+for _tipo, _data, _numero, _aliases in _ATTI_DENOMINATI_SPEC:
+    for _alias in _aliases:
+        ATTI_DENOMINATI[_alias] = {
+            "tipo_atto": _tipo,
+            "data": _data,
+            "numero_atto": _numero,
+        }
+# The source repo leaks these loop variables at module scope, where they show up
+# in dir() and in any star-import.
+del _tipo, _data, _numero, _aliases, _alias
 
 BROCARDI_CODICI = {
     "Costituzione": "https://www.brocardi.it/costituzione/",
@@ -294,7 +610,33 @@ NORMATTIVA_SEARCH = {
         "norme amb.": "norme in materia ambientale",
         "norme in materia ambientale": "norme in materia ambientale",
         "prel.": "preleggi",
-        "preleggi": "preleggi"}
+        "preleggi": "preleggi",
+        # --- merged from mcp-legal-it (additive; no key collided) ------------
+        # The three capitalised spellings above are kept: they are the shape the
+        # URN tables use, and lowercase variants are added alongside, never
+        # instead of them.
+        "ccii": "codice della crisi d'impresa e dell'insolvenza",
+        "codice appalti": "codice dei contratti pubblici",
+        "codice contratti pubblici": "codice dei contratti pubblici",
+        "codice crisi": "codice della crisi d'impresa e dell'insolvenza",
+        "codice del terzo settore": "codice del Terzo settore",
+        "codice della crisi": "codice della crisi d'impresa e dell'insolvenza",
+        "d.m": "decreto ministeriale",
+        "d.m.": "decreto ministeriale",
+        "d.p.c.m": "decreto del presidente del consiglio dei ministri",
+        "d.p.c.m.": "decreto del presidente del consiglio dei ministri",
+        "decreto del presidente del consiglio dei ministri": "decreto del presidente del consiglio dei ministri",
+        "decreto ministeriale": "decreto ministeriale",
+        "disp. prel. c.c.": "preleggi",
+        "disp. prel. cc": "preleggi",
+        "disposizioni per l'attuazione del codice civile e disposizioni transitorie": "disposizioni per l'attuazione del Codice civile e disposizioni transitorie",
+        "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie",
+        "disposizioni preliminari al codice civile": "preleggi",
+        "disposizioni preliminari codice civile": "preleggi",
+        "disposizioni preliminari del codice civile": "preleggi",
+        "disposizioni sulla legge in generale": "preleggi",
+        "dm": "decreto ministeriale",
+        "dpcm": "decreto del presidente del consiglio dei ministri"}
 
 NORMATTIVA = {
         "d.lgs.": "decreto.legislativo",

@@ -157,6 +157,3 @@ class NormaVisitata:
         )
         log.debug(f"NormaVisitata created: {norma_visitata}")
         return norma_visitata
-
-codice_civile = Norma(tipo_atto='codice civile')
-print(codice_civile.to_dict())

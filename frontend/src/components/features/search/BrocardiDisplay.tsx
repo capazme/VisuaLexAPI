@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lightbulb, ExternalLink, ChevronDown, BookOpen, Link2, FileText, ChevronRight, AlertTriangle, RotateCw } from 'lucide-react';
-import type { BrocardiInfo as BrocardiInfoType, RelazioneContent, Footnote, CrossReference } from '../../../types';
+import type { BrocardiInfo as BrocardiInfoType, RelazioneContent, Footnote, CrossReference, GlossaryEntry } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
 import { MassimeSection } from './MassimeSection';
@@ -431,6 +431,82 @@ function CrossReferencesSection({
   );
 }
 
+function GlossarioSection({ entries }: { entries: GlossaryEntry[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggle = () => setIsOpen((v) => !v);
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggle();
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-teal-200 bg-teal-50/50 dark:border-teal-900 dark:bg-teal-950/20">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        aria-label={isOpen ? 'Comprimi il glossario' : 'Espandi il glossario'}
+        onClick={toggle}
+        onKeyDown={onKeyDown}
+        className="flex min-h-[44px] cursor-pointer items-center justify-between px-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0"
+      >
+        <span className="text-sm font-semibold text-teal-900 dark:text-teal-200">
+          Glossario
+        </span>
+        <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs text-teal-800 dark:bg-teal-900 dark:text-teal-200">
+          {entries.length}
+        </span>
+      </div>
+      {isOpen && (
+        <ul className="flex flex-wrap gap-2 px-4 pb-3">
+          {entries.map((entry) => (
+            <li key={entry.url}>
+              <a
+                href={entry.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block rounded-full border border-teal-300 px-3 py-1 text-xs text-teal-900 hover:bg-teal-100 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-900"
+              >
+                {entry.termine}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RelatedArticlesSection({ related }: { related: NonNullable<BrocardiInfoType['RelatedArticles']> }) {
+  const items = [
+    related.previous ? { ...related.previous, label: 'Precedente' } : null,
+    related.next ? { ...related.next, label: 'Successivo' } : null,
+  ].filter(Boolean) as Array<{ numero: string; url: string; titolo?: string; label: string }>;
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <a
+          key={item.url}
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 md:min-h-0 md:py-2"
+        >
+          <span className="text-xs uppercase tracking-wide text-slate-400">{item.label}</span>
+          <span>{item.titolo || `Art. ${item.numero}`}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 interface BrocardiDisplayProps {
   info: BrocardiInfoType | null;
   currentNorma?: { tipo_atto: string; data?: string; numero_atto?: string };
@@ -492,7 +568,9 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
     (info.Relazioni && info.Relazioni.length > 0) ||
     (info.CrossReferences && info.CrossReferences.length > 0) ||
     (info.Footnotes && info.Footnotes.length > 0) ||
-    info.RelazioneCostituzione;
+    info.RelazioneCostituzione ||
+    (info.Glossario?.length ?? 0) > 0 ||
+    Boolean(info.RelatedArticles?.previous || info.RelatedArticles?.next);
 
   if (!hasContent) {
     return <BrocardiEmptyState link={info.link} />;
@@ -581,6 +659,14 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
           {info.RelazioneCostituzione && (
             <RelazioneCostituzione relazione={info.RelazioneCostituzione} />
           )}
+
+          {/* Glossario (dizionario giuridico Brocardi) */}
+          {info.Glossario && info.Glossario.length > 0 && (
+            <GlossarioSection entries={info.Glossario} />
+          )}
+
+          {/* Articoli correlati (precedente/successivo) */}
+          {info.RelatedArticles && <RelatedArticlesSection related={info.RelatedArticles} />}
 
           {info.link && (
             <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50 flex justify-end">

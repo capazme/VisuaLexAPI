@@ -60,7 +60,7 @@ absence broke a deploy, which is why they read as a list of scars:
 |---|---|---|
 | 0 | Branch guard | Refuses to deploy from anything but `main`. See above. |
 | 1 | `git pull -r` on the current branch | Rebases onto the remote. |
-| 2 | `pip install -r requirements.txt` | Runtime deps only. `requirements-dev.txt` (pytest) is deliberately **not** installed in production. |
+| 2 | `pip install -r requirements.txt` | Runtime deps only. `requirements-dev.txt` (pytest) is deliberately **not** installed in production. Now includes `lxml` (the Akoma Ntoso parser): it ships a `cp314` wheel, so the server needs no compiler — check that before pinning a version that has none. |
 | 2b | `playwright install chromium` | `pip install` does not fetch browser binaries. Without this, PDF export and date completion break at runtime, not at build time. |
 | 3 | `npm install` in `backend/` | |
 | 3b | `npx prisma generate` | A schema change pulled from git leaves `node_modules/@prisma/client` stale, and the backend build then fails on missing models. |
@@ -75,8 +75,13 @@ absence broke a deploy, which is why they read as a list of scars:
 
 ## Before you run it
 
-The script builds but **never runs a test**. Nothing between a bad commit and
-production checks behaviour. Run the suites first, from the repo root:
+The script builds but **never runs a test**, and it still has no rollback. Since
+the transfusion round there is CI (`.github/workflows/ci.yml`) on every PR into
+`main` and on `main` itself — Python tests on 3.12 and 3.14, the three frontend
+gates, backend tests, plus a weekly `pip-audit` / `npm audit` — so a red `main`
+is now visible before a deploy rather than after it. It is a signal, not a gate:
+`deploy.sh` does not consult it and will happily ship a red commit. Run the
+suites first, from the repo root:
 
 ```bash
 .venv/bin/python -m pytest tests/ -q
@@ -90,7 +95,7 @@ cd backend && npm test
 cd frontend && npm run build && npx vitest run
 ```
 
-Expected today: 169 Python, 28 backend, 33 frontend.
+Expected today: 355 Python (1 deselected — the `live` marker), 28 backend, 84 frontend.
 
 The backend suite needs `backend/.env.test` pointing at a **separate** database
 (`visualex_test`, not `visualex_platform`) — it runs `prisma migrate reset` on
@@ -131,6 +136,8 @@ startup and the process refuses to boot without them. See
 | `PERSISTENT_CACHE_TTL` | `86400` | |
 | `HTTP_MAX_CONCURRENCY`, `HTTP_TIMEOUT`, `HTTP_MAX_RETRIES`, `HTTP_BACKOFF_FACTOR`, `HTTP_INITIAL_BACKOFF`, `HTTP_MIN_INTERVAL`, `HTTP_JITTER` | see `tools/config.py` | Scraper tuning |
 | `FETCH_QUEUE_WORKERS` / `FETCH_QUEUE_DELAY` | | |
+| `AKN_ENABLED` | `true` | Kill switch for the Akoma Ntoso path (article index + last-resort text fallback). Read at call time, so flipping it needs no code change |
+| `AKN_CACHE_MAX_ACTS` | `40` | Article indexes held in memory, a few tens of KB each. Texts are never cached |
 
 ---
 

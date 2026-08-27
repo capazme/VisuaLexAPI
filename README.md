@@ -142,3 +142,7 @@ MIT — see [LICENSE](LICENSE).
 The licence covers this software only. The legal texts it retrieves come from
 third parties: please respect the Terms of Service of Normattiva, EUR-Lex and
 Brocardi.
+
+Portions of the act-resolution tables and the Akoma Ntoso parser derive from
+[mcp-legal-it](https://github.com/capazme/mcp-legal-it), by the same author,
+relicensed MIT by the copyright holder.

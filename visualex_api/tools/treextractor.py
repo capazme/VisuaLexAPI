@@ -88,7 +88,8 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
             text = await _fetch_with_playwright(normurn)
         else:
             # Normattiva and others use simple HTTP
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session:
+            # Certificate verification enabled (aiohttp default).
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
                 async with session.get(normurn, timeout=30) as response:
                     response.raise_for_status()
                     text = await response.text()
@@ -125,8 +126,8 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
             result, count = await _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False)
             metadata = {}
     elif is_eurlex:
-        result, count = await _parse_eurlex_tree(soup, normurn, link, details)
-        metadata = {}  # EUR-Lex doesn't support annex metadata yet
+        # No annexes on EUR-Lex, but the parse does yield article titles.
+        result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
     else:
         logging.warning(f"Unrecognized norm URN format: {normurn}")
         if return_metadata:
@@ -499,7 +500,44 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
                     count_articles += 1
 
     logging.info(f"Extracted {count_articles} unique articles and {len(seen_sections)} sections from Eur-Lex")
-    return result, count_articles
+    # Article titles come free with this page: EUR-Lex marks the number with
+    # `oj-ti-art` ("Articolo 1") and the title with `oj-sti-art` ("Oggetto e
+    # finalità") right after it. Unlike Normattiva — whose tree carries bare
+    # numbers and whose titles live in a separate 10 MB export — here the whole
+    # index can be labelled without a single extra request, so it is built
+    # during the same parse rather than behind another fetch.
+    rubriche = _extract_eurlex_rubriche(soup)
+    logging.info(f"EUR-Lex rubriche extracted: {len(rubriche)} of {count_articles} articles")
+
+    return result, count_articles, {"rubriche": rubriche}
+
+
+_EURLEX_ARTICLE_NUM = re.compile(r"^(?:Articolo|Article)\s+([\w.-]+)", re.IGNORECASE)
+
+
+def _extract_eurlex_rubriche(soup):
+    """Article number -> title, from an EUR-Lex document.
+
+    The title is the `oj-sti-art` sibling that follows each `oj-ti-art`. Some
+    documents label it `eli-title` instead, so both are accepted; an article
+    with neither is simply absent from the map.
+    """
+    rubriche = {}
+    for marker in soup.find_all(class_=lambda c: c and "ti-art" in str(c).lower()
+                                and "sti-art" not in str(c).lower()):
+        match = _EURLEX_ARTICLE_NUM.match(marker.get_text(" ", strip=True))
+        if not match:
+            continue
+        sibling = marker.find_next_sibling()
+        if sibling is None:
+            continue
+        classes = " ".join(sibling.get("class", []) or []).lower()
+        if "sti-art" not in classes and "eli-title" not in classes:
+            continue
+        title = sibling.get_text(" ", strip=True)
+        if title:
+            rubriche[match.group(1)] = title
+    return rubriche
 
 
 def _extract_eli_info(normurn):

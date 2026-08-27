@@ -71,8 +71,8 @@ export function ImportEnvironmentModal({
       importEnvironment(newEnvironment);
 
       onImported();
-    } catch (err: any) {
-      setError(err.message || 'Errore durante l\'importazione');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Errore durante l\'importazione');
     } finally {
       setLoading(false);
     }

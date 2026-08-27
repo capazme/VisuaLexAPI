@@ -3,7 +3,7 @@ import { Highlighter, StickyNote, Copy, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
-import { getPlainTextOffset } from '../../../utils/selectionOffset';
+import { getPlainTextOffset, alignOffsetToTrimmedText } from '../../../utils/selectionOffset';
 
 interface SelectionPopupProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -51,9 +51,11 @@ export function SelectionPopup({
     // Small delay to let selection finalize
     setTimeout(() => {
       const selection = window.getSelection();
-      const selectedText = selection?.toString().trim();
+      // Keep the untrimmed string until the range offset is known: the offset
+      // and the text must describe the same span (see alignOffsetToTrimmedText).
+      const rawSelected = selection?.toString() ?? '';
 
-      if (!selectedText || selectedText.length < 2) {
+      if (rawSelected.trim().length < 2) {
         // Delay hiding to allow clicking on popup
         hideTimeoutRef.current = setTimeout(hidePopup, 200);
         return;
@@ -78,7 +80,8 @@ export function SelectionPopup({
 
       // Capture the plain-text offset of the selection start so the renderer
       // can pin the mark to this exact occurrence (not every copy of the string).
-      const startOffset = getPlainTextOffset(containerRef.current, range.startContainer, range.startOffset);
+      const rawOffset = getPlainTextOffset(containerRef.current, range.startContainer, range.startOffset);
+      const { text: selectedText, startOffset } = alignOffsetToTrimmedText(rawSelected, rawOffset);
 
       setPopup({
         visible: true,

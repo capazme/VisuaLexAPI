@@ -11,6 +11,8 @@ from typing import Optional
 
 import yaml
 
+from .act_resolver import resolve_atto
+
 
 def _load_presets_from_yaml() -> dict[str, dict]:
     """Load and normalize preset aliases from the YAML file."""
@@ -65,6 +67,19 @@ def resolve_alias(text: str) -> Optional[dict]:
     # Try exact match on the alias part
     if alias_part in _PRESET_ALIASES:
         result = dict(_PRESET_ALIASES[alias_part])
+        if article:
+            result["article"] = article
+        return result
+
+    # The YAML is the override layer and is consulted first, so nothing that
+    # resolves today can change meaning. Everything else goes to the act tables.
+    resolved = resolve_atto(alias_part)
+    if resolved is not None:
+        result = {"act_type": resolved["tipo_atto"]}
+        if resolved.get("numero_atto"):
+            result["act_number"] = resolved["numero_atto"]
+        if resolved.get("data"):
+            result["date"] = resolved["data"]
         if article:
             result["article"] = article
         return result
