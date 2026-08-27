@@ -170,14 +170,17 @@ describe('CommandPalette — naming an act the server resolved', () => {
 });
 
 /**
- * The presets are what the user does NOT have to invent. They were invisible
- * from the palette, which listed only custom aliases.
+ * The presets are what the user does NOT have to invent. Drawing all of them
+ * as tiles duplicated the act grid below — 21 of the 80 only rename an act
+ * that already has its own tile. So at rest they are announced, not drawn.
  */
 describe('CommandPalette — presets the server already understands', () => {
   const CATALOG = {
     presets: {
       gdpr: { act_type: 'Regolamento UE', act_number: '679', date: '2016' },
       tuir: { act_type: 'decreto del presidente della repubblica', act_number: '917', date: '1986' },
+      // No number: this one only renames an act that the grid already carries.
+      'codice appalti': { act_type: 'codice dei contratti pubblici' },
     },
     known_acts: ['statuto dei lavoratori'],
   };
@@ -194,13 +197,36 @@ describe('CommandPalette — presets the server already understands', () => {
     appStore.setState({ customAliases: [] });
   });
 
-  it('lists them, separated from the ones the user made', async () => {
+  it('announces them in the header instead of drawing a grid of tiles', async () => {
     renderPalette();
 
-    expect(await screen.findByText(/In dotazione/i)).toBeInTheDocument();
-    expect(screen.getByText('gdpr')).toBeInTheDocument();
-    expect(screen.getByText('tuir')).toBeInTheDocument();
-    expect(screen.getByText(/I tuoi alias/i)).toBeInTheDocument();
+    // Counted, named, and costing exactly one line.
+    expect(await screen.findByText(/2 già pronti/i)).toBeInTheDocument();
+    expect(screen.queryByText('gdpr')).not.toBeInTheDocument();
+    expect(screen.queryByText('tuir')).not.toBeInTheDocument();
+  });
+
+  it('leaves out a preset that only renames an act already in the grid', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await screen.findByText(/2 già pronti/i);
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'codice appalti');
+
+    // The "Codice Contratti Pubblici" tile covers this; a preset row beside it
+    // is the duplication that made the section feel redundant.
+    expect(screen.queryByText('codice appalti')).not.toBeInTheDocument();
+  });
+
+  it('surfaces one once the user types, under its own heading', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await screen.findByText(/2 già pronti/i);
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'gdpr');
+
+    expect(await screen.findByText('gdpr')).toBeInTheDocument();
+    expect(screen.getByText(/In dotazione/i)).toBeInTheDocument();
   });
 
   it('hides a preset the user has overridden with their own trigger', async () => {
@@ -210,12 +236,14 @@ describe('CommandPalette — presets the server already understands', () => {
         expandTo: 'il mio GDPR', usageCount: 0, createdAt: '2026-08-27T00:00:00.000Z',
       }],
     });
+    const user = userEvent.setup();
     renderPalette();
+
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'gdpr');
 
     // The custom one resolves first, so advertising the preset would point at
     // a shortcut that no longer runs.
-    expect(await screen.findByText('tuir')).toBeInTheDocument();
-    expect(screen.getByText('GDPR')).toBeInTheDocument();
+    expect(await screen.findByText('GDPR')).toBeInTheDocument();
     expect(screen.queryByText('gdpr')).not.toBeInTheDocument();
   });
 });
