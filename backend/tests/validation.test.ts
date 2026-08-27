@@ -20,6 +20,22 @@ describe('malformed request bodies', () => {
     expect(res.body.detail).toMatch(/password/);
   });
 
+  it('names a field once even when it breaks several rules', async () => {
+    // A short password fails both the length check and the complexity regex.
+    // Ungrouped, `detail` read "password (...), password (...)".
+    const res = await request(app).post('/api/auth/register').send({
+      email: 'grouping@test.local',
+      username: 'grouping',
+      password: 'x',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.detail.match(/password \(/g)).toHaveLength(1);
+    // The structured form still carries every violation separately.
+    expect(res.body.errors.filter((e: { field: string }) => e.field === 'password').length)
+      .toBeGreaterThan(1);
+  });
+
   it('reports the rule that was broken, not just the field', async () => {
     // The case found in production: a password below the minimum length.
     const res = await request(app).post('/api/auth/register').send({

@@ -43,12 +43,23 @@ export const errorHandler = (
       fields.map((f) => `${f.field}: ${f.message}`).join('; ')
     );
 
+    // Grouped by field before it becomes prose. One value can break several
+    // rules at once — a short password fails both the length check and the
+    // complexity regex — and naming the field once per violation reads as
+    // "password (...), password (...)".
+    const byField = new Map<string, string[]>();
+    for (const f of fields) {
+      byField.set(f.field, [...(byField.get(f.field) ?? []), f.message]);
+    }
+
     return res.status(400).json({
       // `detail` stays a plain string. services/api.ts renders it straight to
       // the user, so an object here would reach them as "[object Object]".
-      detail: `Invalid request: ${fields
-        .map((f) => `${f.field} (${f.message})`)
+      detail: `Invalid request: ${[...byField]
+        .map(([field, messages]) => `${field} (${messages.join('; ')})`)
         .join(', ')}`,
+      // Ungrouped on purpose: one entry per violation, so a caller that wants
+      // to highlight fields can, without parsing the prose above.
       errors: fields,
     });
   }
