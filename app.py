@@ -332,6 +332,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
+        self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
@@ -904,6 +905,35 @@ class NormaController:
             # Never fail the index over its decoration.
             log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
             return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
+
+    async def fetch_alias_catalog(self):
+        """Everything this server already recognises when naming an act.
+
+        Two lists the alias manager needs side by side, so a user can see what
+        exists before inventing a shortcut for it — which is how the settings
+        screen came to suggest "es. gdpr" as a trigger to create, while `gdpr`
+        had been a shipped preset all along.
+
+        - `presets`: the aliases we ship (preset_aliases.yaml). Read-only here;
+          a user overrides one by creating a CustomAlias with the same trigger,
+          which wins because the client resolves its own aliases first.
+        - `known_acts`: the act names the resolver understands on its own
+          ("statuto dei lavoratori", "legge fornero", "TUSL"). Not aliases —
+          these need no shortcut, and an alias for one is a duplicate.
+
+        Named `/fetch_...` deliberately: nginx routes the Python API by that
+        prefix, so this needs no server-config change to be reachable.
+        """
+        try:
+            from visualex_api.tools.alias_resolver import get_all_presets
+            from visualex_api.tools.act_resolver import known_act_names
+
+            presets = get_all_presets()
+            known = known_act_names()
+            log.info("Alias catalog served", presets=len(presets), known_acts=len(known))
+            return jsonify({'presets': presets, 'known_acts': known})
+        except Exception as e:
+            return self._error_response(e, 'fetch_alias_catalog')
 
     async def fetch_brocardi_info(self):
         try:
