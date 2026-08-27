@@ -191,6 +191,10 @@ POST unless noted, JSON bodies.
 - `/fetch_all_data` — article text + Brocardi in one call
 - `/fetch_tree` — article tree for a complete URN
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
+- `/fetch_rubriche` — article titles and repealed articles for an act, from the
+  AKN index. Structure only: it never carries the display text
+- `GET /fetch_alias_catalog` — the presets we ship plus the act names the
+  resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 
@@ -292,6 +296,31 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
 - **History** (`/history`) — server-side search history.
 
 All of them reopen a norm through `triggerSearch()`.
+
+### Aliases
+
+Three different things. Conflating them is the recurring mistake.
+
+- **Presets** (80) — shipped in `preset_aliases.yaml`, served by
+  `GET /fetch_alias_catalog`. 21 of them only rename an act type: "codice
+  appalti" IS the "Codice Contratti Pubblici" tile already in the palette's
+  grid, so listing them duplicates that grid. The palette shows only the 59
+  that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
+  the grid cannot save.
+- **Known acts** (389) — names `act_resolver.py` understands unaided ("statuto
+  dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
+- **CustomAlias** — the user's own, server-backed. A custom trigger beats a
+  preset of the same name, because the client resolves its own aliases before
+  asking the server. So the palette hides the shadowed preset rather than
+  advertising a shortcut that no longer runs, and the manager badges it
+  "sovrascritto".
+
+`AliasManager` is reached **only** from the command palette (gotcha 27), and in
+the palette the presets cost one line of header text at rest — they render as
+rows only once the user types, and cmdk does the matching. `useAliasCatalog`
+keeps its `loaded` flag in component state, so the palette and the manager each
+fetch the catalog once for as long as they stay mounted — two calls per session,
+never repeated, nothing persisted.
 
 ### Reading surface
 
@@ -565,7 +594,12 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
   `InlineNotePopover.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic).
+  `SearchPanel.tsx` (streaming merge logic, and the mount point for both
+  `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
+  `TreeViewPanel.tsx` (the article index window).
+- `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
+  edits, not for where it opens: it is reached from the command palette, not
+  from Settings (gotcha 27). See the Aliases section above.
 - `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
   `NormaBlockComponent`, `LooseArticleCard`, and `StudyMode/`.
 
@@ -698,3 +732,12 @@ meant to stay split; add new features as new files, not inside the shells:
     and why the Settings entry that used to open it was removed rather than kept
     as a second door. Before adding a global-looking "open X" button, check where
     X is mounted.
+
+28. **Two vocabularies name the same act, and they disagree on case.**
+    `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver
+    answers `regolamento ue`. A `===` between the two silently produced an act
+    with no name in the palette ("· n. 1689 del 2024") and skipped the step
+    that collects an act's number and date. Compare case-insensitively and fall
+    back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
+    40, so a miss is the normal case, not the exception. Same trap as
+    `codice_urn` on the backend.

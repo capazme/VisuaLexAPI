@@ -59,13 +59,13 @@ absence broke a deploy, which is why they read as a list of scars:
 | # | Step | Why it is there |
 |---|---|---|
 | 0 | Branch guard | Refuses to deploy from anything but `main`. See above. |
-| 1 | `git pull -r` on the current branch | Rebases onto the remote. First discards the lockfile churn steps 3 and 4 leave behind (see the npm gap below), and **refuses to continue** if anything else in the tree is dirty — `git pull -r` cannot rebase over unstaged changes, and a deploy must not silently discard work it did not create. |
+| 1 | `git pull -r` on the current branch | Rebases onto the remote. Discards lockfile churn if it finds any — with `npm ci` there should be none, so this is now a net for a hand-run `npm install` — and **refuses to continue** if anything else in the tree is dirty: `git pull -r` cannot rebase over unstaged changes, and a deploy must not silently discard work it did not create. |
 | 2 | `pip install -r requirements.txt` | Runtime deps only. `requirements-dev.txt` (pytest) is deliberately **not** installed in production. Now includes `lxml` (the Akoma Ntoso parser): it ships a `cp314` wheel, so the server needs no compiler — check that before pinning a version that has none. |
 | 2b | `playwright install chromium` | `pip install` does not fetch browser binaries. Without this, PDF export and date completion break at runtime, not at build time. |
-| 3 | `npm install` in `backend/` | Not `npm ci`: the committed lockfiles are written by npm 11 and this server runs npm 10, which rejects them. See the gap below. |
+| 3 | `npm ci` in `backend/` | Installs exactly the committed lockfile and never rewrites it. If it fails with EUSAGE the lockfile and `package.json` have drifted — commit an updated lockfile, do not fall back to `npm install`. |
 | 3b | `npx prisma generate` | A schema change pulled from git leaves `node_modules/@prisma/client` stale, and the backend build then fails on missing models. |
 | 3c | `npx prisma migrate deploy` | Idempotent. Without it a schema change ships with no matching column and the API fails on the first query that touches it. |
-| 4 | `npm install` in `frontend/` | |
+| 4 | `npm ci` in `frontend/` | |
 | 5 | `npm run build` (frontend) | `tsc -b && vite build`. **This is the real type-check** — it walks the project references, which a bare `tsc --noEmit` does not. |
 | 6 | `npm run build` (backend) | pm2 runs `node dist/index.js`, so skipping this leaves the service on a stale `dist/`. `tsc` type-checks as it emits and fails before writing. |
 | 7 | Version bump + commit | Only when `--major/--minor/--patch` is passed. |
@@ -163,20 +163,36 @@ finding out is most expensive.
 
 ---
 
+## Node runtime
+
+The box runs **Node 24 (NodeSource) / npm 11**, matching both CI and the npm
+that writes the committed lockfiles. That alignment is what lets steps 3 and 4
+use `npm ci`; it was Node 20 / npm 10 until 27 August 2026, and the mismatch
+rewrote the lockfiles on every deploy.
+
+Upgrading is an apt operation, because Node comes from NodeSource:
+
+```bash
+sudo sed -i 's|node_20.x|node_24.x|' /etc/apt/sources.list.d/nodesource.list
+sudo apt-get update && sudo apt-get install -y nodejs
+pm2 update            # restarts the pm2 daemon under the new Node
+```
+
+`pm2` lives in `/usr/lib/node_modules`, which the nodejs package does not own,
+so it survives the upgrade — but `pm2 update` is required, or the daemon keeps
+running on the old binary. Run `pm2 save` first.
+
+To roll back, restore `/etc/apt/sources.list.d/nodesource.list.bak-node20` and
+`sudo apt-get install -y nodejs=20.19.6-1nodesource1`, then reinstall
+`node_modules` in both `backend/` and `frontend/`.
+
+Keep this in step with `.github/workflows/ci.yml`, which pins Node 24. If the
+two drift again, the lockfile churn comes back.
+
 ## Known gaps
 
 Recorded rather than fixed, so nobody rediscovers them during an incident.
 
-- **The server's npm is a major behind the one that writes the lockfiles.**
-  This box runs Node 20 / npm 10; the lockfiles committed to the repo are
-  written by npm 11, which represents optional platform packages differently.
-  Two consequences. `npm ci` cannot be used here — it rejects the committed
-  lockfile with "Missing: @esbuild/... from lock file" — so steps 3 and 4 use
-  `npm install`, which is not reproducible. And `npm install` rewrites the
-  lockfiles into npm-10 shape on every run, leaving the tree dirty; step 1
-  discards exactly that and nothing else. Closing this properly means bringing
-  the server's Node up to the major the lockfiles are written with, after which
-  both steps can move to `npm ci`.
 - **CI does not gate the deploy.** `.github/workflows/ci.yml` runs the Python
   suite on 3.12 and 3.14, the three frontend gates and the backend tests on
   every push to `main` — but `deploy.sh` consults nothing and runs no tests, so

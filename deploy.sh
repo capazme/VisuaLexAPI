@@ -207,12 +207,14 @@ if [[ "$DO_PULL" == true ]]; then
     print_step "Pulling latest changes..."
     cd "$SCRIPT_DIR"
 
-    # Steps 3 and 4 run `npm install`, and npm rewrites the lockfiles as it
-    # goes: this box runs npm 10 while the committed lockfiles are written by
-    # npm 11, which represents optional platform packages differently. So every
-    # deploy ends with a dirty tree, and the NEXT one dies here — `git pull -r`
-    # refuses to rebase over unstaged changes. Each deploy broke the one after
-    # it until somebody cleaned up by hand.
+    # Kept as a safety net, no longer as routine cleanup. Steps 3 and 4 used
+    # `npm install` while this box ran npm 10 against lockfiles written by
+    # npm 11, so npm rewrote them on every run: each deploy left a dirty tree
+    # and killed the next one here, because `git pull -r` refuses to rebase
+    # over unstaged changes. The server now runs Node 24 / npm 11 and both
+    # steps use `npm ci`, which never writes a lockfile — so this should find
+    # nothing. It stays because a hand-run `npm install` would bring the churn
+    # straight back.
     #
     # The lockfiles are authoritative in git, never on this machine, so that
     # churn is discardable. Nothing else is: a local edit here is somebody's
@@ -263,7 +265,10 @@ fi
 # Step 3: Backend dependencies
 print_step "Installing backend dependencies..."
 cd "$SCRIPT_DIR/backend"
-npm install --silent
+# `npm ci`, not `npm install`: it installs exactly the committed lockfile and
+# never rewrites it. Requires the lockfile to match package.json — if it fails
+# with EUSAGE, the fix is to commit an updated lockfile, not to loosen this.
+npm ci --silent
 print_success "Backend dependencies installed"
 
 # Step 3b: Regenerate Prisma client to match the current schema.
@@ -284,7 +289,7 @@ print_success "Database migrations applied"
 # Step 4: Frontend dependencies
 print_step "Installing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
-npm install --silent
+npm ci --silent
 print_success "Frontend dependencies installed"
 
 # Step 5: Frontend build

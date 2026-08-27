@@ -13,7 +13,9 @@ import { useEffect, useState } from 'react';
  *   lavoratori", "legge fornero", "TUSL"). These need no shortcut at all, and
  *   an alias for one is a duplicate that can only drift.
  *
- * Fetched once per manager opening, not stored: it is a few hundred short
+ * The `loaded` flag lives in component state, so each consumer fetches once for
+ * as long as it stays mounted — the palette and the manager therefore make one
+ * call each, not one per opening. Nothing is stored: it is a few hundred short
  * strings and it changes only when the server does.
  */
 export interface PresetAlias {
