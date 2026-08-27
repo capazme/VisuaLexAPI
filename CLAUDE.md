@@ -153,6 +153,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `REDIS_ENABLED=true`, else in-memory with a startup warning.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
   connection errors fail open.
+- `src/middleware/errorHandler.ts` — the only place a status is decided for an
+  unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
+  naming the offending fields; everything else is a 500. Controllers therefore
+  call `schema.parse()` and let it throw — 41 sites across 13 controllers — and
+  must not catch it to hand-roll a status. The body is
+  `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
+  string because `services/api.ts` renders it straight to the user.
 - **Environments**: `Environment` model keeps searchable metadata in columns
   (`name/description/author/version/category/color/tags`) and everything else in
   one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
