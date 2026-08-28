@@ -12,6 +12,12 @@ is actually enforced today:
 | `eur-lex.europa.eu` | EUR-Lex — Ufficio delle pubblicazioni UE |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
+| `publications.europa.eu` | Publications Office of the EU — CELLAR, CJEU case law |
+| `www.italgiure.giustizia.it` | Ministero della Giustizia — CED, Corte di cassazione |
+| `def.finanze.it` | MEF — Documentazione economica e finanziaria, giurisprudenza |
+| `www.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR |
+| `mdp.giustizia-amministrativa.it` | Giustizia amministrativa — testi dei provvedimenti |
+| `titrust.crt.sectigo.com` | Sectigo — intermediate CA for italgiure.giustizia.it (Task 2) |
 
 The list lives as data in `visualex_api/tools/egress.py`.
 
