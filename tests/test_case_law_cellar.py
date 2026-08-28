@@ -8,12 +8,25 @@ SPARQL_JSON = """{"head":{"vars":["celex","ecli"]},"results":{"bindings":[
 ]}}"""
 
 
-def test_maps_a_norm_reference_to_a_celex_number():
+@pytest.mark.parametrize(
+    "riferimento,expected",
+    [
+        ("Regolamento UE 2016/679", "32016R0679"),
+        ("regolamento ue 2016/679", "32016R0679"),
+        ("Regolamento UE n. 679/2016", "32016R0679"),
+        ("Regolamento UE 679/2016", "32016R0679"),
+        ("Direttiva 2019/790/UE", "32019L0790"),
+        ("Direttiva UE 2019/790", "32019L0790"),
+        ("art. 2043 codice civile", None),
+    ],
+)
+def test_maps_a_norm_reference_to_a_celex_number(riferimento, expected):
     """The adapter is asked about a norm the way the rest of VisuaLex names
-    one; CELLAR keys on CELEX, so the mapping happens here."""
-    assert _celex_from_riferimento("Regolamento UE 679/2016") == "32016R0679"
-    assert _celex_from_riferimento("Direttiva UE 2019/790") == "32019L0790"
-    assert _celex_from_riferimento("art. 2043 codice civile") is None
+    one; CELLAR keys on CELEX, so the mapping happens here. Both digit
+    orders must resolve — the modern year/num order is the exact key
+    preset_aliases.yaml uses for the GDPR, and the legacy num/year order is
+    still common in older references."""
+    assert _celex_from_riferimento(riferimento) == expected
 
 
 async def test_parses_judgments_and_marks_them_cited(monkeypatch):
@@ -60,6 +73,56 @@ async def test_an_unreachable_endpoint_is_reported_not_swallowed(monkeypatch):
     result = await adapter.cerca_per_norma("Regolamento UE 679/2016")
     assert result.ok is False
     assert "connection reset" in result.error
+
+
+async def test_leggi_confirms_the_celex_resolves_to_a_real_judgment(monkeypatch):
+    """leggi() must never hand back a Decisione it did not verify: link_kind
+    stays CITED throughout the package, which readers take as "the publisher
+    says so" — so an unconfirmed CELEX would be a fabricated citation."""
+    adapter = CellarAdapter()
+
+    async def fake_request(method, url, **kwargs):
+        class R:
+            text = '{"head":{},"boolean":true}'
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cellar.http_client.request", fake_request
+    )
+    decisione = await adapter.leggi("62017CJ0496", 2019)
+    assert decisione is not None
+    assert decisione.numero == "62017CJ0496"
+    assert decisione.link_kind.value == "cited"
+
+
+async def test_leggi_returns_none_for_a_celex_that_does_not_exist(monkeypatch):
+    """A plainly nonexistent CELEX must not become a Decisione — this is
+    what lets the caller's 404 path fire instead of telling a lawyer a
+    fabricated case exists."""
+    adapter = CellarAdapter()
+
+    async def fake_request(method, url, **kwargs):
+        class R:
+            text = '{"head":{},"boolean":false}'
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cellar.http_client.request", fake_request
+    )
+    decisione = await adapter.leggi("69999CJ9999", 9999)
+    assert decisione is None
+
+
+async def test_cerca_libera_reports_it_is_not_supported():
+    adapter = CellarAdapter()
+    result = await adapter.cerca_libera("some text")
+    assert result.ok is True
+    assert result.decisioni == []
+    assert result.coverage != ""
 
 
 @pytest.mark.live

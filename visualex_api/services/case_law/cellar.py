@@ -21,15 +21,31 @@ log = structlog.get_logger()
 _ENDPOINT = "https://publications.europa.eu/webapi/rdf/sparql"
 _EURLEX_DOC = "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:"
 
-# "Regolamento UE 679/2016" -> 32016R0679 ; "Direttiva UE 2019/790" -> 32019L0790
-_REG = re.compile(r"regolamento\s+ue\s+(\d{1,4})/(\d{4})", re.I)
-_DIR = re.compile(r"direttiva\s+ue\s+(?:(\d{4})/(\d{1,4})|(\d{1,4})/(\d{4}))", re.I)
+# A regulation/directive reference names a year and a number, in either order,
+# and CELLAR keys on CELEX rather than on either digit group alone. Whichever
+# group is exactly four digits is unambiguously the year — that is why each
+# alternative below pins one side to \d{4} and lets the other float 1-4.
+#
+#   "Regolamento UE 2016/679"    -> 32016R0679  (modern order, year/num)
+#   "Regolamento UE n. 679/2016" -> 32016R0679  (legacy order, num/year)
+#   "Regolamento UE 679/2016"    -> 32016R0679  (legacy order, no "n.")
+#   "Direttiva UE 2019/790"      -> 32019L0790  ("UE" before the digits)
+#   "Direttiva 2019/790/UE"      -> 32019L0790  ("UE" after the digits)
+_REG = re.compile(
+    r"regolamento\s+ue\s+(?:n\.\s*)?(?:(\d{4})/(\d{1,4})|(\d{1,4})/(\d{4}))",
+    re.I,
+)
+_DIR = re.compile(
+    r"direttiva\s+(?:ue\s+(?:n\.\s*)?)?(?:(\d{4})/(\d{1,4})|(\d{1,4})/(\d{4}))(?:/ue)?",
+    re.I,
+)
 
 
 def _celex_from_riferimento(riferimento: str) -> str | None:
     m = _REG.search(riferimento)
     if m:
-        return f"3{m.group(2)}R{int(m.group(1)):04d}"
+        anno, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        return f"3{anno}R{int(num):04d}"
     m = _DIR.search(riferimento)
     if m:
         anno, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
@@ -45,6 +61,16 @@ SELECT DISTINCT ?celex ?ecli WHERE {
   OPTIONAL { ?sent cdm:case-law_ecli ?ecli }
   FILTER(STRSTARTS(STR(?celex),'6'))
 } LIMIT %d"""
+
+# leggi() must never hand back a Decisione it did not verify: link_kind=CITED
+# is read elsewhere as "the publisher says so", so an unverified CELEX would
+# be a fabricated citation, not a cautious guess. This ASK query is the
+# verification — a nonexistent CELEX resolves to `false` and leggi() returns
+# None, which is what lets Task 8's 404 path fire instead of inventing a case.
+_EXISTS_QUERY = """PREFIX cdm:<http://publications.europa.eu/ontology/cdm#>
+ASK WHERE {
+  ?work cdm:resource_legal_id_celex '%s'^^<http://www.w3.org/2001/XMLSchema#string> .
+}"""
 
 
 class CellarAdapter:
@@ -87,6 +113,23 @@ class CellarAdapter:
         return SourceResult(organo=self.organo, decisioni=decisioni, ok=True)
 
     async def leggi(self, numero: str, anno: int) -> Decisione | None:
+        query = _EXISTS_QUERY % numero
+        url = f"{_ENDPOINT}?{urllib.parse.urlencode({'query': query})}"
+        try:
+            result = await http_client.request(
+                "GET", url, source="cellar",
+                headers=http_headers({"Accept": "application/sparql-results+json"}),
+            )
+            data = json.loads(result.text)
+        except Exception as exc:  # noqa: BLE001 — reported, never swallowed
+            log.warning("CELLAR existence check failed", numero=numero, error=str(exc))
+            return None
+
+        if not data.get("boolean", False):
+            # CELLAR has no resource under this CELEX. Reporting "not found"
+            # beats fabricating a citation for a number nobody confirmed.
+            return None
+
         return Decisione(
             organo=self.organo, numero=numero, anno=anno,
             link_kind=LinkKind.CITED, url=_EURLEX_DOC + numero,
