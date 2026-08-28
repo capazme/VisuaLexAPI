@@ -1,6 +1,6 @@
 """Corte di cassazione from the CED's Solr endpoint (SentenzeWeb).
 
-Two things to know before editing.
+Three things to know before editing.
 
 Coverage is a rolling five years: SentenzeWeb publishes the most recent five,
 and decisions age out. An empty answer therefore means "nothing in the last
@@ -11,7 +11,13 @@ row is `LinkKind.MATCHED`. `build_norma_query` deliberately never emits a
 bare "art. N" without the act it names: a decision citing art. 2043 of the
 code of civil procedure would otherwise land in the results for art. 2043 of
 the civil code, and the lawyer would be reading case law about the wrong
-article.
+article. When no act can be identified at all, `build_norma_query` returns
+`None` and the caller must not run any query — see `cerca_per_norma`.
+
+Every value spliced into a Solr query is escaped with `_escape_phrase`: this
+is a Ministry of Justice endpoint reachable from a free-text field (Task 8),
+and an unescaped double quote closes a phrase clause early, turning the rest
+of the caller's input into live query syntax (`OR *:*` matches everything).
 """
 from __future__ import annotations
 
@@ -43,7 +49,28 @@ _DOC = f"{_BASE}/?dsm=0&provvedimento="
 _ART = re.compile(r"(?:art\.?|articolo)\s*(\d+(?:[-\s][a-z]{2,})?)", re.I)
 
 
-def build_norma_query(riferimento: str) -> str:
+def _escape_phrase(value: str) -> str:
+    """Escape a value bound for a double-quoted Solr phrase clause.
+
+    Every value this function touches ends up inside `"..."`; the only way
+    out of a quoted phrase is an unescaped double quote (Solr's own escape
+    character is backslash, so an unescaped backslash right before a real
+    quote does it too). Escaping those two — backslash first, so the
+    backslash added for the quote below isn't itself re-escaped — keeps the
+    value inside the phrase no matter what it contains, which closes the
+    whole class of injection: `art. 2043" OR *:*` can no longer terminate
+    the clause and turn `OR *:*` into live query syntax.
+
+    Other Solr special characters (wildcards, boolean operators, field
+    delimiters) carry no meaning inside an intact phrase — Solr tokenises
+    phrase content through the field's analyzer, not the query parser — so
+    leaving them unescaped preserves legitimate references such as
+    "2409-octiesdecies" instead of mangling them.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def build_norma_query(riferimento: str) -> str | None:
     """A Solr `ocr:` clause whose every variant keeps the act it belongs to.
 
     The act name can sit on either side of the article number ("art. 2043
@@ -51,19 +78,24 @@ def build_norma_query(riferimento: str) -> str:
     is what gets spliced into the phrase, in the order it was written — never
     reordered into a phrase nobody writes.
 
-    When neither side names an act (e.g. a bare "art. 2043"), there is no act
-    to embed, and no safe way to guess one: the whole raw reference is used
-    verbatim instead of synthesising a template like `f'"art. {numero}"'`,
-    which is exactly the bare-article clause this function exists to avoid.
+    Returns `None` when an article number was recognised but no act names it
+    on either side (e.g. a bare "art. 2043"). Running a query in that case
+    would return case law about "art. N" of every code, indistinguishable
+    from an answer about the one the lawyer meant — an unsafe bare-article
+    clause, just reached from a different branch. The caller must treat
+    `None` as "nothing safe to search", not as an empty string.
     """
     riferimento = riferimento.strip()
     m = _ART.search(riferimento)
     if not m:
-        return f'ocr:("{riferimento}")' if riferimento else 'ocr:("")'
+        # No article recognised at all: no numero to conflate across codes,
+        # so searching the raw reference verbatim carries none of the risk
+        # above.
+        return f'ocr:("{_escape_phrase(riferimento)}")' if riferimento else 'ocr:("")'
 
-    numero = m.group(1).strip()
-    dopo = riferimento[m.end():].strip(" ,;")
-    prima = riferimento[:m.start()].strip(" ,;")
+    numero = _escape_phrase(m.group(1).strip())
+    dopo = _escape_phrase(riferimento[m.end():].strip(" ,;"))
+    prima = _escape_phrase(riferimento[:m.start()].strip(" ,;"))
 
     if dopo:
         variants = [
@@ -80,7 +112,7 @@ def build_norma_query(riferimento: str) -> str:
             f'"{prima} {numero}"',
         ]
     else:
-        return f'ocr:("{riferimento}")'
+        return None
 
     return "ocr:(" + " OR ".join(variants) + ")"
 
@@ -134,31 +166,47 @@ class ItalgiureAdapter:
                             coverage=self.coverage)
 
     async def cerca_per_norma(self, riferimento: str, limite: int = 10) -> SourceResult:
+        query = build_norma_query(riferimento)
+        if query is None:
+            # No act names the article on either side: a query here would
+            # return decisions about "art. N" of every code, presented as if
+            # they answered the one the lawyer typed. An honest empty answer
+            # beats a confident wrong one — the posture of this whole design.
+            return SourceResult(
+                organo=self.organo, decisioni=[], ok=True,
+                coverage="il riferimento non indica l'atto di appartenenza: "
+                         "specificarlo (es. \"c.c.\") per poter cercare",
+            )
         try:
-            data = await self._query(build_norma_query(riferimento), limite)
+            # Parsing is inside the same try as the request: a malformed
+            # field (e.g. a non-numeric "anno") must become ok=False, not
+            # raise out of the adapter past its own error boundary.
+            data = await self._query(query, limite)
+            return self._to_result(data)
         except Exception as exc:  # noqa: BLE001 — reported, never swallowed
             log.warning("Italgiure query failed", riferimento=riferimento, error=str(exc))
             return SourceResult(organo=self.organo, ok=False, error=str(exc),
                                 coverage=self.coverage)
-        return self._to_result(data)
 
     async def cerca_libera(self, testo: str, limite: int = 10) -> SourceResult:
         try:
-            data = await self._query(f'ocr:("{testo}")', limite)
+            data = await self._query(f'ocr:("{_escape_phrase(testo)}")', limite)
+            return self._to_result(data)
         except Exception as exc:  # noqa: BLE001 — reported, never swallowed
             log.warning("Italgiure free search failed", testo=testo[:60], error=str(exc))
             return SourceResult(organo=self.organo, ok=False, error=str(exc),
                                 coverage=self.coverage)
-        return self._to_result(data)
 
     async def leggi(self, numero: str, anno: int) -> Decisione | None:
         """Never fabricates a result: only returns a `Decisione` built from a
         doc Solr actually returned. An empty `docs` list means "not found",
         answered as `None`, not a synthesised row for the number requested."""
         try:
-            data = await self._query(f'numdec:"{numero}" AND anno:"{anno}"', 1)
+            q = (f'numdec:"{_escape_phrase(str(numero))}" '
+                 f'AND anno:"{_escape_phrase(str(anno))}"')
+            data = await self._query(q, 1)
+            result = self._to_result(data)
         except Exception as exc:  # noqa: BLE001 — reported, never swallowed
             log.warning("Italgiure lookup failed", numero=numero, anno=anno, error=str(exc))
             return None
-        result = self._to_result(data)
         return result.decisioni[0] if result.decisioni else None

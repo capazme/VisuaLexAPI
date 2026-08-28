@@ -49,13 +49,23 @@ def test_mixed_case_still_keeps_the_act():
     assert '"art. 2043"' not in q
 
 
-def test_no_act_at_all_never_synthesises_a_bare_article_clause():
-    """With no act on either side, there is nothing safe to embed. The raw
-    reference is searched verbatim rather than through the
-    f'"art. {numero}"' template — the exact shape of the bug this function
-    exists to avoid."""
-    q = build_norma_query("art. 2043")
-    assert q == 'ocr:("art. 2043")'
+def test_no_act_at_all_returns_none_rather_than_a_bare_clause():
+    """With no act on either side, there is nothing safe to embed and no
+    query is safe to run — a bare "art. 2043" would return case law about
+    every code sharing that number. `None` tells the caller to search
+    nothing rather than something misleading."""
+    assert build_norma_query("art. 2043") is None
+
+
+def test_query_injection_cannot_escape_the_quoted_phrase():
+    """A raw double quote in the input would otherwise close the Solr
+    phrase early, turning the remainder into live query syntax that matches
+    everything (`OR *:*`). Escaping keeps the whole payload as literal
+    phrase text instead."""
+    q = build_norma_query('art. 2043" OR *:*')
+    assert q is not None
+    assert '2043" OR *:*' not in q
+    assert '\\" OR *:*' in q
 
 
 async def test_parses_decisions_and_marks_them_matched(monkeypatch):
@@ -152,6 +162,100 @@ async def test_leggi_returns_none_when_nothing_is_found(monkeypatch):
     )
     result = await adapter.leggi("999999", 2024)
     assert result is None
+
+
+async def test_cerca_per_norma_refuses_to_search_without_an_act(monkeypatch):
+    """The reviewer's ruling: a codeless reference must not run any query at
+    all — a bare article number would return decisions about art. N of
+    every code, presented as if they answered the one asked for. The mock
+    raises if a request is attempted, proving the query never runs."""
+    adapter = ItalgiureAdapter()
+
+    async def fail_if_called(method, url, **kwargs):
+        raise AssertionError("no query should be run for a codeless reference")
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.http_client.request", fail_if_called
+    )
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.italgiure_ssl_context", _fake_ctx
+    )
+    result = await adapter.cerca_per_norma("art. 2043")
+    assert result.ok is True
+    assert result.decisioni == []
+    assert "atto" in result.coverage
+
+
+async def test_a_malformed_field_is_reported_not_raised(monkeypatch):
+    """Parsing used to run outside the try/except in `cerca_per_norma`, so a
+    field Solr can't coerce (a non-numeric "anno") would raise past the
+    adapter's own error boundary instead of becoming `ok=False`."""
+    adapter = ItalgiureAdapter()
+    bad = ('{"response":{"numFound":1,"docs":['
+           '{"numdec":"1","anno":"not-a-number","szdec":"1"}]}}')
+
+    async def fake_request(method, url, **kwargs):
+        class R:
+            text = bad
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.http_client.request", fake_request
+    )
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.italgiure_ssl_context", _fake_ctx
+    )
+    result = await adapter.cerca_per_norma("art. 2043 c.c.")
+    assert result.ok is False
+    assert result.error
+
+
+async def test_cerca_libera_escapes_a_quote_in_the_query(monkeypatch):
+    captured = {}
+
+    async def fake_request(method, url, **kwargs):
+        if method == "POST":
+            captured["q"] = kwargs["data"]["q"]
+        class R:
+            text = SOLR_JSON
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.http_client.request", fake_request
+    )
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.italgiure_ssl_context", _fake_ctx
+    )
+    await ItalgiureAdapter().cerca_libera('foo" OR *:*')
+    assert 'foo" OR *:*' not in captured["q"]
+    assert '\\" OR *:*' in captured["q"]
+
+
+async def test_leggi_escapes_a_quote_in_numero_and_anno(monkeypatch):
+    captured = {}
+
+    async def fake_request(method, url, **kwargs):
+        if method == "POST":
+            captured["q"] = kwargs["data"]["q"]
+        class R:
+            text = '{"response":{"numFound":0,"docs":[]}}'
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.http_client.request", fake_request
+    )
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.italgiure.italgiure_ssl_context", _fake_ctx
+    )
+    await ItalgiureAdapter().leggi('1" OR *:*', 2024)
+    assert '1" OR *:*' not in captured["q"]
+    assert '\\" OR *:*' in captured["q"]
 
 
 @pytest.mark.live
