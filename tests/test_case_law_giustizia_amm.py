@@ -175,6 +175,73 @@ def test_link_missing_either_key_is_reported_as_unparsable():
     assert _parse_provvedimento_link(href) is None
 
 
+def test_link_rejects_an_nrg_that_is_not_at_least_four_digits():
+    """`nrg` always carries a four-digit year prefix; a shorter or
+    non-numeric capture is a mis-parse, not a valid register number, and
+    must not be handed back as though it were one."""
+    href = "https://mdp.giustizia-amministrativa.it/visualizza/?nrg=123&nomeFile=x.html"
+    assert _parse_provvedimento_link(href) is None
+
+
+# ---------------------------------------------------------------------------
+# The host check is the one security-relevant line in this file: it decides
+# whether a scraped href is followed as a document link at all. Nothing else
+# in this file pins it — every other link-parsing test uses a valid-host
+# fixture, so these must fail on their own if the check is ever weakened or
+# deleted (verified by hand: commenting out
+# `if parsed.hostname != _MDP_HOSTNAME: return None` makes every test below
+# fail, because each of these hrefs otherwise carries a well-formed
+# `nrg`/`nomeFile` pair that would happily parse).
+# ---------------------------------------------------------------------------
+
+
+def test_link_rejects_a_plainly_foreign_host():
+    href = "https://evil.example.com/visualizza/?nrg=202611111&nomeFile=x.html"
+    assert _parse_provvedimento_link(href) is None
+
+
+def test_link_rejects_a_suffix_spoofed_host():
+    """`mdp.giustizia-amministrativa.it.evil.com` contains the real hostname
+    as a prefix but is a completely different, attacker-controlled domain —
+    a `str.endswith`/`in` check would be fooled by this; `hostname !=` is
+    not."""
+    href = (
+        "https://mdp.giustizia-amministrativa.it.evil.com/visualizza/"
+        "?nrg=202611111&nomeFile=x.html"
+    )
+    assert _parse_provvedimento_link(href) is None
+
+
+def test_link_rejects_a_userinfo_smuggled_host():
+    """`https://real-host@evil.com/...` puts the real hostname before an
+    `@`, where it is parsed as userinfo (a login), not as the host — the
+    host `urllib.parse` actually resolves this to is `evil.com`. A naive
+    substring check on the raw URL text would be fooled; `urlsplit(...).hostname`
+    is not."""
+    href = (
+        "https://mdp.giustizia-amministrativa.it@evil.com/visualizza/"
+        "?nrg=202611111&nomeFile=x.html"
+    )
+    assert _parse_provvedimento_link(href) is None
+
+
+def test_link_rejects_a_mixed_case_foreign_host():
+    href = "https://EVIL.example.com/visualizza/?nrg=202611111&nomeFile=x.html"
+    assert _parse_provvedimento_link(href) is None
+
+
+def test_link_accepts_the_real_host_case_insensitively():
+    """The rejection tests above are only meaningful alongside a positive
+    control: the check must still accept the genuine host, including a
+    differently-cased rendering of it (`urlsplit(...).hostname` lower-cases),
+    so this isn't accidentally passing by rejecting everything."""
+    href = (
+        "https://MDP.Giustizia-Amministrativa.IT/visualizza/"
+        "?nrg=202611111&nomeFile=x.html"
+    )
+    assert _parse_provvedimento_link(href) == ("202611111", "x.html")
+
+
 # ---------------------------------------------------------------------------
 # A row this adapter cannot parse must be logged, never silently dropped.
 # ---------------------------------------------------------------------------

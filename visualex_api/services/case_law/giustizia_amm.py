@@ -46,6 +46,11 @@ _AUTH = re.compile(r"p_auth=([A-Za-z0-9]+)")
 # key/value, order-independent.
 _LINK = re.compile(r'href=["\'](https?://[^"\']*/visualizza/\?[^"\']*)["\']')
 _MDP_HOSTNAME = "mdp.giustizia-amministrativa.it"
+# Real `nrg` values always carry a four-digit year prefix (`anno` is read
+# straight off it in `_search`); this restores the reference
+# implementation's `\d{4,}` minimum-digit guard, dropped by an earlier
+# draft of this parser, which let any non-empty string through.
+_NRG = re.compile(r"^\d{4,}$")
 
 
 def _scrape_session(page: str) -> tuple[str, str]:
@@ -74,7 +79,15 @@ def _parse_provvedimento_link(href: str) -> tuple[str, str] | None:
     Only a link to `_MDP_HOSTNAME` is a decision link at all; `_LINK`'s own
     pattern is scheme-agnostic and host-agnostic (see its comment), so this
     check is what actually restricts the result to the sibling host that
-    serves decision text.
+    serves decision text. `parsed.hostname` lower-cases and strips userinfo
+    and port by construction (`urllib.parse` splits `user:pass@host` and
+    `HOST:port` before returning it), so a smuggled
+    `https://mdp.giustizia-amministrativa.it@evil.com/...` or a mixed-case
+    host cannot slip past this check — verified in
+    `tests/test_case_law_giustizia_amm.py`.
+
+    `_NRG` (see its own comment) rejects a captured `nrg` that isn't at
+    least four digits.
     """
     parsed = urllib.parse.urlsplit(html.unescape(href))
     if parsed.hostname != _MDP_HOSTNAME:
@@ -82,7 +95,7 @@ def _parse_provvedimento_link(href: str) -> tuple[str, str] | None:
     params = urllib.parse.parse_qs(parsed.query)
     nrg = params.get("nrg", [None])[0]
     nome = params.get("nomeFile", [None])[0]
-    if not nrg or not nome:
+    if not nrg or not nome or not _NRG.match(nrg):
         return None
     return nrg, nome
 
