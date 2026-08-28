@@ -33,18 +33,29 @@ _EP = "https://def.finanze.it/DocTribFrontend/executeAdvancedGiurisprudenzaSearc
 _XML_VAR = re.compile(r"var\s+xmlResult\s*=\s*'(.*?)'\s*;", re.S)
 _ESTREMI = re.compile(r"<estremi[^>]*>(.*?)</estremi>", re.S)
 # "Sentenza del 18/07/2026 n. 23488 - Corte di Cassazione - Sezione/Collegio 3"
+# "Ordinanza interlocutoria del 01/01/2020 n. 100 - Corte di Cassazione - ..."
 #
-# `organo` is `.+?` (any character, including a hyphen), not `[^-]+?`. CeRDEF
-# mixes four courts in one feed, and some of their names carry an internal
-# hyphen as part of the name itself (e.g. a regional tax commission rendered
-# "Comm. Trib. Reg. - Abruzzo"). A char class that excludes '-' truncates the
-# organo at that internal hyphen and then fails to match at all, because
-# nothing after it looks like "Sezione/Collegio" — the row is silently
-# dropped. Anchoring on the literal "Sezione/Collegio" tail (present or not)
-# instead of on the first bare hyphen lets the lazy quantifier walk past any
-# hyphen that belongs to the organo's own name.
+# Two groups are deliberately not `\w+`/`[^-]+?`, because a char class that
+# is too narrow does not just mis-parse a row — it makes `_ROW` fail to match
+# at all, and the row is silently dropped (`if not m` below), shrinking the
+# result set with no signal:
+#
+# - `tipo` is `.+?` (lazy, any character), not `\w+`. `\w+` only ever matches
+#   a single token, so a real, multi-word provvedimento type such as
+#   "Ordinanza interlocutoria" fails to match. It is anchored on the literal
+#   `\s+del\s+` that always follows the type, so it cannot run away and
+#   swallow the rest of the line.
+# - `organo` is `.+?` (any character, including a hyphen), not `[^-]+?`. CeRDEF
+#   mixes four courts in one feed, and some of their names carry an internal
+#   hyphen as part of the name itself (e.g. a regional tax commission rendered
+#   "Comm. Trib. Reg. - Abruzzo"). A char class that excludes '-' truncates the
+#   organo at that internal hyphen and then fails to match at all, because
+#   nothing after it looks like "Sezione/Collegio". Anchoring on the literal
+#   "Sezione/Collegio" tail (present or not) instead of on the first bare
+#   hyphen lets the lazy quantifier walk past any hyphen that belongs to the
+#   organo's own name.
 _ROW = re.compile(
-    r"^(?P<tipo>\w+)\s+del\s+(?P<data>\d{2}/\d{2}/(?P<anno>\d{4}))\s+"
+    r"^(?P<tipo>.+?)\s+del\s+(?P<data>\d{2}/\d{2}/(?P<anno>\d{4}))\s+"
     r"n\.\s*(?P<numero>[\w-]+)\s*-\s*(?P<organo>.+?)"
     r"(?:\s*-\s*Sezione/Collegio\s*(?P<sez>.+))?$"
 )
@@ -61,7 +72,14 @@ class CerdefAdapter:
     organo = "CeRDEF"
     coverage = "Cassazione, Corte cost. e Commissioni tributarie, dal 1979"
 
-    async def _search(self, parole: str, criterio: str, limite: int) -> SourceResult:
+    async def _fetch_page(self, parole: str, criterio: str) -> str:
+        """POST the search after the session-cookie GET; returns the raw HTML.
+
+        Split out of `_search` so a caller that needs to verify parsing
+        coverage independently (the live test does — comparing the raw
+        `<estremi>` count against `_ROW`'s output) can fetch the exact same
+        page without duplicating the form fields or the two-request
+        handshake."""
         form = {
             "js_enabled": "0", "tipoComplessitaRicerca": "avanzata",
             "ricercaAreaRiservata": "false", "tipoRicerca": "RA", "device": "D",
@@ -72,27 +90,39 @@ class CerdefAdapter:
             "giornoDataEmissioneA": "", "meseDataEmissioneA": "",
             "annoDataEmissioneA": "", "dataEmissioneA": "",
         }
+        # Session cookie first: the endpoint rejects a cold session. The
+        # shared ClientSession keeps a cookie jar, so this is the whole
+        # handshake.
+        await http_client.request("GET", _EP, source="cerdef",
+                                  headers=http_headers())
+        result = await http_client.request(
+            "POST", _EP, source="cerdef", data=form,
+            headers=http_headers({"Referer": _EP}),
+        )
+        return result.text
+
+    async def _search(self, parole: str, criterio: str, limite: int) -> SourceResult:
         try:
-            # Session cookie first: the endpoint rejects a cold session. The
-            # shared ClientSession keeps a cookie jar, so this is the whole
-            # handshake.
-            await http_client.request("GET", _EP, source="cerdef",
-                                      headers=http_headers())
-            result = await http_client.request(
-                "POST", _EP, source="cerdef", data=form,
-                headers=http_headers({"Referer": _EP}),
-            )
+            page = await self._fetch_page(parole, criterio)
         except Exception as exc:  # noqa: BLE001 — reported, never swallowed
             log.warning("CeRDEF search failed", parole=parole[:60], error=str(exc))
             return SourceResult(organo=self.organo, ok=False, error=str(exc),
                                 coverage=self.coverage)
 
-        xml = _extract_xml(result.text)
+        xml = _extract_xml(page)
         decisioni: list[Decisione] = []
         for estremi in _ESTREMI.findall(xml)[:limite]:
             testo = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", estremi)).strip()
             m = _ROW.match(testo)
             if not m:
+                # A row CeRDEF sent but this parser cannot read is not the
+                # same as "no such row" — dropping it silently would shrink
+                # the lawyer's result count with no way to notice (gotcha
+                # 18). Logging the raw text is what lets the next shape
+                # CeRDEF invents show up in the logs instead of quietly
+                # vanishing.
+                log.warning("CeRDEF row did not match the expected shape",
+                           estremi=testo[:200])
                 continue
             decisioni.append(Decisione(
                 organo=m.group("organo").strip(),
