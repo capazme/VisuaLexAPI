@@ -167,7 +167,7 @@ finding out is most expensive.
 
 The box runs **Node 24 (NodeSource) / npm 11**, matching both CI and the npm
 that writes the committed lockfiles. That alignment is what lets steps 3 and 4
-use `npm ci`; it was Node 20 / npm 10 until 27 August 2026, and the mismatch
+use `npm ci`; it was Node 20 / npm 10 until 29 August 2026, and the mismatch
 rewrote the lockfiles on every deploy.
 
 Upgrading is an apt operation, because Node comes from NodeSource:
