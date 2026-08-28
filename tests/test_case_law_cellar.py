@@ -17,6 +17,8 @@ SPARQL_JSON = """{"head":{"vars":["celex","ecli"]},"results":{"bindings":[
         ("Regolamento UE 679/2016", "32016R0679"),
         ("Direttiva 2019/790/UE", "32019L0790"),
         ("Direttiva UE 2019/790", "32019L0790"),
+        ("Regolamento UE 1234/2007", "32007R1234"),
+        ("Direttiva UE 1234/2007", "32007L1234"),
         ("art. 2043 codice civile", None),
     ],
 )
@@ -25,7 +27,10 @@ def test_maps_a_norm_reference_to_a_celex_number(riferimento, expected):
     one; CELLAR keys on CELEX, so the mapping happens here. Both digit
     orders must resolve — the modern year/num order is the exact key
     preset_aliases.yaml uses for the GDPR, and the legacy num/year order is
-    still common in older references."""
+    still common in older references. Reg. (CE) 1234/2007 (the OCM unica)
+    pins the case where both groups could in principle be a four-digit
+    number: the year must be picked by plausibility, not by which
+    alternative the regex tries first."""
     assert _celex_from_riferimento(riferimento) == expected
 
 

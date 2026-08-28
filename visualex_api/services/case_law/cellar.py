@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.parse
+from datetime import date
 
 import structlog
 
@@ -21,34 +22,56 @@ log = structlog.get_logger()
 _ENDPOINT = "https://publications.europa.eu/webapi/rdf/sparql"
 _EURLEX_DOC = "https://eur-lex.europa.eu/legal-content/IT/TXT/?uri=CELEX:"
 
-# A regulation/directive reference names a year and a number, in either order,
-# and CELLAR keys on CELEX rather than on either digit group alone. Whichever
-# group is exactly four digits is unambiguously the year — that is why each
-# alternative below pins one side to \d{4} and lets the other float 1-4.
+# A regulation/directive reference names a year and a number, in either
+# order, and CELLAR keys on CELEX rather than on either digit group alone.
+# The two groups below are captured in whatever order they appear on the
+# page; _year_and_number() then decides which one is the year by
+# plausibility, not by which alternative the regex tried first — a four-digit
+# *number* (pre-2015 regulations went well into four digits, e.g. Reg. (CE)
+# 1234/2007) is common enough that digit count alone cannot disambiguate.
 #
 #   "Regolamento UE 2016/679"    -> 32016R0679  (modern order, year/num)
 #   "Regolamento UE n. 679/2016" -> 32016R0679  (legacy order, num/year)
 #   "Regolamento UE 679/2016"    -> 32016R0679  (legacy order, no "n.")
+#   "Regolamento UE 1234/2007"   -> 32007R1234  (legacy order, 4-digit number)
 #   "Direttiva UE 2019/790"      -> 32019L0790  ("UE" before the digits)
 #   "Direttiva 2019/790/UE"      -> 32019L0790  ("UE" after the digits)
-_REG = re.compile(
-    r"regolamento\s+ue\s+(?:n\.\s*)?(?:(\d{4})/(\d{1,4})|(\d{1,4})/(\d{4}))",
-    re.I,
-)
-_DIR = re.compile(
-    r"direttiva\s+(?:ue\s+(?:n\.\s*)?)?(?:(\d{4})/(\d{1,4})|(\d{1,4})/(\d{4}))(?:/ue)?",
-    re.I,
-)
+_REG = re.compile(r"regolamento\s+ue\s+(?:n\.\s*)?(\d{1,4})/(\d{1,4})", re.I)
+_DIR = re.compile(r"direttiva\s+(?:ue\s+(?:n\.\s*)?)?(\d{1,4})/(\d{1,4})(?:/ue)?", re.I)
+
+_MIN_PLAUSIBLE_YEAR = 1950
+
+
+def _year_and_number(a: str, b: str) -> tuple[str, str] | None:
+    """Pick which of two digit groups is the year, by plausibility rather
+    than position. Returns None when both groups are plausible years or
+    neither is — a false mapping would return another act's case law under
+    the norm the lawyer asked about, and returning nothing is the safer
+    failure."""
+    max_year = date.today().year + 1
+    a_is_year = _MIN_PLAUSIBLE_YEAR <= int(a) <= max_year
+    b_is_year = _MIN_PLAUSIBLE_YEAR <= int(b) <= max_year
+    if a_is_year and not b_is_year:
+        return a, b
+    if b_is_year and not a_is_year:
+        return b, a
+    return None
 
 
 def _celex_from_riferimento(riferimento: str) -> str | None:
     m = _REG.search(riferimento)
     if m:
-        anno, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        pair = _year_and_number(m.group(1), m.group(2))
+        if pair is None:
+            return None
+        anno, num = pair
         return f"3{anno}R{int(num):04d}"
     m = _DIR.search(riferimento)
     if m:
-        anno, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        pair = _year_and_number(m.group(1), m.group(2))
+        if pair is None:
+            return None
+        anno, num = pair
         return f"3{anno}L{int(num):04d}"
     return None
 
