@@ -42,6 +42,24 @@ verification fully enabled: 1594 civil decisions citing "art. 2043". The
 "anti-bot check" is a session cookie obtained by fetching the homepage first —
 ordinary client behaviour, not circumvention. No spoofing is needed.
 
+**Tributaria — CeRDEF (`def.finanze.it`).** Reclassify this one. It is not the
+tax court: it is a **multi-court aggregator** run by the MEF. A single search for
+"accertamento" returns 66 700 results mixing Corte di Cassazione, **Corte
+Costituzionale**, and Commissioni Tributarie Provinciali, Regionali and Centrale,
+with entries dated to last month. Depth reaches **at least 1979** — 89 results in
+the 1960-1979 window — against Italgiure's five years.
+
+Its link to a norm is the weakest of the four: literal phrase only.
+`"articolo 2043"` returns 5 results; `"art. 36-bis"` returns none. Hyphenated
+ordinals break it.
+
+**TAR / Consiglio di Stato.** Liferay. The search needs three things a naive POST
+omits: `javax.portlet.action=search`, `p_p_mode=view`, and **`p_auth`**, the
+session-bound CSRF token, which is scraped from the search page along with the
+portlet id. With those, a POST returns 20 provvedimenti and their file names.
+184 070 results for "risarcimento danno". The portlet id the source repo
+hardcodes as a fallback is still valid today, but it is read at runtime.
+
 ### The TLS finding, which corrects the source repo
 
 `mcp-legal-it` uses `verify=False` for Italgiure and states its CA is absent from
@@ -88,15 +106,32 @@ rulings — and the Corte costituzionale client in `mcp-legal-it` downloads
 The owner ruled out downloading anything, on freshness grounds. That rules the
 portals out for everything except one case, below.
 
-### Not measured
+### The port is not free
 
-- The live search shape of TAR / Consiglio di Stato. The portal was reorganised
-  in 2026; the source client documents 404s on old paths and a portlet id that
-  must be read at runtime. Fragile, and unverified by us.
-- The live search shape of the tributaria source (`def.finanze.it`).
-- Whether the Corte costituzionale exposes a per-decision live route. Its SPARQL
-  endpoint answers 200 but returned nothing to the queries tried.
-- Whether the norm link for TAR/CdS and tributaria is structured or textual.
+The source clients are not uniformly healthy. **CeRDEF's is stale**: it posts
+`paroleChiave`, `tipoCriterio` and flat date fields, none of which exist on the
+live form any more — it now wants `parole`, `tipoCriterioRicerca`, split
+day/month/year, plus hidden `ambitoRicerca=G`, `tipoRicerca=RA` and
+`tipoComplessitaRicerca=avanzata`. A request built from the client's own field
+names returns "errore sconosciuto".
+
+Both working recipes above were recovered by driving the real form in a browser
+and reading the request it produced, then reproducing it from Python outside the
+browser. That is the method to use when a ported client stops working: watch the
+site, do not guess.
+
+So "port 2400 lines" understates the work. The clients are a map of where the
+endpoints are and what the responses look like, which is most of the value; the
+request shapes have to be re-verified one by one.
+
+### Still not measured
+
+- Whether the Corte costituzionale exposes any live per-decision route.
+  `actionSchedaPronuncia.do` answers 302 to every parameter combination tried,
+  and the SPARQL endpoint returns an empty body to the queries tried.
+- Whether CeRDEF can be filtered by issuing authority (the accordion that would
+  say so loads lazily and did not render).
+- Full-text retrieval of a single decision, for every source except CGUE.
 
 ### The link quality problem
 
@@ -141,12 +176,13 @@ design labels the link rather than hiding it.
 |---|---|---|
 | D1 | **Five bodies: Cassazione, CGUE, TAR/CdS, tributaria, Corte costituzionale.** Garante and Consob are out. | Owner asked for the jurisdictional bodies. The two authorities are a separate product question. |
 | D2 | **One adapter per body; the link's provenance is shown, never averaged away.** Each row carries `cited` (declared by the source) or `matched` (found in the text). No cross-source relevance ranking. | Ranking a declared CELLAR citation against an OCR hit pretends they are the same evidence. The difference is exactly what a lawyer needs in order to know how far to trust the row. |
-| D3 | **Live retrieval, nothing stored** — one narrow exception. Corte costituzionale years that are closed are immutable, so their official distribution file may be fetched and held in the existing cache manager under a TTL, like any other cached fetch. The current year is always live. No index is built, nothing is written outside the cache, and no other body gets this exception. | The freshness objection is sound for rolling datasets. It does not apply to 1956–2025, and refusing it would cost the only source covering seventy years. Bounding it to "a cached fetch of a closed year" keeps it from becoming a corpus by degrees. |
+| D3 | **Live retrieval, nothing stored** — one narrow exception. Corte costituzionale years that are closed are immutable, so their official distribution file may be fetched and held in the existing cache manager under a TTL, like any other cached fetch. The current year is always live. No index is built, nothing is written outside the cache, and no other body gets this exception. | The freshness objection is sound for rolling datasets. It does not apply to 1956–2025, and refusing it would cost the only source covering seventy years. Bounding it to "a cached fetch of a closed year" keeps it from becoming a corpus by degrees. The exception is granted here but **not exercised in the first plan** — see D9. |
 | D4 | **TLS verification stays on for every source.** Italgiure gets the AIA intermediate added to its bundle. `verify=False` does not enter this repo. | Verification was re-enabled repo-wide in the previous round. Measured: pinning the intermediate is sufficient. |
 | D5 | **Honest User-Agent everywhere**, naming VisuaLex with a contact URL. No spoofed browser strings. | Verified to work against Italgiure, the hardest case. A production server pretending to be Chrome is a different posture from a personal tool. |
 | D6 | **Every adapter goes through `ThrottledHttpClient`.** | It brings the throttle, retry, backoff, circuit breaker and the egress allowlist for free — the same reasoning as D7 of the previous round. |
 | D7 | **Port the source clients, do not rewrite them.** ~2400 lines across the five. | They are already written against the live sites and carry hard-won notes about breakage. Rewriting would rediscover the same traps. |
-| D8 | **Ship in the order the evidence allows**: the implementation plan that follows this spec covers **CGUE and Cassazione only**, plus the interface, the panel and the failure behaviour. TAR/CdS, tributaria and Corte costituzionale get their own plans once their recon lands. | Both are verified today. TAR/CdS carries the most unknowns and must not hold the rest hostage; and a plan covering five unverified sources would be fiction for three of them. |
+| D8 | **The first plan covers the four sources whose live request shape is verified**: CGUE, Cassazione, CeRDEF and TAR/CdS — plus the interface, the panel and the failure behaviour. Corte costituzionale follows when a live route is found. | Recon closed four of five. Writing a plan for a source whose request shape is unknown would be fiction; writing one for four that answer today is not. |
+| D9 | **Corte costituzionale stays out of the first plan.** Its tax-relevant decisions already arrive live through CeRDEF, which is not a substitute for the full ~20 000 but is more than nothing. | The only comprehensive route is a 53.5 MB nightly bundle. Fetching it per request is disproportionate on a 1.9 GB box, and D3 rules out holding a corpus. Better to ship four sources and keep looking than to bend the storage rule under time pressure. |
 
 ## Detailed design
 
