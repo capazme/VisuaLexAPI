@@ -57,6 +57,11 @@ NON_NETWORK_HOSTS: dict[str, str] = {
         "the contact URL inside services/case_law/base.py's USER_AGENT "
         "string; sent to case-law sources as a header value, never fetched"
     ),
+    "www.w3.org": (
+        "the XSD string-datatype namespace URI inside the SPARQL query "
+        "literal in services/case_law/cellar.py; part of the query text sent "
+        "to CELLAR, never itself contacted"
+    ),
 }
 
 
