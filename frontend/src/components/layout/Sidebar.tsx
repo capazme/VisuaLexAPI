@@ -36,10 +36,17 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
   const showBadge = (badgeCount ?? 0) > 0;
   const badgeLabel = (badgeCount ?? 0) > 99 ? '99+' : String(badgeCount);
 
+  // The whole control is an icon, and `label` only ever reached the eye — the
+  // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
+  // keyboard user got an unnamed link. The count rides the name because a badge
+  // announced on its own arrives without saying what it counts.
+  const accessibleName = showBadge ? `${label}, ${badgeCount} notifiche` : label;
+
   return (
     <NavLink
       to={to}
       id={id}
+      aria-label={accessibleName}
       className={({ isActive }) => cn(
         "relative flex items-center justify-center rounded-xl transition-all duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
@@ -60,6 +67,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
           >
             <Icon
               size={22}
+              aria-hidden
               className={cn(
                 "transition-colors duration-200",
                 isActive
@@ -81,7 +89,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
           {/* Notification badge */}
           {showBadge && (
             <span
-              aria-label={`${badgeCount} notifiche`}
+              aria-hidden
               className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none ring-2 ring-white dark:ring-slate-900"
             >
               {badgeLabel}
@@ -96,6 +104,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount }: NavItemProp
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: -8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
+                aria-hidden
                 className={cn(
                   "hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap",
                   // The aside is `lg:static`, so its own z-index is inert on desktop and
@@ -128,6 +137,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
 
   return (
     <button
+      aria-label={label}
       onClick={onClick}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
@@ -146,6 +156,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
       >
         <Icon
           size={20}
+          aria-hidden
           className={cn(
             "transition-colors duration-200",
             isActive
@@ -163,6 +174,7 @@ function ActionButton({ icon: Icon, label, onClick, isActive }: ActionButtonProp
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
+            aria-hidden
             className={cn(
                   "hidden md:block absolute left-full ml-3 px-3 py-1.5 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap",
                   // The aside is `lg:static`, so its own z-index is inert on desktop and
@@ -287,6 +299,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       <div className="flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
         <button
           ref={userButtonRef}
+          aria-label="Menu utente"
+          aria-haspopup="menu"
+          aria-expanded={showUserMenu}
           onClick={() => setShowUserMenu(!showUserMenu)}
           className={cn(
             "relative flex items-center justify-center rounded-xl transition-all duration-200",
