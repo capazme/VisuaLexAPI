@@ -1,10 +1,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Gavel, WifiOff, CircleAlert, ExternalLink, RotateCw } from 'lucide-react';
+import { ChevronDown, Gavel, Search, WifiOff, CircleAlert, ExternalLink, RotateCw } from 'lucide-react';
 import type { Decisione, MassimaStructured, NormaVisitata, SourceResult } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { SkeletonText } from '../../ui/Skeleton';
 import { buildCaseLawReference, fetchCaseLawCached, isUnsearchableActType } from '../../../services/caseLawService';
 import { LegalApiError } from '../../../services/legalApi';
+import { parseItalianDate, formatDateItalianLong } from '../../../utils/dateUtils';
 import { LinkKindBadge } from './LinkKindBadge';
 import { MassimeSection } from './MassimeSection';
 
@@ -40,15 +41,19 @@ export interface GiurisprudenzaSectionProps {
  * cards, and it kept case law visually apart from Brocardi's own case law,
  * the Massime).
  *
- * Collapsed by default. The Massime card renders immediately (no network
- * cost, it rode in on the article payload); the four live court sources only
- * fetch from `/fetch_case_law` on first expand, and stay cached for the
- * session via `fetchCaseLawCached` — this is content, but it is not
- * user-owned data, so nothing here is persisted.
+ * Expanded by default the moment there are Massime to show — they rode in on
+ * the article payload at zero network cost, so hiding them behind a click
+ * would be a regression in access for content that already arrived. The four
+ * live court sources are a different concern: they cost seven requests to
+ * four government websites, so they never fetch on expand — only when the
+ * reader presses the explicit "search the four courts" action below, and the
+ * answer then stays cached for the session via `fetchCaseLawCached` — this is
+ * content, but it is not user-owned data, so nothing here is persisted.
  */
 export const GiurisprudenzaSection = forwardRef<GiurisprudenzaSectionHandle, GiurisprudenzaSectionProps>(
     function GiurisprudenzaSection({ articleLabel, norma, massime }, ref) {
-        const [isOpen, setIsOpen] = useState(false);
+        const massimeCount = massime?.length ?? 0;
+        const [isOpen, setIsOpen] = useState(() => massimeCount > 0);
         const rootRef = useRef<HTMLDivElement>(null);
 
         const riferimento = useMemo(
@@ -72,14 +77,24 @@ export const GiurisprudenzaSection = forwardRef<GiurisprudenzaSectionHandle, Giu
 
         // A new article (same tab, cross-reference jump) resets everything —
         // the previous article's decisions must not linger under the new one's
-        // header.
+        // header, and the default-open state re-derives from the new
+        // article's own Massime rather than carrying over whatever the
+        // previous article left the toggle at.
         useEffect(() => {
             triedRef.current = false;
             requestIdRef.current += 1;
             setStatus('idle');
             setFonti([]);
             setErrorMessage(null);
-        }, [riferimento]);
+            setIsOpen(massimeCount > 0);
+            // `massimeCount > 0` (not `massimeCount`) is the real dependency:
+            // Brocardi info can arrive after this component has already
+            // mounted with `massime={null}`, and that later transition to
+            // "there are Massime now" must still open the section — but a
+            // count that merely grows from 3 to 4 Massime on the same
+            // article must not re-open a section the reader just collapsed.
+            // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above: intentionally keyed on the boolean, not massimeCount itself
+        }, [riferimento, massimeCount > 0]);
 
         const runFetch = useCallback(async () => {
             const id = ++requestIdRef.current;
@@ -104,15 +119,16 @@ export const GiurisprudenzaSection = forwardRef<GiurisprudenzaSectionHandle, Giu
             }
         }, [riferimento]);
 
-        // Fetch the four live sources on first expand only — never on mount,
-        // never on every reopen (fetchCaseLawCached covers a reopen for free,
-        // but there is no reason to even call it again).
-        useEffect(() => {
-            if (!isOpen || unsearchable) return;
+        // Fetch the four live sources only on this explicit action — never on
+        // mount, never on expand, never on every reopen (fetchCaseLawCached
+        // covers a reopen for free, but there is no reason to even call it
+        // again; `triedRef` guards a caller pressing the action twice before
+        // the first answer lands).
+        const handleSearchCourts = useCallback(() => {
             if (triedRef.current) return;
             triedRef.current = true;
             void runFetch();
-        }, [isOpen, unsearchable, runFetch]);
+        }, [runFetch]);
 
         useImperativeHandle(ref, () => ({
             expandAndReveal() {
@@ -127,7 +143,6 @@ export const GiurisprudenzaSection = forwardRef<GiurisprudenzaSectionHandle, Giu
             },
         }), []);
 
-        const massimeCount = massime?.length ?? 0;
         const courtsCount = status === 'success'
             ? fonti.reduce((sum, f) => sum + f.decisioni.length, 0)
             : 0;
@@ -166,6 +181,22 @@ export const GiurisprudenzaSection = forwardRef<GiurisprudenzaSectionHandle, Giu
                         )}
 
                         {unsearchable && <UnsearchableActNotice tipoAtto={norma.tipo_atto} />}
+
+                        {!unsearchable && status === 'idle' && (
+                            <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl flex flex-col items-center gap-2 py-6 text-center px-4">
+                                <Search size={20} className="text-slate-400 dark:text-slate-500" />
+                                <p className="text-sm text-slate-600 dark:text-slate-300">
+                                    Cerca le decisioni di Cassazione, Giustizia amministrativa,
+                                    CeRDEF e CGUE che citano questo articolo.
+                                </p>
+                                <button
+                                    onClick={handleSearchCourts}
+                                    className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 px-3 text-xs font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors md:min-h-0 md:py-1.5"
+                                >
+                                    <Search size={12} /> Cerca nei quattro tribunali
+                                </button>
+                            </div>
+                        )}
 
                         {!unsearchable && status === 'loading' && (
                             <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl p-4">
@@ -309,6 +340,8 @@ function SourceCard({ fonte }: { fonte: SourceResult }) {
 }
 
 function DecisionRow({ decisione }: { decisione: Decisione }) {
+    const deposito = formatDecisioneData(decisione.data);
+
     return (
         <div className="text-sm space-y-1">
             <div className="flex items-center justify-between gap-2">
@@ -321,9 +354,9 @@ function DecisionRow({ decisione }: { decisione: Decisione }) {
                 <LinkKindBadge kind={decisione.link_kind} />
             </div>
 
-            {(decisione.data || decisione.ecli) && (
+            {(deposito || decisione.ecli) && (
                 <div className="flex flex-wrap items-center gap-x-3 text-[11px] text-slate-500 dark:text-slate-400">
-                    {decisione.data && <span>Deposito: {decisione.data}</span>}
+                    {deposito && <span>Deposito: {deposito}</span>}
                     {decisione.ecli && <span className="font-mono">{decisione.ecli}</span>}
                 </div>
             )}
@@ -347,6 +380,49 @@ function DecisionRow({ decisione }: { decisione: Decisione }) {
 }
 
 // ───────────────────────── HELPERS ─────────────────────────
+
+/** Normalises the raw `data` a case-law source emits into something
+ * `formatDateItalianLong` can render — never the raw string (CLAUDE.md's Date
+ * System: every displayed date goes through `formatDateItalianLong`, never a
+ * literal). The four adapters agree on nothing:
+ * - Italgiure's `datdep` is `YYYYMMDD`, no separators (measured: "20250702").
+ * - CeRDEF's row regex captures `DD/MM/YYYY` (measured: "25/08/2020").
+ * - Giustizia amministrativa and CGUE never set `data` at all — it defaults
+ *   to `""` in `Decisione` (see `visualex_api/services/case_law/base.py`).
+ *
+ * An absent or unparseable value returns `''`, which callers render as
+ * nothing at all rather than "Invalid Date" or a raw, unlocalised string —
+ * `formatDateItalianLong` itself just echoes back anything it doesn't
+ * recognise, so the two safe shapes (year-only, full ISO date) are checked
+ * explicitly before handing it over. */
+function formatDecisioneData(raw: string): string {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+
+    let iso = trimmed;
+
+    const compact = trimmed.match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/);
+    if (compact) {
+        iso = `${compact[1]}-${compact[2]}-${compact[3]}`;
+    } else {
+        const slashed = trimmed.match(/^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/(\d{4})$/);
+        if (slashed) {
+            iso = `${slashed[3]}-${slashed[2]}-${slashed[1]}`;
+        } else {
+            // Already ISO, or a shape none of the adapters are known to send
+            // (defensive) — `parseItalianDate` covers a few more inputs, and
+            // anything it doesn't recognise it just echoes back, which the
+            // guard below catches.
+            iso = parseItalianDate(trimmed);
+        }
+    }
+
+    // Only a bare year or a full YYYY-MM-DD is safe to hand to
+    // `formatDateItalianLong` — anything else falls through unformatted
+    // there, which would otherwise leak a raw string to the reader.
+    if (!/^\d{4}$/.test(iso) && !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    return formatDateItalianLong(iso);
+}
 
 /** Italian, useful text for the error banner — never the raw error (which the
  * caller already logs). `LegalApiError` carries the HTTP status, so the one

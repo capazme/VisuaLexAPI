@@ -19,6 +19,16 @@ function openSection() {
   fireEvent.click(screen.getByRole('button', { name: /^Giurisprudenza/ }));
 }
 
+/** Opens the section (if not already open) and presses the explicit
+ * "search the four courts" action — the only thing that fires
+ * `/fetch_case_law` since Fix 2 separated the two concerns (see
+ * GiurisprudenzaSection.tsx: Massime cost nothing and show on expand, the
+ * four live courts cost seven requests and need this extra click). */
+function openAndSearchCourts() {
+  openSection();
+  fireEvent.click(screen.getByRole('button', { name: /Cerca nei quattro tribunali/ }));
+}
+
 const citedDecisione: SourceResult['decisioni'][number] = {
   organo: 'CGUE',
   fonte: 'cgue',
@@ -69,11 +79,13 @@ describe('GiurisprudenzaSection — collapsed by default', () => {
 });
 
 describe('GiurisprudenzaSection — never empty on arrival', () => {
-  it('shows the Massime card immediately on first expand, before the courts have answered', async () => {
-    // Courts never resolve in this test — if the Massime card depended on
-    // that same fetch, this would hang. It must not: Massime rides in on
-    // the article payload, at zero network cost.
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+  it('shows the Massime card expanded by default, before the courts have even been asked', async () => {
+    // Courts are never asked in this test (no "Cerca nei quattro tribunali"
+    // click) — if the Massime card depended on that fetch, it would never
+    // appear. It must not: Massime rides in on the article payload, at zero
+    // network cost, and the section opens by itself when there are Massime.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     render(
       <GiurisprudenzaSection
@@ -83,10 +95,9 @@ describe('GiurisprudenzaSection — never empty on arrival', () => {
       />,
     );
 
-    openSection();
-
     expect(await screen.findByText(/Massime \(/)).toBeInTheDocument();
     expect(screen.getByText('Una massima di prova.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
@@ -102,14 +113,12 @@ describe('GiurisprudenzaSection — Massime provenance', () => {
       />,
     );
 
-    openSection();
-
     expect(await screen.findByText('Selezionata da Brocardi')).toBeInTheDocument();
   });
 });
 
-describe('GiurisprudenzaSection — fetches courts lazily on first expand', () => {
-  it('does not fetch before the header is clicked, fetches once it is', async () => {
+describe('GiurisprudenzaSection — fetches courts only on the explicit action', () => {
+  it('does not fetch on expand, fetches once "Cerca nei quattro tribunali" is pressed', async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -122,6 +131,9 @@ describe('GiurisprudenzaSection — fetches courts lazily on first expand', () =
     expect(fetchMock).not.toHaveBeenCalled();
 
     openSection();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Cerca nei quattro tribunali/ }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     // Collapsing and reopening must not fire a second network request — the
@@ -139,6 +151,7 @@ describe('GiurisprudenzaSection — fetches courts lazily on first expand', () =
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
     openSection();
+    fireEvent.click(screen.getByRole('button', { name: /Cerca nei quattro tribunali/ }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
@@ -155,7 +168,7 @@ describe('GiurisprudenzaSection — the central promise: cited vs matched vs cur
     ]);
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     const citedBadge = await screen.findByText('Citazione dichiarata');
     const matchedBadge = screen.getByText('Trovata nel testo');
@@ -178,7 +191,7 @@ describe('GiurisprudenzaSection — the central promise: cited vs matched vs cur
     ]);
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     expect(await screen.findByText('Trovata nel testo')).toBeInTheDocument();
     expect(screen.queryByText('Citazione dichiarata')).not.toBeInTheDocument();
@@ -192,7 +205,7 @@ describe('GiurisprudenzaSection — an unreachable source is not an empty one', 
     ]);
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     expect(await screen.findByText('Non raggiungibile')).toBeInTheDocument();
     expect(screen.getByText('Timed out after 10.0s')).toBeInTheDocument();
@@ -206,7 +219,7 @@ describe('GiurisprudenzaSection — an unreachable source is not an empty one', 
     ]);
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     expect(await screen.findByText('Non raggiungibile')).toBeInTheDocument();
     expect(screen.getByText('Nessuna decisione trovata.')).toBeInTheDocument();
@@ -220,7 +233,7 @@ describe('GiurisprudenzaSection — coverage reaches the reader', () => {
     ]);
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     expect(await screen.findByText('Copertura: ultimi 5 anni')).toBeInTheDocument();
     expect(screen.getByText('Nessuna decisione trovata.')).toBeInTheDocument();
@@ -254,7 +267,7 @@ describe('GiurisprudenzaSection — total request failure', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     expect(await screen.findByText('Impossibile contattare il servizio giurisprudenza.')).toBeInTheDocument();
     expect(consoleError).toHaveBeenCalled();
@@ -270,7 +283,7 @@ describe('GiurisprudenzaSection — total request failure', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
-    openSection();
+    openAndSearchCourts();
 
     await screen.findByText('Impossibile contattare il servizio giurisprudenza.');
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -278,5 +291,53 @@ describe('GiurisprudenzaSection — total request failure', () => {
     fireEvent.click(screen.getByRole('button', { name: /Riprova/ }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('GiurisprudenzaSection — decision dates render in Italian, never raw or "Invalid Date"', () => {
+  it("renders Italgiure's YYYYMMDD date (\"20250702\") in Italian long form", async () => {
+    mockFonti([
+      {
+        organo: 'Cassazione', fonte: 'cassazione', ok: true, error: '', coverage: 'ultimi 5 anni',
+        decisioni: [{ ...matchedDecisione, data: '20250702' }], count: 1,
+      },
+    ]);
+
+    render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
+    openAndSearchCourts();
+
+    expect(await screen.findByText('Deposito: 2 luglio 2025')).toBeInTheDocument();
+    expect(screen.queryByText(/20250702/)).not.toBeInTheDocument();
+  });
+
+  it("renders CeRDEF's DD/MM/YYYY date (\"25/08/2020\") in Italian long form, not the raw slash string", async () => {
+    mockFonti([
+      {
+        organo: 'CeRDEF', fonte: 'cerdef', ok: true, error: '', coverage: '',
+        decisioni: [{ ...matchedDecisione, organo: 'CeRDEF', fonte: 'cerdef', data: '25/08/2020' }], count: 1,
+      },
+    ]);
+
+    render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
+    openAndSearchCourts();
+
+    expect(await screen.findByText('Deposito: 25 agosto 2020')).toBeInTheDocument();
+    expect(screen.queryByText(/25\/08\/2020/)).not.toBeInTheDocument();
+  });
+
+  it('renders nothing for a source that never sets `data` (Giustizia amministrativa, CGUE), not "Invalid Date"', async () => {
+    // citedDecisione carries `data: ''`, exactly what CGUE's adapter leaves
+    // as the dataclass default — see visualex_api/services/case_law/cellar.py.
+    mockFonti([
+      { organo: 'CGUE', fonte: 'cgue', ok: true, error: '', coverage: '', decisioni: [citedDecisione], count: 1 },
+    ]);
+
+    render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
+    openAndSearchCourts();
+
+    // The row still renders (its ecli), just with no "Deposito" line at all.
+    expect(await screen.findByText('ECLI:EU:C:2021:123')).toBeInTheDocument();
+    expect(screen.queryByText(/Deposito/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Invalid Date/i)).not.toBeInTheDocument();
   });
 });
