@@ -108,16 +108,7 @@ async def italgiure_ssl_context() -> ssl.SSLContext:
         if _context is not None:
             return _context
 
-        # The case-law client, not the shared one: this function's only
-        # caller is `services/case_law/italgiure.py` (verified — nothing
-        # else imports `italgiure_ssl_context`), so the AIA fetch belongs to
-        # the case-law package's traffic, not article reading's. It is a
-        # one-time, memoised call (see `_context` above), so the choice only
-        # matters for the first case-law request in a process's lifetime —
-        # but even then there is no reason for it to queue behind, or make
-        # Normattiva/EUR-Lex/Brocardi queue behind, a bootstrap request that
-        # has nothing to do with reading an article.
-        from ..services.case_law.http_client import case_law_http_client as http_client
+        from ..services.http_client import http_client
 
         # The AIA endpoint serves a DER-encoded binary certificate
         # (Content-Type: application/pkix-cert, no charset). aiohttp's

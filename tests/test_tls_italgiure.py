@@ -44,8 +44,8 @@ def _serve(der: bytes, monkeypatch):
             text = der.decode("latin-1")
         return R()
 
-    from visualex_api.services.case_law import http_client as case_law_http_client_module
-    monkeypatch.setattr(case_law_http_client_module.case_law_http_client, "request", fake_request)
+    from visualex_api.services import http_client as http_client_module
+    monkeypatch.setattr(http_client_module.http_client, "request", fake_request)
 
 
 def test_module_never_disables_verification():
@@ -149,8 +149,8 @@ async def test_the_context_is_built_once(monkeypatch):
             text = _REAL.read_bytes().decode("latin-1")
         return R()
 
-    from visualex_api.services.case_law import http_client as case_law_http_client_module
-    monkeypatch.setattr(case_law_http_client_module.case_law_http_client, "request", counting_request)
+    from visualex_api.services import http_client as http_client_module
+    monkeypatch.setattr(http_client_module.http_client, "request", counting_request)
 
     first = await tls.italgiure_ssl_context()
     second = await tls.italgiure_ssl_context()

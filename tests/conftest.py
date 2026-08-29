@@ -55,17 +55,7 @@ def _isolate_shared_http_client():
     """
     yield
     from visualex_api.services.http_client import ThrottledHttpClient, http_client
-    from visualex_api.services.case_law.http_client import case_law_http_client
 
     # Constructing these outside a running loop is safe: since 3.10 asyncio
     # primitives capture their loop on first use, not at construction.
-    #
-    # The case-law package holds a second module-level `ThrottledHttpClient`
-    # instance (`services/case_law/http_client.py`, deliberately independent
-    # of the shared one — see its own docstring). It memoises its own
-    # `aiohttp.ClientSession` bound to whichever loop first used it, so it
-    # needs the exact same reset or the second live test to touch it fails
-    # with "Event loop is closed", indistinguishable from the source being
-    # down.
     http_client.__dict__.update(ThrottledHttpClient().__dict__)
-    case_law_http_client.__dict__.update(ThrottledHttpClient().__dict__)

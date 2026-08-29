@@ -126,41 +126,6 @@ export interface ArticleData {
     };
 }
 
-// ─── Case law (visualex_api/services/case_law/base.py) ───
-//
-// `link_kind` is the load-bearing field of this whole slice: it separates a
-// fact the source publisher declared ("cited") from an inference a search
-// engine made ("matched"). Only CGUE/CELLAR ever emits "cited" — every other
-// source is a text match and must render as "matched". Never collapse the
-// two into one visual treatment; see CaseLawPanel.tsx.
-export type LinkKind = 'cited' | 'matched';
-
-export interface Decisione {
-    organo: string;
-    fonte: string;
-    numero: string;
-    anno: number;
-    link_kind: LinkKind;
-    url: string;
-    sezione: string;
-    data: string;
-    ecli: string;
-    estratto: string;
-}
-
-// One source's answer, including the answer "I could not reach it" (`ok:
-// false`, `error` set). An unreachable source and a source that legitimately
-// found nothing must never look the same — see CaseLawPanel.tsx.
-export interface SourceResult {
-    organo: string;
-    fonte: string;
-    ok: boolean;
-    error: string;
-    coverage: string;
-    decisioni: Decisione[];
-    count: number;
-}
-
 export interface SearchParams {
     act_type: string;
     act_number: string;

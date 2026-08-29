@@ -14,8 +14,8 @@ from datetime import date
 
 import structlog
 
+from ..http_client import http_client
 from .base import Decisione, LinkKind, SourceResult, http_headers
-from .http_client import case_law_http_client as http_client
 
 log = structlog.get_logger()
 
@@ -40,19 +40,6 @@ _REG = re.compile(r"regolamento\s+ue\s+(?:n\.\s*)?(\d{1,4})/(\d{1,4})", re.I)
 _DIR = re.compile(r"direttiva\s+(?:ue\s+(?:n\.\s*)?)?(\d{1,4})/(\d{1,4})(?:/ue)?", re.I)
 
 _MIN_PLAUSIBLE_YEAR = 1950
-
-# `cerca_per_norma` answers `ok=True, decisioni=[]` for any reference that is
-# not an EU regulation/directive — which is most of what this product reads,
-# since Normattiva sources vastly outnumber EU-Lex ones. Without a coverage
-# note, the panel renders that as an empty CGUE section next to the other
-# three sources, and "Nessuna decisione trovata." reads as "the Court of
-# Justice has ruled nothing on art. 2043 c.c.", which is not what happened —
-# nobody asked, because this adapter cannot ask about an Italian norm at all.
-_NOT_AN_EU_ACT_COVERAGE = (
-    "Corte di giustizia UE — copre solo regolamenti e direttive dell'Unione: "
-    "questo riferimento non è un atto UE, quindi non è stata effettuata "
-    "alcuna ricerca"
-)
 
 
 def _year_and_number(a: str, b: str) -> tuple[str, str] | None:
@@ -142,11 +129,8 @@ class CellarAdapter:
     async def cerca_per_norma(self, riferimento: str, limite: int = 10) -> SourceResult:
         celex = _celex_from_riferimento(riferimento)
         if celex is None:
-            # Not an EU act. A normal question with an empty answer — the
-            # coverage note is what stops that empty answer from reading as
-            # "the CGUE ruled nothing on this", see `_NOT_AN_EU_ACT_COVERAGE`.
-            return SourceResult(organo=self.organo, decisioni=[], ok=True,
-                                coverage=_NOT_AN_EU_ACT_COVERAGE)
+            # Not an EU act. A normal question with an empty answer.
+            return SourceResult(organo=self.organo, decisioni=[], ok=True)
 
         query = _QUERY % (celex, limite)
         url = f"{_ENDPOINT}?{urllib.parse.urlencode({'query': query})}"

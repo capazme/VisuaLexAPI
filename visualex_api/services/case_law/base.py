@@ -23,24 +23,11 @@ class LinkKind(str, Enum):
 
 @dataclass
 class Decisione:
-    """`organo` and `fonte` answer two different questions and must not be
-    conflated: `organo` is the court that rendered the decision — for CeRDEF
-    that is parsed off the row itself ("Corte di Cassazione", "Comm. Trib.
-    Reg. per l'Abruzzo") and is deliberately NOT the source's own label.
-    `fonte` is the `registry.ADAPTERS` key this row came from, stamped by the
-    registry (not by the adapter) so a row can be looked up again via
-    `POST /fetch_decision` without the caller having to remember which
-    section it was in. Defaults to "" only so ad-hoc construction (tests,
-    call sites outside the registry) still works; every `Decisione` that
-    reaches a client through the registry has it set.
-    """
-
     organo: str
     numero: str
     anno: int
     link_kind: LinkKind
     url: str
-    fonte: str = ""
     sezione: str = ""
     data: str = ""
     ecli: str = ""
@@ -49,7 +36,6 @@ class Decisione:
     def to_dict(self) -> dict:
         return {
             "organo": self.organo,
-            "fonte": self.fonte,
             "numero": self.numero,
             "anno": self.anno,
             "link_kind": self.link_kind.value,
@@ -68,11 +54,6 @@ class SourceResult:
     A failed source returns `ok=False` rather than an empty list, so the caller
     can say which source is missing instead of implying there is nothing to
     find (CLAUDE.md gotcha 18).
-
-    `organo` is the human-readable label a lawyer reads ("CGUE", "Giustizia
-    amministrativa"); `fonte` is the `registry.ADAPTERS` key a client must
-    send back to `POST /fetch_decision` to address this source. The registry
-    stamps `fonte`, not the adapter — see `Decisione.fonte`.
     """
 
     organo: str
@@ -80,12 +61,10 @@ class SourceResult:
     ok: bool = True
     error: str = ""
     coverage: str = ""
-    fonte: str = ""
 
     def to_dict(self) -> dict:
         return {
             "organo": self.organo,
-            "fonte": self.fonte,
             "ok": self.ok,
             "error": self.error,
             "coverage": self.coverage,
