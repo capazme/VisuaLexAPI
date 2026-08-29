@@ -10,6 +10,31 @@ for "articolo 2043" finds decisions; asking for "art. 36-bis" finds none,
 because hyphenated ordinals break the index. Callers get `LinkKind.MATCHED` and
 should not read an empty answer as "no case law".
 
+The index also only holds the spelled-out form. Every reference this API
+builds is abbreviated ("art. 2043 c.c."), and searching that verbatim as an
+exact phrase (measured live) always returns zero — "art. 2043 c.c." / "art.
+2043" / "2043 c.c." all give 0, "articolo 2043" gives non-zero. `cerca_per_norma`
+therefore reformulates: it pulls the article number out of the reference and
+searches "articolo N", dropping everything else, including the act. Asking
+for the act too ("articolo 2043 codice civile") would just recreate the
+literal-phrase problem this class already has — CeRDEF's index does not
+reliably hold that longer phrase either.
+
+Dropping the act is the same shape of ambiguity `italgiure.py`'s
+`build_norma_query` refuses to run (a bare "art. N" can't tell art. 2043 c.c.
+from art. 2043 c.p.c.), accepted here for three reasons specific to this
+source: the corpus is tax-focused, so the collision surface is narrower than
+a general-purpose court archive; every row was already `LinkKind.MATCHED`, an
+inference rather than a source-declared citation, so this adds imprecision to
+a field that was never exact; and each row carries the issuing court parsed
+off the row itself, which is the signal a lawyer actually uses to judge
+whether a hit is on point. `coverage` says so explicitly, so the imprecision
+travels with the answer instead of only living in this comment. A reference
+that names no article number at all is refused outright — no article number
+means nothing to search for that couldn't also just be noise — and returns an
+empty, `ok=True` result rather than a phrase search on the raw string,
+mirroring the refusal in `italgiure.build_norma_query`.
+
 The hidden form fields below are load-bearing. Sending only the visible ones
 returns "errore sconosciuto"; a sibling client (mcp-legal-it) posts a different,
 smaller field set and does not send these — this one was verified against the
@@ -60,6 +85,22 @@ _ROW = re.compile(
     r"(?:\s*-\s*Sezione/Collegio\s*(?P<sez>.+))?$"
 )
 
+# Same shape as `italgiure.py`'s `_ART` (gotcha 9 — any alphabetic tail, not
+# an enumerated ordinal list; Normattiva goes well past "decies") with one
+# deliberate difference: `italgiure` can afford a case-insensitive suffix
+# because it splices `numero` back together with everything after it into
+# one query, so an over-matched suffix loses nothing. This adapter keeps only
+# `numero` and drops the rest, so an over-match is real data loss — measured
+# live, a case-insensitive suffix on "art. 5 Regolamento UE 679/2016" reads
+# the capitalised act name "Regolamento" as if it were an ordinal suffix and
+# produces "5 Regolamento", losing "UE 679/2016" outright. Real ordinal
+# suffixes are always written lowercase ("bis", "octiesdecies"); Italian act
+# names that can follow a bare number are capitalised ("Regolamento",
+# "Direttiva", "Costituzione"). Scoping `(?i:...)` to the "art."/"articolo"
+# prefix only, and leaving the suffix class case-sensitive, uses that
+# convention to tell the two apart.
+_ART = re.compile(r"(?:(?i:art\.?|articolo))\s*(\d+(?:[-\s][a-z]{2,})?)")
+
 
 def _extract_xml(page: str) -> str:
     m = _XML_VAR.search(page)
@@ -70,7 +111,11 @@ def _extract_xml(page: str) -> str:
 
 class CerdefAdapter:
     organo = "CeRDEF"
-    coverage = "Cassazione, Corte cost. e Commissioni tributarie, dal 1979"
+    coverage = (
+        "Cassazione, Corte cost. e Commissioni tributarie, dal 1979 — il "
+        "collegamento alla norma è per solo numero di articolo, senza il "
+        "codice di appartenenza: precisione minore delle altre fonti"
+    )
 
     async def _fetch_page(self, parole: str, criterio: str) -> str:
         """POST the search after the session-cookie GET; returns the raw HTML.
@@ -138,9 +183,27 @@ class CerdefAdapter:
                             coverage=self.coverage)
 
     async def cerca_per_norma(self, riferimento: str, limite: int = 10) -> SourceResult:
-        # Exact phrase: the index matches literally, so "tutte le parole" would
-        # return decisions containing the words anywhere, which is noise.
-        return await self._search(riferimento, criterio="2", limite=limite)
+        """Reformulates into the spelled-out phrasing CeRDEF's index actually
+        holds, dropping the act. See the module docstring for why that
+        tradeoff is accepted for this source specifically, and why a
+        reference with no article number is refused rather than searched
+        verbatim."""
+        m = _ART.search(riferimento)
+        if not m:
+            # No article number to extract: searching the raw reference as a
+            # phrase would be noise, not a match — same posture as
+            # `italgiure.build_norma_query` refusing an unsafe query instead
+            # of running one.
+            return SourceResult(
+                organo=self.organo, decisioni=[], ok=True,
+                coverage="il riferimento non indica un numero di articolo: "
+                         "specificarlo per poter cercare",
+            )
+        numero = m.group(1).strip()
+        # Exact phrase: the index matches literally, so "tutte le parole"
+        # would return decisions containing the words anywhere, which is
+        # noise.
+        return await self._search(f"articolo {numero}", criterio="2", limite=limite)
 
     async def cerca_libera(self, testo: str, limite: int = 10) -> SourceResult:
         return await self._search(testo, criterio="0", limite=limite)

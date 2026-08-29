@@ -52,6 +52,113 @@ async def test_parses_the_issuing_court_out_of_the_estremi(monkeypatch):
     assert d.link_kind.value == "matched"
 
 
+async def test_cerca_per_norma_reformulates_the_abbreviated_reference(monkeypatch):
+    """CeRDEF's index holds the spelled-out form only — measured live,
+    "art. 2043 c.c." (what every caller actually sends) returns zero, while
+    "articolo 2043" does not. `cerca_per_norma` must send the index the
+    phrasing it actually holds, not the reference verbatim."""
+    adapter = CerdefAdapter()
+    sent: dict = {}
+
+    async def fake_request(method, url, **kwargs):
+        if method == "POST":
+            sent["parole"] = kwargs["data"]["parole"]
+            sent["criterio"] = kwargs["data"]["tipoCriterioRicerca"]
+
+        class R:
+            text = PAGE
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cerdef.http_client.request", fake_request
+    )
+    result = await adapter.cerca_per_norma("art. 2043 c.c.")
+
+    assert sent["parole"] == "articolo 2043"
+    assert sent["criterio"] == "2"  # still an exact phrase, not "tutte le parole"
+    assert result.ok is True
+    assert len(result.decisioni) == 1
+
+
+async def test_cerca_per_norma_extracts_the_number_and_drops_the_act(monkeypatch):
+    """A hyphenated ordinal and an EU act name after the number are both real
+    shapes callers send. Only the bare number should reach the index — the
+    act is dropped deliberately (module docstring), not because it was lost
+    by accident."""
+    adapter = CerdefAdapter()
+    sent: dict = {}
+
+    async def fake_request(method, url, **kwargs):
+        if method == "POST":
+            sent["parole"] = kwargs["data"]["parole"]
+
+        class R:
+            text = PAGE
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cerdef.http_client.request", fake_request
+    )
+
+    await adapter.cerca_per_norma("art. 5 Regolamento UE 679/2016")
+    assert sent["parole"] == "articolo 5", (
+        "the capitalised act name must not be swallowed as if it were an "
+        "ordinal suffix"
+    )
+
+    await adapter.cerca_per_norma("art. 2409-octiesdecies c.c.")
+    assert sent["parole"] == "articolo 2409-octiesdecies"
+
+
+async def test_cerca_per_norma_refuses_a_reference_with_no_article_number(monkeypatch):
+    """No article number means nothing safe to search — falling back to a
+    phrase search on the raw string would just be noise. Mirrors the refusal
+    in `italgiure.build_norma_query`; this must not touch the network at
+    all."""
+    adapter = CerdefAdapter()
+
+    async def boom(method, url, **kwargs):
+        raise AssertionError("no article number should never reach the network")
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cerdef.http_client.request", boom
+    )
+    result = await adapter.cerca_per_norma("Statuto dei lavoratori")
+
+    assert result.ok is True
+    assert result.decisioni == []
+
+
+async def test_cerca_libera_is_not_reformulated(monkeypatch):
+    """Free text is the caller's own words — `cerca_libera` must send it
+    verbatim, unlike `cerca_per_norma`."""
+    adapter = CerdefAdapter()
+    sent: dict = {}
+
+    async def fake_request(method, url, **kwargs):
+        if method == "POST":
+            sent["parole"] = kwargs["data"]["parole"]
+            sent["criterio"] = kwargs["data"]["tipoCriterioRicerca"]
+
+        class R:
+            text = PAGE
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cerdef.http_client.request", fake_request
+    )
+    await adapter.cerca_libera("art. 2043 c.c. risarcimento")
+
+    assert sent["parole"] == "art. 2043 c.c. risarcimento"
+    assert sent["criterio"] == "0"
+
+
 async def test_failure_is_reported(monkeypatch):
     adapter = CerdefAdapter()
 
