@@ -204,9 +204,22 @@ POST unless noted, JSON bodies.
   resolver already understands. The only GET among these; a POST answers 405
 - `/fetch_case_law` — decisions bearing on a norm, grouped by source. Always 200
   on a well-formed request: a source that is down reports `ok:false` inside its
-  own section, so one dead source never hides the ones that answered
+  own section, so one dead source never hides the ones that answered. Each
+  section and each decision inside it carries two source fields that answer
+  different questions: `organo` is the human-readable label a lawyer reads
+  ("CGUE", "Giustizia amministrativa"; for CeRDEF's per-row `organo` it is the
+  court parsed off that row, e.g. "Corte di Cassazione" — never the source's
+  own label), `fonte` is the `registry.ADAPTERS` key ("cgue", "cassazione",
+  "cerdef", "giustizia-amm") this row came from and is what a client must send
+  back as `organo` to `/fetch_decision`. The two only coincide by
+  case-folding for three of the four sources — `fonte="giustizia-amm"` does
+  not fold from `organo="Giustizia amministrativa"` — so always read `fonte`
+  for the address, never derive it from `organo`
 - `/search_case_law` — free-text search across the same sources
-- `/fetch_decision` — one decision by `organo`, `numero`, `anno`
+- `/fetch_decision` — one decision by `organo` (the `fonte` key above —
+  lookup is case-insensitive and also tolerant of the human-readable `organo`
+  label, but the response's `fonte` is always the canonical key), `numero`,
+  `anno`
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 

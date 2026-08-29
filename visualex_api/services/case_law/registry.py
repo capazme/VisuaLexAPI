@@ -40,20 +40,28 @@ ADAPTERS: dict[str, CaseLawAdapter] = {
 _SOURCE_TIMEOUT = 10.0
 
 
-async def _call_one(adapter: CaseLawAdapter, method: str, args: tuple,
+async def _call_one(key: str, adapter: CaseLawAdapter, method: str, args: tuple,
                      limite: int) -> SourceResult:
     """Runs one adapter call under `_SOURCE_TIMEOUT`, translating both a raised
     exception and a timeout into the same `ok=False` shape the caller already
     expects from an adapter's own error handling — this is a second net, not
-    the primary one (every adapter already catches its own exceptions)."""
+    the primary one (every adapter already catches its own exceptions).
+
+    `key` is the `ADAPTERS` dict key this adapter is registered under. It is
+    stamped onto the result (and every `Decisione` inside it) here, at the one
+    place that actually knows the mapping, rather than duplicated as an
+    attribute on each adapter class — an adapter itself has no reason to know
+    which key it was registered under, and a value copied into four files
+    would eventually drift from the dict that is the actual source of truth.
+    """
     try:
-        return await asyncio.wait_for(
+        result = await asyncio.wait_for(
             getattr(adapter, method)(*args, limite=limite), timeout=_SOURCE_TIMEOUT,
         )
     except asyncio.TimeoutError:
         log.warning("Case-law adapter timed out", organo=adapter.organo,
                     timeout=_SOURCE_TIMEOUT)
-        return SourceResult(
+        result = SourceResult(
             organo=adapter.organo, ok=False,
             error=f"Timed out after {_SOURCE_TIMEOUT}s",
             coverage=getattr(adapter, "coverage", ""),
@@ -61,16 +69,20 @@ async def _call_one(adapter: CaseLawAdapter, method: str, args: tuple,
     except Exception as exc:  # noqa: BLE001 — reported, never swallowed
         log.warning("Case-law adapter raised", organo=adapter.organo,
                     error=str(exc))
-        return SourceResult(
+        result = SourceResult(
             organo=adapter.organo, ok=False, error=str(exc),
             coverage=getattr(adapter, "coverage", ""),
         )
+    result.fonte = key
+    for decisione in result.decisioni:
+        decisione.fonte = key
+    return result
 
 
 async def _fan_out(method: str, *args, limite: int) -> list[SourceResult]:
-    adapters = list(ADAPTERS.values())
     results = await asyncio.gather(
-        *(_call_one(a, method, args, limite) for a in adapters),
+        *(_call_one(key, adapter, method, args, limite)
+          for key, adapter in ADAPTERS.items()),
     )
     return list(results)
 
@@ -81,6 +93,28 @@ async def cerca_per_norma(riferimento: str, limite: int = 10) -> list[SourceResu
 
 async def cerca_libera(testo: str, limite: int = 10) -> list[SourceResult]:
     return await _fan_out("cerca_libera", testo, limite=limite)
+
+
+def _resolve_key(organo: str) -> str:
+    """Resolve a client-supplied `organo` to an `ADAPTERS` key, tolerant of
+    case and of the human-readable label a client reads off `SourceResult.
+    organo` / `Decisione.organo` in `/fetch_case_law`.
+
+    The keys ("cgue", "cassazione", "cerdef", "giustizia-amm") and the labels
+    ("CGUE", "Cassazione", "CeRDEF", "Giustizia amministrativa") are not the
+    same strings — three happen to fold to the same value once lower-cased,
+    "giustizia-amm" does not — so this checks both, not just the key
+    case-folded. Raises `KeyError(organo)` for anything that matches neither,
+    mirroring plain dict indexing so callers (the `/fetch_decision` handler)
+    keep treating it as a 400 without a second except clause.
+    """
+    normalized = organo.strip().lower()
+    if normalized in ADAPTERS:
+        return normalized
+    for key, adapter in ADAPTERS.items():
+        if adapter.organo.strip().lower() == normalized:
+            return key
+    raise KeyError(organo)
 
 
 async def leggi(organo: str, numero: str, anno: int) -> Decisione | None:
@@ -100,7 +134,15 @@ async def leggi(organo: str, numero: str, anno: int) -> Decisione | None:
     "we could not reach the source in time" is a different and worse claim
     than "the decision does not exist". Letting `asyncio.TimeoutError`
     propagate keeps those two outcomes distinguishable.
+
+    `organo` is resolved through `_resolve_key` — case-insensitive, and
+    tolerant of the display label — but the `Decisione.fonte` this returns is
+    always the canonical key, never an echo of whatever the caller sent.
     """
-    return await asyncio.wait_for(
-        ADAPTERS[organo].leggi(numero, anno), timeout=_SOURCE_TIMEOUT,
+    key = _resolve_key(organo)
+    decisione = await asyncio.wait_for(
+        ADAPTERS[key].leggi(numero, anno), timeout=_SOURCE_TIMEOUT,
     )
+    if decisione is not None:
+        decisione.fonte = key
+    return decisione
