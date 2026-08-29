@@ -168,6 +168,53 @@ class TestFetchDecision:
         )
         assert resp.status_code == 504
 
+    async def test_the_gdpr_is_not_a_cgue_judgment(self, client, monkeypatch):
+        """End to end, through the real CellarAdapter with only the network
+        stubbed: `{"organo":"cgue","numero":"32016R0679","anno":1900}` used to
+        answer 200 with the GDPR — a regulation — dressed as a CJEU judgment
+        with an invented year and `link_kind: cited`, which is this product's
+        promise that the source declared the link."""
+        async def fake_request(method, url, **kwargs):
+            class R:
+                text = '{"head":{},"boolean":true}'
+                status = 200
+                headers = {}
+            return R()
+
+        monkeypatch.setattr(
+            "visualex_api.services.case_law.cellar.http_client.request", fake_request
+        )
+        resp = await client.post(
+            "/fetch_decision",
+            json={"organo": "cgue", "numero": "32016R0679", "anno": 1900},
+        )
+        assert resp.status_code == 404
+
+    async def test_a_sparql_payload_in_numero_is_not_executed(self, client, monkeypatch):
+        """`numero` reaches a SPARQL string literal in CellarAdapter.leggi.
+        The route is public and unauthenticated, so the payload must die in
+        the adapter's validation, with no request leaving the process."""
+        calls = []
+
+        async def fake_request(method, url, **kwargs):
+            calls.append(url)
+            class R:
+                text = '{"head":{},"boolean":true}'
+                status = 200
+                headers = {}
+            return R()
+
+        monkeypatch.setattr(
+            "visualex_api.services.case_law.cellar.http_client.request", fake_request
+        )
+        resp = await client.post(
+            "/fetch_decision",
+            json={"organo": "cgue", "numero": "x' } ASK WHERE { BIND(1 AS ?z) '",
+                  "anno": 2019},
+        )
+        assert resp.status_code == 404
+        assert calls == []
+
     async def test_a_found_decision_answers_200(self, client, monkeypatch):
         async def fake_leggi(organo, numero, anno):
             return Decisione(organo="Cassazione", numero=numero, anno=anno,

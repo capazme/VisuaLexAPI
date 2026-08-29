@@ -1,6 +1,10 @@
 import pytest
 
-from visualex_api.services.case_law.cellar import CellarAdapter, _celex_from_riferimento
+from visualex_api.services.case_law.cellar import (
+    _EXISTS_QUERY,
+    CellarAdapter,
+    _celex_from_riferimento,
+)
 
 SPARQL_JSON = """{"head":{"vars":["celex","ecli"]},"results":{"bindings":[
  {"celex":{"value":"62017CJ0496"},"ecli":{"value":"ECLI:EU:C:2019:26"}},
@@ -102,6 +106,93 @@ async def test_leggi_confirms_the_celex_resolves_to_a_real_judgment(monkeypatch)
     assert decisione.link_kind.value == "cited"
 
 
+async def test_leggi_derives_the_year_from_the_celex_not_from_the_caller(monkeypatch):
+    """`anno` arrives from the request body and is not evidence of anything.
+    The CELEX carries the year in positions 1-4, and that is the only version
+    of it the source stands behind — echoing back the caller's value turned
+    `{"numero": "62017CJ0496", "anno": 1900}` into a 1900 judgment."""
+    adapter = CellarAdapter()
+
+    async def fake_request(method, url, **kwargs):
+        class R:
+            text = '{"head":{},"boolean":true}'
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cellar.http_client.request", fake_request
+    )
+    decisione = await adapter.leggi("62017CJ0496", 1900)
+    assert decisione is not None
+    assert decisione.anno == 2017
+
+
+async def test_leggi_refuses_a_sparql_injection_payload(monkeypatch):
+    """`numero` is interpolated into a SPARQL string literal, and it comes
+    straight from the body of POST /fetch_decision. This payload closed the
+    literal and had the rest executed as query syntax — the same defect class
+    `_escape_phrase` closes for Solr in italgiure.py. It must be refused
+    before any request leaves the process."""
+    adapter = CellarAdapter()
+    calls = []
+
+    async def fake_request(method, url, **kwargs):
+        calls.append(url)
+        class R:
+            text = '{"head":{},"boolean":true}'
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cellar.http_client.request", fake_request
+    )
+    payload = "x' } ASK WHERE { BIND(1 AS ?z) '"
+    assert await adapter.leggi(payload, 2019) is None
+    assert calls == []
+
+
+@pytest.mark.parametrize("numero", [
+    "32016R0679",           # the GDPR: a regulation, not a judgment
+    "32019L0790",           # a directive
+    "62017CJ0496 OR 1=1",   # trailing query syntax
+    "'",                   # a bare quote
+    "",
+    "62017CJ",              # truncated
+    "art. 2043 c.c.",
+])
+async def test_leggi_refuses_anything_that_is_not_a_case_law_celex(numero, monkeypatch):
+    """Sector 6 is case law. This adapter only ever answers for the CGUE, so a
+    regulation coming back as a judgment marked `cited` would break the one
+    promise link_kind=CITED makes — the source declared the link. Refused
+    client-side, before the query is built."""
+    adapter = CellarAdapter()
+    calls = []
+
+    async def fake_request(method, url, **kwargs):
+        calls.append(url)
+        class R:
+            text = '{"head":{},"boolean":true}'
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cellar.http_client.request", fake_request
+    )
+    assert await adapter.leggi(numero, 2016) is None
+    assert calls == []
+
+
+async def test_the_existence_query_filters_to_case_law_like_the_search_query():
+    """Belt and braces: the regex above refuses a non-case-law CELEX before
+    the network, and the endpoint would refuse it too. `_QUERY` has carried
+    this FILTER since the start; `_EXISTS_QUERY` did not, which is how a
+    regulation could come back as a judgment."""
+    assert "STRSTARTS(STR(?celex),'6')" in _EXISTS_QUERY
+
+
 async def test_leggi_returns_none_for_a_celex_that_does_not_exist(monkeypatch):
     """A plainly nonexistent CELEX must not become a Decisione — this is
     what lets the caller's 404 path fire instead of telling a lawyer a
@@ -135,3 +226,48 @@ async def test_cellar_answers_for_the_gdpr():
     result = await CellarAdapter().cerca_per_norma("Regolamento UE 679/2016", limite=5)
     assert result.ok is True
     assert len(result.decisioni) > 0
+
+
+@pytest.mark.live
+async def test_leggi_confirms_a_real_judgment_live():
+    """The filtered ASK query must still answer `true` for a judgment that
+    exists — a filter that silently broke the working path would turn every
+    fetch_decision into a 404."""
+    decisione = await CellarAdapter().leggi("62017CJ0496", 1900)
+    assert decisione is not None
+    assert decisione.numero == "62017CJ0496"
+    assert decisione.anno == 2017
+    assert decisione.link_kind.value == "cited"
+
+
+@pytest.mark.live
+async def test_the_endpoint_itself_refuses_a_regulation():
+    """CELEX 32016R0679 is the GDPR. The adapter's regex already refuses it
+    before the network, so this test asks CELLAR directly: it proves the
+    FILTER in `_EXISTS_QUERY` is a real server-side restriction and not a
+    string that happens to parse, which is what makes the two layers
+    independent rather than one layer written twice."""
+    import json
+    import urllib.parse
+
+    from visualex_api.services.case_law.base import http_headers
+    from visualex_api.services.case_law.cellar import _ENDPOINT, http_client
+
+    async def ask(celex: str) -> bool:
+        url = f"{_ENDPOINT}?{urllib.parse.urlencode({'query': _EXISTS_QUERY % celex})}"
+        result = await http_client.request(
+            "GET", url, source="cellar",
+            headers=http_headers({"Accept": "application/sparql-results+json"}),
+        )
+        return json.loads(result.text).get("boolean", False)
+
+    assert await ask("62017CJ0496") is True    # a judgment
+    assert await ask("32016R0679") is False    # the GDPR, a regulation
+
+
+@pytest.mark.live
+async def test_leggi_refuses_the_gdpr_live():
+    """The same claim at the adapter's own boundary: asked of the CGUE
+    adapter, a regulation must come back as "not found", never as a
+    judgment marked `cited`."""
+    assert await CellarAdapter().leggi("32016R0679", 1900) is None
