@@ -156,7 +156,7 @@ export const GiurisprudenzaSection = forwardRef<GiurisprudenzaSectionHandle, Giu
                 <button
                     onClick={() => setIsOpen((v) => !v)}
                     aria-expanded={isOpen}
-                    aria-label={`Giurisprudenza — ${articleLabel}`}
+                    aria-label={`${isOpen ? 'Comprimi' : 'Espandi'} Giurisprudenza — ${articleLabel}, ${totalCount} ${totalCount === 1 ? 'decisione' : 'decisioni'}`}
                     className="w-full flex items-center justify-between text-primary-700 dark:text-primary-400 font-bold uppercase tracking-wider text-xs hover:opacity-80 transition-opacity"
                 >
                     <span className="flex items-center gap-2">
@@ -340,7 +340,7 @@ function SourceCard({ fonte }: { fonte: SourceResult }) {
 }
 
 function DecisionRow({ decisione }: { decisione: Decisione }) {
-    const deposito = formatDecisioneData(decisione.data);
+    const deposito = formatDecisioneData(decisione.data ?? '');
 
     return (
         <div className="text-sm space-y-1">

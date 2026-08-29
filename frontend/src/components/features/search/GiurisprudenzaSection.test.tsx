@@ -16,7 +16,7 @@ function mockFonti(fonti: SourceResult[]) {
 }
 
 function openSection() {
-  fireEvent.click(screen.getByRole('button', { name: /^Giurisprudenza/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Giurisprudenza/ }));
 }
 
 /** Opens the section (if not already open) and presses the explicit
@@ -73,7 +73,7 @@ describe('GiurisprudenzaSection — collapsed by default', () => {
 
     render(<GiurisprudenzaSection articleLabel="Art. 2043" norma={NORMA} massime={null} />);
 
-    expect(screen.getByRole('button', { name: /^Giurisprudenza/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Giurisprudenza/ })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -179,6 +179,12 @@ describe('GiurisprudenzaSection — the central promise: cited vs matched vs cur
     expect(citedBadge.className).not.toBe(matchedBadge.className);
     expect(citedBadge.className).toMatch(/emerald/);
     expect(matchedBadge.className).toMatch(/amber/);
+
+    // The coverage note is a property of the source, not of an empty result
+    // set — a source that rolls off after 5 years still needs that caveat
+    // read even when it did return hits (retired CaseLawPanel.test.tsx: "keeps
+    // the coverage note visible even when the source has results").
+    expect(screen.getByText('Copertura: ultimi 5 anni')).toBeInTheDocument();
   });
 
   it('falls back to "matched" for a link_kind the badge map has no entry for, never to "cited"', async () => {
