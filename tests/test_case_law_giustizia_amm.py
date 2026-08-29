@@ -1,6 +1,7 @@
 import pytest
 import structlog
 
+from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
 from visualex_api.services.case_law import giustizia_amm as giustizia_amm_module
 from visualex_api.services.case_law.giustizia_amm import (
     GiustiziaAmmAdapter, _parse_provvedimento_link, _scrape_session,
@@ -306,6 +307,22 @@ async def test_a_row_that_cannot_be_parsed_is_logged_and_skipped(
 
 @pytest.mark.live
 async def test_giustizia_amm_answers():
+    """`_search`'s own `try` wraps the session GET, `_scrape_session` (which
+    raises `ValueError` if the portal was reorganised again) and the search
+    POST all together, so `result.ok is False` cannot tell "the portal is
+    down" apart from "the portal changed shape". A cheap, independent GET of
+    the search page first establishes reachability precisely — only
+    `TRANSPORT_ERRORS` skips here — and leaves everything downstream
+    (`_scrape_session`, the POST, the row parse) to `cerca_libera`'s own
+    assertions, which still fail on a real regression."""
+    try:
+        await giustizia_amm_module.http_client.request(
+            "GET", giustizia_amm_module._BASE + giustizia_amm_module._PATH,
+            source="giustizia-amm", headers=giustizia_amm_module.http_headers(),
+        )
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("Giustizia amministrativa", exc)
+
     result = await GiustiziaAmmAdapter().cerca_libera("risarcimento danno", limite=5)
     assert result.ok is True, result.error
     assert len(result.decisioni) > 0

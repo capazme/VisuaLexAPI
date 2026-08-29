@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import inspect
 import pathlib
@@ -6,6 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
 from visualex_api.services.http_client import ThrottledHttpClient
 from visualex_api.tools import tls
 
@@ -222,12 +224,20 @@ async def test_text_encoding_round_trips_binary_body():
 async def test_the_aia_endpoint_still_serves_the_pinned_certificate():
     """The rotation canary. When TI Trust rotates its CA this fails here
     first, in a test that names the procedure, rather than in production as an
-    unexplained italgiure outage."""
+    unexplained italgiure outage.
+
+    Only the fetch itself is a reachability precondition — a plaintext HTTP
+    endpoint timing out or 500ing is not a rotation. The hash comparison
+    stays a hard `assert`: that is the one signal this test exists to catch,
+    and it must never be swallowed into a skip."""
     from visualex_api.services.http_client import http_client
 
-    result = await http_client.request(
-        "GET", tls._AIA_URI, source="sectigo-aia", text_encoding="latin-1",
-    )
+    try:
+        result = await http_client.request(
+            "GET", tls._AIA_URI, source="sectigo-aia", text_encoding="latin-1",
+        )
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("sectigo-aia", exc)
     served = hashlib.sha256(result.text.encode("latin-1")).hexdigest()
     assert served == tls._EXPECTED_SHA256, (
         "The AIA endpoint no longer serves the pinned intermediate. Follow the "
@@ -238,14 +248,36 @@ async def test_the_aia_endpoint_still_serves_the_pinned_certificate():
 
 @pytest.mark.live
 async def test_context_verifies_italgiure():
-    ctx = await tls.italgiure_ssl_context()
+    """Two network steps, two different failure classes to keep apart.
+
+    `italgiure_ssl_context()` fetches the AIA intermediate through the same
+    plaintext endpoint as the test above — `TRANSPORT_ERRORS` there means
+    unreachable, skip; `IntermediateCertificateMismatch` means the pin no
+    longer matches what is served, a real finding this test must still
+    surface, so it is left to propagate uncaught.
+
+    The handshake against italgiure itself distinguishes the same way at the
+    socket level: `ssl.SSLError` (a subclass of `OSError`, checked first) is
+    the actual thing being verified here — a broken chain or a hostname
+    mismatch — and must fail loudly. A bare `OSError` below it (connection
+    refused, DNS failure, a timeout) means the socket never got that far, so
+    it is the only case that skips.
+    """
+    try:
+        ctx = await tls.italgiure_ssl_context()
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("sectigo-aia", exc)
     assert ctx.verify_mode is ssl.CERT_REQUIRED
     assert ctx.check_hostname is True
 
-    import asyncio
-    reader, writer = await asyncio.open_connection(
-        "www.italgiure.giustizia.it", 443, ssl=ctx,
-        server_hostname="www.italgiure.giustizia.it",
-    )
+    try:
+        reader, writer = await asyncio.open_connection(
+            "www.italgiure.giustizia.it", 443, ssl=ctx,
+            server_hostname="www.italgiure.giustizia.it",
+        )
+    except ssl.SSLError:
+        raise
+    except OSError as exc:
+        skip_if_unreachable("italgiure.giustizia.it", exc)
     writer.close()
     await writer.wait_closed()

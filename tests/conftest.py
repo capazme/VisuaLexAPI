@@ -1,6 +1,33 @@
 import pytest
 
+from visualex_api.tools.exceptions import DocumentNotFoundError, NetworkError
+
 pytest_plugins = ("pytest_asyncio",)
+
+#: What `ThrottledHttpClient.request` raises once it has exhausted its own
+#: retries — the only two exception types that mean "the source could not be
+#: reached", as opposed to "it answered with something we could not read".
+#: `NetworkError` covers a timeout, a connection failure or a non-2xx status
+#: (a bad afternoon at the source, e.g. CeRDEF returning 500 under repeated
+#: querying — see `test_case_law_cerdef.py`); `DocumentNotFoundError` covers
+#: an unexpected 404 from an endpoint that should not be answering with one.
+TRANSPORT_ERRORS = (NetworkError, DocumentNotFoundError)
+
+
+def skip_if_unreachable(source: str, exc: Exception) -> None:
+    """Turn a live source's unreachability into a skip, never a failure.
+
+    Reaching a live source is a *precondition* of a live test, not the thing
+    it tests — a live test's job is to catch a real shape change, not to
+    report the source's uptime. Callers must wrap only the transport step
+    (the call that can raise `TRANSPORT_ERRORS`) in the `try`, and let
+    anything downstream of a successful fetch — JSON/HTML that does not
+    parse, a certificate that does not match the pin, a query that comes
+    back empty — propagate and fail the test normally. That split is what
+    keeps a skip from ever hiding a genuine regression: only "we never got a
+    response" is forgiven; "we got a response we did not expect" never is.
+    """
+    pytest.skip(f"{source} unreachable: {exc}")
 
 
 @pytest.fixture(autouse=True)

@@ -1,10 +1,34 @@
+import urllib.parse
+
 import pytest
 
+from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
+from visualex_api.services.case_law.base import http_headers
 from visualex_api.services.case_law.cellar import (
+    _ENDPOINT,
     _EXISTS_QUERY,
     CellarAdapter,
     _celex_from_riferimento,
+    http_client,
 )
+
+
+async def _skip_if_cellar_unreachable() -> None:
+    """A cheap ASK probe as the reachability precondition for the live tests
+    below. `cerca_per_norma` and `leggi` both wrap the request and the JSON
+    parse in the same `try` (see cellar.py's docstrings), so their own
+    `ok`/`None` cannot tell "CELLAR is down" apart from "CELLAR answered
+    something we cannot read". Only `TRANSPORT_ERRORS` from this probe skips
+    a test; a real answer of any shape lets the adapter calls that follow run
+    and fail on their own terms if the response no longer parses."""
+    url = f"{_ENDPOINT}?{urllib.parse.urlencode({'query': _EXISTS_QUERY % '62017CJ0496'})}"
+    try:
+        await http_client.request(
+            "GET", url, source="cellar",
+            headers=http_headers({"Accept": "application/sparql-results+json"}),
+        )
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("CELLAR", exc)
 
 SPARQL_JSON = """{"head":{"vars":["celex","ecli"]},"results":{"bindings":[
  {"celex":{"value":"62017CJ0496"},"ecli":{"value":"ECLI:EU:C:2019:26"}},
@@ -229,6 +253,7 @@ async def test_cerca_libera_reports_it_is_not_supported():
 
 @pytest.mark.live
 async def test_cellar_answers_for_the_gdpr():
+    await _skip_if_cellar_unreachable()
     result = await CellarAdapter().cerca_per_norma("Regolamento UE 679/2016", limite=5)
     assert result.ok is True
     assert len(result.decisioni) > 0
@@ -239,6 +264,7 @@ async def test_leggi_confirms_a_real_judgment_live():
     """The filtered ASK query must still answer `true` for a judgment that
     exists — a filter that silently broke the working path would turn every
     fetch_decision into a 404."""
+    await _skip_if_cellar_unreachable()
     decisione = await CellarAdapter().leggi("62017CJ0496", 1900)
     assert decisione is not None
     assert decisione.numero == "62017CJ0496"
@@ -254,10 +280,6 @@ async def test_the_endpoint_itself_refuses_a_regulation():
     string that happens to parse, which is what makes the two layers
     independent rather than one layer written twice."""
     import json
-    import urllib.parse
-
-    from visualex_api.services.case_law.base import http_headers
-    from visualex_api.services.case_law.cellar import _ENDPOINT, http_client
 
     async def ask(celex: str) -> bool:
         url = f"{_ENDPOINT}?{urllib.parse.urlencode({'query': _EXISTS_QUERY % celex})}"
@@ -267,8 +289,11 @@ async def test_the_endpoint_itself_refuses_a_regulation():
         )
         return json.loads(result.text).get("boolean", False)
 
-    assert await ask("62017CJ0496") is True    # a judgment
-    assert await ask("32016R0679") is False    # the GDPR, a regulation
+    try:
+        assert await ask("62017CJ0496") is True    # a judgment
+        assert await ask("32016R0679") is False    # the GDPR, a regulation
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("CELLAR", exc)
 
 
 @pytest.mark.live

@@ -3,6 +3,7 @@ import re
 import pytest
 import structlog
 
+from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
 from visualex_api.services.case_law import cerdef as cerdef_module
 from visualex_api.services.case_law.cerdef import (
     CerdefAdapter, _ESTREMI, _ROW, _extract_xml,
@@ -348,10 +349,22 @@ async def test_cerdef_answers_and_mixes_courts():
     shape too narrow for a real row silently shrinks the result set with no
     signal. Comparing the number of raw `<estremi>` blocks CeRDEF actually
     sent against how many parse cleanly through `_ROW` turns a parsing gap
-    into a test failure instead of a quietly smaller answer."""
+    into a test failure instead of a quietly smaller answer.
+
+    CeRDEF itself answers HTTP 500 under repeated querying often enough that
+    reaching it is not a safe assumption — a bad afternoon at the Ministry of
+    Finance must not fail the build. `_fetch_page` is a thin wrapper around
+    the two-request handshake with no parsing in it (see its docstring), so
+    the only thing that can raise out of it is `TRANSPORT_ERRORS`; anything
+    CeRDEF answers with, however malformed, reaches the assertions below and
+    still fails the test."""
     adapter = CerdefAdapter()
 
-    page = await adapter._fetch_page("accertamento", criterio="0")
+    try:
+        page = await adapter._fetch_page("accertamento", criterio="0")
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("CeRDEF", exc)
+
     xml = cerdef_module._extract_xml(page)
     raw_rows = _ESTREMI.findall(xml)
     assert raw_rows, "CeRDEF returned no <estremi> rows for a broad free search"
@@ -366,7 +379,13 @@ async def test_cerdef_answers_and_mixes_courts():
     )
 
     result = await adapter.cerca_libera("accertamento", limite=len(raw_rows))
-    assert result.ok is True, result.error
+    if not result.ok:
+        # `_search`'s own `try` wraps only the second `_fetch_page` call
+        # (see cerdef.py) — parsing never raises, a row it cannot read is
+        # logged and skipped, not turned into `ok=False`. So `ok=False` here
+        # can only mean the second round-trip hit the same transport
+        # failure, never a parsing regression.
+        skip_if_unreachable("CeRDEF", result.error)
     assert len(result.decisioni) == len(raw_rows)
 
     organi = {d.organo for d in result.decisioni}

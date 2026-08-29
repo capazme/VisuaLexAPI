@@ -1,5 +1,6 @@
 import pytest
 
+from tests.conftest import TRANSPORT_ERRORS, skip_if_unreachable
 from visualex_api.services.case_law.italgiure import ItalgiureAdapter, build_norma_query
 
 SOLR_JSON = """{"response":{"numFound":1594,"docs":[
@@ -260,6 +261,21 @@ async def test_leggi_escapes_a_quote_in_numero_and_anno(monkeypatch):
 
 @pytest.mark.live
 async def test_italgiure_answers_for_art_2043():
-    result = await ItalgiureAdapter().cerca_per_norma("art. 2043 c.c.", limite=3)
-    assert result.ok is True, result.error
+    """`cerca_per_norma` wraps both the request and the JSON parse in one
+    `try` (deliberately — see its docstring), so `result.ok is False` cannot
+    tell "Solr is down" apart from "Solr answered something we can't read".
+    Calling `_query`/`_to_result` directly here restores that distinction:
+    only the two exceptions the shared HTTP client raises after exhausting
+    its retries (`TRANSPORT_ERRORS`) are grounds to skip. A JSON shape Solr
+    changed still raises out of `json.loads` uncaught, and a field `_to_result`
+    can't read still raises out of it uncaught — both fail the test, as they
+    should."""
+    adapter = ItalgiureAdapter()
+    query = build_norma_query("art. 2043 c.c.")
+    try:
+        data = await adapter._query(query, 3)
+    except TRANSPORT_ERRORS as exc:
+        skip_if_unreachable("Italgiure", exc)
+    result = adapter._to_result(data)
+    assert result.ok is True
     assert len(result.decisioni) > 0
