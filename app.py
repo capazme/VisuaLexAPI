@@ -35,7 +35,7 @@ from visualex_api.tools.map import codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.alias_resolver import resolve_alias
 from visualex_api.tools.citation_linker import extract_citations as extract_citations_from_text
-from visualex_api.tools.changelog import build_changelog, changelog_range, SCAN_LIMIT
+from visualex_api.tools.changelog import build_changelog, changelog_boundary, SCAN_LIMIT
 from visualex_api.tools.exceptions import (
     ValidationError,
     ResourceNotFoundError,
@@ -1325,14 +1325,16 @@ class NormaController:
         # development step; visualex_api/tools/changelog.py drops the rest.
         version_file_log = await asyncio.to_thread(
             run_git_command,
-            ['log', '-n', '2', '--format=%H', '--', 'version.txt']
+            ['log', '-n', '2', '--format=%h', '--', 'version.txt']
         )
-        log_args = ['log', '--first-parent', '--format=%h|%s|%ci|%an', '-n', str(SCAN_LIMIT)]
-        commit_range = changelog_range(version_file_log)
-        if commit_range:
-            log_args.append(commit_range)
-        changelog_raw = await asyncio.to_thread(run_git_command, log_args)
-        changelog = build_changelog(changelog_raw)
+        changelog_raw = await asyncio.to_thread(
+            run_git_command,
+            ['log', '--first-parent', '--format=%h|%s|%ci|%an', '-n', str(SCAN_LIMIT)]
+        )
+        changelog = build_changelog(
+            changelog_raw,
+            boundary=changelog_boundary(version_file_log),
+        )
 
         return jsonify({
             'version': version,
