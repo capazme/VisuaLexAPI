@@ -370,19 +370,24 @@ exports to `.txt` — it is not a second creator (that was tried and rolled back
 `BrocardiDisplay` below the article body (`mt-8 border-t pt-6`, same
 separator idiom) — not a floating popover. That was tried (`CaseLawPanel`,
 retired) and was the wrong container for up to 20 decision cards; it also
-kept case law apart from Brocardi's own case law, the Massime. Collapsed by
-default: the toolbar's Gavel button calls its `expandAndReveal()` imperative
-handle (exposed via `forwardRef`) to expand it and scroll it into view,
-rather than toggling a boolean the toolbar owns. The **Massime** card (moved
-out of `BrocardiDisplay`, still `MassimeSection.tsx` with its year filter and
-search intact) renders immediately — it rides in on the article payload at
-zero network cost, so the block is never empty on arrival. The four live
-court sources (CGUE, Cassazione, Consiglio di Stato/TAR, CeRDEF) fetch from
-`/fetch_case_law` only on first expand, through `fetchCaseLawCached`
+kept case law apart from Brocardi's own case law, the Massime. Open by
+default the moment the article has Massime — they ride in on the article
+payload at zero network cost, so hiding them behind a click would regress
+access to content that already arrived; with no Massime it starts collapsed.
+The toolbar's Gavel button calls its `expandAndReveal()` imperative handle
+(exposed via `forwardRef`) to force it open and scroll it into view. The
+**Massime** card (moved out of `BrocardiDisplay`, still `MassimeSection.tsx`
+with its year filter and search intact) renders immediately whenever the
+section is open — it rides in on the article payload at zero network cost, so
+the block is never empty on arrival. The four live court sources (CGUE,
+Cassazione, Consiglio di Stato/TAR, CeRDEF) fetch from `/fetch_case_law` only
+from the explicit "Cerca nei quattro tribunali" action inside the section —
+never on mount, never on expand — through `fetchCaseLawCached`
 (`caseLawService.ts`, same session-cache-plus-in-flight-registry shape as
 `utils/articleFetchCache.ts`) — nothing here is persisted, it is not
-user-owned data, but a reopen must not refire ~7 requests to four government
-websites. `BrocardiDisplay` now carries doctrine only (Brocardi, Ratio,
+user-owned data, but pressing the action twice (or reopening the section)
+must not refire ~7 requests to four government websites. `BrocardiDisplay`
+now carries doctrine only (Brocardi, Ratio,
 Spiegazione, Relazioni, RelazioneCostituzione, Footnotes, RelatedArticles,
 CrossReferences, Glossario); Massime does not participate in the
 highlight/note anchoring flow (`MarkableBrocardiSection`), so moving it
