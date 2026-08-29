@@ -84,7 +84,23 @@ async def cerca_libera(testo: str, limite: int = 10) -> list[SourceResult]:
 
 
 async def leggi(organo: str, numero: str, anno: int) -> Decisione | None:
-    """Raises KeyError for an unknown source — the caller turns that into a
-    400. Not routed through `_fan_out`: this targets exactly one source, so
-    there is nothing to fan out to and no other source's result to preserve."""
-    return await ADAPTERS[organo].leggi(numero, anno)
+    """Raises `KeyError` for an unknown source and `asyncio.TimeoutError` if
+    the source does not answer within `_SOURCE_TIMEOUT` — the caller turns
+    both into an HTTP error (400 for the former, 504/503 for the latter). Not
+    routed through `_fan_out`: this targets exactly one source, so there is
+    nothing to fan out to and no other source's result to preserve. The
+    timeout is bounded the same way the fan-out is, for the same reason: the
+    shared HTTP client's own retry budget runs to roughly 150s, and
+    `CerdefAdapter.leggi` makes several calls internally, so an unwrapped
+    await here could leave a lawyer waiting nearly three minutes for a
+    single decision.
+
+    A timeout here is deliberately NOT swallowed into `None` — this
+    signature's `None` already means "not found", and telling the caller
+    "we could not reach the source in time" is a different and worse claim
+    than "the decision does not exist". Letting `asyncio.TimeoutError`
+    propagate keeps those two outcomes distinguishable.
+    """
+    return await asyncio.wait_for(
+        ADAPTERS[organo].leggi(numero, anno), timeout=_SOURCE_TIMEOUT,
+    )

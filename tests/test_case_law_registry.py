@@ -44,6 +44,7 @@ class _HangingAdapter:
         return await self.cerca_per_norma(testo, limite)
 
     async def leggi(self, numero, anno):
+        await asyncio.sleep(self._sleep)
         return None
 
 
@@ -98,3 +99,18 @@ async def test_a_hanging_source_times_out_without_stalling_the_others(monkeypatc
     assert per_organo["lento"].ok is False
     assert "timed out" in per_organo["lento"].error.lower()
     assert per_organo["lento"].coverage == "covers everything, eventually"
+
+
+async def test_leggi_propagates_timeout_instead_of_claiming_not_found(monkeypatch):
+    """`leggi()` has no fan-out to fall back on, so a hanging source must not
+    be swallowed into `None` — that already means "not found", a different
+    and worse claim than "we could not reach the source in time". The caller
+    (Task 8's HTTP layer) is expected to catch `asyncio.TimeoutError` and map
+    it to a 504/503, not to receive a plain `None`."""
+    monkeypatch.setattr(registry, "_SOURCE_TIMEOUT", 0.05)
+    monkeypatch.setattr(registry, "ADAPTERS", {
+        "lento": _HangingAdapter("lento", sleep=1.0),
+    })
+
+    with pytest.raises(asyncio.TimeoutError):
+        await registry.leggi("lento", "1", 2024)
