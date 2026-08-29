@@ -38,15 +38,50 @@ _REVERT = re.compile(r'^Revert "(?P<subject>.+)"$')
 _BARE_MERGE = re.compile(r"^Merge (branch|pull request|remote-tracking) ")
 
 
-def build_changelog(raw_log: str, limit: int = DEFAULT_LIMIT) -> list[dict[str, Any]]:
+def build_changelog(
+    raw_log: str,
+    boundary: Optional[str] = None,
+    limit: int = DEFAULT_LIMIT,
+) -> list[dict[str, Any]]:
     """Turn `git log --first-parent --format=%h|%s|%ci|%an` into shown entries.
 
     Expects git's own order, newest first, which is what the revert pairing
     below reads: a revert cancels the nearest older commit with that subject,
     so a revert of a revert leaves the original work standing.
+
+    `boundary` is the commit the current version started from, from
+    `changelog_boundary()`. Everything at or below it is another version's
+    news. When that window turns out to hold nothing worth showing, the whole
+    log is used instead — see the fallback below for why that happens in
+    production.
     """
     parsed = [entry for entry in (_parse_line(line) for line in raw_log.splitlines()) if entry]
 
+    entries = _select(_window(parsed, boundary), limit)
+    if not entries and boundary is not None:
+        # The window can be empty through no fault of the log. The production
+        # server commits each version bump but never pushes it, so every
+        # `git pull -r` rebases those commits forward and they end up stacked
+        # above the real work — twenty of them, at the time of writing. The two
+        # most recent bumps are then adjacent and nothing sits between them.
+        # Showing the most recent work beats answering "nothing changed".
+        entries = _select(parsed, limit)
+    return entries
+
+
+def _window(
+    entries: list[dict[str, Any]], boundary: Optional[str]
+) -> list[dict[str, Any]]:
+    """Everything newer than `boundary`. An unknown boundary truncates nothing."""
+    if not boundary:
+        return entries
+    for index, entry in enumerate(entries):
+        if entry['hash'] == boundary:
+            return entries[:index]
+    return entries
+
+
+def _select(parsed: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     pending_reverts: list[str] = []
     for entry in parsed:
@@ -74,18 +109,18 @@ def build_changelog(raw_log: str, limit: int = DEFAULT_LIMIT) -> list[dict[str, 
     return entries
 
 
-def changelog_range(version_file_log: str) -> Optional[str]:
-    """The commit range holding the current version's changes.
+def changelog_boundary(version_file_log: str) -> Optional[str]:
+    """Where the current version's news starts.
 
-    Takes `git log -n 2 --format=%H -- version.txt`. The deploy script stamps
-    `version.txt` after building, so everything between the previous stamp and
-    HEAD is what this version brought. Returns None before a second release
-    exists, leaving the caller to fall back to a plain window of recent commits.
+    Takes `git log -n 2 --format=%h -- version.txt`. The deploy script stamps
+    `version.txt` after building, so everything above the previous stamp is what
+    this version brought. Returns None before a second release exists, which
+    leaves the changelog unwindowed.
     """
     bumps = [line.strip() for line in version_file_log.splitlines() if line.strip()]
     if len(bumps) < 2:
         return None
-    return f'{bumps[1]}..HEAD'
+    return bumps[1]
 
 
 def _parse_line(line: str) -> Optional[dict[str, Any]]:

@@ -1,6 +1,6 @@
 """Tests for the user-facing changelog built from the git first-parent log."""
 
-from visualex_api.tools.changelog import build_changelog, changelog_range
+from visualex_api.tools.changelog import build_changelog, changelog_boundary
 
 DATE = "2026-08-20 10:00:00 +0200"
 
@@ -129,12 +129,52 @@ def test_no_output_from_git_yields_no_entries():
     assert build_changelog("") == []
 
 
-def test_the_window_starts_at_the_bump_before_the_current_one():
-    version_log = "2be0468aaa\n79b4d1dbbb\ncf93c8eccc"
+def test_the_window_keeps_only_what_landed_after_the_previous_bump():
+    raw = "\n".join([
+        line("aaaaaaa", "merge: the newest thing"),
+        line("bbbbbbb", "chore: bump version to 1.4.0"),
+        line("ccccccc", "merge: shipped in 1.4.0"),
+        line("ddddddd", "chore: bump version to 1.3.0"),
+        line("eeeeeee", "merge: ancient history"),
+    ])
 
-    assert changelog_range(version_log) == "79b4d1dbbb..HEAD"
+    assert subjects(build_changelog(raw, boundary="ddddddd")) == [
+        "the newest thing",
+        "shipped in 1.4.0",
+    ]
 
 
-def test_a_first_ever_release_has_no_earlier_bump_to_start_from():
-    assert changelog_range("2be0468aaa") is None
-    assert changelog_range("") is None
+def test_a_window_holding_nothing_but_bumps_falls_back_to_the_whole_log():
+    # The production server never pushes its bump commits, so every deploy
+    # rebases them forward and they end up stacked above the real work. The
+    # two most recent bumps are then adjacent, and the window between them is
+    # empty. Showing "no changelog" there would be a worse answer than showing
+    # the most recent work.
+    raw = "\n".join([
+        line("aaaaaaa", "chore: bump version to 1.6.3"),
+        line("bbbbbbb", "chore: bump version to 1.6.2"),
+        line("ccccccc", "chore: bump version to 1.6.1"),
+        line("ddddddd", "merge: the last real thing that happened"),
+    ])
+
+    assert subjects(build_changelog(raw, boundary="bbbbbbb")) == [
+        "the last real thing that happened"
+    ]
+
+
+def test_a_boundary_older_than_the_scan_does_not_truncate_anything():
+    raw = "\n".join([
+        line("aaaaaaa", "merge: one"),
+        line("bbbbbbb", "merge: two"),
+    ])
+
+    assert subjects(build_changelog(raw, boundary="not-in-the-log")) == ["one", "two"]
+
+
+def test_the_boundary_is_the_bump_before_the_current_one():
+    assert changelog_boundary("2be0468\n79b4d1d\ncf93c8e") == "79b4d1d"
+
+
+def test_a_first_ever_release_has_no_boundary():
+    assert changelog_boundary("2be0468") is None
+    assert changelog_boundary("") is None
