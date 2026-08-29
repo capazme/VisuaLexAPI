@@ -4,8 +4,9 @@
  *
  * Three endpoints exist: `/fetch_case_law` (a norm -> decisions bearing on
  * it), `/search_case_law` (free text) and `/fetch_decision` (one decision by
- * source/numero/anno). Only `fetchCaseLaw` is wired into UI today — the
- * reading panel (CaseLawPanel.tsx), owner priority (a). `searchCaseLaw` and
+ * source/numero/anno). Only `fetchCaseLaw` (via the cached `fetchCaseLawCached`
+ * below) is wired into UI today — the inline Giurisprudenza block
+ * (GiurisprudenzaSection.tsx), owner priority (a). `searchCaseLaw` and
  * `fetchDecision` are kept here, unused by any component, so a future search
  * page or citation-lookup form (priorities b/c) has a ready service layer
  * instead of a reason to duplicate this file.
@@ -25,6 +26,48 @@ export interface FetchCaseLawRequest {
 
 export function fetchCaseLaw(body: FetchCaseLawRequest): Promise<CaseLawResponse> {
   return legalApiPost<CaseLawResponse>('/fetch_case_law', body);
+}
+
+// ─── Session cache ───
+//
+// The four live sources cost ~7 requests to four government websites per
+// call, so the inline Giurisprudenza block (GiurisprudenzaSection.tsx) must
+// not refire them every time a collapsed section is reopened. Same shape as
+// `utils/articleFetchCache.ts`: a session-only Map (never persisted, never
+// entering the Zustand store), an in-flight registry so concurrent callers
+// share one request, and errors deliberately NOT cached so "Riprova" really
+// refetches instead of replaying a stale failure.
+const caseLawCache = new Map<string, CaseLawResponse>();
+const caseLawInFlight = new Map<string, Promise<CaseLawResponse>>();
+
+export function clearCaseLawCache(): void {
+  caseLawCache.clear();
+  caseLawInFlight.clear();
+}
+
+function caseLawCacheKey(body: FetchCaseLawRequest): string {
+  return `${body.riferimento}::${body.limite ?? ''}`;
+}
+
+/** Cached wrapper around `fetchCaseLaw` — the one call site the reading
+ * surface should use (GiurisprudenzaSection.tsx). */
+export function fetchCaseLawCached(body: FetchCaseLawRequest): Promise<CaseLawResponse> {
+  const key = caseLawCacheKey(body);
+  const cached = caseLawCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  const pending = caseLawInFlight.get(key);
+  if (pending) return pending;
+
+  const promise = fetchCaseLaw(body)
+    .then((res) => {
+      caseLawCache.set(key, res);
+      return res;
+    })
+    .finally(() => {
+      caseLawInFlight.delete(key);
+    });
+  caseLawInFlight.set(key, promise);
+  return promise;
 }
 
 export interface SearchCaseLawRequest {
@@ -132,7 +175,7 @@ const POPULAR_NAME_ONLY_ACT_TYPES = new Set(['regio decreto']);
 /**
  * True when `norma.tipo_atto` names an act this module cannot build a
  * searchable case-law reference for — see `POPULAR_NAME_ONLY_ACT_TYPES`.
- * `CaseLawPanel` checks this before calling `/fetch_case_law` at all: for
+ * `GiurisprudenzaSection` checks this before calling `/fetch_case_law` at all: for
  * these acts, four "Nessuna decisione trovata." sections would assert an
  * absence nobody verified.
  */
