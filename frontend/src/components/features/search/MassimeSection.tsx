@@ -180,8 +180,10 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
         </div>
       </div>
 
-      {/* Massime list */}
-      <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[500px] overflow-y-auto">
+      {/* Massime list — no inner scroller: this card now lives full-width in
+          the Giurisprudenza section, not inside a fixed-height popover, so it
+          grows with its content and the page itself scrolls. */}
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
         {filteredMassime.length === 0 ? (
           <div className="p-4 text-center text-sm text-slate-500">
             Nessuna massima trovata con i filtri selezionati
