@@ -40,7 +40,6 @@ from visualex_api.tools.exceptions import (
     ResourceNotFoundError,
     RateLimitExceededError,
 )
-from visualex_api.services.case_law import registry as case_law_registry
 
 # Configurazione del logging
 logging.basicConfig(
@@ -334,9 +333,6 @@ class NormaController:
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
-        self.app.add_url_rule('/fetch_case_law', view_func=self.fetch_case_law, methods=['POST'])
-        self.app.add_url_rule('/search_case_law', view_func=self.search_case_law, methods=['POST'])
-        self.app.add_url_rule('/fetch_decision', view_func=self.fetch_decision, methods=['POST'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
@@ -938,127 +934,6 @@ class NormaController:
             return jsonify({'presets': presets, 'known_acts': known})
         except Exception as e:
             return self._error_response(e, 'fetch_alias_catalog')
-
-    @staticmethod
-    async def _get_json_body():
-        """Never let a malformed JSON body reach a handler as an unrelated
-        crash. Quart's `get_json()` raises `werkzeug.exceptions.BadRequest`
-        when the body isn't valid JSON (or is absent with the wrong
-        Content-Type); left unguarded that becomes a 500 for what is really a
-        400-shaped problem — the same "validation reported as server fault"
-        defect as the unguarded `int()` calls below.
-        """
-        try:
-            return await request.get_json()
-        except Exception:
-            return None
-
-    @staticmethod
-    def _parse_optional_int(value, field_name, default):
-        """Guard a user-supplied integer field: a non-numeric `value` would
-        otherwise raise a bare `ValueError` deep in the handler and answer
-        500, exactly the defect class already fixed on the Node backend for
-        the same reason — a malformed request is not a server fault.
-        """
-        if value is None:
-            return default
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            raise ValidationError(
-                f"Campo '{field_name}' non valido: deve essere un numero intero")
-
-    def _parse_limite(self, raw_limite):
-        """`limite` bounded to (0, 50]. The upper bound was already in the
-        brief; the lower bound closes a second gap the brief did not cover: a
-        zero or negative value parses cleanly as an int, so it survives
-        `_parse_optional_int`, but every adapter treats it as a literal
-        page-size/slice bound (`giustizia_amm` sends it verbatim as
-        `pageSize`, `cerdef` slices a regex match list with it) — silently
-        sending a nonsensical value to four external services rather than
-        crashing. Rejecting it here keeps the failure at the boundary where
-        it can be reported to the caller as a 400.
-        """
-        limite = self._parse_optional_int(raw_limite, 'limite', 10)
-        if limite < 1:
-            raise ValidationError(
-                "Campo 'limite' non valido: deve essere maggiore di zero")
-        return min(limite, 50)
-
-    async def fetch_case_law(self):
-        """Decisions bearing on a norm, one section per source.
-
-        Always answers 200 when the request is well formed: a source that is
-        down is reported inside its own section, because an error status here
-        would hide the sources that did answer.
-        """
-        data = await self._get_json_body() or {}
-        riferimento = (data.get('riferimento') or '').strip()
-        if not riferimento:
-            return self._error_response(
-                ValidationError("Campo obbligatorio mancante: riferimento"),
-                'fetch_case_law')
-        try:
-            limite = self._parse_limite(data.get('limite'))
-        except ValidationError as exc:
-            return self._error_response(exc, 'fetch_case_law')
-        fonti = await case_law_registry.cerca_per_norma(riferimento, limite)
-        return jsonify({'fonti': [f.to_dict() for f in fonti]})
-
-    async def search_case_law(self):
-        """Free-text search across the same four sources as `/fetch_case_law`."""
-        data = await self._get_json_body() or {}
-        testo = (data.get('testo') or '').strip()
-        if not testo:
-            return self._error_response(
-                ValidationError("Campo obbligatorio mancante: testo"),
-                'search_case_law')
-        try:
-            limite = self._parse_limite(data.get('limite'))
-        except ValidationError as exc:
-            return self._error_response(exc, 'search_case_law')
-        fonti = await case_law_registry.cerca_libera(testo, limite)
-        return jsonify({'fonti': [f.to_dict() for f in fonti]})
-
-    async def fetch_decision(self):
-        """One decision by `organo`, `numero`, `anno`.
-
-        `registry.leggi` raises `KeyError` for an unrecognised `organo` (400)
-        and lets `asyncio.TimeoutError` propagate when the source does not
-        answer in time — deliberately not swallowed into `None`, because
-        `None` already means "not found" and a timeout is a different, worse
-        claim ("we could not reach the source") that would otherwise be
-        reported as "this decision does not exist". Answered here as 504,
-        kept distinct from the 400 (unknown source) and 404 (genuinely
-        absent).
-        """
-        data = await self._get_json_body() or {}
-        organo = (data.get('organo') or '').strip()
-        numero = (data.get('numero') or '').strip()
-        anno_raw = data.get('anno')
-        if not organo or not numero or anno_raw is None:
-            return self._error_response(
-                ValidationError("Campi obbligatori: organo, numero, anno"),
-                'fetch_decision')
-        try:
-            anno = self._parse_optional_int(anno_raw, 'anno', None)
-        except ValidationError as exc:
-            return self._error_response(exc, 'fetch_decision')
-        try:
-            decisione = await case_law_registry.leggi(organo, numero, anno)
-        except KeyError:
-            return self._error_response(
-                ValidationError(f"Organo non riconosciuto: {organo}"), 'fetch_decision')
-        except asyncio.TimeoutError:
-            log.warning("Case-law source timed out on fetch_decision",
-                        organo=organo, numero=numero, anno=anno)
-            return jsonify(
-                {'error': f"La fonte '{organo}' non ha risposto in tempo"}), 504
-        if decisione is None:
-            return self._error_response(
-                ResourceNotFoundError(f"Decisione {numero}/{anno} non trovata in {organo}"),
-                'fetch_decision')
-        return jsonify(decisione.to_dict())
 
     async def fetch_brocardi_info(self):
         try:

@@ -202,11 +202,6 @@ POST unless noted, JSON bodies.
   AKN index. Structure only: it never carries the display text
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
-- `/fetch_case_law` — decisions bearing on a norm, grouped by source. Always 200
-  on a well-formed request: a source that is down reports `ok:false` inside its
-  own section, so one dead source never hides the ones that answered
-- `/search_case_law` — free-text search across the same sources
-- `/fetch_decision` — one decision by `organo`, `numero`, `anno`
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 

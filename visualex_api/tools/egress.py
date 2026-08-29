@@ -33,13 +33,6 @@ ALLOWED_HOSTS: dict[str, str] = {
     # so both are declared.
     "brocardi.it": "Brocardi.it — annotazioni dottrinali (fonte privata)",
     "www.brocardi.it": "Brocardi.it — annotazioni dottrinali (fonte privata)",
-    # --- Case law ---
-    "publications.europa.eu": "Publications Office of the EU — CELLAR, CJEU case law",
-    "www.italgiure.giustizia.it": "Ministero della Giustizia — CED, Corte di cassazione",
-    "def.finanze.it": "MEF — Documentazione economica e finanziaria, giurisprudenza",
-    "www.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR",
-    "mdp.giustizia-amministrativa.it": "Giustizia amministrativa — testi dei provvedimenti",
-    "titrust.crt.sectigo.com": "Sectigo — intermediate CA for italgiure.giustizia.it (Task 2)",
 }
 
 #: Strings that look like hosts but are never fetched.
@@ -52,15 +45,6 @@ NON_NETWORK_HOSTS: dict[str, str] = {
     "docs.oasis-open.org": (
         "the Akoma Ntoso 3.0 XML namespace URI, named in the akn_parser "
         "docstring; the parser resolves nothing (no_network=True)"
-    ),
-    "visualex.org": (
-        "the contact URL inside services/case_law/base.py's USER_AGENT "
-        "string; sent to case-law sources as a header value, never fetched"
-    ),
-    "www.w3.org": (
-        "the XSD string-datatype namespace URI inside the SPARQL query "
-        "literal in services/case_law/cellar.py; part of the query text sent "
-        "to CELLAR, never itself contacted"
     ),
 }
 

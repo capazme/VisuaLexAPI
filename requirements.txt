@@ -9,8 +9,3 @@ aiohttp
 redis>=5.0
 pyyaml>=6.0
 lxml>=5.0
-# Imported directly by visualex_api/tools/tls.py (the CA bundle the italgiure
-# context is built on); it only arrived transitively via requests before.
-# Floor is the release that dropped the compromised GLOBALTRUST root
-# (CVE-2024-39689) — a stale bundle is a trust-store problem, not a nuisance.
-certifi>=2024.7.4

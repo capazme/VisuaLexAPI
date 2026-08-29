@@ -329,8 +329,8 @@ Information Access), and it is only trusted because it verifies against a root
 already in certifi — an attacker substituting it changes nothing, because the
 signature check still has to pass.
 
-Do not "simplify" this into disabling verification.
-tests/test_tls_italgiure.py fails if anyone does.
+Do not "simplify" this into `ssl=False`. tests/test_tls_italgiure.py fails if
+anyone does.
 """
 from __future__ import annotations
 
@@ -752,9 +752,7 @@ def build_norma_query(riferimento: str) -> str:
     if not m:
         return f'ocr:("{riferimento.strip()}")'
     numero = m.group(1).strip()
-    # Strip separators but never the trailing dot: "c.c." is the abbreviation,
-    # and "c.c" matches nothing in the index.
-    resto = riferimento[m.end():].strip(" ,;")
+    resto = riferimento[m.end():].strip(" ,.;")
     if not resto:
         return f'ocr:("art. {numero}")'
     variants = [f'"art. {numero} {resto}"', f'"articolo {numero} {resto}"',

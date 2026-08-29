@@ -12,12 +12,6 @@ is actually enforced today:
 | `eur-lex.europa.eu` | EUR-Lex — Ufficio delle pubblicazioni UE |
 | `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
-| `publications.europa.eu` | Publications Office of the EU — CELLAR, CJEU case law |
-| `www.italgiure.giustizia.it` | Ministero della Giustizia — CED, Corte di cassazione |
-| `def.finanze.it` | MEF — Documentazione economica e finanziaria, giurisprudenza |
-| `www.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR |
-| `mdp.giustizia-amministrativa.it` | Giustizia amministrativa — testi dei provvedimenti |
-| `titrust.crt.sectigo.com` | Sectigo — intermediate CA for italgiure.giustizia.it (Task 2) |
 
 The list lives as data in `visualex_api/tools/egress.py`.
 
@@ -64,21 +58,6 @@ of ways a crafted request could still make it fetch something else.
 ## Transport
 
 Certificate verification is enabled for every outbound request.
-
-One host needs help to be verified. `www.italgiure.giustizia.it` serves an
-incomplete chain: it omits the "TI Trust Technologies OV CA" intermediate that
-links its leaf to a root already in certifi. `visualex_api/tools/tls.py`
-supplies that intermediate rather than turning verification off — it downloads
-it from the URI the leaf advertises (Authority Information Access), which is a
-plaintext HTTP endpoint and therefore authenticates nothing on its own.
-
-The download is accepted only if its DER bytes hash to the SHA-256 pin recorded
-in that module; anything else raises and no context is built, so a failed check
-means italgiure requests fail rather than running over a connection whose trust
-anchor someone else chose. The pin is what makes this safe —
-`load_verify_locations` installs a trust anchor and verifies nothing about it.
-When the CA rotates, the module documents the procedure: verify the new
-certificate chains to a certifi root *before* updating the pin.
 
 ## Reporting
 
