@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCaseLawReference } from './caseLawService';
+import { buildCaseLawReference, isUnsearchableActType } from './caseLawService';
 
 describe('buildCaseLawReference', () => {
   it('abbreviates a codified act to the form courts actually cite', () => {
@@ -60,5 +60,22 @@ describe('buildCaseLawReference', () => {
     expect(
       buildCaseLawReference({ tipo_atto: 'codice del consumo', numero_atto: '206', data: '2005-09-06', numero_articolo: '33' }),
     ).toBe('art. 33 codice del consumo');
+  });
+});
+
+describe('isUnsearchableActType', () => {
+  it('flags regio decreto — cited by a popular name no wire field carries', () => {
+    expect(isUnsearchableActType('regio decreto')).toBe(true);
+  });
+
+  it('is case- and whitespace-tolerant, like the other tipo_atto lookups in this module', () => {
+    expect(isUnsearchableActType('Regio Decreto')).toBe(true);
+    expect(isUnsearchableActType('  regio decreto  ')).toBe(true);
+  });
+
+  it('does not flag ordinary act types', () => {
+    expect(isUnsearchableActType('codice civile')).toBe(false);
+    expect(isUnsearchableActType('legge')).toBe(false);
+    expect(isUnsearchableActType('decreto legislativo')).toBe(false);
   });
 });

@@ -114,6 +114,32 @@ const GENERIC_ACT_ABBREVIATIONS: Record<string, string> = {
   'decreto del presidente della repubblica': 'D.P.R.',
 };
 
+// `regio decreto` is the one entry in `GENERIC_ACT_TYPES` that stays
+// unabbreviated on purpose (see the block comment above): "regio decreto n.
+// 267 del 1942" and "R.D. n. 267 del 1942" both scored 0/5 live. That is not
+// a phrasing gap this module can close — old regio decreto acts (the legge
+// fallimentare, the T.U.L.P.S.) are cited by a popular name that isn't
+// derivable from `tipo_atto`/`numero_atto`/`data`, the only fields this API
+// has. `buildCaseLawReference` still returns a string for one (the type plus
+// number and year), but a caller that queries every source with it gets four
+// honest-looking empty sections that never verified anything — the same
+// shape `italgiure.build_norma_query` and `cerdef.cerca_per_norma` refuse
+// server-side for their own unsafe cases, via a `coverage` note instead of a
+// silent empty. This is the same posture, one level up: the query itself
+// should never be sent.
+const POPULAR_NAME_ONLY_ACT_TYPES = new Set(['regio decreto']);
+
+/**
+ * True when `norma.tipo_atto` names an act this module cannot build a
+ * searchable case-law reference for — see `POPULAR_NAME_ONLY_ACT_TYPES`.
+ * `CaseLawPanel` checks this before calling `/fetch_case_law` at all: for
+ * these acts, four "Nessuna decisione trovata." sections would assert an
+ * absence nobody verified.
+ */
+export function isUnsearchableActType(tipoAtto: string): boolean {
+  return POPULAR_NAME_ONLY_ACT_TYPES.has(tipoAtto.trim().toLowerCase());
+}
+
 type ReferenceNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo'>;
 
 /**

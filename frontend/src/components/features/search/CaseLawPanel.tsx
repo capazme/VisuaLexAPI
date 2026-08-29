@@ -17,7 +17,7 @@ import type { Decisione, LinkKind, NormaVisitata, SourceResult } from '../../../
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { SkeletonText } from '../../ui/Skeleton';
-import { buildCaseLawReference, fetchCaseLaw } from '../../../services/caseLawService';
+import { buildCaseLawReference, fetchCaseLaw, isUnsearchableActType } from '../../../services/caseLawService';
 import { LegalApiError } from '../../../services/legalApi';
 
 // Per-source cap on a fan-out to four sources rendered in a single 380px
@@ -142,6 +142,15 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the primitive fields the reference is built from, not `norma`'s identity
         [norma.tipo_atto, norma.numero_atto, norma.data, norma.numero_articolo],
     );
+    // Some act types (regio decreto — see `isUnsearchableActType`) have no
+    // reference this API can search: courts cite them by a popular name this
+    // API has no field for. Skipping the fetch entirely, rather than sending
+    // a reference nobody will match, is what keeps the panel from asserting
+    // four unverified absences.
+    const unsearchable = useMemo(
+        () => isUnsearchableActType(norma.tipo_atto),
+        [norma.tipo_atto],
+    );
 
     const [status, setStatus] = useState<FetchStatus>('loading');
     const [fonti, setFonti] = useState<SourceResult[]>([]);
@@ -150,6 +159,7 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
     const [retryToken, setRetryToken] = useState(0);
 
     useEffect(() => {
+        if (unsearchable) return;
         let cancelled = false;
         setStatus('loading');
         setErrorMessage(null);
@@ -172,7 +182,7 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
                 setStatus('error');
             });
         return () => { cancelled = true; };
-    }, [riferimento, retryToken]);
+    }, [riferimento, retryToken, unsearchable]);
 
     return (
         <>
@@ -200,9 +210,11 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
                 max-height, so it grows the whole card instead of scrolling
                 internally. */}
             <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
-                {status === 'loading' && <SkeletonText lines={4} />}
+                {unsearchable && <UnsearchableActNotice tipoAtto={norma.tipo_atto} />}
 
-                {status === 'error' && (
+                {!unsearchable && status === 'loading' && <SkeletonText lines={4} />}
+
+                {!unsearchable && status === 'error' && (
                     <div className="flex flex-col items-center gap-2 py-6 text-center">
                         <CircleAlert size={20} className="text-rose-500" />
                         <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -220,13 +232,13 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
                     </div>
                 )}
 
-                {status === 'success' && fonti.length === 0 && (
+                {!unsearchable && status === 'success' && fonti.length === 0 && (
                     <p className="text-sm text-slate-500 dark:text-slate-400 italic text-center py-6">
                         Nessuna fonte disponibile.
                     </p>
                 )}
 
-                {status === 'success' && fonti.map((fonte) => (
+                {!unsearchable && status === 'success' && fonti.map((fonte) => (
                     <SourceSection key={fonte.fonte || fonte.organo} fonte={fonte} />
                 ))}
             </div>
@@ -235,6 +247,30 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
 }
 
 // ───────────────────────── SUBCOMPONENTS ─────────────────────────
+
+/**
+ * Replaces the four-source fetch for an act this API cannot build a
+ * searchable reference for (`isUnsearchableActType`) — today, `regio
+ * decreto` (the legge fallimentare, il T.U.L.P.S.). Four sections saying
+ * "Nessuna decisione trovata." would assert an absence nobody verified;
+ * this says the true reason instead, in the same italic, muted register the
+ * per-source empty state already uses elsewhere in this panel.
+ */
+function UnsearchableActNotice({ tipoAtto }: { tipoAtto: string }) {
+    return (
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <CircleAlert size={20} className="text-slate-400 dark:text-slate-500" />
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+                I tribunali citano questo atto ({tipoAtto}) con un nome proprio
+                (es. &ldquo;legge fallimentare&rdquo;), non ricavabile dal solo
+                tipo e numero.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+                La ricerca in giurisprudenza non può essere eseguita per questo atto.
+            </p>
+        </div>
+    );
+}
 
 function SourceSection({ fonte }: { fonte: SourceResult }) {
     return (

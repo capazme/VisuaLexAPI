@@ -246,6 +246,46 @@ describe('CaseLawPanel — a bounded fan-out', () => {
   });
 });
 
+describe('CaseLawPanel — an act with no searchable reference', () => {
+  const REGIO_DECRETO_NORMA = {
+    tipo_atto: 'regio decreto', numero_atto: '267', data: '1942-03-16', numero_articolo: '1',
+  };
+
+  it('never calls /fetch_case_law for a regio decreto, and explains why instead of rendering empty sections', async () => {
+    // `buildCaseLawReference` still returns a string for `regio decreto`
+    // (module docstring: neither the spelled-out nor abbreviated form
+    // matched anything live), but sending it would render four
+    // "Nessuna decisione trovata." sections that never verified anything —
+    // courts cite this act by a popular name ("legge fallimentare") no
+    // wire field carries.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <CaseLawPanel isOpen anchorEl={null} articleLabel="Art. 1" norma={REGIO_DECRETO_NORMA} onClose={vi.fn()} />,
+    );
+
+    expect(await screen.findByText(/non può essere eseguita/)).toBeInTheDocument();
+    expect(screen.getByText(/regio decreto/)).toBeInTheDocument();
+    expect(screen.queryByText('Nessuna decisione trovata.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nessuna fonte disponibile.')).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('still fetches normally for an act with a searchable reference (codice civile)', async () => {
+    mockFonti([
+      { organo: 'Cassazione', fonte: 'cassazione', ok: true, error: '', coverage: '', decisioni: [], count: 0 },
+    ]);
+
+    render(
+      <CaseLawPanel isOpen anchorEl={null} articleLabel="Art. 2043" norma={NORMA} onClose={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('Nessuna decisione trovata.')).toBeInTheDocument();
+    expect(screen.queryByText(/non può essere eseguita/)).not.toBeInTheDocument();
+  });
+});
+
 describe('CaseLawPanel — total request failure', () => {
   it('shows a top-level error, not a silently empty panel, when the request itself fails', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
