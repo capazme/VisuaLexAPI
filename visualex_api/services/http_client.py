@@ -56,8 +56,18 @@ class ThrottledHttpClient:
         url: str,
         *,
         source: str = "generic",
+        text_encoding: Optional[str] = None,
         **kwargs,
     ) -> HttpResult:
+        """`text_encoding` overrides the codec used to decode the response body
+        into `HttpResult.text`. Left at the default (None), aiohttp guesses the
+        charset from the response and falls back to utf-8 — unchanged behaviour
+        for every existing caller. Pass "latin-1" for endpoints that answer with
+        binary content and no charset (e.g. a DER certificate): latin-1 is a
+        bijective mapping over bytes 0-255, so `text.encode("latin-1")` losslessly
+        recovers the original bytes, where the utf-8 fallback would raise
+        UnicodeDecodeError instead.
+        """
         if not is_allowed(url):
             log.error("Blocked request to undeclared host", url=url[:120], source=source)
             raise NetworkError(
@@ -72,7 +82,7 @@ class ThrottledHttpClient:
                 session = await self._get_session()
                 try:
                     async with session.request(method, url, **kwargs) as response:
-                        text = await response.text()
+                        text = await response.text(encoding=text_encoding)
                         headers = dict(response.headers)
                         status = response.status
                         self._log_response(source, url, status, headers)
