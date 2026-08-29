@@ -1,6 +1,6 @@
 import type { Ref } from 'react';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Gavel, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 
@@ -16,10 +16,13 @@ export interface ReadingToolbarProps {
     isHighlightsPeekOpen: boolean;
     highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
+    isCaseLawPanelOpen: boolean;
+    caseLawButtonRef?: Ref<HTMLButtonElement | null>;
     showMoreMenu: boolean;
     isPinnedQuick: boolean;
     onToggleNotes: () => void;
     onToggleHighlightsPeek: () => void;
+    onToggleCaseLaw: () => void;
     onToggleMoreMenu: (next: boolean) => void;
     onToggleQuickNorm: () => void;
     onMobileCopy: () => Promise<void> | void;
@@ -43,10 +46,13 @@ export function ReadingToolbar({
     isHighlightsPeekOpen,
     highlightsButtonRef,
     highlightsCount,
+    isCaseLawPanelOpen,
+    caseLawButtonRef,
     showMoreMenu,
     isPinnedQuick,
     onToggleNotes,
     onToggleHighlightsPeek,
+    onToggleCaseLaw,
     onToggleMoreMenu,
     onToggleQuickNorm,
     onMobileCopy,
@@ -198,6 +204,20 @@ export function ReadingToolbar({
                             {highlightsCount}
                         </span>
                     )}
+                </button>
+                <button
+                    ref={caseLawButtonRef}
+                    onClick={onToggleCaseLaw}
+                    aria-expanded={isCaseLawPanelOpen}
+                    aria-haspopup="dialog"
+                    className={cn("p-1.5 rounded-md transition-colors",
+                        isCaseLawPanelOpen
+                            ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400"
+                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500"
+                    )}
+                    title={isCaseLawPanelOpen ? "Chiudi giurisprudenza" : "Giurisprudenza su questo articolo"}
+                >
+                    <Gavel size={16} />
                 </button>
                 <button
                     onClick={onOpenCopyModal}
