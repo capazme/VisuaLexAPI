@@ -740,6 +740,21 @@ meant to stay split; add new features as new files, not inside the shells:
     as a second door. Before adding a global-looking "open X" button, check where
     X is mounted.
 
+29. **A Tailwind class whose token is undeclared fails in total silence.**
+    `frontend/tailwind.config.js` is a v3-style config and Tailwind v4 never
+    loads it — there is no `@config` in `src/index.css`. Every
+    `primary-<number>` class the app wrote therefore generated no CSS at all:
+    568 of them across 60 files, including 38 buttons carrying `text-white` on
+    a `bg-primary-600` that painted nothing, and the
+    `focus-visible:ring-primary-500` this file prescribes for accessibility.
+    No build error, no lint warning, no visual difference from a typo. The
+    scale now lives in the `@theme` block of `index.css`, which is the only
+    place v4 reads; `src/theme.test.ts` compiles the real stylesheet and fails
+    if a step stops resolving. **`--color-primary` and `--color-primary-500`
+    are different tokens** — `bg-primary` (213 uses) comes from the first and
+    must keep working. Everything else the config declares — `font-sans`,
+    `shadow-glow`, `animate-shimmer` — is still inert.
+
 28. **Two vocabularies name the same act, and they disagree on case.**
     `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver
     answers `regolamento ue`. A `===` between the two silently produced an act

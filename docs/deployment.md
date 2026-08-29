@@ -95,7 +95,7 @@ cd backend && npm test
 cd frontend && npm run build && npx vitest run
 ```
 
-Expected today: 400 Python (1 deselected — the `live` marker), 35 backend, 192 frontend.
+Expected today: 400 Python (1 deselected — the `live` marker), 35 backend, 194 frontend.
 
 The backend suite needs `backend/.env.test` pointing at a **separate** database
 (`visualex_test`, not `visualex_platform`) — it runs `prisma migrate reset` on
