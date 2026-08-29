@@ -114,3 +114,89 @@ async def test_leggi_propagates_timeout_instead_of_claiming_not_found(monkeypatc
 
     with pytest.raises(asyncio.TimeoutError):
         await registry.leggi("lento", "1", 2024)
+
+
+class _LookupAdapter:
+    """Like `_Adapter`, but `leggi()` answers a real `Decisione` instead of
+    always `None` — needed to assert what the registry stamps onto it."""
+
+    def __init__(self, organo):
+        self.organo = organo
+        self.coverage = ""
+
+    async def cerca_per_norma(self, riferimento, limite=10):
+        return SourceResult(
+            organo=self.organo, ok=True,
+            decisioni=[Decisione(organo=self.organo, numero="1", anno=2024,
+                                 link_kind=LinkKind.MATCHED, url="u")],
+        )
+
+    async def cerca_libera(self, testo, limite=10):
+        return await self.cerca_per_norma(testo, limite)
+
+    async def leggi(self, numero, anno):
+        return Decisione(organo=self.organo, numero=numero, anno=anno,
+                         link_kind=LinkKind.MATCHED, url="u")
+
+
+class TestFonteKey:
+    """FIX 1: the key a client reads back from `/fetch_case_law` must be the
+    key `/fetch_decision` accepts. This is the registry-level half of that
+    contract — `tests/test_case_law_endpoints.py` covers the HTTP round trip.
+    """
+
+    async def test_fan_out_stamps_the_registry_key_on_the_source_result(self, monkeypatch):
+        monkeypatch.setattr(registry, "ADAPTERS", {
+            "cgue": _Adapter("CGUE"), "cassazione": _Adapter("Cassazione"),
+        })
+
+        results = await registry.cerca_per_norma("art. 2043 c.c.")
+        per_key = {r.fonte: r for r in results}
+        assert per_key["cgue"].organo == "CGUE"
+        assert per_key["cassazione"].organo == "Cassazione"
+
+    async def test_fan_out_stamps_the_registry_key_on_every_decisione(self, monkeypatch):
+        monkeypatch.setattr(registry, "ADAPTERS", {
+            "giustizia-amm": _Adapter("Giustizia amministrativa"),
+        })
+        results = await registry.cerca_per_norma("art. 21-septies")
+        result = results[0]
+        assert result.fonte == "giustizia-amm"
+        assert result.decisioni[0].fonte == "giustizia-amm"
+        # `organo` on the row is untouched — CeRDEF depends on this staying
+        # the court parsed off the row, not the source's own label.
+        assert result.decisioni[0].organo == "Giustizia amministrativa"
+
+    async def test_leggi_stamps_the_canonical_key_not_the_callers_casing(self, monkeypatch):
+        monkeypatch.setattr(registry, "ADAPTERS", {"cgue": _LookupAdapter("CGUE")})
+
+        decisione = await registry.leggi("CGUE", "62017CJ0496", 2019)
+
+        assert decisione.fonte == "cgue"
+
+    async def test_leggi_accepts_the_registry_key_case_insensitively(self, monkeypatch):
+        monkeypatch.setattr(registry, "ADAPTERS", {"cgue": _LookupAdapter("CGUE")})
+
+        assert (await registry.leggi("cgue", "1", 2019)).fonte == "cgue"
+        assert (await registry.leggi("CGUE", "1", 2019)).fonte == "cgue"
+        assert (await registry.leggi("CgUe", "1", 2019)).fonte == "cgue"
+
+    async def test_leggi_accepts_the_human_readable_label(self, monkeypatch):
+        """A client will inevitably try the label it read off `organo` in
+        `/fetch_case_law` instead of `fonte` — this must not 400 either, even
+        when the label and the key are not the same string once lower-cased
+        (unlike "CGUE"/"cgue", "Giustizia amministrativa" does not fold to
+        "giustizia-amm")."""
+        monkeypatch.setattr(registry, "ADAPTERS", {
+            "giustizia-amm": _LookupAdapter("Giustizia amministrativa"),
+        })
+
+        decisione = await registry.leggi("Giustizia amministrativa", "1", 2020)
+
+        assert decisione.fonte == "giustizia-amm"
+
+    async def test_leggi_still_rejects_an_unknown_source(self, monkeypatch):
+        monkeypatch.setattr(registry, "ADAPTERS", {"cgue": _LookupAdapter("CGUE")})
+
+        with pytest.raises(KeyError):
+            await registry.leggi("corte-costituzionale", "1", 2020)

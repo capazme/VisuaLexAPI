@@ -229,3 +229,60 @@ class TestFetchDecision:
         body = await resp.get_json()
         assert body["numero"] == "1234"
         assert body["link_kind"] == "matched"
+
+
+class TestFetchDecisionRoundTrip:
+    """FIX 1: `registry.ADAPTERS` is keyed `"cgue"`/`"cassazione"`/`"cerdef"`/
+    `"giustizia-amm"`, but `/fetch_case_law` used to answer `organo` as the
+    human-readable label ("CGUE", "Giustizia amministrativa") with no
+    mapping published anywhere — a client that read that field and sent it
+    straight back to `/fetch_decision` got a 400 on all four sources. This
+    exercises the real `registry` fan-out and lookup (only the four adapters
+    are stubbed, at the `ADAPTERS` level, not `cerca_per_norma`/`leggi`
+    themselves), because the defect lives in exactly that boundary.
+    """
+
+    class _FakeAdapter:
+        def __init__(self, organo):
+            self.organo = organo
+            self.coverage = ""
+
+        async def cerca_per_norma(self, riferimento, limite=10):
+            return SourceResult(organo=self.organo, ok=True, decisioni=[
+                Decisione(organo=self.organo, numero="62017CJ0496", anno=2019,
+                          link_kind=LinkKind.CITED, url="u")])
+
+        async def cerca_libera(self, testo, limite=10):
+            return await self.cerca_per_norma(testo, limite)
+
+        async def leggi(self, numero, anno):
+            return Decisione(organo=self.organo, numero=numero, anno=anno,
+                              link_kind=LinkKind.CITED, url="u")
+
+    async def test_the_key_read_back_from_fetch_case_law_is_accepted(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.case_law_registry.ADAPTERS",
+            {"giustizia-amm": self._FakeAdapter("Giustizia amministrativa")},
+        )
+        app_client = NormaController().app.test_client()
+
+        resp = await app_client.post("/fetch_case_law", json={"riferimento": "art. 21-septies"})
+        assert resp.status_code == 200
+        body = await resp.get_json()
+        source = body["fonti"][0]
+        # The label a lawyer reads and the key a client must send back are
+        # not the same string ("Giustizia amministrativa" vs "giustizia-amm")
+        # — this is precisely the case the fix has to cover, not the three
+        # sources whose label happens to fold to the key.
+        assert source["organo"] == "Giustizia amministrativa"
+        assert source["fonte"] == "giustizia-amm"
+        assert source["decisioni"][0]["fonte"] == "giustizia-amm"
+
+        resp2 = await app_client.post(
+            "/fetch_decision",
+            json={"organo": source["fonte"], "numero": "62017CJ0496", "anno": 2019},
+        )
+
+        assert resp2.status_code != 400
+        assert resp2.status_code == 200
+        assert (await resp2.get_json())["fonte"] == "giustizia-amm"

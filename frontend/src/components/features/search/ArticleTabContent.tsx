@@ -19,6 +19,7 @@ import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
 import { HighlightsActionsPicker } from './HighlightsActionsPicker';
+import { CaseLawPanel } from './CaseLawPanel';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
@@ -107,6 +108,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isHighlightsPeekOpen, setIsHighlightsPeekOpen] = useState(false);
     const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
+    const [isCaseLawPanelOpen, setIsCaseLawPanelOpen] = useState(false);
+    const [caseLawButtonEl, setCaseLawButtonEl] = useState<HTMLButtonElement | null>(null);
     // Local visibility toggle: when true, the article body keeps the markup
     // (so highlights aren't lost) but renders `.highlight-mark` transparent
     // via the `.highlights-hidden` class scoped to contentRef. Per-article,
@@ -589,9 +592,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isHighlightsPeekOpen={isHighlightsPeekOpen}
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={allPanelHighlights.length}
+                isCaseLawPanelOpen={isCaseLawPanelOpen}
+                caseLawButtonRef={setCaseLawButtonEl}
                 showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
+                onToggleCaseLaw={() => setIsCaseLawPanelOpen(v => !v)}
                 onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
@@ -629,6 +635,14 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onClose={() => setIsHighlightsPeekOpen(false)}
                 onToggleVisibility={() => setHighlightsHidden(v => !v)}
                 onExportTxt={handleExportHighlightsTxt}
+            />
+
+            <CaseLawPanel
+                isOpen={isCaseLawPanelOpen}
+                anchorEl={caseLawButtonEl}
+                articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
+                norma={norma_data}
+                onClose={() => setIsCaseLawPanelOpen(false)}
             />
 
             {inlineNote && (

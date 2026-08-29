@@ -27,8 +27,8 @@ import re
 import structlog
 
 from ...tools.tls import italgiure_ssl_context
-from ..http_client import http_client
 from .base import Decisione, LinkKind, SourceResult, http_headers
+from .http_client import case_law_http_client as http_client
 
 log = structlog.get_logger()
 

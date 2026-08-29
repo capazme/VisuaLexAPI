@@ -204,9 +204,22 @@ POST unless noted, JSON bodies.
   resolver already understands. The only GET among these; a POST answers 405
 - `/fetch_case_law` — decisions bearing on a norm, grouped by source. Always 200
   on a well-formed request: a source that is down reports `ok:false` inside its
-  own section, so one dead source never hides the ones that answered
+  own section, so one dead source never hides the ones that answered. Each
+  section and each decision inside it carries two source fields that answer
+  different questions: `organo` is the human-readable label a lawyer reads
+  ("CGUE", "Giustizia amministrativa"; for CeRDEF's per-row `organo` it is the
+  court parsed off that row, e.g. "Corte di Cassazione" — never the source's
+  own label), `fonte` is the `registry.ADAPTERS` key ("cgue", "cassazione",
+  "cerdef", "giustizia-amm") this row came from and is what a client must send
+  back as `organo` to `/fetch_decision`. The two only coincide by
+  case-folding for three of the four sources — `fonte="giustizia-amm"` does
+  not fold from `organo="Giustizia amministrativa"` — so always read `fonte`
+  for the address, never derive it from `organo`
 - `/search_case_law` — free-text search across the same sources
-- `/fetch_decision` — one decision by `organo`, `numero`, `anno`
+- `/fetch_decision` — one decision by `organo` (the `fonte` key above —
+  lookup is case-insensitive and also tolerant of the human-readable `organo`
+  label, but the response's `fonte` is always the canonical key), `numero`,
+  `anno`
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 
@@ -352,6 +365,18 @@ Three entry points, deliberately distinct — don't collapse them.
 **Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
+
+**Case law**: the toolbar's Gavel button opens `CaseLawPanel`, a desktop-only
+Peek fetching live from `/fetch_case_law` on open (nothing cached or
+persisted — it is not user-owned data). It preserves one distinction end to
+end: `LinkKind.cited` (the source declares the citation, e.g. CELLAR's
+citation graph) versus `.matched` (a search engine's text match, which can be
+wrong) get different badges, never the same treatment, and an unrecognised
+`link_kind` falls back to `matched`, never `cited` — an unknown provenance is
+an inference, not a fact. `buildCaseLawReference` (`caseLawService.ts`) builds
+the free-text query every adapter behind that endpoint reads; see its own
+comment for which act types it abbreviates and why, checked against what each
+adapter can actually match, not assumed.
 
 **The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
 `'window'` on desktop — a draggable, backdrop-less window portalled to
