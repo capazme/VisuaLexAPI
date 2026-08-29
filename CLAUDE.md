@@ -366,6 +366,18 @@ Three entry points, deliberately distinct — don't collapse them.
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
 
+**Case law**: the toolbar's Gavel button opens `CaseLawPanel`, a desktop-only
+Peek fetching live from `/fetch_case_law` on open (nothing cached or
+persisted — it is not user-owned data). It preserves one distinction end to
+end: `LinkKind.cited` (the source declares the citation, e.g. CELLAR's
+citation graph) versus `.matched` (a search engine's text match, which can be
+wrong) get different badges, never the same treatment, and an unrecognised
+`link_kind` falls back to `matched`, never `cited` — an unknown provenance is
+an inference, not a fact. `buildCaseLawReference` (`caseLawService.ts`) builds
+the free-text query every adapter behind that endpoint reads; see its own
+comment for which act types it abbreviates and why, checked against what each
+adapter can actually match, not assumed.
+
 **The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
 `'window'` on desktop — a draggable, backdrop-less window portalled to
 `document.body`, parked where the user left it — and `'drawer'` on mobile, the

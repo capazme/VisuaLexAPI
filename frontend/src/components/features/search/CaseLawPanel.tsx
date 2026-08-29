@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     useFloating,
     useDismiss,
@@ -16,9 +16,16 @@ import { Gavel, X, BadgeCheck, SearchCheck, WifiOff, CircleAlert, ExternalLink, 
 import type { Decisione, LinkKind, NormaVisitata, SourceResult } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { SkeletonText } from '../../ui/Skeleton';
 import { buildCaseLawReference, fetchCaseLaw } from '../../../services/caseLawService';
+import { LegalApiError } from '../../../services/legalApi';
+
+// Per-source cap on a fan-out to four sources rendered in a single 380px
+// popover — the backend default (10/source, up to 40 cards) is what made the
+// panel grow past its own bounds in the first place. 5 keeps a source with
+// hits readable without scrolling through a wall of cards, while the panel's
+// own internal scroll (see PeekBody) still covers a source with more.
+const RESULTS_PER_SOURCE = 5;
 
 type ReferenceNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo'>;
 
@@ -36,15 +43,18 @@ export interface CaseLawPanelProps {
  * changes while the panel stays open); nothing is cached or persisted, per
  * CLAUDE.md: this is not user-owned data.
  *
- * Follows NotesPeekPanel's shape: a desktop floating popover / mobile bottom
- * sheet split, both driven by the same body, and the same
- * offset-transform/animation-transform split (gotcha 10) so the entry
- * animation doesn't fight floating-ui's positioning.
+ * Desktop-only floating popover: its trigger (`ReadingToolbar`'s Gavel
+ * button) lives in the toolbar's `hidden md:flex` row, same as the Notes and
+ * Highlights triggers it was modelled on — none of the three has a mobile
+ * entry point today. A NotesPeekPanel-style mobile bottom sheet was tried
+ * here and removed: with no way to open it, it was UI no user could ever
+ * reach (CLAUDE.md's "shipping UI no user can open" is exactly this shape).
+ * If a mobile entry point is added for any of the three, add it for all
+ * three together, not just this one.
  */
 export function CaseLawPanel(props: CaseLawPanelProps) {
-    const isDesktop = useIsDesktop();
     if (!props.isOpen) return null;
-    return isDesktop ? <DesktopPeek {...props} /> : <MobileSheet {...props} />;
+    return <DesktopPeek {...props} />;
 }
 
 type BodyProps = Omit<CaseLawPanelProps, 'anchorEl'>;
@@ -52,6 +62,17 @@ type BodyProps = Omit<CaseLawPanelProps, 'anchorEl'>;
 // ───────────────────────── DESKTOP POPOVER ─────────────────────────
 
 function DesktopPeek({ anchorEl, onClose, ...rest }: CaseLawPanelProps) {
+    // The `size()` middleware only ever hands a computed value to
+    // `elements.floating` — the OUTER div below, positioned by floating-ui.
+    // That div isn't the flex column that holds the scrollable body, so a
+    // max-height set there just lets the inner card grow past it instead of
+    // capping anything: `overflow: visible` (the default) paints the
+    // overflow outside the box rather than clipping or scrolling it. Routing
+    // the computed value through this ref, onto the INNER card (the actual
+    // `flex flex-col overflow-hidden` container), is what makes the cap and
+    // the body's `overflow-y-auto` (see PeekBody) apply to the same box.
+    const cardRef = useRef<HTMLDivElement>(null);
+
     // Anchor passed via `elements.reference` so the first render is already
     // positioned — see NotesPeekPanel for the same reasoning (gotcha 13).
     const { refs, floatingStyles, context, placement } = useFloating({
@@ -63,11 +84,13 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: CaseLawPanelProps) {
             offset(8),
             flip({ fallbackPlacements: ['top-end', 'bottom', 'top'] }),
             shift({ padding: 16 }),
+            // eslint-disable-next-line react-hooks/refs -- `apply()` is invoked by floating-ui's own positioning pass (autoUpdate/ResizeObserver), asynchronously and outside React's render, never synchronously while this component renders — same category as the `refs.setFloating` disable above.
             size({
-                apply({ availableHeight, elements }) {
-                    Object.assign(elements.floating.style, {
-                        maxHeight: `${Math.max(280, Math.min(520, availableHeight - 16))}px`,
-                    });
+                apply({ availableHeight }) {
+                    if (cardRef.current) {
+                        cardRef.current.style.maxHeight =
+                            `${Math.max(280, Math.min(520, availableHeight - 16))}px`;
+                    }
                 },
                 padding: 16,
             }),
@@ -83,19 +106,21 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: CaseLawPanelProps) {
         <FloatingPortal>
             <FloatingFocusManager context={context} modal={false} initialFocus={-1}>
                 <div
-                    // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
                     ref={refs.setFloating}
                     style={floatingStyles}
                     {...getFloatingProps()}
                     className={Z_INDEX.citationPreview}
                 >
-                    {/* Inner wrapper owns the entry animation, kept apart from
-                        floating-ui's positioning transform on the outer div —
-                        see the matching comment in NotesPeekPanel. */}
+                    {/* Inner wrapper owns both the entry animation, kept apart
+                        from floating-ui's positioning transform on the outer
+                        div (see the matching comment in NotesPeekPanel), AND
+                        the height cap (see `cardRef` above) — it is the box
+                        that actually needs to stop growing. */}
                     <div
+                        ref={cardRef}
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'w-[380px] flex flex-col rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
+                            'w-[380px] flex flex-col overflow-hidden rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >
@@ -103,41 +128,6 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: CaseLawPanelProps) {
                     </div>
                 </div>
             </FloatingFocusManager>
-        </FloatingPortal>
-    );
-}
-
-// ───────────────────────── MOBILE BOTTOM SHEET ─────────────────────────
-
-function MobileSheet({ onClose, ...rest }: CaseLawPanelProps) {
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [onClose]);
-
-    return (
-        <FloatingPortal>
-            <div
-                className={cn('fixed inset-0 bg-black/30 animate-in fade-in duration-150', Z_INDEX.citationPreview)}
-                onClick={onClose}
-                aria-hidden
-            />
-            <div
-                role="dialog"
-                aria-modal="true"
-                className={cn(
-                    'fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl shadow-2xl',
-                    'bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800',
-                    'max-h-[75vh] animate-in slide-in-from-bottom duration-200',
-                    Z_INDEX.citationPreview,
-                )}
-            >
-                <div className="flex justify-center pt-2 pb-1">
-                    <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
-                </div>
-                <PeekBody onClose={onClose} {...rest} />
-            </div>
         </FloatingPortal>
     );
 }
@@ -163,7 +153,7 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
         let cancelled = false;
         setStatus('loading');
         setErrorMessage(null);
-        fetchCaseLaw({ riferimento })
+        fetchCaseLaw({ riferimento, limite: RESULTS_PER_SOURCE })
             .then((res) => {
                 if (cancelled) return;
                 setFonti(res.fonti);
@@ -174,8 +164,11 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
                 // This is a whole-request failure (the fan-out never ran) — never
                 // swallowed into an empty list, which would read as "no case law"
                 // for every source at once instead of "the service didn't answer".
+                // The raw error (e.g. "/fetch_case_law failed: Internal Server
+                // Error") is logged for diagnosis, never shown: the UI is Italian
+                // throughout, and a lawyer gets no use out of an HTTP status text.
                 console.error('CaseLawPanel: /fetch_case_law failed', { riferimento, err });
-                setErrorMessage(err instanceof Error ? err.message : 'Errore sconosciuto');
+                setErrorMessage(friendlyErrorMessage(err));
                 setStatus('error');
             });
         return () => { cancelled = true; };
@@ -200,7 +193,13 @@ function PeekBody({ articleLabel, norma, onClose }: BodyProps) {
                 </button>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+            {/* `min-h-0` overrides the flex item's default `min-height: auto`
+                (a well-known flexbox trap): without it, this box refuses to
+                shrink below its content's natural height even though it sits
+                in a `flex flex-col` parent with `overflow-hidden` and a
+                max-height, so it grows the whole card instead of scrolling
+                internally. */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
                 {status === 'loading' && <SkeletonText lines={4} />}
 
                 {status === 'error' && (
@@ -314,7 +313,14 @@ const LINK_KIND_CONFIG: Record<LinkKind, {
 };
 
 function LinkKindBadge({ kind }: { kind: LinkKind }) {
-    const config = LINK_KIND_CONFIG[kind];
+    // A `kind` this map has no entry for must never fall back to `cited`:
+    // that badge claims the source *declared* the citation, which would turn
+    // an unrecognised value into a fabricated fact instead of the inference
+    // `matched` already, correctly, admits it might be wrong. It must also
+    // not throw — this renders inside a `FloatingPortal` with no error
+    // boundary above it, so an unguarded lookup would take the whole reading
+    // surface down over one bad badge.
+    const config = LINK_KIND_CONFIG[kind] ?? LINK_KIND_CONFIG.matched;
     const Icon = config.icon;
     return (
         <span
@@ -369,6 +375,17 @@ function DecisionRow({ decisione }: { decisione: Decisione }) {
 }
 
 // ───────────────────────── HELPERS ─────────────────────────
+
+/** Italian, useful text for the error banner — never the raw error (which the
+ * caller already logs). `LegalApiError` carries the HTTP status, so the one
+ * case worth telling apart is rate-limiting, which has an actionable answer
+ * ("wait"); everything else collapses into one honest "didn't answer". */
+function friendlyErrorMessage(err: unknown): string {
+    if (err instanceof LegalApiError && err.status === 429) {
+        return 'Troppe richieste in questo momento: riprova tra qualche secondo.';
+    }
+    return 'Il servizio di giurisprudenza non ha risposto correttamente. Riprova.';
+}
 
 /** Same helper as NotesPeekPanel/HighlightsActionsPicker — not shared between
  * them either, so this keeps the existing (non-)convention rather than

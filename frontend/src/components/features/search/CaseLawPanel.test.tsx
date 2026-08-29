@@ -159,6 +159,93 @@ describe('CaseLawPanel — coverage reaches the reader', () => {
   });
 });
 
+describe('CaseLawPanel — height cap sits on the box that actually scrolls', () => {
+  it('applies the computed max-height to the card that owns overflow-hidden and the flex layout, not the outer positioning div', async () => {
+    mockFonti([
+      { organo: 'Cassazione', fonte: 'cassazione', ok: true, error: '', coverage: 'ultimi 5 anni', decisioni: [matchedDecisione], count: 1 },
+    ]);
+
+    // floating-ui only runs the `size()` middleware's `apply()` (and so only
+    // ever computes a max-height at all) once it has a real reference
+    // element to position against — `anchorEl={null}`, used by the other
+    // tests in this file, short-circuits that computation entirely. A real,
+    // attached DOM node is what makes this assertion possible.
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+
+    render(
+      <CaseLawPanel isOpen anchorEl={anchor} articleLabel="Art. 2043" norma={NORMA} onClose={vi.fn()} />,
+    );
+
+    await screen.findByText('Giurisprudenza — Art. 2043');
+
+    // The card is identified by the classes that make the cap meaningful:
+    // it is the flex column that clips overflow, so a bounded max-height on
+    // it (rather than on its unconstrained parent) is what lets the body's
+    // `overflow-y-auto` section scroll internally instead of the whole
+    // panel growing past it.
+    const card = document.querySelector('.overflow-hidden.flex-col') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    await waitFor(() => {
+      expect(card!.style.maxHeight).toMatch(/px$/);
+    });
+
+    // The outer positioning div (floating-ui's `refs.setFloating` target,
+    // the parent of the card) must NOT carry the cap — that was the bug:
+    // a max-height on an ancestor that isn't the flex/overflow container
+    // does nothing, because `overflow: visible` just paints the overflow
+    // outside its box instead of clipping or scrolling it.
+    const outer = card!.parentElement as HTMLElement;
+    expect(outer.style.maxHeight).toBe('');
+
+    document.body.removeChild(anchor);
+  });
+
+  it('gives the scrollable body min-h-0 so it can shrink inside the capped card instead of forcing it to grow', async () => {
+    mockFonti([
+      { organo: 'Cassazione', fonte: 'cassazione', ok: true, error: '', coverage: 'ultimi 5 anni', decisioni: [matchedDecisione], count: 1 },
+    ]);
+
+    render(
+      <CaseLawPanel isOpen anchorEl={null} articleLabel="Art. 2043" norma={NORMA} onClose={vi.fn()} />,
+    );
+
+    const body = await screen.findByText('Copertura: ultimi 5 anni');
+    const scrollContainer = body.closest('.overflow-y-auto');
+    expect(scrollContainer).not.toBeNull();
+    // Without `min-h-0`, a flex item's default `min-height: auto` refuses to
+    // shrink below its content size even inside a bounded, overflow-hidden
+    // parent — the classic reason an `overflow-y-auto` section never
+    // actually scrolls and the card grows past its cap instead.
+    expect(scrollContainer!.className).toMatch(/\bmin-h-0\b/);
+    expect(scrollContainer!.className).toMatch(/\bflex-1\b/);
+  });
+});
+
+describe('CaseLawPanel — a bounded fan-out', () => {
+  it('asks each source for a small, panel-sized number of decisions, not the unbounded backend default', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({ fonti: [] }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <CaseLawPanel isOpen anchorEl={null} articleLabel="Art. 2043" norma={NORMA} onClose={vi.fn()} />,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    // Up to 4 sources * this limit is what actually has to fit (and scroll)
+    // inside a single 380px popover — the backend's own default (10/source,
+    // up to 40 cards) is what made the panel grow past its bounds.
+    expect(body.limite).toBe(5);
+  });
+});
+
 describe('CaseLawPanel — total request failure', () => {
   it('shows a top-level error, not a silently empty panel, when the request itself fails', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
