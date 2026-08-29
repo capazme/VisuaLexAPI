@@ -72,6 +72,48 @@ const EU_ACT_LABELS: Record<string, string> = {
   'direttiva ue': 'Direttiva UE',
 };
 
+// `norma.tipo_atto` for an uncodified act takes one of two shapes, and a
+// court decision cites each of them completely differently — measured live
+// against Italgiure (`visualex_api/services/case_law/italgiure.py`), not
+// assumed:
+//
+// - A GENERIC act-type descriptor ("legge", "decreto legislativo", …) names
+//   no act by itself; the citation is the type plus number and year. For the
+//   decree family, the type is always abbreviated in the OCR text —
+//   "decreto legislativo n. 231 del 2001" scores 0/10 live,
+//   "d.lgs. n. 231 del 2001" 10/10; same gap for "decreto del presidente
+//   della repubblica" (D.P.R., "d.P.R. n. 445 del 2000" 5/5 vs the spelled
+//   form 0/5) and "decreto legge"/"decreto-legge" (D.L., "d.l. n. 34 del
+//   2020" 5/5 vs 0/5 spelled). "legge" is the one exception: spelled out it
+//   already matches ("legge n. 241 del 1990" 10/10 live), so it is left
+//   alone rather than abbreviated to "l." on no evidence it helps.
+//   "regio decreto" stays in this bucket too, but unabbreviated: neither
+//   "regio decreto n. 267 del 1942" nor "R.D. n. 267 del 1942" matched
+//   anything live (0/5 each) — old regio decreto acts are cited by a popular
+//   name ("legge fallimentare") this API has no field for, a gap noted in
+//   the report rather than guessed at here.
+// - Everything else already reads as the act's OWN name, the same way
+//   "codice civile" does (every "codice …" alias in
+//   `visualex_api/tools/map.py`'s `NORMATTIVA_URN_CODICI`, plus
+//   "costituzione", handled above): a decision cites the name alone, never
+//   the enacting decree's number and date — "codice del consumo n. 206 del
+//   2005" scores 0/10 live, bare "codice del consumo" 5/5.
+const GENERIC_ACT_TYPES = new Set([
+  'legge',
+  'decreto legislativo',
+  'decreto legge',
+  'decreto-legge',
+  'decreto del presidente della repubblica',
+  'regio decreto',
+]);
+
+const GENERIC_ACT_ABBREVIATIONS: Record<string, string> = {
+  'decreto legislativo': 'D.lgs.',
+  'decreto legge': 'D.L.',
+  'decreto-legge': 'D.L.',
+  'decreto del presidente della repubblica': 'D.P.R.',
+};
+
 type ReferenceNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' | 'numero_articolo'>;
 
 /**
@@ -87,6 +129,11 @@ type ReferenceNorma = Pick<NormaVisitata, 'tipo_atto' | 'numero_atto' | 'data' |
  * (e.g. "codice civile", whose real enactment is a regio decreto) the alias
  * is the name a court decision actually cites — nobody writes "art. 2043
  * regio decreto 16 marzo 1942, n. 262".
+ *
+ * Never an ISO date (`norma.data`, e.g. "1990-08-07"): no decision cites a
+ * day and month, so a full ISO date can never appear verbatim in one and every
+ * exact-phrase source (Italgiure, CeRDEF) returns nothing for it. Only the
+ * year — see `GENERIC_ACT_TYPES` below.
  */
 export function buildCaseLawReference(norma: ReferenceNorma): string {
   const tipoLower = norma.tipo_atto.trim().toLowerCase();
@@ -104,10 +151,16 @@ export function buildCaseLawReference(norma: ReferenceNorma): string {
     return `${articolo} ${abbreviazione}`;
   }
 
-  // Uncodified acts (leggi, decreti…): the act's own name and number are what
-  // a court decision would cite, e.g. "art. 3 legge n. 241 del 1990".
-  const parts = [articolo, norma.tipo_atto];
-  if (norma.numero_atto) parts.push(`n. ${norma.numero_atto}`);
-  if (norma.data) parts.push(`del ${norma.data}`);
-  return parts.join(' ');
+  if (GENERIC_ACT_TYPES.has(tipoLower)) {
+    const nomeAtto = GENERIC_ACT_ABBREVIATIONS[tipoLower] ?? norma.tipo_atto;
+    const parts = [articolo, nomeAtto];
+    if (norma.numero_atto) parts.push(`n. ${norma.numero_atto}`);
+    if (norma.data) parts.push(`del ${norma.data.slice(0, 4)}`);
+    return parts.join(' ');
+  }
+
+  // A named act Normattiva resolves directly by its own title (every
+  // "codice …" alias, "preleggi", …): cited by that name alone, exactly like
+  // the abbreviated codes above — see the block comment.
+  return `${articolo} ${norma.tipo_atto}`;
 }
