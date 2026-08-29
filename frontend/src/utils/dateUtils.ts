@@ -115,6 +115,12 @@ export function formatDateItalianLong(isoDate: string): string {
     const monthNum = parseInt(month, 10);
     const dayNum = parseInt(day, 10);
 
+    // A month outside 1-12 indexes past the end of the array and renders
+    // "1 undefined 2025" in the UI. Return the input untouched instead: a
+    // string we cannot read is better shown as it came than as a broken
+    // sentence.
+    if (monthNum < 1 || monthNum > 12) return isoDate;
+
     const monthName = ITALIAN_MONTHS_DISPLAY[monthNum - 1];
     return `${dayNum} ${monthName} ${year}`;
   }

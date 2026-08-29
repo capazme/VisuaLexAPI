@@ -210,6 +210,22 @@ script does not check.
 Config changes are made with `sudo`, after `sudo nginx -t` and with a timestamped
 backup beside the file.
 
+## The shared HTTP client binds to the first event loop that used it
+
+`visualex_api/services/http_client.py` keeps one module-level `ThrottledHttpClient`
+whose `aiohttp.ClientSession` is created lazily and then memoised. It binds to
+whatever event loop was running at that moment.
+
+pytest-asyncio gives each test its own loop, so the **second** live test in a
+single process fails with "Event loop is closed" — and that surfaces as the
+adapter reporting the source unreachable, which is the worst possible disguise:
+it looks exactly like the remote site being down.
+
+Today only one test carries the `live` marker, so the bug is dormant. The moment
+a second one is added, reset the client between tests (replace the instance's
+`__dict__` in an autouse fixture) rather than spending an afternoon believing
+Normattiva is down.
+
 ## Known gaps
 
 Recorded rather than fixed, so nobody rediscovers them during an incident.
