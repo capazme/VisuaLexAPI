@@ -189,6 +189,27 @@ To roll back, restore `/etc/apt/sources.list.d/nodesource.list.bak-node20` and
 Keep this in step with `.github/workflows/ci.yml`, which pins Node 24. If the
 two drift again, the lockfile churn comes back.
 
+## nginx routes the Python API by prefix, and the list is hand-maintained
+
+`/etc/nginx/sites-enabled/visualex` proxies to the Quart app only for paths
+matching one regex:
+
+```
+location ~ ^/(fetch_|search_|stream_|export_|history|version|health|dossiers|parse_query)
+```
+
+Anything else is served as frontend. **A new endpoint whose path does not start
+with one of those prefixes is invisible in production** — nginx answers with the
+SPA and the client sees a 405 or an HTML page, while every local test passes.
+
+This has cost two incidents in one day: `/parse_query` and `/search_case_law`.
+When adding an endpoint, either name it with an existing prefix or add the new
+one here, and verify against production with `curl` after deploying — the deploy
+script does not check.
+
+Config changes are made with `sudo`, after `sudo nginx -t` and with a timestamped
+backup beside the file.
+
 ## Known gaps
 
 Recorded rather than fixed, so nobody rediscovers them during an incident.
