@@ -114,6 +114,43 @@ async def test_cerca_per_norma_extracts_the_number_and_drops_the_act(monkeypatch
     assert sent["parole"] == "articolo 2409-octiesdecies"
 
 
+async def test_cerca_per_norma_does_not_swallow_the_acts_first_lowercase_word(monkeypatch):
+    """Pins the exact strings `buildCaseLawReference` (frontend) emits today
+    for the two act shapes that used to be over-matched: a generic act type
+    ("legge") and a named code with no abbreviation ("codice del consumo").
+    Before the fix, the space-separated suffix group accepted any run of 2+
+    lowercase letters as an ordinal, so it swallowed the act's first word —
+    measured live, "articolo 33 codice" returns 0 where "articolo 33"
+    returns 10."""
+    adapter = CerdefAdapter()
+    sent: dict = {}
+
+    async def fake_request(method, url, **kwargs):
+        if method == "POST":
+            sent["parole"] = kwargs["data"]["parole"]
+
+        class R:
+            text = PAGE
+            status = 200
+            headers = {}
+        return R()
+
+    monkeypatch.setattr(
+        "visualex_api.services.case_law.cerdef.http_client.request", fake_request
+    )
+
+    await adapter.cerca_per_norma("art. 3 legge n. 241 del 1990")
+    assert sent["parole"] == "articolo 3"
+
+    await adapter.cerca_per_norma("art. 33 codice del consumo")
+    assert sent["parole"] == "articolo 33"
+
+    # The hyphenated ordinal form stays free (any letters after the hyphen),
+    # unaffected by the enumerated-ordinal restriction on the space form.
+    await adapter.cerca_per_norma("art. 2409-octiesdecies c.c.")
+    assert sent["parole"] == "articolo 2409-octiesdecies"
+
+
 async def test_cerca_per_norma_refuses_a_reference_with_no_article_number(monkeypatch):
     """No article number means nothing safe to search — falling back to a
     phrase search on the raw string would just be noise. Mirrors the refusal

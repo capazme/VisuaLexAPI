@@ -85,21 +85,39 @@ _ROW = re.compile(
     r"(?:\s*-\s*Sezione/Collegio\s*(?P<sez>.+))?$"
 )
 
-# Same shape as `italgiure.py`'s `_ART` (gotcha 9 — any alphabetic tail, not
-# an enumerated ordinal list; Normattiva goes well past "decies") with one
-# deliberate difference: `italgiure` can afford a case-insensitive suffix
-# because it splices `numero` back together with everything after it into
-# one query, so an over-matched suffix loses nothing. This adapter keeps only
-# `numero` and drops the rest, so an over-match is real data loss — measured
-# live, a case-insensitive suffix on "art. 5 Regolamento UE 679/2016" reads
-# the capitalised act name "Regolamento" as if it were an ordinal suffix and
-# produces "5 Regolamento", losing "UE 679/2016" outright. Real ordinal
-# suffixes are always written lowercase ("bis", "octiesdecies"); Italian act
-# names that can follow a bare number are capitalised ("Regolamento",
-# "Direttiva", "Costituzione"). Scoping `(?i:...)` to the "art."/"articolo"
-# prefix only, and leaving the suffix class case-sensitive, uses that
-# convention to tell the two apart.
-_ART = re.compile(r"(?:(?i:art\.?|articolo))\s*(\d+(?:[-\s][a-z]{2,})?)")
+# Deliberately NOT the same shape as `italgiure.py`'s `_ART` (gotcha 9 — treat
+# any alphabetic tail as a suffix, not an enumerated ordinal list). That rule
+# is safe for `italgiure` because it splices `numero` back together with
+# everything after it into one query, so an over-matched suffix loses
+# nothing. This adapter keeps only `numero` and drops the rest of the
+# reference, so an over-match is real data loss, not redundancy — and "any
+# lowercase word" over-matches constantly, because most of what follows an
+# article number in the references this API builds
+# (`caseLawService.buildCaseLawReference`) is a lowercase act name: "art. 3
+# legge n. 241 del 1990", "art. 33 codice del consumo", "art. 1 preleggi".
+# Measured live before this fix: the space-separated group swallowed the
+# first word of the act every time, and CeRDEF's index does not hold that
+# longer phrase — "articolo 33 codice" returns 0 where "articolo 33" returns
+# 10; "articolo 3 legge" returns 6 where "articolo 3" returns 10.
+#
+# The fix enumerates the real ordinal suffixes instead, for the
+# SPACE-separated form only — the HYPHENATED form stays free
+# (`-[a-z]{2,}`, any letters). A hyphen never separates an article number
+# from the first word of an act name in this API's own references, so there
+# is no over-match risk to guard against there, and staying permissive is
+# what lets an ordinal past this list (Normattiva goes well past "decies",
+# e.g. the civil code's own "2409 octiesdecies") still parse whole, exactly
+# as Normattiva itself renders it — hyphenated, never space-separated
+# ("2409-octiesdecies", never "2409 octiesdecies").
+_ORDINALI = (
+    r"bis|ter|quater|quinquies|sexies|septies|octies|novies|decies|"
+    r"undecies|duodecies|terdecies|quaterdecies|quinquiesdecies|"
+    r"sexiesdecies|septiesdecies|octiesdecies|noviesdecies"
+)
+_ART = re.compile(
+    r"(?:(?i:art\.?|articolo))\s*"
+    r"(\d+(?:-[a-z]{2,}|\s+(?:" + _ORDINALI + r")\b)?)"
+)
 
 
 def _extract_xml(page: str) -> str:
