@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, Scale, ChevronDown, Filter } from 'lucide-react';
 import type { MassimaStructured } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { LinkKindBadge } from './LinkKindBadge';
 
 interface MassimeSectionProps {
   massime: (string | MassimaStructured)[] | null;
@@ -119,19 +120,21 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
   const hasStructuredData = normalizedMassime.some(m => m.autorita || m.numero || m.anno);
 
   return (
-    <div className="card border border-slate-200 dark:border-slate-700 shadow-sm rounded-md overflow-hidden">
-      {/* Header with collapse button */}
+    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md">
+      {/* Header with collapse button — same chrome as the other cards in the
+          Giurisprudenza block (BrocardiSectionContent's shape). */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"
       >
-        <strong className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-          <Scale size={14} className="text-blue-600" />
+        <strong className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase flex items-center gap-2.5">
+          <Scale size={16} className="text-blue-600" />
           Massime ({filteredMassime.length}/{normalizedMassime.length})
         </strong>
-        <span className={cn("transition-transform text-slate-400", isOpen ? "rotate-180" : "")}>
-          ▼
-        </span>
+        <ChevronDown
+          size={16}
+          className={cn("text-slate-400 transition-transform duration-200", isOpen && "rotate-180")}
+        />
       </button>
 
       {isOpen && (
@@ -177,8 +180,10 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
         </div>
       </div>
 
-      {/* Massime list */}
-      <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[500px] overflow-y-auto">
+      {/* Massime list — no inner scroller: this card now lives full-width in
+          the Giurisprudenza section, not inside a fixed-height popover, so it
+          grows with its content and the page itself scrolls. */}
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
         {filteredMassime.length === 0 ? (
           <div className="p-4 text-center text-sm text-slate-500">
             Nessuna massima trovata con i filtri selezionati
@@ -203,10 +208,15 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    {/* Header with authority and case number */}
-                    {hasStructuredData && (m.autorita || m.numero || m.anno) && (
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        {m.autorita && (
+                    {/* Header: authority/case number on the left, provenance
+                        badge on the right — a massima is always "curated"
+                        (a Brocardi editor chose it for this article), the
+                        same badge the court cards use for "cited"/"matched"
+                        so the three provenances stay visually distinct at a
+                        glance wherever a decision appears in this block. */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {hasStructuredData && m.autorita && (
                           <span className={cn(
                             "px-2 py-0.5 rounded text-xs font-medium",
                             getAuthorityColor(m.autorita)
@@ -214,13 +224,14 @@ export function MassimeSection({ massime }: MassimeSectionProps) {
                             {m.autorita}
                           </span>
                         )}
-                        {m.numero && m.anno && (
+                        {hasStructuredData && m.numero && m.anno && (
                           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                             n. {m.numero}/{m.anno}
                           </span>
                         )}
                       </div>
-                    )}
+                      <LinkKindBadge kind="curated" />
+                    </div>
 
                     {/* Massima text */}
                     <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">

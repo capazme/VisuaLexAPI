@@ -115,6 +115,11 @@ export function formatDateItalianLong(isoDate: string): string {
     const monthNum = parseInt(month, 10);
     const dayNum = parseInt(day, 10);
 
+    // A malformed ISO date ("2025-13-01") must not index past the end of
+    // the month-name array and render "1 undefined 2025" — fall through to
+    // the raw string like every other unrecognised shape in this file.
+    if (monthNum < 1 || monthNum > 12) return isoDate;
+
     const monthName = ITALIAN_MONTHS_DISPLAY[monthNum - 1];
     return `${dayNum} ${monthName} ${year}`;
   }

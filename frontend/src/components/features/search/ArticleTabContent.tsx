@@ -19,7 +19,7 @@ import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
 import { ReadingToolbar } from './ReadingToolbar';
 import { NotesPeekPanel } from './NotesPeekPanel';
 import { HighlightsActionsPicker } from './HighlightsActionsPicker';
-import { CaseLawPanel } from './CaseLawPanel';
+import { GiurisprudenzaSection, type GiurisprudenzaSectionHandle } from './GiurisprudenzaSection';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
@@ -108,8 +108,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isHighlightsPeekOpen, setIsHighlightsPeekOpen] = useState(false);
     const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
-    const [isCaseLawPanelOpen, setIsCaseLawPanelOpen] = useState(false);
-    const [caseLawButtonEl, setCaseLawButtonEl] = useState<HTMLButtonElement | null>(null);
+    // No popover any more (see GiurisprudenzaSection.tsx) — the Gavel button
+    // just expands the inline section and scrolls it into view, via this
+    // imperative handle rather than a boolean the toolbar toggles.
+    const giurisprudenzaRef = useRef<GiurisprudenzaSectionHandle>(null);
     // Local visibility toggle: when true, the article body keeps the markup
     // (so highlights aren't lost) but renders `.highlight-mark` transparent
     // via the `.highlights-hidden` class scoped to contentRef. Per-article,
@@ -592,12 +594,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isHighlightsPeekOpen={isHighlightsPeekOpen}
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={allPanelHighlights.length}
-                isCaseLawPanelOpen={isCaseLawPanelOpen}
-                caseLawButtonRef={setCaseLawButtonEl}
                 showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
-                onToggleCaseLaw={() => setIsCaseLawPanelOpen(v => !v)}
+                onOpenGiurisprudenza={() => giurisprudenzaRef.current?.expandAndReveal()}
                 onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
@@ -637,14 +637,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onExportTxt={handleExportHighlightsTxt}
             />
 
-            <CaseLawPanel
-                isOpen={isCaseLawPanelOpen}
-                anchorEl={caseLawButtonEl}
-                articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
-                norma={norma_data}
-                onClose={() => setIsCaseLawPanelOpen(false)}
-            />
-
             {inlineNote && (
                 <InlineNotePopover
                     note={inlineNote.note}
@@ -674,6 +666,21 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupCopy={handlePopupCopy}
                 onRemoveHighlight={removeHighlight}
             />
+
+            {/* Case law above doctrine: a sibling of the Brocardi block,
+                always rendered (courts are searchable independently of
+                whether Brocardi doctrine has loaded), collapsed by default.
+                Massime — Brocardi's own case-law selections — render inside
+                it immediately; the four live court sources fetch lazily on
+                first expand. See GiurisprudenzaSection.tsx. */}
+            <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
+                <GiurisprudenzaSection
+                    ref={giurisprudenzaRef}
+                    articleLabel={`Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''}`}
+                    norma={norma_data}
+                    massime={brocardi_info?.Massime ?? null}
+                />
+            </div>
 
             {brocardi_info !== undefined && (
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
