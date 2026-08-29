@@ -68,6 +68,12 @@ async def test_a_norm_with_no_celex_is_not_an_error(monkeypatch):
     result = await adapter.cerca_per_norma("art. 2043 codice civile")
     assert result.ok is True
     assert result.decisioni == []
+    # An empty CGUE section next to three other sources reads as "the Court
+    # of Justice has ruled nothing on this" unless the coverage note says
+    # otherwise — this source only ever covers EU acts, and nobody asked it
+    # about the codice civile.
+    assert result.coverage != ""
+    assert "UE" in result.coverage
 
 
 async def test_an_unreachable_endpoint_is_reported_not_swallowed(monkeypatch):
