@@ -131,17 +131,9 @@ export interface ArticleData {
 // `link_kind` is the load-bearing field of this whole slice: it separates a
 // fact the source publisher declared ("cited") from an inference a search
 // engine made ("matched"). Only CGUE/CELLAR ever emits "cited" — every other
-// live source is a text match and must render as "matched". Never collapse
-// the two into one visual treatment; see GiurisprudenzaSection.tsx.
-//
-// `curated` is a third, frontend-only provenance: a Brocardi maxim was
-// *chosen by an editor* for this article — more reliable than an automated
-// text match, but still a secondary source's judgement, not the court's own
-// declared citation. The API never sends it: no adapter in
-// `visualex_api/services/case_law/` emits `curated`, it is produced only by
-// the Massime card (see MassimeSection.tsx) when it renders a
-// `MassimaStructured` as a `Decisione`-shaped row.
-export type LinkKind = 'cited' | 'matched' | 'curated';
+// source is a text match and must render as "matched". Never collapse the
+// two into one visual treatment; see CaseLawPanel.tsx.
+export type LinkKind = 'cited' | 'matched';
 
 export interface Decisione {
     organo: string;
@@ -158,7 +150,7 @@ export interface Decisione {
 
 // One source's answer, including the answer "I could not reach it" (`ok:
 // false`, `error` set). An unreachable source and a source that legitimately
-// found nothing must never look the same — see GiurisprudenzaSection.tsx.
+// found nothing must never look the same — see CaseLawPanel.tsx.
 export interface SourceResult {
     organo: string;
     fonte: string;

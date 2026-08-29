@@ -366,45 +366,17 @@ Three entry points, deliberately distinct — don't collapse them.
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
 
-**Case law**: `GiurisprudenzaSection` is an inline block, a sibling of
-`BrocardiDisplay` below the article body (`mt-8 border-t pt-6`, same
-separator idiom) — not a floating popover. That was tried (`CaseLawPanel`,
-retired) and was the wrong container for up to 20 decision cards; it also
-kept case law apart from Brocardi's own case law, the Massime. Open by
-default the moment the article has Massime — they ride in on the article
-payload at zero network cost, so hiding them behind a click would regress
-access to content that already arrived; with no Massime it starts collapsed.
-The toolbar's Gavel button calls its `expandAndReveal()` imperative handle
-(exposed via `forwardRef`) to force it open and scroll it into view. The
-**Massime** card (moved out of `BrocardiDisplay`, still `MassimeSection.tsx`
-with its year filter and search intact) renders immediately whenever the
-section is open — it rides in on the article payload at zero network cost, so
-the block is never empty on arrival. The four live court sources (CGUE,
-Cassazione, Consiglio di Stato/TAR, CeRDEF) fetch from `/fetch_case_law` only
-from the explicit "Cerca nei quattro tribunali" action inside the section —
-never on mount, never on expand — through `fetchCaseLawCached`
-(`caseLawService.ts`, same session-cache-plus-in-flight-registry shape as
-`utils/articleFetchCache.ts`) — nothing here is persisted, it is not
-user-owned data, but pressing the action twice (or reopening the section)
-must not refire ~7 requests to four government websites. `BrocardiDisplay`
-now carries doctrine only (Brocardi, Ratio,
-Spiegazione, Relazioni, RelazioneCostituzione, Footnotes, RelatedArticles,
-CrossReferences, Glossario); Massime does not participate in the
-highlight/note anchoring flow (`MarkableBrocardiSection`), so moving it
-changed no `scopedArticleId`.
-
-It preserves one distinction end to end, now three-way:
-`LinkKind.cited` (the source declares the citation, e.g. CELLAR's citation
-graph), `.matched` (a search engine's text match, which can be wrong), and
-`.curated` (an editor at Brocardi chose the maxim for this article —
-frontend-only, never sent by the API, produced solely by the Massime card).
-`LinkKindBadge` (`LinkKindBadge.tsx`) gives all three a different label, icon
-and colour, never the same treatment, and an unrecognised `link_kind` falls
-back to `matched`, never `cited` — an unknown provenance is an inference, not
-a fact. `buildCaseLawReference` (`caseLawService.ts`) builds the free-text
-query every adapter behind `/fetch_case_law` reads; see its own comment for
-which act types it abbreviates and why, checked against what each adapter can
-actually match, not assumed.
+**Case law**: the toolbar's Gavel button opens `CaseLawPanel`, a desktop-only
+Peek fetching live from `/fetch_case_law` on open (nothing cached or
+persisted — it is not user-owned data). It preserves one distinction end to
+end: `LinkKind.cited` (the source declares the citation, e.g. CELLAR's
+citation graph) versus `.matched` (a search engine's text match, which can be
+wrong) get different badges, never the same treatment, and an unrecognised
+`link_kind` falls back to `matched`, never `cited` — an unknown provenance is
+an inference, not a fact. `buildCaseLawReference` (`caseLawService.ts`) builds
+the free-text query every adapter behind that endpoint reads; see its own
+comment for which act types it abbreviates and why, checked against what each
+adapter can actually match, not assumed.
 
 **The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
 `'window'` on desktop — a draggable, backdrop-less window portalled to
@@ -659,10 +631,8 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
   `InlineNotePopover.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `GiurisprudenzaSection.tsx` (inline case-law block, sibling of
-  `BrocardiDisplay.tsx`; `MassimeSection.tsx` is its first card, `LinkKindBadge.tsx`
-  is shared by both), `SearchPanel.tsx` (streaming merge logic, and the mount
-  point for both `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
+  `SearchPanel.tsx` (streaming merge logic, and the mount point for both
+  `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
 - `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
   edits, not for where it opens: it is reached from the command palette, not

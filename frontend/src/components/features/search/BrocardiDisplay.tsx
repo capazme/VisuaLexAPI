@@ -3,6 +3,7 @@ import { Lightbulb, ExternalLink, ChevronDown, BookOpen, Link2, FileText, Chevro
 import type { BrocardiInfo as BrocardiInfoType, RelazioneContent, Footnote, CrossReference, GlossaryEntry } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
+import { MassimeSection } from './MassimeSection';
 import { FootnoteTooltip } from './FootnoteTooltip';
 import { MarkableBrocardiSection } from './MarkableBrocardiSection';
 import { useAppStore } from '../../../store/useAppStore';
@@ -534,7 +535,7 @@ function BrocardiEmptyState({ link }: { link?: string | null }) {
           Nessun approfondimento disponibile
         </div>
         <div className="text-xs text-slate-400 dark:text-slate-500 max-w-md">
-          Brocardi.it non pubblica dottrina per questo articolo.
+          Brocardi.it non pubblica dottrina o massime per questo articolo.
         </div>
         {link && (
           <a
@@ -563,6 +564,7 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
   }
 
   const hasContent = info.Brocardi || info.Ratio || info.Spiegazione ||
+    (info.Massime && info.Massime.length > 0) ||
     (info.Relazioni && info.Relazioni.length > 0) ||
     (info.CrossReferences && info.CrossReferences.length > 0) ||
     (info.Footnotes && info.Footnotes.length > 0) ||
@@ -627,6 +629,11 @@ export function BrocardiDisplay({ info, currentNorma, onArticleClick, itemKey, u
               content={info.Spiegazione || null}
               icon={<FileText size={16} className="text-primary-500" />}
             />
+          )}
+
+          {/* Massime with search and filter */}
+          {info.Massime && info.Massime.length > 0 && (
+            <MassimeSection massime={info.Massime} />
           )}
 
           {/* Note a piè di pagina */}

@@ -16,14 +16,13 @@ export interface ReadingToolbarProps {
     isHighlightsPeekOpen: boolean;
     highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
+    isCaseLawPanelOpen: boolean;
+    caseLawButtonRef?: Ref<HTMLButtonElement | null>;
     showMoreMenu: boolean;
     isPinnedQuick: boolean;
     onToggleNotes: () => void;
     onToggleHighlightsPeek: () => void;
-    /** No popover to toggle any more — the Gavel button expands the inline
-     * Giurisprudenza section and scrolls it into view (see
-     * GiurisprudenzaSection.expandAndReveal). */
-    onOpenGiurisprudenza: () => void;
+    onToggleCaseLaw: () => void;
     onToggleMoreMenu: (next: boolean) => void;
     onToggleQuickNorm: () => void;
     onMobileCopy: () => Promise<void> | void;
@@ -47,11 +46,13 @@ export function ReadingToolbar({
     isHighlightsPeekOpen,
     highlightsButtonRef,
     highlightsCount,
+    isCaseLawPanelOpen,
+    caseLawButtonRef,
     showMoreMenu,
     isPinnedQuick,
     onToggleNotes,
     onToggleHighlightsPeek,
-    onOpenGiurisprudenza,
+    onToggleCaseLaw,
     onToggleMoreMenu,
     onToggleQuickNorm,
     onMobileCopy,
@@ -205,10 +206,16 @@ export function ReadingToolbar({
                     )}
                 </button>
                 <button
-                    onClick={onOpenGiurisprudenza}
-                    className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500 transition-colors"
-                    title="Vai alla giurisprudenza"
-                    aria-label="Vai alla giurisprudenza"
+                    ref={caseLawButtonRef}
+                    onClick={onToggleCaseLaw}
+                    aria-expanded={isCaseLawPanelOpen}
+                    aria-haspopup="dialog"
+                    className={cn("p-1.5 rounded-md transition-colors",
+                        isCaseLawPanelOpen
+                            ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400"
+                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500"
+                    )}
+                    title={isCaseLawPanelOpen ? "Chiudi giurisprudenza" : "Giurisprudenza su questo articolo"}
                 >
                     <Gavel size={16} />
                 </button>

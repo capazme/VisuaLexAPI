@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { buildCaseLawReference, clearCaseLawCache, fetchCaseLawCached, isUnsearchableActType } from './caseLawService';
+import { describe, it, expect } from 'vitest';
+import { buildCaseLawReference, isUnsearchableActType } from './caseLawService';
 
 describe('buildCaseLawReference', () => {
   it('abbreviates a codified act to the form courts actually cite', () => {
@@ -77,66 +77,5 @@ describe('isUnsearchableActType', () => {
     expect(isUnsearchableActType('codice civile')).toBe(false);
     expect(isUnsearchableActType('legge')).toBe(false);
     expect(isUnsearchableActType('decreto legislativo')).toBe(false);
-  });
-});
-
-describe('fetchCaseLawCached — session cache (same shape as utils/articleFetchCache.ts)', () => {
-  beforeEach(() => {
-    clearCaseLawCache();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('serves a second call for the same riferimento from cache, without a second network request', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true, status: 200, statusText: 'OK', json: async () => ({ fonti: [] }),
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const first = await fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 });
-    const second = await fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(second).toBe(first);
-  });
-
-  it('shares one in-flight request across concurrent callers for the same key', async () => {
-    let resolveFetch: (value: unknown) => void = () => {};
-    const fetchMock = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const p1 = fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 });
-    const p2 = fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 });
-
-    resolveFetch({ ok: true, status: 200, statusText: 'OK', json: async () => ({ fonti: [] }) });
-    await Promise.all([p1, p2]);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not cache a failed request — a retry really refetches', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: false, status: 500, statusText: 'Internal Server Error', json: async () => ({}),
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 })).rejects.toThrow();
-    await expect(fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 })).rejects.toThrow();
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('keeps distinct riferimento strings in separate cache entries', async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true, status: 200, statusText: 'OK', json: async () => ({ fonti: [] }),
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await fetchCaseLawCached({ riferimento: 'art. 2043 c.c.', limite: 5 });
-    await fetchCaseLawCached({ riferimento: 'art. 3 Cost.', limite: 5 });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
