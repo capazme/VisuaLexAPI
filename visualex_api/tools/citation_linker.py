@@ -33,7 +33,11 @@ _ACT_ABBREVS = sorted(
 # dell'ordinamento militare and "costituzionalmente" the "cost" of the
 # Costituzione, and the false act poisoned the context of every bare
 # "art. N" that followed.
-_ACT_ABBREV_PATTERN = "(?:" + "|".join(re.escape(a) for a in _ACT_ABBREVS) + r")(?![A-Za-z'\u2019])"
+# … and a name is not the prefix of a longer one: "codice penale militare di
+# pace" is not the codice penale.
+_ACT_ABBREV_PATTERN = (
+    "(?:" + "|".join(re.escape(a) for a in _ACT_ABBREVS) + r")(?![A-Za-z'\u2019])(?!\s+milita(?:re|ri)\b)"
+)
 
 # Acts that cannot be opened without a number. One that comes out of a
 # pattern number-less ("art. 17 della legge 23 agosto 1988, n. 400" — a form
@@ -71,7 +75,7 @@ _EXPLICIT_CITE_RE = re.compile(
     r"(?:\s*(?:e|,)\s*" + _ARTICLE_NUMBER_RE.pattern + r")*"  # optional additional articles
     + _COMMA_CLAUSE_SOURCE +
     r"\s*,?\s+"  # separator — ", comma 1, c.c." closes the clause with a comma
-    r"(?:del\s+|della\s+|dello\s+|dell['']\s*)?"  # optional preposition
+    r"(?:delle\s+|dello\s+|della\s+|degli\s+|dei\s+|del\s+|dell['']\s*)?"  # optional preposition
     r"(" + _ACT_ABBREV_PATTERN + r")"  # group 3: act abbreviation
     r"(?:\s+(\d+)\s*/\s*(\d{4}|\d{2})\b)?"  # group 4,5: optional act_number/year
     ,
@@ -83,7 +87,7 @@ _ART_DEL_ACT_RE = re.compile(
     r"((?:artt?\.?|articol[oi])\s+)"
     r"(" + _ARTICLE_NUMBER_RE.pattern + r")"
     + _COMMA_CLAUSE_SOURCE +
-    r"\s*,?\s+(?:del|della|dello|dell['\u2019]\s*)\s*"
+    r"\s*,?\s+(?:delle|dello|della|degli|dei|del|dell['\u2019]\s*)\s*"
     r"(" + _ACT_ABBREV_PATTERN + r")"
     r"(?:\s+(\d+)\s*/\s*(\d{4}|\d{2})\b)?"
     ,
@@ -118,7 +122,7 @@ _ART_DEL_EU_ACT_RE = re.compile(
     r"((?:artt?\.?|articol[oi])\s+)"
     r"(" + _ARTICLE_LIST_SOURCE + r")"
     + _COMMA_CLAUSE_SOURCE +
-    r"\s*,?\s+(?:del|della|dello|dell['\u2019]\s*)\s*"
+    r"\s*,?\s+(?:delle|dello|della|degli|dei|del|dell['\u2019]\s*)\s*"
     + _EU_ACT_SOURCE,
     re.IGNORECASE,
 )

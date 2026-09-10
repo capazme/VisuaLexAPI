@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatParsedCitation, isSearchReady, parseLegalCitation } from './citationParser';
+import { FULL_ACT_NAMES, formatParsedCitation, isSearchReady, parseLegalCitation } from './citationParser';
 import type { CustomAlias } from '../types';
 
 describe('formatParsedCitation — date shown in a citation', () => {
@@ -245,5 +245,19 @@ describe('parseLegalCitation — date sanity', () => {
 
   it('keeps searching after an impossible date', () => {
     expect(parse('art. 1 legge 31/13/1990 del 12 agosto 1991 n. 400')?.date).toBe('1991-08-12');
+  });
+});
+
+describe('FULL_ACT_NAMES', () => {
+  it('lists the acts a text can name in full, without the numbered ones or the abbreviations', () => {
+    const names = FULL_ACT_NAMES.map(([name]) => name);
+    expect(names).toEqual(expect.arrayContaining(['codice civile', 'codice penale', 'costituzione', 'codice del consumo']));
+    for (const excluded of ['legge', 'decreto legislativo', 'cc', 'cost', 'c.c.', 'tue']) {
+      expect(names).not.toContain(excluded);
+    }
+  });
+
+  it('maps every name to the act type the palette resolves it to', () => {
+    expect(Object.fromEntries(FULL_ACT_NAMES)).toMatchObject({ 'codice civile': 'codice civile', 'costituzione': 'costituzione' });
   });
 });

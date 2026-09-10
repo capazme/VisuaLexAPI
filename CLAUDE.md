@@ -445,9 +445,11 @@ Duplicating any of these is a defect, not a shortcut.
   all towards the EU act. The client matcher reads the article-first form
   for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
   without the preposition), as the server's `_EXPLICIT_CITE_RE` and
-  `_ART_DEL_ACT_RE` do. An article the prose gives to an act no pattern
-  can read ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on
-  the client rather than one to the act being read.
+  `_ART_DEL_ACT_RE` do, and the codici and the Costituzione named in full
+  ("art. 5 del codice civile") through `FULL_ACT_NAMES`, the palette's own
+  vocabulary. An article the prose gives to an act no pattern can read
+  ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on the
+  client rather than one to the act being read.
 - `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
   (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
   copyable citation string.
