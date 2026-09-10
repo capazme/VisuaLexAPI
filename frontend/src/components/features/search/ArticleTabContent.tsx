@@ -12,7 +12,7 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../ui/Button';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
-import { wrapCitationsInHtml, deserializeCitation, type ParsedCitationData } from '../../../utils/citationMatcher';
+import { wrapCitationsInHtml, deserializeCitation, isSameCitationTarget, type ParsedCitationData } from '../../../utils/citationMatcher';
 import { openCompareWithArticle, getCompareState } from '../../../hooks/useCompare';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { subscribeSearchNavigation } from '../../../hooks/useGlobalSearch';
@@ -556,6 +556,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             const target = event.target as HTMLElement;
             const citationElement = target.closest('.citation-hover');
             if (citationElement) {
+                // A citation wrapped per segment is several spans sharing one
+                // cache key: crossing from one to the next is not leaving it.
+                if (isSameCitationTarget(citationElement, (event as MouseEvent).relatedTarget)) return;
                 // Delay hide to allow moving to popup
                 setTimeout(() => {
                     if (!isHoveringPopupRef.current) {

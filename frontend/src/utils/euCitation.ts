@@ -30,16 +30,22 @@ const EU_MARKER_SOURCE = '\\(?\\s*(?:cee|ce|ue|euratom)\\s*\\)?';
 const EU_QUALIFIER_SOURCE = '(?:\\s+(?:di\\s+esecuzione|di\\s+attuazione|delegat[oa]))?';
 
 /**
- * Head of an EU citation as one capture group: the act word, its marker and an
- * optional "n.". The marker is optional for directives (nothing else is called
- * "direttiva 2016/680"); for regulations the caller decides, because in an
- * article body a bare "regolamento n. 5/2020" is usually a national one.
+ * Head of an EU citation as one capture group: the act word, an optional
+ * marker and an optional "n.". The marker is always optional here; a caller
+ * that needs it for regulations (the in-text matcher: in an article body a
+ * bare "regolamento n. 5/2020" is usually a national one) checks
+ * `hasEuMarker` on the head, or the trailing marker of the pair, afterwards.
  */
-export function buildEuHeadSource(opts: { markerRequiredForRegulation: boolean }): string {
-  const marker = `(?:${EU_MARKER_SOURCE})`;
-  const reg = `(?:regolamento${EU_QUALIFIER_SOURCE}|reg\\.?)\\s*${opts.markerRequiredForRegulation ? marker : `${marker}?`}`;
-  const dir = `(?:direttiva${EU_QUALIFIER_SOURCE}|dir\\.?)\\s*${marker}?`;
+export function buildEuHeadSource(): string {
+  const marker = `(?:${EU_MARKER_SOURCE})?`;
+  const reg = `(?:regolamento${EU_QUALIFIER_SOURCE}|reg\\.?)\\s*${marker}`;
+  const dir = `(?:direttiva${EU_QUALIFIER_SOURCE}|dir\\.?)\\s*${marker}`;
   return `(${reg}|${dir})\\s*(?:n\\.?\\s*)?`;
+}
+
+/** Whether a head or a trailing marker names a Community/Union at all. */
+export function hasEuMarker(text: string): boolean {
+  return /\b(?:ue|cee?|euratom)\b/i.test(text);
 }
 
 /**
@@ -81,7 +87,9 @@ function canBeYear(half: string): boolean {
 /**
  * Decide which half of "first/second" is the year, or null when neither can be.
  *
- * - a trailing marker ("2002/58/CE") is the old directive format: year first;
+ * - a trailing marker on a directive ("2002/58/CE") is the old directive
+ *   format: year first; on a regulation ("1049/2001/CE") it says nothing
+ *   about the order, which the rules below decide;
  * - one half looks like a year and the other does not: that one is the year
  *   ("2024/2847", "679/2016", "1/2003");
  * - both look like years: year first from 2015 on, number first before
@@ -105,7 +113,7 @@ export function resolveEuPair(
   const numberFirst = (): EuPair | null =>
     canBeYear(second) ? { actNumber: first, year: expandTwoDigitYear(second) } : null;
 
-  if (opts.trailingMarker) return yearFirst();
+  if (opts.trailingMarker && opts.kind === 'direttiva') return yearFirst();
   if (firstIsYear && !secondIsYear) return yearFirst();
   if (secondIsYear && !firstIsYear) return numberFirst();
   if (firstIsYear && secondIsYear) {

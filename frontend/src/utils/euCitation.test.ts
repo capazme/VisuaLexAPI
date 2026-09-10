@@ -71,3 +71,10 @@ describe('resolveEuPair', () => {
       .toEqual({ year: '2012', actNumber: '30' });
   });
 });
+
+describe('resolveEuPair — trailing marker on a regulation', () => {
+  it('says nothing about the order: "1049/2001/CE" is number 1049 of 2001', () => {
+    expect(resolveEuPair('1049', '2001', { kind: 'regolamento', trailingMarker: true, currentYear: 2026 }))
+      .toEqual({ year: '2001', actNumber: '1049' });
+  });
+});

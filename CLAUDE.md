@@ -137,7 +137,12 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     Regolamento UE 2016/679); runs before the NL parser
   - `citation_linker.py` — citation detection in article text, emits
     `{start, end, display_text, article, act_type, date, act_number}`; exposed at
-    `POST /extract_citations`
+    `POST /extract_citations`. EU acts ("regolamento (UE) 2016/679, art. 5",
+    "art. 5 del regolamento (UE) 2016/679", "direttiva 2002/58/CE") go
+    through `nl_parser`'s shared pattern, with the marker mandatory for
+    regulations — a bare "regolamento n. 5/2020" in a text is a national
+    one. A bare "art. 7" after a numbered act inherits its number and year,
+    not only its type
   - `circuit_breaker.py` — per-source breaker. **State is in-memory
     per-instance** — single-instance deployment only. Status at
     `GET /api/circuit-breakers`
@@ -431,7 +436,18 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
   then number, "679/2016" the reverse, "2006/2004" number first), shared by
   the palette parser and the in-text matcher and mirrored by
-  `resolve_eu_year_and_number` in `nl_parser.py`. Change all three together.
+  `resolve_eu_year_and_number` in `nl_parser.py`, which `citation_linker.py`
+  reuses through `build_eu_act_pattern` / `eu_act_from_groups`. Change all
+  four together. The two in-text detectors (`citationMatcher.ts`,
+  `citation_linker.py`) read the same prose forms: "regolamento (UE)
+  2016/679, art. 5", "art. 5 del regolamento (UE) 2016/679", "art. 5, comma
+  1, del …", and a list ("articoli 8 e 9 del …") becomes one link per number,
+  all towards the EU act. The client matcher reads the article-first form
+  for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
+  without the preposition), as the server's `_EXPLICIT_CITE_RE` and
+  `_ART_DEL_ACT_RE` do. An article the prose gives to an act no pattern
+  can read ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on
+  the client rather than one to the act being read.
 - `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
   (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
   copyable citation string.

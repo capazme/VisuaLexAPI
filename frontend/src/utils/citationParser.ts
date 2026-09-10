@@ -6,7 +6,7 @@
 
 import type { CustomAlias } from '../types';
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
-import { expandTwoDigitYear } from './dateUtils';
+import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -178,11 +178,37 @@ const ABBREVIATION_MAP: Record<string, string> = {
 const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.length - a.length);
 
 /**
- * Pattern per estrarre articoli con suffissi (bis, ter, ...) o range (es. "artt. 1-10").
- * Group 1: numero di partenza. Group 2 (opzionale): numero finale del range.
- * Group 3 (opzionale): suffisso numerico ordinale (bis/ter/...).
+ * Un articolo: numero, eventuale suffisso (bis, ter, ...) o intervallo ("1-10").
  */
-const ARTICLE_PATTERN = /\b(?:artt?\.?|articol[oi])\s*(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?\b/i;
+const ARTICLE_ITEM = '\\d+(?:\\s*-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?(?:\\s*-\\s*\\d+)?';
+
+/**
+ * Un elenco di articoli separati da "," o "e": "artt. 1, 2 e 3". L'API
+ * accetta "1,2,3" e "1-10", non "5 e 6".
+ */
+const ARTICLE_SEPARATOR = /\s*(?:,|\be\b)\s*/i;
+const ARTICLE_PATTERN = new RegExp(
+  `\\b(?:artt?\\.?|articol[oi])\\s*(${ARTICLE_ITEM}(?:${ARTICLE_SEPARATOR.source}${ARTICLE_ITEM})*)`,
+  'i'
+);
+
+/**
+ * "comma 1", "co. 3", "comma 1, lett. b)": qualifica l'articolo, non è il
+ * numero dell'atto. Va tolto dopo l'articolo o "1" diventa l'atto n. 1.
+ */
+const COMMA_CLAUSE_PATTERN = /\s*,?\s*(?:comma|co\.|c\.)\s*\d+(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?/i;
+
+/**
+ * Date complete, da riconoscere PRIMA della coppia numero/anno: in
+ * "legge 7/8/1990 n. 241" la coppia leggerebbe "8/1990" come atto n. 8.
+ * La conversione la fa parseItalianDate, che questi pattern si limitano a
+ * delimitare.
+ */
+const FULL_DATE_PATTERNS = [
+  /\b\d{1,2}\s*[/-]\s*\d{1,2}\s*[/-]\s*\d{4}\b/,
+  /\b\d{1,2}\s+[a-z]+\s+\d{4}\b/i,
+  /\b\d{4}-\d{2}-\d{2}\b/,
+];
 
 /**
  * Pattern per numeri di articolo standalone (senza "art"); supporta range.
@@ -191,9 +217,11 @@ const STANDALONE_NUMBER_PATTERN = /^(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|qua
 
 /**
  * Pattern per numero/anno (es. "241/1990", "679/2016"). L'anno ha due o
- * quattro cifre: "241/456" non è un atto del 456.
+ * quattro cifre ("241/456" non è un atto del 456) e nessuna delle due metà
+ * può far parte di una terna giorno/mese/anno ("31/13/1990" è una data
+ * sbagliata, non l'atto 31 del 2013).
  */
-const NUMBER_YEAR_PATTERN = /\b(\d+)\s*[/\\]\s*(\d{4}|\d{2})\b/;
+const NUMBER_YEAR_PATTERN = /(?<![\d/])\b(\d+)\s*[/\\]\s*(\d{4}|\d{2})\b(?!\s*[/\\]\s*\d)/;
 
 /**
  * Pattern per anno isolato (es. "1990", "2016")
@@ -213,7 +241,7 @@ const ACT_NUMBER_PATTERN = /\bn\.?\s*(\d+)\b/i;
  * metà, marcatore finale.
  */
 const EU_CITATION_PATTERN = new RegExp(
-  `\\b${buildEuHeadSource({ markerRequiredForRegulation: false })}${EU_PAIR_SOURCE}\\b`,
+  `\\b${buildEuHeadSource()}${EU_PAIR_SOURCE}\\b`,
   'i'
 );
 
@@ -227,7 +255,11 @@ function normalizeInput(input: string): string {
     // passaggio "regolamento (ue)" non combaciava con nessuna abbreviazione.
     .replace(/[()[\]]+/g, ' ')
     .replace(/\s+/g, ' ')
-    .replace(/[,;:]+/g, ' ')
+    // La virgola resta solo davanti a una cifra, dove separa gli articoli di
+    // un elenco ("artt. 1, 2 e 3"); altrove è punteggiatura ("d.lgs.
+    // 196/2003, art. 7").
+    .replace(/,(?!\s*\d)/g, ' ')
+    .replace(/[;:]+/g, ' ')
     .trim();
 }
 
@@ -322,21 +354,49 @@ function extractEuCitation(normalized: string): ActTypeExtraction | null {
 function extractArticle(input: string): { article: string | undefined; remaining: string } {
   const match = input.match(ARTICLE_PATTERN);
   if (match) {
-    // Match groups: [1]=start number, [2]=end number (range), [3]=ordinal suffix.
-    // Range wins over suffix (rare to combine "1-10 bis").
-    const [, start, rangeEnd, suffix] = match;
-    let article: string;
-    if (rangeEnd) {
-      article = `${start}-${rangeEnd}`;
-    } else if (suffix) {
-      article = `${start}-${suffix}`;
-    } else {
-      article = start;
-    }
-    const remaining = input.replace(ARTICLE_PATTERN, ' ').replace(/\s+/g, ' ').trim();
+    // Nelle forme dell'API: "2 bis" → "2-bis", "1 - 10" → "1-10", "5 e 6" → "5,6".
+    const article = match[1]
+      .split(ARTICLE_SEPARATOR)
+      .map(item => item
+        .trim()
+        .replace(/(\d+)\s*-?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)/i, '$1-$2')
+        .replace(/(\d+)\s*-\s*(\d+)/, '$1-$2'))
+      .join(',');
+    const tail = input.slice((match.index ?? 0) + match[0].length);
+    const clause = tail.match(COMMA_CLAUSE_PATTERN);
+    const tailWithoutClause = clause && clause.index === 0 ? tail.slice(clause[0].length) : tail;
+    const remaining = (input.slice(0, match.index) + ' ' + tailWithoutClause).replace(/\s+/g, ' ').trim();
     return { article, remaining };
   }
   return { article: undefined, remaining: input };
+}
+
+/**
+ * Estrae una data completa (g/m/aaaa, "7 agosto 1990", ISO) e la restituisce
+ * in forma ISO; il resto dell'input resta per numero e anno.
+ */
+function isPlausibleIsoDate(iso: string): boolean {
+  const match = iso.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
+}
+
+function extractFullDate(input: string): { date: string | undefined; remaining: string } {
+  for (const pattern of FULL_DATE_PATTERNS) {
+    const everywhere = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    for (const match of input.matchAll(everywhere)) {
+      const iso = parseItalianDate(match[0]);
+      // Un mese sconosciuto ("7 pippo 1990") o impossibile ("31/13/1990")
+      // non è una data: si va avanti, sullo stesso pattern prima.
+      if (!isPlausibleIsoDate(iso)) continue;
+      const start = match.index ?? 0;
+      const remaining = `${input.slice(0, start)} ${input.slice(start + match[0].length)}`.replace(/\s+/g, ' ').trim();
+      return { date: iso, remaining };
+    }
+  }
+  return { date: undefined, remaining: input };
 }
 
 /**
@@ -439,11 +499,13 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
   let actNumber = actTypeResult.actNumber;
   let date = actTypeResult.date;
 
-  // Se non abbiamo numero/data dall'alias, estrai dall'input
+  // Se non abbiamo numero/data dall'alias, estrai dall'input: prima una
+  // data completa, poi numero e anno da ciò che resta
   if (!actNumber && !date) {
-    const numYearResult = extractNumberAndYear(afterArticle);
+    const fullDate = extractFullDate(afterArticle);
+    const numYearResult = extractNumberAndYear(fullDate.remaining);
     actNumber = numYearResult.actNumber;
-    date = numYearResult.date;
+    date = fullDate.date ?? numYearResult.date;
     afterArticle = numYearResult.remaining;
   }
 

@@ -172,3 +172,78 @@ describe('parseLegalCitation — EU acts, hardening', () => {
       .toMatchObject({ act_type: 'Regolamento UE', act_number: '679', date: '2016', article: '5', fromAlias: true });
   });
 });
+
+describe('parseLegalCitation — full dates and article lists', () => {
+  const parse = (input: string) => parseLegalCitation(input);
+
+  it('reads a day/month/year date before the act number', () => {
+    expect(parse('art. 1 legge 7/8/1990 n. 241'))
+      .toMatchObject({ act_type: 'legge', act_number: '241', date: '1990-08-07', article: '1' });
+  });
+
+  it('reads an Italian long date', () => {
+    expect(parse('legge 7 agosto 1990 n. 241 art. 1'))
+      .toMatchObject({ act_type: 'legge', act_number: '241', date: '1990-08-07', article: '1' });
+  });
+
+  it('reads an ISO date', () => {
+    expect(parse('art. 1 legge 1990-08-07 n. 241'))
+      .toMatchObject({ act_type: 'legge', act_number: '241', date: '1990-08-07', article: '1' });
+  });
+
+  it('shows only the year of a full date in the preview', () => {
+    expect(formatParsedCitation(parse('art. 1 legge 7/8/1990 n. 241')!)).toBe('Art. 1 L. 241/1990');
+  });
+
+  it('collects an "e"-separated list of articles', () => {
+    expect(parse('artt. 5 e 6 cc')).toMatchObject({ act_type: 'codice civile', article: '5,6' });
+  });
+
+  it('collects a comma-and-e list without reading a member as the act number', () => {
+    const r = parse('artt. 1, 2 e 3 cc');
+    expect(r).toMatchObject({ act_type: 'codice civile', article: '1,2,3' });
+    expect(r?.act_number).toBeUndefined();
+  });
+
+  it('keeps a range', () => {
+    expect(parse('artt. 1-10 cc')).toMatchObject({ act_type: 'codice civile', article: '1-10' });
+  });
+
+  it('collects a list on an EU act', () => {
+    expect(parse('reg. ue 2016/679 artt. 5 e 6'))
+      .toMatchObject({ act_type: 'Regolamento UE', act_number: '679', date: '2016', article: '5,6' });
+  });
+
+  it('still separates the act from the article on a comma', () => {
+    expect(parse('d.lgs. 196/2003, art. 7'))
+      .toMatchObject({ act_type: 'decreto legislativo', act_number: '196', date: '2003', article: '7' });
+  });
+});
+
+describe('parseLegalCitation — comma clauses', () => {
+  const parse = (input: string) => parseLegalCitation(input);
+
+  it('does not read "comma 1" as the act number', () => {
+    const r = parse('art. 5, comma 1, cc');
+    expect(r).toMatchObject({ act_type: 'codice civile', article: '5' });
+    expect(r?.act_number).toBeUndefined();
+  });
+
+  it('skips a comma and letter clause before a numbered act', () => {
+    expect(parse('art. 2, co. 3, lett. b) d.lgs. 196/2003'))
+      .toMatchObject({ act_type: 'decreto legislativo', act_number: '196', date: '2003', article: '2' });
+  });
+});
+
+describe('parseLegalCitation — date sanity', () => {
+  const parse = (input: string) => parseLegalCitation(input);
+
+  it('rejects an impossible month and does not feed it to the number/year pair', () => {
+    expect(parse('art. 1 legge 31/13/1990 n. 400'))
+      .toMatchObject({ act_type: 'legge', act_number: '400', date: '1990' });
+  });
+
+  it('keeps searching after an impossible date', () => {
+    expect(parse('art. 1 legge 31/13/1990 del 12 agosto 1991 n. 400')?.date).toBe('1991-08-12');
+  });
+});

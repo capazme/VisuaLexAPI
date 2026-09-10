@@ -9,7 +9,7 @@
  * - Con comma/lettera: "art. 5, comma 1" (ignora comma, prende articolo)
  */
 
-import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
+import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, hasEuMarker, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear } from './dateUtils';
 
 // Minimal interface for norma context (subset of NormaVisitata)
@@ -103,6 +103,15 @@ const PREPOSITION_PATTERN = "(?:dell?'|dall?'|all?'|nell?'|sull?')?";
 // Pattern base per "articolo" con tutte le varianti
 const ARTICLE_WORD_PATTERN = `${PREPOSITION_PATTERN}art(?:icol[oi])?t?\\.?`;
 
+// Atti nazionali numerati (legge, L., d.lgs., decreto legislativo, ecc.),
+// condiviso dal PATTERN 1 (atto prima) e dal PATTERN 1a (articolo prima)
+const NATIONAL_ACT_SOURCE =
+  'legge|l\\.|' +
+  'decreto\\s+legge|d\\.?\\s*l\\.?|dl|' +
+  'decreto\\s+legislativo|d\\.?\\s*lgs\\.?|dlgs|' +
+  'd\\.?\\s*p\\.?\\s*r\\.?|dpr|' +
+  'regio\\s+decreto|r\\.?\\s*d\\.?|rd';
+
 /**
  * Normalizza il tipo atto
  */
@@ -187,41 +196,129 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
   // ============================================
   // PATTERN 0: Atti UE, che leggono la coppia nel loro ordine
   // Es: "regolamento (UE) 2016/679, art. 5", "direttiva 2002/58/CE art. 5",
-  //     "reg. ue 679/2016 art. 5"
+  //     "reg. ue 679/2016 art. 5", "art. 5 del regolamento (UE) 2016/679",
+  //     "articoli 8 e 9 del regolamento (UE) 2016/679"
   // Prima del pattern italiano, così è questo a rivendicare l'intervallo:
   // letto come numero/anno, "2016/679" diventava il regolamento n. 2016.
   // Il marcatore è obbligatorio per i regolamenti: in un testo normativo un
   // "regolamento n. 5/2020" senza (UE) è di regola un regolamento interno.
-  // Un elenco ("articoli 8 e 9") non viene rivendicato: resta al PATTERN 4,
-  // che ne emette un link per numero, come prima che questo pattern esistesse.
+  // Un elenco produce un link per numero, tutti verso l'atto UE: lasciato al
+  // PATTERN 4 finiva sulla norma corrente, cioè sull'atto sbagliato.
   // ============================================
-  const euCitationRegex = new RegExp(
-    `\\b${buildEuHeadSource({ markerRequiredForRegulation: true })}${EU_PAIR_SOURCE}` +
-    `(?:\\s*,?\\s*${ARTICLE_WORD_PATTERN}\\s*(\\d+${ARTICLE_SUFFIX_PATTERN})(?!\\s*[,e]\\s*\\d))?`,
+  const euHead = buildEuHeadSource();
+  // Un articolo: numero, intervallo ("1-10") o suffisso ("2-bis")
+  const articleItem = `\\d+(?:\\s*-\\s*\\d+)?${ARTICLE_SUFFIX_PATTERN}`;
+  const articleList = `${articleItem}(?:\\s*(?:,|\\be\\b)\\s*${articleItem})*`;
+  // "comma 1", "commi 1 e 2", "co. 3", "comma 1, lett. b)": qualifica
+  // l'articolo, mai l'atto; la virgola di chiusura è punteggiatura normale
+  const commaClause =
+    '(?:\\s*,?\\s*(?:comm[ai]|co\\.)\\s*\\d+(?:\\s*(?:,|\\be\\b)\\s*\\d+)*)?' +
+    '(?:\\s*,?\\s*(?:lett\\.?|lettera)\\s*[a-z]\\)?)?\\s*,?';
+  // Parole d'atto che la prosa lega a un articolo con "del/della": se seguono
+  // un articolo che nessun pattern ha saputo agganciare, quell'articolo NON è
+  // della norma in lettura, e un link sbagliato è peggio di nessun link.
+  // Residui che il PATTERN 4/5 lascia davanti a "del": la ")" di "lett. b)",
+  // virgole, clausole di comma, lettera o numero.
+  const tailResidue =
+    '(?:\\s*[,)]|\\s*(?:comm[ai]|co\\.)\\s*\\d+(?:\\s*(?:,|\\be\\b)\\s*\\d+)*|\\s*(?:lett\\.?|lettera|numero|n\\.)\\s*[a-z0-9]+\\)?)*';
+  const namesAnotherAct = (tail: string) => new RegExp(
+    `^${tailResidue}\\s*(?:del|della|dello|dell['’])\\s*` +
+    "(?:legge|l\\.|decreto|d\\.?\\s*lgs|dlgs|d\\.?\\s*p\\.?\\s*r|dpr|regolamento|reg\\.|direttiva|dir\\.|r\\.?\\s*d\\.|rd\\b|dl\\b|codice|costituzione|trattato)",
+    'i'
+  ).test(tail);
+
+  const addArticleList = (
+    whole: string, wholeStart: number, listText: string, listStart: number,
+    base: { act_type: string; act_number: string; date: string }
+  ) => {
+    const numbers = Array.from(listText.matchAll(new RegExp(articleItem, 'gi')));
+    if (numbers.length <= 1) {
+      addMatch(whole, wholeStart, wholeStart + whole.length, {
+        ...base, article: listText.replace(/\s+/g, ''), confidence: 0.95,
+      });
+      return;
+    }
+    for (const n of numbers) {
+      const start = listStart + (n.index ?? 0);
+      addMatch(n[0], start, start + n[0].length, {
+        ...base, article: n[0].replace(/\s+/g, ''), confidence: 0.95,
+      });
+    }
+  };
+
+  const euBase = (head: string, first: string, second: string, trailingMarker: string | undefined) => {
+    const kind = euKindOf(head);
+    // Il marcatore è obbligatorio per i regolamenti, nella testa o in coda
+    // alla coppia ("regolamento 1049/2001/CE"): in un testo normativo un
+    // "regolamento n. 5/2020" senza (UE) è di regola un regolamento interno.
+    const markers = `${head} ${trailingMarker ?? ''}`;
+    if (kind === 'regolamento' && !hasEuMarker(markers)) return null;
+    const pair = resolveEuPair(first, second, {
+      kind, trailingMarker: Boolean(trailingMarker), oldMarker: isOldEuMarker(markers),
+    });
+    return pair ? { act_type: EU_ACT_TYPES[kind], act_number: pair.actNumber, date: pair.year } : null;
+  };
+
+  // La preposizione è facoltativa: "art. 5 direttiva (UE) 2016/680" e
+  // "art. 7 d.lgs. 196/2003" sono la scorciatoia corrente nella prosa.
+  const preposition = "(?:(?:del|della|dello|dell['’])\\s*)?";
+
+  // 0a: "art. 5 del regolamento (UE) 2016/679", "articoli 8 e 9 del …"
+  // Gruppi: 1 prefisso articolo, 2 elenco, 3-5 testa/coppia UE, 6 marcatore finale.
+  const euArticleFirstRegex = new RegExp(
+    `(${ARTICLE_WORD_PATTERN}\\s*)(${articleList})${commaClause}\\s+${preposition}` +
+    `${euHead}${EU_PAIR_SOURCE}`,
     'gi'
   );
 
   let match;
+  while ((match = euArticleFirstRegex.exec(cleanText)) !== null) {
+    const [, prefix, listText, head, first, second, trailingMarker] = match;
+    const base = euBase(head, first, second, trailingMarker);
+    if (!base) continue;
+    addArticleList(match[0], match.index, listText, match.index + prefix.length, base);
+  }
+
+  // 0b: "regolamento (UE) 2016/679, art. 5", "regolamento (UE) 2016/679, articoli 8 e 9"
+  const euCitationRegex = new RegExp(
+    `\\b${euHead}${EU_PAIR_SOURCE}` +
+    `(?:\\s*,?\\s*${ARTICLE_WORD_PATTERN}\\s*(${articleList}))?`,
+    'gi'
+  );
+
   while ((match = euCitationRegex.exec(cleanText)) !== null) {
-    const [, head, first, second, trailingMarker, article] = match;
+    const [, head, first, second, trailingMarker, listText] = match;
 
     // Senza articolo niente anteprima, come per il pattern italiano
-    if (!article) continue;
+    if (!listText) continue;
+    if (isOverlapping(match.index, match.index + match[0].length)) continue;
 
-    const kind = euKindOf(head);
-    const pair = resolveEuPair(first, second, {
-      kind, trailingMarker: Boolean(trailingMarker), oldMarker: isOldEuMarker(head),
-    });
-    if (!pair) continue;
+    const base = euBase(head, first, second, trailingMarker);
+    if (!base) continue;
+    addArticleList(match[0], match.index, listText, match.index + match[0].length - listText.length, base);
+  }
 
-    const { actNumber, year } = pair;
+  // ============================================
+  // PATTERN 1a: Articolo PRIMA di un atto nazionale numerato
+  // Es: "art. 7 del d.lgs. 196/2003", "artt. 1, 2 e 3 del d.lgs. 196/2003",
+  //     "art. 5, comma 1, della legge 241/1990", "art. 7 d.lgs. 196/2003"
+  // È la forma corrente nella prosa: lasciata al PATTERN 5, l'articolo
+  // finiva sulla norma in lettura, cioè su un atto sbagliato, in silenzio.
+  // Gruppi: 1 prefisso, 2 elenco, 3 tipo atto, 4 numero, 5 anno.
+  // ============================================
+  const nationalArticleFirstRegex = new RegExp(
+    `(${ARTICLE_WORD_PATTERN}\\s*)(${articleList})${commaClause}\\s+${preposition}` +
+    `(${NATIONAL_ACT_SOURCE})\\s+(?:n\\.?\\s*)?(\\d+)\\s*[/\\\\]\\s*(\\d{4}|\\d{2})\\b`,
+    'gi'
+  );
 
-    addMatch(match[0], match.index, match.index + match[0].length, {
-      act_type: EU_ACT_TYPES[kind],
+  while ((match = nationalArticleFirstRegex.exec(cleanText)) !== null) {
+    if (isOverlapping(match.index, match.index + match[0].length)) continue;
+    const [, prefix, listText, actTypeMatch, actNumber, year] = match;
+    addArticleList(match[0], match.index, listText, match.index + prefix.length, {
+      act_type: normalizeActType(actTypeMatch),
       act_number: actNumber,
-      date: year,
-      article: article.replace(/\s+/g, ''),
-      confidence: 0.95,
+      date: expandTwoDigitYear(year),
     });
   }
 
@@ -231,13 +328,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
   // ============================================
   const fullCitationRegex = new RegExp(
     // Tipo atto (legge, L., d.lgs., decreto legislativo, etc.)
-    '(' +
-      'legge|l\\.|' +
-      'decreto\\s+legge|d\\.?\\s*l\\.?|dl|' +
-      'decreto\\s+legislativo|d\\.?\\s*lgs\\.?|dlgs|' +
-      'd\\.?\\s*p\\.?\\s*r\\.?|dpr|' +
-      'regio\\s+decreto|r\\.?\\s*d\\.?|rd' +
-    ')' +
+    `(${NATIONAL_ACT_SOURCE})` +
     // Spazio e numero/anno (l'anno ha due o quattro cifre)
     '\\s+(?:n\\.?\\s*)?(\\d+)\\s*[/\\\\]\\s*(\\d{4}|\\d{2})\\b' +
     // Articolo opzionale
@@ -345,6 +436,12 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
 
       // Verifica che l'intero range non sia già usato
       if (isOverlapping(fullMatchStart, fullMatchEnd)) continue;
+      if (namesAnotherAct(cleanText.slice(fullMatchEnd, fullMatchEnd + 120))) {
+        // Rinunciato: l'intervallo va marcato, o il PATTERN 5 riprende il
+        // primo articolo dell'elenco e lo dà alla norma in lettura.
+        usedRanges.push([fullMatchStart, fullMatchEnd]);
+        continue;
+      }
 
       const prefix = match[1];  // "articoli " o "degli articoli "
       const articlesGroup = match[2];  // "8 e 9"
@@ -396,6 +493,8 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
 
     while ((match = simpleArticleRegex.exec(cleanText)) !== null) {
       if (isOverlapping(match.index, match.index + match[0].length)) continue;
+      const end = match.index + match[0].length;
+      if (namesAnotherAct(cleanText.slice(end, end + 120))) continue;
 
       const article = match[1];
 
@@ -411,6 +510,21 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
 
   // Ordina per posizione
   return matches.sort((a, b) => a.startIndex - b.startIndex);
+}
+
+/**
+ * Vero se `to` (il relatedTarget di un mouseleave) sta ancora dentro la
+ * stessa citazione di `from`: una citazione avvolta per segmenti è fatta di
+ * più span con lo stesso data-cache-key, e passare da uno all'altro non è
+ * uscire dalla citazione. Senza questa guardia l'anteprima si chiudeva
+ * proprio sulle citazioni che l'avvolgimento per segmenti aveva sistemato.
+ */
+export function isSameCitationTarget(from: Element, to: EventTarget | null): boolean {
+  const candidate = to as Element | null;
+  if (!candidate || typeof candidate.closest !== 'function') return false;
+  const target = candidate.closest('.citation-hover');
+  if (!target) return false;
+  return target.getAttribute('data-cache-key') === from.getAttribute('data-cache-key');
 }
 
 /**
@@ -482,14 +596,21 @@ export function wrapCitationsInHtml(
     const citation = citations[i];
     const serialized = serializeCitation(citation.parsed);
     const escaped = serialized.replace(/"/g, '&quot;');
+    const open = `<span class="citation-hover" data-citation="${escaped}" data-cache-key="${citation.cacheKey}">`;
 
     const before = result.substring(0, citation.startIndex);
     const after = result.substring(citation.endIndex);
-    const matchText = result.substring(citation.startIndex, citation.endIndex);
+    const matchHtml = result.substring(citation.startIndex, citation.endIndex);
 
-    result = before +
-      `<span class="citation-hover" data-citation="${escaped}" data-cache-key="${citation.cacheKey}">${matchText}</span>` +
-      after;
+    // La citazione può attraversare un tag (un link lasciato nel testo, il
+    // <mark> di un'evidenziazione): uno span aperto dentro un elemento e
+    // chiuso fuori non è HTML. Si avvolge quindi ogni segmento di testo per
+    // conto suo e i tag si lasciano dove stanno.
+    const wrapped = matchHtml.replace(/<[^>]*>|[^<]+/g, piece =>
+      piece.startsWith('<') ? piece : `${open}${piece}</span>`
+    );
+
+    result = before + wrapped + after;
   }
 
   return result;
