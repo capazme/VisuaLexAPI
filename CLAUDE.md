@@ -425,7 +425,13 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
   `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
   (**tolerant** lookup — required, see gotcha 9).
-- `utils/dateUtils.ts` — `parseItalianDate`, `formatDateItalianLong`.
+- `utils/dateUtils.ts` — `parseItalianDate`, `formatDateItalianLong`,
+  `expandTwoDigitYear` (the one two-digit-year pivot, same as the backend's
+  `_expand_year`: "90" → 1990, "23" → 2023).
+- `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
+  then number, "679/2016" the reverse, "2006/2004" number first), shared by
+  the palette parser and the in-text matcher and mirrored by
+  `resolve_eu_year_and_number` in `nl_parser.py`. Change all three together.
 - `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
   (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
   copyable citation string.

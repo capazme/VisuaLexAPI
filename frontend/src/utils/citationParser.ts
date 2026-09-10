@@ -5,6 +5,8 @@
  */
 
 import type { CustomAlias } from '../types';
+import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
+import { expandTwoDigitYear } from './dateUtils';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -188,9 +190,10 @@ const ARTICLE_PATTERN = /\b(?:artt?\.?|articol[oi])\s*(\d+)(?:\s*-\s*(\d+))?\s*[
 const STANDALONE_NUMBER_PATTERN = /^(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?$/i;
 
 /**
- * Pattern per numero/anno (es. "241/1990", "679/2016")
+ * Pattern per numero/anno (es. "241/1990", "679/2016"). L'anno ha due o
+ * quattro cifre: "241/456" non è un atto del 456.
  */
-const NUMBER_YEAR_PATTERN = /\b(\d+)\s*[/\\]\s*(\d{2,4})\b/;
+const NUMBER_YEAR_PATTERN = /\b(\d+)\s*[/\\]\s*(\d{4}|\d{2})\b/;
 
 /**
  * Pattern per anno isolato (es. "1990", "2016")
@@ -203,11 +206,26 @@ const YEAR_PATTERN = /\b(19\d{2}|20\d{2})\b/;
 const ACT_NUMBER_PATTERN = /\bn\.?\s*(\d+)\b/i;
 
 /**
+ * Citazione di un atto UE, in tutte le grafie correnti: "regolamento (ue)
+ * 2016/679", "reg. ue 679/2016", "regolamento (ce) n. 1/2003", "direttiva
+ * 2002/58/ce". Il marcatore è facoltativo: chi digita "regolamento 2016/679"
+ * nella palette non può intendere altro. Gruppi: testa, prima metà, seconda
+ * metà, marcatore finale.
+ */
+const EU_CITATION_PATTERN = new RegExp(
+  `\\b${buildEuHeadSource({ markerRequiredForRegulation: false })}${EU_PAIR_SOURCE}\\b`,
+  'i'
+);
+
+/**
  * Normalizza l'input rimuovendo punteggiatura extra e spazi multipli
  */
 function normalizeInput(input: string): string {
   return input
     .toLowerCase()
+    // "(UE)" è la grafia ufficiale del marcatore, non rumore: senza questo
+    // passaggio "regolamento (ue)" non combaciava con nessuna abbreviazione.
+    .replace(/[()[\]]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/[,;:]+/g, ' ')
     .trim();
@@ -234,8 +252,14 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
   const sortedAliases = [...customAliases].sort((a, b) => b.trigger.length - a.trigger.length);
 
   for (const alias of sortedAliases) {
-    const triggerLower = alias.trigger.toLowerCase();
-    const regex = new RegExp(`\\b${triggerLower.replace(/\./g, '\\.?')}\\b`, 'i');
+    // Il trigger passa dalla stessa normalizzazione dell'input, altrimenti
+    // uno scritto con parentesi non combacerebbe mai; poi un trigger con "+"
+    // o "*" non deve far saltare il parser a ogni tasto: si escapa tutto, e
+    // solo il punto resta facoltativo.
+    const triggerSource = normalizeInput(alias.trigger)
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\./g, '\\.?');
+    const regex = new RegExp(`\\b${triggerSource}\\b`, 'i');
 
     if (regex.test(normalized) && alias.searchParams) {
       const remaining = normalized.replace(regex, ' ').replace(/\s+/g, ' ').trim();
@@ -252,6 +276,10 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
     }
   }
 
+  // Poi gli atti UE, che portano con sé numero e anno nel loro ordine
+  const eu = extractEuCitation(normalized);
+  if (eu) return eu;
+
   // Poi controlla le abbreviazioni di sistema
   for (const abbr of SORTED_ABBREVIATIONS) {
     const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.?')}\\b`, 'i');
@@ -263,6 +291,29 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
   }
 
   return { actType: undefined, remaining: normalized };
+}
+
+/**
+ * Riconosce una citazione UE e ne risolve numero e anno, che nella coppia
+ * "2024/2847" stanno nell'ordine europeo (anno/numero) e non in quello
+ * italiano: lasciata al pattern numero/anno, la stessa coppia diventava il
+ * regolamento n. 2024 dell'anno 2847.
+ */
+function extractEuCitation(normalized: string): ActTypeExtraction | null {
+  const match = normalized.match(EU_CITATION_PATTERN);
+  if (!match) return null;
+
+  const [, head, first, second, trailingMarker] = match;
+  const kind = euKindOf(head);
+  const pair = resolveEuPair(first, second, {
+    kind, trailingMarker: Boolean(trailingMarker), oldMarker: isOldEuMarker(head),
+  });
+  if (!pair) return null;
+
+  const { actNumber, year } = pair;
+  const remaining = normalized.replace(match[0], ' ').replace(/\s+/g, ' ').trim();
+
+  return { actType: EU_ACT_TYPES[kind], actNumber, date: year, remaining };
 }
 
 /**
@@ -300,12 +351,7 @@ function extractNumberAndYear(input: string): { actNumber: string | undefined; d
   const numYearMatch = input.match(NUMBER_YEAR_PATTERN);
   if (numYearMatch) {
     actNumber = numYearMatch[1];
-    let year = numYearMatch[2];
-    // Converti anno a 2 cifre in 4 cifre
-    if (year.length === 2) {
-      year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-    }
-    date = year;
+    date = expandTwoDigitYear(numYearMatch[2]);
     remaining = remaining.replace(NUMBER_YEAR_PATTERN, ' ').replace(/\s+/g, ' ').trim();
     return { actNumber, date, remaining };
   }
