@@ -413,3 +413,57 @@ class TestEuPairRule:
     def test_two_two_digit_halves_follow_the_kind(self):
         assert resolve_eu_year_and_number("45", "01", current_year=2026) == ("2001", "45")
         assert resolve_eu_year_and_number("93", "13", kind="direttiva", current_year=2026) == ("1993", "13")
+
+
+class TestArticleLists:
+    """The API takes lists as "1,2" and ranges as "1-10"; the parser must hand
+    it those shapes, not "5 e 6", which parse_article_input rejects as invalid."""
+
+    def test_e_separated_list(self):
+        assert parse_nl_query("artt. 5 e 6 cc").article == "5,6"
+
+    def test_comma_and_e_list(self):
+        r = parse_nl_query("artt. 1, 2 e 3 cc")
+        assert (r.article, r.act_type) == ("1,2,3", "codice civile")
+
+    def test_range(self):
+        r = parse_nl_query("artt. 1-10 cc")
+        assert (r.article, r.act_type) == ("1-10", "codice civile")
+
+    def test_list_with_suffix(self):
+        assert parse_nl_query("artt. 2 bis e 3 cc").article == "2-bis,3"
+
+    def test_list_on_an_eu_act(self):
+        r = parse_nl_query("reg. ue 2016/679 artt. 5 e 6")
+        assert (r.article, r.act_number, r.date) == ("5,6", "679", "2016")
+
+
+class TestCommaClauses:
+    """"comma 1" and "lett. b" qualify the article; they are not the act number."""
+
+    def test_comma_is_not_the_act_number(self):
+        r = parse_nl_query("art. 5, comma 1, cc")
+        assert (r.article, r.act_type, r.act_number) == ("5", "codice civile", None)
+
+    def test_comma_and_letter(self):
+        r = parse_nl_query("art. 6, comma 1, lett. b) gdpr")
+        assert (r.article, r.act_number, r.date) == ("6", "679", "2016")
+
+    def test_co_abbreviation(self):
+        r = parse_nl_query("art. 2, co. 3, d.lgs. 196/2003")
+        assert (r.article, r.act_number, r.date) == ("2", "196", "2003")
+
+
+class TestDateSanity:
+    def test_impossible_month_is_not_a_date_and_does_not_feed_the_pair(self):
+        r = parse_nl_query("art. 1 legge 31/13/1990 n. 400")
+        assert (r.act_number, r.date) == ("400", "1990")
+
+    def test_search_goes_on_after_an_impossible_date(self):
+        r = parse_nl_query("art. 1 legge 31/13/1990 del 12 agosto 1991 n. 400")
+        assert r.date == "1991-08-12"
+
+
+class TestTrailingMarkerOnRegulations:
+    def test_trailing_marker_on_a_regulation_says_nothing_about_the_order(self):
+        assert resolve_eu_year_and_number("1049", "2001", kind="regolamento", trailing_marker=True, current_year=2026) == ("2001", "1049")

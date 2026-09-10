@@ -744,7 +744,10 @@ class NormaController:
             context_act_type = data.get("context_act_type")
             if context_act_type is not None and not isinstance(context_act_type, str):
                 return jsonify({"error": "context_act_type must be a string"}), 400
-            citations = extract_citations_from_text(text, context_act_type=context_act_type)
+            # A regex pass over up to 500 KB of text: off the event loop (CLAUDE.md async rule)
+            citations = await asyncio.to_thread(
+                extract_citations_from_text, text, context_act_type=context_act_type
+            )
             return jsonify({
                 "citations": [c.to_dict() for c in citations],
                 "count": len(citations),
