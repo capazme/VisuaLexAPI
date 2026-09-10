@@ -7,6 +7,7 @@ into structured data for the VisuaLex API.
 
 import re
 from dataclasses import dataclass
+from datetime import date as _date
 from typing import Optional
 
 from .act_resolver import resolve_atto
@@ -34,13 +35,34 @@ _ART_NUM_RE = re.compile(
 
 # Act number patterns: "241/90", "241/1990", "n. 241", "241 del 1990"
 _ACT_NUM_DATE_PATTERNS = [
-    # "196/2003" or "241/90"
-    re.compile(r"\b(\d+)\s*/\s*(\d{2,4})\b"),
+    # "196/2003" or "241/90" — the year has two or four digits, "241/456" is
+    # not an act of the year 456
+    re.compile(r"\b(\d+)\s*/\s*(\d{4}|\d{2})\b"),
     # "n. 241" or "n 241"
     re.compile(r"\bn\.?\s*(\d+)\b"),
     # "241 del 1990" or "241 del 7 agosto 1990"
     re.compile(r"\b(\d+)\s+del\s+(\d{1,2}\s+\w+\s+\d{4}|\d{4})\b", re.IGNORECASE),
 ]
+
+# EU acts: "Regolamento (UE) 2016/679", "Reg. UE 2024/2847", "Regolamento (CE)
+# n. 1/2003", "Direttiva 2002/58/CE", "dir. ue 2555/2022". The marker is
+# optional (nothing else a lawyer types as "regolamento 2016/679" exists in
+# this app), "n." may precede the pair, and the pair comes in either order —
+# see resolve_eu_year_and_number. Parentheses are already gone by _normalize.
+# A third numeric group after the pair is a day/month/year date, never an act:
+# "direttiva 1/2/2016" is not directive 1 of the year 2.
+# Groups: act word, marker, first half, second half, trailing marker.
+_EU_MARKER = r"(?:cee|ce|ue|euratom)"
+_EU_QUALIFIER = r"(?:\s+(?:di\s+esecuzione|di\s+attuazione|delegat[oa]))?"
+_EU_ACT_RE = re.compile(
+    r"\b(regolamento" + _EU_QUALIFIER + r"|reg\.?|direttiva" + _EU_QUALIFIER + r"|dir\.?)"
+    r"\s*(" + _EU_MARKER + r")?\s*(?:n\.?\s*)?"
+    r"(\d{1,4})\s*/\s*(\d{1,4})(\s*/\s*" + _EU_MARKER + r")?(?!\s*/\s*\d)\b",
+    re.IGNORECASE,
+)
+_EU_ACT_TYPES = {"regolamento": "regolamento ue", "direttiva": "direttiva ue"}
+_EU_YEAR_FLOOR = 1950
+_EU_NEW_NUMBERING_FROM = 2015
 
 # Date patterns
 _DATE_PATTERNS = [
@@ -111,6 +133,15 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
     if articles:
         result.article = articles
 
+    # 1b. EU acts read their pair in their own order. Resolve them before the
+    #     Italian number/year rule can read "2024/2847" as act 2024 of 2847.
+    text, eu_type, eu_number, eu_year = _extract_eu_act(text)
+    if eu_type:
+        result.act_type = eu_type
+        result.act_number = eu_number
+        result.date = eu_year
+        return result
+
     # 2. Extract explicit full dates (d/m/y, Italian, ISO) BEFORE act numbers
     #    to avoid "7/8/1990" being partially consumed as act number "8/1990"
     text, found_date = _extract_full_date(text)
@@ -152,6 +183,9 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
 def _normalize(text: str) -> str:
     """Normalize whitespace, lowercase, clean up punctuation."""
     text = text.strip().lower()
+    # "(UE)" is the official spelling of the marker, not noise: with the
+    # parentheses in place "regolamento (ue)" matched no act at all.
+    text = re.sub(r"[()\[\]]+", " ", text)
     # Normalize multiple spaces
     text = re.sub(r"\s+", " ", text)
     # Normalize dashes (en-dash, em-dash → hyphen)
@@ -182,6 +216,88 @@ def _extract_articles(text: str) -> tuple[str, Optional[str]]:
     remaining = re.sub(r"\s+", " ", remaining).strip()
 
     return remaining, full_match_str
+
+
+def _is_eu_year_like(half: str, ceiling: int) -> bool:
+    return len(half) == 4 and half.isdigit() and _EU_YEAR_FLOOR <= int(half) <= ceiling
+
+
+def _can_be_year(half: str) -> bool:
+    """Only a two-digit or a four-digit half can be the year of an act."""
+    return len(half) in (2, 4)
+
+
+def resolve_eu_year_and_number(
+    first: str,
+    second: str,
+    *,
+    kind: str = "regolamento",
+    trailing_marker: bool = False,
+    old_marker: bool = False,
+    current_year: Optional[int] = None,
+) -> Optional[tuple[str, str]]:
+    """Return ``(year, act_number)`` for the EU pair ``first/second``, or
+    ``None`` when neither half can be the year.
+
+    The Official Journal numbers EU acts year-first since 2015 ("2016/679",
+    "2024/2847"), directives always did ("95/46/CE", "2002/58/CE"), pre-2015
+    regulations are number-first ("1/2003", "2913/92") and Italian practice
+    writes any of them the Italian way round ("679/2016"). The rules, in
+    order:
+
+    - a trailing marker is the old directive format: year first;
+    - one half looks like a year and the other does not: that one is the year;
+    - both look like years: year first from 2015 on, number first before
+      ("Regolamento (CE) n. 2006/2004" is number 2006 of 2004) — and a
+      "(CE)"/"(CEE)" act is always number first, because those Communities
+      ended in 2009 ("Regolamento (CE) n. 2015/2006" is number 2015 of 2006);
+    - a two-digit year is in play otherwise: "2913/92" is number first,
+      "95/46" is year first, and two two-digit halves follow the kind —
+      directives were always year first, regulations number first.
+
+    The frontend mirrors this in ``utils/euCitation.ts``.
+    """
+    ceiling = (current_year or _date.today().year) + 1
+    first_is_year = _is_eu_year_like(first, ceiling)
+    second_is_year = _is_eu_year_like(second, ceiling)
+    year_first = (_expand_year(first), second) if _can_be_year(first) else None
+    number_first = (_expand_year(second), first) if _can_be_year(second) else None
+
+    if trailing_marker:
+        return year_first
+    if first_is_year and not second_is_year:
+        return year_first
+    if second_is_year and not first_is_year:
+        return number_first
+    if first_is_year and second_is_year:
+        if not old_marker and int(first) >= _EU_NEW_NUMBERING_FROM:
+            return year_first
+        return number_first
+    if len(first) == 2 and len(second) == 2:
+        return year_first if kind == "direttiva" else number_first
+    if len(first) == 2:
+        return year_first
+    return number_first
+
+
+def _extract_eu_act(text: str) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+    """Extract an EU act. Returns (remaining_text, act_type, act_number, year)."""
+    m = _EU_ACT_RE.search(text)
+    if not m:
+        return text, None, None, None
+
+    head, marker, first, second, trailing = m.groups()
+    kind = "direttiva" if head.lower().startswith("dir") else "regolamento"
+    resolved = resolve_eu_year_and_number(
+        first, second, kind=kind, trailing_marker=bool(trailing),
+        old_marker=(marker or "").lower() in ("ce", "cee"),
+    )
+    if resolved is None:
+        return text, None, None, None
+
+    year, number = resolved
+    remaining = re.sub(r"\s+", " ", text[:m.start()] + " " + text[m.end():]).strip()
+    return remaining, _EU_ACT_TYPES[kind], number, year
 
 
 def _extract_act_number(text: str) -> tuple[str, Optional[str], Optional[str]]:

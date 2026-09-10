@@ -68,6 +68,19 @@ export function parseItalianDate(input: string): string {
 }
 
 /**
+ * Expand a two-digit year the way the backend does (`_expand_year` in
+ * `nl_parser.py`): up to 30 is 20xx, above is 19xx. "90" → 1990, "23" → 2023,
+ * "35" → 1935 (the regi decreti of the thirties are still cited). The client
+ * once carried two private copies of this with a different pivot, so a
+ * citation typed in the palette and the same one hovered in a text could
+ * resolve to years a century apart. Anything but two digits is returned as is.
+ */
+export function expandTwoDigitYear(year: string): string {
+  if (!/^\d{2}$/.test(year)) return year;
+  return parseInt(year, 10) <= 30 ? `20${year}` : `19${year}`;
+}
+
+/**
  * Formats a date for display in Italian format.
  *
  * @param isoDate - Date in YYYY-MM-DD format

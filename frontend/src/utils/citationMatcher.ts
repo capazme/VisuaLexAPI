@@ -9,6 +9,9 @@
  * - Con comma/lettera: "art. 5, comma 1" (ignora comma, prende articolo)
  */
 
+import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
+import { expandTwoDigitYear } from './dateUtils';
+
 // Minimal interface for norma context (subset of NormaVisitata)
 interface NormaContext {
   tipo_atto: string;
@@ -58,11 +61,7 @@ const ABBREVIATION_TO_ACT_TYPE: Record<string, string> = {
   'r.d.': 'regio decreto',
   'r.d': 'regio decreto',
   'regio decreto': 'regio decreto',
-  // EU
-  'reg. ue': 'Regolamento UE',
-  'regolamento ue': 'Regolamento UE',
-  'dir. ue': 'Direttiva UE',
-  'direttiva ue': 'Direttiva UE',
+  // Gli atti UE non stanno qui: li legge il PATTERN 0 con `euCitation.ts`.
 };
 
 // Suffissi tipo atto dopo articolo (c.c., c.p., etc.)
@@ -135,17 +134,6 @@ function normalizeActType(input: string): string {
 }
 
 /**
- * Converte anno a 2 cifre in 4 cifre
- */
-function normalizeYear(year: string): string {
-  if (year.length === 2) {
-    const num = parseInt(year);
-    return num > 50 ? `19${year}` : `20${year}`;
-  }
-  return year;
-}
-
-/**
  * Genera una chiave di cache univoca per la citazione
  */
 function generateCacheKey(parsed: ParsedCitationData): string {
@@ -197,6 +185,47 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
   };
 
   // ============================================
+  // PATTERN 0: Atti UE, che leggono la coppia nel loro ordine
+  // Es: "regolamento (UE) 2016/679, art. 5", "direttiva 2002/58/CE art. 5",
+  //     "reg. ue 679/2016 art. 5"
+  // Prima del pattern italiano, così è questo a rivendicare l'intervallo:
+  // letto come numero/anno, "2016/679" diventava il regolamento n. 2016.
+  // Il marcatore è obbligatorio per i regolamenti: in un testo normativo un
+  // "regolamento n. 5/2020" senza (UE) è di regola un regolamento interno.
+  // Un elenco ("articoli 8 e 9") non viene rivendicato: resta al PATTERN 4,
+  // che ne emette un link per numero, come prima che questo pattern esistesse.
+  // ============================================
+  const euCitationRegex = new RegExp(
+    `\\b${buildEuHeadSource({ markerRequiredForRegulation: true })}${EU_PAIR_SOURCE}` +
+    `(?:\\s*,?\\s*${ARTICLE_WORD_PATTERN}\\s*(\\d+${ARTICLE_SUFFIX_PATTERN})(?!\\s*[,e]\\s*\\d))?`,
+    'gi'
+  );
+
+  let match;
+  while ((match = euCitationRegex.exec(cleanText)) !== null) {
+    const [, head, first, second, trailingMarker, article] = match;
+
+    // Senza articolo niente anteprima, come per il pattern italiano
+    if (!article) continue;
+
+    const kind = euKindOf(head);
+    const pair = resolveEuPair(first, second, {
+      kind, trailingMarker: Boolean(trailingMarker), oldMarker: isOldEuMarker(head),
+    });
+    if (!pair) continue;
+
+    const { actNumber, year } = pair;
+
+    addMatch(match[0], match.index, match.index + match[0].length, {
+      act_type: EU_ACT_TYPES[kind],
+      act_number: actNumber,
+      date: year,
+      article: article.replace(/\s+/g, ''),
+      confidence: 0.95,
+    });
+  }
+
+  // ============================================
   // PATTERN 1: Citazioni complete con numero/anno
   // Es: "legge 241/1990", "L. 241/90", "d.lgs. 50/2016 art. 3"
   // ============================================
@@ -207,22 +236,19 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
       'decreto\\s+legge|d\\.?\\s*l\\.?|dl|' +
       'decreto\\s+legislativo|d\\.?\\s*lgs\\.?|dlgs|' +
       'd\\.?\\s*p\\.?\\s*r\\.?|dpr|' +
-      'regio\\s+decreto|r\\.?\\s*d\\.?|rd|' +
-      'reg(?:olamento)?\\.?\\s+ue|' +
-      'dir(?:ettiva)?\\.?\\s+ue' +
+      'regio\\s+decreto|r\\.?\\s*d\\.?|rd' +
     ')' +
-    // Spazio e numero/anno
-    '\\s+(?:n\\.?\\s*)?(\\d+)\\s*[/\\\\]\\s*(\\d{2,4})' +
+    // Spazio e numero/anno (l'anno ha due o quattro cifre)
+    '\\s+(?:n\\.?\\s*)?(\\d+)\\s*[/\\\\]\\s*(\\d{4}|\\d{2})\\b' +
     // Articolo opzionale
     `(?:\\s*,?\\s*${ARTICLE_WORD_PATTERN}\\s*(\\d+${ARTICLE_SUFFIX_PATTERN}))?`,
     'gi'
   );
 
-  let match;
   while ((match = fullCitationRegex.exec(cleanText)) !== null) {
     const actTypeMatch = match[1];
     const actNumber = match[2];
-    const year = normalizeYear(match[3]);
+    const year = expandTwoDigitYear(match[3]);
     const article = match[4];
 
     // Se non c'è articolo, skip (non possiamo fare preview di tutta la legge)
