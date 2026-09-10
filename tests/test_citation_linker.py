@@ -384,3 +384,23 @@ class TestContextNeedsANumber:
     def test_apostrophe_does_not_end_an_abbreviation(self):
         c = extract_citations("art. 5 com'era previsto")
         assert (c[0].article, c[0].act_type) == ("5", None)
+
+
+class TestPluralPrepositions:
+    def test_delle_preleggi(self):
+        c = extract_citations("art. 1 delle preleggi", context_act_type="decreto legislativo")
+        assert (c[0].article, c[0].act_type) == ("1", "preleggi")
+
+    def test_dei_before_a_numbered_act(self):
+        c = extract_citations("art. 7 dei d.lgs. 196/2003")
+        assert (c[0].article, c[0].act_type, c[0].act_number) == ("7", "decreto legislativo", "196")
+
+
+class TestNamesThatPrefixOtherActs:
+    def test_codice_penale_militare_is_not_the_codice_penale(self):
+        c = extract_citations("art. 5 del codice penale militare di pace")
+        assert all(x.act_type != "codice penale" for x in c)
+
+    def test_codice_penale_still_read(self):
+        c = extract_citations("art. 5 del codice penale")
+        assert (c[0].article, c[0].act_type) == ("5", "codice penale")

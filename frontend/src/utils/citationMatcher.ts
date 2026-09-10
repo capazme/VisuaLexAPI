@@ -11,6 +11,7 @@
 
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, hasEuMarker, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear } from './dateUtils';
+import { FULL_ACT_NAMES } from './citationParser';
 
 // Minimal interface for norma context (subset of NormaVisitata)
 interface NormaContext {
@@ -102,6 +103,16 @@ const PREPOSITION_PATTERN = "(?:dell?'|dall?'|all?'|nell?'|sull?')?";
 
 // Pattern base per "articolo" con tutte le varianti
 const ARTICLE_WORD_PATTERN = `${PREPOSITION_PATTERN}art(?:icol[oi])?t?\\.?`;
+
+// Atti nominati per esteso ("codice civile", "Costituzione", "codice del
+// consumo"): il vocabolario è quello della palette, una sola copia.
+const FULL_ACT_NAME_MAP: Record<string, string> = Object.fromEntries(FULL_ACT_NAMES);
+const FULL_ACT_NAME_SOURCE = FULL_ACT_NAMES
+  .map(([name]) => name
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/'/g, "['’]")
+    .replace(/\s+/g, '\\s+'))
+  .join('|');
 
 // Atti nazionali numerati (legge, L., d.lgs., decreto legislativo, ecc.),
 // condiviso dal PATTERN 1 (atto prima) e dal PATTERN 1a (articolo prima)
@@ -222,14 +233,14 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
   const tailResidue =
     '(?:\\s*[,)]|\\s*(?:comm[ai]|co\\.)\\s*\\d+(?:\\s*(?:,|\\be\\b)\\s*\\d+)*|\\s*(?:lett\\.?|lettera|numero|n\\.)\\s*[a-z0-9]+\\)?)*';
   const namesAnotherAct = (tail: string) => new RegExp(
-    `^${tailResidue}\\s*(?:del|della|dello|dell['’])\\s*` +
-    "(?:legge|l\\.|decreto|d\\.?\\s*lgs|dlgs|d\\.?\\s*p\\.?\\s*r|dpr|regolamento|reg\\.|direttiva|dir\\.|r\\.?\\s*d\\.|rd\\b|dl\\b|codice|costituzione|trattato)",
+    `^${tailResidue}\\s*(?:delle|dello|della|degli|dei|del|dell['’])\\s*` +
+    "(?:legge|l\\.|decreto|d\\.?\\s*lgs|dlgs|d\\.?\\s*p\\.?\\s*r|dpr|regolamento|reg\\.|direttiva|dir\\.|r\\.?\\s*d\\.|rd\\b|dl\\b|codice|costituzione|trattato|tue\\b|tfue\\b|cdfue\\b)",
     'i'
   ).test(tail);
 
   const addArticleList = (
     whole: string, wholeStart: number, listText: string, listStart: number,
-    base: { act_type: string; act_number: string; date: string }
+    base: { act_type: string; act_number?: string; date?: string }
   ) => {
     const numbers = Array.from(listText.matchAll(new RegExp(articleItem, 'gi')));
     if (numbers.length <= 1) {
@@ -261,7 +272,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
 
   // La preposizione è facoltativa: "art. 5 direttiva (UE) 2016/680" e
   // "art. 7 d.lgs. 196/2003" sono la scorciatoia corrente nella prosa.
-  const preposition = "(?:(?:del|della|dello|dell['’])\\s*)?";
+  const preposition = "(?:(?:delle|dello|della|degli|dei|del|dell['’])\\s*)?";
 
   // 0a: "art. 5 del regolamento (UE) 2016/679", "articoli 8 e 9 del …"
   // Gruppi: 1 prefisso articolo, 2 elenco, 3-5 testa/coppia UE, 6 marcatore finale.
@@ -320,6 +331,27 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
       act_number: actNumber,
       date: expandTwoDigitYear(year),
     });
+  }
+
+  // ============================================
+  // PATTERN 1b: Articolo prima di un atto nominato per esteso
+  // Es: "art. 5 del codice civile", "art. 117 della Costituzione",
+  //     "artt. 2043 e 2059 del codice civile", "art. 3 del codice del consumo"
+  // Gruppi: 1 prefisso, 2 elenco, 3 nome dell'atto.
+  // ============================================
+  const namedActRegex = new RegExp(
+    // Un nome non è il prefisso di uno più lungo: "codice penale militare di
+    // pace" non è il codice penale.
+    `(${ARTICLE_WORD_PATTERN}\\s*)(${articleList})${commaClause}\\s+${preposition}(${FULL_ACT_NAME_SOURCE})(?![a-zà-ù])(?!\\s+milita(?:re|ri)\\b)`,
+    'gi'
+  );
+
+  while ((match = namedActRegex.exec(cleanText)) !== null) {
+    if (isOverlapping(match.index, match.index + match[0].length)) continue;
+    const [, prefix, listText, name] = match;
+    const actType = FULL_ACT_NAME_MAP[name.toLowerCase().replace(/’/g, "'").replace(/\s+/g, ' ')];
+    if (!actType) continue;
+    addArticleList(match[0], match.index, listText, match.index + prefix.length, { act_type: actType });
   }
 
   // ============================================

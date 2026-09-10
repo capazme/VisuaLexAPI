@@ -177,6 +177,31 @@ const ABBREVIATION_MAP: Record<string, string> = {
 // Ordinati per lunghezza decrescente per matching greedy
 const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.length - a.length);
 
+// Atti che senza numero e anno non si aprono: nominati per esteso senza
+// numero ("della legge") non sono un bersaglio, e li leggono i pattern
+// numerati.
+const NUMBERED_ACT_TYPES = new Set([
+  'legge', 'decreto legge', 'decreto legislativo',
+  'decreto del presidente della repubblica', 'regio decreto',
+  'Regolamento UE', 'Direttiva UE',
+]);
+
+/**
+ * Atti che un testo può nominare per esteso ("del codice civile", "della
+ * Costituzione", "del codice del consumo"), con il tipo a cui la palette li
+ * risolve: le voci della mappa senza punti, multi-parola o di almeno otto
+ * lettere ("preleggi" ha esattamente otto: la soglia tiene fuori "cost",
+ * "prel", "tfue", "cdfue", "regue", non lei), esclusi gli atti numerati.
+ * Dal più lungo al più corto, per il
+ * matching greedy. Le usa il rilevatore in-testo (citationMatcher.ts), che
+ * fino a qui conosceva solo le abbreviazioni e su "art. 5 del codice civile"
+ * non metteva alcun link, o lo metteva sulla norma in lettura.
+ */
+export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
+  .filter(([name, actType]) =>
+    !name.includes('.') && (name.includes(' ') || name.length >= 8) && !NUMBERED_ACT_TYPES.has(actType))
+  .sort((a, b) => b[0].length - a[0].length);
+
 /**
  * Un articolo: numero, eventuale suffisso (bis, ter, ...) o intervallo ("1-10").
  */

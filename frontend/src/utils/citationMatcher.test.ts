@@ -204,3 +204,83 @@ describe('extractCitations — an act written out in full is never the current n
     expect(m.parsed).toMatchObject({ act_type: 'decreto legislativo', article: '5' });
   });
 });
+
+// The in-text matcher only knew abbreviations ("c.c.", "cost."). An act named
+// in full got either no link or, worse, a link to the norma being read.
+describe('extractCitations — acts named in full', () => {
+  const inDlgs = { tipo_atto: 'decreto legislativo', numero_atto: '196', data: '2003' };
+
+  it('links "art. 5 del codice civile" to the codice civile whatever is being read', () => {
+    const [m, ...rest] = extractCitations('ai sensi dell\'art. 5 del codice civile', inDlgs);
+    expect(rest).toHaveLength(0);
+    expect(m.parsed).toMatchObject({ act_type: 'codice civile', article: '5' });
+    expect(m.parsed.act_number).toBeUndefined();
+  });
+
+  it('links "art. 117 della Costituzione"', () => {
+    const [m] = extractCitations('come da art. 117 della Costituzione', inDlgs);
+    expect(m.parsed).toMatchObject({ act_type: 'costituzione', article: '117' });
+  });
+
+  it('reads the form without the preposition', () => {
+    const [m] = extractCitations('vedi art. 5 codice civile', inDlgs);
+    expect(m.parsed).toMatchObject({ act_type: 'codice civile', article: '5' });
+  });
+
+  it('gives every article of a list to the named act', () => {
+    const ms = extractCitations('artt. 2043 e 2059 del codice civile', inDlgs);
+    expect(ms.map(m => [m.parsed.article, m.parsed.act_type])).toEqual([['2043', 'codice civile'], ['2059', 'codice civile']]);
+  });
+
+  it('tolerates a comma clause before the name', () => {
+    const [m] = extractCitations('art. 5, comma 1, del codice penale', inDlgs);
+    expect(m.parsed).toMatchObject({ act_type: 'codice penale', article: '5' });
+  });
+
+  it('reads a multi-word name that itself contains a preposition', () => {
+    const [m] = extractCitations('art. 3 del codice del consumo', inDlgs);
+    expect(m.parsed).toMatchObject({ act_type: 'codice del consumo', article: '3' });
+  });
+
+  it('keeps "del presente codice" on the current norma', () => {
+    const [m] = extractCitations('art. 5 del presente codice', inDlgs);
+    expect(m.parsed).toMatchObject({ act_type: 'decreto legislativo', act_number: '196', article: '5' });
+  });
+
+  it('does not claim a numbered act named without its number', () => {
+    const ms = extractCitations('art. 5 della legge', inDlgs);
+    expect(ms).toHaveLength(0);
+  });
+});
+
+describe('extractCitations — plural prepositions', () => {
+  it('reads "delle preleggi"', () => {
+    const [m] = extractCitations('art. 1 delle preleggi', { tipo_atto: 'decreto legislativo', numero_atto: '196', data: '2003' });
+    expect(m.parsed).toMatchObject({ act_type: 'preleggi', article: '1' });
+  });
+
+  it('reads "degli articoli … del codice civile" and "dei" before a numbered act', () => {
+    const ms = extractCitations('ai sensi degli articoli 8 e 9 del codice civile e dei d.lgs. 196/2003', { tipo_atto: 'costituzione' });
+    expect(ms.map(m => [m.parsed.article, m.parsed.act_type])).toEqual([['8', 'codice civile'], ['9', 'codice civile']]);
+  });
+});
+
+describe('extractCitations — names that are prefixes of other acts', () => {
+  const inDlgs = { tipo_atto: 'decreto legislativo', numero_atto: '196', data: '2003' };
+
+  it('does not read the codice penale militare as the codice penale', () => {
+    const ms = extractCitations('art. 5 del codice penale militare di pace', inDlgs);
+    expect(ms.filter(m => m.parsed.act_type === 'codice penale' || m.parsed.act_type === 'decreto legislativo')).toHaveLength(0);
+  });
+
+  it('gives a treaty no link rather than one to the act being read', () => {
+    for (const t of ['art. 5 del TUE', 'art. 101 del TFUE', 'art. 8 della CDFUE']) {
+      expect(extractCitations(t, inDlgs)).toHaveLength(0);
+    }
+  });
+
+  it('reads "dei" before a numbered act', () => {
+    const [m] = extractCitations('art. 7 dei d.lgs. 196/2003', { tipo_atto: 'costituzione' });
+    expect(m.parsed).toMatchObject({ act_type: 'decreto legislativo', act_number: '196', article: '7' });
+  });
+});
