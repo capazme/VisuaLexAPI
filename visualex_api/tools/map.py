@@ -103,6 +103,7 @@ ATTI_NOTI = {
     "rgpd": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
     "regolamento privacy": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
     "regolamento generale protezione dati": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
+    "regolamento generale sulla protezione dei dati": {"tipo_atto": "regolamento ue", "data": "2016", "numero_atto": "679"},
     "dora": {"tipo_atto": "regolamento ue", "data": "2022", "numero_atto": "2554"},
     "ai act": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "1689"},
     "regolamento ia": {"tipo_atto": "regolamento ue", "data": "2024", "numero_atto": "1689"},
@@ -196,6 +197,8 @@ _ATTI_DENOMINATI_SPEC: list[tuple[str, str, str, list[str]]] = [
         "disposizioni transitorie codice penale"]),
     ("decreto del presidente della repubblica", "1988-09-22", "448", [
         "codice processo penale minorile", "processo penale minorile", "cppm", "c.p.p.m."]),
+    ("decreto legislativo", "1989-07-28", "271", [
+        "disposizioni di attuazione del codice di procedura penale", "disp. att. cpp"]),
     ("decreto legislativo", "2003-06-30", "196", ["codice della privacy"]),
     ("decreto legislativo", "2006-04-03", "152", [
         "codice dell'ambiente", "codice ambiente", "testo unico ambientale", "tua"]),
@@ -429,6 +432,10 @@ BROCARDI_CODICI = {
     "Codice della protezione civile(D.lgs. 2 gennaio 2018, n. 1)": "https://www.brocardi.it/codice-protezione-civile/",
     "Codice della crisi d'impresa e dell'insolvenza(D.lgs. 12 gennaio 2019, n. 14)": "https://www.brocardi.it/codice-crisi-impresa/",
     "Codice degli appalti [ABROGATO](D.lgs. 12 aprile 2006, n. 163)": "https://www.brocardi.it/codice-degli-appalti/",
+    # Brocardi keeps the old name on the D.lgs. 50/2016 page; "codice dei
+    # contratti pubblici" resolves to the current D.lgs. 36/2023 through its
+    # URN, so only an explicit 50/2016 citation lands here.
+    "Codice dei contratti pubblici [ABROGATO](D.lgs. 18 aprile 2016, n. 50)": "https://www.brocardi.it/codice-dei-contratti-pubblici/",
     "Disposizioni in materia di separazione dei genitori e affidamento condiviso dei figli(L. 8 febbraio 2006, n. 54)": "https://www.brocardi.it/affido-condiviso/",
     "Legge sull'aborto(L. 22 maggio 1978, n. 194)": "https://www.brocardi.it/legge-aborto/",
     "Decreto lavoro 2023(D.L. 4 maggio 2023, n. 48)": "https://www.brocardi.it/decreto-lavoro-2023/",
@@ -436,6 +443,8 @@ BROCARDI_CODICI = {
     "Decreto \"Sostegni\"(D.L. 22 marzo 2021, n. 41)": "https://www.brocardi.it/decreto-sostegni/",
     "Decreto \"Rilancio\"(D.L. 19 maggio 2020, n. 34)": "https://www.brocardi.it/decreto-rilancio/",
     "Decreto \"Cura Italia\"(L. 24 aprile 2020, n. 27)": "https://www.brocardi.it/decreto-cura-italia/",
+    # Same page as its conversion law above: the resolver names the decree.
+    "Decreto \"Cura Italia\"(D.L. 17 marzo 2020, n. 18)": "https://www.brocardi.it/decreto-cura-italia/",
     "Legge sul divorzio(L. 1 dicembre 1970, n. 898)": "https://www.brocardi.it/legge-sul-divorzio/",
     "Regolamentazione delle unioni civili tra persone dello stesso sesso e disciplina delle convivenze(L. 20 maggio 2016, n. 76)": "https://www.brocardi.it/legge-cirinna/",
     "Legge sull'adozione(L. 4 maggio 1983, n. 184)": "https://www.brocardi.it/legge-sull-adozione/",
@@ -467,7 +476,7 @@ BROCARDI_CODICI = {
     "Legge sull'ordinamento penitenziario(L. 26 luglio 1975, n. 354)": "https://www.brocardi.it/legge-ordinamento-penitenziario/",
     "Riforma del sistema italiano di diritto internazionale privato(L. 31 maggio 1995, n. 218)": "https://www.brocardi.it/legge-diritto-internazionale-privato/",
     "Legge sui reati tributari(D.lgs. 10 marzo 2000, n. 74)": "https://www.brocardi.it/legge-sui-reati-tributari/",
-    "Testo unico in materia di tutela e sostegno della maternità e della paternità": "https://www.brocardi.it/testo-unico-sostegno-maternita-paternita/",
+    "Testo unico in materia di tutela e sostegno della maternità e della paternità(D.lgs. 26 marzo 2001, n. 151)": "https://www.brocardi.it/testo-unico-sostegno-maternita-paternita/",
     "Testo unico sul pubblico impiego(D.lgs. 30 marzo 2001, n. 165)": "https://www.brocardi.it/testo-unico-sul-pubblico-impiego/",
     "Testo unico degli enti locali(D.lgs. 18 agosto 2000, n. 267)": "https://www.brocardi.it/testo-unico-enti-locali/",
     "Testo unico bancario(D.lgs. 1 settembre 1993, n. 385)": "https://www.brocardi.it/testo-unico-bancario/",
@@ -498,6 +507,158 @@ BROCARDI_CODICI = {
     "Contratto Collettivo Nazionale del Lavoro Domestico": "https://www.brocardi.it/contratto-collettivo-colf-badanti/",
     "Contratto Collettivo Nazionale del Turismo, Pubblici esercizi, Ristorazione collettiva e commerciale, Alberghi": "https://www.brocardi.it/contratto-collettivo-turismo/"
 }
+
+
+# Every label carries the act's extremes — "Statuto dei lavoratori(L. 20 maggio
+# 1970, n. 300)". They are parsed once here into the identity a norma is
+# matched against: (tipo esteso, anno, numero). do_know used to look for
+# "D.lgs. 2001-06-08, n. 231" inside the labels, which spell "8 giugno 2001":
+# no act outside the codici ever found its page.
+_MESI_IT = {
+    m: f"{i + 1:02d}"
+    for i, m in enumerate(
+        "gennaio febbraio marzo aprile maggio giugno luglio agosto "
+        "settembre ottobre novembre dicembre".split()
+    )
+}
+
+_ESTREMI_TIPI = {
+    "r.d.": "regio decreto",
+    "d.p.r.": "decreto del presidente della repubblica",
+    "d.lgs.": "decreto legislativo",
+    "d.l.": "decreto legge",
+    "l.": "legge",
+    "reg. ue": "regolamento ue",
+}
+
+_ESTREMI_RE = re.compile(
+    r"\((R\.D\.|D\.P\.R\.|D\.\s?Lgs\.|D\.L\.|L\.|Reg\.\s*UE)\s*"
+    r"(\d{1,2})\s+([A-Za-zà]+)\s+(\d{4}),?\s*n\.\s*(\d+)\)",
+    re.IGNORECASE,
+)
+
+
+def parse_brocardi_estremi(label: str) -> dict | None:
+    """Act identity embedded in a Brocardi label, or None for labels without one.
+
+    "Legge fallimentare(R.D. 16 marzo 1942, n. 267)" →
+    {"tipo_atto": "regio decreto", "data": "1942-03-16", "numero_atto": "267"}.
+    The last parenthesis wins: a few labels open with a display name in brackets.
+    """
+    matches = list(_ESTREMI_RE.finditer(label))
+    if not matches:
+        return None
+    tipo_raw, giorno, mese_raw, anno, numero = matches[-1].groups()
+    tipo = _ESTREMI_TIPI.get(re.sub(r"\s+", " ", tipo_raw.lower()).replace("d. lgs.", "d.lgs."))
+    mese = _MESI_IT.get(mese_raw.lower())
+    if not tipo or not mese:
+        return None
+    return {"tipo_atto": tipo, "data": f"{anno}-{mese}-{int(giorno):02d}", "numero_atto": numero}
+
+
+def _brocardi_label_name(label: str) -> str:
+    """The display name of a label: text before the extremes, tidied for lookup."""
+    name = label.split("(")[0]
+    return re.sub(r"\s+", " ", name.replace("[ABROGATO]", "").replace('"', "")).strip().lower()
+
+
+# (tipo esteso, anno, numero) → URL, and (tipo esteso, numero) → set of URLs for
+# citations that carry no year: those resolve only when the number is unique.
+_BROCARDI_BY_IDENTITY: dict[tuple[str, str, str], str] = {}
+_BROCARDI_BY_TIPO_NUMERO: dict[tuple[str, str], set[str]] = {}
+# display name → URL for callers that pass the act by its Brocardi name; the
+# labels without extremes (Costituzione, Preleggi…) have no other way in and
+# are consulted before any identity — Preleggi share the codice civile's R.D.
+_BROCARDI_BY_NAME: dict[str, str] = {}
+_BROCARDI_BARE_NAMES: dict[str, str] = {}
+# display name → its label's (tipo, anno, numero), to refuse a name paired with
+# somebody else's extremes ("statuto dei lavoratori", n. 267).
+_BROCARDI_NAME_ESTREMI: dict[str, tuple[str, str, str]] = {}
+for _key, _url in BROCARDI_CODICI.items():
+    _BROCARDI_BY_NAME.setdefault(_brocardi_label_name(_key), _url)
+    _estremi = parse_brocardi_estremi(_key)
+    if _estremi:
+        _BROCARDI_NAME_ESTREMI.setdefault(
+            _brocardi_label_name(_key),
+            (_estremi["tipo_atto"], _estremi["data"][:4], _estremi["numero_atto"]),
+        )
+        _anno = _estremi["data"][:4]
+        _BROCARDI_BY_IDENTITY[(_estremi["tipo_atto"], _anno, _estremi["numero_atto"])] = _url
+        _BROCARDI_BY_TIPO_NUMERO.setdefault((_estremi["tipo_atto"], _estremi["numero_atto"]), set()).add(_url)
+    else:
+        _BROCARDI_BARE_NAMES.setdefault(_brocardi_label_name(_key), _url)
+
+
+def _brocardi_by_identity(tipo_atto: str, numero_atto: str, data: str) -> str | None:
+    """URL for (tipo, numero[, anno]); None when the year is missing and ambiguous."""
+    if not numero_atto:
+        return None
+    anno = data.strip()[:4] if data else ""
+    if anno:
+        return _BROCARDI_BY_IDENTITY.get((tipo_atto, anno, numero_atto))
+    candidates = _BROCARDI_BY_TIPO_NUMERO.get((tipo_atto, numero_atto), set())
+    return next(iter(candidates)) if len(candidates) == 1 else None
+
+
+def _brocardi_by_name(tipo_lower: str, numero_atto: str, data: str) -> str | None:
+    """URL for a Brocardi display name, provided any extremes given agree with it."""
+    url = _BROCARDI_BY_NAME.get(tipo_lower)
+    if url is None:
+        return None
+    if not numero_atto:
+        return url
+    own = _BROCARDI_NAME_ESTREMI.get(tipo_lower)
+    if own is None or own[2] != numero_atto:
+        return None
+    anno = data.strip()[:4] if data else ""
+    return url if not anno or anno == own[1] else None
+
+
+def find_brocardi_url(tipo_atto: str, numero_atto: str = "", data: str = "") -> str | None:
+    """Brocardi base URL for an act, matched by identity — never by substring.
+
+    Order: the labels without extremes by name (Preleggi share the codice
+    civile's R.D. 262/1942); a codice through the extremes of its Normattiva
+    URN, which is how "codice in materia di protezione dei dati personali"
+    reaches the page Brocardi calls "Codice della privacy" — unless the caller
+    passed extremes of its own, which then must match; the identity (tipo,
+    anno, numero) — without a year only if the number is unique for that tipo;
+    finally the plain Brocardi name, again only if any extremes given agree
+    with it. An act that is not on Brocardi yields None rather than the
+    nearest label.
+    """
+    tipo_lower = re.sub(r"\s+", " ", (tipo_atto or "").lower().strip())
+    if not tipo_lower:
+        return None
+    numero_atto = numero_atto or ""
+    data = data or ""
+
+    if tipo_lower in _BROCARDI_BARE_NAMES:
+        return _BROCARDI_BARE_NAMES[tipo_lower]
+
+    anno = data.strip()[:4]
+    codice = extract_codice_details(tipo_lower)
+    if codice:
+        same_numero = not numero_atto or numero_atto == codice["numero_atto"]
+        same_anno = not anno or anno == codice["data"][:4]
+        if same_numero and same_anno:
+            found = _brocardi_by_identity(codice["tipo_atto_reale"], codice["numero_atto"], codice["data"])
+            if found:
+                return found
+        elif numero_atto:
+            # Explicit extremes that contradict the URN name the act themselves:
+            # "codice dei contratti pubblici" + 50/2016 is the abrogated code.
+            return _brocardi_by_identity(codice["tipo_atto_reale"], numero_atto, data)
+
+    tipo_esteso = _NORMATTIVA_SEARCH_LOWER.get(tipo_lower, tipo_lower)
+    if tipo_esteso in ("reg. ue", "regolamento (ue)"):
+        tipo_esteso = "regolamento ue"
+    found = _brocardi_by_identity(tipo_esteso, numero_atto, data)
+    if found:
+        return found
+
+    return _brocardi_by_name(tipo_lower, numero_atto, data)
+
 
 NORMATTIVA_SEARCH = {
         "d.lgs.": "decreto legislativo",
@@ -764,6 +925,8 @@ BROCARDI_SEARCH = {
     'decreto.legislativo': 'D.lgs.',
     'decreto.legge': 'D.L.',
 }
+
+_NORMATTIVA_SEARCH_LOWER = {_k.lower(): _v.lower() for _k, _v in NORMATTIVA_SEARCH.items()}
 
 EURLEX = {
     'tue': 'https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:12016M/TXT',

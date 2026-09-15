@@ -1,7 +1,7 @@
 import structlog
 import re
 import os
-from typing import Optional, Tuple, Union, Dict, Any, List
+from typing import Optional, Tuple, Dict, Any, List
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
 
@@ -9,9 +9,8 @@ from bs4 import BeautifulSoup
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 
-from ..tools.map import BROCARDI_CODICI
+from ..tools.map import BROCARDI_CODICI, find_brocardi_url
 from ..tools.norma import NormaVisitata
-from ..tools.text_op import normalize_act_type
 from ..tools.sys_op import BaseScraper
 from ..tools.cache_manager import get_cache_manager
 from .http_client import http_client
@@ -476,24 +475,30 @@ class BrocardiScraper(BaseScraper):
 
     @cached(ttl=86400, cache=Cache.MEMORY, serializer=JsonSerializer())
     async def do_know(self, norma_visitata: NormaVisitata) -> Optional[Tuple[str, str]]:
+        """(label, base URL) of the Brocardi page for this act, or None.
+
+        Matched by identity (tipo, anno, numero) against the extremes parsed
+        from the table labels — the year is what tells D.lgs. 81/2008 from
+        D.lgs. 81/2015 — and by name only for the labels without extremes.
+        """
         log.info(f"Checking if knowledge exists for norma: {norma_visitata}")
 
-        norma_str: Optional[str] = self._build_norma_string(norma_visitata)
-        if norma_str is None:
+        if not isinstance(norma_visitata, NormaVisitata):
             log.error("Invalid norma format")
             raise DocumentNotFoundError(
                 "Invalid norma format for Brocardi lookup",
                 urn=str(norma_visitata)
             )
 
-        search_str = norma_str.lower()
-        for txt, link in self.knowledge[0].items():
-            if search_str in txt.lower():
-                log.info(f"Knowledge found for norma: {norma_visitata}")
-                return txt, link
+        norma = norma_visitata.norma
+        link = find_brocardi_url(norma.tipo_atto_str, norma.numero_atto or "", norma.data or "")
+        if link is None:
+            log.warning(f"No knowledge found for norma: {norma_visitata}")
+            return None
 
-        log.warning(f"No knowledge found for norma: {norma_visitata}")
-        return None
+        label = next((txt for txt, url in self.knowledge[0].items() if url == link), link)
+        log.info(f"Knowledge found for norma: {norma_visitata}")
+        return label, link
 
     async def look_up(self, norma_visitata: NormaVisitata) -> Optional[str]:
         log.info(f"Looking up norma: {norma_visitata}")
@@ -704,32 +709,6 @@ class BrocardiScraper(BaseScraper):
         cross_refs = self._extract_cross_references(corpo)
         if cross_refs:
             info['CrossReferences'] = cross_refs
-
-    def _build_norma_string(self, norma_visitata: Union[NormaVisitata, str]) -> Optional[str]:
-        if isinstance(norma_visitata, NormaVisitata):
-            norma = norma_visitata.norma
-            tipo_norm = normalize_act_type(norma.tipo_atto_str, True, 'brocardi')
-            # BROCARDI_CODICI keys for codes have shape "Codice Civile (R.D. 16 marzo 1942, n. 262)".
-            # Appending `data` / `numero_atto` in a different format ("1942-03-16, n. 262") would
-            # break the substring match in do_know. For codes the name alone uniquely identifies
-            # the entry, so we skip the decorative components.
-            tipo_lower = tipo_norm.lower()
-            is_code = (
-                tipo_lower in ('costituzione', 'preleggi')
-                or tipo_lower.startswith('codice')
-                or tipo_lower.startswith('disposizioni')
-            )
-            if is_code:
-                return tipo_norm
-            components = [tipo_norm]
-            if norma.data:
-                components.append(f"{norma.data},")
-            if norma.numero_atto:
-                components.append(f"n. {norma.numero_atto}")
-            return " ".join(components).strip()
-        elif isinstance(norma_visitata, str):
-            return norma_visitata.strip()
-        return None
 
     async def _fetch_soup(self, url: str, *, cache_suffix: str, source: str) -> Optional[BeautifulSoup]:
         cache_key = f"{cache_suffix}:{url}"
