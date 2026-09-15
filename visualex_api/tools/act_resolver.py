@@ -52,6 +52,8 @@ def _normalize_key(name: str) -> str:
     """
     key = name.strip().lower()
     key = key.replace("’", "'").replace("ʼ", "'")
+    # Nicknames arrive quoted the way Brocardi prints them: Decreto "Sostegni".
+    key = key.replace('"', "").replace("“", "").replace("”", "")
     key = re.sub(r"\s+", " ", key)
     return key.strip(" ,;:")
 

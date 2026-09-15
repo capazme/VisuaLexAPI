@@ -115,11 +115,27 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
   - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py` — act-type mappings, plus the act tables the resolver reads
-    (`ATTI_NOTI` 63 aliases, `ATTI_DENOMINATI` 200 aliases over 80 acts, built
+    (`ATTI_NOTI` 64 aliases, `ATTI_DENOMINATI` 202 aliases over 81 acts, built
     from the reviewable `_ATTI_DENOMINATI_SPEC` rows) and `codice_urn(name)`,
     the **case-insensitive** lookup into `NORMATTIVA_URN_CODICI` — six keys
     carry capitals ("codice del Terzo settore"), so a bare `in` test missed
     them and those codici lost their default annex
+  - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
+    brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
+    `brocardi_scraper.do_know` asks. The lookup is **by identity**: every label
+    embeds the act's extremes ("Statuto dei lavoratori(L. 20 maggio 1970, n.
+    300)"), `parse_brocardi_estremi()` reads them once into (tipo esteso, anno,
+    numero), and a norma matches only its own triple — the year is what tells
+    D.lgs. 81/2008 from D.lgs. 81/2015, so without one the number must be unique
+    for that tipo. Only the labels without extremes (Costituzione, Preleggi,
+    CCNL) match by name, and they win: Preleggi share the codice civile's R.D.
+    262/1942. Codici go through the extremes of their Normattiva URN, which is
+    how "codice in materia di protezione dei dati personali" reaches the page
+    Brocardi calls "Codice della privacy". **Never match a label as a
+    substring**: `do_know` used to look for "D.lgs. 2001-06-08, n. 231" inside
+    "(D.lgs. 8 giugno 2001, n. 231)", so no act outside the codici ever got its
+    dottrina and massime (69 of 100 sources). An act that is not on Brocardi
+    returns `None`, never the nearest label.
   - `act_resolver.py` — `resolve_atto(name)` maps an act named the way a lawyer
     writes it ("statuto dei lavoratori", "TUSL", "del D.Lgs. 231/2001") to
     `{tipo_atto, data, numero_atto}`, over the `ATTI_NOTI` / `ATTI_DENOMINATI`
@@ -319,7 +335,7 @@ Three different things. Conflating them is the recurring mistake.
   grid, so listing them duplicates that grid. The palette shows only the 59
   that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
   the grid cannot save.
-- **Known acts** (389) — names `act_resolver.py` understands unaided ("statuto
+- **Known acts** (392) — names `act_resolver.py` understands unaided ("statuto
   dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
 - **CustomAlias** — the user's own, server-backed. A custom trigger beats a
   preset of the same name, because the client resolves its own aliases before
