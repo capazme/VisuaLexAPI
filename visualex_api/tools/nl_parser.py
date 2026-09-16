@@ -11,6 +11,7 @@ from datetime import date as _date
 from typing import Optional
 
 from .act_resolver import resolve_atto
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA_SEARCH
 
 # Italian month names → month number
@@ -26,9 +27,12 @@ _ART_RE = re.compile(
     re.IGNORECASE,
 )
 
-# One article: digits, an optional bis/ter/... suffix, or a range ("1-10").
+# One article: digits, an optional bis/ter/.../terdecies suffix, or a range
+# ("1-10"). The suffix table is the shared one; the \b closing it keeps "bis"
+# from matching the head of an ordinary word ("art. 5 bisogna").
+_ART_SUFFIX = r"(?:" + ARTICLE_SUFFIX_ALTERNATION + r")\b"
 _ART_ITEM = (
-    r"\d+(?:\s*[-‑]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?"
+    r"\d+(?:\s*[-‑]?\s*" + _ART_SUFFIX + r")?"
     r"(?:\s*[-‑]\s*\d+)?"
 )
 # A list of them, separated by "," or "e": "artt. 1, 2 e 3". The API takes
@@ -242,7 +246,7 @@ def _extract_articles(text: str) -> tuple[str, Optional[str]]:
     # "5 e 6" → "5,6".
     items = []
     for item in _ART_SEPARATOR_RE.split(num_match.group(0).strip()):
-        item = re.sub(r"(\d+)\s*[-‑]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)",
+        item = re.sub(r"(\d+)\s*[-‑]?\s*(" + _ART_SUFFIX + r")",
                       r"\1-\2", item.strip(), flags=re.IGNORECASE)
         item = re.sub(r"(\d+)\s*[-‑]\s*(\d+)", r"\1-\2", item)
         items.append(item)

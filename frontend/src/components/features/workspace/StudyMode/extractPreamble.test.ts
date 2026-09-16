@@ -24,6 +24,15 @@ describe('extractPreamble', () => {
     expect(extractPreamble('art. 50-ter.\n(Con trattino).\nCorpo.').rubric).toBe('Con trattino');
   });
 
+  // Normattiva goes far past "decies" (d.lgs. 231/2001 runs to 25-sexiesdecies
+  // and beyond). With a suffix the regex could not read, the preamble stayed in
+  // the body and Study Mode rendered "Art. 25-terdecies." twice.
+  it('recognises numbering suffixes past "decies"', () => {
+    expect(extractPreamble('art. 25-terdecies.\n(Rubrica lunga).\nCorpo.').rubric).toBe('Rubrica lunga');
+    expect(extractPreamble('Art. 25 quinquiesdecies.\n(Rubrica).\nCorpo.').rubric).toBe('Rubrica');
+    expect(extractPreamble('Art. 2409 noviesdecies.\n(Rubrica).\nCorpo.').body).toBe('Corpo.');
+  });
+
   it('returns the full text when no preamble is present', () => {
     const raw = 'Testo che non inizia con art.';
     const r = extractPreamble(raw);

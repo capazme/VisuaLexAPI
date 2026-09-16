@@ -265,3 +265,27 @@ class TestResolverFallback:
 
     def test_unknown_still_returns_none(self):
         assert resolve_alias("legge sugli unicorni") is None
+
+
+class TestArticleSuffixesPastDecies:
+    """The article prefix is stripped before the alias lookup.
+
+    With a suffix the pattern could not read, "art. 25-terdecies dlgs 231"
+    merged article "25-ter" into the resolved act — a different article of the
+    same decree, so nothing looked wrong downstream.
+    """
+
+    @pytest.mark.parametrize("suffix", [
+        "undecies", "terdecies", "quinquiesdecies", "sexiesdecies", "undevicies",
+    ])
+    def test_hyphenated_article_is_kept_whole(self, suffix):
+        got = resolve_alias(f"art. 25-{suffix} statuto dei lavoratori")
+        assert got is not None
+        assert got["article"] == f"25-{suffix}"
+
+    def test_spaced_article_is_normalised(self):
+        got = resolve_alias("art. 25 terdecies statuto dei lavoratori")
+        assert got["article"] == "25-terdecies"
+
+    def test_short_suffix_unchanged(self):
+        assert resolve_alias("art. 18-ter statuto dei lavoratori")["article"] == "18-ter"

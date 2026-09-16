@@ -287,5 +287,45 @@ describe('toApiArticleNumber', () => {
     expect(toApiArticleNumber('480-ter')).toBe('480-ter');
     expect(toApiArticleNumber('480')).toBe('480');
     expect(toApiArticleNumber('1 - 10')).toBe('1-10');
+    // The suffix table, not a private list: a long suffix must hyphenate too.
+    expect(toApiArticleNumber('25 quinquiesdecies')).toBe('25-quinquiesdecies');
+  });
+});
+
+// Same gap as the in-text matcher: the command palette parses what the user
+// types, and "art. 25-terdecies d.lgs. 231/2001" used to reach the API as
+// article "25-ter" — an article that exists, so nothing looked wrong.
+describe('parseLegalCitation — article suffixes past decies', () => {
+  const parse = (input: string) => parseLegalCitation(input);
+
+  it.each([
+    'undecies', 'duodecies', 'terdecies', 'quaterdecies',
+    'quinquiesdecies', 'sexiesdecies', 'septiesdecies', 'undevicies',
+  ])('keeps "art. 25-%s d.lgs. 231/2001" whole', (suffix) => {
+    expect(parse(`art. 25-${suffix} d.lgs. 231/2001`))
+      .toMatchObject({ act_type: 'decreto legislativo', act_number: '231', date: '2001', article: `25-${suffix}` });
+  });
+
+  it('normalises the spaced spelling to the API form', () => {
+    expect(parse('art. 25 terdecies d.lgs. 231/2001'))
+      .toMatchObject({ act_type: 'decreto legislativo', act_number: '231', article: '25-terdecies' });
+  });
+
+  it('collects a list of long suffixes', () => {
+    expect(parse('artt. 25-undecies e 25-terdecies d.lgs. 231/2001'))
+      .toMatchObject({ act_type: 'decreto legislativo', act_number: '231', article: '25-undecies,25-terdecies' });
+  });
+
+  it('reads a standalone long suffix once the act type is known', () => {
+    // Senza "art.": è il ramo STANDALONE_NUMBER_PATTERN.
+    expect(parse('dlgs 231/2001 25 quinquiesdecies'))
+      .toMatchObject({ act_type: 'decreto legislativo', act_number: '231', article: '25-quinquiesdecies' });
+  });
+});
+
+describe('extractArticleRefs — article suffixes past decies', () => {
+  it('extracts the whole suffix from a footnote', () => {
+    const refs = extractArticleRefs('cfr. art. 25-septiesdecies e art. 25-ter', 'decreto legislativo');
+    expect(refs.map(r => r.numero)).toEqual(['25-septiesdecies', '25-ter']);
   });
 });
