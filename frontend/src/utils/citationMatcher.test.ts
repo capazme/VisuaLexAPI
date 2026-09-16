@@ -284,3 +284,31 @@ describe('extractCitations — names that are prefixes of other acts', () => {
     expect(m.parsed).toMatchObject({ act_type: 'decreto legislativo', act_number: '196', article: '7' });
   });
 });
+
+describe('extractCitations — an ordinal is not a numbering suffix', () => {
+  // c.p.c. art. 615: "nell'articolo 480 terzo comma" was linked as art. 480-ter,
+  // a page that does not exist — "ter" matched the start of "terzo".
+  const inCpc = { tipo_atto: 'codice di procedura civile', numero_atto: '1443', data: '1940-10-28' };
+
+  it('reads "articolo 480 terzo comma" as article 480', () => {
+    const [m] = extractCitations("prima che sia iniziata l'esecuzione, nell'articolo 480 terzo comma, con atto", inCpc);
+    expect(m.parsed.article).toBe('480');
+    expect(m.text).toBe("nell'articolo 480");
+  });
+
+  it('still reads a real suffix, spaced or hyphenated, in the form the API accepts', () => {
+    // parse_article_input rejects "480ter": the hyphen is the wire form.
+    const ms = extractCitations("l'articolo 480 ter e l'articolo 480-ter, comma 2", inCpc);
+    expect(ms.map(m => m.parsed.article)).toEqual(['480-ter', '480-ter']);
+  });
+
+  it('hyphenates spaced suffixes inside an article list and a bare article', () => {
+    const ms = extractCitations("artt. 5 bis e 6 ter del d.lgs. 196/2003; vedi anche art. 7 quater", inCpc);
+    expect(ms.map(m => m.parsed.article)).toEqual(['5-bis', '6-ter', '7-quater']);
+  });
+
+  it('does not read "bisogno" or "quaterna" as suffixes', () => {
+    const ms = extractCitations("art. 12 bisogna leggerlo con l'art. 13 quaterna", inCpc);
+    expect(ms.map(m => m.parsed.article)).toEqual(['12', '13']);
+  });
+});

@@ -205,7 +205,8 @@ export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.e
 /**
  * Un articolo: numero, eventuale suffisso (bis, ter, ...) o intervallo ("1-10").
  */
-const ARTICLE_ITEM = '\\d+(?:\\s*-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?(?:\\s*-\\s*\\d+)?';
+// \b after the suffix: "480 terzo comma" is art. 480, not 480-ter.
+const ARTICLE_ITEM = '\\d+(?:\\s*-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\\b)?(?:\\s*-\\s*\\d+)?';
 
 /**
  * Un elenco di articoli separati da "," o "e": "artt. 1, 2 e 3". L'API
@@ -374,6 +375,18 @@ function extractEuCitation(normalized: string): ActTypeExtraction | null {
 }
 
 /**
+ * An article number the way the API reads it: "480 ter", "480ter" and
+ * "480 - ter" all become "480-ter" (parse_article_input rejects "480ter"),
+ * "1 - 10" becomes "1-10". Every citation source must go through here, so
+ * the matcher and the palette parser cannot drift apart again.
+ */
+export function toApiArticleNumber(raw: string): string {
+  return raw
+    .replace(/\s+/g, '')
+    .replace(/^(\d+)-?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)$/i, '$1-$2');
+}
+
+/**
  * Estrae il numero dell'articolo dall'input
  */
 function extractArticle(input: string): { article: string | undefined; remaining: string } {
@@ -382,10 +395,7 @@ function extractArticle(input: string): { article: string | undefined; remaining
     // Nelle forme dell'API: "2 bis" → "2-bis", "1 - 10" → "1-10", "5 e 6" → "5,6".
     const article = match[1]
       .split(ARTICLE_SEPARATOR)
-      .map(item => item
-        .trim()
-        .replace(/(\d+)\s*-?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)/i, '$1-$2')
-        .replace(/(\d+)\s*-\s*(\d+)/, '$1-$2'))
+      .map(toApiArticleNumber)
       .join(',');
     const tail = input.slice((match.index ?? 0) + match[0].length);
     const clause = tail.match(COMMA_CLAUSE_PATTERN);
@@ -658,7 +668,7 @@ export interface ArticleRef {
  * - "art. 2043 c.c."
  * - "art. 123-bis"
  */
-const ARTICLE_REF_PATTERN = /\b(?:art(?:icol[oi])?t?\.?\s*)(\d+(?:\s*-\s*\d+)?(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)\s*(?:e\s+(?:ss\.?|seg(?:uenti)?\.?)|(?:c\.?\s*c\.?|c\.?\s*p\.?|c\.?\s*p\.?\s*c\.?|c\.?\s*p\.?\s*p\.?|cost\.?|costituzione))?/gi;
+const ARTICLE_REF_PATTERN = /\b(?:art(?:icol[oi])?t?\.?\s*)(\d+(?:\s*-\s*\d+)?(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)\s*(?:e\s+(?:ss\.?|seg(?:uenti)?\.?)|(?:c\.?\s*c\.?|c\.?\s*p\.?|c\.?\s*p\.?\s*c\.?|c\.?\s*p\.?\s*p\.?|cost\.?|costituzione))?/gi;
 
 /**
  * Pattern per rilevare il tipo di atto dopo il numero articolo
@@ -698,7 +708,7 @@ export function extractArticleRefs(text: string, defaultActType = 'codice civile
   let match;
   while ((match = ARTICLE_REF_PATTERN.exec(text)) !== null) {
     const fullMatch = match[0].toLowerCase();
-    const articleNum = match[1].replace(/\s+/g, '').trim();
+    const articleNum = toApiArticleNumber(match[1]);
 
     // Evita duplicati
     if (seenArticles.has(articleNum)) continue;
