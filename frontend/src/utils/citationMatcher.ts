@@ -11,7 +11,7 @@
 
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, hasEuMarker, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear } from './dateUtils';
-import { FULL_ACT_NAMES } from './citationParser';
+import { FULL_ACT_NAMES, toApiArticleNumber } from './citationParser';
 
 // Minimal interface for norma context (subset of NormaVisitata)
 interface NormaContext {
@@ -96,7 +96,9 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
 };
 
 // Suffissi articolo (bis, ter, etc.)
-const ARTICLE_SUFFIX_PATTERN = '(?:-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?';
+// The \b keeps an ordinal apart from a suffix: "480 terzo comma" is art. 480,
+// not 480-ter (a page that does not exist).
+const ARTICLE_SUFFIX_PATTERN = '(?:-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\\b)?';
 
 // Preposizioni articolate che precedono "articolo" (dell'articolo, dall'articolo, etc.)
 const PREPOSITION_PATTERN = "(?:dell?'|dall?'|all?'|nell?'|sull?')?";
@@ -245,14 +247,14 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
     const numbers = Array.from(listText.matchAll(new RegExp(articleItem, 'gi')));
     if (numbers.length <= 1) {
       addMatch(whole, wholeStart, wholeStart + whole.length, {
-        ...base, article: listText.replace(/\s+/g, ''), confidence: 0.95,
+        ...base, article: toApiArticleNumber(listText), confidence: 0.95,
       });
       return;
     }
     for (const n of numbers) {
       const start = listStart + (n.index ?? 0);
       addMatch(n[0], start, start + n[0].length, {
-        ...base, article: n[0].replace(/\s+/g, ''), confidence: 0.95,
+        ...base, article: toApiArticleNumber(n[0]), confidence: 0.95,
       });
     }
   };
@@ -381,7 +383,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
       act_type: normalizeActType(actTypeMatch),
       act_number: actNumber,
       date: year,
-      article: article.replace(/\s+/g, ''),
+      article: toApiArticleNumber(article),
       confidence: 0.95,
     });
   }
@@ -412,7 +414,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
     // Aggiungi solo il primo articolo (gli altri sono correlati)
     addMatch(match[0], match.index, match.index + match[0].length, {
       act_type: actType,
-      article: firstArticle.replace(/\s+/g, ''),
+      article: toApiArticleNumber(firstArticle),
       confidence: 0.85,
     });
   }
@@ -442,7 +444,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
 
     addMatch(match[0], match.index, match.index + match[0].length, {
       act_type: normalizeActType(actTypeSuffix),
-      article: article.replace(/\s+/g, ''),
+      article: toApiArticleNumber(article),
       confidence: 0.9,
     });
   }
@@ -479,7 +481,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
       const articlesGroup = match[2];  // "8 e 9"
 
       // Trova la posizione di ogni numero all'interno del testo originale
-      const numberRegex = /(\d+(?:-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)/gi;
+      const numberRegex = /(\d+(?:-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)/gi;
       let numMatch;
 
       // La posizione base è dopo il prefisso
@@ -500,7 +502,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
             act_type: defaultNorma.tipo_atto,
             act_number: defaultNorma.numero_atto,
             date: defaultNorma.data,
-            article: articleNum.replace(/\s+/g, ''),
+            article: toApiArticleNumber(articleNum),
             confidence: 0.75,
           });
         }
@@ -534,7 +536,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
         act_type: defaultNorma.tipo_atto,
         act_number: defaultNorma.numero_atto,
         date: defaultNorma.data,
-        article: article.replace(/\s+/g, ''),
+        article: toApiArticleNumber(article),
         confidence: 0.7,
       });
     }

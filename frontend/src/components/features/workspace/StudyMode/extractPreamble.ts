@@ -15,7 +15,7 @@
  * don't follow the usual convention render as-is.
  */
 
-const PREAMBLE_RE = /^\s*art(?:icolo)?\.?\s+\d+(?:\s*-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?\.?\s*(?:\(\s*([^)]+?)\s*\)\s*\.?)?\s*(?:\n\s*)*/i;
+const PREAMBLE_RE = /^\s*art(?:icolo)?\.?\s+\d+(?:\s*-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?\.?\s*(?:\(\s*([^)]+?)\s*\)\s*\.?)?\s*(?:\n\s*)*/i;
 
 export interface PreambleSplit {
   /** Text inside the first parenthetical after the article number, trimmed. Null when no rubric was present. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FULL_ACT_NAMES, formatParsedCitation, isSearchReady, parseLegalCitation } from './citationParser';
+import { FULL_ACT_NAMES, extractArticleRefs, formatParsedCitation, isSearchReady, parseLegalCitation, toApiArticleNumber } from './citationParser';
 import type { CustomAlias } from '../types';
 
 describe('formatParsedCitation — date shown in a citation', () => {
@@ -259,5 +259,33 @@ describe('FULL_ACT_NAMES', () => {
 
   it('maps every name to the act type the palette resolves it to', () => {
     expect(Object.fromEntries(FULL_ACT_NAMES)).toMatchObject({ 'codice civile': 'codice civile', 'costituzione': 'costituzione' });
+  });
+});
+
+describe('ordinals are not numbering suffixes', () => {
+  it('parseLegalCitation reads "art. 480 terzo comma c.p.c." as article 480', () => {
+    expect(parseLegalCitation('art. 480 terzo comma c.p.c.'))
+      .toMatchObject({ act_type: 'codice di procedura civile', article: '480' });
+  });
+
+  it('extractArticleRefs reads "articolo 480 terzo comma" as article 480', () => {
+    const refs = extractArticleRefs("nell'articolo 480 terzo comma, con atto", 'codice di procedura civile');
+    expect(refs.map(r => r.numero)).toEqual(["480"]);
+  });
+
+  it('extractArticleRefs still reads a spaced suffix', () => {
+    const refs = extractArticleRefs("l'articolo 480 ter e l'art. 615-bis", 'codice di procedura civile');
+    expect(refs.map(r => r.numero)).toEqual(['480-ter', '615-bis']);
+  });
+});
+
+describe('toApiArticleNumber', () => {
+  it('writes every suffix form the way parse_article_input reads it', () => {
+    expect(toApiArticleNumber('480 ter')).toBe('480-ter');
+    expect(toApiArticleNumber('480ter')).toBe('480-ter');
+    expect(toApiArticleNumber('480 - ter')).toBe('480-ter');
+    expect(toApiArticleNumber('480-ter')).toBe('480-ter');
+    expect(toApiArticleNumber('480')).toBe('480');
+    expect(toApiArticleNumber('1 - 10')).toBe('1-10');
   });
 });
