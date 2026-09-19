@@ -29,8 +29,10 @@ cherry-picked back. If you find yourself fixing something vanilla while on
 `merlt`, stop and move to `main` — that one-way-valve discipline is what this
 model exists to enforce, after 32 vanilla commits (four of them security fixes)
 sat stranded on the experiment for weeks. There is deliberately no `dev`
-branch. **`docs/git-workflow.md` is the standard** — the merlt merge checklist,
-the monthly sweep, why `dev` was rejected.
+branch. The experiment lives in its own checkout, the permanent worktree
+`../VisuaLexAPI-merlt` — never switch this checkout to it.
+**`docs/git-workflow.md` is the standard** — the merlt merge checklist, the
+monthly sweep, why `dev` was rejected.
 
 Two more places where work strands, both checked before assuming every fix
 has reached `main`: Claude Code web sessions push `origin/claude/<name>-<id>` branches
