@@ -1,4 +1,5 @@
 """Pure parser tests. No network: XML string in, ParsedAct out."""
+import re
 from pathlib import Path
 
 import pytest
@@ -216,3 +217,31 @@ class TestRubricheOnSuffixedArticles:
 
         text = "### Art. 2409 undecies\n\nArt. 2409-undecies.\n\nARTICOLO ABROGATO DAL D.LGS. 27 MARZO 2026, N. 47"
         assert extract_rubrica(text, "2409-undecies") is None
+
+
+class TestPerArticleDates:
+    """The date of the text currently in force, per article.
+
+    Component acts (codici) give each article its own <doc> with its own FRBR
+    metadata; the FRBRWork date there moves when the article is amended:
+    art. 1 c.p. still reads 1931-07-01, art. 3-bis (d.lgs. 21/2018) reads
+    2018-04-06. Flat acts have act-level metadata only, so no article date.
+    """
+
+    def test_component_act_dates_follow_each_article(self, cp):
+        assert cp.dates["1"] == "1931-07-01"
+        assert cp.dates["3-bis"] == "2018-04-06"
+
+    def test_every_article_of_a_component_act_has_a_date(self, cp):
+        assert set(cp.dates) == set(cp.order)
+
+    def test_dates_are_iso_strings(self, cp):
+        assert all(re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) for d in cp.dates.values())
+
+    def test_flat_acts_have_no_article_dates(self, l241):
+        assert l241.dates == {}
+
+    def test_parts_carry_their_own_dates(self, cp):
+        main = cp.parts["Codice Penale"]
+        assert main.dates["3-bis"] == "2018-04-06"
+        assert cp.dates == main.dates

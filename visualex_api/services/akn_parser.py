@@ -255,6 +255,9 @@ class ParsedPart:
     name: str
     articles: dict[str, str] = field(default_factory=dict)
     order: list[str] = field(default_factory=list)
+    # Article key -> ISO date of the text in force for that article, read from
+    # the article's own FRBRWork/FRBRdate. Component acts only.
+    dates: dict[str, str] = field(default_factory=dict)
 
     @property
     def article_count(self) -> int:
@@ -270,6 +273,9 @@ class ParsedAct:
     title: str
     articles: dict[str, str] = field(default_factory=dict)
     order: list[str] = field(default_factory=list)
+    # Mirrors the dominant part's ``dates``; empty for flat acts, whose
+    # lifecycle is recorded at act level only.
+    dates: dict[str, str] = field(default_factory=dict)
     structure: str = "flat"
     # All component parts keyed by their AKN PART name. Empty for flat acts and
     # for single-part component acts. ``articles``/``order`` mirror the dominant
@@ -516,6 +522,25 @@ def _parse_flat(root) -> tuple[dict[str, str], list[str]]:
 
 _DOC_NAME_RE = re.compile(r"^(?P<part>.+?)-art\.\s*(?P<num>.+)$", re.IGNORECASE)
 
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _doc_work_date(doc) -> str | None:
+    """The FRBRWork date of a component <doc>, or None.
+
+    Expression and Manifestation dates sit beside it and are the act's, not
+    the article's — the Work date is the one that moves when the article's
+    text is replaced.
+    """
+    dates = doc.xpath(
+        f".//{_local('meta')}//{_local('FRBRWork')}/{_local('FRBRdate')}/@date"
+    )
+    for value in dates:
+        value = (value or "").strip()
+        if _ISO_DATE.match(value):
+            return value
+    return None
+
 
 def _render_component_doc(doc, num_label: str) -> str:
     """Render a component ``<doc>`` element to markdown."""
@@ -576,6 +601,7 @@ def _parse_component(root) -> tuple[dict[str, ParsedPart], str]:
     for part_name, entries in by_part.items():
         articles: dict[str, str] = {}
         order: list[str] = []
+        dates: dict[str, str] = {}
         for num_raw, doc in entries:
             key = normalize_article_key(num_raw)
             if not key or key in articles:
@@ -584,8 +610,11 @@ def _parse_component(root) -> tuple[dict[str, ParsedPart], str]:
             if rendered:
                 articles[key] = rendered
                 order.append(key)
+                work_date = _doc_work_date(doc)
+                if work_date:
+                    dates[key] = work_date
         if articles:
-            parts[part_name] = ParsedPart(name=part_name, articles=articles, order=order)
+            parts[part_name] = ParsedPart(name=part_name, articles=articles, order=order, dates=dates)
 
     if not parts:
         return {}, ""
@@ -672,6 +701,7 @@ def parse_akn(xml: str) -> ParsedAct:
             title=title,
             articles=main.articles,
             order=main.order,
+            dates=main.dates,
             structure="component",
             parts=parts,
         )
