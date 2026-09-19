@@ -946,13 +946,15 @@ class NormaController:
             # send Playwright to ".../reg/None/None/oj/ita" (or raise a
             # ValueError out of Norma.__post_init__ into a 500) to discover
             # what a regex tells for free.
+            # ASCII digits: `\d` alone accepts other scripts' digits, which
+            # do not belong in a URL.
             act_number = str(data.get('act_number') or '').strip()
-            if not re.fullmatch(r'\d+', act_number):
+            if not re.fullmatch(r'\d+', act_number, re.ASCII):
                 raise ValidationError(
                     "Campo act_number mancante o non valido: atteso il numero dell'atto (es. 679)"
                 )
             date = str(data.get('date') or '').strip()
-            if not re.fullmatch(r'\d{4}(-\d{2}-\d{2})?', date):
+            if not re.fullmatch(r'\d{4}(-\d{2}-\d{2})?', date, re.ASCII):
                 raise ValidationError(
                     "Campo date mancante o non valido: atteso l'anno (es. 2016) o una data AAAA-MM-GG"
                 )

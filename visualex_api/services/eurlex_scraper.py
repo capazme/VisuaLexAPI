@@ -144,7 +144,11 @@ def _cons_text(element) -> str:
     # read "1 quater ." while "1 bis." elsewhere keeps the period inside the
     # span, and "lettera a )" / "articolo 14 bis , paragrafo 2" likewise.
     # Consolidated path only: the OJ extractor never comes through here.
-    return re.sub(r"\s+([.,;:)])", r"\1", text)
+    text = re.sub(r"\s+([.,;:)])", r"\1", text)
+    # The same separator lands after an opening bracket: a footnote reference
+    # is literal parens around a superscript link, (<a><span>1</span></a>),
+    # and read "( 1 )" — the page shows "(1)".
+    return re.sub(r"([(«])\s+", r"\1", text)
 
 
 def _is_cons_point(element) -> bool:

@@ -118,6 +118,17 @@ class TestEndpoint:
         assert response.status_code == 400
         assert "act_number" in (await response.get_json())["error"]
 
+    async def test_non_ascii_digits_are_a_400(self, client):
+        # `\d` alone matches Arabic-Indic digits; they do not belong in a URL.
+        boom = AsyncMock(side_effect=AssertionError("must not fetch"))
+        with patch("app.eurlex_scraper.get_recitals", boom):
+            response = await client.post("/fetch_recitals", json={
+                "act_type": "regolamento ue", "date": "2016", "act_number": "\u0666\u0667\u0669",
+            })
+        assert response.status_code == 400
+        assert "act_number" in (await response.get_json())["error"]
+        boom.assert_not_called()
+
     async def test_a_malformed_date_is_a_400_not_a_500(self, client):
         # "duemilasedici" used to raise ValueError out of Norma.__post_init__.
         response = await client.post("/fetch_recitals", json={

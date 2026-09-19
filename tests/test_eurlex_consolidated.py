@@ -331,6 +331,13 @@ class TestNoSpaceBeforePunctuation:
             "articolo 14 bis, paragrafo 2;"
         assert _cons_text(BeautifulSoup("<p>1. Il presente regolamento</p>", "html.parser")) == \
             "1. Il presente regolamento"
+        # The opening side: a footnote reference reads "( 1 )" on the page.
+        assert _cons_text(BeautifulSoup("<p>nota ( 1 ) fine</p>", "html.parser")) == "nota (1) fine"
+        assert _cons_text(BeautifulSoup("<p>« testo</p>", "html.parser")) == "«testo"
+        # A real footnote reference: literal parens around a superscript link.
+        assert _cons_text(BeautifulSoup(
+            '<p>del Consiglio (<a href="#E0001"><span class="superscript">1</span></a>).</p>',
+            "html.parser")) == "del Consiglio (1)."
 
     async def test_the_real_lines_that_had_the_wart(self):
         eidas = soup_of("eidas_consolidated_20241018_trimmed.html")
@@ -344,6 +351,18 @@ class TestNoSpaceBeforePunctuation:
         assert any(line.startswith("1 bis. Fatta salva la direttiva 95/46/CE") for line in text4.split("\n"))
         assert "articolo 14 bis, paragrafo 2." in text4
 
+    async def test_footnote_references_read_as_the_page_shows_them(self):
+        # "( 1 )" — literal parens around a superscript link — is "(1)".
+        eidas = soup_of("eidas_consolidated_20241018_trimmed.html")
+        text2 = await EurlexScraper().extract_article_text(eidas, "2")
+        assert "del Parlamento europeo e del Consiglio (1)." in text2
+        text3 = await EurlexScraper().extract_article_text(eidas, "3")
+        assert "del Parlamento europeo e del Consiglio (2);" in text3
+        eprivacy = soup_of("eprivacy_consolidated_20091219.html")
+        text2 = await EurlexScraper().extract_article_text(eprivacy, "2")
+        assert "(direttiva quadro) (1)." in text2
+        assert "( " not in text2 and "( " not in text3
+
     @pytest.mark.parametrize("fixture", [
         "eprivacy_consolidated_20091219.html",
         "eidas_consolidated_20241018_trimmed.html",
@@ -355,6 +374,7 @@ class TestNoSpaceBeforePunctuation:
         for item in result:
             text = await scraper.extract_article_text(soup, item["numero"])
             assert not re.search(r"\s[.,;:)]", text), (fixture, item["numero"])
+            assert not re.search(r"[(«]\s", text), (fixture, item["numero"])
 
     async def test_the_oj_path_is_untouched(self):
         # The normalisation lives in _cons_text; an OJ page never reaches it.
