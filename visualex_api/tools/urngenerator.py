@@ -98,12 +98,16 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
     normalized_act_type = normalize_act_type(act_type)
     
-    # Check if 'article' is a valid string before attempting to split it
+    # Check if 'article' is a valid string before attempting to split it.
+    # Every token after the number is the extension, joined: "270-bis.1" ->
+    # "270" + "bis.1" (~art270bis.1) and "135-sex-decies" -> "135" +
+    # "sexdecies" (~art135sexdecies). Unpacking parts[1] alone broke on the
+    # compound ordinals. "314/2" has no dash and stays whole (~art314/2).
     extension = None
     if article and '-' in article:
         parts = article.split('-')
         article = parts[0]
-        extension = parts[1]
+        extension = ''.join(parts[1:]) or None
     
     # Handle EURLEX cases (check before replacing spaces with dots)
     if normalized_act_type.lower() in EURLEX:
@@ -215,7 +219,8 @@ def append_article_info(urn, article, extension):
     """
     if article:
         if "-" in article:
-            article, extension = article.split("-")
+            parts = article.split("-")
+            article, extension = parts[0], ''.join(parts[1:]) or extension
         article = re.sub(r'\b[Aa]rticoli?\b|\b[Aa]rt\.?\b', "", article).strip()
         urn += f"~art{article}"
         if extension:

@@ -224,8 +224,15 @@ def normalize_article_key(numero_articolo: str) -> str:
         return key.replace(" ", "-")
 
     # Fallback: collapse internal whitespace to dashes, strip stray chars.
+    # This is where the shapes the table cannot spell land — "270 bis.1" ->
+    # "270-bis.1", "314/2", "135 sex decies" -> "135-sex-decies" — and they
+    # need nothing more. A bare digit after an ordinal is a dotted sub-number
+    # ("171 octies 1" in the tree of l. 633/1941 is ~art171octies.1 on
+    # Normattiva), so it joins with a dot: the tree's spelling, the archive's
+    # "171-octies-1" and the request's "171-octies.1" share one key.
     key = re.sub(r"\s+", "-", key)
     key = re.sub(r"-{2,}", "-", key).strip("-")
+    key = re.sub(r"(?<=[a-z])-(\d+)$", r".\1", key)
     return key
 
 

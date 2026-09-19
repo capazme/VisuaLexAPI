@@ -377,8 +377,16 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     """
     logging.info(f"Generating article URL for article_number: {article_number}, attachment_number: {attachment_number} based on normurn: {normurn}")
 
-    # Normalize article_number: rimuovi spazi e trattini, converti in minuscolo
-    article_number = article_number.lower().replace(' ', '').replace('-', '')
+    # Normalize article_number: rimuovi spazi e trattini, converti in minuscolo.
+    # "270 bis.1" -> art270bis.1, "19-bis.1" -> art19bis.1, "314/2" -> art314/2,
+    # "135 sex decies" -> art135sexdecies. A bare digit after an ordinal is a
+    # dotted sub-number in Normattiva's URN grammar: "171 octies 1" (l.
+    # 633/1941) is ~art171octies.1 — ~art171octies1, which this used to build,
+    # makes Normattiva answer Art. 1 (gotcha 24). Same rule as
+    # text_op._canonicalise_article_token.
+    article_number = article_number.lower()
+    article_number = re.sub(r'(?<=[a-z])[\s-]+(?=\d+$)', '.', article_number)
+    article_number = article_number.replace(' ', '').replace('-', '')
 
     # Regex per identificare i suffissi di versione e di articolo
     split_pattern = re.compile(r'([~@!])')
