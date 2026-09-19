@@ -270,7 +270,8 @@ error page instead of NDJSON.
   "article": "2043",             // required: single, list "1,2", or range "3-5"
   "version": "vigente",          // optional: "vigente" | "originale"
   "version_date": "2024-01-15",  // optional
-  "annex": "A"                   // optional (allegato)
+  "annex": "A",                  // optional (allegato)
+  "celex_consolidated": "02002L0058-20091219"  // optional, EU acts only: serve this consolidated version
 }
 ```
 
