@@ -117,84 +117,90 @@ async def run_build(args, manifest: Manifest) -> int:
         store = Store(db_path) if db_path.exists() else None
     else:
         store = Store(db_path)
-        interrupted = store.mark_running_as_interrupted()
-        for rid in interrupted:
-            log.warning("run %d was left running (killed?) — marked interrupted; `--resume %d` continues it", rid, rid)
-        if args.resume is not None:
-            run_id = args.resume if args.resume > 0 else store.latest_interrupted_run()
-            if run_id is None or store.get_run(run_id) is None:
-                log.error("no interrupted run to resume")
-                return 2
-            store.reopen_run(run_id)
-            log.info("resuming run %d", run_id)
-        else:
-            run_id = store.start_run({k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},
-                                     stamp(datetime.now))
 
-    options = RunOptions(
-        out_dir=out_dir, dry_run=args.dry_run, full=args.full, resume_run_id=run_id if args.resume is not None else None,
-        enrich_override=override, refresh_enrich=args.refresh_enrich,
-        batch_size=args.batch_size or manifest.defaults.batch_size, enrich_ttl_days=manifest.defaults.enrich_ttl_days,
-    )
-    throttle = Throttle(args.rate if args.rate is not None else manifest.defaults.rate_per_second)
-    enrich_throttle = Throttle(args.enrich_rate if args.enrich_rate is not None else manifest.defaults.enrich_rate_per_second)
-
-    def on_retry(attempt, delay, error):
-        log.warning("retry %d in %.1fs: %s", attempt, delay, error)
-
-    reports = []
-    status = "done"
     try:
-        async with aiohttp.ClientSession() as session:
-            visualex = VisuaLexClient(base_url, session, throttle, on_retry=on_retry)
-            if not args.dry_run and _needs_legalit(specs, override):
-                async with LegalItClient(manifest.providers.legalit_command, enrich_throttle, on_retry=on_retry) as legalit:
-                    enricher = Enricher(store=store, legalit=legalit, options=options, run_id=run_id,
-                                        log=log, now=datetime.now)
+        if not args.dry_run:
+            interrupted = store.mark_running_as_interrupted()
+            for rid in interrupted:
+                log.warning("run %d was left running (killed?) — marked interrupted; `--resume %d` continues it", rid, rid)
+            if args.resume is not None:
+                run_id = args.resume if args.resume > 0 else store.latest_interrupted_run()
+                if run_id is None or store.get_run(run_id) is None:
+                    log.error("no interrupted run to resume")
+                    return 2
+                store.reopen_run(run_id)
+                log.info("resuming run %d", run_id)
+            else:
+                run_id = store.start_run({k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},
+                                         stamp(datetime.now))
+
+        options = RunOptions(
+            out_dir=out_dir, dry_run=args.dry_run, full=args.full, resume_run_id=run_id if args.resume is not None else None,
+            enrich_override=override, refresh_enrich=args.refresh_enrich,
+            batch_size=args.batch_size or manifest.defaults.batch_size, enrich_ttl_days=manifest.defaults.enrich_ttl_days,
+        )
+        throttle = Throttle(args.rate if args.rate is not None else manifest.defaults.rate_per_second)
+        enrich_throttle = Throttle(args.enrich_rate if args.enrich_rate is not None else manifest.defaults.enrich_rate_per_second)
+
+        def on_retry(attempt, delay, error):
+            log.warning("retry %d in %.1fs: %s", attempt, delay, error)
+
+        reports = []
+        status = "done"
+        pipeline = None
+        try:
+            async with aiohttp.ClientSession() as session:
+                visualex = VisuaLexClient(base_url, session, throttle, on_retry=on_retry)
+                if not args.dry_run and _needs_legalit(specs, override):
+                    async with LegalItClient(manifest.providers.legalit_command, enrich_throttle, on_retry=on_retry) as legalit:
+                        enricher = Enricher(store=store, legalit=legalit, options=options, run_id=run_id,
+                                            log=log, now=datetime.now)
+                        pipeline = Pipeline(store=store, visualex=visualex, options=options, run_id=run_id,
+                                            log=log, now=datetime.now, enricher=enricher)
+                        reports = await pipeline.run(specs)
+                else:
+                    enricher = None
+                    if args.dry_run and _needs_legalit(specs, override):
+                        enricher = Enricher(store=store, legalit=None, options=options, run_id=0, log=log, now=datetime.now)
                     pipeline = Pipeline(store=store, visualex=visualex, options=options, run_id=run_id,
                                         log=log, now=datetime.now, enricher=enricher)
                     reports = await pipeline.run(specs)
-            else:
-                enricher = None
-                if args.dry_run and _needs_legalit(specs, override) and store is not None:
-                    enricher = Enricher(store=store, legalit=None, options=options, run_id=0, log=log, now=datetime.now)
-                pipeline = Pipeline(store=store, visualex=visualex, options=options, run_id=run_id,
-                                    log=log, now=datetime.now, enricher=enricher)
-                reports = await pipeline.run(specs)
-    except LegalItError as exc:
-        log.error("legal-it: %s", exc)
-        if store is not None and run_id is not None:
-            store.finish_run(run_id, "interrupted", stamp(datetime.now), {"error": str(exc)})
-        return 2
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        status = "interrupted"
-        log.warning("interrupted — the archive holds everything committed so far; `--resume` continues")
+        except LegalItError as exc:
+            log.error("legal-it: %s", exc)
+            if store is not None and run_id is not None:
+                store.finish_run(run_id, "interrupted", stamp(datetime.now), {"error": str(exc)})
+            return 2
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            status = "interrupted"
+            reports = pipeline.reports if pipeline is not None else []
+            log.warning("interrupted — the archive holds everything committed so far; `--resume` continues")
 
-    findings = []
-    if store is not None and not args.dry_run and run_id is not None:
-        changed = [r.act_id for r in reports if r.changed]
-        if changed:
-            written = write_outputs(store, out_dir, changed, stamp(datetime.now))
-            log.info("rendered %d files", len(written))
-        else:
-            write_outputs(store, out_dir, [], stamp(datetime.now))
-        findings = verify_store(store, act_ids={s.id for s in specs})
-        stats = {
-            "acts": len(reports), "unresolved": sum(1 for r in reports if not r.resolved),
-            "new": sum(r.new for r in reports), "updated": sum(r.updated for r in reports),
-            "unchanged": sum(r.unchanged for r in reports), "failed": sum(r.failed for r in reports),
-            "skipped": sum(r.skipped for r in reports), "findings": len(findings),
-        }
-        store.finish_run(run_id, status, stamp(datetime.now), stats)
-    print(format_report(reports, findings, duration_s=time.monotonic() - started, base_url=base_url,
-                        run_id=run_id, dry_run=args.dry_run))
-    if store is not None:
-        store.close()
-    if status == "interrupted":
-        return 130
-    if any(not r.resolved for r in reports) or any(r.failed for r in reports):
-        return 1
-    return 0
+        findings = []
+        if store is not None and not args.dry_run and run_id is not None:
+            changed = [r.act_id for r in reports if r.changed]
+            if changed:
+                written = write_outputs(store, out_dir, changed, stamp(datetime.now))
+                log.info("rendered %d files", len(written))
+            else:
+                write_outputs(store, out_dir, [], stamp(datetime.now))
+            findings = verify_store(store, act_ids={s.id for s in specs})
+            stats = {
+                "acts": len(reports), "unresolved": sum(1 for r in reports if not r.resolved),
+                "new": sum(r.new for r in reports), "updated": sum(r.updated for r in reports),
+                "unchanged": sum(r.unchanged for r in reports), "failed": sum(r.failed for r in reports),
+                "skipped": sum(r.skipped for r in reports), "findings": len(findings),
+            }
+            store.finish_run(run_id, status, stamp(datetime.now), stats)
+        print(format_report(reports, findings, duration_s=time.monotonic() - started, base_url=base_url,
+                            run_id=run_id, dry_run=args.dry_run))
+        if status == "interrupted":
+            return 130
+        if any(not r.resolved for r in reports) or any(r.failed for r in reports):
+            return 1
+        return 0
+    finally:
+        if store is not None:
+            store.close()
 
 
 def _open_store(args) -> Store | None:

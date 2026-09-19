@@ -114,21 +114,22 @@ class Pipeline:
         self.log = log
         self.now = now
         self.enricher = enricher
+        self.reports: list[ActReport] = []
         if not options.dry_run and (store is None or run_id is None):
             raise ValueError("a store and a run id are required unless dry_run")
 
     # -- driver --------------------------------------------------------------
 
     async def run(self, specs: Iterable[ActSpec]) -> list[ActReport]:
-        reports = []
         for spec in specs:
             try:
-                reports.append(await self.process_act(spec))
+                report = await self.process_act(spec)
             except Exception as exc:  # noqa: BLE001 — one act must not end the run
                 self.log.exception("act=%s crashed: %s", spec.id, exc)
-                reports.append(ActReport(spec.id, spec.label, resolved=False,
-                                         reason=f"unexpected error: {exc}", text_status=spec.text_status()))
-        return reports
+                report = ActReport(spec.id, spec.label, resolved=False,
+                                   reason=f"unexpected error: {exc}", text_status=spec.text_status())
+            self.reports.append(report)
+        return self.reports
 
     # -- one act -------------------------------------------------------------
 

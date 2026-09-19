@@ -4,6 +4,7 @@
 import yaml
 
 from archivio_normativo.cli import async_main
+from archivio_normativo.store import Store
 from tests.archivio.fake_visualex import FakeVisuaLex
 
 CC_URL = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262"
@@ -103,3 +104,34 @@ async def test_commands_without_an_archive_say_so(fake_visualex, tmp_path, capsy
     manifest = write_manifest(tmp_path, fake_visualex.base_url)
     assert await async_main(["verify", "--manifest", str(manifest), "--out", str(tmp_path / "nowhere")]) == 2
     assert "run `build` first" in capsys.readouterr().err
+
+
+async def test_dry_run_counts_enrichment_on_a_fresh_archive(fake_visualex, tmp_path, capsys):
+    fake_visualex.add_act(
+        act_type="codice civile", url=CC_URL, annex="2",
+        tree=["LIBRO QUARTO Delle obbligazioni", {"numero": "2043", "allegato": "2"},
+              {"numero": "2044", "allegato": "2"}, {"numero": "2045", "allegato": "2"}],
+        rubriche={"2043": "Risarcimento per fatto illecito"},
+        fingerprints={"2043": {"fingerprint": "a" * 64, "date": None}, "2044": {"fingerprint": "b" * 64, "date": None},
+                      "2045": {"fingerprint": "c" * 64, "date": None}},
+        articles={"2043": "Qualunque fatto…", "2044": "Non è responsabile…", "2045": "Chiunque cagiona…"},
+    )
+    manifest = write_manifest(tmp_path, fake_visualex.base_url)
+    out = tmp_path / "out"  # fresh: no archivio.sqlite yet, so the store is None
+    code = await async_main(["build", "--manifest", str(manifest), "--out", str(out), "--dry-run", "--rate", "0",
+                             "--enrich", "cassazione"])
+    assert code == 0
+    assert "3 previste" in capsys.readouterr().out
+
+
+async def test_resume_continues_the_interrupted_run(fake_visualex, tmp_path, capsys):
+    add_cc(fake_visualex)
+    manifest = write_manifest(tmp_path, fake_visualex.base_url)
+    out = tmp_path / "out"
+    with Store(out / "archivio.sqlite") as store:
+        run_id = store.start_run({}, "t")
+    code = await async_main(["build", "--manifest", str(manifest), "--out", str(out), "--rate", "0", "--resume"])
+    assert code == 0
+    assert f"Run {run_id}" in capsys.readouterr().out
+    with Store(out / "archivio.sqlite") as store:
+        assert store.get_run(run_id)["status"] == "done"

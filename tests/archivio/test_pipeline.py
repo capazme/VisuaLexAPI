@@ -1,4 +1,5 @@
 """The per-act pipeline against the fake VisuaLex and a real SQLite store."""
+import asyncio
 import logging
 from datetime import datetime
 
@@ -6,6 +7,7 @@ import pytest
 
 from archivio_normativo.manifest import ActSpec
 from archivio_normativo.pipeline import Pipeline, RunOptions, unit_id
+from archivio_normativo.report import format_report
 from archivio_normativo.sources.visualex import VisuaLexClient
 from archivio_normativo.store import Store
 
@@ -296,3 +298,43 @@ class TestEuActs:
         assert store.get_unit("eprivacy:art:14-bis").text == "Comitato…"
         recital_body = [b for p, b in fake_visualex.calls if p == "/fetch_recitals"][0]
         assert "celex_consolidated" not in recital_body
+
+
+class TestInterrupts:
+    async def test_a_cancelled_act_keeps_the_reports_collected_so_far(self, fake_visualex, make_pipeline):
+        add_cc(fake_visualex)
+        pipeline = make_pipeline()
+        real_resolve = pipeline.visualex.resolve_act
+        calls = {"n": 0}
+
+        async def flaky(spec):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise asyncio.CancelledError()
+            return await real_resolve(spec)
+
+        pipeline.visualex.resolve_act = flaky
+        with pytest.raises(asyncio.CancelledError):
+            await pipeline.run([cc_spec(), cc_spec(id="cc2")])
+        assert len(pipeline.reports) == 1
+        assert pipeline.reports[0].resolved is True
+
+
+class TestDuplicateIndexEntries:
+    async def test_a_number_listed_twice_is_reported(self, fake_visualex, store, make_pipeline):
+        fake_visualex.add_act(
+            act_type="codice civile", url=CC_URL, annex="2",
+            tree=[{"numero": "2043", "allegato": "2"}, {"numero": "2043", "allegato": "2"},
+                  {"numero": "2044", "allegato": "2"}],
+            rubriche={"2043": "Risarcimento per fatto illecito"},
+            fingerprints={"2043": {"fingerprint": "a" * 64, "date": None},
+                          "2044": {"fingerprint": "b" * 64, "date": None}},
+            articles={"2043": "Qualunque fatto…", "2044": "Non è responsabile…"},
+        )
+        report = await make_pipeline().process_act(cc_spec())
+        assert report.duplicates == ["2043"]
+        assert report.total == 3
+        units = [u for u in store.units_for_act("cc") if u.number == "2043"]
+        assert len(units) == 1
+        text = format_report([report], [], duration_s=1, base_url="u", run_id=1, dry_run=False)
+        assert "numeri duplicati nell'indice: 2043" in text
