@@ -1,3 +1,4 @@
+import copy
 import os
 import re
 import structlog
@@ -138,6 +139,69 @@ def _cons_text(element) -> str:
     return strip_amendment_markers(element.get_text(" ", strip=True))
 
 
+def _is_cons_point(element) -> bool:
+    """A lettered or numbered point: a `grid-list` div on recent pages
+    ("a) " in `grid-list-column-1`, the text in `grid-list-column-2`), a
+    table row on older ones."""
+    if element.name == "tr":
+        return True
+    return element.name == "div" and "grid-list" in _element_classes(element)
+
+
+def _cons_points(element) -> list:
+    """The outermost point containers below `element`, in document order.
+
+    A point nested in another point (art. 3 n. 16 of eIDAS lists a) to d)
+    inside the definition) belongs to that point's own lines, so the walk
+    stops at the first point it meets on each branch.
+    """
+    points = []
+    for child in element.find_all(recursive=False):
+        if _is_cons_point(child):
+            points.append(child)
+        else:
+            points.extend(_cons_points(child))
+    return points
+
+
+def _is_bare_point_wrapper(element) -> bool:
+    """A class-less `<div style="margin-left: 24pt">` holding a `p.norm`: how
+    the older flat pages (02002L0058) render "a) «utente»: …". Without it
+    the 13 lettered points of art. 2, 4 and 10 of the ePrivacy directive were
+    not text at all."""
+    return (element.name == "div" and not _element_classes(element)
+            and element.find(class_="norm") is not None)
+
+
+def _cons_lines(element) -> list[str]:
+    """One line per point, whatever the markup nests.
+
+    A paragraph whose points sit inside its own `div.norm` yields its lead-in
+    first ("3. Il quadro di interoperabilità risponde ai seguenti criteri:")
+    and then one line per point; a point holding sub-points does the same;
+    an element with no points is one line. This is the shape the OJ path
+    gives through `extract_table_text` — one row, one line — and the archive
+    anchors on it (gotcha 23), so it must not depend on where EUR-Lex chose
+    to put the grid.
+    """
+    points = _cons_points(element)
+    if not points:
+        text = _cons_text(element)
+        return [text] if text else []
+    # The lead-in is the element's text with the points taken out. A copy is
+    # detached from the soup, so the points stay in place for the lines below.
+    lead = copy.copy(element)
+    for point in _cons_points(lead):
+        point.decompose()
+    lines = []
+    head = _cons_text(lead)
+    if head:
+        lines.append(head)
+    for point in points:
+        lines.extend(_cons_lines(point))
+    return lines
+
+
 def _cons_find_title(soup, article):
     wanted = normalize_article_key(str(article))
     for marker in soup.find_all("p", class_=_CONS_ARTICLE_CLASS):
@@ -150,8 +214,9 @@ def extract_article_consolidated(soup, article) -> "str | None":
     """Article text from a consolidated page, or None when the page lacks it.
 
     Same line structure as the OJ extractor — "Articolo N", the rubrica, one
-    line per paragraph — so a client sees the same shape whichever version it
-    asked for. Modification markers are not text and are dropped.
+    line per paragraph, one line per lettered point — so a client sees the
+    same shape whichever version it asked for. Modification markers are not
+    text and are dropped.
     """
     title = _cons_find_title(soup, article)
     if title is None:
@@ -173,10 +238,9 @@ def extract_article_consolidated(soup, article) -> "str | None":
             continue
         if classes & _CONS_SKIP_CLASSES:
             continue
-        if sibling.name == "table" or classes & _CONS_BODY_CLASSES:
-            text = _cons_text(sibling)
-            if text:
-                lines.append(text)
+        if (sibling.name == "table" or classes & _CONS_BODY_CLASSES
+                or _is_bare_point_wrapper(sibling)):
+            lines.extend(_cons_lines(sibling))
     return "\n".join(lines)
 
 

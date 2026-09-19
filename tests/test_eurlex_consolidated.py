@@ -210,12 +210,80 @@ class TestConsolidatedArticleText:
         scraper = EurlexScraper()
         text12 = await scraper.extract_article_text(soup, "12")
         assert "▼" not in text12 and "—————" not in text12
-        assert "norme europee e internazionali; c) facilita" in text12
+        assert "norme europee e internazionali;\nc) facilita" in text12
         assert "8. Entro il 18 settembre 2025" in text12
         text24 = await scraper.extract_article_text(soup, "24")
         assert "▼" not in text24 and "—————" not in text24
-        assert "servizi fiduciari qualificati: a) informa l’organismo di vigilanza" in text24
-        assert "lettera i); k) se i prestatori" in text24
+        assert "servizi fiduciari qualificati:\na) informa l’organismo di vigilanza" in text24
+        assert "lettera i);\nk) se i prestatori" in text24
+
+
+class TestOneLinePerPoint:
+    """Ruling: one line per lettered point, wherever EUR-Lex put the grid.
+
+    The OJ path already gives one row per line (`extract_table_text`); the
+    consolidated text is the offset space the archive anchors on (gotcha 23),
+    so its shape must not depend on whether the points are siblings of the
+    title, nested in the paragraph's own `div.norm`, or class-less divs.
+    """
+
+    async def test_sibling_points_are_one_line_each(self):
+        # eIDAS art. 3: 48 definitions as `grid-list` siblings of the title.
+        text = await EurlexScraper().extract_article_text(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), "3")
+        lines = text.split("\n")
+        assert lines[:3] == ["Articolo 3", "Definizioni",
+                             "Ai fini del presente regolamento si intende per:"]
+        assert lines[3].startswith("1) «identificazione elettronica»")
+        assert lines[4].startswith("2) «mezzi di identificazione elettronica»")
+        assert sum(1 for line in lines if re.match(r"\d+\) ", line)) >= 40
+
+    async def test_points_nested_in_a_paragraph_start_their_own_lines(self):
+        # eIDAS art. 12 §3: the grid sits inside the paragraph's div.norm.
+        text = await EurlexScraper().extract_article_text(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), "12")
+        lines = text.split("\n")
+        i = lines.index("3. Il quadro di interoperabilità risponde ai seguenti criteri:")
+        assert lines[i + 1].startswith("a) mira a essere neutrale")
+        assert lines[i + 2].startswith("b) segue, ove possibile")
+        assert lines[i + 3].startswith("c) facilita l’applicazione")
+        assert lines[i + 4].startswith("4. Il quadro di interoperabilità è composto da:")
+
+    async def test_sub_points_of_a_point_start_their_own_lines(self):
+        # eIDAS art. 3 n. 16 lists a) to d) inside the definition.
+        text = await EurlexScraper().extract_article_text(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), "3")
+        lines = text.split("\n")
+        i = next(k for k, line in enumerate(lines) if line.startswith("16) «servizio fiduciario»"))
+        assert lines[i].endswith("elementi seguenti:")
+        assert lines[i + 1].startswith("a) il rilascio di certificati")
+        assert lines[i + 2].startswith("b) la convalida di certificati")
+        j = next(k for k, line in enumerate(lines) if line.startswith("17) «servizio fiduciario qualificato»"))
+        assert all(re.match(r"[a-z]\) ", line) for line in lines[i + 1:j]), "n. 16 ends where n. 17 starts"
+
+    async def test_lettered_points_of_the_flat_page_are_text(self):
+        # ePrivacy art. 2 renders each point as a class-less
+        # <div style="margin-left: 24pt"><p class="norm">a) …</p></div>; the
+        # walk used to drop them all — 13 points across art. 2, 4 and 10.
+        soup = soup_of("eprivacy_consolidated_20091219.html")
+        text = await EurlexScraper().extract_article_text(soup, "2")
+        lines = text.split("\n")
+        assert lines[3] == "Si applicano inoltre le seguenti definizioni:"
+        assert lines[4].startswith("a) «utente»: qualsiasi persona fisica")
+        assert lines[5].startswith("b) «dati relativi al traffico»")
+        assert lines[-1].startswith("i) «violazione dei dati personali»")
+        assert len(lines) == 12  # e) was deleted by Dir. 2009/136/CE
+        text4 = await EurlexScraper().extract_article_text(soup, "4")
+        assert sum(1 for line in text4.split("\n") if line.startswith("— ")) == 3
+        text10 = await EurlexScraper().extract_article_text(soup, "10")
+        assert text10.split("\n")[3].startswith("a) possa annullare, in via temporanea")
+
+    async def test_the_openings_the_other_tests_pin_are_unchanged(self):
+        eidas = soup_of("eidas_consolidated_20241018_trimmed.html")
+        text1 = await EurlexScraper().extract_article_text(eidas, "1")
+        assert text1.startswith("Articolo 1\nOggetto\n")
+        text50 = await EurlexScraper().extract_article_text(eidas, "50")
+        assert text50.startswith("Articolo 50\nAbrogazione\n1. La direttiva 1999/93/CE")
 
 
 class TestConsolidatedRubriche:
