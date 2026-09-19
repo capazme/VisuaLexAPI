@@ -11,6 +11,7 @@ nothing and `--resume` continues it.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
@@ -73,6 +74,7 @@ class ActReport:
     enrich_error: int = 0
     enrich_kept: int = 0
     failures: list[tuple[str, str]] = field(default_factory=list)
+    duplicates: list[str] = field(default_factory=list)
     changed: bool = False
 
     def count(self, outcome: str) -> None:
@@ -155,6 +157,11 @@ class Pipeline:
                              f"{[x.get('number') for x in tree.annexes]}")
             self.log.error("ACT %s: %s", spec.id, report.reason)
             return report
+        duplicates = sorted(n for n, c in Counter(a.number for a in indexed).items() if c > 1)
+        if duplicates:
+            # The store keys units by number, so the later listing wins; say so.
+            report.duplicates = duplicates
+            self.log.warning("ACT %s: the index lists %s more than once", spec.id, ", ".join(duplicates))
         rubriche = await self.visualex.fetch_rubriche(res.act_url)
 
         fingerprints: dict[str, dict] = {}

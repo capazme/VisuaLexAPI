@@ -17,6 +17,8 @@ def _notes(r: ActReport) -> str:
         notes.append("testo GU non consolidato")
     if r.recitals:
         notes.append(f"{r.recitals} considerando")
+    if r.duplicates:
+        notes.append("numeri duplicati nell'indice: " + ", ".join(r.duplicates[:5]))
     return "; ".join(notes)
 
 

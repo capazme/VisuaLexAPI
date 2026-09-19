@@ -189,6 +189,10 @@ class Store:
             self._db.execute("UPDATE runs SET status = 'interrupted' WHERE status = 'running'")
         return ids
 
+    def reopen_run(self, run_id: int) -> None:
+        """`--resume`: the interrupted run continues under its own id."""
+        self._db.execute("UPDATE runs SET status = 'running', finished_at = NULL WHERE id = ?", (run_id,))
+
     def latest_interrupted_run(self) -> int | None:
         row = self._db.execute(
             "SELECT id FROM runs WHERE status = 'interrupted' ORDER BY id DESC LIMIT 1").fetchone()
