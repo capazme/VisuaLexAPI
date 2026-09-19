@@ -125,10 +125,23 @@ followed by a tagged deploy the same day.
 
 ## `visualex-merlt-main` follows the tags
 
+The experiment lives in **its own checkout**, a permanent worktree beside the
+repository:
+
+```
+git worktree add ../VisuaLexAPI-merlt visualex-merlt-main   # once
+```
+
+Two directories, one branch each: `VisuaLexAPI/` never leaves `main` (or a
+topic branch off it), `VisuaLexAPI-merlt/` never leaves `merlt`. They keep
+separate `node_modules` — the lockfiles differ — and only the second has the
+Docker stack; and a branch switch in the deployable checkout is one slip
+away from a wrong commit or a wrong deploy, so there is none to make.
+
 The experiment absorbs vanilla **after every release**, by merging the tag:
 
 ```
-git checkout visualex-merlt-main
+cd ../VisuaLexAPI-merlt
 git merge v1.7.6 -F msg.txt     # "merge: v1.7.6 — vanilla 1.7.6 into merlt"
 # resolve, run every suite, commit
 ```
@@ -197,7 +210,7 @@ Once a month, or before assuming every fix has reached `main`:
 git fetch --prune
 git branch -r | grep origin/claude/          # session branches: merge or delete
 git branch --merged main                     # local branches to delete
-git worktree list                            # anything but the main checkout?
+git worktree list                            # anything but VisuaLexAPI/ and VisuaLexAPI-merlt/?
 git log --oneline $(git describe --tags --abbrev=0 --match 'v*' visualex-merlt-main)..main | wc -l
                                              # how far behind is merlt (--match: ignore merlt-* tags)
 ```
@@ -224,7 +237,8 @@ refuse — do not leave it there overnight.
 | Start a change | `git checkout -b fix/thing main` |
 | Land it | verify · `git merge --no-ff` into `main` · delete branch · push |
 | Ship it | on the server, `./deploy.sh --patch` |
-| Bring vanilla into the experiment | `git checkout visualex-merlt-main && git merge vX.Y.Z` |
+| Work on the experiment | `cd ../VisuaLexAPI-merlt` (its own checkout, never a branch switch) |
+| Bring vanilla into the experiment | in `../VisuaLexAPI-merlt`: `git merge vX.Y.Z` |
 | See what is in production | `git tag -l 'v*' --sort=-v:refname \| head -1` |
 | See what merlt is missing | `git log --oneline vX.Y.Z..main` |
 | Close a web session's branch | `git checkout -b fix/… origin/claude/…` → `git rebase main` → suites → `--no-ff` merge → `git push origin --delete claude/…` |
