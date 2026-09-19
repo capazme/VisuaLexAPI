@@ -133,12 +133,12 @@ when an enrichment kind beyond `brocardi` is requested. Declared in
    dicts (`numero`, `link`). `metadata.annexes` gives each annex's number and
    article list. `hierarchy.py` walks the list with a stack: a heading at level
    L resets every level below L (levels: PARTE > LIBRO > TITOLO > CAPO >
-   SEZIONE); every article dict takes the current values. Position in the list
+   SEZIONE; all five are stored); every article dict takes the current values. Position in the list
    is the unit's `position`.
 2. `POST /fetch_rubriche {urn}` → `rubriche` (number → title), `abrogati`,
    `parts`.
 3. `POST /fetch_act_fingerprints {urn}` → per article `{fingerprint,
-   expression_date}`. Compared with the stored fingerprint: only articles that
+   date}`. Compared with the stored fingerprint: only articles that
    are new or whose fingerprint changed go to step 4. On the first run, or with
    `--full`, every article does. If the endpoint answers with no index (AKN
    unavailable), the act falls back to a full fetch for this run and the report
@@ -347,7 +347,7 @@ transaction per unit.
 | `position` INTEGER | order in the act's index — the true order, not a numeric sort |
 | `identifier` | full URN with `~art…`, or `CELEX#art_n` / `CELEX#rct_n` |
 | `rubrica` | nullable |
-| `libro`, `titolo`, `capo`, `sezione` | heading strings as read from the index; null for recitals |
+| `parte`, `libro`, `titolo`, `capo`, `sezione` | heading strings as read from the index (`parte` for acts divided in parti, e.g. the Costituzione); null for recitals |
 | `text` NOT NULL | VisuaLex's `article_text` contract, never the AKN text |
 | `text_hash` | sha256 of `text` — the change registry |
 | `fingerprint` | AKN hash used for the diff; null for EUR-Lex |
@@ -489,7 +489,7 @@ Request `{urn}`. Response:
 
 ```json
 {
-  "fingerprints": {"2043": {"fingerprint": "sha256…", "expression_date": "2018-04-06"}},
+  "fingerprints": {"2043": {"fingerprint": "sha256…", "date": "2018-04-06"}},
   "parts": [{"name": "…", "fingerprints": {…}}],
   "count": 3249
 }
@@ -497,10 +497,11 @@ Request `{urn}`. Response:
 
 `AktIndex` (`services/akn_fetch.py`) gains a `fingerprints` map built in
 `_to_index` from the parsed article texts: `sha256` of the AKN article text
-plus the article's `FRBRExpression/FRBRdate` where the export has a
+plus the article's `FRBRWork/FRBRdate` where the export has a
 per-article `<doc>` (component acts, i.e. the codici; verified on the
 committed fixture: art. 3-bis c.p. → 2018-04-06, the date the article was
-introduced). Flat acts have act-level lifecycle only → `expression_date` is
+introduced; the `FRBRExpression` date beside it is the act's, identical for
+every article). Flat acts have act-level lifecycle only → `date` is
 null. A hash is not the text, so the rule "AKN is structure and fallback,
 never the display text" stands; the memory cost is ~200 KB for the codice
 civile, inside `AKN_CACHE_MAX_ACTS`. The endpoint answers 200 with an empty
