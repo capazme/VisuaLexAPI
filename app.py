@@ -333,6 +333,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
+        self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
@@ -910,6 +911,35 @@ class NormaController:
             # Never fail the index over its decoration.
             log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
             return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
+
+    async def fetch_recitals(self):
+        """All the considerando of an EU act, in one call.
+
+        A separate endpoint rather than a flag on /stream_article_text: a
+        recital is not an article — no URN, no annex, no Brocardi — and the
+        archive that consumes this wants the whole preamble at once. The
+        page is the one the tree and the articles already come from, cached
+        for 24 h, so the call costs one parse and no network on a warm cache.
+        Consolidated texts have no preamble; they answer an empty list.
+        """
+        try:
+            data = await request.get_json() or {}
+            act_type = data.get('act_type')
+            if not act_type:
+                raise ValidationError("Campo obbligatorio mancante: act_type")
+            if normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+                raise ValidationError(
+                    "fetch_recitals accetta solo atti EUR-Lex (regolamento ue, direttiva ue)"
+                )
+            norma = Norma(
+                tipo_atto=act_type,
+                data=data.get('date') or None,
+                numero_atto=data.get('act_number'),
+            )
+            recitals, url = await eurlex_scraper.get_recitals(norma)
+            return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_recitals')
 
     async def fetch_alias_catalog(self):
         """Everything this server already recognises when naming an act.

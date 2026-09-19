@@ -238,6 +238,10 @@ POST unless noted, JSON bodies.
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index. Structure only: it never carries the display text
+- `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
+  `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
+  Reads the OJ page the tree already uses; a consolidated text has no
+  preamble and answers an empty list. Normattiva acts get a 400
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)

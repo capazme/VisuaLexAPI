@@ -151,6 +151,33 @@ class EurlexScraper(BaseScraper):
 
         return uri
 
+    async def _load_soup(self, url: str):
+        """The parsed page for ``url``, from the persistent cache when it has it.
+
+        One page carries the whole act — tree, articles, rubriche and recitals
+        — so every extractor goes through here and the WAF is crossed once.
+        """
+        cached_html = await self.cache.get(url)
+        if cached_html:
+            log.info("Cache hit", source="eurlex_persistent")
+            return self.parse_document(cached_html)
+        html_content = await self.request_document(url)
+        await self.cache.set(url, html_content)
+        return self.parse_document(html_content)
+
+    async def get_recitals(self, norma) -> tuple[list[dict], str]:
+        """All recitals (considerando) of an EU act, and the page they came from.
+
+        ``norma.url`` is the act page (the OJ version: consolidated texts carry
+        no preamble, so a consolidated URL yields an empty list).
+        """
+        url = norma.url
+        log.info("Fetching EUR-Lex recitals", url=url)
+        soup = await self._load_soup(url)
+        recitals = extract_recitals(soup)
+        log.info("EUR-Lex recitals extracted", url=url, count=len(recitals))
+        return recitals, url
+
     async def get_document(self, normavisitata=None, act_type=None, article=None, year=None, num=None, urn=None):
         log.info(f"Fetching EUR-Lex document with parameters {normavisitata.to_dict() if normavisitata else {}}: act_type={act_type}, article={article}, year={year}, num={num}, urn={urn}")
 
@@ -173,16 +200,7 @@ class EurlexScraper(BaseScraper):
         else:
             url = urn
 
-        # Check persistent cache first
-        cache_key = url
-        cached_html = await self.cache.get(cache_key)
-        if cached_html:
-            log.info("Cache hit", source="eurlex_persistent")
-            soup = self.parse_document(cached_html)
-        else:
-            html_content = await self.request_document(url)
-            await self.cache.set(cache_key, html_content)
-            soup = self.parse_document(html_content)
+        soup = await self._load_soup(url)
 
         if article:
             log.info(f"Extracting text for article {article}")
