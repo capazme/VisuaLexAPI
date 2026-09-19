@@ -334,6 +334,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
         self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
+        self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
@@ -940,6 +941,50 @@ class NormaController:
             return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
         except Exception as exc:
             return self._error_response(exc, 'fetch_recitals')
+
+    async def fetch_act_fingerprints(self):
+        """Per-article change detectors for a Normattiva act.
+
+        One download of the act's AKN export yields a hash of every article's
+        text and, for the codici, the date each article's text came into
+        force. A client that stored the hashes last time can tell which
+        articles to refetch without touching the others — the archive's
+        update run drops from hours to minutes on this.
+
+        The AKN text itself is never served (it transliterates accents; see
+        akn_parser.py). Two answers are deliberately different: no index
+        (AKN disabled or unavailable) is `available: false` with empty maps
+        and 200, so the caller falls back to a full fetch; a crash is a 500,
+        so it is never read as "nothing changed".
+        """
+        try:
+            data = await request.get_json() or {}
+            urn = data.get('urn')
+            if not urn:
+                raise ValidationError("Missing 'urn' in request data")
+            if 'eur-lex' in str(urn):
+                raise ValidationError(
+                    "fetch_act_fingerprints accetta solo atti Normattiva: EUR-Lex non ha un export AKN"
+                )
+            # The AKN index keys off the ACT, so an article suffix has to go:
+            # ...;241~art2 -> ...;241 (same rule as fetch_rubriche).
+            act_url = str(urn).split('~')[0]
+            index = await fetch_act_index(SimpleNamespace(url=act_url))
+            if index is None:
+                log.info("No AKN index available for fingerprints", urn=act_url[:100])
+                return jsonify({'available': False, 'fingerprints': {}, 'parts': [], 'count': 0})
+            log.info("Fingerprints served", urn=act_url[:100], count=len(index.fingerprints))
+            return jsonify({
+                'available': True,
+                'fingerprints': index.fingerprints,
+                'parts': [
+                    {'name': part['name'], 'fingerprints': part.get('fingerprints', {})}
+                    for part in index.parts_detail
+                ],
+                'count': len(index.fingerprints),
+            })
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_act_fingerprints')
 
     async def fetch_alias_catalog(self):
         """Everything this server already recognises when naming an act.

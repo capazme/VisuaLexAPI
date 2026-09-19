@@ -112,8 +112,10 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     Only the article INDEX is cached — in memory, capped at
     `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
     in-flight registry so N concurrent cold requests download the act once.
-    Article texts are never cached. `AKN_ENABLED=false` disables the whole path
-    and is read at call time.
+    Article texts are never cached. `ParsedPart.dates` carries each article's
+    FRBRWork date (component acts only), and `AktIndex.fingerprints` a sha256
+    per article — both are metadata about the text, not the text.
+    `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
     article numbers and needs no network.
 - **`tools/`**:
@@ -242,6 +244,12 @@ POST unless noted, JSON bodies.
   `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
   Reads the OJ page the tree already uses; a consolidated text has no
   preamble and answers an empty list. Normattiva acts get a 400
+- `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
+  AKN text plus, for the codici, the FRBRWork date of each article (the day
+  its current text came into force). A change detector, never the text:
+  a client refetches only the articles whose hash moved. `available: false`
+  with empty maps when there is no AKN index — the caller must then refetch
+  everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
