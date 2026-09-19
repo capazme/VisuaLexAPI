@@ -87,3 +87,45 @@ def test_extractor_error_paths_report_the_real_cause(scraper, method_name):
         f"{method_name} reported the undefined name instead of the real cause"
     )
     assert method_name in message, "the raised error should name the failing extractor"
+
+
+class TestRepealedArticleWithMalformedMarkup:
+    """A repealed article must never come back as its label alone.
+
+    For c.p. art. 524 Normattiva's bodyTesto is malformed — the attachment span
+    is opened inside an <a> and closed after it — so once html.parser has
+    repaired the tree the `div.ins-akn.art_abrogato-akn` is a sibling of the
+    span `_estrai_testo_allegato` reads, and the API answered
+    'Codice Penale-art. 524' with HTTP 200 for 19 articles of the codice
+    penale (523-526, 530, 539, 541-543, 545-555). Art. 544 is the healthy
+    shape: same notice, inside the span, and its output is frozen.
+    """
+
+    @pytest.mark.asyncio
+    async def test_orphan_abrogation_notice_is_appended(self, scraper):
+        html = (FIXTURES / "cp_524_abrogato_malformed_trimmed.html").read_text(encoding="utf-8")
+        text = await scraper.estrai_da_html(html)
+        assert text == (
+            "Codice Penale-art. 524\n\n"
+            "((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66))"
+        )
+
+    @pytest.mark.asyncio
+    async def test_orphan_notice_link_is_collected(self, scraper):
+        html = (FIXTURES / "cp_524_abrogato_malformed_trimmed.html").read_text(encoding="utf-8")
+        result = await scraper.estrai_da_html(html, get_link_dict=True)
+        assert "ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996" in result["testo"]
+        assert result["link"]["L. 15 FEBBRAIO 1996, N. 66"].endswith("legge:1996-02-15;66")
+
+    @pytest.mark.asyncio
+    async def test_healthy_repealed_article_is_unchanged(self, scraper):
+        """gotcha 23: the in-span case parsed before and its text is frozen."""
+        html = (FIXTURES / "cp_544_abrogato_trimmed.html").read_text(encoding="utf-8")
+        text = await scraper.estrai_da_html(html)
+        assert text == "Art. 544. \n\n((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))"
+
+    @pytest.mark.asyncio
+    async def test_in_span_notice_is_not_appended_twice(self, scraper):
+        html = (FIXTURES / "cp_544_abrogato_trimmed.html").read_text(encoding="utf-8")
+        text = await scraper.estrai_da_html(html)
+        assert text.count("ARTICOLO ABROGATO") == 1
