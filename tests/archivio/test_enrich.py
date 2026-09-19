@@ -189,6 +189,15 @@ class TestActLevel:
         assert legalit.calls == [] and report.enrich_kept == 1
 
 
+class TestExecuteGuard:
+    async def test_empty_calls_list_is_a_no_op(self, store):
+        enricher, _ = make(store, FakeLegalIt())
+        report = ActReport("a", "b")
+        await enricher._execute(spec(), "", "base_ue", [], report)
+        assert store.get_enrichment("dlgs-231-2001", "", "base_ue") is None
+        assert (report.enrich_ok, report.enrich_empty, report.enrich_error, report.enrich_kept) == (0, 0, 0, 0)
+
+
 class TestPlan:
     def test_counts_the_calls_of_a_full_pass(self, store):
         enricher, _ = make(store, FakeLegalIt())

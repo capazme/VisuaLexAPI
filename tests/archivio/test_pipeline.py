@@ -230,6 +230,25 @@ class TestDryRunAndResume:
         report = await make_pipeline(dry_run=True).process_act(cc_spec())
         assert (report.planned_new, report.planned_changed, report.unchanged) == (0, 1, 2)
 
+    async def test_dry_run_counts_the_brocardi_calls(self, fake_visualex, make_pipeline):
+        add_cc(fake_visualex)
+        report = await make_pipeline(dry_run=True).process_act(cc_spec(enrich=("brocardi",)))
+        assert report.enrich_planned == 3
+        assert streamed_numbers(fake_visualex) == []
+
+    async def test_dry_run_adds_the_enrichers_plan(self, fake_visualex, make_pipeline):
+        add_cc(fake_visualex)
+
+        class StubEnricher:
+            def plan_act(self, spec, numbers):
+                return len(numbers) * 2
+
+            async def enrich_act(self, spec, res, units, report):
+                raise AssertionError("must not run in dry-run")
+
+        report = await make_pipeline(dry_run=True, enricher=StubEnricher()).process_act(cc_spec())
+        assert report.enrich_planned == 6
+
     async def test_resume_skips_units_already_logged(self, fake_visualex, store, make_pipeline):
         add_cc(fake_visualex)
         run_id = store.start_run({}, NOW.isoformat())

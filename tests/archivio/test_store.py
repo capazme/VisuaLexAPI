@@ -99,6 +99,19 @@ class TestUnits:
         assert numbers == [("article", "2043"), ("article", "2044"), ("recital", "1")]
         assert store.fingerprints_for_act("cc") == {"2043": "f" * 64, "2044": "f" * 64}
 
+    def test_unit_ids_for_act_is_a_cheap_membership_set(self, store):
+        store.upsert_act(act(), unit_count=0, updated_at="x")
+        r = store.start_run({}, "t")
+        store.upsert_unit(unit("2044", position=1), r)
+        store.upsert_unit(unit("2043", position=0), r)
+        store.upsert_unit(UnitRecord(id="cc:rec:1", act_id="cc", kind="recital", number="1", position=0,
+                                     identifier="x#rct_1", rubrica=None, parte=None, libro=None, titolo=None,
+                                     capo=None, sezione=None, text="Considerando.", fingerprint=None,
+                                     abrogato=False, version="vigente", vigenza_al="d", ultimo_aggiornamento=None,
+                                     source_url="x", fetched_at="t"), r)
+        assert store.unit_ids_for_act("cc") == {"cc:art:2043", "cc:art:2044", "cc:rec:1"}
+        assert store.unit_ids_for_act("unknown-act") == set()
+
     def test_get_unit_missing(self, store):
         assert store.get_unit("nope") is None
 

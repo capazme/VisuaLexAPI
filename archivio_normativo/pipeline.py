@@ -229,6 +229,7 @@ class Pipeline:
               kinds: tuple[str, ...], report: ActReport):
         """Split the index into (to_fetch, unchanged, brocardi_only)."""
         stored_fp = self.store.fingerprints_for_act(spec.id) if self.store else {}
+        known_ids = self.store.unit_ids_for_act(spec.id) if self.store else set()
         skip = set()
         if self.store and self.options.resume_run_id is not None and self.run_id == self.options.resume_run_id:
             skip = self.store.logged_unit_ids(self.run_id)
@@ -241,7 +242,7 @@ class Pipeline:
             if uid in skip:
                 report.count("skipped")
                 continue
-            known = self.store.get_unit(uid) is not None if self.store else False
+            known = uid in known_ids
             same = (fingerprints.get(a.number) is not None and known
                     and stored_fp.get(a.number) == fingerprints[a.number]["fingerprint"])
             if self.options.full or not same:

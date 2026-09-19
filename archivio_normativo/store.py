@@ -303,6 +303,10 @@ class Store:
             (act_id,)).fetchall()
         return [self._unit_from_row(r) for r in rows]
 
+    def unit_ids_for_act(self, act_id: str) -> set[str]:
+        rows = self._db.execute("SELECT id FROM units WHERE act_id = ?", (act_id,)).fetchall()
+        return {r["id"] for r in rows}
+
     def fingerprints_for_act(self, act_id: str) -> dict[str, str]:
         rows = self._db.execute(
             "SELECT number, fingerprint FROM units WHERE act_id = ? AND kind = 'article' AND fingerprint IS NOT NULL",

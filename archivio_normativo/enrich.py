@@ -81,6 +81,8 @@ class Enricher:
 
     async def _execute(self, spec: ActSpec, uid: str, kind: str, calls: list[ToolCall],
                        report: ActReport) -> None:
+        if not calls:
+            return  # a kind without calls has nothing to store
         sections: list[str] = []
         statuses: list[str] = []
         error: str | None = None
