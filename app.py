@@ -941,11 +941,22 @@ class NormaController:
                 raise ValidationError(
                     "fetch_recitals accetta solo atti EUR-Lex (regolamento ue, direttiva ue)"
                 )
-            norma = Norma(
-                tipo_atto=act_type,
-                data=data.get('date') or None,
-                numero_atto=data.get('act_number'),
-            )
+            # Validate before building the Norma: the EUR-Lex URL is built
+            # from these two fields, and a missing or malformed one used to
+            # send Playwright to ".../reg/None/None/oj/ita" (or raise a
+            # ValueError out of Norma.__post_init__ into a 500) to discover
+            # what a regex tells for free.
+            act_number = str(data.get('act_number') or '').strip()
+            if not re.fullmatch(r'\d+', act_number):
+                raise ValidationError(
+                    "Campo act_number mancante o non valido: atteso il numero dell'atto (es. 679)"
+                )
+            date = str(data.get('date') or '').strip()
+            if not re.fullmatch(r'\d{4}(-\d{2}-\d{2})?', date):
+                raise ValidationError(
+                    "Campo date mancante o non valido: atteso l'anno (es. 2016) o una data AAAA-MM-GG"
+                )
+            norma = Norma(tipo_atto=act_type, data=date, numero_atto=act_number)
             recitals, url = await eurlex_scraper.get_recitals(norma)
             return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
         except Exception as exc:

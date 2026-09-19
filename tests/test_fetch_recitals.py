@@ -99,6 +99,48 @@ class TestEndpoint:
         assert response.status_code == 400
         assert "act_type" in (await response.get_json())["error"]
 
+    async def test_missing_act_number_is_a_400_before_any_fetch(self, client):
+        # Without the number the URL used to become ".../reg/2016/None/oj/ita"
+        # and Playwright navigated there to find out.
+        boom = AsyncMock(side_effect=AssertionError("must not fetch"))
+        with patch("app.eurlex_scraper.get_recitals", boom):
+            response = await client.post("/fetch_recitals", json={
+                "act_type": "regolamento ue", "date": "2016",
+            })
+        assert response.status_code == 400
+        assert "act_number" in (await response.get_json())["error"]
+        boom.assert_not_called()
+
+    async def test_a_malformed_act_number_is_a_400(self, client):
+        response = await client.post("/fetch_recitals", json={
+            "act_type": "regolamento ue", "date": "2016", "act_number": "679/x",
+        })
+        assert response.status_code == 400
+        assert "act_number" in (await response.get_json())["error"]
+
+    async def test_a_malformed_date_is_a_400_not_a_500(self, client):
+        # "duemilasedici" used to raise ValueError out of Norma.__post_init__.
+        response = await client.post("/fetch_recitals", json={
+            "act_type": "regolamento ue", "date": "duemilasedici", "act_number": "679",
+        })
+        assert response.status_code == 400
+        assert "date" in (await response.get_json())["error"]
+
+    async def test_missing_date_is_a_400(self, client):
+        response = await client.post("/fetch_recitals", json={
+            "act_type": "regolamento ue", "act_number": "679",
+        })
+        assert response.status_code == 400
+        assert "date" in (await response.get_json())["error"]
+
+    async def test_a_full_date_is_accepted(self, client):
+        fake = AsyncMock(return_value=([], "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita"))
+        with patch("app.eurlex_scraper.get_recitals", fake):
+            response = await client.post("/fetch_recitals", json={
+                "act_type": "regolamento ue", "date": "2016-04-27", "act_number": "679",
+            })
+        assert response.status_code == 200
+
     async def test_a_scraper_failure_is_a_500_with_a_message(self, client):
         boom = AsyncMock(side_effect=RuntimeError("EUR-Lex is down"))
         with patch("app.eurlex_scraper.get_recitals", boom):
