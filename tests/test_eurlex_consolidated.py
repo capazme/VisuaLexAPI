@@ -112,3 +112,117 @@ class TestRequestThreading:
         })
         assert response.status_code == 400
         assert "EUR-Lex" in (await response.get_json())["error"]
+
+
+from pathlib import Path
+
+from bs4 import BeautifulSoup
+
+from visualex_api.tools.exceptions import DocumentNotFoundError
+from visualex_api.tools.treextractor import _extract_eurlex_rubriche, _parse_eurlex_tree
+
+FIXTURES = Path(__file__).parent / "fixtures" / "eurlex"
+
+
+def soup_of(name):
+    return BeautifulSoup((FIXTURES / name).read_text(encoding="utf-8"), "html.parser")
+
+
+class TestConsolidatedArticleText:
+    async def test_flat_consolidated_page(self):
+        text = await EurlexScraper().extract_article_text(
+            soup_of("eprivacy_consolidated_20091219.html"), "5")
+        lines = text.split("\n")
+        assert lines[0] == "Articolo 5"
+        assert lines[1] == "Riservatezza delle comunicazioni"
+        assert lines[2].startswith("1. Gli Stati membri assicurano")
+        assert "▼" not in text, "modref markers are not text"
+        assert "Articolo 6" not in text, "the next article must not leak in"
+
+    async def test_suffixed_article_in_both_spellings(self):
+        soup = soup_of("eprivacy_consolidated_20091219.html")
+        hyphen = await EurlexScraper().extract_article_text(soup, "14-bis")
+        space = await EurlexScraper().extract_article_text(soup, "14 bis")
+        assert hyphen == space
+        assert hyphen.startswith("Articolo 14 bis\nProcedura di comitato\n1. La Commissione")
+
+    async def test_subdivision_wrapped_consolidated_page(self):
+        text = await EurlexScraper().extract_article_text(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), "50")
+        assert text.startswith("Articolo 50\nAbrogazione\n1. La direttiva 1999/93/CE")
+        assert "2. I riferimenti alla direttiva abrogata" in text
+        assert "Articolo 51" not in text
+
+    async def test_paragraph_numbers_are_separated_from_their_text(self):
+        # eIDAS renders "1." in a <span class="no-parag"> beside the text; a
+        # bare get_text(strip=True) would glue them into "1.Il presente".
+        text = await EurlexScraper().extract_article_text(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), "2")
+        assert "\n1. " in text or text.split("\n")[2].startswith("1. ")
+
+    async def test_missing_article_raises(self):
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(
+                soup_of("eidas_consolidated_20241018_trimmed.html"), "999")
+
+    async def test_oj_pages_take_the_old_path(self):
+        text = await EurlexScraper().extract_article_text(soup_of("gdpr_oj_trimmed.html"), "1")
+        assert text.startswith("Articolo 1")
+        assert "Oggetto e finalità" in text
+
+
+class TestConsolidatedRubriche:
+    def test_flat_page(self):
+        rubriche = _extract_eurlex_rubriche(soup_of("eprivacy_consolidated_20091219.html"))
+        assert rubriche["5"] == "Riservatezza delle comunicazioni"
+        assert rubriche["14-bis"] == "Procedura di comitato"
+        assert len(rubriche) == 23
+
+    def test_subdivision_page(self):
+        rubriche = _extract_eurlex_rubriche(soup_of("eidas_consolidated_20241018_trimmed.html"))
+        assert rubriche["1"] == "Oggetto"
+        assert rubriche["50"] == "Abrogazione"
+
+    def test_oj_page_unchanged(self):
+        rubriche = _extract_eurlex_rubriche(soup_of("gdpr_oj_trimmed.html"))
+        assert rubriche["1"] == "Oggetto e finalità"
+        assert rubriche["17"] == "Diritto alla cancellazione («diritto all'oblio»)"
+
+
+class TestConsolidatedTree:
+    CONS = "https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:02002L0058-20091219"
+
+    async def test_flat_page_lists_suffixed_articles_in_order(self):
+        result, count, metadata = await _parse_eurlex_tree(
+            soup_of("eprivacy_consolidated_20091219.html"), self.CONS, link=False, details=True)
+        numbers = [item["numero"] for item in result if isinstance(item, dict)]
+        assert count == 23
+        assert numbers[13:17] == ["14", "14-bis", "15", "15-bis"]
+        assert metadata["rubriche"]["14-bis"] == "Procedura di comitato"
+
+    async def test_headings_carry_their_title_and_precede_their_articles(self):
+        result, count, _ = await _parse_eurlex_tree(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), self.CONS, link=False, details=True)
+        assert result[0] == "CAPO I DISPOSIZIONI GENERALI"
+        assert result[1] == {"numero": "1"}
+        assert count >= 6  # Capo I (art. 1-5) + art. 50
+
+    async def test_headings_are_omitted_without_details(self):
+        result, _, _ = await _parse_eurlex_tree(
+            soup_of("eidas_consolidated_20241018_trimmed.html"), self.CONS, link=False, details=False)
+        assert all(isinstance(item, dict) for item in result)
+
+    async def test_link_true_falls_back_to_an_anchor_on_the_consolidated_url(self):
+        result, _, _ = await _parse_eurlex_tree(
+            soup_of("eprivacy_consolidated_20091219.html"), self.CONS, link=True, details=False)
+        first = result[0]
+        assert first["numero"] == "1"
+        assert first["url"] == f"{self.CONS}#art_1"
+
+    async def test_oj_page_unchanged(self):
+        result, count, metadata = await _parse_eurlex_tree(
+            soup_of("gdpr_oj_trimmed.html"), "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita",
+            link=False, details=True)
+        numbers = [item["numero"] for item in result if isinstance(item, dict)]
+        assert numbers == ["1", "2", "3", "4", "17"]
+        assert "CAPO I" in result

@@ -308,6 +308,13 @@ to the cached or synthetic value.
 1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
    EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
    state law, Brocardi for annotations on Normattiva sources.
+   EU acts come from the Official Journal page unless the request names a
+   `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
+   tree, rubriche and article text are read from that consolidated page,
+   whose markup is different (`title-article-norm`, `modref` markers) and
+   handled by its own branch in `eurlex_scraper.py` / `treextractor.py`.
+   Consolidated texts carry no preamble — recitals always come from the OJ
+   page of the base act.
 2. **Parallel fetching** via `asyncio.gather()`.
 3. **Streaming**: `/stream_article_text` uses a Quart `Response` generator.
 4. **Browsers**: always through the `PlaywrightManager` singleton.

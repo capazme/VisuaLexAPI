@@ -8,6 +8,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
+from .akn_parser import normalize_article_key
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -97,6 +98,78 @@ def extract_recitals(soup) -> list[dict]:
     if recitals:
         return recitals
     return _extract_recitals_legacy(soup)
+
+
+# --- Consolidated texts ---------------------------------------------------
+#
+# EUR-Lex renders a consolidated version with a markup of its own: the number
+# is <p class="title-article-norm">Articolo 5</p> (an ordinal suffix as
+# <span class="italics">bis</span>), the rubrica <p class="stitle-article-norm">
+# (bare, or inside <div class="eli-title">), the body in `norm` paragraphs or
+# divs with `no-parag` numbers and `grid-list` tables for lettered points,
+# and <p class="modref">▼M1</p> markers naming the amending act before each
+# changed block. Recent consolidations wrap every article in
+# <div class="eli-subdivision" id="art_N">; older ones are flat.
+_CONS_ARTICLE_CLASS = "title-article-norm"
+_CONS_RUBRICA_CLASS = "stitle-article-norm"
+_CONS_SKIP_CLASSES = {"modref", "separator", "separator-short", "hd-modifiers", "footnote", "arrow"}
+_CONS_BODY_CLASSES = {"norm", "grid-container", "grid-list", "list", "no-parag"}
+
+
+def is_consolidated_markup(soup) -> bool:
+    return soup.find("p", class_=_CONS_ARTICLE_CLASS) is not None
+
+
+def _element_classes(element) -> set:
+    return set(element.get("class", []) or [])
+
+
+def _cons_text(element) -> str:
+    # A separator between child nodes: "1." sits in its own span next to the
+    # paragraph text, and NBSP is EUR-Lex's favourite space.
+    return re.sub(r"[ \t\xa0]+", " ", element.get_text(" ", strip=True)).strip()
+
+
+def _cons_find_title(soup, article):
+    wanted = normalize_article_key(str(article))
+    for marker in soup.find_all("p", class_=_CONS_ARTICLE_CLASS):
+        if normalize_article_key(marker.get_text(" ", strip=True)) == wanted:
+            return marker
+    return None
+
+
+def extract_article_consolidated(soup, article) -> "str | None":
+    """Article text from a consolidated page, or None when the page lacks it.
+
+    Same line structure as the OJ extractor — "Articolo N", the rubrica, one
+    line per paragraph — so a client sees the same shape whichever version it
+    asked for. Modification markers are not text and are dropped.
+    """
+    title = _cons_find_title(soup, article)
+    if title is None:
+        return None
+    lines = [_cons_text(title)]
+    for sibling in title.find_next_siblings():
+        classes = _element_classes(sibling)
+        if (_CONS_ARTICLE_CLASS in classes or "eli-subdivision" in classes
+                or "hd-modifiers" in classes
+                or any(c.startswith("title-division") for c in classes)):
+            break  # next article, next chapter, or the amendments table
+        if _CONS_RUBRICA_CLASS in classes:
+            lines.append(_cons_text(sibling))
+            continue
+        if "eli-title" in classes:
+            rubrica = sibling.find("p", class_=_CONS_RUBRICA_CLASS)
+            if rubrica is not None:
+                lines.append(_cons_text(rubrica))
+            continue
+        if classes & _CONS_SKIP_CLASSES:
+            continue
+        if sibling.name == "table" or classes & _CONS_BODY_CLASSES:
+            text = _cons_text(sibling)
+            if text:
+                lines.append(text)
+    return "\n".join(lines)
 
 
 class EurlexScraper(BaseScraper):
@@ -228,6 +301,17 @@ class EurlexScraper(BaseScraper):
 
     async def extract_article_text(self, soup, article):
         log.info(f"Searching for article {article} in the document")
+
+        if is_consolidated_markup(soup):
+            text = extract_article_consolidated(soup, article)
+            if text is None:
+                log.warning(f"Article {article} not found in the consolidated document")
+                raise DocumentNotFoundError(
+                    f"Article {article} not found in EUR-Lex consolidated document",
+                    urn=soup.find('link', rel='canonical')['href'] if soup.find('link', rel='canonical') else None
+                )
+            log.info(f"Article {article} text extracted from consolidated markup")
+            return text
 
         # Multiple patterns to find article header (EUR-Lex structure may vary)
         search_patterns = [
