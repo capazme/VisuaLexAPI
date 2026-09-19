@@ -5,12 +5,18 @@ from playwright.async_api import async_playwright
 
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
-from ..tools.exceptions import DocumentNotFoundError, NetworkError
+from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
 
 # Configure structured logger
 log = structlog.get_logger()
+
+# A consolidated version's CELEX: sector 0, year, type letter, act number,
+# then the consolidation date. "02002L0058-20091219" is Dir. 2002/58/CE as
+# amended up to 19 December 2009. Sector 3 ("32002L0058") is the OJ act and
+# is what the ELI URL already serves, so it is not accepted here.
+_CONSOLIDATED_CELEX = re.compile(r"^0\d{4}[A-Z]\d{4}-\d{8}$")
 
 
 # --- Recitals -------------------------------------------------------------
@@ -135,8 +141,19 @@ class EurlexScraper(BaseScraper):
             log.error(f"Error during EUR-Lex consultation: {e}")
             raise NetworkError(f"Failed to fetch EUR-Lex document: {e}")
 
-    def get_uri(self, act_type, year, num):
-        log.debug(f"get_uri called with act_type={act_type}, year={year}, num={num}")
+    def get_uri(self, act_type, year, num, celex_consolidated=None):
+        log.debug(f"get_uri called with act_type={act_type}, year={year}, num={num}, "
+                  f"celex_consolidated={celex_consolidated}")
+
+        if celex_consolidated:
+            if not _CONSOLIDATED_CELEX.match(str(celex_consolidated)):
+                raise ValidationError(
+                    f"celex_consolidated non valido: {celex_consolidated!r} "
+                    "(atteso il CELEX di una versione consolidata, es. 02002L0058-20091219)"
+                )
+            uri = f"https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:{celex_consolidated}"
+            log.info(f"Consolidated version requested. URI: {uri}")
+            return uri
 
         # EUR-Lex only needs the year, not full date (YYYY-MM-DD → YYYY)
         if year and '-' in str(year):

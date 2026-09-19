@@ -75,7 +75,8 @@ async def complete_date(act_type: str, date: str, act_number: str) -> str:
         if context:
             await context.close()
 
-def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None, version_date=None, urn_flag=True):
+def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None,
+                 version_date=None, urn_flag=True, celex_consolidated=None):
     """
     Generates the URN for a legal norm.
 
@@ -88,6 +89,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     version -- Version of the act (optional)
     version_date -- Date of the version (optional)
     urn_flag -- Boolean flag to include full URN or not
+    celex_consolidated -- Sector-0 CELEX of a consolidated EU version (optional, EU acts only)
 
     Returns:
     str -- The generated URN
@@ -106,7 +108,8 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     # Handle EURLEX cases (check before replacing spaces with dots)
     if normalized_act_type.lower() in EURLEX:
         eurlex_scraper = EurlexScraper()
-        return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number)
+        return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number,
+                                      celex_consolidated=celex_consolidated)
 
     # Handle special codes (codice civile, codice penale, etc.)
     # IMPORTANT: Check BEFORE replacing spaces with dots, as the codici table uses spaces

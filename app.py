@@ -383,6 +383,14 @@ class NormaController:
         act_number = data.get('act_number')
         norma_date = data.get('date')
 
+        # A consolidated EU version. Validated here so a Normattiva request
+        # carrying the field fails loudly instead of being silently ignored.
+        celex_consolidated = data.get('celex_consolidated') or None
+        if celex_consolidated and normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+            raise ValidationError(
+                "celex_consolidated vale solo per atti EUR-Lex (regolamento ue, direttiva ue)"
+            )
+
         # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
         codice_details = extract_codice_details(act_type) if act_type else None
         tipo_atto_reale = None
@@ -411,7 +419,8 @@ class NormaController:
             tipo_atto=act_type,
             data=norma_date if norma_date else None,
             numero_atto=act_number,
-            tipo_atto_reale=tipo_atto_reale
+            tipo_atto_reale=tipo_atto_reale,
+            celex_consolidated=celex_consolidated
         )
         log.info("Norma instance created", norma=norma)
 
