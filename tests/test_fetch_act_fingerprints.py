@@ -60,8 +60,12 @@ class TestHappyPath:
         index.parts_detail = [{
             "name": "Disposizioni sulla legge in generale", "keys": ["1"],
             "rubriche": {}, "abrogati": [],
-            "fingerprints": {"1": {"fingerprint": "d" * 64, "date": "1942-04-21"}},
         }]
+        index.parts_fingerprints = {
+            "Disposizioni sulla legge in generale": {
+                "1": {"fingerprint": "d" * 64, "date": "1942-04-21"},
+            },
+        }
         with patch("app.fetch_act_index", AsyncMock(return_value=index)):
             response = await client.post("/fetch_act_fingerprints", json={"urn": ACT_URL})
         body = await response.get_json()

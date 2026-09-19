@@ -114,7 +114,15 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     in-flight registry so N concurrent cold requests download the act once.
     Article texts are never cached. `ParsedPart.dates` carries each article's
     FRBRWork date (component acts only), and `AktIndex.fingerprints` a sha256
-    per article — both are metadata about the text, not the text.
+    per article — both are metadata about the text, not the text. The hash
+    is of the RENDERED AKN text (the markdown `akn_parser` produces,
+    AGGIORNAMENTO blocks included), so a renderer change moves every hash — a
+    harmless full refetch. The top-level map covers the dominant part only;
+    an annex such as the preleggi or the disposizioni di attuazione must be
+    read from `parts_fingerprints` (served as `parts` by
+    `/fetch_act_fingerprints`), which is kept apart from `parts_detail` so
+    the hashes do not ride along on every `/fetch_rubriche` answer. With
+    the fingerprints a codice's in-memory index is a few hundred KB.
     `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
     article numbers and needs no network.
@@ -637,8 +645,9 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
 `AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
-call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory,
-a few tens of KB each). Template in `.env.example`.
+call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
+a few tens of KB for an ordinary act, a few hundred KB for a codice because of
+the per-article fingerprints). Template in `.env.example`.
 
 Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
 parser uses; it ships a `cp314` wheel, so `deploy.sh` needs no compiler.

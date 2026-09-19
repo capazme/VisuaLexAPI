@@ -992,8 +992,8 @@ class NormaController:
                 'available': True,
                 'fingerprints': index.fingerprints,
                 'parts': [
-                    {'name': part['name'], 'fingerprints': part.get('fingerprints', {})}
-                    for part in index.parts_detail
+                    {'name': name, 'fingerprints': fingerprints}
+                    for name, fingerprints in index.parts_fingerprints.items()
                 ],
                 'count': len(index.fingerprints),
             })

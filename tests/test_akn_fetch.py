@@ -286,12 +286,16 @@ class TestFingerprints:
         expected = hashlib.sha256(act.articles["3-bis"].encode("utf-8")).hexdigest()
         assert index.fingerprints["3-bis"]["fingerprint"] == expected
 
-    def test_parts_detail_carries_fingerprints_too(self):
+    def test_parts_fingerprints_are_kept_apart_from_parts_detail(self):
+        # /fetch_rubriche returns parts_detail verbatim on every index open;
+        # the hashes must not ride along with it.
         from visualex_api.services.akn_parser import parse_akn
         index = akn_fetch._to_index(parse_akn(self.CP_XML), "codice", "19301026")
         by_name = {p["name"]: p for p in index.parts_detail}
         assert "Codice Penale" in by_name
-        assert set(by_name["Codice Penale"]["fingerprints"]) == set(by_name["Codice Penale"]["keys"])
+        assert set(index.parts_fingerprints["Codice Penale"]) == set(by_name["Codice Penale"]["keys"])
+        assert set(index.parts_fingerprints) == set(by_name)
+        assert all("fingerprints" not in part for part in index.parts_detail)
 
     @pytest.mark.asyncio
     async def test_fingerprints_survive_the_persistent_cache(self):

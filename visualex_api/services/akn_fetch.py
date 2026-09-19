@@ -80,6 +80,11 @@ class AktIndex:
     # which articles changed since it last looked — one act-level download
     # instead of one request per article. ~200 KB for the codice civile.
     fingerprints: dict[str, dict] = field(default_factory=dict)
+    # Part name -> the same map, one per annex. Kept apart from `parts_detail`
+    # on purpose: /fetch_rubriche returns `parts_detail` verbatim on every
+    # index open, and the hashes rode along at +114 B per article — some
+    # 340 KB the frontend never read. Only /fetch_act_fingerprints reads this.
+    parts_fingerprints: dict[str, dict[str, dict]] = field(default_factory=dict)
 
 
 def akn_disabled() -> bool:
@@ -145,11 +150,14 @@ def _to_index(act, codice: str, data_gu: str) -> AktIndex:
                 "keys": list(part.order),
                 "rubriche": act.rubriche(name),
                 "abrogati": act.abrogati(name),
-                "fingerprints": _fingerprints(part.articles, part.dates),
             }
             for name, part in act.parts.items()
         ],
         fingerprints=_fingerprints(act.articles, act.dates),
+        parts_fingerprints={
+            name: _fingerprints(part.articles, part.dates)
+            for name, part in act.parts.items()
+        },
     )
 
 
