@@ -112,6 +112,13 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     the primary container across the API)
   - `urngenerator.py` — URN generation · `treextractor.py` — article trees
   - `text_op.py` — text parsing **and** date handling (see Date System)
+  - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
+    article-number regex reads, longest-first so a short entry cannot claim the
+    head of a longer one. A leaf module, imported by `nl_parser`,
+    `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
+    `frontend/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
+    `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
+    exists, which is why nothing looked broken
   - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py` — act-type mappings, plus the act tables the resolver reads
@@ -426,7 +433,8 @@ A dossier is where the articles needed for a task are aggregated and read.
 Duplicating any of these is a defect, not a shortcut.
 
 **Python**: `urngenerator.py` (URNs) · `text_op.py` (text parsing + dates) ·
-`treextractor.py` (trees) · `PlaywrightManager` (browsers).
+`treextractor.py` (trees) · `PlaywrightManager` (browsers) ·
+`article_suffixes.py` (the ordinal suffix table).
 
 **Frontend**:
 - `utils/normaKeys.ts` — `buildItemKey(norma)` (norm + article),
@@ -443,6 +451,11 @@ Duplicating any of these is a defect, not a shortcut.
   *structurally* different markup per breakpoint (portal vs. inline). It existed
   as two private copies before round 2a; do not make a third. For anything a CSS
   breakpoint can express, use the CSS breakpoint.
+- `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
+  `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
+  regex (`citationMatcher`, `citationParser`, `treeUtils`, `extractPreamble`).
+  Mirrors `visualex_api/tools/article_suffixes.py` — change both together. Each
+  pattern must close the alternation with `\b`.
 - `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
   `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
   (**tolerant** lookup — required, see gotcha 9).
@@ -612,7 +625,8 @@ Breaking one of these breaks the product. Read before editing.
 `services/*_scraper.py` (fragile HTML parsers).
 
 **Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
-`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/dateUtils.ts` ·
+`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
+`utils/dateUtils.ts` ·
 `utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
 `utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
 `hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
@@ -672,12 +686,13 @@ meant to stay split; add new features as new files, not inside the shells:
 8. **Selenium is gone** — Playwright only.
 9. **Article id formatting (`-bis` / `-ter`)** — the tree API and the scraper
    disagree (`"1-bis"` vs `"1 bis"`). Server-side both are now canonicalised
-   through `normalize_article_key` (`services/akn_parser.py`), which treats the
-   suffix as any alphabetic tail rather than an enumerated ordinal list —
-   Normattiva goes well past `decies` ("2409 octiesdecies" c.c.). On the
-   frontend the tolerant `findArticleByNormalizedId` is still required: a naive
-   `===` silently misses and falls back to the first article. Always use it, then
-   canonicalise with `getUniqueArticleId(match)` before storing in state.
+   through `normalize_article_key` (`services/akn_parser.py`), which reads the
+   ordinal from `tools/article_suffixes.py` and falls back to "any alphabetic
+   tail" for anything that table does not list — Normattiva goes well past
+   `decies` ("2409 octiesdecies" c.c.). On the frontend the tolerant
+   `findArticleByNormalizedId` is still required: a naive `===` silently misses
+   and falls back to the first article. Always use it, then canonicalise with
+   `getUniqueArticleId(match)` before storing in state.
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.

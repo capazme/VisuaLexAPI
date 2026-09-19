@@ -569,13 +569,14 @@ class NormaController:
 
         Article numbers are canonicalised on both sides with the AKN parser's
         `normalize_article_key`: the tree API and the scraper disagree on the
-        separator ("1-bis" vs "1 bis"). That normaliser treats the suffix as
-        "any alphabetic tail" rather than an enumerated ordinal list, which is
+        separator ("1-bis" vs "1 bis"). That normaliser reads the ordinal from
+        the shared table in `tools/article_suffixes.py` and falls back to "any
+        alphabetic tail" for anything the table does not list, which is
         load-bearing — Normattiva goes far past `decies` ("25 undecies",
         "25 quinquiesdecies", "25 duodevicies" in d.lgs. 231/2001,
-        "669 terdecies" c.p.c., "2409 octiesdecies" c.c.) and an enumerated
-        list would silently turn every article beyond its last entry into
-        "does not exist".
+        "669 terdecies" c.p.c., "2409 octiesdecies" c.c.) and a normaliser that
+        stopped at its last entry would silently turn every article beyond it
+        into "does not exist".
         """
         act_url = getattr(norma, 'url', None) or str(norma)
         try:

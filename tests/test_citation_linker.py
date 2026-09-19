@@ -404,3 +404,51 @@ class TestNamesThatPrefixOtherActs:
     def test_codice_penale_still_read(self):
         c = extract_citations("art. 5 del codice penale")
         assert (c[0].article, c[0].act_type) == ("5", "codice penale")
+
+
+class TestSuffixesPastDecies:
+    """Article numbering does not stop at "decies".
+
+    The catalogue of reati presupposto of d.lgs. 231/2001 runs from 25-bis to
+    25-sexiesdecies and beyond; tests/test_article_existence.py records the
+    spellings captured live from Normattiva's article tree ("25 undecies",
+    "25 quinquiesdecies", "25 septiesdecies", "25 undevicies", "669 terdecies",
+    "2409 octiesdecies"). An alternation that stopped at "decies" matched only
+    the head of the suffix, so "art. 25-terdecies" was linked as art. 25-ter —
+    an article that exists, so the wrong link looked perfectly normal.
+    """
+
+    @pytest.mark.parametrize("suffix", [
+        "undecies", "duodecies", "terdecies", "quaterdecies",
+        "quinquiesdecies", "sexiesdecies", "septiesdecies", "undevicies",
+    ])
+    def test_article_before_the_act(self, suffix):
+        text = f"ai sensi dell'art. 25-{suffix} del d.lgs. 231/2001"
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        c = citations[0]
+        assert c.article == f"25-{suffix}"
+        assert c.act_type == "decreto legislativo"
+        assert c.act_number == "231"
+        assert c.date == "2001"
+
+    def test_act_before_the_article(self):
+        # The act itself also yields an article-less citation; that is the
+        # linker's own contract and predates this fix.
+        citations = extract_citations("il d.lgs. 231/2001, art. 25-quinquiesdecies, prevede")
+        assert [c.article for c in citations if c.article] == ["25-quinquiesdecies"]
+
+    def test_list_keeps_the_long_suffix_of_its_first_item(self):
+        # The server linker emits one citation per list, the client matcher one
+        # per number; what this pins is that the suffix is not cut at "ter".
+        text = "artt. 25-terdecies e 25-undecies del d.lgs. 231/2001"
+        citations = [c for c in extract_citations(text) if c.article]
+        assert [c.article for c in citations] == ["25-terdecies"]
+
+    def test_short_suffix_still_reads_as_itself(self):
+        citations = extract_citations("ai sensi dell'art. 25-ter del d.lgs. 231/2001")
+        assert [c.article for c in citations] == ["25-ter"]
+
+    def test_codice_suffix_past_decies(self):
+        citations = extract_citations("si veda l'art. 2409-octiesdecies c.c.")
+        assert [c.article for c in citations] == ["2409-octiesdecies"]

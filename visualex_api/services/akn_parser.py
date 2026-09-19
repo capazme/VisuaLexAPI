@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 import structlog
 from lxml import etree
 
+from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+
 log = structlog.get_logger()
 
 
@@ -188,11 +190,6 @@ def extract_rubrica(article_text: str | None, key: str | None = None) -> str | N
 # Article key normalization
 # ---------------------------------------------------------------------------
 
-_ORDINAL_SUFFIXES = (
-    "bis", "ter", "quater", "quinquies", "sexies", "septies",
-    "octies", "novies", "decies",
-)
-
 
 def normalize_article_key(numero_articolo: str) -> str:
     """Normalize an article reference to the canonical key form.
@@ -212,7 +209,11 @@ def normalize_article_key(numero_articolo: str) -> str:
 
     # Unify separators between the number and an ordinal suffix: a space, a dash
     # or nothing all collapse to a single dash. e.g. "2 bis" / "2bis" -> "2-bis".
-    suffix_alt = "|".join(_ORDINAL_SUFFIXES)
+    # The table is the shared one: numbering goes far past "decies"
+    # ("2409 octiesdecies" c.c., "25 undevicies" d.lgs. 231/2001), and the short
+    # list this used to carry left "25terdecies" to the fallback below, which
+    # cannot tell a suffix from a rubrica.
+    suffix_alt = ARTICLE_SUFFIX_ALTERNATION
     m = re.match(rf"^(\d+)\s*[-\s]?\s*({suffix_alt})$", key)
     if m:
         return f"{m.group(1)}-{m.group(2)}"
