@@ -79,6 +79,17 @@ class TestDegradedAndInvalid:
         body = await response.get_json()
         assert body == {"available": False, "fingerprints": {}, "parts": [], "count": 0}
 
+    async def test_an_index_without_fingerprints_is_reported_as_unavailable(self, client):
+        """An index cached before the fingerprints field existed rehydrates with
+        an empty map; `available: true` over it would read as "every article
+        vanished". A real index always has at least one fingerprint."""
+        stale = AktIndex(title="x", keys=["1"], fingerprints={})
+        with patch("app.fetch_act_index", AsyncMock(return_value=stale)):
+            response = await client.post("/fetch_act_fingerprints", json={"urn": ACT_URL})
+        assert response.status_code == 200
+        body = await response.get_json()
+        assert body == {"available": False, "fingerprints": {}, "parts": [], "count": 0}
+
     async def test_missing_urn_is_a_400(self, client):
         response = await client.post("/fetch_act_fingerprints", json={})
         assert response.status_code == 400

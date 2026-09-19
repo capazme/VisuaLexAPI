@@ -964,7 +964,11 @@ class NormaController:
         akn_parser.py). Two answers are deliberately different: no index
         (AKN disabled or unavailable) is `available: false` with empty maps
         and 200, so the caller falls back to a full fetch; a crash is a 500,
-        so it is never read as "nothing changed".
+        so it is never read as "nothing changed". An index WITHOUT
+        fingerprints gets the first answer too: one written to the persistent
+        cache before this field existed rehydrates with an empty map, and a
+        real index always carries at least one fingerprint — `available:
+        true` over an empty map would read as "every article vanished".
         """
         try:
             data = await request.get_json() or {}
@@ -979,8 +983,9 @@ class NormaController:
             # ...;241~art2 -> ...;241 (same rule as fetch_rubriche).
             act_url = str(urn).split('~')[0]
             index = await fetch_act_index(SimpleNamespace(url=act_url))
-            if index is None:
-                log.info("No AKN index available for fingerprints", urn=act_url[:100])
+            if index is None or not index.fingerprints:
+                log.info("No AKN fingerprints available", urn=act_url[:100],
+                         reason="no index" if index is None else "index without fingerprints")
                 return jsonify({'available': False, 'fingerprints': {}, 'parts': [], 'count': 0})
             log.info("Fingerprints served", urn=act_url[:100], count=len(index.fingerprints))
             return jsonify({
