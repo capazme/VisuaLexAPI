@@ -33,6 +33,27 @@ python -m archivio_normativo export --jsonl units.jsonl
 Output goes to `--out` (default `archivio_out/`, gitignored):
 `archivio.sqlite`, `INDICE.md`, one `<area>/<id>.md` per act, `logs/`.
 
+## Running it
+
+Never start two `build`s against the same `--out` at once: both open the same
+SQLite store and write to it, and the second one's startup marks the first
+run "interrupted" (`store.mark_running_as_interrupted`) even though it is
+still going — the run row and the archive end up written by two writers at
+once.
+
+A long build (a fresh archive, or `--full`) outlives a terminal session, so
+run it detached and check on it separately:
+
+```bash
+nohup .venv/bin/python -m archivio_normativo build > archivio_out/build.txt 2>&1 &
+python -m archivio_normativo report                # progress / last run's stats
+```
+
+If it gets killed (Ctrl-C, a closed terminal, `kill`), the next `report` or
+`verify` still reflects everything committed so far — nothing is lost, units
+are written per act — and `build --resume` continues the same run rather than
+starting over.
+
 ## How an update run stays cheap
 
 For Normattiva acts, `/fetch_act_fingerprints` gives a hash per article from

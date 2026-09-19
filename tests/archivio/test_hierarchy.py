@@ -20,6 +20,16 @@ class TestNormalizeNumber:
     def test_unknown_tails_collapse_to_dashes(self):
         assert normalize_number("1 allegato A") == "1-allegato-a"
 
+    def test_dotted_sub_numbers_mirror_the_server(self):
+        # Mirrors visualex_api.services.akn_parser.normalize_article_key: a
+        # trailing all-digit token after an ordinal token becomes ".N".
+        assert normalize_number("171 octies 1") == "171-octies.1"
+        assert normalize_number("171-octies-1") == "171-octies.1"
+        assert normalize_number("270 bis.1") == "270-bis.1"
+        assert normalize_number("314/2") == "314/2"
+        assert normalize_number("135 sex decies") == "135-sex-decies"
+        assert normalize_number("473 bis.72") == "473-bis.72"
+
 
 class TestClassifyHeading:
     def test_levels(self):

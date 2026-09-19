@@ -64,6 +64,18 @@ async def test_build_then_rebuild(fake_visualex, tmp_path, capsys):
     assert "invariati 2" in capsys.readouterr().out
 
 
+async def test_indice_shows_done_not_running_after_a_build(fake_visualex, tmp_path, capsys):
+    add_cc(fake_visualex)
+    manifest = write_manifest(tmp_path, fake_visualex.base_url)
+    out = tmp_path / "out"
+    code = await async_main(["build", "--manifest", str(manifest), "--out", str(out), "--rate", "0"])
+    assert code == 0
+    capsys.readouterr()
+    indice = (out / "INDICE.md").read_text(encoding="utf-8")
+    assert "(done)" in indice
+    assert "(running)" not in indice
+
+
 async def test_verify_report_and_export(fake_visualex, tmp_path, capsys):
     add_cc(fake_visualex)
     manifest = write_manifest(tmp_path, fake_visualex.base_url)

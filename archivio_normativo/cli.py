@@ -177,12 +177,6 @@ async def run_build(args, manifest: Manifest) -> int:
 
         findings = []
         if store is not None and not args.dry_run and run_id is not None:
-            changed = [r.act_id for r in reports if r.changed]
-            if changed:
-                written = write_outputs(store, out_dir, changed, stamp(datetime.now))
-                log.info("rendered %d files", len(written))
-            else:
-                write_outputs(store, out_dir, [], stamp(datetime.now))
             findings = verify_store(store, act_ids={s.id for s in specs})
             stats = {
                 "acts": len(reports), "unresolved": sum(1 for r in reports if not r.resolved),
@@ -190,7 +184,16 @@ async def run_build(args, manifest: Manifest) -> int:
                 "unchanged": sum(r.unchanged for r in reports), "failed": sum(r.failed for r in reports),
                 "skipped": sum(r.skipped for r in reports), "findings": len(findings),
             }
+            # The status must be final before INDICE.md is rendered — it reads
+            # the run row straight from the store, and would otherwise always
+            # show "(running)".
             store.finish_run(run_id, status, stamp(datetime.now), stats)
+            changed = [r.act_id for r in reports if r.changed]
+            if changed:
+                written = write_outputs(store, out_dir, changed, stamp(datetime.now))
+                log.info("rendered %d files", len(written))
+            else:
+                write_outputs(store, out_dir, [], stamp(datetime.now))
         print(format_report(reports, findings, duration_s=time.monotonic() - started, base_url=base_url,
                             run_id=run_id, dry_run=args.dry_run))
         if status == "interrupted":

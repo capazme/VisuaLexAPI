@@ -287,40 +287,69 @@ class Pipeline:
                      brocardi_pass: bool = False) -> list[UnitOutcome]:
         assert self.store is not None and self.run_id is not None
         outcomes: list[UnitOutcome] = []
-        by_number_index = {a.number: a for a in targets}
         for batch in _chunks(targets, self.options.batch_size):
             numbers = [a.number for a in batch]
             try:
                 results = await self.visualex.stream_articles(spec, numbers, res.annex, brocardi)
             except VisuaLexError as exc:
+                if len(batch) > 1 and exc.status == 400:
+                    # A validation refusal names one bad number, but the whole
+                    # batch comes back empty — the good articles in it are not
+                    # at fault, so retry each on its own before giving up.
+                    self.log.warning("batch refused (400), retrying %d articles one by one", len(batch))
+                    await self._fetch_one_by_one(spec, res, batch, rubriche, fingerprints, brocardi,
+                                                 brocardi_pass, report, outcomes)
+                    continue
                 for a in batch:
                     self._fail(spec, a.number, str(exc), report)
                 continue
             answered = {r.number: r for r in results}
             for a in batch:
-                r = answered.get(a.number)
-                if r is None:
-                    self._fail(spec, a.number, "not returned by VisuaLex (not in the act?)", report)
-                    continue
-                if r.error or r.text is None:
-                    self._fail(spec, a.number, r.error or "empty text", report)
-                    continue
-                uid = unit_id(spec.id, "article", a.number)
-                record = self._record(spec, res, by_number_index[a.number], r, rubriche, fingerprints)
-                outcome = self.store.upsert_unit(record, self.run_id)
-                if brocardi_pass:
-                    # The text came along, but this pass was for the annotations:
-                    # the unit was already counted as unchanged.
-                    self.store.log_unit(self.run_id, uid, "unchanged", "brocardi refresh")
-                else:
-                    self.store.log_unit(self.run_id, uid, outcome)
-                    report.count(outcome)
-                    outcomes.append(UnitOutcome(uid, a.number, outcome))
-                    self.log.info("%s act=%s art=%s hash=%s", outcome.upper(), spec.id, a.number,
-                                  record.text_hash[:12])
-                if brocardi:
-                    self._store_brocardi(spec, uid, r, report)
+                self._absorb(spec, res, a, answered.get(a.number), rubriche, fingerprints, brocardi,
+                            brocardi_pass, report, outcomes)
         return outcomes
+
+    async def _fetch_one_by_one(self, spec: ActSpec, res: ActResolution, batch: list[IndexedArticle],
+                                rubriche, fingerprints: dict[str, dict], brocardi: bool,
+                                brocardi_pass: bool, report: ActReport,
+                                outcomes: list[UnitOutcome]) -> None:
+        for a in batch:
+            try:
+                results = await self.visualex.stream_articles(spec, [a.number], res.annex, brocardi)
+            except VisuaLexError as exc:
+                self._fail(spec, a.number, str(exc), report)
+                continue
+            answered = {r.number: r for r in results}
+            self._absorb(spec, res, a, answered.get(a.number), rubriche, fingerprints, brocardi,
+                        brocardi_pass, report, outcomes)
+
+    def _absorb(self, spec: ActSpec, res: ActResolution, a: IndexedArticle, r: ArticleResult | None,
+               rubriche, fingerprints: dict[str, dict], brocardi: bool, brocardi_pass: bool,
+               report: ActReport, outcomes: list[UnitOutcome]) -> None:
+        """One article's stream result, batch or single: `answered` /
+        `not returned` / error line -> `_fail`, otherwise stored and counted."""
+        assert self.store is not None and self.run_id is not None
+        if r is None:
+            self._fail(spec, a.number, "not returned by VisuaLex (not in the act?)", report)
+            return
+        if r.error or r.text is None:
+            self._fail(spec, a.number, r.error or "empty text", report)
+            return
+        uid = unit_id(spec.id, "article", a.number)
+        record = self._record(spec, res, a, r, rubriche, fingerprints)
+        outcome = self.store.upsert_unit(record, self.run_id)
+        if brocardi_pass:
+            # The text came along, but this pass was for the annotations:
+            # the unit was already counted as unchanged.
+            self.store.log_unit(self.run_id, uid, "unchanged", "brocardi refresh")
+        else:
+            self.store.log_unit(self.run_id, uid, outcome)
+            report.count(outcome)
+            outcomes.append(UnitOutcome(uid, a.number, outcome))
+            self.log.info("%s act=%s art=%s hash=%s", outcome.upper(), spec.id, a.number,
+                          record.text_hash[:12])
+        if brocardi:
+            self._store_brocardi(spec, uid, r, report)
 
     def _fail(self, spec: ActSpec, number: str, reason: str, report: ActReport) -> None:
         uid = unit_id(spec.id, "article", number)

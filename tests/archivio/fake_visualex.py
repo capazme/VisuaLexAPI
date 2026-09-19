@@ -26,13 +26,14 @@ class FakeVisuaLex:
 
     def add_act(self, *, act_type, date=None, act_number=None, celex_consolidated=None, url, annex=None,
                 tree=(), annexes=None, rubriche=None, abrogati=(), fingerprints=None, recitals=(),
-                articles=None, brocardi=None) -> dict:
+                articles=None, brocardi=None, reject_numbers=None) -> dict:
         scenario = {
             "act_type": act_type, "date": date, "act_number": act_number,
             "celex_consolidated": celex_consolidated, "url": url, "annex": annex,
             "tree": list(tree), "annexes": annexes or [], "rubriche": rubriche or {},
             "abrogati": list(abrogati), "fingerprints": fingerprints, "recitals": list(recitals),
             "articles": dict(articles or {}), "brocardi": dict(brocardi or {}),
+            "reject_numbers": set(reject_numbers or ()),
         }
         self.acts[self.key(act_type, date, act_number, celex_consolidated)] = scenario
         return scenario
@@ -128,10 +129,13 @@ class FakeVisuaLex:
         s = self._scenario(body)
         if s is None:
             return web.json_response({"error": f"Articolo non presente in {body.get('act_type')}"}, status=404)
+        numbers = [raw.strip().lower().replace(" ", "-") for raw in str(body.get("article", "")).split(",")]
+        rejected = next((n for n in numbers if n in s["reject_numbers"]), None)
+        if rejected is not None:
+            return web.json_response({"error": f"Invalid article format: {rejected}"}, status=400)
         annex = body.get("annex") if body.get("annex") not in (None, "") else s["annex"]
         lines = []
-        for raw in str(body.get("article", "")).split(","):
-            number = raw.strip().lower().replace(" ", "-")
+        for number in numbers:
             if number not in s["articles"]:
                 continue  # the real API drops articles the act does not have
             entry = s["articles"][number]

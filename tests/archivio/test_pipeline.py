@@ -200,6 +200,24 @@ class TestFailures:
         report = await pipeline.process_act(cc_spec())
         assert report.failed == 3 and all("HTTP 500" in reason for _, reason in report.failures)
 
+    async def test_a_batch_refused_with_400_is_retried_one_by_one(self, fake_visualex, store, make_pipeline):
+        fake_visualex.add_act(
+            act_type="codice civile", url=CC_URL, annex="2",
+            tree=[{"numero": "2043", "allegato": "2"}, {"numero": "270-bis.1", "allegato": "2"},
+                  {"numero": "2044", "allegato": "2"}],
+            fingerprints=None,
+            articles={"2043": "Qualunque fatto…", "270-bis.1": "Testo lecito…", "2044": "Non è responsabile…"},
+            reject_numbers={"270-bis.1"},
+        )
+        report = await make_pipeline().process_act(cc_spec())
+        assert report.new == 2 and report.failed == 1
+        reasons = dict(report.failures)
+        assert "270-bis.1" in reasons["cc:art:270-bis.1"]
+        calls = [b["article"] for p, b in fake_visualex.calls if p == "/stream_article_text"]
+        assert calls == ["2043,270-bis.1,2044", "2043", "270-bis.1", "2044"]
+        assert store.get_unit("cc:art:2043") is not None and store.get_unit("cc:art:2044") is not None
+        assert store.get_unit("cc:art:270-bis.1") is None
+
     async def test_unresolvable_act_is_reported_not_raised(self, fake_visualex, make_pipeline):
         report = await make_pipeline().process_act(cc_spec(act_type="codice inesistente"))
         assert report.resolved is False

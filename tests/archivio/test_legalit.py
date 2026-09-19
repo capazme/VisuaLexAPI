@@ -77,6 +77,13 @@ class TestClassify:
         assert classify_result("") == "empty"
         assert classify_result("## Sentenze\n- Cass. civ. 123/2024 …") == "ok"
 
+    def test_other_no_hits_phrasings_are_also_empty(self):
+        assert classify_result("Nessuna pronuncia trovata.") == "empty"
+        assert classify_result("Nessun provvedimento trovato per la query indicata.") == "empty"
+        assert classify_result("Nessuno trovato.") == "empty"
+        # Ordinary text mentioning "trovato" outside that shape stays "ok".
+        assert classify_result("## Risultati\nAbbiamo trovato 3 provvedimenti rilevanti.") == "ok"
+
 
 class FakeSession:
     def __init__(self, responses):

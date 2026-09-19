@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import re
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import Callable, Sequence
@@ -67,6 +68,12 @@ def act_calls(kind: str, spec: ActSpec) -> list[ToolCall]:
     return [ToolCall("get_eu_basis", {"atto": spec.cite})]  # base_ue
 
 
+#: "Nessuna pronuncia trovata", "Nessun provvedimento trovato" — the various
+#: no-hits phrasings the legal-it tools use beyond the literal "nessun
+#: risultato" already matched above.
+_NO_HITS_RE = re.compile(r"nessun[ao]?\b[^.\n]{0,80}\btrovat[aoei]", re.IGNORECASE)
+
+
 def classify_result(text: str) -> str:
     head = (text or "").strip()
     if not head:
@@ -74,6 +81,8 @@ def classify_result(text: str) -> str:
     if head.startswith("**Errore**"):
         return "error"
     if head[:200].lower().startswith("nessun risultato") or "nessun risultato" in head[:200].lower():
+        return "empty"
+    if _NO_HITS_RE.search(head[:200]):
         return "empty"
     return "ok"
 

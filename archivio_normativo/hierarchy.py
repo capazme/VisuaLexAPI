@@ -29,8 +29,13 @@ def normalize_number(raw: str) -> str:
         return f"{match.group(1)}-{match.group(2)}"
     if re.fullmatch(r"\d+", key):
         return key
+    # Fallback: collapse internal whitespace to dashes. A bare digit trailing
+    # an ordinal token is a dotted sub-number ("171 octies 1" / "171-octies-1"
+    # both mean art. 171-octies.1), which the server's normalize_article_key
+    # spells with a dot — so it joins the same way here.
     key = re.sub(r"\s+", "-", key)
-    return re.sub(r"-{2,}", "-", key).strip("-")
+    key = re.sub(r"-{2,}", "-", key).strip("-")
+    return re.sub(r"(?<=[a-z])-(\d+)$", r".\1", key)
 
 
 def classify_heading(text: str) -> tuple[str, str] | None:
