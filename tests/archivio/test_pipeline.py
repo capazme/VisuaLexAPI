@@ -6,6 +6,7 @@ from datetime import datetime
 import pytest
 
 from archivio_normativo.manifest import ActSpec
+from archivio_normativo.pipeline import Enricher as EnricherProtocol
 from archivio_normativo.pipeline import Pipeline, RunOptions, unit_id
 from archivio_normativo.render_md import render_act
 from archivio_normativo.report import format_report
@@ -338,6 +339,18 @@ class TestDryRunAndResume:
         assert report.skipped == 1 and report.new == 2
         assert "2043" not in streamed_numbers(fake_visualex)
 
+    async def test_resume_retries_what_the_interrupted_run_failed(self, fake_visualex, store, make_pipeline):
+        """A `failed` outcome is not work done: the article is not in the
+        store, so skipping it on `--resume` would leave the hole for good."""
+        add_cc(fake_visualex)
+        run_id = store.start_run({}, NOW.isoformat())
+        store.log_unit(run_id, unit_id("cc", "article", "2043"), "failed", "HTTP 500")
+        store.log_unit(run_id, unit_id("cc", "article", "2044"), "new")
+        report = await make_pipeline(resume=run_id).process_act(cc_spec())
+        assert (report.skipped, report.new, report.failed) == (1, 2, 0)
+        assert sorted(streamed_numbers(fake_visualex)) == ["2-bis", "2043"]
+        assert store.get_unit("cc:art:2043") is not None
+
 
 class TestEuActs:
     async def test_recitals_and_no_fingerprints(self, fake_visualex, store, make_pipeline):
@@ -417,3 +430,14 @@ class TestDuplicateIndexEntries:
         assert len(units) == 1
         text = format_report([report], [], duration_s=1, base_url="u", run_id=1, dry_run=False)
         assert "numeri duplicati nell'indice: 2043" in text
+
+
+class TestEnricherProtocol:
+    def test_the_protocol_names_both_methods_the_pipeline_calls(self):
+        """`process_act` calls `plan_act` in dry-run and `enrich_act` otherwise;
+        a stand-in that satisfies the Protocol must be asked for both."""
+        from archivio_normativo.enrich import Enricher
+        members = set(getattr(EnricherProtocol, "__protocol_attrs__", ()))
+        assert {"enrich_act", "plan_act"} <= members
+        for name in members:
+            assert callable(getattr(Enricher, name)), name

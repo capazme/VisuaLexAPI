@@ -147,3 +147,17 @@ async def test_resume_continues_the_interrupted_run(fake_visualex, tmp_path, cap
     assert f"Run {run_id}" in capsys.readouterr().out
     with Store(out / "archivio.sqlite") as store:
         assert store.get_run(run_id)["status"] == "done"
+
+
+async def test_a_long_ndjson_line_is_read_whole(fake_visualex, tmp_path, capsys):
+    """One NDJSON line carries an article and its Brocardi annotations; a long
+    one blows aiohttp's default line limit (LineTooLong) and lost the batch."""
+    fake_visualex.add_act(act_type="codice civile", url=CC_URL, annex="2",
+                          tree=[{"numero": "2043", "allegato": "2"}], fingerprints=None,
+                          articles={"2043": "x" * 700_000})
+    manifest = write_manifest(tmp_path, fake_visualex.base_url)
+    out = tmp_path / "out"
+    code = await async_main(["build", "--manifest", str(manifest), "--out", str(out), "--rate", "0"])
+    assert code == 0, capsys.readouterr().out
+    with Store(out / "archivio.sqlite") as store:
+        assert len(store.get_unit("cc:art:2043").text) == 700_000

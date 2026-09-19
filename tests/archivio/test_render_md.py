@@ -1,8 +1,10 @@
 """Markdown for reading, rendered from the store and nothing else."""
 from pathlib import Path
 
+import pytest
+
 from archivio_normativo.render_md import (
-    anchor_for, demote_headings, escape_md, heading_for, render_act, render_index, write_outputs,
+    act_path, anchor_for, demote_headings, escape_md, heading_for, render_act, render_index, write_outputs,
 )
 from archivio_normativo.store import ActRecord, Store, UnitRecord
 
@@ -110,5 +112,42 @@ class TestIndexAndFiles:
     def test_write_outputs_can_limit_to_changed_acts_but_always_refreshes_the_index(self, tmp_path):
         with Store(tmp_path / "a.sqlite") as store:
             store.upsert_act(act(), unit_count=0, updated_at="t")
+            write_outputs(store, tmp_path / "out", None, RENDERED_AT)  # the act has its file
             written = write_outputs(store, tmp_path / "out", [], RENDERED_AT)
         assert [p.name for p in written] == ["INDICE.md"]
+
+    def test_write_outputs_renders_an_act_whose_file_is_missing(self, tmp_path):
+        """An act stored by an interrupted run and `unchanged` afterwards is
+        never in the changed list, so its file would never appear. A missing
+        file is rendered regardless; a present one is left to the list."""
+        out = tmp_path / "out"
+        with Store(tmp_path / "a.sqlite") as store:
+            store.upsert_act(act(), unit_count=1, updated_at="t")
+            run = store.start_run({}, RENDERED_AT)
+            store.upsert_unit(units()[0], run)
+            written = write_outputs(store, out, [], RENDERED_AT)
+            path = out / "civile" / "cc.md"
+            assert path.exists() and path in written
+            assert "## Art. 2043" in path.read_text(encoding="utf-8")
+            path.write_text("sentinel", encoding="utf-8")
+            written = write_outputs(store, out, [], RENDERED_AT)
+        assert path.read_text(encoding="utf-8") == "sentinel", "present and not in the list: not rewritten"
+        assert [p.name for p in written] == ["INDICE.md"]
+
+
+class TestActPath:
+    """The output tree is built from slugs and the manifest's areas — the
+    guarantee holds against the store's contents, not only the manifest's."""
+
+    def test_paths_come_from_the_slug_and_the_area(self, tmp_path):
+        assert act_path(tmp_path, act()) == tmp_path / "civile" / "cc.md"
+
+    @pytest.mark.parametrize("bad", [
+        {"id": "../x"}, {"id": "Codice Civile"}, {"id": ""}, {"area": "../etc"}, {"area": "commerciale"},
+    ])
+    def test_an_id_or_area_outside_the_vocabulary_is_refused(self, tmp_path, bad):
+        record = act()
+        for key, value in bad.items():
+            setattr(record, key, value)
+        with pytest.raises(ValueError):
+            act_path(tmp_path, record)

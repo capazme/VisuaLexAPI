@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .hierarchy import LEVELS
+from .manifest import AREAS, _SLUG
 from .store import ActRecord, Store, UnitRecord
 
 KIND_TITLES: dict[str, str] = {
@@ -236,11 +237,23 @@ def render_index(acts: list[ActRecord], unit_counts: dict[str, int], vigenza: di
 
 
 def act_path(out_dir: Path, act: ActRecord) -> Path:
+    """`<out>/<area>/<id>.md`. The manifest already admits only a slug and
+    one of `AREAS`, but the path is built from the store, so the same two
+    checks stand here: nothing a row could carry may escape `out_dir`."""
+    if not _SLUG.match(act.id or ""):
+        raise ValueError(f"act id must be a slug [a-z0-9-], got {act.id!r}")
+    if act.area not in AREAS:
+        raise ValueError(f"act area must be one of {', '.join(AREAS)}, got {act.area!r}")
     return Path(out_dir) / act.area / f"{act.id}.md"
 
 
 def write_outputs(store: Store, out_dir: Path, act_ids: Iterable[str] | None, rendered_at: str) -> list[Path]:
-    """Render the given acts (all when None) and always the root index."""
+    """Render the given acts (all when None), any act whose file does not
+    exist yet, and always the root index.
+
+    The missing-file rule covers an act stored by an interrupted run and
+    `unchanged` ever after: it is never in the changed list, so without it
+    the act would sit in the store with no Markdown for good."""
     out_dir = Path(out_dir)
     acts = store.acts()
     wanted = set(act_ids) if act_ids is not None else None
@@ -251,9 +264,9 @@ def write_outputs(store: Store, out_dir: Path, act_ids: Iterable[str] | None, re
         units = store.units_for_act(act.id)
         counts[act.id] = len(units)
         vigenza[act.id] = max((u.vigenza_al for u in units), default="")
-        if wanted is not None and act.id not in wanted:
-            continue
         path = act_path(out_dir, act)
+        if wanted is not None and act.id not in wanted and path.exists():
+            continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(render_act(act, units, store.enrichments_for_act(act.id), rendered_at), encoding="utf-8")
         written.append(path)

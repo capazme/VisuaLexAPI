@@ -745,7 +745,10 @@ meant to stay split; add new features as new files, not inside the shells:
    `decies` ("2409 octiesdecies" c.c.). On the frontend the tolerant
    `findArticleByNormalizedId` is still required: a naive `===` silently misses
    and falls back to the first article. Always use it, then canonicalise with
-   `getUniqueArticleId(match)` before storing in state.
+   `getUniqueArticleId(match)` before storing in state. The accepted forms now
+   include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
+   (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
+   normaliser and the archive (`archivio_normativo/hierarchy.py`).
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.

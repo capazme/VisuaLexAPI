@@ -392,8 +392,15 @@ class Store:
             (run_id, unit_id, outcome, reason),
         )
 
-    def logged_unit_ids(self, run_id: int) -> set[str]:
-        rows = self._db.execute("SELECT unit_id FROM unit_log WHERE run_id = ?", (run_id,)).fetchall()
+    def logged_unit_ids(self, run_id: int, exclude: tuple[str, ...] = ()) -> set[str]:
+        """The units this run has logged, less the outcomes in `exclude` —
+        `--resume` passes `("failed",)` so a failure is retried, not skipped."""
+        sql = "SELECT unit_id FROM unit_log WHERE run_id = ?"
+        params: list = [run_id]
+        if exclude:
+            sql += f" AND outcome NOT IN ({', '.join('?' for _ in exclude)})"
+            params += list(exclude)
+        rows = self._db.execute(sql, params).fetchall()
         return {r["unit_id"] for r in rows}
 
     def act_changed_in_run(self, act_id: str, run_id: int) -> bool:

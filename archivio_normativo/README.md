@@ -24,6 +24,7 @@ python -m archivio_normativo build --area privacy-digitale
 python -m archivio_normativo build --only dlgs-231-2001 --enrich brocardi,giurisprudenza
 python -m archivio_normativo build --full                    # ignore fingerprints (monthly)
 python -m archivio_normativo build --resume                  # continue the interrupted run
+python -m archivio_normativo build --rate 0 --only cc        # no pacing towards VisuaLex (tests, a local API)
 python -m archivio_normativo verify                          # integrity checks over the store
 python -m archivio_normativo render                          # rewrite the Markdown, no network
 python -m archivio_normativo report                          # last run
@@ -50,9 +51,22 @@ python -m archivio_normativo report                # progress / last run's stats
 ```
 
 If it gets killed (Ctrl-C, a closed terminal, `kill`), the next `report` or
-`verify` still reflects everything committed so far — nothing is lost, units
-are written per act — and `build --resume` continues the same run rather than
-starting over.
+`verify` still reflects everything committed so far — nothing is lost, every
+unit is committed as soon as it is stored — and `build --resume` continues
+the same run rather than starting over: it skips what the interrupted run
+completed (new, updated, unchanged) and retries what it failed, since a
+failed article is not in the store and skipping it would leave the hole.
+
+Pacing: `--rate` is articles per second towards VisuaLex (manifest default
+`rate_per_second`), `--enrich-rate` calls per second towards legal-it.
+`--rate 0` turns pacing off — for the tests and for an API on this machine;
+never against a shared instance.
+
+legal-it can hang: a tool call that gets no answer times out after 120 s
+(retried with backoff, then stored as `error`), and after five consecutive
+transport errors the run stops asking legal-it altogether — the remaining
+rows are stored as `error` ("legal-it unavailable (breaker open)") without
+waiting on each one, and the next run retries them.
 
 ## How an update run stays cheap
 

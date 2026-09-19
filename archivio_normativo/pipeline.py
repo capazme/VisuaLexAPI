@@ -93,6 +93,8 @@ class UnitOutcome:
 
 
 class Enricher(Protocol):
+    def plan_act(self, spec: ActSpec, numbers: list[str]) -> int: ...
+
     async def enrich_act(self, spec: ActSpec, res: ActResolution, units: list[UnitOutcome],
                          report: ActReport) -> None: ...
 
@@ -248,7 +250,9 @@ class Pipeline:
         known_ids = self.store.unit_ids_for_act(spec.id) if self.store else set()
         skip = set()
         if self.store and self.options.resume_run_id is not None and self.run_id == self.options.resume_run_id:
-            skip = self.store.logged_unit_ids(self.run_id)
+            # What the interrupted run completed is skipped; what it failed is
+            # not in the store and is asked for again.
+            skip = self.store.logged_unit_ids(self.run_id, exclude=("failed",))
         to_fetch: list[IndexedArticle] = []
         unchanged: list[IndexedArticle] = []
         brocardi_only: list[IndexedArticle] = []

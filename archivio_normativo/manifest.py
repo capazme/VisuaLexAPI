@@ -239,6 +239,15 @@ def _parse_act(raw: dict, defaults: Defaults) -> ActSpec:
     if "recitals" in units and source != "eurlex":
         raise ManifestError(f"{where}: recitals exist only for EUR-Lex acts")
     enrich = expand_kinds(raw["enrich"]) if raw.get("enrich") is not None else defaults.enrich
+    if "attuazione" in enrich and source != "eurlex":
+        raise ManifestError(f"{where}: enrichment kind 'attuazione' (national implementation of a directive) "
+                            f"applies to EUR-Lex acts only")
+    if "base_ue" in enrich and source == "eurlex":
+        raise ManifestError(f"{where}: enrichment kind 'base_ue' (the EU basis of a national act) "
+                            f"applies to Normattiva acts only")
+    celex = _optional_str(raw.get("celex"))
+    if source == "eurlex" and not celex:
+        raise ManifestError(f"{where}: an EUR-Lex act needs its 'celex' (e.g. 32016R0679)")
     enrich_articles = _optional_str(raw.get("enrich_articles"))
     if enrich_articles:
         try:
@@ -263,7 +272,7 @@ def _parse_act(raw: dict, defaults: Defaults) -> ActSpec:
         date=_optional_str(raw.get("date")),
         act_number=_optional_str(raw.get("act_number")),
         annex=_optional_str(raw.get("annex")),
-        celex=_optional_str(raw.get("celex")),
+        celex=celex,
         celex_consolidated=celex_consolidated,
         units=units,
         enrich=enrich,

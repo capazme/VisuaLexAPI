@@ -176,6 +176,15 @@ class TestLogAndChange:
         store.log_unit(r, "cc:art:2", "unchanged")  # a later outcome for the same unit replaces
         assert store.logged_unit_ids(r) == {"cc:art:1", "cc:art:2"}
 
+    def test_logged_unit_ids_can_leave_out_an_outcome(self, store):
+        r = store.start_run({}, "t")
+        store.log_unit(r, "cc:art:1", "new")
+        store.log_unit(r, "cc:art:2", "failed", "HTTP 500")
+        store.log_unit(r, "cc:art:3", "unchanged")
+        assert store.logged_unit_ids(r, exclude=("failed",)) == {"cc:art:1", "cc:art:3"}
+        assert store.logged_unit_ids(r, exclude=("failed", "unchanged")) == {"cc:art:1"}
+        assert store.logged_unit_ids(r) == {"cc:art:1", "cc:art:2", "cc:art:3"}, "the default keeps everything"
+
     def test_act_changed_in_run(self, store):
         store.upsert_act(act(), unit_count=0, updated_at="x")
         r1 = store.start_run({}, "t")

@@ -120,6 +120,32 @@ class TestValidation:
         with pytest.raises(ManifestError, match="recitals"):
             load_manifest(write(tmp_path, minimal(units=["articles", "recitals"])))
 
+    def test_an_eu_act_needs_its_celex(self, tmp_path):
+        eu = minimal(id="gdpr", area="ue", source="eurlex", act_type="regolamento ue", date="2016",
+                     act_number="679", cite="GDPR")
+        with pytest.raises(ManifestError, match=r"act 'gdpr'.*celex"):
+            load_manifest(write(tmp_path, eu))
+        eu["acts"][0]["celex"] = "32016R0679"
+        assert load_manifest(write(tmp_path, eu)).act("gdpr").celex == "32016R0679"
+
+    def test_attuazione_belongs_to_eu_acts_only(self, tmp_path):
+        with pytest.raises(ManifestError, match=r"act 'cc'.*attuazione.*EUR-Lex"):
+            load_manifest(write(tmp_path, minimal(enrich=["attuazione"])))
+
+    def test_base_ue_belongs_to_normattiva_acts_only(self, tmp_path):
+        eu = minimal(id="gdpr", area="ue", source="eurlex", act_type="regolamento ue", date="2016",
+                     act_number="679", celex="32016R0679", cite="GDPR", enrich=["base_ue"])
+        with pytest.raises(ManifestError, match=r"act 'gdpr'.*base_ue.*Normattiva"):
+            load_manifest(write(tmp_path, eu))
+
+    def test_the_act_level_kinds_on_the_right_source_load(self, tmp_path):
+        data = minimal(enrich=["base_ue"])
+        data["acts"].append({"id": "gdpr", "area": "ue", "label": "GDPR", "source": "eurlex",
+                             "act_type": "regolamento ue", "date": "2016", "act_number": "679",
+                             "celex": "32016R0679", "cite": "GDPR", "enrich": ["attuazione"]})
+        m = load_manifest(write(tmp_path, data))
+        assert m.act("cc").enrich == ("base_ue",) and m.act("gdpr").enrich == ("attuazione",)
+
     def test_unknown_top_level_key_is_an_error(self, tmp_path):
         data = minimal()
         data["defualts"] = {}
