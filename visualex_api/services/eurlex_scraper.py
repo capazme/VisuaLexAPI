@@ -13,6 +13,86 @@ from ..tools.selectors import EURLexSelectors
 log = structlog.get_logger()
 
 
+# --- Recitals -------------------------------------------------------------
+#
+# Two markups. The modern OJ page (acts published since ~2014) wraps every
+# recital in <div class="eli-subdivision" id="rct_N"> holding a two-cell table:
+# "(N)" on the left, the text on the right. Older acts are served class-less:
+# a run of <p>(N) …</p> between "considerando quanto segue:" and the enacting
+# formula ("HA/HANNO ADOTTATO …"). Consolidated texts have no preamble at all.
+_RECITAL_DIV_ID = re.compile(r"^rct_(\d+)$")
+_RECITAL_NUMBER_ONLY = re.compile(r"^\(\d+\)$")
+_LEGACY_RECITAL = re.compile(r"^\((\d+)\)\s+(.*)$", re.S)
+_LEGACY_PREAMBLE_MARKER = re.compile(r"considerando quanto segue", re.I)
+_LEGACY_ENACTING_FORMULA = re.compile(r"^HA(?:NNO)?\s+ADOTTAT[OA]\b", re.I)
+
+
+def _strip_footnote_marks(element) -> None:
+    """Remove "(18)"-style footnote call-outs in place.
+
+    EUR-Lex renders them as <a>(<span class="oj-note-tag">18</span>)</a>; the
+    anchor's whole text is the parenthesised number, so dropping the anchor
+    leaves the sentence intact. The soup is built per request from the cached
+    HTML, so mutating it here is local to this call.
+    """
+    for span in element.find_all("span", class_="oj-note-tag"):
+        anchor = span.find_parent("a")
+        target = anchor if anchor is not None else span
+        if _RECITAL_NUMBER_ONLY.match(target.get_text(strip=True) or ""):
+            target.decompose()
+
+
+def _extract_recitals_modern(soup) -> list[dict]:
+    recitals = []
+    for div in soup.find_all("div", id=_RECITAL_DIV_ID):
+        number = _RECITAL_DIV_ID.match(div["id"]).group(1)
+        _strip_footnote_marks(div)
+        paragraphs = []
+        for p in div.find_all("p"):
+            text = p.get_text(" ", strip=True)
+            if not text or _RECITAL_NUMBER_ONLY.match(text):
+                continue  # the "(N)" cell
+            paragraphs.append(text)
+        if paragraphs:
+            recitals.append({"number": number, "text": "\n".join(paragraphs)})
+    return recitals
+
+
+def _extract_recitals_legacy(soup) -> list[dict]:
+    marker = soup.find("p", string=_LEGACY_PREAMBLE_MARKER)
+    if marker is None:
+        return []
+    recitals = []
+    expected = 1
+    for p in marker.find_all_next("p"):
+        text = p.get_text(" ", strip=True)
+        if _LEGACY_ENACTING_FORMULA.match(text):
+            break
+        match = _LEGACY_RECITAL.match(text)
+        if not match:
+            continue
+        number, body = match.group(1), match.group(2).strip()
+        # Footnote paragraphs also read "(4) …"; a recital number is the next
+        # one in the sequence, nothing else.
+        if int(number) != expected:
+            continue
+        recitals.append({"number": number, "text": body})
+        expected += 1
+    return recitals
+
+
+def extract_recitals(soup) -> list[dict]:
+    """Recitals of an EU act as ``[{"number": "1", "text": "…"}, …]``.
+
+    Modern markup first; the legacy paragraph walk only when the page has no
+    ``rct_N`` divs. A consolidated text yields ``[]``: it has no preamble.
+    """
+    recitals = _extract_recitals_modern(soup)
+    if recitals:
+        return recitals
+    return _extract_recitals_legacy(soup)
+
+
 class EurlexScraper(BaseScraper):
     def __init__(self):
         self.base_url = 'https://eur-lex.europa.eu/eli'
