@@ -39,8 +39,10 @@ included:
 deploying a hotfix branch.
 
 Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
-through short-lived branches; `merlt` absorbs them with a periodic
-`git merge main`. Nothing is ever cherry-picked back.
+through short-lived branches; `merlt` absorbs them by merging each release
+tag (`git merge v1.7.6`), never `main` itself. Nothing is ever cherry-picked
+back. The full model — topic branches, tags, the merlt merge checklist, where
+session branches strand — is in `docs/git-workflow.md`.
 
 ---
 
@@ -68,7 +70,7 @@ absence broke a deploy, which is why they read as a list of scars:
 | 4 | `npm ci` in `frontend/` | |
 | 5 | `npm run build` (frontend) | `tsc -b && vite build`. **This is the real type-check** — it walks the project references, which a bare `tsc --noEmit` does not. |
 | 6 | `npm run build` (backend) | pm2 runs `node dist/index.js`, so skipping this leaves the service on a stale `dist/`. `tsc` type-checks as it emits and fails before writing. |
-| 7 | Version bump + commit | Only when `--major/--minor/--patch` is passed. |
+| 7 | Version bump + commit + tag + push | Only when `--major/--minor/--patch` is passed. Writes `version.txt`, commits, tags the commit `vX.Y.Z` and pushes `HEAD` plus the tag. The tag is the record of what production ran; a failed push is a warning, not a failed deploy — push by hand. |
 | 8 | Restart | `pm2 restart all`, else `systemctl restart visualex-backend`. |
 
 ---
@@ -243,11 +245,15 @@ Recorded rather than fixed, so nobody rediscovers them during an incident.
   directory, exists only on the server; if that machine is lost, so is the
   knowledge. `start.sh` is a *development* launcher (`npm run dev`,
   `python app.py &`) and is not what production runs.
-- **The version bump commit is never pushed.** It stays local to the server, so
-  the server's `main` sits one commit ahead of `origin/main` and `git pull -r`
-  rebases it forward on every deploy.
+- **The push at step 7 is best-effort.** If the server cannot reach GitHub,
+  the bump commit and the `vX.Y.Z` tag stay local to it; the server's `main`
+  then sits ahead of `origin/main`, the laptop never sees the tag, and the
+  merlt merge in `docs/git-workflow.md` has nothing to merge. The script warns
+  with the exact command to run; run it.
+- **Releases before 19 September 2026 have no tag.** The tags start at
+  `v1.7.5`, added retroactively; `git describe` on anything older says so.
 - **`requirements.txt` has no version pins.** Builds are not reproducible, and a
   compromised or breaking upstream release lands in production on the next
   deploy without anyone choosing it.
-- **No rollback.** Recovery means checking out the previous tag and re-running
-  the script — and `prisma migrate deploy` does not walk migrations backwards.
+- **No rollback.** Recovery means checking out the previous `vX.Y.Z` tag and
+  re-running the script — and `prisma migrate deploy` does not walk migrations backwards.

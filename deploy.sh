@@ -312,13 +312,31 @@ if [[ -n "$VERSION_BUMP" ]]; then
     update_version_file "$NEW_VERSION"
     print_success "Version updated to ${NEW_VERSION}"
 
-    # Commit version change
+    # Commit the bump, tag it, push both. The tag is the record of what
+    # production ran (docs/git-workflow.md, "Release = deploy + tag"): a bump
+    # that stays on the server is invisible from the laptop, and the experiment
+    # branch merges tags, not main. Neither the tag nor the push may abort the
+    # deploy (set -e): the build succeeded and the restart still has to run.
     cd "$SCRIPT_DIR"
     git add version.txt
-    git commit -m "chore: bump version to ${NEW_VERSION}
+    if git commit -q -m "chore: bump version to ${NEW_VERSION}
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)" || true
-    print_success "Version commit created"
+🤖 Generated with [Claude Code](https://claude.com/claude-code)"; then
+        if git tag -a "v${NEW_VERSION}" -m "Release ${NEW_VERSION}"; then
+            print_success "Version commit created and tagged v${NEW_VERSION}"
+        else
+            print_warning "Version commit created, but tag v${NEW_VERSION} already exists"
+        fi
+        # HEAD, not $DEPLOY_BRANCH: with --allow-branch the bump sits on the
+        # branch actually deployed, and that is the one origin must receive.
+        if git push origin HEAD "v${NEW_VERSION}" 2>/dev/null; then
+            print_success "Pushed bump and v${NEW_VERSION} to origin"
+        else
+            print_warning "Push failed — run by hand: git push origin HEAD v${NEW_VERSION}"
+        fi
+    else
+        print_warning "No version commit created (nothing to commit?)"
+    fi
 fi
 
 # Step 8: Restart services

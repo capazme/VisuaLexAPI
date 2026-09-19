@@ -22,11 +22,21 @@ comments and commits are English.
 AI experiment and is never deployed.**
 
 Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
-through short-lived branches (`fix/…`, `feature/…`); `merlt` absorbs them with a
-periodic `git merge main`. Nothing is cherry-picked back. If you find yourself
-fixing something vanilla while on `merlt`, stop and move to `main` — that
-one-way-valve discipline is what this model exists to enforce, after 32 vanilla
-commits (four of them security fixes) sat stranded on the experiment for weeks.
+through short-lived branches (`fix/…`, `feature/…`, merged `--no-ff`); a release
+is a deploy, and `deploy.sh` tags it `vX.Y.Z` at bump time; `merlt` absorbs
+vanilla by merging each release **tag**, never `main` itself. Nothing is
+cherry-picked back. If you find yourself fixing something vanilla while on
+`merlt`, stop and move to `main` — that one-way-valve discipline is what this
+model exists to enforce, after 32 vanilla commits (four of them security fixes)
+sat stranded on the experiment for weeks. There is deliberately no `dev`
+branch. **`docs/git-workflow.md` is the standard** — the merlt merge checklist,
+the monthly sweep, why `dev` was rejected.
+
+Two more places where work strands, both checked before assuming every fix
+has reached `main`: Claude Code web sessions push `origin/claude/<name>-<id>` branches
+(merge into `main` within days or delete — one held a real fix for three days
+while a parallel fix landed), and desktop sessions leave worktrees under
+`.claude/worktrees/`, sometimes with an uncommitted file inside.
 
 When backporting from `merlt`, watch for two things: commits are often mixed
 (a vanilla fix and MERL-T work in one commit), and MERL-T code can ride along —
@@ -818,3 +828,11 @@ meant to stay split; add new features as new files, not inside the shells:
     back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
     40, so a miss is the normal case, not the exception. Same trap as
     `codice_urn` on the backend.
+
+<!-- second-brain:inizio -->
+## Second brain (vault Obsidian)
+- Scheda del progetto: `🛠️ Progetti/VisuaLexAPI/VisuaLexAPI.md` (stato repo generato ogni ora, non modificarlo a mano).
+- Decisioni architetturali: `🛠️ Progetti/VisuaLexAPI/ADR/` — leggi le ADR prima di cambiare l'architettura; per una nuova decisione scrivi una ADR (template `🧩 Template/ADR.md`).
+- Memorie di Claude Code copiate in `🛠️ Progetti/VisuaLexAPI/Memorie/` (sola lettura: la fonte è `~/.claude/projects`).
+- Accesso: server MCP `obsidian` (Local REST API). Non scrivere nel vault fuori da ADR e note del progetto.
+<!-- second-brain:fine -->
