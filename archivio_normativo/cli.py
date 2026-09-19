@@ -154,7 +154,10 @@ async def run_build(args, manifest: Manifest) -> int:
             async with aiohttp.ClientSession(read_bufsize=2**20) as session:
                 visualex = VisuaLexClient(base_url, session, throttle, on_retry=on_retry)
                 if not args.dry_run and _needs_legalit(specs, override):
-                    async with LegalItClient(manifest.providers.legalit_command, enrich_throttle, on_retry=on_retry) as legalit:
+                    # 60 s and one retry: a hung server costs ~2 min per execute, so
+                    # the enricher's breaker (five in a row) opens in ~10 min, not ~30.
+                    async with LegalItClient(manifest.providers.legalit_command, enrich_throttle, on_retry=on_retry,
+                                             attempts=2, call_timeout=60.0) as legalit:
                         enricher = Enricher(store=store, legalit=legalit, options=options, run_id=run_id,
                                             log=log, now=datetime.now)
                         pipeline = Pipeline(store=store, visualex=visualex, options=options, run_id=run_id,

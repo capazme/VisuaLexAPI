@@ -1,4 +1,6 @@
 # Optional extra for `python -m archivio_normativo`: enrichment through the
 # legal-it MCP server. The archive's text path needs nothing beyond the API's
 # own requirements.txt (aiohttp, pyyaml).
-mcp>=1.2
+# 2.x only: `ClientSession.call_tool(read_timeout_seconds=<float>)` is the 2.x
+# signature (1.x wanted a timedelta and would fail every call).
+mcp>=2,<3

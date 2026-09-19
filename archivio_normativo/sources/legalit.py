@@ -32,9 +32,9 @@ class LegalItTransportError(LegalItError, RetryableError):
     """The MCP transport failed or timed out; the call may be retried."""
 
 
-#: The SDK's own exception, by name: `McpError` in mcp 1.x, `MCPError` in
-#: 2.x. Matched on the class hierarchy so the SDK stays an optional import.
-_MCP_ERROR_NAMES = frozenset({"McpError", "MCPError"})
+#: The SDK's own exception (mcp 2.x, the version requirements-archivio.txt
+#: pins), by name on the class hierarchy so the SDK stays an optional import.
+_MCP_ERROR_NAMES = frozenset({"MCPError"})
 
 
 def _is_mcp_error(exc: BaseException) -> bool:

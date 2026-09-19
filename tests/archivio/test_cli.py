@@ -3,6 +3,7 @@
 `--rate 0` disables pacing: without it every call waits its second."""
 import yaml
 
+from archivio_normativo import cli
 from archivio_normativo.cli import async_main
 from archivio_normativo.store import Store
 from tests.archivio.fake_visualex import FakeVisuaLex
@@ -161,3 +162,30 @@ async def test_a_long_ndjson_line_is_read_whole(fake_visualex, tmp_path, capsys)
     assert code == 0, capsys.readouterr().out
     with Store(out / "archivio.sqlite") as store:
         assert len(store.get_unit("cc:art:2043").text) == 700_000
+
+
+async def test_legalit_is_opened_with_a_short_timeout_and_one_retry(fake_visualex, tmp_path, monkeypatch, capsys):
+    """A hung server must cost ~2 min per execute, not ~6: 60 s, retried once,
+    so the breaker (five in a row) opens in about ten minutes."""
+    seen = {}
+
+    class RecordingClient:
+        def __init__(self, command, throttle, **kwargs):
+            seen.update(kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def call(self, call):
+            return "Nessun risultato."
+
+    monkeypatch.setattr(cli, "LegalItClient", RecordingClient)
+    add_cc(fake_visualex)
+    manifest = write_manifest(tmp_path, fake_visualex.base_url)
+    code = await async_main(["build", "--manifest", str(manifest), "--out", str(tmp_path / "out"), "--rate", "0",
+                             "--enrich", "cassazione"])
+    assert code == 0, capsys.readouterr().out
+    assert (seen.get("attempts"), seen.get("call_timeout")) == (2, 60.0)

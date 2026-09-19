@@ -208,11 +208,10 @@ class TestTimeouts:
             await client.call(ToolCall("t", {}))
         assert session.timeouts == [120.0]
 
-    @pytest.mark.parametrize("name", ["McpError", "MCPError"])
-    async def test_the_sdks_own_error_is_a_transport_error(self, name):
-        """The SDK spells it `McpError` (1.x) and `MCPError` (2.x); both are
-        transport failures worth a retry, matched by name so the SDK stays optional."""
-        exc_type = type(name, (Exception,), {})
+    async def test_the_sdks_own_error_is_a_transport_error(self):
+        """mcp 2.x's `MCPError` (a request timeout, a closed stream) is a
+        transport failure worth a retry, matched by name so the SDK stays optional."""
+        exc_type = type("MCPError", (Exception,), {})
         session = FakeSession([exc_type("request timed out"), "ok"])
         async with LegalItClient(("bash", "x.sh"), Throttle(0), session_factory=factory_for(session),
                                  sleep=_no_sleep, jitter=lambda: 0.5) as client:

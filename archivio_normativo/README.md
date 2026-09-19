@@ -62,11 +62,10 @@ Pacing: `--rate` is articles per second towards VisuaLex (manifest default
 `--rate 0` turns pacing off — for the tests and for an API on this machine;
 never against a shared instance.
 
-legal-it can hang: a tool call that gets no answer times out after 120 s
-(retried with backoff, then stored as `error`), and after five consecutive
-transport errors the run stops asking legal-it altogether — the remaining
-rows are stored as `error` ("legal-it unavailable (breaker open)") without
-waiting on each one, and the next run retries them.
+legal-it can hang: a hung call times out after 60 s, is retried once, and
+after five such failures in a row the run stops asking legal-it altogether —
+the remaining rows are stored as `error` ("legal-it unavailable (breaker
+open)") without waiting on each one, and the next run retries them.
 
 ## How an update run stays cheap
 
