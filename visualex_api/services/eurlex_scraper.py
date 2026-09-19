@@ -8,6 +8,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
+from ..tools.treextractor import strip_amendment_markers
 from .akn_parser import normalize_article_key
 
 # Configure structured logger
@@ -127,7 +128,7 @@ def _element_classes(element) -> set:
 def _cons_text(element) -> str:
     # A separator between child nodes: "1." sits in its own span next to the
     # paragraph text, and NBSP is EUR-Lex's favourite space.
-    return re.sub(r"[ \t\xa0]+", " ", element.get_text(" ", strip=True)).strip()
+    return strip_amendment_markers(element.get_text(" ", strip=True))
 
 
 def _cons_find_title(soup, article):

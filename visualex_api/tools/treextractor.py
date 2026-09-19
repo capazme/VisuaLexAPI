@@ -522,6 +522,17 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 _EURLEX_ARTICLE_NUM = re.compile(r"^(?:Articolo|Article)\s+([\w.-]+)", re.IGNORECASE)
 
 
+# EUR-Lex marks amended passages inline as well as with block markers:
+# "►M2 … ◄" (amending act), "►C2 … ◄" (corrigendum), "►B" (base act). The
+# glyphs are never part of the legal text.
+_AMENDMENT_MARK = re.compile(r"\s*[►◄](?:[A-Z]\d*)?\s*")
+
+
+def strip_amendment_markers(text: str) -> str:
+    """Drop inline "►M2 … ◄" markers and collapse the whitespace they leave."""
+    return re.sub(r"[ \t\xa0]+", " ", _AMENDMENT_MARK.sub(" ", text or "")).strip()
+
+
 def _cons_rubrica_of(marker):
     """The rubrica element that follows a consolidated article marker.
 
@@ -550,7 +561,7 @@ def _extract_consolidated_rubriche(soup):
         rubrica = _cons_rubrica_of(marker)
         if rubrica is None:
             continue
-        title = re.sub(r"\s+", " ", rubrica.get_text(" ", strip=True)).strip()
+        title = strip_amendment_markers(rubrica.get_text(" ", strip=True))
         if title:
             rubriche[key] = title
     return rubriche
@@ -577,7 +588,7 @@ def _walk_consolidated_tree(soup, normurn, link, details, eli_info):
             nxt = elem.find_next_sibling()
             if nxt is not None and "title-division-2" in (nxt.get("class", []) or []):
                 heading = f"{heading} {nxt.get_text(' ', strip=True)}"
-            result.append(re.sub(r"\s+", " ", heading).strip())
+            result.append(strip_amendment_markers(heading))
             continue
         key = normalize_article_key(elem.get_text(" ", strip=True))
         if not key or key in seen:

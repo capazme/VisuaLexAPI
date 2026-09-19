@@ -119,7 +119,11 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from visualex_api.tools.exceptions import DocumentNotFoundError
-from visualex_api.tools.treextractor import _extract_eurlex_rubriche, _parse_eurlex_tree
+from visualex_api.tools.treextractor import (
+    _extract_eurlex_rubriche,
+    _parse_eurlex_tree,
+    strip_amendment_markers,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "eurlex"
 
@@ -170,6 +174,18 @@ class TestConsolidatedArticleText:
         assert text.startswith("Articolo 1")
         assert "Oggetto e finalità" in text
 
+    async def test_inline_amendment_markers_are_not_text(self):
+        soup = soup_of("eprivacy_consolidated_20091219.html")
+        scraper = EurlexScraper()
+        text4 = await scraper.extract_article_text(soup, "4")
+        assert text4.split("\n")[1] == "Sicurezza del trattamento"
+        text13 = await scraper.extract_article_text(soup, "13")
+        assert "►" not in text13 and "◄" not in text13
+        result, _, _ = await _parse_eurlex_tree(soup, CONSOLIDATED, link=False, details=False)
+        for item in result:
+            text = await scraper.extract_article_text(soup, item["numero"])
+            assert "►" not in text and "◄" not in text
+
 
 class TestConsolidatedRubriche:
     def test_flat_page(self):
@@ -187,6 +203,17 @@ class TestConsolidatedRubriche:
         rubriche = _extract_eurlex_rubriche(soup_of("gdpr_oj_trimmed.html"))
         assert rubriche["1"] == "Oggetto e finalità"
         assert rubriche["17"] == "Diritto alla cancellazione («diritto all'oblio»)"
+
+    def test_inline_markers_are_stripped_from_rubriche(self):
+        rubriche = _extract_eurlex_rubriche(soup_of("eprivacy_consolidated_20091219.html"))
+        assert rubriche["4"] == "Sicurezza del trattamento"
+
+
+class TestStripAmendmentMarkers:
+    def test_examples(self):
+        assert strip_amendment_markers("►M2 Sicurezza del trattamento ◄") == "Sicurezza del trattamento"
+        assert strip_amendment_markers("personali»: ◄ violazione") == "personali»: violazione"
+        assert strip_amendment_markers("Articolo 5") == "Articolo 5"
 
 
 class TestConsolidatedTree:
