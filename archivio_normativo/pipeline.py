@@ -173,7 +173,9 @@ class Pipeline:
 
         if self.options.dry_run:
             report.enrich_planned = len(brocardi_only) + (len(to_fetch) if brocardi else 0)
-            self.log.info("DRY-RUN act=%s new=%d changed=%d unchanged=%d brocardi=%d",
+            if self.enricher is not None:
+                report.enrich_planned += self.enricher.plan_act(spec, [a.number for a in indexed])
+            self.log.info("DRY-RUN act=%s new=%d changed=%d unchanged=%d enrichment_calls=%d",
                           spec.id, report.planned_new, report.planned_changed, report.unchanged,
                           report.enrich_planned)
             return report
