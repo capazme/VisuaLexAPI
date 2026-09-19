@@ -265,6 +265,22 @@ class TestConsolidatedTree:
         assert result[1] == {"numero": "1"}
         assert count >= 6  # Capo I (art. 1-5) + art. 50
 
+    async def test_heading_title_survives_a_modref_between_number_and_title(self):
+        # Live eIDAS: a "▼M2" marker sits between "SEZIONE 2" and its title,
+        # and the index read a bare "SEZIONE 2".
+        html = ('<html><body>'
+                '<p class="title-division-1">SEZIONE 2</p>'
+                '<p class="modref">▼M2</p>'
+                '<p class="title-division-2">Servizi fiduciari non qualificati</p>'
+                '<p class="title-article-norm">Articolo 17</p>'
+                '<p class="stitle-article-norm">Requisiti generali</p>'
+                '</body></html>')
+        result, count, _ = await _parse_eurlex_tree(
+            BeautifulSoup(html, "html.parser"), self.CONS, link=False, details=True)
+        assert result[0] == "SEZIONE 2 Servizi fiduciari non qualificati"
+        assert result[1] == {"numero": "17"}
+        assert count == 1
+
     async def test_headings_are_omitted_without_details(self):
         result, _, _ = await _parse_eurlex_tree(
             soup_of("eidas_consolidated_20241018_trimmed.html"), self.CONS, link=False, details=False)

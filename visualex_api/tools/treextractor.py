@@ -534,15 +534,26 @@ def strip_amendment_markers(text: str) -> str:
     return re.sub(r"[ \t\xa0]+", " ", _AMENDMENT_MARK.sub(" ", text or "")).strip()
 
 
+def _next_non_modref_sibling(element):
+    """The next sibling that is not a `modref` marker.
+
+    EUR-Lex drops a "▼M2" / "▼B" paragraph before every block an amendment
+    touched, so the element that logically follows a title — its rubrica,
+    or the heading text after a heading number — may sit one marker away.
+    """
+    sibling = element.find_next_sibling()
+    while sibling is not None and "modref" in (sibling.get("class", []) or []):
+        sibling = sibling.find_next_sibling()
+    return sibling
+
+
 def _cons_rubrica_of(marker):
     """The rubrica element that follows a consolidated article marker.
 
     Bare `stitle-article-norm` (flat pages) or inside `div.eli-title`
     (subdivision pages); a `modref` marker may sit in between.
     """
-    sibling = marker.find_next_sibling()
-    while sibling is not None and "modref" in (sibling.get("class", []) or []):
-        sibling = sibling.find_next_sibling()
+    sibling = _next_non_modref_sibling(marker)
     if sibling is None:
         return None
     classes = sibling.get("class", []) or []
@@ -586,7 +597,7 @@ def _walk_consolidated_tree(soup, normurn, link, details, eli_info):
             if not details:
                 continue
             heading = elem.get_text(" ", strip=True)
-            nxt = elem.find_next_sibling()
+            nxt = _next_non_modref_sibling(elem)
             if nxt is not None and "title-division-2" in (nxt.get("class", []) or []):
                 heading = f"{heading} {nxt.get_text(' ', strip=True)}"
             result.append(strip_amendment_markers(heading))
