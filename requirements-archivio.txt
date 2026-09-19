@@ -1,0 +1,4 @@
+# Optional extra for `python -m archivio_normativo`: enrichment through the
+# legal-it MCP server. The archive's text path needs nothing beyond the API's
+# own requirements.txt (aiohttp, pyyaml).
+mcp>=1.2
