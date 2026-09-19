@@ -13,7 +13,10 @@ URLs (the `/eli/` URLs answer 202 to non-browsers). Three markups live here:
   `title-article-norm` / `stitle-article-norm`, `modref` markers, no recitals,
   "Articolo 14 <span class="norm">bis</span>".
 - `eidas_consolidated_20241018_trimmed.html` — consolidated format with
-  `eli-subdivision` wrappers and `title-division-1/2` headings. Capo I, art. 50.
+  `eli-subdivision` wrappers and `title-division-1/2` headings. Capo I,
+  art. 12 and art. 24 (`modref` markers nested inside `div.norm` and the
+  `grid-list` point grids, one of them the "▼M2 —————" deleted-point
+  placeholder), art. 50.
 
 Trimming: `str()` of the elements with the listed ids, assembled inside
 `<html><body>`. The capture and trim commands are in

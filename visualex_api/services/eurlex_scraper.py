@@ -126,6 +126,13 @@ def _element_classes(element) -> set:
 
 
 def _cons_text(element) -> str:
+    # A `modref` marker ("▼M2", or "▼M2 —————" for a deleted point) is a
+    # sibling of the article title only on older pages; a recent consolidation
+    # nests it inside `div.norm` and the point grids, where a class check on
+    # the sibling cannot see it. The soup is parsed per request, so removing
+    # the markers in place is local to this call.
+    for marker in element.find_all(class_="modref"):
+        marker.decompose()
     # A separator between child nodes: "1." sits in its own span next to the
     # paragraph text, and NBSP is EUR-Lex's favourite space.
     return strip_amendment_markers(element.get_text(" ", strip=True))

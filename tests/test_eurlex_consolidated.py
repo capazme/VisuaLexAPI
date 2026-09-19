@@ -7,6 +7,7 @@ cookie rule in art. 5(3); Reg. 910/2014 was rewritten by Reg. 2024/1183.
 EUR-Lex publishes consolidated versions under a sector-0 CELEX
 ("02002L0058-20091219"); a request may name one and VisuaLex serves it.
 """
+import re
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -181,10 +182,40 @@ class TestConsolidatedArticleText:
         assert text4.split("\n")[1] == "Sicurezza del trattamento"
         text13 = await scraper.extract_article_text(soup, "13")
         assert "►" not in text13 and "◄" not in text13
-        result, _, _ = await _parse_eurlex_tree(soup, CONSOLIDATED, link=False, details=False)
+
+    @pytest.mark.parametrize("fixture", [
+        "eprivacy_consolidated_20091219.html",
+        "eidas_consolidated_20241018_trimmed.html",
+    ])
+    async def test_no_article_carries_a_marker_or_a_deletion_placeholder(self, fixture):
+        # Every article the tree yields, on both consolidated markups: no
+        # "►M2 … ◄" inline marker, no "▼M2" block marker, no "—————" left by a
+        # deleted point. The markers are not text (gotcha 23).
+        soup = soup_of(fixture)
+        scraper = EurlexScraper()
+        result, count, _ = await _parse_eurlex_tree(soup, CONSOLIDATED, link=False, details=False)
+        assert count > 0
         for item in result:
             text = await scraper.extract_article_text(soup, item["numero"])
-            assert "►" not in text and "◄" not in text
+            assert not re.search(r"[►◄▼]", text), (fixture, item["numero"])
+            assert not re.search(r"—{3,}", text), (fixture, item["numero"])
+
+    async def test_markers_nested_in_the_body_are_not_text(self):
+        # On the 2024 eIDAS consolidation the "▼M2" / "▼B" markers sit inside
+        # `div.norm` and the point grids, not beside the title, so a class
+        # check on the article's siblings never sees them: art. 12 read
+        # "…internazionali; ▼M2 c) facilita…" and art. 24 "…qualificati: ▼M2
+        # a) informa…", with a "▼M2 ————— ▼B" where a point was deleted.
+        soup = soup_of("eidas_consolidated_20241018_trimmed.html")
+        scraper = EurlexScraper()
+        text12 = await scraper.extract_article_text(soup, "12")
+        assert "▼" not in text12 and "—————" not in text12
+        assert "norme europee e internazionali; c) facilita" in text12
+        assert "8. Entro il 18 settembre 2025" in text12
+        text24 = await scraper.extract_article_text(soup, "24")
+        assert "▼" not in text24 and "—————" not in text24
+        assert "servizi fiduciari qualificati: a) informa l’organismo di vigilanza" in text24
+        assert "lettera i); k) se i prestatori" in text24
 
 
 class TestConsolidatedRubriche:

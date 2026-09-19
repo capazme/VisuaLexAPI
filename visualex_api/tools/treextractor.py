@@ -523,13 +523,14 @@ _EURLEX_ARTICLE_NUM = re.compile(r"^(?:Articolo|Article)\s+([\w.-]+)", re.IGNORE
 
 
 # EUR-Lex marks amended passages inline as well as with block markers:
-# "►M2 … ◄" (amending act), "►C2 … ◄" (corrigendum), "►B" (base act). The
-# glyphs are never part of the legal text.
-_AMENDMENT_MARK = re.compile(r"\s*[►◄](?:[A-Z]\d*)?\s*")
+# "►M2 … ◄" (amending act), "►C2 … ◄" (corrigendum), "►B" (base act), and
+# "▼M2" / "▼B" at the head of a replaced block. The glyphs are never part of
+# the legal text.
+_AMENDMENT_MARK = re.compile(r"\s*[►◄▼](?:[A-Z]\d*)?\s*")
 
 
 def strip_amendment_markers(text: str) -> str:
-    """Drop inline "►M2 … ◄" markers and collapse the whitespace they leave."""
+    """Drop inline "►M2 … ◄" / "▼M2" markers and collapse the whitespace they leave."""
     return re.sub(r"[ \t\xa0]+", " ", _AMENDMENT_MARK.sub(" ", text or "")).strip()
 
 

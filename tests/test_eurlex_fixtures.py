@@ -39,3 +39,17 @@ def test_consolidated_fixtures_use_norm_classes():
 def test_consolidated_eprivacy_has_a_suffixed_article():
     html = _read("eprivacy_consolidated_20091219.html")
     assert 'Articolo 14 <span class="norm">bis</span>' in html
+
+
+def test_consolidated_eidas_nests_modref_markers_inside_the_body():
+    # A recent consolidation puts the "▼M2" marker inside `div.norm` and the
+    # point grids, not beside the article title: the fixture must carry that
+    # shape or the marker-leak test would pass for the wrong reason.
+    html = _read("eidas_consolidated_20241018_trimmed.html")
+    assert 'id="art_12"' in html
+    assert 'id="art_24"' in html
+    assert ('<div class="norm inline-element">\n'
+            '<p class="norm inline-element">Un prestatore di servizi fiduciari qualificato '
+            'che presta servizi fiduciari qualificati:</p>\n'
+            '<p class="modref">') in html
+    assert '>▼M2</a>\xa0—————</p>' in html, "the deleted-point placeholder lives in a modref"
