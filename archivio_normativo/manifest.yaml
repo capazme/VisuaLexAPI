@@ -1,0 +1,354 @@
+version: 1
+
+providers:
+  visualex:
+    base_url: "http://localhost:5000"
+  legalit:
+    # The MCP server, as the Claude plugin starts it. Override with the
+    # LEGALIT_MCP_COMMAND environment variable (a JSON list).
+    command: ["bash", "~/.claude/plugins/cache/mcp-legal-it/legal-it/2.13.0/start_server.sh"]
+
+defaults:
+  version: vigente
+  rate_per_second: 1.0
+  enrich_rate_per_second: 0.5
+  enrich_ttl_days: 90
+  enrich: []
+  batch_size: 25
+
+acts:
+  # --- A) Costituzione e codici -------------------------------------------
+  - id: costituzione
+    area: costituzionale
+    label: Costituzione della Repubblica italiana
+    source: normattiva
+    act_type: costituzione
+    cite: "Cost."
+  - id: preleggi
+    area: civile
+    label: Disposizioni sulla legge in generale (preleggi)
+    source: normattiva
+    act_type: preleggi
+    cite: "preleggi"
+  - id: cc
+    area: civile
+    label: Codice civile
+    source: normattiva
+    act_type: codice civile
+    cite: "c.c."
+  - id: cc-disp-att
+    area: civile
+    label: Disposizioni per l'attuazione del codice civile e disposizioni transitorie
+    source: normattiva
+    act_type: disposizioni per l'attuazione del Codice civile e disposizioni transitorie
+    cite: "disp. att. c.c."
+  - id: cpc
+    area: civile
+    label: Codice di procedura civile
+    source: normattiva
+    act_type: codice di procedura civile
+    cite: "c.p.c."
+  - id: cpc-disp-att
+    area: civile
+    label: Disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie
+    source: normattiva
+    act_type: disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie
+    cite: "disp. att. c.p.c."
+  - id: cp
+    area: penale
+    label: Codice penale
+    source: normattiva
+    act_type: codice penale
+    cite: "c.p."
+  - id: cpp
+    area: penale
+    label: Codice di procedura penale
+    source: normattiva
+    act_type: codice di procedura penale
+    cite: "c.p.p."
+  - id: cpp-disp-att
+    area: penale
+    label: Norme di attuazione, di coordinamento e transitorie del codice di procedura penale
+    source: normattiva
+    act_type: norme di attuazione, di coordinamento e transitorie del codice di procedura penale
+    cite: "disp. att. c.p.p."
+  - id: cpa
+    area: amministrativo
+    label: Codice del processo amministrativo (d.lgs. 104/2010)
+    source: normattiva
+    act_type: codice del processo amministrativo
+    cite: "c.p.a."
+  - id: cpa-disp-att
+    area: amministrativo
+    label: Norme di attuazione del codice del processo amministrativo (d.lgs. 104/2010, allegato 2)
+    source: normattiva
+    act_type: decreto legislativo
+    date: 2010-07-02
+    act_number: "104"
+    annex: "3"   # checked against the tree by --dry-run; VisuaLex maps the code body to annex 2
+    cite: "disp. att. c.p.a."
+  - id: cod-consumo
+    area: civile
+    label: Codice del consumo (d.lgs. 206/2005)
+    source: normattiva
+    act_type: codice del consumo
+    cite: "cod. cons."
+
+  # --- B) Fonti nazionali di settore --------------------------------------
+  - id: dlgs-231-2001
+    area: penale
+    label: D.Lgs. 8 giugno 2001, n. 231 (responsabilità amministrativa degli enti)
+    source: normattiva
+    act_type: decreto legislativo
+    date: 2001-06-08
+    act_number: "231"
+    cite: "D.Lgs. 231/2001"
+    enrich: [base_ue]
+  - id: l-241-1990
+    area: amministrativo
+    label: L. 7 agosto 1990, n. 241 (procedimento amministrativo)
+    source: normattiva
+    act_type: legge
+    date: 1990-08-07
+    act_number: "241"
+    cite: "L. 241/1990"
+  - id: l-689-1981
+    area: amministrativo
+    label: L. 24 novembre 1981, n. 689 (sanzioni amministrative)
+    source: normattiva
+    act_type: legge
+    date: 1981-11-24
+    act_number: "689"
+    cite: "L. 689/1981"
+  - id: cod-privacy
+    area: privacy-digitale
+    label: Codice in materia di protezione dei dati personali (d.lgs. 196/2003)
+    source: normattiva
+    act_type: codice in materia di protezione dei dati personali
+    cite: "D.Lgs. 196/2003"
+    enrich: [base_ue]
+  - id: cad
+    area: privacy-digitale
+    label: Codice dell'amministrazione digitale (d.lgs. 82/2005)
+    source: normattiva
+    act_type: codice dell'amministrazione digitale
+    cite: "CAD"
+  - id: dlgs-138-2024
+    area: privacy-digitale
+    label: D.Lgs. 4 settembre 2024, n. 138 (recepimento NIS2)
+    source: normattiva
+    act_type: decreto legislativo
+    date: 2024-09-04
+    act_number: "138"
+    cite: "D.Lgs. 138/2024"
+    enrich: [base_ue]
+  - id: dlgs-23-2025
+    area: privacy-digitale
+    label: D.Lgs. 10 marzo 2025, n. 23 (adeguamento a DORA)
+    source: normattiva
+    act_type: decreto legislativo
+    date: 2025-03-10
+    act_number: "23"
+    cite: "D.Lgs. 23/2025"
+    enrich: [base_ue]
+  - id: dlgs-81-2008
+    area: lavoro
+    label: D.Lgs. 9 aprile 2008, n. 81 (sicurezza sul lavoro)
+    source: normattiva
+    act_type: decreto legislativo
+    date: 2008-04-09
+    act_number: "81"
+    cite: "D.Lgs. 81/2008"
+  - id: l-300-1970
+    area: lavoro
+    label: L. 20 maggio 1970, n. 300 (Statuto dei lavoratori)
+    source: normattiva
+    act_type: legge
+    date: 1970-05-20
+    act_number: "300"
+    cite: "L. 300/1970"
+  - id: l-633-1941
+    area: civile
+    label: L. 22 aprile 1941, n. 633 (diritto d'autore)
+    source: normattiva
+    act_type: legge
+    date: 1941-04-22
+    act_number: "633"
+    cite: "L. 633/1941"
+  - id: cod-appalti
+    area: amministrativo
+    label: Codice dei contratti pubblici (d.lgs. 36/2023)
+    source: normattiva
+    act_type: codice dei contratti pubblici
+    cite: "D.Lgs. 36/2023"
+  - id: dlgs-33-2013
+    area: amministrativo
+    label: D.Lgs. 14 marzo 2013, n. 33 (trasparenza)
+    source: normattiva
+    act_type: decreto legislativo
+    date: 2013-03-14
+    act_number: "33"
+    cite: "D.Lgs. 33/2013"
+  - id: ccii
+    area: civile
+    label: Codice della crisi d'impresa e dell'insolvenza (d.lgs. 14/2019)
+    source: normattiva
+    act_type: codice della crisi d'impresa e dell'insolvenza
+    cite: "CCII"
+  - id: tuir
+    area: tributario
+    label: Testo unico delle imposte sui redditi (d.P.R. 917/1986)
+    source: normattiva
+    act_type: d.p.r.
+    date: 1986-12-22
+    act_number: "917"
+    cite: "TUIR"
+  - id: dpr-600-1973
+    area: tributario
+    label: D.P.R. 29 settembre 1973, n. 600 (accertamento)
+    source: normattiva
+    act_type: d.p.r.
+    date: 1973-09-29
+    act_number: "600"
+    cite: "D.P.R. 600/1973"
+  - id: dpr-633-1972
+    area: tributario
+    label: D.P.R. 26 ottobre 1972, n. 633 (IVA)
+    source: normattiva
+    act_type: d.p.r.
+    date: 1972-10-26
+    act_number: "633"
+    cite: "D.P.R. 633/1972"
+  - id: dlgs-546-1992
+    area: tributario
+    label: D.Lgs. 31 dicembre 1992, n. 546 (processo tributario)
+    source: normattiva
+    act_type: codice del processo tributario
+    cite: "D.Lgs. 546/1992"
+
+  # --- C) Fonti europee ---------------------------------------------------
+  - id: gdpr
+    area: ue
+    label: Regolamento (UE) 2016/679 (GDPR)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2016"
+    act_number: "679"
+    celex: 32016R0679
+    units: [articles, recitals]
+    cite: "GDPR"
+    enrich: [attuazione]
+  - id: eprivacy
+    area: ue
+    label: Direttiva 2002/58/CE (e-privacy)
+    source: eurlex
+    act_type: direttiva ue
+    date: "2002"
+    act_number: "58"
+    celex: 32002L0058
+    celex_consolidated: 02002L0058-20091219
+    units: [articles, recitals]
+    cite: "dir. 2002/58/CE"
+    enrich: [attuazione]
+  - id: ai-act
+    area: ue
+    label: Regolamento (UE) 2024/1689 (AI Act)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2024"
+    act_number: "1689"
+    celex: 32024R1689
+    units: [articles, recitals]
+    cite: "AI Act"
+  - id: nis2
+    area: ue
+    label: Direttiva (UE) 2022/2555 (NIS2)
+    source: eurlex
+    act_type: direttiva ue
+    date: "2022"
+    act_number: "2555"
+    celex: 32022L2555
+    units: [articles, recitals]
+    cite: "dir. (UE) 2022/2555"
+    enrich: [attuazione]
+  - id: dora
+    area: ue
+    label: Regolamento (UE) 2022/2554 (DORA)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2022"
+    act_number: "2554"
+    celex: 32022R2554
+    units: [articles, recitals]
+    cite: "DORA"
+  - id: dsa
+    area: ue
+    label: Regolamento (UE) 2022/2065 (Digital Services Act)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2022"
+    act_number: "2065"
+    celex: 32022R2065
+    units: [articles, recitals]
+    cite: "DSA"
+  - id: dma
+    area: ue
+    label: Regolamento (UE) 2022/1925 (Digital Markets Act)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2022"
+    act_number: "1925"
+    celex: 32022R1925
+    units: [articles, recitals]
+    cite: "DMA"
+  - id: data-act
+    area: ue
+    label: Regolamento (UE) 2023/2854 (Data Act)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2023"
+    act_number: "2854"
+    celex: 32023R2854
+    units: [articles, recitals]
+    cite: "Data Act"
+  - id: dga
+    area: ue
+    label: Regolamento (UE) 2022/868 (Data Governance Act)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2022"
+    act_number: "868"
+    celex: 32022R0868
+    units: [articles, recitals]
+    cite: "DGA"
+  - id: eidas
+    area: ue
+    label: Regolamento (UE) 910/2014 (eIDAS, testo consolidato)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2014"
+    act_number: "910"
+    celex: 32014R0910
+    celex_consolidated: 02014R0910-20241018
+    units: [articles, recitals]
+    cite: "reg. eIDAS"
+  - id: eidas2
+    area: ue
+    label: Regolamento (UE) 2024/1183 (eIDAS 2)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2024"
+    act_number: "1183"
+    celex: 32024R1183
+    units: [articles, recitals]
+    cite: "reg. (UE) 2024/1183"
+  - id: cra
+    area: ue
+    label: Regolamento (UE) 2024/2847 (Cyber Resilience Act)
+    source: eurlex
+    act_type: regolamento ue
+    date: "2024"
+    act_number: "2847"
+    celex: 32024R2847
+    units: [articles, recitals]
+    cite: "CRA"
