@@ -317,6 +317,54 @@ class TestOneLinePerPoint:
         assert text50.startswith("Articolo 50\nAbrogazione\n1. La direttiva 1999/93/CE")
 
 
+class TestNoSpaceBeforePunctuation:
+    """EUR-Lex closes a span early and the get_text separator lands before
+    the punctuation: "1 quater ." where "1 bis." reads correctly, "f bis )",
+    "articolo 14 bis , paragrafo 2". Normalised in the consolidated path only,
+    before any text is stored."""
+
+    def test_unit_cases(self):
+        from visualex_api.services.eurlex_scraper import _cons_text
+        assert _cons_text(BeautifulSoup("<p>1 quater .</p>", "html.parser")) == "1 quater."
+        assert _cons_text(BeautifulSoup("<p>lettera a )</p>", "html.parser")) == "lettera a)"
+        assert _cons_text(BeautifulSoup("<p>articolo 14 bis , paragrafo 2 ;</p>", "html.parser")) == \
+            "articolo 14 bis, paragrafo 2;"
+        assert _cons_text(BeautifulSoup("<p>1. Il presente regolamento</p>", "html.parser")) == \
+            "1. Il presente regolamento"
+
+    async def test_the_real_lines_that_had_the_wart(self):
+        eidas = soup_of("eidas_consolidated_20241018_trimmed.html")
+        text24 = await EurlexScraper().extract_article_text(eidas, "24")
+        lines = text24.split("\n")
+        assert any(line.startswith("1 quater. Entro il 21 maggio 2025") for line in lines)
+        assert any(line.startswith("f bis) fatto salvo") for line in lines)
+        assert " ." not in text24 and " )" not in text24 and " ," not in text24
+        eprivacy = soup_of("eprivacy_consolidated_20091219.html")
+        text4 = await EurlexScraper().extract_article_text(eprivacy, "4")
+        assert any(line.startswith("1 bis. Fatta salva la direttiva 95/46/CE") for line in text4.split("\n"))
+        assert "articolo 14 bis, paragrafo 2." in text4
+
+    @pytest.mark.parametrize("fixture", [
+        "eprivacy_consolidated_20091219.html",
+        "eidas_consolidated_20241018_trimmed.html",
+    ])
+    async def test_no_line_keeps_a_space_before_punctuation(self, fixture):
+        soup = soup_of(fixture)
+        scraper = EurlexScraper()
+        result, _, _ = await _parse_eurlex_tree(soup, CONSOLIDATED, link=False, details=False)
+        for item in result:
+            text = await scraper.extract_article_text(soup, item["numero"])
+            assert not re.search(r"\s[.,;:)]", text), (fixture, item["numero"])
+
+    async def test_the_oj_path_is_untouched(self):
+        # The normalisation lives in _cons_text; an OJ page never reaches it.
+        with patch("visualex_api.services.eurlex_scraper._cons_text",
+                   side_effect=AssertionError("the OJ path must not use _cons_text")):
+            text = await EurlexScraper().extract_article_text(soup_of("gdpr_oj_trimmed.html"), "4")
+        assert text.startswith("Articolo 4")
+        assert "Definizioni" in text
+
+
 class TestConsolidatedRubriche:
     def test_flat_page(self):
         rubriche = _extract_eurlex_rubriche(soup_of("eprivacy_consolidated_20091219.html"))

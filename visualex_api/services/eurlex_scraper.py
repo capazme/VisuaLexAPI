@@ -138,7 +138,13 @@ def _cons_text(element) -> str:
         marker.decompose()
     # A separator between child nodes: "1." sits in its own span next to the
     # paragraph text, and NBSP is EUR-Lex's favourite space.
-    return strip_amendment_markers(element.get_text(" ", strip=True))
+    text = strip_amendment_markers(element.get_text(" ", strip=True))
+    # The separator also lands before punctuation when EUR-Lex closes a span
+    # early: <span class="no-parag">1 <span class="italics">quater</span>. </span>
+    # read "1 quater ." while "1 bis." elsewhere keeps the period inside the
+    # span, and "lettera a )" / "articolo 14 bis , paragrafo 2" likewise.
+    # Consolidated path only: the OJ extractor never comes through here.
+    return re.sub(r"\s+([.,;:)])", r"\1", text)
 
 
 def _is_cons_point(element) -> bool:
