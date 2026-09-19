@@ -81,8 +81,21 @@ class TestClassify:
         assert classify_result("Nessuna pronuncia trovata.") == "empty"
         assert classify_result("Nessun provvedimento trovato per la query indicata.") == "empty"
         assert classify_result("Nessuno trovato.") == "empty"
+        assert classify_result("**Nessun provvedimento trovato**") == "empty"
         # Ordinary text mentioning "trovato" outside that shape stays "ok".
         assert classify_result("## Risultati\nAbbiamo trovato 3 provvedimenti rilevanti.") == "ok"
+
+    def test_no_hits_phrasing_mid_sentence_does_not_shadow_a_real_result(self):
+        """`_NO_HITS_RE` must only match at the start of a line.
+
+        "Nessun nesso causale è stato trovato dal giudice" inside a real
+        result used to match the unanchored pattern anywhere in the first 200
+        characters and get classified "empty".
+        """
+        assert classify_result(
+            "## Sentenze\n- Cass. civ. 123/2024: nessun nesso causale è stato "
+            "trovato dal giudice tra la condotta e l'evento."
+        ) == "ok"
 
 
 class FakeSession:

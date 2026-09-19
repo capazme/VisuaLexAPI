@@ -120,7 +120,7 @@ async def parse_article_input(article_string, normurn):
                         article_num = int(article_number_match.group(1))
                         if start <= article_num <= end:
                             logging.debug(f"Adding article from range: {article_str}")
-                            articles.append(article_str)
+                            articles.append(_canonicalise_article_token(article_str).lower())
 
             except Exception as e:
                 error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"

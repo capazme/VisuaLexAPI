@@ -70,8 +70,11 @@ def act_calls(kind: str, spec: ActSpec) -> list[ToolCall]:
 
 #: "Nessuna pronuncia trovata", "Nessun provvedimento trovato" — the various
 #: no-hits phrasings the legal-it tools use beyond the literal "nessun
-#: risultato" already matched above.
-_NO_HITS_RE = re.compile(r"nessun[ao]?\b[^.\n]{0,80}\btrovat[aoei]", re.IGNORECASE)
+#: risultato" already matched above. Anchored to the start of a line (an
+#: optional leading "**" for markdown bold) so prose mentioning "nessun ...
+#: trovato" mid-sentence in a real result ("Nessun nesso causale è stato
+#: trovato dal giudice") is not mistaken for a no-hits response.
+_NO_HITS_RE = re.compile(r"(?im)^\s*(?:\*\*)?nessun[ao]?\b[^.\n]{0,80}\btrovat[aoei]")
 
 
 def classify_result(text: str) -> str:

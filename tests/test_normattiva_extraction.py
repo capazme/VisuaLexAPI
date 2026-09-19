@@ -4,6 +4,7 @@ Every scraper in this repo parses third-party HTML, so a break means the site
 changed. These fixtures freeze what the site looked like when the extractor was
 known good; a diff here is the signal that a selector needs updating.
 """
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "normattiva"
 CASES = [
     "akn_comma_div.html",
     "akn_just_text.html",
+    "abrogato.html",
     "attachment.html",
     "fallback.html",
 ]
@@ -129,3 +131,35 @@ class TestRepealedArticleWithMalformedMarkup:
         html = (FIXTURES / "cp_544_abrogato_trimmed.html").read_text(encoding="utf-8")
         text = await scraper.estrai_da_html(html)
         assert text.count("ARTICOLO ABROGATO") == 1
+
+
+# `article_text` is not just any string: it is the offset space every stored
+# highlight and note is anchored to (gotcha 23). `test_every_branch_yields_text`
+# only checks `len > 50`, which two very differently-formatted outputs can both
+# clear — it would not notice a stray space or a reordered line. This pins the
+# exact sha256 of what the extractor produces for each of the five whole-page
+# fixtures, plus art. 544 (the healthy in-span abrogation shape, contrasted
+# with art. 524's malformed one above). A failure here means the extractor's
+# output changed for one of these inputs — deliberate or not, that is a change
+# to every highlight and note offset stored against it, and must be reviewed
+# as such before the fixture (or this hash) is updated.
+FROZEN_TEXT_SHA256 = {
+    "akn_comma_div.html": "c98b1ef2caecb3daf236cb912dfade4bbe4db3bb378d48221f586d374401f4f4",
+    "akn_just_text.html": "154ba79f6ece9bbb6ec5915b84065aeb9c60950556a69fa4a5e70d559d873cce",
+    "abrogato.html": "6d06df4c2674d688ec0024301b5ed04ddce42387ef4260e60d602b2b8911f6e5",
+    "attachment.html": "d69cc4cfcd7ea042c1a230e5b9037d94564451408b637b929adbb5868fb20ef8",
+    "fallback.html": "1181881d79d0dd1a31c7e79ea6ace6627022ee2f164c3498a497a9fd3b4fcaba",
+    "cp_544_abrogato_trimmed.html": "5c06313f7d36e5f171cf3f63393029fcea1b83bf48cd539618efcb66f402a87a",
+}
+
+
+@pytest.mark.parametrize("fixture_name,expected_sha256", sorted(FROZEN_TEXT_SHA256.items()))
+@pytest.mark.asyncio
+async def test_extracted_text_matches_the_frozen_sha256(scraper, fixture_name, expected_sha256):
+    html = (FIXTURES / fixture_name).read_text(encoding="utf-8")
+    text = await scraper.estrai_da_html(html)
+    actual = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    assert actual == expected_sha256, (
+        f"{fixture_name} extracted text changed — every highlight/note offset "
+        f"anchored to it is now wrong unless this is a deliberate, reviewed change"
+    )

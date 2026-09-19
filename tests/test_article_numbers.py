@@ -130,15 +130,33 @@ class TestParseArticleInputAcceptsTheTreeShapes:
     async def test_range_still_expands_through_the_tree(self):
         tree = AsyncMock(return_value=RANGE_TREE)
         with patch("visualex_api.tools.text_op.get_tree", new=tree):
-            assert await parse_article_input("3-5", "urn:x") == ["3", "4", "4 bis", "5"]
+            assert await parse_article_input("3-5", "urn:x") == ["3", "4", "4-bis", "5"]
         tree.assert_awaited_once()
 
     async def test_range_and_dotted_single_in_one_request(self):
         """`473-bis.1` must not be read as the range 473..bis."""
         with patch("visualex_api.tools.text_op.get_tree", new=AsyncMock(return_value=RANGE_TREE)):
             assert await parse_article_input("3-4, 473-bis.1, 314/2", "urn:x") == [
-                "3", "4", "4 bis", "473-bis.1", "314/2",
+                "3", "4", "4-bis", "473-bis.1", "314/2",
             ]
+
+    async def test_range_canonicalises_compound_ordinal_members(self):
+        """A range built from a live tree must canonicalise every member it picks up.
+
+        Members taken from the tree used to be appended raw ("171 octies 1"),
+        bypassing `_canonicalise_article_token`, so a range request on
+        L. 633/1941 built `~art171octies1` — the tail Normattiva answers with
+        Art. 1, HTTP 200 (gotcha 24) — instead of `~art171octies.1`.
+        """
+        tree = AsyncMock(return_value=(
+            [{"numero": "170", "allegato": None},
+             {"numero": "171 octies 1", "allegato": None},
+             {"numero": "172", "allegato": None}],
+            3,
+        ))
+        with patch("visualex_api.tools.text_op.get_tree", new=tree):
+            result = await parse_article_input("170-172", "urn:x")
+        assert result == ["170", "171-octies.1", "172"]
 
 
 class TestGenerateUrnTails:
