@@ -16,7 +16,12 @@ from dataclasses import dataclass
 from .store import Store, UnitRecord
 
 SHORT_TEXT_CHARS = 40
-_ABROGATO = re.compile(r"^\(?\s*(?:articolo\s+)?(?:abrogat|soppress)", re.IGNORECASE)
+# Normattiva's repeal notice, as the extractor delivers it: the label line,
+# a blank line, then "((ARTICOLO ABROGATO DAL …))" — so the notice is searched
+# for by its double parenthesis anywhere in the text. The anchored form keeps
+# matching a bare "(abrogato)" / "Abrogato." with no label.
+_ABROGATO_NOTICE = re.compile(r"\(\(\s*(?:articolo\s+)?(?:abrogat|soppress)", re.IGNORECASE)
+_ABROGATO_HEAD = re.compile(r"^\(?\s*(?:articolo\s+)?(?:abrogat|soppress)", re.IGNORECASE)
 _NUMERIC_HEAD = re.compile(r"^(\d+)")
 
 
@@ -29,7 +34,8 @@ class Finding:
 
 
 def _looks_repealed(unit: UnitRecord) -> bool:
-    return unit.abrogato or bool(_ABROGATO.match((unit.text or "").strip()))
+    text = (unit.text or "").strip()
+    return unit.abrogato or bool(_ABROGATO_NOTICE.search(text)) or bool(_ABROGATO_HEAD.match(text))
 
 
 def verify_act(act_id: str, units: list[UnitRecord]) -> list[Finding]:

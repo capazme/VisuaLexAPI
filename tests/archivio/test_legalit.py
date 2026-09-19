@@ -3,15 +3,17 @@
 The SDK is never imported here — a fake session stands in — so the suite
 runs without the `mcp` package, which is optional for the archive itself.
 """
+import asyncio
 import sys
 from contextlib import asynccontextmanager
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 from archivio_normativo.manifest import ActSpec
 from archivio_normativo.sources.legalit import (
-    LegalItClient, LegalItError, ToolCall, act_calls, classify_result, reference_for, unit_calls,
+    LegalItClient, LegalItError, LegalItTransportError, ToolCall, act_calls, classify_result, reference_for,
+    unit_calls,
 )
 from archivio_normativo.throttle import Throttle
 
@@ -102,9 +104,11 @@ class FakeSession:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = []
+        self.timeouts = []
 
-    async def call_tool(self, name, arguments):
+    async def call_tool(self, name, arguments, read_timeout_seconds=None):
         self.calls.append((name, arguments))
+        self.timeouts.append(read_timeout_seconds)
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -139,7 +143,7 @@ class TestClient:
 
     async def test_a_tool_error_result_is_a_legalit_error(self):
         class ErrSession:
-            async def call_tool(self, name, arguments):
+            async def call_tool(self, name, arguments, read_timeout_seconds=None):
                 return SimpleNamespace(isError=True, content=[SimpleNamespace(type="text", text="boom")])
 
         async with LegalItClient(("bash", "x.sh"), Throttle(0), session_factory=factory_for(ErrSession())) as client:
@@ -168,4 +172,83 @@ class TestClient:
     async def test_an_empty_command_is_refused(self):
         with pytest.raises(LegalItError, match="command"):
             async with LegalItClient((), Throttle(0)):
+                pass
+
+
+class TestTimeouts:
+    """A hung legal-it call must not hang the run: the client bounds every
+    tool call and the handshake, and a timeout is a retryable transport error."""
+
+    async def test_a_hung_call_times_out_as_a_transport_error(self):
+        class HangingSession:
+            def __init__(self):
+                self.calls = 0
+
+            async def call_tool(self, name, arguments, read_timeout_seconds=None):
+                self.calls += 1
+                await asyncio.Event().wait()  # never set: the server never answers
+
+        session = HangingSession()
+        async with LegalItClient(("bash", "x.sh"), Throttle(0), session_factory=factory_for(session),
+                                 attempts=2, sleep=_no_sleep, jitter=lambda: 0.5, call_timeout=0.05) as client:
+            with pytest.raises(LegalItTransportError, match="timed out"):
+                await client.call(ToolCall("giurisprudenza_su_norma", {"riferimento": "art. 6"}))
+        assert session.calls == 2, "the timeout is retried like any other transport error, then given up"
+
+    async def test_the_call_timeout_is_handed_to_the_sdk(self):
+        session = FakeSession(["ok"])
+        async with LegalItClient(("bash", "x.sh"), Throttle(0), session_factory=factory_for(session),
+                                 call_timeout=7.5) as client:
+            await client.call(ToolCall("t", {}))
+        assert session.timeouts == [7.5]
+
+    async def test_the_default_call_timeout_is_two_minutes(self):
+        session = FakeSession(["ok"])
+        async with LegalItClient(("bash", "x.sh"), Throttle(0), session_factory=factory_for(session)) as client:
+            await client.call(ToolCall("t", {}))
+        assert session.timeouts == [120.0]
+
+    @pytest.mark.parametrize("name", ["McpError", "MCPError"])
+    async def test_the_sdks_own_error_is_a_transport_error(self, name):
+        """The SDK spells it `McpError` (1.x) and `MCPError` (2.x); both are
+        transport failures worth a retry, matched by name so the SDK stays optional."""
+        exc_type = type(name, (Exception,), {})
+        session = FakeSession([exc_type("request timed out"), "ok"])
+        async with LegalItClient(("bash", "x.sh"), Throttle(0), session_factory=factory_for(session),
+                                 sleep=_no_sleep, jitter=lambda: 0.5) as client:
+            assert await client.call(ToolCall("t", {})) == "ok"
+        assert len(session.calls) == 2
+
+    async def test_a_hung_handshake_is_a_clear_error(self, monkeypatch):
+        """`initialize()` is bounded too: the first start builds a venv through
+        uv and a server that never answers must not hang `build` forever.
+        Exercised through the default factory with a stand-in `mcp` package."""
+        class HangingClientSession:
+            def __init__(self, read, write):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return None
+
+            async def initialize(self):
+                await asyncio.Event().wait()
+
+        @asynccontextmanager
+        async def stdio_client(params):
+            yield (None, None)
+
+        fake_mcp = ModuleType("mcp")
+        fake_mcp.ClientSession = HangingClientSession
+        fake_mcp.StdioServerParameters = lambda command, args: SimpleNamespace(command=command, args=args)
+        fake_stdio = ModuleType("mcp.client.stdio")
+        fake_stdio.stdio_client = stdio_client
+        fake_client = ModuleType("mcp.client")
+        monkeypatch.setitem(sys.modules, "mcp", fake_mcp)
+        monkeypatch.setitem(sys.modules, "mcp.client", fake_client)
+        monkeypatch.setitem(sys.modules, "mcp.client.stdio", fake_stdio)
+        with pytest.raises(LegalItError, match=r"initialize.*0\.05"):
+            async with LegalItClient(("bash", "x.sh"), Throttle(0), start_timeout=0.05):
                 pass

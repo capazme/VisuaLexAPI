@@ -195,7 +195,15 @@ class Pipeline:
         outcomes: list[UnitOutcome] = []
         for a in unchanged:
             uid = unit_id(spec.id, "article", a.number)
-            self.store.touch_checked(uid, self.run_id, today(self.now))
+            # The text is the same; its place in the act may not be — an
+            # article inserted before it, a heading added above it.
+            fp = fingerprints.get(a.number) or {}
+            self.store.refresh_structure(
+                uid, position=a.position, parte=a.parte, libro=a.libro, titolo=a.titolo, capo=a.capo,
+                sezione=a.sezione, rubrica=rubriche.rubriche.get(a.number), abrogato=a.number in rubriche.abrogati,
+                fingerprint=fp.get("fingerprint"), ultimo_aggiornamento=fp.get("date"),
+                run_id=self.run_id, vigenza_al=today(self.now),
+            )
             self.store.log_unit(self.run_id, uid, "unchanged", "fingerprint")
             report.count("unchanged")
             outcomes.append(UnitOutcome(uid, a.number, "unchanged"))
@@ -377,9 +385,19 @@ class Pipeline:
     def _store_brocardi(self, spec: ActSpec, uid: str, r: ArticleResult, report: ActReport) -> None:
         assert self.store is not None and self.run_id is not None
         if r.brocardi:
-            self.store.upsert_enrichment(spec.id, uid, "brocardi", BROCARDI_TOOL, {}, None, r.brocardi,
-                                         "ok", None, stamp(self.now), self.run_id)
-            report.enrich_ok += 1
+            # An article Brocardi has nothing on comes back as an object with
+            # every field null (or only its position and page link): that is
+            # "empty", not an annotation, and the Markdown must say so.
+            has_content = any(v not in (None, "", [], {}) for k, v in r.brocardi.items()
+                              if k not in ("position", "link"))
+            if has_content:
+                self.store.upsert_enrichment(spec.id, uid, "brocardi", BROCARDI_TOOL, {}, None, r.brocardi,
+                                             "ok", None, stamp(self.now), self.run_id)
+                report.count("enrich_ok")
+            else:
+                self.store.upsert_enrichment(spec.id, uid, "brocardi", BROCARDI_TOOL, {}, None, None,
+                                             "empty", None, stamp(self.now), self.run_id)
+                report.count("enrich_empty")
         elif r.brocardi_error:
             self.store.upsert_enrichment(spec.id, uid, "brocardi", BROCARDI_TOOL, {}, None, None,
                                          "error", r.brocardi_error, stamp(self.now), self.run_id)

@@ -2,7 +2,7 @@
 from archivio_normativo.pipeline import ActReport
 from archivio_normativo.report import format_report
 from archivio_normativo.store import ActRecord, Store, UnitRecord
-from archivio_normativo.verify import Finding, format_findings, verify_act, verify_store
+from archivio_normativo.verify import Finding, _looks_repealed, format_findings, verify_act, verify_store
 
 
 def unit(number, text, *, kind="article", abrogato=False, position=0):
@@ -33,6 +33,28 @@ class TestVerifyAct:
         assert ("short", "a:art:2") in kinds
         assert not any(f.unit_ids == ("a:art:3",) for f in findings), "a repeal notice is legitimately short"
         assert not any(f.unit_ids == ("a:art:4",) for f in findings)
+
+    def test_normattivas_repeal_notice_is_recognised_after_the_label(self):
+        """What the extractor really produces for a repealed article: the
+        label line, a blank line, then `((ARTICOLO ABROGATO DAL …))`. The old
+        check anchored on `^\\(?` and never saw past "Art. 3"."""
+        labelled = unit("3", "Art. 3\n\n((ARTICOLO ABROGATO DAL D.LGS. 10 AGOSTO 2018, N. 101))")
+        malformed = unit("524", "Codice Penale-art. 524\n\n((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66 ))")
+        bare = unit("544", "((ARTICOLO ABROGATO DALLA L. 5 AGOSTO 1981, N. 442))")
+        suppressed = unit("7", "Art. 7\n\n((ARTICOLO SOPPRESSO DAL D.L. 1 GENNAIO 2000, N. 1))")
+        for u in (labelled, malformed, bare, suppressed, unit("9", "(abrogato)"), unit("10", "Abrogato.")):
+            assert _looks_repealed(u), u.text
+        # Mentioning a repeal inside a living article is not a repeal.
+        assert not _looks_repealed(unit("11", "1. Il comma 3 dell'articolo 5 è abrogato dalla presente legge."))
+        assert not _looks_repealed(unit("12", "Art. 12\n\n1. Resta fermo quanto disposto ((dal comma 2))."))
+
+    def test_identical_repeal_notices_are_not_identical_articles(self):
+        """Eighteen articles of the codice penale carry the same notice
+        without their label; that is not the "art. 1 for everything" signature."""
+        notice = "((ARTICOLO ABROGATO DALLA L. 15 FEBBRAIO 1996, N. 66))"
+        findings = verify_act("a", [unit("523", "Art. 523\n\n" + notice), unit("524", "Art. 524\n\n" + notice),
+                                    unit("525", notice), unit("526", notice)])
+        assert findings == []
 
     def test_identical_texts_are_flagged(self):
         findings = verify_act("a", [unit("1", LONG), unit("2", LONG), unit("3", LONG + "!")])

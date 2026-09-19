@@ -85,6 +85,27 @@ class TestUnits:
         assert store.unit_run_columns("cc:art:2043") == (r1, r1, r2)
         assert store.get_unit("cc:art:2043").vigenza_al == "2026-10-01"
 
+    def test_refresh_structure_moves_the_unit_without_touching_its_text(self, store):
+        """An unchanged article still has to follow the act around it: an
+        insertion before it shifts its position, a new heading changes its
+        titolo. None of that is a text change, so the change registry stays."""
+        store.upsert_act(act(), unit_count=0, updated_at="x")
+        r1 = store.start_run({}, "t")
+        store.upsert_unit(unit(), r1)
+        before = store.get_unit("cc:art:2043")
+        r2 = store.start_run({}, "t")
+        store.refresh_structure("cc:art:2043", position=1, parte=None, libro="LIBRO QUARTO", titolo="TITOLO X Nuovo",
+                                capo="CAPO I", sezione=None, rubrica="Rubrica nuova", abrogato=True,
+                                fingerprint="g" * 64, ultimo_aggiornamento="2026-01-01", run_id=r2,
+                                vigenza_al="2026-10-01")
+        after = store.get_unit("cc:art:2043")
+        assert (after.position, after.titolo, after.capo, after.rubrica) == (1, "TITOLO X Nuovo", "CAPO I", "Rubrica nuova")
+        assert after.abrogato is True and after.fingerprint == "g" * 64 and after.ultimo_aggiornamento == "2026-01-01"
+        assert after.vigenza_al == "2026-10-01"
+        assert after.text == before.text and after.text_hash == before.text_hash
+        assert after.fetched_at == before.fetched_at, "nothing was fetched"
+        assert store.unit_run_columns("cc:art:2043") == (r1, r1, r2)
+
     def test_units_for_act_come_back_in_position_order(self, store):
         store.upsert_act(act(), unit_count=0, updated_at="x")
         r = store.start_run({}, "t")

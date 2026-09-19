@@ -7,7 +7,7 @@ import pytest
 from archivio_normativo.enrich import Enricher
 from archivio_normativo.manifest import ActSpec
 from archivio_normativo.pipeline import ActReport, RunOptions, UnitOutcome
-from archivio_normativo.sources.legalit import LegalItError, ToolCall
+from archivio_normativo.sources.legalit import LegalItError, LegalItTransportError, ToolCall
 from archivio_normativo.sources.visualex import ActResolution
 from archivio_normativo.store import ActRecord, Store
 
@@ -47,12 +47,12 @@ def store(tmp_path):
         yield s
 
 
-def make(store, legalit, *, run_id=None, refresh=False, ttl=90, override=None, now=NOW):
+def make(store, legalit, *, run_id=None, refresh=False, ttl=90, override=None, now=NOW, breaker_after=5):
     run_id = run_id or store.start_run({}, NOW.isoformat())
     options = RunOptions(out_dir=store.path.parent, refresh_enrich=refresh, enrich_ttl_days=ttl,
                          enrich_override=override)
     return Enricher(store=store, legalit=legalit, options=options, run_id=run_id,
-                    log=logging.getLogger("t"), now=lambda: now), run_id
+                    log=logging.getLogger("t"), now=lambda: now, breaker_after=breaker_after), run_id
 
 
 def units(*numbers, outcome="new"):
@@ -159,6 +159,73 @@ class TestResults:
         await again.enrich_act(spec(enrich=("cassazione",)), RES, units("6", outcome="unchanged"), ActReport("a", "b"))
         assert len(legalit.calls) == 1
         assert store.get_enrichment("dlgs-231-2001", "dlgs-231-2001:art:6", "cassazione")["status"] == "ok"
+
+
+class ScriptedLegalIt:
+    """Answers in order; an exception in the script is raised."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls: list[ToolCall] = []
+
+    async def call(self, call: ToolCall) -> str:
+        self.calls.append(call)
+        item = self.script.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+class TestBreaker:
+    """Five hung or broken calls in a row mean legal-it is gone for this run:
+    the rest is marked `error` without waiting two minutes on each one."""
+
+    async def test_consecutive_transport_errors_open_the_breaker(self, store, caplog):
+        legalit = FakeLegalIt({"giurisprudenza_su_norma": LegalItTransportError("pipe"),
+                               "pronunce_cost_su_norma": LegalItTransportError("pipe")})
+        enricher, _ = make(store, legalit, breaker_after=2)
+        report = ActReport("a", "b")
+        with caplog.at_level(logging.ERROR, logger="t"):
+            await enricher.enrich_act(spec(), RES, units("6", "7", "8"), report)
+        assert len(legalit.calls) == 2, "after the second failure legal-it is not asked again"
+        rows = [store.get_enrichment("dlgs-231-2001", f"dlgs-231-2001:art:{n}", k)
+                for n in ("6", "7", "8") for k in ("cassazione", "costituzionale")]
+        assert all(r is not None and r["status"] == "error" for r in rows)
+        assert [r["error"] for r in rows[:2]] == ["pipe", "pipe"], "the two real failures keep their own message"
+        assert all(r["error"] == "legal-it unavailable (breaker open)" for r in rows[2:])
+        assert (report.enrich_error, report.enrich_ok) == (6, 0)
+        opened = [r for r in caplog.records if r.levelno == logging.ERROR and "breaker" in r.getMessage()]
+        assert len(opened) == 1, "the breaker announces itself once, not per row"
+
+    async def test_a_success_resets_the_count(self, store):
+        pipe = LegalItTransportError("pipe")
+        legalit = ScriptedLegalIt([pipe, pipe, "## ok", pipe, pipe, "## ok"])
+        enricher, _ = make(store, legalit, breaker_after=3)
+        report = ActReport("a", "b")
+        await enricher.enrich_act(spec(), RES, units("6", "7", "8"), report)
+        assert len(legalit.calls) == 6, "two failures, a success, two failures: never three in a row"
+        assert (report.enrich_error, report.enrich_ok) == (4, 2)
+
+    async def test_a_tool_error_is_not_a_transport_error(self, store):
+        legalit = FakeLegalIt({"giurisprudenza_su_norma": LegalItError("tool said no"),
+                               "pronunce_cost_su_norma": LegalItError("tool said no")})
+        enricher, _ = make(store, legalit, breaker_after=2)
+        report = ActReport("a", "b")
+        await enricher.enrich_act(spec(), RES, units("6", "7", "8"), report)
+        assert len(legalit.calls) == 6, "the server answered every time; the breaker stays closed"
+        assert report.enrich_error == 6
+
+    async def test_error_rows_left_by_the_breaker_are_retried_next_run(self, store):
+        legalit = FakeLegalIt({"giurisprudenza_su_norma": LegalItTransportError("pipe")})
+        enricher, _ = make(store, legalit, breaker_after=1)
+        await enricher.enrich_act(spec(enrich=("cassazione",)), RES, units("6", "7"), ActReport("a", "b"))
+        assert len(legalit.calls) == 1
+        legalit.responses.clear()
+        legalit.calls.clear()
+        again, _ = make(store, legalit, breaker_after=1)
+        report = ActReport("a", "b")
+        await again.enrich_act(spec(enrich=("cassazione",)), RES, units("6", "7", outcome="unchanged"), report)
+        assert len(legalit.calls) == 2 and report.enrich_ok == 2
 
 
 class TestActLevel:

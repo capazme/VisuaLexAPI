@@ -7,6 +7,7 @@ import pytest
 
 from archivio_normativo.manifest import ActSpec
 from archivio_normativo.pipeline import Pipeline, RunOptions, unit_id
+from archivio_normativo.render_md import render_act
 from archivio_normativo.report import format_report
 from archivio_normativo.sources.visualex import VisuaLexClient
 from archivio_normativo.store import Store
@@ -124,6 +125,35 @@ class TestFirstRun:
         assert report.enrich_ok == 1
 
 
+class TestEmptyBrocardi:
+    async def test_an_all_none_payload_is_stored_as_empty_not_ok(self, fake_visualex, store, make_pipeline):
+        """VisuaLex answers a `brocardi_info` object with every field null for
+        an article Brocardi has nothing on. That is "empty", and the Markdown
+        must say so instead of leaving a heading with nothing under it."""
+        empty = {"position": None, "link": None, "Brocardi": None, "Ratio": None, "Spiegazione": None,
+                 "Massime": None, "Relazioni": None, "RelazioneCostituzione": None, "Footnotes": None,
+                 "RelatedArticles": None, "CrossReferences": None, "Glossario": None}
+        fake_visualex.add_act(act_type="codice civile", url=CC_URL, annex="2",
+                              tree=[{"numero": "1", "allegato": "2"}], fingerprints=None,
+                              articles={"1": "Testo"}, brocardi={"1": empty})
+        report = await make_pipeline().process_act(cc_spec(enrich=("brocardi",)))
+        row = store.get_enrichment("cc", "cc:art:1", "brocardi")
+        assert row["status"] == "empty" and row["content_json"] is None
+        assert (report.enrich_ok, report.enrich_empty, report.enrich_error) == (0, 1, 0)
+        md = render_act(store.get_act("cc"), store.units_for_act("cc"), store.enrichments_for_act("cc"), "2026-09-19")
+        section = md[md.index("### Annotazioni (Brocardi)"):]
+        assert "_Nessun risultato._" in section
+
+    async def test_a_payload_with_only_position_and_link_is_empty_too(self, fake_visualex, store, make_pipeline):
+        fake_visualex.add_act(act_type="codice civile", url=CC_URL, annex="2",
+                              tree=[{"numero": "1", "allegato": "2"}], fingerprints=None,
+                              articles={"1": "Testo"},
+                              brocardi={"1": {"position": "Libro IV", "link": "https://brocardi.it/1", "Massime": []}})
+        report = await make_pipeline().process_act(cc_spec(enrich=("brocardi",)))
+        assert store.get_enrichment("cc", "cc:art:1", "brocardi")["status"] == "empty"
+        assert report.enrich_empty == 1
+
+
 class TestSecondRun:
     async def test_unchanged_fingerprints_mean_no_stream(self, fake_visualex, store, make_pipeline):
         add_cc(fake_visualex)
@@ -162,6 +192,37 @@ class TestSecondRun:
         fake_visualex.calls.clear()
         r2 = await make_pipeline().process_act(cc_spec())
         assert r2.unchanged == 3 and len(streamed_numbers(fake_visualex)) == 3
+
+    async def test_an_insertion_moves_unchanged_articles_and_refreshes_their_headings(self, fake_visualex, store, make_pipeline):
+        """Between two runs the act gains 2043-bis and a new TITOLO before 2044.
+        2044's text is untouched, so it is `unchanged` — but its position and
+        its titolo must follow the act, or the rendered index lies."""
+        fp = {"2043": {"fingerprint": "a" * 64, "date": None}, "2044": {"fingerprint": "b" * 64, "date": None},
+              "2045": {"fingerprint": "c" * 64, "date": None}}
+        scenario = fake_visualex.add_act(
+            act_type="codice civile", url=CC_URL, annex="2",
+            tree=["LIBRO IV", {"numero": "2043", "allegato": "2"}, {"numero": "2044", "allegato": "2"},
+                  {"numero": "2045", "allegato": "2"}],
+            fingerprints=fp, articles={"2043": "A", "2044": "B", "2045": "C"})
+        await make_pipeline().process_act(cc_spec())
+        before = store.get_unit("cc:art:2044")
+        first, changed_before, _ = store.unit_run_columns("cc:art:2044")
+        scenario["tree"] = ["LIBRO IV", {"numero": "2043", "allegato": "2"}, {"numero": "2043-bis", "allegato": "2"},
+                            "TITOLO X Nuovo", {"numero": "2044", "allegato": "2"}, {"numero": "2045", "allegato": "2"}]
+        scenario["fingerprints"]["2043-bis"] = {"fingerprint": "d" * 64, "date": None}
+        scenario["articles"]["2043-bis"] = "D"
+        scenario["rubriche"]["2044"] = "Legittima difesa"
+        fake_visualex.calls.clear()
+        report = await make_pipeline().process_act(cc_spec())
+        assert (report.new, report.updated, report.unchanged) == (1, 0, 3)
+        assert streamed_numbers(fake_visualex) == ["2043-bis"], "the three unchanged articles are not refetched"
+        units = store.units_for_act("cc")
+        assert [(u.number, u.position) for u in units] == [("2043", 0), ("2043-bis", 1), ("2044", 2), ("2045", 3)]
+        after = units[2]
+        assert after.titolo == "TITOLO X Nuovo" and after.rubrica == "Legittima difesa"
+        assert after.text == before.text and after.text_hash == before.text_hash
+        assert store.unit_run_columns("cc:art:2044") == (first, changed_before, 2)
+        assert report.changed is True, "2043-bis is new; the file is re-rendered"
 
     async def test_stale_brocardi_is_refetched_alone(self, fake_visualex, store, make_pipeline):
         add_cc(fake_visualex)

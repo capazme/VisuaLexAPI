@@ -5,6 +5,12 @@ answers are markdown for a reader and are stored verbatim, attributed to the
 tool and dated. The refresh policy keeps the sources' load proportional to
 what changed: a fresh answer on an unchanged article is kept; a changed
 text, an aged answer, a past failure or `--refresh-enrich` asks again.
+
+A breaker guards the run: after `breaker_after` consecutive transport
+errors (a dead or hung server, each already retried and timed out by the
+client) legal-it is not asked again for the rest of the run. Every remaining
+row is stored as `error` and the next run retries them, so a whole-corpus
+build does not spend two minutes per article on a server that is gone.
 """
 from __future__ import annotations
 
@@ -14,20 +20,32 @@ from typing import Callable
 
 from .manifest import KINDS, ActSpec
 from .pipeline import ActReport, RunOptions, UnitOutcome, stamp
-from .sources.legalit import LegalItError, ToolCall, act_calls, classify_result, unit_calls
+from .sources.legalit import (
+    LegalItError, LegalItTransportError, ToolCall, act_calls, classify_result, unit_calls,
+)
 from .sources.visualex import ActResolution
 from .store import Store
 
 
+BREAKER_OPEN = "legal-it unavailable (breaker open)"
+
+
 class Enricher:
     def __init__(self, *, store: Store, legalit, options: RunOptions, run_id: int,
-                 log: logging.Logger, now: Callable[[], datetime]):
+                 log: logging.Logger, now: Callable[[], datetime], breaker_after: int = 5):
         self.store = store
         self.legalit = legalit
         self.options = options
         self.run_id = run_id
         self.log = log
         self.now = now
+        self.breaker_after = int(breaker_after)
+        self._consecutive_transport_errors = 0
+        self._breaker_open = False
+
+    @property
+    def breaker_open(self) -> bool:
+        return self._breaker_open
 
     # -- what applies -------------------------------------------------------
 
@@ -87,12 +105,21 @@ class Enricher:
         statuses: list[str] = []
         error: str | None = None
         for call in calls:
+            if self._breaker_open:
+                error = BREAKER_OPEN
+                break
             try:
                 text = await self.legalit.call(call)
+            except LegalItTransportError as exc:
+                error = str(exc)
+                self.log.warning("ENRICH %s act=%s unit=%s tool=%s error=%s", kind, spec.id, uid or "-", call.tool, exc)
+                self._note_transport_error()
+                break
             except LegalItError as exc:
                 error = str(exc)
                 self.log.warning("ENRICH %s act=%s unit=%s tool=%s error=%s", kind, spec.id, uid or "-", call.tool, exc)
                 break
+            self._consecutive_transport_errors = 0
             statuses.append(classify_result(text))
             if statuses[-1] == "error":
                 error = text.strip()
@@ -111,3 +138,10 @@ class Enricher:
         )
         report.count(f"enrich_{status}")
         self.log.info("ENRICH %s act=%s unit=%s status=%s", kind, spec.id, uid or "-", status)
+
+    def _note_transport_error(self) -> None:
+        self._consecutive_transport_errors += 1
+        if self._consecutive_transport_errors >= self.breaker_after and not self._breaker_open:
+            self._breaker_open = True
+            self.log.error("legal-it: %d consecutive transport errors — breaker open, the rest of this run is "
+                           "stored as error without asking; rerun to retry", self._consecutive_transport_errors)

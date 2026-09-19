@@ -3,8 +3,10 @@
 `text_hash` is the change registry — a unit is "updated" only when the sha256
 of its text moves. Everything else on the row (rubrica, position, headings,
 fingerprint, dates) is refreshed silently, because none of it is what the
-owner reads. Time never comes from here: callers pass ISO strings, so tests
-are exact and a run's timestamps are consistent.
+owner reads — on a fetch through `upsert_unit`, and on an unchanged article
+through `refresh_structure`, so an insertion before it still moves it. Time
+never comes from here: callers pass ISO strings, so tests are exact and a
+run's timestamps are consistent.
 
 Act-level enrichments (attuazione, base_ue) use `unit_id = ""` rather than
 NULL so the (act_id, unit_id, kind) key stays a plain UNIQUE.
@@ -293,6 +295,22 @@ class Store:
         self._db.execute(
             "UPDATE units SET last_checked_run = ?, vigenza_al = ? WHERE id = ?",
             (run_id, vigenza_al, unit_id),
+        )
+
+    def refresh_structure(self, unit_id: str, *, position: int, parte: str | None, libro: str | None,
+                          titolo: str | None, capo: str | None, sezione: str | None, rubrica: str | None,
+                          abrogato: bool, fingerprint: str | None, ultimo_aggiornamento: str | None,
+                          run_id: int, vigenza_al: str) -> None:
+        """An unchanged article's place in the act, re-read from this run's
+        index: position, headings, rubrica, repeal flag, fingerprint and the
+        dates of the check. `text`, `text_hash` and `last_changed_run` are
+        deliberately not here — nothing was fetched, so nothing changed."""
+        self._db.execute(
+            "UPDATE units SET position = ?, parte = ?, libro = ?, titolo = ?, capo = ?, sezione = ?, "
+            "rubrica = ?, abrogato = ?, fingerprint = ?, ultimo_aggiornamento = ?, "
+            "last_checked_run = ?, vigenza_al = ? WHERE id = ?",
+            (position, parte, libro, titolo, capo, sezione, rubrica, int(bool(abrogato)), fingerprint,
+             ultimo_aggiornamento, run_id, vigenza_al, unit_id),
         )
 
     def unit_run_columns(self, unit_id: str) -> tuple[int, int, int]:

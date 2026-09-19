@@ -4,6 +4,12 @@ Every kind beyond `brocardi` is one or two tool calls whose results are
 markdown for a reader, not data: the archive stores the text as it came,
 attributed and dated. The `mcp` SDK is imported only when a client is
 opened, so the text-only path never needs it.
+
+Nothing here waits forever. A tool call is bounded by `call_timeout` (the
+SDK is told the same figure, and `asyncio.wait_for` guards it in case the
+transport ignores it); the handshake by `start_timeout`, which is generous
+because the first start of mcp-legal-it builds its venv through uv. A
+timeout is a transport error: retried with backoff, then reported.
 """
 from __future__ import annotations
 
@@ -23,7 +29,16 @@ class LegalItError(Exception):
 
 
 class LegalItTransportError(LegalItError, RetryableError):
-    """The MCP transport failed; the call may be retried."""
+    """The MCP transport failed or timed out; the call may be retried."""
+
+
+#: The SDK's own exception, by name: `McpError` in mcp 1.x, `MCPError` in
+#: 2.x. Matched on the class hierarchy so the SDK stays an optional import.
+_MCP_ERROR_NAMES = frozenset({"McpError", "MCPError"})
+
+
+def _is_mcp_error(exc: BaseException) -> bool:
+    return any(cls.__name__ in _MCP_ERROR_NAMES for cls in type(exc).__mro__)
 
 
 @dataclass(frozen=True)
@@ -90,7 +105,7 @@ def classify_result(text: str) -> str:
     return "ok"
 
 
-def _default_session_factory(command: Sequence[str]) -> Callable:
+def _default_session_factory(command: Sequence[str], start_timeout: float) -> Callable:
     try:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
@@ -104,7 +119,12 @@ def _default_session_factory(command: Sequence[str]) -> Callable:
     async def factory():
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
-                await session.initialize()
+                try:
+                    await asyncio.wait_for(session.initialize(), timeout=start_timeout)
+                except asyncio.TimeoutError:
+                    raise LegalItError(
+                        f"the legal-it server did not answer initialize within {start_timeout:g}s"
+                    ) from None
                 yield session
 
     return factory
@@ -113,7 +133,8 @@ def _default_session_factory(command: Sequence[str]) -> Callable:
 class LegalItClient:
     def __init__(self, command: Sequence[str], throttle: Throttle, *, attempts: int = 3,
                  sleep=asyncio.sleep, jitter: Callable[[], float] = random.random, on_retry=None,
-                 session_factory: Callable | None = None):
+                 session_factory: Callable | None = None, call_timeout: float = 120.0,
+                 start_timeout: float = 180.0):
         self._command = tuple(command)
         self._throttle = throttle
         self._attempts = attempts
@@ -121,6 +142,8 @@ class LegalItClient:
         self._jitter = jitter
         self._on_retry = on_retry
         self._session_factory = session_factory
+        self._call_timeout = float(call_timeout)
+        self._start_timeout = float(start_timeout)
         self._stack: AsyncExitStack | None = None
         self._session = None
 
@@ -128,14 +151,14 @@ class LegalItClient:
         if self._session_factory is None:
             if not self._command:
                 raise LegalItError("no legal-it command configured (providers.legalit.command or LEGALIT_MCP_COMMAND)")
-            self._session_factory = _default_session_factory(self._command)
+            self._session_factory = _default_session_factory(self._command, self._start_timeout)
         self._stack = AsyncExitStack()
         try:
             self._session = await self._stack.enter_async_context(self._session_factory())
-        except LegalItError:
-            raise
         except Exception as exc:  # noqa: BLE001 — spawn/handshake failures of any shape
             await self._stack.aclose()
+            if isinstance(exc, LegalItError):
+                raise
             raise LegalItError(f"could not start the legal-it server: {exc}") from exc
         return self
 
@@ -152,11 +175,18 @@ class LegalItClient:
 
         async def attempt():
             try:
-                result = await self._session.call_tool(call.tool, arguments=dict(call.args))
+                result = await asyncio.wait_for(
+                    self._session.call_tool(call.tool, arguments=dict(call.args),
+                                            read_timeout_seconds=self._call_timeout),
+                    timeout=self._call_timeout,
+                )
             except LegalItError:
                 raise
-            except Exception as exc:  # noqa: BLE001 — transport errors of any shape
-                raise LegalItTransportError(f"{call.tool}: {exc}") from exc
+            except asyncio.TimeoutError as exc:
+                raise LegalItTransportError(f"{call.tool}: timed out after {self._call_timeout:g}s") from exc
+            except Exception as exc:  # noqa: BLE001 — the SDK's error, or a transport failure of any shape
+                what = "MCP error" if _is_mcp_error(exc) else "transport error"
+                raise LegalItTransportError(f"{call.tool}: {what}: {exc}") from exc
             text = "\n".join(
                 getattr(item, "text", "") for item in (getattr(result, "content", None) or [])
                 if getattr(item, "type", "text") == "text"
