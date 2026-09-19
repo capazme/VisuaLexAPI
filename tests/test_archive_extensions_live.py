@@ -35,4 +35,6 @@ async def test_eprivacy_consolidated_has_the_2009_cookie_rule():
     text, url = await scraper.get_document(normavisitata=None, act_type="direttiva ue",
                                            article="5", year="2002", num="58", urn=norma.url)
     assert "CELEX:02002L0058-20091219" in url
-    assert "consenso" in text  # art. 5(3) as amended by Dir. 2009/136/CE
+    # art. 5(3) as amended by Dir. 2009/136/CE: "già archiviate" is the 2009
+    # wording; "consenso" would also match the 2002 text ("senza consenso").
+    assert "già archiviate" in text

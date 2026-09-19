@@ -18,8 +18,10 @@ log = structlog.get_logger()
 # A consolidated version's CELEX: sector 0, year, type letter, act number,
 # then the consolidation date. "02002L0058-20091219" is Dir. 2002/58/CE as
 # amended up to 19 December 2009. Sector 3 ("32002L0058") is the OJ act and
-# is what the ELI URL already serves, so it is not accepted here.
-_CONSOLIDATED_CELEX = re.compile(r"^0\d{4}[A-Z]\d{4}-\d{8}$")
+# is what the ELI URL already serves, so it is not accepted here. Matched
+# with fullmatch and ASCII digits: `$` would let "…-20091219\n" through, and
+# `\d` alone accepts other scripts' digits — neither belongs in a URL.
+_CONSOLIDATED_CELEX = re.compile(r"0\d{4}[A-Z]\d{4}-\d{8}", re.ASCII)
 
 
 # --- Recitals -------------------------------------------------------------
@@ -106,7 +108,7 @@ def extract_recitals(soup) -> list[dict]:
 #
 # EUR-Lex renders a consolidated version with a markup of its own: the number
 # is <p class="title-article-norm">Articolo 5</p> (an ordinal suffix as
-# <span class="italics">bis</span>), the rubrica <p class="stitle-article-norm">
+# <span class="norm">bis</span>), the rubrica <p class="stitle-article-norm">
 # (bare, or inside <div class="eli-title">), the body in `norm` paragraphs or
 # divs with `no-parag` numbers and `grid-list` tables for lettered points,
 # and <p class="modref">▼M1</p> markers naming the amending act before each
@@ -224,10 +226,14 @@ def extract_article_consolidated(soup, article) -> "str | None":
     lines = [_cons_text(title)]
     for sibling in title.find_next_siblings():
         classes = _element_classes(sibling)
+        # Stop at the next article, the next chapter or annex heading, or
+        # the amendments table. The `eli-subdivision` stop is for a flat page
+        # whose next article is wrapped; on a subdivision page the walk ends
+        # with the article's own div, since the title has no later siblings.
         if (_CONS_ARTICLE_CLASS in classes or "eli-subdivision" in classes
                 or "hd-modifiers" in classes
-                or any(c.startswith("title-division") for c in classes)):
-            break  # next article, next chapter, or the amendments table
+                or any(c.startswith(("title-division", "title-annex")) for c in classes)):
+            break
         if _CONS_RUBRICA_CLASS in classes:
             lines.append(_cons_text(sibling))
             continue
@@ -291,7 +297,7 @@ class EurlexScraper(BaseScraper):
                   f"celex_consolidated={celex_consolidated}")
 
         if celex_consolidated:
-            if not _CONSOLIDATED_CELEX.match(str(celex_consolidated)):
+            if not _CONSOLIDATED_CELEX.fullmatch(str(celex_consolidated)):
                 raise ValidationError(
                     f"celex_consolidated non valido: {celex_consolidated!r} "
                     "(atteso il CELEX di una versione consolidata, es. 02002L0058-20091219)"

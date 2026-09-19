@@ -254,9 +254,12 @@ POST unless noted, JSON bodies.
   preamble and answers an empty list. Normattiva acts get a 400
 - `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
   AKN text plus, for the codici, the FRBRWork date of each article (the day
-  its current text came into force). A change detector, never the text:
-  a client refetches only the articles whose hash moved. `available: false`
-  with empty maps when there is no AKN index — the caller must then refetch
+  its current text came into force). `urn` is the act's full URL as
+  `norma_data.url` gives it (`https://www.normattiva.it/uri-res/N2Ls?urn:nir:…`),
+  not a bare `urn:nir:` string; an article suffix (`~art2`) is stripped. A
+  change detector, never the text: a client refetches only the articles
+  whose hash moved. `available: false` with empty maps when there is no AKN
+  index, or an index without fingerprints — the caller must then refetch
   everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405

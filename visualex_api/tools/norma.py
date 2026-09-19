@@ -68,6 +68,10 @@ class Norma:
             parts.append(f"{self.data},")
         if self.numero_atto:
             parts.append(f"n. {self.numero_atto}")
+        if self.celex_consolidated:
+            # "Articolo N non presente in …" must name the version it looked
+            # in: the OJ text and a consolidation do not have the same articles.
+            parts.append(f"(consolidato {self.celex_consolidated})")
         return " ".join(parts)
 
     def to_dict(self):

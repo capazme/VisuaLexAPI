@@ -71,6 +71,23 @@ class TestModel:
             Norma(tipo_atto="direttiva ue", data="2002", numero_atto="58",
                   celex_consolidated="32002L0058").url  # sector 3 is the OJ act, not a consolidation
 
+    def test_a_celex_with_a_trailing_newline_is_rejected(self):
+        # `$` matches before a trailing newline; the URL must not carry one.
+        with pytest.raises(ValidationError):
+            Norma(tipo_atto="direttiva ue", data="2002", numero_atto="58",
+                  celex_consolidated="02002L0058-20091219\n").url
+
+    def test_str_names_the_consolidated_version(self):
+        # The 404 reads "Articolo N non presente in …": the OJ text and a
+        # consolidation do not have the same articles, so name the version.
+        plain = Norma(tipo_atto="direttiva ue", data="2002", numero_atto="58")
+        cons = Norma(tipo_atto="direttiva ue", data="2002", numero_atto="58",
+                     celex_consolidated="02002L0058-20091219")
+        assert str(plain) == "direttiva ue 2002, n. 58"
+        assert str(cons) == "direttiva ue 2002, n. 58 (consolidato 02002L0058-20091219)"
+        assert str(NormaVisitata(norma=cons, numero_articolo="99")).endswith(
+            "(consolidato 02002L0058-20091219) art. 99")
+
     def test_get_uri_accepts_the_field_directly(self):
         scraper = EurlexScraper()
         assert scraper.get_uri("direttiva ue", "2002", "58",
@@ -164,6 +181,20 @@ class TestConsolidatedArticleText:
         text = await EurlexScraper().extract_article_text(
             soup_of("eidas_consolidated_20241018_trimmed.html"), "2")
         assert "\n1. " in text or text.split("\n")[2].startswith("1. ")
+
+    async def test_the_last_article_does_not_swallow_the_annex(self):
+        # A flat page (no eli-subdivision wrapper) ends its articles with an
+        # `title-annex-*` heading; the sibling walk must stop there.
+        html = ('<html><body>'
+                '<p class="title-article-norm">Articolo 52</p>'
+                '<p class="stitle-article-norm">Entrata in vigore</p>'
+                '<p class="norm">Il presente regolamento entra in vigore.</p>'
+                '<p class="title-annex-1">ALLEGATO I</p>'
+                '<p class="title-annex-2">REQUISITI PER I CERTIFICATI QUALIFICATI</p>'
+                '<p class="norm">I certificati qualificati contengono:</p>'
+                '</body></html>')
+        text = await EurlexScraper().extract_article_text(BeautifulSoup(html, "html.parser"), "52")
+        assert text == "Articolo 52\nEntrata in vigore\nIl presente regolamento entra in vigore."
 
     async def test_missing_article_raises(self):
         with pytest.raises(DocumentNotFoundError):
