@@ -1,6 +1,7 @@
 // Configuration for automatic annex detection and switching
 // NOTE: Auto-switch is DISABLED because it causes double-load and confusing UX.
-// The user should select the correct annex from DocumentStructure.
+// The user should select the correct annex from the structure window
+// (TreeViewPanel), which exposes one tab per annex.
 
 export const ANNEX_AUTO_SWITCH_CONFIG = {
   // Auto-switch if main text has this many articles or fewer

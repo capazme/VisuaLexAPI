@@ -74,6 +74,13 @@ export interface RelatedArticles {
     next?: RelatedArticle;
 }
 
+// Glossary entry (voce del dizionario giuridico Brocardi)
+export interface GlossaryEntry {
+    termine: string;
+    url: string;
+    dizionario_id: string;
+}
+
 // Cross Reference (riferimento incrociato)
 export interface CrossReference {
     articolo: string;
@@ -101,6 +108,8 @@ export interface BrocardiInfo {
     RelatedArticles?: RelatedArticles | null;
     // Cross References (riferimenti incrociati)
     CrossReferences?: CrossReference[] | null;
+    // Brocardi legal-dictionary links for terms used in the article
+    Glossario?: GlossaryEntry[] | null;
 }
 
 export interface ArticleData {

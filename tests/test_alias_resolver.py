@@ -234,3 +234,34 @@ class TestResolveNlQueryWithAlias:
         result = ctrl._resolve_nl_query({"query": "art. 2043 cc"})
         assert result["act_type"] == "codice civile"
         assert result["article"] == "2043"
+
+
+class TestResolverFallback:
+    """Names the YAML never had, resolved through the act tables."""
+
+    @pytest.mark.parametrize("text,act_number", [
+        ("statuto dei lavoratori", "300"),
+        ("legge fornero", "92"),
+        ("tusl", "81"),
+    ])
+    def test_falls_through_to_resolve_atto(self, text, act_number):
+        got = resolve_alias(text)
+        assert got is not None, f"{text!r} did not resolve"
+        assert got["act_number"] == act_number
+
+    def test_yaml_still_wins_over_the_tables(self):
+        # "jobs act" means d.lgs. 81/2015 in this product and is pinned by an
+        # existing test; the source repo files it under 23/2015. The YAML is
+        # consulted first precisely so existing behaviour cannot drift.
+        assert resolve_alias("jobs act")["act_number"] == "81"
+
+    def test_the_other_jobs_act_decree_has_its_own_alias(self):
+        assert resolve_alias("jobs act tutele crescenti")["act_number"] == "23"
+
+    def test_article_prefix_still_merges(self):
+        got = resolve_alias("art. 18 statuto dei lavoratori")
+        assert got["article"] == "18"
+        assert got["act_number"] == "300"
+
+    def test_unknown_still_returns_none(self):
+        assert resolve_alias("legge sugli unicorni") is None

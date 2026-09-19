@@ -22,9 +22,16 @@ export const VERSION_FETCH_TIMEOUT = 5000;
  */
 export interface ChangelogEntry {
   hash: string;
+  /** Raw commit subject, prefix included. Shown only in the technical panel. */
   message: string;
   date: string;
   author: string;
+  /** Conventional-commit type, when the subject carries one. */
+  type?: string | null;
+  /** Conventional-commit scope: the area of the app the change touched. */
+  scope?: string | null;
+  /** The subject without its prefix. Absent from servers older than 1.4. */
+  summary?: string;
 }
 
 /**

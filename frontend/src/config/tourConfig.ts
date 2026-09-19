@@ -221,7 +221,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card',
         popover: {
             title: 'Card Dossier',
-            description: 'Ogni card mostra titolo, tag, conteggio elementi e un riepilogo colorato degli stati (importante, in lettura, ecc.). Clicca per aprire.',
+            description: 'Ogni card mostra titolo, tag, quante norme e note contiene e l\'ultimo aggiornamento. Clicca per aprire.',
             side: 'right',
             align: 'center',
         }
@@ -238,7 +238,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Gestione dettagliata',
-            description: 'Entra in un dossier (clic sulla card) per riordinare gli elementi, cambiarne lo stato, selezionarne in blocco, esportare in PDF/JSON o condividere un link. Buon lavoro!',
+            description: 'Entra in un dossier (clic sulla card) per leggere gli articoli sul posto, riordinare gli elementi, selezionarne in blocco, esportare in PDF/JSON o condividere un link. Buon lavoro!',
             side: 'over',
             align: 'center',
         }

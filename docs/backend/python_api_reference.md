@@ -549,7 +549,10 @@ Get application version and git information.
   "changelog": [
     {
       "hash": "abc1234",
-      "message": "feat: Add new feature",
+      "message": "feat(reading): Add new feature",
+      "summary": "Add new feature",
+      "type": "feat",
+      "scope": "reading",
       "date": "2024-01-15T10:30:45Z",
       "author": "Developer Name"
     }
@@ -557,7 +560,14 @@ Get application version and git information.
 }
 ```
 
-**Notes:** Changelog contains last 10 commits.
+**Notes:** The changelog is what landed in the current version, read from the
+first-parent log so each entry is a branch that landed rather than a development
+step. `visualex_api/tools/changelog.py` drops reverted work (a revert cancels
+the merge it undid, and with it everything that merge brought in), housekeeping
+types (`build/chore/ci/docs/refactor/style/test`) and toolchain scopes, then
+caps the list at 20 entries. `message` is the raw commit subject; `summary`,
+`type` and `scope` are its parsed parts, `type` and `scope` null when the
+subject carries no conventional prefix.
 
 ---
 

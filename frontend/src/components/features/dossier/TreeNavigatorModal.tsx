@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, CheckSquare, Square, Loader2, TreeDeciduous } from 'lucide-react';
 import { parseItalianDate } from '../../../utils/dateUtils';
+import { resolveAct } from '../../../utils/actUrn';
 import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
@@ -33,24 +34,12 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
     setLoading(true);
     setError(null);
     try {
-      // First get norma data to derive the URN used by the tree endpoint.
-      const normaRes = await fetch('/fetch_norma_data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          act_type: actType,
-          act_number: actNumber || undefined,
-          date: actDate ? parseItalianDate(actDate) : undefined,
-          article: '1', // placeholder: we only need the URN from the response
-        }),
+      // Derive the URN the tree endpoint needs, without fetching article text.
+      const { urn: urnToUse } = await resolveAct({
+        act_type: actType,
+        act_number: actNumber || undefined,
+        date: actDate ? parseItalianDate(actDate) : undefined,
       });
-      const normaData = await normaRes.json();
-      // /fetch_norma_data returns { norma_data: [{ urn, url, ... }] }, not a flat
-      // urn — mirror SearchForm so import-from-tree actually resolves.
-      const urnToUse = normaData.norma_data?.[0]?.urn || normaData.norma_data?.[0]?.url;
-      if (!urnToUse) {
-        throw new Error('Impossibile generare URN per questa norma');
-      }
 
       const treeRes = await fetch('/fetch_tree', {
         method: 'POST',
@@ -61,7 +50,7 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
       if (treeResponse.error) throw new Error(treeResponse.error);
 
       // /fetch_tree returns { articles: [{allegato, numero}] } (no `tree` key);
-      // flatten to deduped article-id strings via the shared util like SearchForm.
+      // flatten to deduped article-id strings via the shared util.
       const rawTree = Array.isArray(treeResponse) ? treeResponse : (treeResponse.articles ?? []);
       const treeData = rawTree.filter(
         (node: unknown): node is TreeNode =>

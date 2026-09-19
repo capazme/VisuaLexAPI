@@ -46,6 +46,8 @@ MERLT_REBUILD=true      # --no-merlt-build flips this off (up without rebuild)
 # MERL-T compose invocation — keep in sync with start.sh / docs.
 MERLT_COMPOSE_FILE="docker-compose.merlt.yml"
 MERLT_BUILD_SERVICES=("merlt-api" "merlt-worker" "mcp-legal-it")
+DEPLOY_BRANCH="main"
+ALLOW_BRANCH=false
 
 #===============================================================================
 # Functions
@@ -85,6 +87,7 @@ Options:
   --patch          Increment patch version (1.0.0 -> 1.0.1)
   --no-pull        Skip git pull
   --no-restart     Skip service restart
+  --allow-branch   Deploy from a branch other than main (refused by default)
   --merlt          Build + (re)start the MERL-T Docker stack this deploy
   --no-merlt-build Bring the MERL-T stack up WITHOUT rebuilding images
                    (only meaningful together with --merlt)
@@ -172,6 +175,10 @@ while [[ $# -gt 0 ]]; do
             MERLT_REBUILD=false
             shift
             ;;
+        --allow-branch)
+            ALLOW_BRANCH=true
+            shift
+            ;;
         -h|--help)
             show_help
             ;;
@@ -199,10 +206,58 @@ fi
 
 echo ""
 
+# Step 0: Branch guard.
+# The pull below follows whatever branch this checkout is on. `main` is the
+# product; `visualex-merlt-main` is the AI experiment and must never reach
+# production. A debugging session left on the wrong branch would otherwise ship
+# it silently. See docs/deployment.md.
+cd "$SCRIPT_DIR"
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ "$CURRENT_BRANCH" != "$DEPLOY_BRANCH" ]]; then
+    if [[ "$ALLOW_BRANCH" == true ]]; then
+        print_warning "Deploying from '$CURRENT_BRANCH', not '$DEPLOY_BRANCH' (--allow-branch)"
+    else
+        print_error "Refusing to deploy from branch '$CURRENT_BRANCH' — expected '$DEPLOY_BRANCH'."
+        echo "  Switch with: git checkout $DEPLOY_BRANCH"
+        echo "  Or, if this is deliberate, re-run with --allow-branch"
+        exit 1
+    fi
+else
+    print_success "On branch '$DEPLOY_BRANCH'"
+fi
+
 # Step 1: Git Pull
 if [[ "$DO_PULL" == true ]]; then
     print_step "Pulling latest changes..."
     cd "$SCRIPT_DIR"
+
+    # Kept as a safety net, no longer as routine cleanup. Steps 3 and 4 used
+    # `npm install` while this box ran npm 10 against lockfiles written by
+    # npm 11, so npm rewrote them on every run: each deploy left a dirty tree
+    # and killed the next one here, because `git pull -r` refuses to rebase
+    # over unstaged changes. The server now runs Node 24 / npm 11 and both
+    # steps use `npm ci`, which never writes a lockfile — so this should find
+    # nothing. It stays because a hand-run `npm install` would bring the churn
+    # straight back.
+    #
+    # The lockfiles are authoritative in git, never on this machine, so that
+    # churn is discardable. Nothing else is: a local edit here is somebody's
+    # work or somebody's emergency patch, and throwing it away silently during
+    # a deploy is how you lose it.
+    if ! git diff --quiet -- '*package-lock.json'; then
+        print_warning "Discarding npm's lockfile churn from the previous deploy"
+        git checkout -- '*package-lock.json'
+    fi
+
+    if ! git diff --quiet; then
+        print_error "Working tree has local changes beyond the lockfiles:"
+        git status --short
+        echo
+        echo "  Commit or stash them, then re-run. Deliberately not discarded:"
+        echo "  a deploy must not destroy work it did not create."
+        exit 1
+    fi
+
     git pull -r origin "$(git branch --show-current)"
     print_success "Git pull completed"
 
@@ -243,7 +298,10 @@ fi
 # Step 3: Backend dependencies
 print_step "Installing backend dependencies..."
 cd "$SCRIPT_DIR/backend"
-npm install --silent
+# `npm ci`, not `npm install`: it installs exactly the committed lockfile and
+# never rewrites it. Requires the lockfile to match package.json — if it fails
+# with EUSAGE, the fix is to commit an updated lockfile, not to loosen this.
+npm ci --silent
 print_success "Backend dependencies installed"
 
 # Step 3b: Regenerate Prisma client to match the current schema.
@@ -264,7 +322,7 @@ print_success "Database migrations applied"
 # Step 4: Frontend dependencies
 print_step "Installing frontend dependencies..."
 cd "$SCRIPT_DIR/frontend"
-npm install --silent
+npm ci --silent
 print_success "Frontend dependencies installed"
 
 # Step 5: Frontend build

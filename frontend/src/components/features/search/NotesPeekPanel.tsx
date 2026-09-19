@@ -16,6 +16,7 @@ import { StickyNote, X, BookOpen, Trash2, Download } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { AttributionChip } from '../bulletin/AttributionChip';
 
 export interface NotesPeekPanelProps {
@@ -31,24 +32,6 @@ export interface NotesPeekPanelProps {
     onClearAnchor: () => void;
     onOpenStudyMode?: () => void;
     onExportTxt: () => void;
-}
-
-/**
- * Minimal media query hook: `true` when viewport is desktop-sized.
- * Intentionally lightweight — no SSR, no breakpoint config — we only
- * need to pick between a floating popover and a bottom sheet.
- */
-function useIsDesktop(): boolean {
-    const [desktop, setDesktop] = useState(() =>
-        typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true,
-    );
-    useEffect(() => {
-        const mql = window.matchMedia('(min-width: 768px)');
-        const handler = (e: MediaQueryListEvent) => setDesktop(e.matches);
-        mql.addEventListener('change', handler);
-        return () => mql.removeEventListener('change', handler);
-    }, []);
-    return desktop;
 }
 
 export function NotesPeekPanel(props: NotesPeekPanelProps) {

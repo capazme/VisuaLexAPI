@@ -55,22 +55,3 @@ class EURLexSelectors:
 
     # Canonical link
     CANONICAL_LINK_REL = "canonical"
-
-
-@dataclass
-class BrocardiSelectors:
-    """CSS selectors for Brocardi.it HTML structure."""
-
-    # Navigation
-    BREADCRUMB_ID = "breadcrumb"
-    SECTION_TITLE_CLASS = "section-title"
-
-    # Content sections
-    MAIN_CONTENT_CLASS = "panes-condensed panes-w-ads content-ext-guide content-mark"
-    BROCARDI_CONTENT_CLASS = "brocardi-content"
-    RATIO_CONTAINER_CLASS = "container-ratio"
-    SPIEGAZIONE_CLASS = "spiegazione-articolo"
-
-    # Massime
-    MASSIME_CONTAINER_CLASS = "massime"
-    MASSIMA_ITEM_CLASS = "massima-item"

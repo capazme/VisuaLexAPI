@@ -1,12 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Tag, Pencil, Trash2, ArrowRight, AlertCircle, Plus } from 'lucide-react';
+import { Tag, Pencil, Trash2, ArrowRight, AlertCircle, Plus, Package, BookOpen, Search, Info } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import type { CustomAlias } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 
 // Relative "ultima <when>" recency label from an ISO timestamp. Returns
 // null when the timestamp is absent or unparseable so the caller can omit
@@ -56,10 +57,55 @@ export function AliasManager() {
     const [actDate, setActDate] = useState('');
     const [defaultArticle, setDefaultArticle] = useState('');
 
+    // What the system already recognises: the aliases we ship, and the act
+    // names the resolver understands without any alias at all. Both were
+    // invisible here, which is how this screen came to suggest "es. gdpr" as a
+    // trigger to create while `gdpr` had been a shipped preset all along.
+    const { catalog, loading: catalogLoading } = useAliasCatalog(aliasManagerOpen);
+    const [catalogFilter, setCatalogFilter] = useState('');
+
     // Edit state
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editTrigger, setEditTrigger] = useState('');
     const [editDisplayName, setEditDisplayName] = useState('');
+
+    const aliasTriggers = useMemo(
+        () => new Set(getCustomAliasesSorted().map(a => foldAlias(a.trigger))),
+        [getCustomAliasesSorted]
+    );
+
+    // Presets the user has taken over by creating the same trigger. Their own
+    // wins: the client resolves its aliases before asking the server.
+    const overriddenPresets = useMemo(
+        () => new Set(Object.keys(catalog.presets).filter(t => aliasTriggers.has(foldAlias(t)))),
+        [catalog.presets, aliasTriggers]
+    );
+
+    const filteredPresets = useMemo(() => {
+        const q = foldAlias(catalogFilter);
+        return Object.entries(catalog.presets)
+            .filter(([trigger, p]) => !q || foldAlias(trigger).includes(q) || foldAlias(p.act_type).includes(q))
+            .sort(([a], [b]) => a.localeCompare(b));
+    }, [catalog.presets, catalogFilter]);
+
+    const filteredKnownActs = useMemo(() => {
+        const q = foldAlias(catalogFilter);
+        return q ? catalog.knownActs.filter(n => foldAlias(n).includes(q)) : catalog.knownActs;
+    }, [catalog.knownActs, catalogFilter]);
+
+    // A warning, never a block: creating one of these is allowed, it is just
+    // usually pointless or a takeover the user should make knowingly.
+    const triggerNotice = useMemo(() => {
+        const t = foldAlias(trigger);
+        if (!t || t.length < 2) return null;
+        if (Object.keys(catalog.presets).some(p => foldAlias(p) === t)) {
+            return 'Esiste già come alias in dotazione: il tuo lo sovrascriverà.';
+        }
+        if (catalog.knownActs.some(n => foldAlias(n) === t)) {
+            return 'Questo nome è già riconosciuto così com\'è — un alias non serve.';
+        }
+        return null;
+    }, [trigger, catalog]);
 
     // Validation
     const triggerError = useMemo(() => {
@@ -179,7 +225,7 @@ export function AliasManager() {
                                     type="text"
                                     value={trigger}
                                     onChange={(e) => setTrigger(e.target.value.toLowerCase())}
-                                    placeholder="es. gdpr, 231"
+                                    placeholder="es. mio-contratto"
                                     className={cn(
                                         "w-full px-3 py-2 rounded-lg text-sm",
                                         "bg-white dark:bg-slate-800 border",
@@ -193,6 +239,15 @@ export function AliasManager() {
                                     <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
                                         <AlertCircle size={12} />
                                         {triggerError}
+                                    </p>
+                                )}
+                                {/* A notice, not an error: creating it is allowed,
+                                    it is just usually pointless or a takeover the
+                                    user should make knowingly. */}
+                                {!triggerError && triggerNotice && (
+                                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1">
+                                        <Info size={12} className="mt-0.5 shrink-0" />
+                                        <span>{triggerNotice}</span>
                                     </p>
                                 )}
                             </div>
@@ -314,6 +369,77 @@ export function AliasManager() {
                                 />
                             ))}
                         </div>
+                    )}
+                </div>
+
+                {/* What the system already knows. Read-only: the point is to
+                    stop the user inventing a shortcut for something that
+                    already works — which is how duplicates are born. */}
+                <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Search size={14} className="text-slate-400" />
+                        <input
+                            value={catalogFilter}
+                            onChange={(e) => setCatalogFilter(e.target.value)}
+                            placeholder="Cerca fra gli alias in dotazione e i nomi riconosciuti…"
+                            className="flex-1 px-3 py-2 text-sm rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                        />
+                    </div>
+
+                    {catalogLoading && (
+                        <p className="text-xs text-slate-400 py-3">Carico ciò che il sistema già riconosce…</p>
+                    )}
+
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <Package size={12} />
+                        In dotazione ({filteredPresets.length})
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mb-3">
+                        Alias già pronti. Per cambiarne uno, crea sopra un alias con lo stesso trigger: il tuo ha la precedenza.
+                    </p>
+                    <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
+                        {filteredPresets.map(([trigger, preset]) => (
+                            <div key={trigger} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 text-xs">
+                                <span className="font-mono font-bold text-slate-600 dark:text-slate-300 min-w-24">{trigger}</span>
+                                <ArrowRight size={10} className="text-slate-400 shrink-0" />
+                                <span className="flex-1 min-w-0 truncate text-slate-500 dark:text-slate-400">
+                                    {preset.act_type}
+                                    {preset.act_number ? ` ${preset.act_number}` : ''}
+                                    {preset.date ? `/${preset.date}` : ''}
+                                </span>
+                                {overriddenPresets.has(trigger) && (
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase">
+                                        sovrascritto
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                        {!catalogLoading && filteredPresets.length === 0 && (
+                            <p className="text-xs text-slate-400 py-2">Nessun alias in dotazione corrisponde.</p>
+                        )}
+                    </div>
+
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-6 mb-2 flex items-center gap-2">
+                        <BookOpen size={12} />
+                        Nomi riconosciuti ({filteredKnownActs.length})
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mb-3">
+                        Questi puoi scriverli per esteso nella ricerca: non serve alcun alias.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto pr-1">
+                        {filteredKnownActs.slice(0, 300).map((name) => (
+                            <span key={name} className="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+                                {name}
+                            </span>
+                        ))}
+                        {!catalogLoading && filteredKnownActs.length === 0 && (
+                            <p className="text-xs text-slate-400 py-2">Nessun nome corrisponde.</p>
+                        )}
+                    </div>
+                    {filteredKnownActs.length > 300 && (
+                        <p className="text-[11px] text-slate-400 mt-2">
+                            …e altri {filteredKnownActs.length - 300}. Restringi la ricerca per vederli.
+                        </p>
                     )}
                 </div>
             </div>

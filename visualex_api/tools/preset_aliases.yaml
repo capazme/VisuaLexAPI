@@ -315,6 +315,19 @@ jobs act:
   act_number: "81"
   date: "2015"
 
+# Both decrees belong to the Jobs Act package; neither owns the name on its own.
+# "jobs act" keeps its existing meaning (81/2015) — changing it would move
+# existing users' results. The other decree gets an explicit alias.
+jobs act tutele crescenti:
+  act_type: "decreto legislativo"
+  act_number: "23"
+  date: "2015"
+
+jobs act contratti:
+  act_type: "decreto legislativo"
+  act_number: "81"
+  date: "2015"
+
 tutele crescenti:
   act_type: "decreto legislativo"
   act_number: "23"

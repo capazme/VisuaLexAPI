@@ -1,3 +1,16 @@
+/**
+ * NOT LOADED. This is a Tailwind v3-style config; the project runs Tailwind v4
+ * (`@import "tailwindcss"` + `@theme` in src/index.css) and v4 only reads a JS
+ * config when the stylesheet asks for it with `@config`. Nothing here reaches
+ * the build: editing a value in this file changes nothing you can see.
+ *
+ * The `primary` scale below is live only because it was copied into the
+ * `@theme` block in src/index.css — edit it there. `fontFamily`, `boxShadow`
+ * (`shadow-glow`, `shadow-glass-lg`) and the keyframes/animations are still
+ * inert, and the fonts named here are never fetched anyway.
+ *
+ * Kept for the record until we decide whether to wire it up or delete it.
+ */
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [

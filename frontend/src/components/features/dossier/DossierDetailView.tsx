@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Folder,
   Trash2,
@@ -13,9 +13,10 @@ import {
   ExternalLink,
   Star,
   X,
-  ListChecks,
   GripVertical,
   StickyNote,
+  ChevronsUpDown,
+  ChevronsDownUp,
 } from 'lucide-react';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { useNavigate } from 'react-router-dom';
@@ -41,11 +42,10 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import { SortableDossierItem } from './SortableDossierItem';
-import { formatTimestampLong, STATUS_CONFIG, computeNormaGroups, type DossierItemStatus, type NormaGroup } from './dossierUtils';
+import { formatTimestampLong, computeNormaGroups, searchParamsFromNorma, type NormaGroup } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
-import { ArticleViewerModal } from './ArticleViewerModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { ToolbarButton } from './ToolbarButton';
 import { AddNoteModal } from './AddNoteModal';
@@ -76,7 +76,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   } = useAppStore();
   const navigate = useNavigate();
 
-  const [viewingItem, setViewingItem] = useState<DossierItem | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
@@ -84,38 +84,15 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [treeNavigatorOpen, setTreeNavigatorOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<DossierItemStatus | null>(null);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
-  const [bulkStatusMenuOpen, setBulkStatusMenuOpen] = useState(false);
-  const bulkStatusMenuRef = useRef<HTMLDivElement>(null);
   const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
 
-  // Close the bulk-status menu on click-outside / Escape.
-  useEffect(() => {
-    if (!bulkStatusMenuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (bulkStatusMenuRef.current && !bulkStatusMenuRef.current.contains(e.target as Node)) {
-        setBulkStatusMenuOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setBulkStatusMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [bulkStatusMenuOpen]);
-
-  // Items filtered by status + free-text query. Drag-reorder still operates on
+  // Items filtered by free-text query. Drag-reorder still operates on
   // the full `dossier.items` array, so indexes stay absolute even while filtered.
   const visibleItems = useMemo(() => {
     const q = itemSearchQuery.trim().toLowerCase();
     return dossier.items.filter((item) => {
-      if (statusFilter && (item.status ?? 'unread') !== statusFilter) return false;
       if (!q) return true;
       if (item.type === 'norma') {
         const d = item.data;
@@ -128,9 +105,16 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
       }
       return typeof item.data === 'string' && item.data.toLowerCase().includes(q);
     });
-  }, [dossier.items, statusFilter, itemSearchQuery]);
+  }, [dossier.items, itemSearchQuery]);
 
-  const hasFilter = statusFilter !== null || itemSearchQuery.trim().length > 0;
+  const hasFilter = itemSearchQuery.trim().length > 0;
+
+  const toggleExpanded = (id: string) => setExpandedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allExpanded = visibleItems.length > 0 && visibleItems.every(i => expandedIds.has(i.id));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -203,14 +187,6 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     });
   };
 
-  const bulkChangeStatus = (status: DossierItemStatus) => {
-    if (selectedItems.size === 0) return;
-    selectedItems.forEach((itemId) => updateDossierItemStatus(dossier.id, itemId, status));
-    setBulkStatusMenuOpen(false);
-    clearSelection();
-    showToast(`Stato aggiornato per ${selectedItems.size} elementi`, 'success');
-  };
-
   const handleMoveToDossier = (targetDossierId: string) => {
     if (selectedItems.size === 0) return;
     moveToDossier(dossier.id, targetDossierId, Array.from(selectedItems));
@@ -218,21 +194,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     setMoveToModalOpen(false);
   };
 
-  const handleDossierItemClick = (item: DossierItem) => {
-    if (item.type === 'norma') {
-      navigate('/');
-      triggerSearch({
-        act_type: item.data.tipo_atto,
-        act_number: item.data.numero_atto || '',
-        date: item.data.data || '',
-        article: item.data.numero_articolo?.toString() || '',
-        version: 'vigente',
-        version_date: '',
-        show_brocardi_info: true,
-      });
-    } else {
-      setViewingItem(item);
-    }
+  // Notes are read in place (expanded row), so only norma items have a
+  // dashboard destination.
+  const openItemOnDashboard = (item: DossierItem) => {
+    if (item.type !== 'norma') return;
+    navigate('/');
+    triggerSearch(searchParamsFromNorma(item.data));
   };
 
   const normaGroups = useMemo<NormaGroup[]>(() => computeNormaGroups(dossier.items), [dossier.items]);
@@ -451,46 +418,6 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
             <div className="text-xs md:text-sm text-slate-400 mt-2">
               Creato il {formatTimestampLong(dossier.createdAt)} • {dossier.items.length} elementi
             </div>
-            {dossier.items.length > 0 && (
-              <div id="tour-dossier-stats" className="flex gap-2 md:gap-3 mt-3 text-xs overflow-x-auto pb-2 md:pb-0 -mx-1 px-1 items-center">
-                {(Object.keys(STATUS_CONFIG) as DossierItemStatus[]).map((key) => {
-                  const cfg = STATUS_CONFIG[key];
-                  const Icon = cfg.icon;
-                  const count = dossier.items.filter((i) => (i.status ?? 'unread') === key).length;
-                  const active = statusFilter === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setStatusFilter(active ? null : key)}
-                      aria-pressed={active}
-                      aria-label={`${active ? 'Rimuovi filtro' : 'Filtra per'} ${cfg.label.toLowerCase()} (${count})`}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 min-h-7 px-2.5 py-1 rounded-full whitespace-nowrap transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                        cfg.bg, cfg.color,
-                        active
-                          ? 'font-semibold ring-1 ring-current/40 shadow-sm'
-                          : 'opacity-80 hover:opacity-100',
-                      )}
-                    >
-                      <Icon size={12} className="flex-shrink-0" />
-                      {count} {cfg.label.toLowerCase()}
-                    </button>
-                  );
-                })}
-                {statusFilter && (
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter(null)}
-                    aria-label="Azzera filtro stato"
-                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-1 py-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
@@ -661,6 +588,15 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               </button>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setExpandedIds(allExpanded ? new Set() : new Set(visibleItems.map(i => i.id)))}
+            className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-pressed={allExpanded}
+          >
+            {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
+            {allExpanded ? 'Comprimi tutto' : 'Espandi tutto'}
+          </button>
         </div>
       )}
 
@@ -690,40 +626,6 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           </div>
           {showBulkActions && selectedItems.size > 0 && (
             <div className="flex items-center gap-2">
-              <div ref={bulkStatusMenuRef} className="relative">
-                <button
-                  onClick={() => setBulkStatusMenuOpen((v) => !v)}
-                  aria-haspopup="menu"
-                  aria-expanded={bulkStatusMenuOpen}
-                  className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
-                >
-                  <ListChecks size={16} />
-                  <span className="md:inline">Stato</span>
-                </button>
-                {bulkStatusMenuOpen && (
-                  <div
-                    role="menu"
-                    className="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50"
-                  >
-                    {(Object.keys(STATUS_CONFIG) as DossierItemStatus[]).map((key) => {
-                      const cfg = STATUS_CONFIG[key];
-                      const Icon = cfg.icon;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => bulkChangeStatus(key)}
-                          className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 min-h-[44px] focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700"
-                        >
-                          <Icon size={16} className={cfg.color} />
-                          {cfg.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
               <button onClick={() => setMoveToModalOpen(true)} className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                 <FolderInput size={16} />
                 <span className="md:inline">Sposta</span>
@@ -772,15 +674,11 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                 <EmptyState
                   variant="search"
                   title="Nessun elemento corrisponde ai filtri"
-                  description={statusFilter && itemSearchQuery
-                    ? 'Prova a rimuovere uno dei filtri applicati.'
-                    : statusFilter
-                      ? 'Nessun elemento con lo stato selezionato.'
-                      : 'La ricerca non ha trovato corrispondenze in questo dossier.'}
+                  description="La ricerca non ha trovato corrispondenze in questo dossier."
                   action={
                     <button
                       type="button"
-                      onClick={() => { setStatusFilter(null); setItemSearchQuery(''); }}
+                      onClick={() => setItemSearchQuery('')}
                       className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                     >
                       <X size={18} />
@@ -796,9 +694,12 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
                   item={item}
                   isSelected={selectedItems.has(item.id)}
                   onToggleSelect={() => toggleItemSelection(item.id)}
-                  onView={() => handleDossierItemClick(item)}
+                  isExpanded={expandedIds.has(item.id)}
+                  onToggleExpand={() => toggleExpanded(item.id)}
+                  onOpenOnDashboard={() => openItemOnDashboard(item)}
+                  showToast={showToast}
                   onRemove={() => handleRemoveSingle(item)}
-                  onStatusChange={(status: DossierItemStatus) => updateDossierItemStatus(dossier.id, item.id, status)}
+                  onToggleImportant={() => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
                   showCheckbox={showBulkActions}
                   dragDisabled={hasFilter}
                 />
@@ -815,10 +716,6 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
           onMove={handleMoveToDossier}
           onClose={() => setMoveToModalOpen(false)}
         />
-      )}
-
-      {viewingItem && (
-        <ArticleViewerModal item={viewingItem} onClose={() => setViewingItem(null)} />
       )}
 
       {editingDossier && (

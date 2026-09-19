@@ -1,0 +1,99 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableDossierItem } from './SortableDossierItem';
+import type { DossierItem } from '../../../types';
+
+const normaItem: DossierItem = {
+  id: 'i1', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z',
+  data: { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '2043' },
+};
+
+function renderRow(item: DossierItem, over: Partial<Parameters<typeof SortableDossierItem>[0]> = {}) {
+  return render(
+    <DndContext>
+      <SortableContext items={[item.id]} strategy={verticalListSortingStrategy}>
+        <SortableDossierItem
+          item={item} isSelected={false} showCheckbox={false}
+          onToggleSelect={() => {}} onRemove={() => {}}
+          onToggleImportant={() => {}}
+          isExpanded={false} onToggleExpand={() => {}}
+          onOpenOnDashboard={() => {}} showToast={() => {}}
+          {...over}
+        />
+      </SortableContext>
+    </DndContext>,
+  );
+}
+
+describe('SortableDossierItem star', () => {
+  it('renders an unpressed star for a plain norma item and fires onToggleImportant', () => {
+    const onToggleImportant = vi.fn();
+    renderRow(normaItem, { onToggleImportant });
+    const star = screen.getByRole('button', { name: /segna come importante/i });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(star);
+    expect(onToggleImportant).toHaveBeenCalledTimes(1);
+  });
+  it('renders a pressed star for an important item', () => {
+    renderRow({ ...normaItem, status: 'important' });
+    expect(screen.getByRole('button', { name: /rimuovi da importanti/i }))
+      .toHaveAttribute('aria-pressed', 'true');
+  });
+  it('shows no status menu anymore', () => {
+    renderRow(normaItem);
+    expect(screen.queryByRole('button', { name: /cambia stato/i })).toBeNull();
+  });
+  it('hides the star on note items', () => {
+    renderRow({ id: 'n1', type: 'note', data: 'appunto di pratica', addedAt: '2026-08-01' });
+    expect(screen.queryByRole('button', { name: /importante/i })).toBeNull();
+  });
+});
+
+describe('SortableDossierItem expansion', () => {
+  it('expands a note item in place on row click', () => {
+    const noteItem: DossierItem = { id: 'n1', type: 'note', data: 'appunto di pratica completo', addedAt: '2026-08-01' };
+    const { rerender } = renderRow(noteItem);
+    const row = screen.getByRole('button', { name: /espandi nota/i });
+    expect(row).toHaveAttribute('aria-expanded', 'false');
+    // Parent owns the state, so re-render with it flipped to see the body.
+    rerender(
+      <DndContext>
+        <SortableContext items={[noteItem.id]} strategy={verticalListSortingStrategy}>
+          <SortableDossierItem
+            item={noteItem} isSelected={false} showCheckbox={false}
+            onToggleSelect={() => {}} onRemove={() => {}} onToggleImportant={() => {}}
+            isExpanded={true} onToggleExpand={() => {}}
+            onOpenOnDashboard={() => {}} showToast={() => {}}
+          />
+        </SortableContext>
+      </DndContext>,
+    );
+    // The truncated preview is gone, so the full note is the only copy on screen.
+    expect(screen.getByText('appunto di pratica completo')).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /comprimi nota/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // The toggle must point at the region it reveals.
+    const regionId = toggle.getAttribute('aria-controls');
+    expect(regionId).toBeTruthy();
+    expect(document.getElementById(regionId as string)).toHaveTextContent('appunto di pratica completo');
+  });
+
+  it('keeps interactive controls out of the expand toggle subtree', () => {
+    // ARIA makes descendants of a role="button" presentational, so the star
+    // and the remove button must be siblings of the toggle, never children.
+    renderRow(normaItem, { isExpanded: false });
+    const toggle = screen.getByRole('button', { name: /espandi codice civile/i });
+    expect(within(toggle).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /segna come importante/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /rimuovi elemento dal dossier/i })).toBeInTheDocument();
+  });
+
+  it('fires onToggleExpand when the row is activated', () => {
+    const onToggleExpand = vi.fn();
+    renderRow(normaItem, { onToggleExpand });
+    fireEvent.click(screen.getByRole('button', { name: /espandi codice civile/i }));
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+  });
+});

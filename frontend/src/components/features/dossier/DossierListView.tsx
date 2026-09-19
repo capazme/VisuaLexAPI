@@ -18,7 +18,7 @@ import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
-import { formatTimestampLong, computeNormaGroups, computeStatusBreakdown, STATUS_CONFIG, type NormaGroup } from './dossierUtils';
+import { formatTimestampLong, computeNormaGroups, computeItemCounts, type NormaGroup } from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
@@ -380,7 +380,7 @@ export function DossierListView({ onSelect, showToast }: Props) {
           filteredDossiers.map((dossier, idx) => {
             const isMenuOpen = activeMenuId === dossier.id;
             const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
-            const statusBreakdown = computeStatusBreakdown(dossier.items);
+            const counts = computeItemCounts(dossier.items);
             return (
               <div
                 key={dossier.id}
@@ -512,27 +512,17 @@ export function DossierListView({ onSelect, showToast }: Props) {
                     )}
                   </div>
                 )}
-                {statusBreakdown.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2 md:mt-3" aria-label="Riepilogo stati">
-                    {statusBreakdown.map(({ status, count }) => {
-                      const cfg = STATUS_CONFIG[status];
-                      const Icon = cfg.icon;
-                      return (
-                        <span
-                          key={status}
-                          title={`${count} ${cfg.label.toLowerCase()}`}
-                          className={cn(
-                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
-                            cfg.bg, cfg.color,
-                          )}
-                        >
-                          <Icon size={11} className="flex-shrink-0" />
-                          {count}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
+                <p className="mt-2 md:mt-3 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <span>
+                    {counts.norme} {counts.norme === 1 ? 'norma' : 'norme'} · {counts.note} {counts.note === 1 ? 'nota' : 'note'}
+                  </span>
+                  {counts.important > 0 && (
+                    <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"
+                          title={`${counts.important} element${counts.important === 1 ? 'o' : 'i'} importanti`}>
+                      <Star size={11} className="fill-amber-400 text-amber-400" /> {counts.important}
+                    </span>
+                  )}
+                </p>
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                   <span className="text-xs text-slate-400">{formatTimestampLong(dossier.createdAt)}</span>
                   <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />

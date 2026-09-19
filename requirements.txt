@@ -8,3 +8,4 @@ aiocache
 aiohttp
 redis>=5.0
 pyyaml>=6.0
+lxml>=5.0

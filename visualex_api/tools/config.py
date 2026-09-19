@@ -28,6 +28,14 @@ HTTP_INITIAL_BACKOFF = float(os.getenv("HTTP_INITIAL_BACKOFF", 0.5))
 HTTP_JITTER = float(os.getenv("HTTP_JITTER", 0.3))
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", 30))
 
+# Akoma Ntoso structure source. Kill switch for the whole AKN path; read at call
+# time so it can be flipped without a code change.
+AKN_ENABLED = os.getenv("AKN_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+# Parsed indexes held in memory. An index is a few tens of KB (the codice civile
+# is 3249 short keys), so this is cheap — unlike the source repo's cache, which
+# held whole parsed acts.
+AKN_CACHE_MAX_ACTS = int(os.getenv("AKN_CACHE_MAX_ACTS", "40"))
+
 FETCH_QUEUE_WORKERS = int(os.getenv("FETCH_QUEUE_WORKERS", 2))
 FETCH_QUEUE_DELAY = float(os.getenv("FETCH_QUEUE_DELAY", 0.3))
 

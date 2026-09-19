@@ -132,13 +132,17 @@ export function WorkspaceTabPanel({
 
   // Create new dossier and add articles
   const handleCreateAndAdd = async () => {
-    const name = newDossierName.trim();
-    if (!name) return;
-    setNewDossierName('');
-    setIsCreatingDossier(false);
-    const newDossierId = await createDossier(name);
-    if (newDossierId) {
-      handleAddToDossier(newDossierId);
+    const title = newDossierName.trim();
+    if (!title) return;
+    const id = await createDossier(title);
+    if (id) {
+      handleAddToDossier(id);
+      setNewDossierName('');
+      setIsCreatingDossier(false);
+    } else {
+      // Keep the input open with the typed name so the user can retry;
+      // no toast infra exists in this component, so log per gotcha #18.
+      console.error('WorkspaceTabPanel: failed to create dossier for tab content add');
     }
   };
 

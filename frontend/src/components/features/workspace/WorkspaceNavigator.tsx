@@ -121,9 +121,11 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
             </div>
             <button
               onClick={() => setIsExpanded(false)}
+              aria-label="Comprimi il workspace"
+              aria-expanded
               className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
             >
-              <ChevronDown size={14} className="text-slate-400" />
+              <ChevronDown size={14} aria-hidden className="text-slate-400" />
             </button>
           </div>
 

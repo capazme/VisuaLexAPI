@@ -6,6 +6,12 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierNormaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment, EnvironmentCategory } from '../types';
 import { filterEnvironmentBySelection, type EnvironmentSelection } from '../utils/environmentUtils';
 import { getErrorMessage } from '../utils/errors';
+import {
+    appendBackEntry,
+    findLiveBackIndex,
+    type ReadingBackEntry,
+} from '../utils/readingBackStack';
+import { uniqueArticleIdFromNorma } from '../utils/normaKeys';
 import { normalizeArticleId } from '../utils/treeUtils';
 
 // Services for API sync
@@ -26,6 +32,7 @@ import {
     highlightApiToStore,
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
+import { packItemContent, unpackItemContent } from '../components/features/dossier/dossierUtils';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -167,6 +174,17 @@ interface SearchPanelState {
     position: { x: number; y: number };
 }
 
+export interface StructureWindowState {
+    /**
+     * Norma block that owns the window; null when closed. Never persisted —
+     * a block id from a previous session may no longer exist, and rehydrating
+     * it would open a window owned by nothing.
+     */
+    blockId: string | null;
+    /** Where the user parked it. Persisted: that is the point of a movable window. */
+    position: { x: number; y: number };
+}
+
 interface AppState {
     settings: AppSettings;
     bookmarks: Bookmark[];
@@ -183,6 +201,16 @@ interface AppState {
      */
     loadedHighlightKeys: Record<string, true>;
     loadedAnnotationKeys: Record<string, true>;
+    /**
+     * Dossier item ids that are still client-generated tempIds awaiting the
+     * server id from their `addToDossier` `addItem` POST. Not persisted
+     * (absent from `partialize`) — it only needs to survive the in-flight
+     * window of a single session. See `updateDossierItemStatus`: a status
+     * change against a pending item is applied optimistically only (no PUT
+     * against a temp id the server has never seen); `addToDossier` persists
+     * the star itself once the id swap to the real server id happens.
+     */
+    pendingDossierItemIds: Record<string, true>;
     quickNorms: QuickNorm[];
     customAliases: CustomAlias[];
     environments: Environment[];
@@ -209,6 +237,22 @@ interface AppState {
     searchPanelState: SearchPanelState;
     workspaceTabs: WorkspaceTab[];
     highestZIndex: number;
+
+    /**
+     * The floating structure (index) window. A single `blockId` — rather than
+     * a set — is what keeps exactly one window open: opening another norm's
+     * index hands ownership over instead of stacking a second window, which
+     * would recreate the accumulation problem on a different plane.
+     */
+    structureWindow: StructureWindowState;
+
+    /**
+     * Undo stack for citation jumps. See `utils/readingBackStack.ts` for what
+     * goes in it and why nothing else does. Session-scoped: its entries point
+     * at tab and block ids that mean nothing after a reload, so it is
+     * deliberately absent from `partialize`.
+     */
+    readingBackStack: ReadingBackEntry[];
 
     // Search State
     searchTrigger: SearchParams | null;
@@ -257,6 +301,28 @@ interface AppState {
     setTabLabel: (id: string, label: string) => void;
     reorderWorkspaceTabs: (fromIndex: number, toIndex: number) => void;
 
+    // Structure Window Actions
+    /**
+     * Drops an article-less norma block on a tab and points the structure
+     * window at it — the "open a code and browse" entry point. Atomic on
+     * purpose: the window can never end up pointing at a block that was not
+     * created. Reuses a block already holding the same act instead of adding
+     * a duplicate. Returns the block id, or null if the tab is gone.
+     */
+    addNormaIndexToTab: (tabId: string, norma: Norma) => string | null;
+    openStructureWindow: (blockId: string) => void;
+    closeStructureWindow: () => void;
+    setStructureWindowPosition: (position: { x: number; y: number }) => void;
+
+    // Reading Back-Stack Actions
+    pushReadingBack: (entry: ReadingBackEntry) => void;
+    /**
+     * Removes and returns the newest entry that still points at a live tab and
+     * block, discarding any dead ones above it. Returns null when nothing is
+     * left to go back to.
+     */
+    popReadingBack: () => ReadingBackEntry | null;
+
     // Drag & Drop Actions
     moveNormaBetweenTabs: (normaId: string, sourceTabId: string, targetTabId: string) => void;
     extractArticleFromNorma: (tabId: string, normaId: string, articleId: string) => void;
@@ -286,7 +352,7 @@ interface AppState {
     removeFromDossier: (dossierId: string, itemId: string) => void;
     restoreDossierItem: (dossierId: string, item: DossierItem, atIndex: number) => void;
     reorderDossierItems: (dossierId: string, fromIndex: number, toIndex: number) => void;
-    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'reading' | 'important' | 'done') => void;
+    updateDossierItemStatus: (dossierId: string, itemId: string, status: 'unread' | 'important') => void;
     moveToDossier: (sourceDossierId: string, targetDossierId: string, itemIds: string[]) => void;
     importDossier: (dossier: Dossier) => Promise<string | null>; // returns new server-side dossier ID, null on failure
 
@@ -389,6 +455,7 @@ const appStore = createStore<AppState>()(
             highlights: [],
             loadedHighlightKeys: {},
             loadedAnnotationKeys: {},
+            pendingDossierItemIds: {},
             quickNorms: [],
             customAliases: [],
             environments: [],
@@ -423,6 +490,11 @@ const appStore = createStore<AppState>()(
             },
             workspaceTabs: [],
             highestZIndex: 100,
+            structureWindow: {
+                blockId: null,
+                position: { x: Math.max(16, window.innerWidth - 400), y: 96 },
+            },
+            readingBackStack: [],
 
             updateSettings: (newSettings) => set((state) => {
                 state.settings = { ...state.settings, ...newSettings };
@@ -485,23 +557,28 @@ const appStore = createStore<AppState>()(
                         title: d.name,
                         description: d.description || undefined,
                         createdAt: d.created_at,
-                        items: d.items.map((item): DossierItem =>
-                            item.item_type === 'norm'
+                        items: d.items.map((item): DossierItem => {
+                            // The star travels inside `content` as a _dossierMeta
+                            // envelope (packItemContent); the DB `status` column is
+                            // not read. Branch on item_type so each arm satisfies
+                            // its member of the DossierItem union.
+                            const { data, status } = unpackItemContent(item.content);
+                            return item.item_type === 'norm'
                                 ? {
                                     id: item.id,
                                     type: 'norma',
-                                    data: item.content as DossierNormaData,
+                                    data: data as DossierNormaData,
                                     addedAt: item.created_at,
-                                    status: item.status,
+                                    ...(status ? { status } : {}),
                                 }
                                 : {
                                     id: item.id,
                                     type: 'note',
-                                    data: item.content as string,
+                                    data: data as string,
                                     addedAt: item.created_at,
-                                    status: item.status,
-                                }
-                        ),
+                                    ...(status ? { status } : {}),
+                                };
+                        }),
                         tags: d.tags ?? [],
                         isPinned: d.is_pinned,
                     }));
@@ -776,19 +853,101 @@ const appStore = createStore<AppState>()(
                 state.workspaceTabs.splice(toIndex, 0, moved);
             }),
 
+            // ── Structure window ─────────────────────────────────────────
+            addNormaIndexToTab: (tabId, norma) => {
+                const tab = get().workspaceTabs.find(t => t.id === tabId);
+                if (!tab) return null;
+
+                const existing = tab.content.find(
+                    (c): c is NormaBlock => c.type === 'norma' &&
+                        c.norma.tipo_atto === norma.tipo_atto &&
+                        c.norma.numero_atto === norma.numero_atto &&
+                        c.norma.data === norma.data
+                );
+                const blockId = existing ? existing.id : uuidv4();
+
+                set((state) => {
+                    const target = state.workspaceTabs.find(t => t.id === tabId);
+                    if (!target) return;
+
+                    if (existing) {
+                        // The act is already on the table: point the window at
+                        // it rather than adding a second copy. Backfill the URN
+                        // if that block arrived without one, since the tree
+                        // endpoint needs it.
+                        const block = target.content.find(c => c.id === blockId);
+                        if (block?.type === 'norma' && !block.norma.urn) {
+                            block.norma.urn = norma.urn;
+                        }
+                    } else {
+                        target.content.push({
+                            type: 'norma',
+                            id: blockId,
+                            norma,
+                            articles: [],
+                            isCollapsed: false,
+                        });
+                    }
+
+                    target.zIndex = ++state.highestZIndex;
+                    state.structureWindow.blockId = blockId;
+                });
+
+                return blockId;
+            },
+
+            // Assigning `blockId` is the whole mechanism: a second open hands
+            // ownership over rather than adding a window.
+            openStructureWindow: (blockId) => set((state) => {
+                state.structureWindow.blockId = blockId;
+            }),
+
+            closeStructureWindow: () => set((state) => {
+                state.structureWindow.blockId = null;
+            }),
+
+            setStructureWindowPosition: (position) => set((state) => {
+                state.structureWindow.position = position;
+            }),
+
+            // ── Reading back-stack ───────────────────────────────────────
+            pushReadingBack: (entry) => set((state) => {
+                state.readingBackStack = appendBackEntry(state.readingBackStack, entry);
+            }),
+
+            popReadingBack: () => {
+                const { readingBackStack, workspaceTabs } = get();
+                const index = findLiveBackIndex(readingBackStack, workspaceTabs);
+                if (index < 0) {
+                    // Everything above (and including) the oldest entry is dead;
+                    // drop the lot so the control stops offering a dead end.
+                    if (readingBackStack.length > 0) {
+                        set((state) => { state.readingBackStack = []; });
+                    }
+                    return null;
+                }
+                const entry = readingBackStack[index];
+                // Entries newer than the live one point at closed tabs/blocks:
+                // they are discarded together with the one being consumed.
+                set((state) => { state.readingBackStack = state.readingBackStack.slice(0, index); });
+                return entry;
+            },
+
             focusArticleInTab: (tabId, articleId) => set((state) => {
                 const tab = state.workspaceTabs.find(t => t.id === tabId);
                 if (!tab) return;
                 // Find the NormaBlock that actually contains this article so
                 // callers don't need to track normaBlockId themselves.
+                // Matched through the shared encoder and a normalized compare:
+                // the incoming id may come from the tree API ("1-bis") while
+                // the loaded article stores the scraper's form ("1 bis"), and a
+                // strict === would silently focus nothing (gotcha 9).
+                const wanted = normalizeArticleId(articleId);
                 const block = tab.content.find(c => {
                     if (c.type !== 'norma') return false;
-                    return c.articles.some(a => {
-                        const uid = a.norma_data.allegato
-                            ? `all${a.norma_data.allegato}:${a.norma_data.numero_articolo}`
-                            : a.norma_data.numero_articolo;
-                        return uid === articleId;
-                    });
+                    return c.articles.some(
+                        a => normalizeArticleId(uniqueArticleIdFromNorma(a.norma_data)) === wanted
+                    );
                 }) as NormaBlock | undefined;
                 if (!block) return;
                 block.autoFocusArticleId = articleId;
@@ -1279,6 +1438,11 @@ const appStore = createStore<AppState>()(
                     if (dossier) {
                         dossier.items.push(newItem);
                     }
+                    // Mark as pending until the addItem POST below settles.
+                    // While pending, updateDossierItemStatus applies status
+                    // changes locally only (a PUT against tempId would
+                    // reject — the server has never seen this id).
+                    state.pendingDossierItemIds[tempId] = true;
                 });
 
                 // API call
@@ -1287,15 +1451,36 @@ const appStore = createStore<AppState>()(
                     title: typeof itemData === 'string' ? 'Nota' : (itemData.tipo_atto || 'Nota'),
                     content: itemData,
                 }).then(created => {
-                    // Update with server ID
+                    // Update with server ID; the item is now settled.
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
                         const item = dossier?.items.find(i => i.id === tempId);
                         if (item) {
                             item.id = created.id;
                         }
+                        delete state.pendingDossierItemIds[tempId];
                     });
 
+                    // The user may have starred this item while its addItem
+                    // POST was still in flight. updateDossierItemStatus saw
+                    // it as pending and only applied the optimistic status
+                    // (no PUT, since the item only had a temp id then). Now
+                    // that it has a real server id, persist that star.
+                    // Read from get() (finalized state), not the Immer draft
+                    // above — the draft's object references are revoked
+                    // proxies once the producer returns.
+                    const settledItem = get().dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                    if (settledItem?.status === 'important') {
+                        dossierService.updateItem(dossierId, created.id, {
+                            content: packItemContent(settledItem.data, 'important'),
+                        }).catch(err => {
+                            console.error('Failed to persist dossier item status set while item was pending:', err);
+                            set((state) => {
+                                const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === created.id);
+                                if (it) it.status = undefined;
+                            });
+                        });
+                    }
                     // MERLT-1.8: emit dossier_item_add when a norma is filed
                     // into a dossier. Notes have no article_urn and are skipped
                     // here. Only on server confirmation — RLCF must never
@@ -1318,6 +1503,7 @@ const appStore = createStore<AppState>()(
                         if (dossier) {
                             dossier.items = dossier.items.filter(i => i.id !== tempId);
                         }
+                        delete state.pendingDossierItemIds[tempId];
                     });
                 });
             },
@@ -1372,7 +1558,7 @@ const appStore = createStore<AppState>()(
                 dossierService.addItem(dossierId, {
                     itemType: item.type === 'norma' ? 'norm' : 'note',
                     title: item.type === 'norma' ? (item.data.tipo_atto || 'Nota') : 'Nota',
-                    content: item.data,
+                    content: packItemContent(item.data, item.status),
                 }).then(created => {
                     set((state) => {
                         const dossier = state.dossiers.find(d => d.id === dossierId);
@@ -1413,21 +1599,46 @@ const appStore = createStore<AppState>()(
             },
 
             updateDossierItemStatus: (dossierId, itemId, status) => {
+                const dossier = get().dossiers.find(d => d.id === dossierId);
+                const item = dossier?.items.find(i => i.id === itemId);
+                if (!dossier || !item || item.type !== 'norma') return;
+
+                // The item hasn't settled on the server yet — itemId is
+                // still the client-generated tempId from addToDossier. A PUT
+                // against it would reject (the server has never seen this
+                // id), and by the time addItem resolves, addToDossier swaps
+                // item.id to the real server id — which would silently break
+                // the revert lookup below (stale tempId never matches again).
+                // Apply the optimistic status only; addToDossier persists it
+                // once the item settles (see the `settledItem?.status ===
+                // 'important'` check in its addItem `.then()`).
+                if (get().pendingDossierItemIds[itemId]) {
+                    set((state) => {
+                        const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                        if (it) it.status = status;
+                    });
+                    return;
+                }
+
+                const previous = item.status;
+
                 // Optimistic update
                 set((state) => {
-                    const dossier = state.dossiers.find(d => d.id === dossierId);
-                    if (dossier) {
-                        const item = dossier.items.find(i => i.id === itemId);
-                        if (item) {
-                            item.status = status;
-                        }
-                    }
+                    const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                    if (it) it.status = status;
                 });
 
-                // Sync to server
-                dossierService.updateItem(dossierId, itemId, { status }).catch(err => {
-                    console.error('Failed to update dossier item status:', err);
-                    get().pushSyncError('Impossibile salvare lo stato dell\'elemento. Riprova.');
+                // API call - persist the star (only 'important' is meaningfully
+                // encoded server-side via the _dossierMeta envelope; see packItemContent)
+                dossierService.updateItem(dossierId, itemId, {
+                    content: packItemContent(item.data, status),
+                }).catch(err => {
+                    console.error('Failed to persist dossier item status:', err);
+                    // Rollback
+                    set((state) => {
+                        const it = state.dossiers.find(d => d.id === dossierId)?.items.find(i => i.id === itemId);
+                        if (it) it.status = previous;
+                    });
                 });
             },
 
@@ -1496,7 +1707,7 @@ const appStore = createStore<AppState>()(
                             const serverItem = await dossierService.addItem(created.id, {
                                 itemType: item.type === 'norma' ? 'norm' : 'note',
                                 title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
-                                content: item.data,
+                                content: packItemContent(item.data, item.status),
                             });
                             return { serverItem, original: item };
                         })
@@ -2514,6 +2725,10 @@ const appStore = createStore<AppState>()(
                 searchPanelState: state.searchPanelState,
                 workspaceTabs: state.workspaceTabs,
                 highestZIndex: state.highestZIndex,
+                // Narrowed on purpose: the parked position is worth keeping,
+                // the owning block id is not — it would rehydrate a window
+                // belonging to a block that no longer exists.
+                structureWindow: { position: state.structureWindow.position, blockId: null },
                 // Every user-data slice is now server-backed and hydrated by
                 // fetchUserData. Nothing user-owned survives in localStorage
                 // anymore — persisting would cause drift with the server.
@@ -2547,10 +2762,10 @@ const appStore = createStore<AppState>()(
 export function useAppStore(): AppState;
 export function useAppStore<T>(selector: (state: AppState) => T): T;
 export function useAppStore<T>(selector?: (state: AppState) => T) {
-    // Call useStore unconditionally (rules-of-hooks). The no-selector overload
-    // subscribes to the whole state via an identity selector — behaviourally
-    // identical to useStore(appStore) since immer returns a new state ref on
-    // every update.
+    // Single unconditional useStore call — calling it conditionally (only
+    // when a selector is passed) violates react-hooks/rules-of-hooks since
+    // the number of hook calls must stay constant across renders. The
+    // identity selector reproduces the old no-arg behavior.
     return useStore(appStore, selector ?? ((state) => state as unknown as T));
 }
 

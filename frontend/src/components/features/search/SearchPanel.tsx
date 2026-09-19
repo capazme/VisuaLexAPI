@@ -20,16 +20,9 @@ import { cn } from '../../../lib/utils';
 import { useAutoSwitch } from '../../../hooks/useAutoSwitch';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { getErrorMessage } from '../../../utils/errors';
-
-// Helper to generate keys (replicates original JS logic)
-const sanitize = (str: string) => str.replace(/\s+/g, '-').replace(/[^\w-]/g, '').toLowerCase();
-const generateNormaKey = (norma: Norma) => {
-  if (!norma) return '';
-  const parts = [norma.tipo_atto];
-  if (norma.numero_atto?.trim()) parts.push(norma.numero_atto);
-  if (norma.data?.trim()) parts.push(norma.data);
-  return parts.map(part => sanitize(part || '')).join('--');
-};
+import { buildNormaKey } from '../../../utils/normaKeys';
+import { resolveAct } from '../../../utils/actUrn';
+import { ReadingBackControl } from './ReadingBackControl';
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -59,7 +52,7 @@ export function SearchPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
-    addWorkspaceTab, addNormaToTab, workspaceTabs, removeArticleFromNorma, removeTab,
+    addWorkspaceTab, addNormaToTab, addNormaIndexToTab, workspaceTabs, removeArticleFromNorma, removeTab,
     focusArticleInTab,
     searchTrigger, clearSearchTrigger,
     searchQueue, drainNextSearch,
@@ -69,6 +62,7 @@ export function SearchPanel() {
   } = useAppStore(useShallow(s => ({
     addWorkspaceTab: s.addWorkspaceTab,
     addNormaToTab: s.addNormaToTab,
+    addNormaIndexToTab: s.addNormaIndexToTab,
     workspaceTabs: s.workspaceTabs,
     removeArticleFromNorma: s.removeArticleFromNorma,
     removeTab: s.removeTab,
@@ -158,7 +152,7 @@ export function SearchPanel() {
       urn: normaData.url
     };
 
-    const key = generateNormaKey(norma);
+    const key = buildNormaKey(norma);
     if (!key) return;
 
     // If streaming, add directly to workspace instead of buffering
@@ -554,6 +548,46 @@ export function SearchPanel() {
   }, [handleSearch]);
 
 
+  /**
+   * "Open a code and browse" — the entry point the app never had.
+   *
+   * Resolves the act's URN structurally (no article text is fetched), drops an
+   * article-less block on the active tab and points the structure window at
+   * it. From there every pick loads into that block.
+   */
+  const handleBrowseStructure = useCallback(async (params: SearchParams) => {
+    setError(null);
+    try {
+      // The resolved identity, not the requested one: asking for "codice
+      // civile" comes back as regio decreto 262/1942, and a block built from
+      // the request would never match that same act arriving from a later
+      // search — the workspace would grow a duplicate tab for it.
+      const { norma } = await resolveAct({
+        act_type: params.act_type,
+        act_number: params.act_number || undefined,
+        date: params.date || undefined,
+      });
+
+      // Land on the tab the user is already working in; only open a new one
+      // when the workspace is empty.
+      //
+      // Deliberately NOT `{ isCustom: true }`: a custom-labelled tab is
+      // excluded from processResult's merge heuristics, so every later search
+      // for this act — a citation jump included — would spawn a duplicate tab.
+      // That is the accumulation this round exists to reduce.
+      const targetTabId = workspaceTabs.length > 0
+        ? workspaceTabs[workspaceTabs.length - 1].id
+        : addWorkspaceTab(params.act_type);
+
+      addNormaIndexToTab(targetTabId, norma);
+    } catch (e) {
+      // Loud on purpose: the user asked for a door and must be told when it
+      // does not open (CLAUDE.md gotcha #18 — no silent fallbacks).
+      console.error('handleBrowseStructure: URN resolution failed:', e);
+      setError(getErrorMessage(e) || "Impossibile aprire l'indice di questo atto.");
+    }
+  }, [workspaceTabs, addWorkspaceTab, addNormaIndexToTab]);
+
   const handleViewPdf = async (urn: string) => {
     setPdfState({ isOpen: true, url: null, isLoading: true });
     try {
@@ -583,6 +617,16 @@ export function SearchPanel() {
         isOpen={commandPaletteOpen}
         onClose={closeCommandPalette}
         onSearch={handleSearch}
+        onBrowseStructure={handleBrowseStructure}
+      />
+
+      {/* One global control: the back-stack is global, so a per-tab copy would
+          sit inside the very tab an entry points at. */}
+      <ReadingBackControl
+        onNavigated={(tabId) => {
+          const index = workspaceTabs.findIndex(t => t.id === tabId);
+          if (index >= 0) setMobileActiveTabIndex(index);
+        }}
       />
 
       {/* Workspace Manager - renders all tabs */}
@@ -692,6 +736,7 @@ export function SearchPanel() {
                           norma={normaBlock.norma}
                           articles={normaBlock.articles || []}
                           tabId={workspaceTabs[mobileActiveTabIndex].id}
+                          normaBlockId={normaBlock.id}
                           onCloseArticle={(articleId) => {
                             removeArticleFromNorma(workspaceTabs[mobileActiveTabIndex].id, normaBlock.id, articleId);
                           }}

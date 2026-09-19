@@ -5,6 +5,8 @@
  */
 
 import type { CustomAlias } from '../types';
+import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
+import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -175,12 +177,64 @@ const ABBREVIATION_MAP: Record<string, string> = {
 // Ordinati per lunghezza decrescente per matching greedy
 const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.length - a.length);
 
+// Atti che senza numero e anno non si aprono: nominati per esteso senza
+// numero ("della legge") non sono un bersaglio, e li leggono i pattern
+// numerati.
+const NUMBERED_ACT_TYPES = new Set([
+  'legge', 'decreto legge', 'decreto legislativo',
+  'decreto del presidente della repubblica', 'regio decreto',
+  'Regolamento UE', 'Direttiva UE',
+]);
+
 /**
- * Pattern per estrarre articoli con suffissi (bis, ter, ...) o range (es. "artt. 1-10").
- * Group 1: numero di partenza. Group 2 (opzionale): numero finale del range.
- * Group 3 (opzionale): suffisso numerico ordinale (bis/ter/...).
+ * Atti che un testo può nominare per esteso ("del codice civile", "della
+ * Costituzione", "del codice del consumo"), con il tipo a cui la palette li
+ * risolve: le voci della mappa senza punti, multi-parola o di almeno otto
+ * lettere ("preleggi" ha esattamente otto: la soglia tiene fuori "cost",
+ * "prel", "tfue", "cdfue", "regue", non lei), esclusi gli atti numerati.
+ * Dal più lungo al più corto, per il
+ * matching greedy. Le usa il rilevatore in-testo (citationMatcher.ts), che
+ * fino a qui conosceva solo le abbreviazioni e su "art. 5 del codice civile"
+ * non metteva alcun link, o lo metteva sulla norma in lettura.
  */
-const ARTICLE_PATTERN = /\b(?:artt?\.?|articol[oi])\s*(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?\b/i;
+export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.entries(ABBREVIATION_MAP)
+  .filter(([name, actType]) =>
+    !name.includes('.') && (name.includes(' ') || name.length >= 8) && !NUMBERED_ACT_TYPES.has(actType))
+  .sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * Un articolo: numero, eventuale suffisso (bis, ter, ...) o intervallo ("1-10").
+ */
+// \b after the suffix: "480 terzo comma" is art. 480, not 480-ter.
+const ARTICLE_ITEM = '\\d+(?:\\s*-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\\b)?(?:\\s*-\\s*\\d+)?';
+
+/**
+ * Un elenco di articoli separati da "," o "e": "artt. 1, 2 e 3". L'API
+ * accetta "1,2,3" e "1-10", non "5 e 6".
+ */
+const ARTICLE_SEPARATOR = /\s*(?:,|\be\b)\s*/i;
+const ARTICLE_PATTERN = new RegExp(
+  `\\b(?:artt?\\.?|articol[oi])\\s*(${ARTICLE_ITEM}(?:${ARTICLE_SEPARATOR.source}${ARTICLE_ITEM})*)`,
+  'i'
+);
+
+/**
+ * "comma 1", "co. 3", "comma 1, lett. b)": qualifica l'articolo, non è il
+ * numero dell'atto. Va tolto dopo l'articolo o "1" diventa l'atto n. 1.
+ */
+const COMMA_CLAUSE_PATTERN = /\s*,?\s*(?:comma|co\.|c\.)\s*\d+(?:\s*,?\s*(?:lett\.?|lettera)\s*[a-z]\b\)?)?/i;
+
+/**
+ * Date complete, da riconoscere PRIMA della coppia numero/anno: in
+ * "legge 7/8/1990 n. 241" la coppia leggerebbe "8/1990" come atto n. 8.
+ * La conversione la fa parseItalianDate, che questi pattern si limitano a
+ * delimitare.
+ */
+const FULL_DATE_PATTERNS = [
+  /\b\d{1,2}\s*[/-]\s*\d{1,2}\s*[/-]\s*\d{4}\b/,
+  /\b\d{1,2}\s+[a-z]+\s+\d{4}\b/i,
+  /\b\d{4}-\d{2}-\d{2}\b/,
+];
 
 /**
  * Pattern per numeri di articolo standalone (senza "art"); supporta range.
@@ -188,9 +242,12 @@ const ARTICLE_PATTERN = /\b(?:artt?\.?|articol[oi])\s*(\d+)(?:\s*-\s*(\d+))?\s*[
 const STANDALONE_NUMBER_PATTERN = /^(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?$/i;
 
 /**
- * Pattern per numero/anno (es. "241/1990", "679/2016")
+ * Pattern per numero/anno (es. "241/1990", "679/2016"). L'anno ha due o
+ * quattro cifre ("241/456" non è un atto del 456) e nessuna delle due metà
+ * può far parte di una terna giorno/mese/anno ("31/13/1990" è una data
+ * sbagliata, non l'atto 31 del 2013).
  */
-const NUMBER_YEAR_PATTERN = /\b(\d+)\s*[/\\]\s*(\d{2,4})\b/;
+const NUMBER_YEAR_PATTERN = /(?<![\d/])\b(\d+)\s*[/\\]\s*(\d{4}|\d{2})\b(?!\s*[/\\]\s*\d)/;
 
 /**
  * Pattern per anno isolato (es. "1990", "2016")
@@ -203,13 +260,32 @@ const YEAR_PATTERN = /\b(19\d{2}|20\d{2})\b/;
 const ACT_NUMBER_PATTERN = /\bn\.?\s*(\d+)\b/i;
 
 /**
+ * Citazione di un atto UE, in tutte le grafie correnti: "regolamento (ue)
+ * 2016/679", "reg. ue 679/2016", "regolamento (ce) n. 1/2003", "direttiva
+ * 2002/58/ce". Il marcatore è facoltativo: chi digita "regolamento 2016/679"
+ * nella palette non può intendere altro. Gruppi: testa, prima metà, seconda
+ * metà, marcatore finale.
+ */
+const EU_CITATION_PATTERN = new RegExp(
+  `\\b${buildEuHeadSource()}${EU_PAIR_SOURCE}\\b`,
+  'i'
+);
+
+/**
  * Normalizza l'input rimuovendo punteggiatura extra e spazi multipli
  */
 function normalizeInput(input: string): string {
   return input
     .toLowerCase()
+    // "(UE)" è la grafia ufficiale del marcatore, non rumore: senza questo
+    // passaggio "regolamento (ue)" non combaciava con nessuna abbreviazione.
+    .replace(/[()[\]]+/g, ' ')
     .replace(/\s+/g, ' ')
-    .replace(/[,;:]+/g, ' ')
+    // La virgola resta solo davanti a una cifra, dove separa gli articoli di
+    // un elenco ("artt. 1, 2 e 3"); altrove è punteggiatura ("d.lgs.
+    // 196/2003, art. 7").
+    .replace(/,(?!\s*\d)/g, ' ')
+    .replace(/[;:]+/g, ' ')
     .trim();
 }
 
@@ -234,8 +310,14 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
   const sortedAliases = [...customAliases].sort((a, b) => b.trigger.length - a.trigger.length);
 
   for (const alias of sortedAliases) {
-    const triggerLower = alias.trigger.toLowerCase();
-    const regex = new RegExp(`\\b${triggerLower.replace(/\./g, '\\.?')}\\b`, 'i');
+    // Il trigger passa dalla stessa normalizzazione dell'input, altrimenti
+    // uno scritto con parentesi non combacerebbe mai; poi un trigger con "+"
+    // o "*" non deve far saltare il parser a ogni tasto: si escapa tutto, e
+    // solo il punto resta facoltativo.
+    const triggerSource = normalizeInput(alias.trigger)
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\./g, '\\.?');
+    const regex = new RegExp(`\\b${triggerSource}\\b`, 'i');
 
     if (regex.test(normalized) && alias.searchParams) {
       const remaining = normalized.replace(regex, ' ').replace(/\s+/g, ' ').trim();
@@ -252,6 +334,10 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
     }
   }
 
+  // Poi gli atti UE, che portano con sé numero e anno nel loro ordine
+  const eu = extractEuCitation(normalized);
+  if (eu) return eu;
+
   // Poi controlla le abbreviazioni di sistema
   for (const abbr of SORTED_ABBREVIATIONS) {
     const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.?')}\\b`, 'i');
@@ -266,26 +352,86 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
 }
 
 /**
+ * Riconosce una citazione UE e ne risolve numero e anno, che nella coppia
+ * "2024/2847" stanno nell'ordine europeo (anno/numero) e non in quello
+ * italiano: lasciata al pattern numero/anno, la stessa coppia diventava il
+ * regolamento n. 2024 dell'anno 2847.
+ */
+function extractEuCitation(normalized: string): ActTypeExtraction | null {
+  const match = normalized.match(EU_CITATION_PATTERN);
+  if (!match) return null;
+
+  const [, head, first, second, trailingMarker] = match;
+  const kind = euKindOf(head);
+  const pair = resolveEuPair(first, second, {
+    kind, trailingMarker: Boolean(trailingMarker), oldMarker: isOldEuMarker(head),
+  });
+  if (!pair) return null;
+
+  const { actNumber, year } = pair;
+  const remaining = normalized.replace(match[0], ' ').replace(/\s+/g, ' ').trim();
+
+  return { actType: EU_ACT_TYPES[kind], actNumber, date: year, remaining };
+}
+
+/**
+ * An article number the way the API reads it: "480 ter", "480ter" and
+ * "480 - ter" all become "480-ter" (parse_article_input rejects "480ter"),
+ * "1 - 10" becomes "1-10". Every citation source must go through here, so
+ * the matcher and the palette parser cannot drift apart again.
+ */
+export function toApiArticleNumber(raw: string): string {
+  return raw
+    .replace(/\s+/g, '')
+    .replace(/^(\d+)-?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)$/i, '$1-$2');
+}
+
+/**
  * Estrae il numero dell'articolo dall'input
  */
 function extractArticle(input: string): { article: string | undefined; remaining: string } {
   const match = input.match(ARTICLE_PATTERN);
   if (match) {
-    // Match groups: [1]=start number, [2]=end number (range), [3]=ordinal suffix.
-    // Range wins over suffix (rare to combine "1-10 bis").
-    const [, start, rangeEnd, suffix] = match;
-    let article: string;
-    if (rangeEnd) {
-      article = `${start}-${rangeEnd}`;
-    } else if (suffix) {
-      article = `${start}-${suffix}`;
-    } else {
-      article = start;
-    }
-    const remaining = input.replace(ARTICLE_PATTERN, ' ').replace(/\s+/g, ' ').trim();
+    // Nelle forme dell'API: "2 bis" → "2-bis", "1 - 10" → "1-10", "5 e 6" → "5,6".
+    const article = match[1]
+      .split(ARTICLE_SEPARATOR)
+      .map(toApiArticleNumber)
+      .join(',');
+    const tail = input.slice((match.index ?? 0) + match[0].length);
+    const clause = tail.match(COMMA_CLAUSE_PATTERN);
+    const tailWithoutClause = clause && clause.index === 0 ? tail.slice(clause[0].length) : tail;
+    const remaining = (input.slice(0, match.index) + ' ' + tailWithoutClause).replace(/\s+/g, ' ').trim();
     return { article, remaining };
   }
   return { article: undefined, remaining: input };
+}
+
+/**
+ * Estrae una data completa (g/m/aaaa, "7 agosto 1990", ISO) e la restituisce
+ * in forma ISO; il resto dell'input resta per numero e anno.
+ */
+function isPlausibleIsoDate(iso: string): boolean {
+  const match = iso.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
+}
+
+function extractFullDate(input: string): { date: string | undefined; remaining: string } {
+  for (const pattern of FULL_DATE_PATTERNS) {
+    const everywhere = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    for (const match of input.matchAll(everywhere)) {
+      const iso = parseItalianDate(match[0]);
+      // Un mese sconosciuto ("7 pippo 1990") o impossibile ("31/13/1990")
+      // non è una data: si va avanti, sullo stesso pattern prima.
+      if (!isPlausibleIsoDate(iso)) continue;
+      const start = match.index ?? 0;
+      const remaining = `${input.slice(0, start)} ${input.slice(start + match[0].length)}`.replace(/\s+/g, ' ').trim();
+      return { date: iso, remaining };
+    }
+  }
+  return { date: undefined, remaining: input };
 }
 
 /**
@@ -300,12 +446,7 @@ function extractNumberAndYear(input: string): { actNumber: string | undefined; d
   const numYearMatch = input.match(NUMBER_YEAR_PATTERN);
   if (numYearMatch) {
     actNumber = numYearMatch[1];
-    let year = numYearMatch[2];
-    // Converti anno a 2 cifre in 4 cifre
-    if (year.length === 2) {
-      year = parseInt(year) > 50 ? `19${year}` : `20${year}`;
-    }
-    date = year;
+    date = expandTwoDigitYear(numYearMatch[2]);
     remaining = remaining.replace(NUMBER_YEAR_PATTERN, ' ').replace(/\s+/g, ' ').trim();
     return { actNumber, date, remaining };
   }
@@ -393,11 +534,13 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
   let actNumber = actTypeResult.actNumber;
   let date = actTypeResult.date;
 
-  // Se non abbiamo numero/data dall'alias, estrai dall'input
+  // Se non abbiamo numero/data dall'alias, estrai dall'input: prima una
+  // data completa, poi numero e anno da ciò che resta
   if (!actNumber && !date) {
-    const numYearResult = extractNumberAndYear(afterArticle);
+    const fullDate = extractFullDate(afterArticle);
+    const numYearResult = extractNumberAndYear(fullDate.remaining);
     actNumber = numYearResult.actNumber;
-    date = numYearResult.date;
+    date = fullDate.date ?? numYearResult.date;
     afterArticle = numYearResult.remaining;
   }
 
@@ -474,7 +617,13 @@ export function formatParsedCitation(parsed: ParsedCitation): string {
   }
 
   if (parsed.act_number && parsed.date) {
-    parts.push(`${parsed.act_number}/${parsed.date}`);
+    // A citation names the year, not the day: "L. 92/2012", never
+    // "L. 92/2012-06-28". The client's own aliases carry a year already, but
+    // the server resolver answers with the full ISO date for acts it knows by
+    // name, and that date is worth keeping in the params even though the
+    // preview should not show it.
+    const year = /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? parsed.date.slice(0, 4) : parsed.date;
+    parts.push(`${parsed.act_number}/${year}`);
   } else if (parsed.act_number) {
     parts.push(`n. ${parsed.act_number}`);
   } else if (parsed.date) {
@@ -519,7 +668,7 @@ export interface ArticleRef {
  * - "art. 2043 c.c."
  * - "art. 123-bis"
  */
-const ARTICLE_REF_PATTERN = /\b(?:art(?:icol[oi])?t?\.?\s*)(\d+(?:\s*-\s*\d+)?(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)\s*(?:e\s+(?:ss\.?|seg(?:uenti)?\.?)|(?:c\.?\s*c\.?|c\.?\s*p\.?|c\.?\s*p\.?\s*c\.?|c\.?\s*p\.?\s*p\.?|cost\.?|costituzione))?/gi;
+const ARTICLE_REF_PATTERN = /\b(?:art(?:icol[oi])?t?\.?\s*)(\d+(?:\s*-\s*\d+)?(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)\s*(?:e\s+(?:ss\.?|seg(?:uenti)?\.?)|(?:c\.?\s*c\.?|c\.?\s*p\.?|c\.?\s*p\.?\s*c\.?|c\.?\s*p\.?\s*p\.?|cost\.?|costituzione))?/gi;
 
 /**
  * Pattern per rilevare il tipo di atto dopo il numero articolo
@@ -559,7 +708,7 @@ export function extractArticleRefs(text: string, defaultActType = 'codice civile
   let match;
   while ((match = ARTICLE_REF_PATTERN.exec(text)) !== null) {
     const fullMatch = match[0].toLowerCase();
-    const articleNum = match[1].replace(/\s+/g, '').trim();
+    const articleNum = toApiArticleNumber(match[1]);
 
     // Evita duplicati
     if (seenArticles.has(articleNum)) continue;

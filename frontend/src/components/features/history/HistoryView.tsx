@@ -241,12 +241,12 @@ export function HistoryView() {
         const norma = historyToNormaVisitata(createDossierFor);
         setCreateDossierFor(null);
         setNewDossierTitle('');
-        const newDossierId = await createDossier(title);
-        if (newDossierId) {
-            addToDossier(newDossierId, norma, 'norma');
+        const id = await createDossier(title);
+        if (id) {
+            addToDossier(id, norma, 'norma');
             showFeedback(`Creato "${title}" e aggiunta norma`);
         } else {
-            showFeedback('Impossibile creare il dossier', 'error');
+            showFeedback('Errore nella creazione del dossier', 'error');
         }
     };
 

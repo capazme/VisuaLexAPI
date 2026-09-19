@@ -68,3 +68,13 @@ describe('extractPreamble', () => {
     expect(r.offset).toBe(r.plainOffset);
   });
 });
+
+describe('extractPreamble — ordinals are not numbering suffixes', () => {
+  it('never cuts inside "terzo" when reading "Art. 480 terzo comma"', () => {
+    // "ter" used to be taken as the numbering suffix, leaving a body of "zo comma…".
+    const raw = 'Art. 480 terzo comma si applica.\nTesto.';
+    const r = extractPreamble(raw);
+    expect(raw.slice(r.offset)).toBe(r.body);
+    expect(r.body.startsWith('terzo comma')).toBe(true);
+  });
+});

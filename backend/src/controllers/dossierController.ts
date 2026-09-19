@@ -280,6 +280,10 @@ export const updateDossierItem = async (req: Request, res: Response) => {
   let item;
   try {
     item = await prisma.dossierItem.update({
+      // Scoped by dossierId: the ownership check above proves the dossier is
+      // ours, not that the item belongs to it. Without this an authenticated
+      // user could pass their own dossier id together with someone else's
+      // item id and mutate a row they do not own.
       where: { id: itemId, dossierId: id },
       data: {
         ...(data.title !== undefined && { title: data.title }),

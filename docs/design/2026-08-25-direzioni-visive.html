@@ -1,0 +1,603 @@
+<title>Direzioni VisuaLex</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ---------- Page chrome (theme-aware, deliberately quiet) ---------- */
+  :root {
+    --pg-bg: #f2f2ef;
+    --pg-surface: #ffffff;
+    --pg-ink: #1d2126;
+    --pg-muted: #626a72;
+    --pg-border: #dcdfe2;
+    --pg-accent: #1d2126;
+    --pg-chip: #e9eaе6;
+  }
+  :root { --pg-chip: #e9eae6; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --pg-bg: #16181b;
+      --pg-surface: #1e2126;
+      --pg-ink: #e8eaec;
+      --pg-muted: #9aa3ab;
+      --pg-border: #33383e;
+      --pg-accent: #e8eaec;
+      --pg-chip: #262a2f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --pg-bg: #16181b;
+    --pg-surface: #1e2126;
+    --pg-ink: #e8eaec;
+    --pg-muted: #9aa3ab;
+    --pg-border: #33383e;
+    --pg-accent: #e8eaec;
+    --pg-chip: #262a2f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--pg-bg);
+    color: var(--pg-ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 48px 24px 96px; }
+  header.top { margin-bottom: 40px; max-width: 720px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--pg-muted); font-weight: 600; margin-bottom: 10px;
+  }
+  h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.12; margin: 0 0 14px; letter-spacing: -0.02em; text-wrap: balance; }
+  .lede { color: var(--pg-muted); font-size: 16px; margin: 0; }
+  .lede strong { color: var(--pg-ink); font-weight: 600; }
+
+  .diagnosis {
+    margin: 28px 0 0; padding: 18px 20px; border: 1px solid var(--pg-border);
+    border-radius: 10px; background: var(--pg-surface); font-size: 14px; color: var(--pg-muted);
+  }
+  .diagnosis b { color: var(--pg-ink); }
+  .diagnosis ul { margin: 8px 0 0; padding-left: 18px; }
+  .diagnosis li { margin: 4px 0; }
+
+  /* ---------- Direction sections ---------- */
+  section.dir { margin-top: 72px; }
+  .dir-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .dir-letter {
+    font-size: 13px; font-weight: 700; letter-spacing: .1em;
+    padding: 4px 10px; border-radius: 999px; border: 1.5px solid var(--pg-ink);
+  }
+  .dir-head h2 { font-size: 26px; margin: 0; letter-spacing: -0.015em; }
+  .dir-thesis { max-width: 680px; color: var(--pg-muted); font-size: 15px; margin: 6px 0 22px; }
+  .dir-thesis b { color: var(--pg-ink); font-weight: 600; }
+
+  .tokens { display: flex; gap: 24px; flex-wrap: wrap; align-items: stretch; margin-bottom: 20px; }
+  .palette { display: flex; gap: 8px; align-items: center; }
+  .swatch { width: 44px; height: 44px; border-radius: 8px; border: 1px solid rgba(0,0,0,.12); position: relative; }
+  .swatch span {
+    position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: var(--pg-muted); white-space: nowrap;
+  }
+  .palette { padding-bottom: 22px; }
+  .typespec {
+    border: 1px solid var(--pg-border); background: var(--pg-surface);
+    border-radius: 10px; padding: 12px 16px; font-size: 13px; color: var(--pg-muted);
+    display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 260px;
+  }
+  .typespec .big { font-size: 19px; color: var(--pg-ink); }
+
+  .plates { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 18px; }
+  @media (max-width: 920px) { .plates { grid-template-columns: 1fr; } }
+  .plate {
+    border-radius: 14px; padding: 26px; border: 1px solid var(--pg-border);
+    min-width: 0; overflow: hidden;
+  }
+  .plate-label {
+    font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600;
+    color: var(--pg-muted); margin: -6px 0 14px;
+  }
+  .darkrow { margin-top: 18px; }
+  .whatchanges { margin-top: 18px; font-size: 14px; color: var(--pg-muted); max-width: 780px; }
+  .whatchanges b { color: var(--pg-ink); }
+
+  /* =========================================================
+     SHARED MOCKUP SKELETON — each direction restyles via scope
+     ========================================================= */
+  .m-card { border-style: solid; border-width: 1px; }
+  .m-doss-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .m-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .m-status { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .m-foot { display: flex; justify-content: space-between; align-items: center; }
+  .m-toolbar { display: flex; align-items: center; gap: 6px; }
+  .m-toolbar svg { display: block; }
+  .m-btnrow { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .hl { border-radius: 2px; padding: 0 1px; }
+  .note-u { text-decoration: underline wavy; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+  .cit { text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+
+  /* =========================================================
+     STATO ATTUALE (system-ui + Georgia + Tailwind blue)
+     ========================================================= */
+  .dNow .plate { background: #f8fafc; }
+  .dNow * { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .now-doss {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .now-folder { width: 30px; height: 30px; color: #3b82f6; }
+  .now-count { background: #f1f5f9; color: #475569; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; }
+  .now-doss h4 { margin: 10px 0 4px; font-size: 17px; font-weight: 700; color: #0f172a; }
+  .now-desc { font-size: 13px; color: #64748b; margin: 0 0 10px; }
+  .now-tag { background: #eff6ff; color: #2563eb; font-size: 11.5px; padding: 2px 8px; border-radius: 6px; }
+  .now-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 999px; }
+  .now-pill.imp { background: #fef3c7; color: #b45309; }
+  .now-pill.read { background: #e0e7ff; color: #4338ca; }
+  .now-foot { border-top: 1px solid #f1f5f9; margin-top: 12px; padding-top: 10px; font-size: 11.5px; color: #94a3b8; }
+  .now-art {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,.05);
+  }
+  .now-art-head { background: #f8fafc; padding: 14px 18px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 12px; align-items: center; }
+  .now-book { width: 38px; height: 38px; background: #dbeafe; color: #2563eb; border-radius: 12px; display: grid; place-items: center; flex: none; }
+  .now-art-title { font-size: 15.5px; font-weight: 700; color: #0f172a; }
+  .now-art-sub { font-size: 12px; color: #64748b; }
+  .now-meta { display: flex; gap: 6px; padding: 10px 18px 0; }
+  .now-vpill { font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #d1fae5; color: #047857; }
+  .now-vpill.b { background: #ede9fe; color: #6d28d9; }
+  .now-body { padding: 12px 18px 18px; font-family: Georgia, serif; font-size: 15.5px; line-height: 1.75; color: #1e293b; }
+  .now-body .artn { font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 14px; color: #0f172a; display: block; margin-bottom: 6px; }
+  .now-body .hl { background: #fef08a; color: #713f12; }
+  .now-body .note-u { text-decoration-color: #f59e0b; }
+  .now-body .cit { color: #2563eb; text-decoration-color: #93c5fd; }
+  .now-btn { font-size: 13px; font-weight: 500; padding: 8px 16px; border-radius: 8px; border: none; }
+  .now-btn.p { background: #2563eb; color: #fff; box-shadow: 0 4px 10px rgba(37,99,235,.25); }
+  .now-btn.s { background: #fff; color: #334155; border: 1px solid #e2e8f0; }
+
+  /* =========================================================
+     DIREZIONE A — «STUDIO» (Schibsted Grotesk + Literata, petrolio)
+     ========================================================= */
+  .dA .plate { background: #eef1f2; }
+  .dA .ui { font-family: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  .a-doss {
+    background: #fff; border: 1px solid #dde4e7; border-radius: 10px; padding: 20px;
+    box-shadow: 0 1px 2px rgba(24,36,48,.05);
+  }
+  .a-kicker { font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; font-weight: 600; color: #12586c; }
+  .a-count { font-size: 12px; color: #5c6b78; font-variant-numeric: tabular-nums; }
+  .a-doss h4 { margin: 8px 0 4px; font-size: 17.5px; font-weight: 600; letter-spacing: -0.01em; color: #182430; }
+  .a-desc { font-size: 13px; color: #5c6b78; margin: 0 0 12px; }
+  .a-tag { font-size: 11.5px; font-weight: 500; color: #12586c; background: #e3eef1; padding: 2px 9px; border-radius: 5px; }
+  .a-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #435463; font-variant-numeric: tabular-nums; }
+  .a-dot { width: 7px; height: 7px; border-radius: 999px; }
+  .a-foot { border-top: 1px solid #eceff1; margin-top: 14px; padding-top: 11px; font-size: 12px; color: #8794a0; }
+  .a-open { font-size: 12.5px; font-weight: 600; color: #12586c; }
+  .a-art { background: #fff; border: 1px solid #dde4e7; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(24,36,48,.06); }
+  .a-art-head { padding: 18px 24px 14px; border-bottom: 1px solid #eceff1; }
+  .a-eyebrow { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; color: #7a8894; }
+  .a-artrow { display: flex; align-items: baseline; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+  .a-artn { font-size: 21px; font-weight: 700; letter-spacing: -0.015em; color: #182430; }
+  .a-rubrica { font-family: "Literata", Georgia, serif; font-style: italic; font-size: 15px; color: #435463; }
+  .a-metarow { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+  .a-vpill { font-size: 11px; font-weight: 600; padding: 2.5px 9px; border-radius: 5px; background: #e5f2ec; color: #17694a; }
+  .a-vdate { font-size: 11.5px; color: #7a8894; font-variant-numeric: tabular-nums; }
+  .a-tool { margin-left: auto; }
+  .a-tool button { background: none; border: none; padding: 6px; border-radius: 6px; color: #5c6b78; }
+  .a-tool button:hover { background: #eef1f2; }
+  .a-body { padding: 18px 24px 22px; font-family: "Literata", Georgia, serif; font-size: 16px; line-height: 1.8; color: #23303c; }
+  .a-body .hl { background: #fbe9a9; color: #5c430f; }
+  .a-body .note-u { text-decoration-color: #d99a06; }
+  .a-body .cit { color: #12586c; text-decoration-color: #9cc0ca; }
+  .a-brocardi { margin: 0 24px 20px; padding: 10px 14px; border-left: 3px solid #8a63b8; background: #f6f2fa; font-size: 12.5px; color: #5a4a74; border-radius: 0 6px 6px 0; }
+  .a-btn { font-size: 13.5px; font-weight: 600; padding: 8px 18px; border-radius: 7px; border: none; letter-spacing: .01em; }
+  .a-btn.p { background: #12586c; color: #fff; }
+  .a-btn.s { background: transparent; color: #12586c; border: 1.5px solid #bfd2d8; }
+  .a-dark { background: #10191f; border-radius: 10px; padding: 16px 20px; border: 1px solid #223039; }
+  .a-dark .a-eyebrow { color: #6d8290; }
+  .a-dark .a-artn { color: #e8eef2; }
+  .a-dark .a-rubrica { color: #9fb0bc; }
+  .a-dark .a-darktext { font-family: "Literata", Georgia, serif; font-size: 14.5px; line-height: 1.7; color: #cdd8de; margin-top: 8px; }
+  .a-dark .hl { background: #4d3f10; color: #f4dc8a; }
+  .a-dark .cit { color: #62b2c4; text-decoration-color: #33606d; }
+
+  /* =========================================================
+     DIREZIONE B — «BIBLIOTECA» (Newsreader + Archivo, bordeaux)
+     ========================================================= */
+  .dB .plate { background: #efe8db; }
+  .dB .ui { font-family: "Archivo", ui-sans-serif, system-ui, sans-serif; }
+  .b-doss { position: relative; margin-top: 14px; background: #fcf9f3; border: 1px solid #e0d5c2; border-radius: 0 8px 8px 8px; padding: 20px; box-shadow: 0 1px 3px rgba(59,42,24,.08); }
+  .b-doss::before {
+    content: ""; position: absolute; top: -14px; left: -1px; width: 108px; height: 14px;
+    background: #fcf9f3; border: 1px solid #e0d5c2; border-bottom: none; border-radius: 7px 7px 0 0;
+  }
+  .b-doss::after { content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 4px; background: #79293a; border-radius: 0 0 0 8px; }
+  .b-fasc { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; font-weight: 600; color: #97722e; }
+  .b-count { font-size: 12px; color: #6e6152; font-variant-numeric: tabular-nums; }
+  .b-doss h4 { margin: 8px 0 4px; font-family: "Newsreader", Georgia, serif; font-size: 21px; font-weight: 600; letter-spacing: -0.005em; color: #2a2016; }
+  .b-desc { font-size: 13px; color: #6e6152; margin: 0 0 12px; }
+  .b-tag { font-size: 11.5px; font-weight: 500; color: #79293a; border: 1px solid #dfc9ce; padding: 2px 9px; border-radius: 999px; }
+  .b-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #574b3c; font-variant-numeric: tabular-nums; }
+  .b-foot { border-top: 1px solid #ece3d3; margin-top: 14px; padding-top: 11px; font-size: 12px; color: #99917f; }
+  .b-open { font-size: 12.5px; font-weight: 600; color: #79293a; }
+  .b-art { background: #fcf9f3; border: 1px solid #e0d5c2; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(59,42,24,.08); }
+  .b-art-head { padding: 20px 26px 14px; border-bottom: 1px solid #ece3d3; }
+  .b-eyebrow { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; font-weight: 600; color: #97722e; }
+  .b-artn { font-family: "Newsreader", Georgia, serif; font-size: 26px; font-weight: 600; color: #2a2016; }
+  .b-rubrica { font-family: "Newsreader", Georgia, serif; font-style: italic; font-size: 16px; color: #6e6152; }
+  .b-vpill { font-size: 11px; font-weight: 600; padding: 2.5px 9px; border-radius: 999px; background: #e7ede2; color: #46603a; }
+  .b-vdate { font-size: 11.5px; color: #99917f; font-variant-numeric: tabular-nums; }
+  .b-tool { margin-left: auto; }
+  .b-tool button { background: none; border: none; padding: 6px; border-radius: 6px; color: #6e6152; }
+  .b-body { padding: 18px 26px 22px; font-family: "Newsreader", Georgia, serif; font-size: 17px; line-height: 1.78; color: #33291c; }
+  .b-body .hl { background: #f3dfa2; color: #56410f; }
+  .b-body .note-u { text-decoration-color: #b3822a; }
+  .b-body .cit { color: #79293a; text-decoration-color: #c9a3ab; }
+  .b-brocardi { margin: 0 26px 20px; padding: 10px 14px; border-left: 3px solid #79293a; background: #f5ede4; font-size: 13px; color: #6b4a3a; font-family: "Newsreader", Georgia, serif; font-style: italic; }
+  .b-btn { font-size: 13.5px; font-weight: 600; padding: 8px 18px; border-radius: 6px; border: none; }
+  .b-btn.p { background: #79293a; color: #f8f2ea; }
+  .b-btn.s { background: transparent; color: #79293a; border: 1.5px solid #d3bfa8; }
+  .b-dark { background: #211a12; border-radius: 8px; padding: 16px 20px; border: 1px solid #3b3226; }
+  .b-dark .b-eyebrow { color: #b08e4a; }
+  .b-dark .b-artn { color: #f0e9dd; }
+  .b-dark .b-rubrica { color: #b0a390; }
+  .b-dark .b-darktext { font-family: "Newsreader", Georgia, serif; font-size: 15px; line-height: 1.7; color: #d9cfc0; margin-top: 8px; }
+  .b-dark .hl { background: #57451a; color: #f2dc9e; }
+  .b-dark .cit { color: #d18a99; text-decoration-color: #6d4650; }
+
+  /* =========================================================
+     DIREZIONE C — «TAVOLO TECNICO» (IBM Plex, quasi monocromo)
+     ========================================================= */
+  .dC .plate { background: #eeefed; }
+  .dC .ui { font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
+  .c-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .c-doss { background: #fff; border: 1px solid #d5d9db; border-radius: 3px; padding: 18px; }
+  .c-ref { font-size: 11px; letter-spacing: .06em; color: #5f6a72; }
+  .c-count { font-size: 11.5px; color: #5f6a72; }
+  .c-doss h4 { margin: 8px 0 4px; font-size: 16.5px; font-weight: 600; color: #14181b; letter-spacing: -0.005em; }
+  .c-desc { font-size: 12.5px; color: #5f6a72; margin: 0 0 12px; }
+  .c-tag { font-size: 11px; font-weight: 500; color: #14181b; background: #eef0f1; padding: 2px 8px; border-radius: 2px; }
+  .c-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #40484f; }
+  .c-bar { width: 3px; height: 12px; }
+  .c-foot { border-top: 1px solid #e8eaec; margin-top: 13px; padding-top: 10px; font-size: 11.5px; color: #7c868d; }
+  .c-open { font-size: 12px; font-weight: 600; color: #0f62fe; }
+  .c-kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; border: 1px solid #d5d9db; border-bottom-width: 2px; border-radius: 3px; padding: 1px 5px; color: #5f6a72; background: #f7f8f8; }
+  .c-art { background: #fff; border: 1px solid #d5d9db; border-radius: 3px; overflow: hidden; }
+  .c-art-head { padding: 16px 22px 12px; border-bottom: 1px solid #e8eaec; }
+  .c-eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #5f6a72; }
+  .c-artn { font-size: 20px; font-weight: 600; color: #14181b; }
+  .c-rubrica { font-family: "IBM Plex Serif", Georgia, serif; font-style: italic; font-size: 14.5px; color: #40484f; }
+  .c-vpill { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 500; padding: 2px 8px; border-radius: 2px; background: #e2ece6; color: #12633e; }
+  .c-vdate { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: #7c868d; }
+  .c-tool { margin-left: auto; }
+  .c-tool button { background: none; border: 1px solid transparent; padding: 5px; border-radius: 3px; color: #5f6a72; }
+  .c-body { padding: 16px 22px 20px; font-family: "IBM Plex Serif", Georgia, serif; font-size: 15.5px; line-height: 1.75; color: #23282d; }
+  .c-body .hl { background: #f2e4a4; color: #574310; }
+  .c-body .note-u { text-decoration-color: #c98a0a; }
+  .c-body .cit { color: #0f62fe; text-decoration-color: #a8c3fe; }
+  .c-brocardi { margin: 0 22px 18px; padding: 9px 12px; border: 1px solid #e0d6ec; border-left: 3px solid #8a63b8; background: #f8f5fb; font-size: 12px; color: #5a4a74; border-radius: 2px; }
+  .c-btn { font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 3px; border: none; display: inline-flex; align-items: center; gap: 8px; }
+  .c-btn.p { background: #14181b; color: #fff; }
+  .c-btn.s { background: transparent; color: #14181b; border: 1px solid #c3c9cc; }
+  .c-dark { background: #111417; border-radius: 3px; padding: 16px 20px; border: 1px solid #2a3036; }
+  .c-dark .c-eyebrow { color: #8b959c; }
+  .c-dark .c-artn { color: #edeff1; }
+  .c-dark .c-rubrica { color: #9aa4ab; }
+  .c-dark .c-darktext { font-family: "IBM Plex Serif", Georgia, serif; font-size: 14px; line-height: 1.7; color: #ccd2d6; margin-top: 8px; }
+  .c-dark .hl { background: #4d3f12; color: #eed88e; }
+  .c-dark .cit { color: #4589ff; text-decoration-color: #274f8f; }
+
+  /* ---------- Comparison table ---------- */
+  .cmp { margin-top: 80px; }
+  .cmp h2 { font-size: 24px; letter-spacing: -0.015em; margin-bottom: 16px; }
+  .cmp-scroll { overflow-x: auto; border: 1px solid var(--pg-border); border-radius: 12px; background: var(--pg-surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--pg-border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--pg-muted); font-weight: 600; }
+  td b { font-weight: 600; }
+  .note-final { margin-top: 28px; font-size: 14px; color: var(--pg-muted); max-width: 760px; }
+  .note-final b { color: var(--pg-ink); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">VisuaLex · Round 0 — Linguaggio visivo</div>
+    <h1>Tre direzioni, stesse schermate</h1>
+    <p class="lede">Ogni direzione è applicata alle stesse due superfici reali dell'app — una card dossier e la lettura dell'<strong>art. 2043 c.c.</strong> — con palette, tipografia e variante scura. Prima, lo stato attuale come riferimento.</p>
+    <div class="diagnosis">
+      <b>Perché oggi sembra «poco professionale» — la diagnosi dall'audit del codice:</b>
+      <ul>
+        <li>I font dichiarati (Inter, Merriweather) <b>non vengono mai caricati</b>: l'app renderizza il font di sistema e Georgia.</li>
+        <li>Il colore brand è il <b>blu default di Tailwind/shadcn</b>, non una scelta.</li>
+        <li>Vetri sfumati, ombre glow e raggi molto ampi danno un tono più «consumer» che da strumento di lavoro.</li>
+        <li>Buone fondamenta da preservare: sistema di componenti, colori semantici (Brocardi viola, evidenziazioni, categorie), lettura serif.</li>
+      </ul>
+    </div>
+  </header>
+
+  <!-- ============ STATO ATTUALE ============ -->
+  <section class="dir dNow">
+    <div class="dir-head"><span class="dir-letter">OGGI</span><h2>Stato attuale</h2></div>
+    <p class="dir-thesis">Font di sistema + Georgia, blu Tailwind, card bianche con raggi ampi. Funzionale, ma senza un'identità riconoscibile.</p>
+    <div class="plates">
+      <div class="plate">
+        <div class="plate-label">Card dossier</div>
+        <div class="now-doss">
+          <div class="m-doss-head">
+            <svg class="now-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+            <span class="now-count">12 elementi</span>
+          </div>
+          <h4>Responsabilità medica — fasc. 412/2025</h4>
+          <p class="now-desc">Azione ex artt. 2043 e 2236 c.c. — CTU e giurisprudenza rilevante</p>
+          <div class="m-tags" style="margin-bottom:10px"><span class="now-tag">sanitario</span><span class="now-tag">r.c.</span></div>
+          <div class="m-status"><span class="now-pill imp">★ 3 importanti</span><span class="now-pill read">5 da leggere</span></div>
+          <div class="m-foot now-foot"><span>Aggiornato il 21 agosto 2026</span><span style="color:#3b82f6">›</span></div>
+        </div>
+        <div class="m-btnrow"><button class="now-btn p">Nuovo dossier</button><button class="now-btn s">Importa</button></div>
+      </div>
+      <div class="plate">
+        <div class="plate-label">Lettura articolo</div>
+        <div class="now-art">
+          <div class="now-art-head">
+            <div class="now-book"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5z"/></svg></div>
+            <div><div class="now-art-title">Codice Civile</div><div class="now-art-sub">Edizione vigente · 16 marzo 1942, n. 262</div></div>
+          </div>
+          <div class="now-meta"><span class="now-vpill">VIGENTE</span><span class="now-vpill b">BROCARDI</span></div>
+          <div class="now-body">
+            <span class="artn">Art. 2043 — Risarcimento per fatto illecito</span>
+            Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>, obbliga colui che ha commesso il fatto a <span class="note-u">risarcire il danno</span>. Nei casi previsti dalla legge si applica anche l'<span class="cit">art. 2059</span> per i danni non patrimoniali.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DIREZIONE A ============ -->
+  <section class="dir dA">
+    <div class="dir-head"><span class="dir-letter">A</span><h2>«Studio» — sobrio contemporaneo</h2></div>
+    <p class="dir-thesis">Lo strumento di uno studio legale moderno: neutri freddi precisi, <b>petrolio profondo</b> al posto del blu default, grottesca con carattere (<b>Schibsted Grotesk</b>) per l'interfaccia e un serif da lettura progettato per lo schermo (<b>Literata</b>) per il testo di legge. Ombre quasi azzerate, bordi netti, numeri tabellari. La firma: l'intestazione dell'atto come targa tipografica — occhiello in maiuscoletto, numero d'articolo e rubrica in corsivo.</p>
+    <div class="tokens">
+      <div class="palette">
+        <div class="swatch" style="background:#eef1f2"><span>fondo</span></div>
+        <div class="swatch" style="background:#ffffff"><span>superficie</span></div>
+        <div class="swatch" style="background:#182430"><span>inchiostro</span></div>
+        <div class="swatch" style="background:#12586c"><span>petrolio</span></div>
+        <div class="swatch" style="background:#e3eef1"><span>velo</span></div>
+      </div>
+      <div class="typespec ui" style="font-family:'Schibsted Grotesk',sans-serif">
+        <span class="big" style="font-family:'Schibsted Grotesk',sans-serif; font-weight:600">Schibsted Grotesk — interfaccia</span>
+        <span class="big" style="font-family:'Literata',serif">Literata — testo di legge</span>
+      </div>
+    </div>
+    <div class="plates">
+      <div class="plate">
+        <div class="plate-label">Card dossier</div>
+        <div class="a-doss ui">
+          <div class="m-doss-head">
+            <span class="a-kicker">Dossier</span>
+            <span class="a-count">12 elementi</span>
+          </div>
+          <h4>Responsabilità medica — fasc. 412/2025</h4>
+          <p class="a-desc">Azione ex artt. 2043 e 2236 c.c. — CTU e giurisprudenza rilevante</p>
+          <div class="m-tags" style="margin-bottom:12px"><span class="a-tag">sanitario</span><span class="a-tag">r.c.</span></div>
+          <div class="m-status">
+            <span class="a-st"><span class="a-dot" style="background:#d99a06"></span>3 importanti</span>
+            <span class="a-st"><span class="a-dot" style="background:#5b7d94"></span>5 da leggere</span>
+          </div>
+          <div class="m-foot a-foot"><span>Aggiornato il 21 agosto 2026</span><span class="a-open">Apri →</span></div>
+        </div>
+        <div class="m-btnrow ui"><button class="a-btn p">Nuovo dossier</button><button class="a-btn s">Importa</button></div>
+      </div>
+      <div class="plate">
+        <div class="plate-label">Lettura articolo</div>
+        <div class="a-art">
+          <div class="a-art-head ui">
+            <div class="a-eyebrow">Codice Civile · Libro IV · Titolo IX</div>
+            <div class="a-artrow">
+              <span class="a-artn">Art. 2043</span>
+              <span class="a-rubrica">Risarcimento per fatto illecito</span>
+            </div>
+            <div class="a-metarow">
+              <span class="a-vpill">Vigente</span>
+              <span class="a-vdate">agg. 24 ago 2026</span>
+              <div class="m-toolbar a-tool">
+                <button title="Nota"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12h-6l-4 4v-4H4z"/></svg></button>
+                <button title="Evidenzia"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11 6-6 4 4-6 6H9z"/><path d="M5 19h14"/></svg></button>
+                <button title="Salva"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="a-body">
+            Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>, obbliga colui che ha commesso il fatto a <span class="note-u">risarcire il danno</span>. Nei casi previsti dalla legge si applica anche l'<span class="cit">art. 2059</span> per i danni non patrimoniali.
+          </div>
+          <div class="a-brocardi ui"><b>Brocardi</b> · Neminem laedere — il principio generale del divieto di arrecare danno ad altri.</div>
+        </div>
+        <div class="darkrow">
+          <div class="a-dark ui">
+            <div class="a-eyebrow">Tema scuro · Codice Civile</div>
+            <div class="a-artrow"><span class="a-artn" style="font-size:17px">Art. 2043</span><span class="a-rubrica" style="font-size:13.5px">Risarcimento per fatto illecito</span></div>
+            <div class="a-darktext">Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>… si applica anche l'<span class="cit">art. 2059</span>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="whatchanges"><b>Cosa cambia in pratica:</b> il blu Tailwind sparisce ovunque a favore del petrolio; i vetri sfumati diventano superfici piene; le pillole tonde diventano etichette rettangolari discrete; i punti di stato sostituiscono le pillole colorate sature. È l'evoluzione più naturale dell'app attuale.</p>
+  </section>
+
+  <!-- ============ DIREZIONE B ============ -->
+  <section class="dir dB">
+    <div class="dir-head"><span class="dir-letter">B</span><h2>«Biblioteca» — editoriale giuridico</h2></div>
+    <p class="dir-thesis">L'erede digitale dell'editoria giuridica italiana: carta calda, <b>bordeaux dei codici</b> come accento, ottone per i dettagli. Titoli e testo di legge in <b>Newsreader</b> (serif editoriale con corsivi veri), interfaccia in <b>Archivo</b>. La firma: il dossier è un <b>fascicolo d'archivio</b> — la card ha la linguetta della cartellina e la costa bordeaux. È la direzione con più identità e più calore.</p>
+    <div class="tokens">
+      <div class="palette">
+        <div class="swatch" style="background:#efe8db"><span>carta</span></div>
+        <div class="swatch" style="background:#fcf9f3"><span>foglio</span></div>
+        <div class="swatch" style="background:#2a2016"><span>inchiostro</span></div>
+        <div class="swatch" style="background:#79293a"><span>bordeaux</span></div>
+        <div class="swatch" style="background:#97722e"><span>ottone</span></div>
+      </div>
+      <div class="typespec">
+        <span class="big" style="font-family:'Newsreader',serif; font-weight:600">Newsreader — titoli e testo di legge</span>
+        <span class="big" style="font-family:'Archivo',sans-serif">Archivo — interfaccia</span>
+      </div>
+    </div>
+    <div class="plates">
+      <div class="plate">
+        <div class="plate-label">Card dossier (fascicolo)</div>
+        <div class="b-doss ui">
+          <div class="m-doss-head">
+            <span class="b-fasc">Fascicolo</span>
+            <span class="b-count">12 elementi</span>
+          </div>
+          <h4>Responsabilità medica — fasc. 412/2025</h4>
+          <p class="b-desc">Azione ex artt. 2043 e 2236 c.c. — CTU e giurisprudenza rilevante</p>
+          <div class="m-tags" style="margin-bottom:12px"><span class="b-tag">sanitario</span><span class="b-tag">r.c.</span></div>
+          <div class="m-status">
+            <span class="b-st"><span class="a-dot" style="background:#97722e"></span>3 importanti</span>
+            <span class="b-st"><span class="a-dot" style="background:#7d6b52"></span>5 da leggere</span>
+          </div>
+          <div class="m-foot b-foot"><span>Aggiornato il 21 agosto 2026</span><span class="b-open">Apri →</span></div>
+        </div>
+        <div class="m-btnrow ui"><button class="b-btn p">Nuovo dossier</button><button class="b-btn s">Importa</button></div>
+      </div>
+      <div class="plate">
+        <div class="plate-label">Lettura articolo</div>
+        <div class="b-art">
+          <div class="b-art-head ui">
+            <div class="b-eyebrow">Codice Civile · Libro IV · Titolo IX</div>
+            <div class="a-artrow">
+              <span class="b-artn">Art. 2043</span>
+              <span class="b-rubrica">Risarcimento per fatto illecito</span>
+            </div>
+            <div class="a-metarow">
+              <span class="b-vpill">Vigente</span>
+              <span class="b-vdate">agg. 24 ago 2026</span>
+              <div class="m-toolbar b-tool">
+                <button title="Nota"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12h-6l-4 4v-4H4z"/></svg></button>
+                <button title="Evidenzia"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11 6-6 4 4-6 6H9z"/><path d="M5 19h14"/></svg></button>
+                <button title="Salva"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="b-body">
+            Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>, obbliga colui che ha commesso il fatto a <span class="note-u">risarcire il danno</span>. Nei casi previsti dalla legge si applica anche l'<span class="cit">art. 2059</span> per i danni non patrimoniali.
+          </div>
+          <div class="b-brocardi"><b style="font-style:normal; font-family:'Archivo',sans-serif; font-size:11px; letter-spacing:.08em; text-transform:uppercase">Brocardi</b> · Neminem laedere — il principio generale del divieto di arrecare danno ad altri.</div>
+        </div>
+        <div class="darkrow">
+          <div class="b-dark ui">
+            <div class="b-eyebrow">Tema scuro · Codice Civile</div>
+            <div class="a-artrow"><span class="b-artn" style="font-size:19px">Art. 2043</span><span class="b-rubrica" style="font-size:14px">Risarcimento per fatto illecito</span></div>
+            <div class="b-darktext">Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>… si applica anche l'<span class="cit">art. 2059</span>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="whatchanges"><b>Cosa cambia in pratica:</b> tutta la temperatura dell'app si sposta sul caldo (fondi carta, non bianco-azzurri); i titoli passano al serif; il bordeaux marca azioni primarie e stati attivi. È la direzione più distintiva — e anche quella che richiede più disciplina per non scivolare nel décor.</p>
+  </section>
+
+  <!-- ============ DIREZIONE C ============ -->
+  <section class="dir dC">
+    <div class="dir-head"><span class="dir-letter">C</span><h2>«Tavolo tecnico» — strumento denso</h2></div>
+    <p class="dir-thesis">Il pannello di lavoro del professionista che vive di tastiera: quasi monocromo, angoli minimi, righe più fitte, <b>famiglia IBM Plex</b> (sans per l'interfaccia, serif per la legge, mono per numeri, date e riferimenti). Un solo colore d'azione usato con parsimonia. La firma: <b>le scorciatoie visibili sui comandi</b> e i metadati in monospazio — l'app dichiara di essere uno strumento, non un sito.</p>
+    <div class="tokens">
+      <div class="palette">
+        <div class="swatch" style="background:#eeefed"><span>fondo</span></div>
+        <div class="swatch" style="background:#ffffff"><span>superficie</span></div>
+        <div class="swatch" style="background:#14181b"><span>inchiostro</span></div>
+        <div class="swatch" style="background:#0f62fe"><span>segnale</span></div>
+        <div class="swatch" style="background:#e8eaec"><span>filetti</span></div>
+      </div>
+      <div class="typespec">
+        <span class="big" style="font-family:'IBM Plex Sans',sans-serif; font-weight:600">IBM Plex Sans — interfaccia</span>
+        <span class="big" style="font-family:'IBM Plex Serif',serif">Plex Serif — legge</span>
+        <span class="big c-mono" style="font-size:14px">Plex Mono — Art. 2043 · 24-08-2026</span>
+      </div>
+    </div>
+    <div class="plates">
+      <div class="plate">
+        <div class="plate-label">Card dossier</div>
+        <div class="c-doss ui">
+          <div class="m-doss-head">
+            <span class="c-ref c-mono">FASC 412/2025</span>
+            <span class="c-count c-mono">12 el.</span>
+          </div>
+          <h4>Responsabilità medica</h4>
+          <p class="c-desc">Azione ex artt. 2043 e 2236 c.c. — CTU e giurisprudenza rilevante</p>
+          <div class="m-tags" style="margin-bottom:12px"><span class="c-tag">sanitario</span><span class="c-tag">r.c.</span></div>
+          <div class="m-status">
+            <span class="c-st"><span class="c-bar" style="background:#c98a0a"></span>3 importanti</span>
+            <span class="c-st"><span class="c-bar" style="background:#5b7d94"></span>5 da leggere</span>
+          </div>
+          <div class="m-foot c-foot"><span class="c-mono">agg. 21-08-2026</span><span class="c-open">Apri ↵</span></div>
+        </div>
+        <div class="m-btnrow ui"><button class="c-btn p">Nuovo dossier <span class="c-kbd" style="border-color:#3a4147; background:#22272b; color:#9aa3ab">N</span></button><button class="c-btn s">Importa <span class="c-kbd">I</span></button></div>
+      </div>
+      <div class="plate">
+        <div class="plate-label">Lettura articolo</div>
+        <div class="c-art">
+          <div class="c-art-head ui">
+            <div class="c-eyebrow">CC · Libro IV · Tit. IX</div>
+            <div class="a-artrow">
+              <span class="c-artn">Art. 2043</span>
+              <span class="c-rubrica">Risarcimento per fatto illecito</span>
+            </div>
+            <div class="a-metarow">
+              <span class="c-vpill">VIGENTE</span>
+              <span class="c-vdate">24-08-2026</span>
+              <div class="m-toolbar c-tool">
+                <button title="Nota"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12h-6l-4 4v-4H4z"/></svg></button>
+                <button title="Evidenzia"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11 6-6 4 4-6 6H9z"/><path d="M5 19h14"/></svg></button>
+                <button title="Salva"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+              </div>
+            </div>
+          </div>
+          <div class="c-body">
+            Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>, obbliga colui che ha commesso il fatto a <span class="note-u">risarcire il danno</span>. Nei casi previsti dalla legge si applica anche l'<span class="cit">art. 2059</span> per i danni non patrimoniali.
+          </div>
+          <div class="c-brocardi ui"><b>BROCARDI</b> · Neminem laedere — il principio generale del divieto di arrecare danno ad altri.</div>
+        </div>
+        <div class="darkrow">
+          <div class="c-dark ui">
+            <div class="c-eyebrow">TEMA SCURO · CC</div>
+            <div class="a-artrow"><span class="c-artn" style="font-size:16px">Art. 2043</span><span class="c-rubrica" style="font-size:13px">Risarcimento per fatto illecito</span></div>
+            <div class="c-darktext">Qualunque fatto doloso o colposo, che cagiona ad altri un <span class="hl">danno ingiusto</span>… si applica anche l'<span class="cit">art. 2059</span>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="whatchanges"><b>Cosa cambia in pratica:</b> densità maggiore (più contenuto per schermata), scorciatoie visibili ovunque, quasi tutto il colore rimosso dal chrome — restano solo i colori semantici (stati, evidenziazioni, Brocardi). La più «agile per il lavoro», la meno calda.</p>
+  </section>
+
+  <!-- ============ CONFRONTO ============ -->
+  <section class="cmp">
+    <h2>Confronto rapido</h2>
+    <div class="cmp-scroll">
+      <table>
+        <thead>
+          <tr><th>Direzione</th><th>Tono</th><th>Tipografia</th><th>Quando sceglierla</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>A — Studio</b></td>
+            <td>Sobrio, freddo, contemporaneo</td>
+            <td>Schibsted Grotesk + Literata</td>
+            <td>Vuoi il salto di professionalità con il minimo attrito: è l'evoluzione diretta dell'app di oggi. La scelta più sicura.</td>
+          </tr>
+          <tr>
+            <td><b>B — Biblioteca</b></td>
+            <td>Caldo, editoriale, con identità forte</td>
+            <td>Newsreader + Archivo</td>
+            <td>Vuoi che VisuaLex abbia una faccia sua, riconoscibile, radicata nella tradizione giuridica italiana. La scelta più distintiva.</td>
+          </tr>
+          <tr>
+            <td><b>C — Tavolo tecnico</b></td>
+            <td>Denso, tecnico, keyboard-first</td>
+            <td>IBM Plex (Sans + Serif + Mono)</td>
+            <td>La priorità assoluta è l'agilità operativa: più informazione a schermo, scorciatoie in vista, zero decorazione. La scelta più operativa.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note-final"><b>Nota di metodo:</b> la direzione scelta diventa il Round 0 (token, font, componenti base) e viene poi applicata pagina per pagina — insieme alla revisione dei flussi (meno modali, meno passaggi), che è indipendente dalla direzione estetica. Le direzioni sono componibili: si può prendere l'impianto di una e un elemento firma di un'altra (es. A come base + il fascicolo con linguetta di B, o le scorciatoie visibili di C).</p>
+  </section>
+</div>

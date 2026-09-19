@@ -5,6 +5,16 @@ from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
 from .treextractor import get_tree
 import logging
 
+# Case-insensitive views of the act-type tables. A handful of keys carry
+# capitals ("codice del Terzo settore", "disposizioni per l'attuazione del
+# Codice civile ...") while normalize_act_type lowercases every lookup, so
+# without these indices those keys are unreachable — the same capital-letter
+# bug that _URN_CODICI_LOWER fixes for the codici URN table. Verified: no two
+# keys that collide when lowered carry different values, so nothing is lost.
+_NORMATTIVA_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA.items()}
+_NORMATTIVA_SEARCH_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA_SEARCH.items()}
+_BROCARDI_SEARCH_LOWER = {_k.lower(): _v for _k, _v in BROCARDI_SEARCH.items()}
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -214,15 +224,31 @@ def normalize_act_type(input_type, search=False, source='normattiva'):
     """
     logging.debug(f"Normalizing act type: {input_type}, search: {search}, source: {source}")
     
-    act_types = NORMATTIVA_SEARCH if source == 'normattiva' and search else NORMATTIVA
+    if source == 'normattiva' and search:
+        act_types, act_types_lower = NORMATTIVA_SEARCH, _NORMATTIVA_SEARCH_LOWER
+    else:
+        act_types, act_types_lower = NORMATTIVA, _NORMATTIVA_LOWER
     if source == 'brocardi':
-        act_types = BROCARDI_SEARCH if search else {}
+        if search:
+            act_types, act_types_lower = BROCARDI_SEARCH, _BROCARDI_SEARCH_LOWER
+        else:
+            act_types, act_types_lower = {}, {}
 
     if input_type in {"TUE", "TFUE", "CDFUE"}:
         return input_type
 
-    normalized_type = act_types.get(input_type.lower().strip().replace(" ", ""), input_type.lower().strip())
-    
+    key = input_type.lower().strip()
+    # The tables hold both spaced keys ("cod. civ.") and spaceless ones ("cc"),
+    # and a few keys carry capitals. Literal first, then the case-insensitive
+    # index, then the spaceless form: each added attempt only ever resolves
+    # more names, it never changes one that already resolved.
+    normalized_type = act_types.get(key)
+    if normalized_type is None:
+        normalized_type = act_types_lower.get(key)
+    if normalized_type is None:
+        normalized_type = act_types.get(key.replace(" ", ""), key)
+
+
     logging.debug(f"Normalized act type: {normalized_type}")
     return normalized_type
 
