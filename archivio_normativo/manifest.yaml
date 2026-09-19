@@ -71,6 +71,7 @@ acts:
     label: Norme di attuazione, di coordinamento e transitorie del codice di procedura penale
     source: normattiva
     act_type: norme di attuazione, di coordinamento e transitorie del codice di procedura penale
+    annex: "1"   # d.lgs. 271/1989: annex None is the one-article Dispositivo, the 324 norms live in annex 1
     cite: "disp. att. c.p.p."
   - id: cpa
     area: amministrativo
@@ -85,7 +86,7 @@ acts:
     act_type: decreto legislativo
     date: 2010-07-02
     act_number: "104"
-    annex: "3"   # checked against the tree by --dry-run; VisuaLex maps the code body to annex 2
+    annex: "3"   # verified 2026-09-19 on the live tree: None=Dispositivo (2 art.), 1=Indice generale, 2=Allegato 1 Codice (139), 3=Allegato 2 Norme di attuazione (19), 4=Allegato 3 transitorie, 5=Allegato 4 coordinamento
     cite: "disp. att. c.p.a."
   - id: cod-consumo
     area: civile
