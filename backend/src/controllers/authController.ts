@@ -32,6 +32,11 @@ const changePasswordSchema = z.object({
   new_password: z.string().min(8).regex(passwordRegex, passwordErrorMessage),
 });
 
+const deleteAccountSchema = z.object({
+  password: z.string().min(1),
+  confirmation: z.literal('ELIMINA ACCOUNT'),
+});
+
 // Register - creates inactive user pending admin approval
 export const register = async (req: Request, res: Response) => {
   const { email, username, password } = registerSchema.parse(req.body);
@@ -196,4 +201,52 @@ export const changePassword = async (req: Request, res: Response) => {
   });
 
   res.json({ message: 'Password changed successfully' });
+};
+
+/**
+ * Export the user's portable data set. Passwords, tokens and operational
+ * secrets are deliberately excluded; the payload is versioned so a future
+ * importer can migrate it without guessing its shape.
+ */
+export const exportAccountData = async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
+    prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.annotation.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.highlight.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.dossier.findMany({ where: { userId }, include: { items: true, snapshots: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.searchHistory.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.environment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.quickNorm.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.customAlias.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleThread.findMany({ where: { userId }, include: { comments: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+  ]);
+
+  res.json({
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    user,
+    data: { folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments },
+  });
+};
+
+/**
+ * Permanently delete the authenticated account after explicit confirmation.
+ * Prisma relations are configured with cascading ownership deletes.
+ */
+export const deleteAccount = async (req: Request, res: Response) => {
+  const { password, confirmation } = deleteAccountSchema.parse(req.body);
+  if (confirmation !== 'ELIMINA ACCOUNT') {
+    throw new AppError(400, 'Conferma non valida');
+  }
+  const user = req.user!;
+  if (!(await verifyPassword(password, user.password))) {
+    throw new AppError(400, 'La password non è corretta');
+  }
+
+  await prisma.user.delete({ where: { id: user.id } });
+  res.status(204).send();
 };

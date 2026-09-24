@@ -4,7 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { useDraggable } from '@dnd-kit/core';
 import type { LooseArticle } from '../../../store/useAppStore';
 import { ArticleTabContent } from '../search/ArticleTabContent';
-import { StudyMode } from './StudyMode';
+import { LazyStudyMode as StudyMode } from './LazyStudyMode';
 import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { Toast } from '../../ui/Toast';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';

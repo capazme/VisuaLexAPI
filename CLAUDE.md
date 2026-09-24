@@ -232,16 +232,52 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   scoped to `req.user.id`. Intended caller is `applyEnvironment(replace)` ONLY —
   do not wire into end-user UI without a dedicated confirm flow.
 - Dossier item mutations are scoped to their dossier (IDOR fix — keep it that
-  way when adding item routes).
+  way when adding item routes). `POST`/`GET /dossiers/:id/snapshots` are
+  scoped to the owner the same way. Write-only from the UI today ("Snapshot"
+  in the detail view); there is no restore yet.
+- **Saved-norm change tracking** (`routes/notifications.ts`, all behind
+  `authenticate`): `POST /notifications/normas/check` — the reader registers
+  `{normaKey, normaData: {norma_data, article_text}}` (Zod, 2 MB cap on the
+  text) — plus `GET /notifications/normas`, `GET …/unread-count`,
+  `POST …/mark-read`. One `NormaWatch` row per `(userId, normaKey)` holds
+  the last snapshot; a `NormaChangeNotification` is written when the
+  **text** differs. `compareNormaSnapshots` in `utils/normaWatcher.ts` is
+  the one definition of "changed" for both writers of those rows (this
+  endpoint and the background watcher): compare anything but `article_text`
+  and the two ping-pong false notifications forever, because each stores
+  `norma_data` in its own shape. A stored snapshot with no text
+  (metadata-only, from before this contract) is a `baseline`: the snapshot
+  is replaced and nothing is notified.
+- **`utils/normaWatcher.ts`** — started from `index.ts`. Every
+  `NORMA_WATCH_INTERVAL_MS` (6 h, floor 1 min) it refetches up to 100
+  watches through the Python API — `LEGAL_API_URL` is the **base** URL,
+  `/fetch_article_text` is appended — and notifies on a text change.
+  `NORMA_WATCH_ENABLED=false` turns it off. A malformed answer (no
+  `norma_data`, empty text) is a no-op, never a fallback to the stored data.
+- **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
+  on `{normaKey, articleId, version}` with comments, toggled votes and
+  reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
+  `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
+  `updatedAt`, vote count.
+- **Account data**: `GET /auth/export` (the user's data, minus password and
+  tokens) and `DELETE /auth/account` (password re-checked; every relation to
+  `User` cascades). Reached from the Settings modal.
+- **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
+  banner. The Python `/health/detailed` is the one that probes the sources
+  (see Key API Endpoints).
 
 ### Frontend (`/frontend/src`)
 
 - `App.tsx` — routing. Routes: `/` (search), `/dossier`, `/history`,
-  `/environments`, `/forum`, `/admin/*`, plus `/login` and `/register`.
+  `/environments`, `/forum`, `/documents`, `/admin/*`, plus `/login` and
+  `/register`.
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`, `environments`,
-  `bulletin` (the Forum), `history`, `compare`, `settings`.
+  `bulletin` (the Forum), `history`, `compare`, `settings`, `documents`
+  (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
+  user drops in — parsed in the browser, never uploaded — each opening the
+  reader through `navigate('/')` + `triggerSearch`, gotcha 15).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
@@ -278,6 +314,11 @@ POST unless noted, JSON bodies.
   resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
+- `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
+  real**, on the shared client and circuit breakers. One result is cached
+  for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
+  concurrent cold callers run one probe; the body carries `cached` and the
+  status stays 503 while a source fails. Never wire it to a tight loop
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
@@ -382,7 +423,13 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   `bookmarkService`. There is **no bookmarks page or route**; the dedicated UI was
   removed as dead code. Don't document or build against a bookmarks page without
   first deciding to rebuild one.
-- **History** (`/history`) — server-side search history.
+- **History** (`/history`) — server-side search history. It also hosts
+  `NormaChangesSection`, the one place the "a saved norm changed"
+  notifications are listed and marked read; the Cronologia entry in the
+  sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
+  deliberately kept out of the Forum's `total`, which nothing on that page
+  could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
+  on `window` so the badge drops before the next 30s poll.
 
 All of them reopen a norm through `triggerSearch()`.
 
@@ -429,6 +476,22 @@ Three entry points, deliberately distinct — don't collapse them.
 **Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
+
+**Discussions**: the toolbar's speech-bubble button opens
+`ArticleDiscussionPanel`, a draggable portal anchored on
+`{normaKey, articleId, version}` (threads, replies, votes, report; moderation
+is admin-only, `PATCH /admin/article-discussions/:id`). The panel is mounted
+for every rendered article and fetches **only while open** — a load on mount
+cost one GET per article of a range.
+
+**Saved-norm change check**: when a *bookmarked* article is shown,
+`ArticleTabContent` posts `{norma_data, article_text}` to
+`/notifications/normas/check`; the server keeps one snapshot per
+`(user, normaKey)` and answers `changed` when the **text** differs, which
+the reader toasts. The effect is keyed on `(itemKey, isSavedArticle)` and
+reads the body through a ref, so a re-render with the same text as a new
+object does not post again; it is separate from the highlights/annotations
+load effect, which stays keyed on identity alone.
 
 **The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
 `'window'` on desktop — a draggable, backdrop-less window portalled to
@@ -541,6 +604,27 @@ Duplicating any of these is a defect, not a shortcut.
   `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
+- `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
+  `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
+  an optional article to focus, which `SearchPanel` focuses even inside a
+  range). `SearchPanel` still reads the older `?share=`.
+- `utils/searchFilters.ts` — `matchesSearchFilters(article, filters)` for the
+  palette's source / Brocardi / historical / year filters, applied
+  client-side to each streamed result. `SearchPanel` counts what a filter
+  drops and, when nothing got through, says so instead of showing an empty
+  search.
+- `utils/normaChanges.ts` — `normaFromChangeNotification` /
+  `normaChangeLabel`: reopen and label a change notification from the
+  snapshot the server stored (null, not a guess, when the snapshot has no
+  identity).
+- `hooks/useForumNotifications.ts` — the one 30s poller behind both sidebar
+  badges (Forum `total`, Cronologia `normaChanges`).
+- `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
+  `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
+  Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
+  **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
+  cached server-side for `HEALTH_DETAILED_TTL`. Do not tighten either loop —
+  the first version polled every 60s per tab.
 
 ## UI Conventions
 
@@ -663,13 +747,17 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
 call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
 a few tens of KB for an ordinary act, a few hundred KB for a codice because of
-the per-article fingerprints). Template in `.env.example`.
+the per-article fingerprints), `HEALTH_DETAILED_TTL` (`120` — seconds the
+`/health/detailed` probe is cached, read at call time). Template in
+`.env.example`.
 
 Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
 parser uses; it ships a `cp314` wheel, so `deploy.sh` needs no compiler.
 
 **Node backend** — see `backend/.env.example`. `REDIS_ENABLED` defaults to
 `"true"` there to mirror production; set `"false"` for dev without Redis.
+`NORMA_WATCH_ENABLED` / `NORMA_WATCH_INTERVAL_MS` / `LEGAL_API_URL` drive the
+saved-norm watcher (see the Node backend section); all three have defaults.
 
 ## Critical Files
 
@@ -717,7 +805,14 @@ meant to stay split; add new features as new files, not inside the shells:
   edits, not for where it opens: it is reached from the command palette, not
   from Settings (gotcha 27). See the Aliases section above.
 - `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
-  `NormaBlockComponent`, `LooseArticleCard`, and `StudyMode/`.
+  `NormaBlockComponent`, `LooseArticleCard`, `LazyStudyMode` (the
+  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are
+  lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
+  "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
+  workspace is persisted).
+- `features/history/` — `HistoryView.tsx` plus `NormaChangesSection.tsx`
+  (see History above).
+- `features/documents/` — `DocumentReviewPage.tsx` only.
 
 **Backend** — `prisma/schema.prisma` · `controllers/` (`environmentController`,
 `quickNormController`, `customAliasController`, `dossierController`) ·

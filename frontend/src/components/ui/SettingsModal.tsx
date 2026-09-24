@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Type, Palette } from 'lucide-react';
+import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Type, Palette, Download, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
+import { accountService } from '../../services/accountService';
 
 interface CommitInfo {
     hash: string;
@@ -42,12 +43,15 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     const [versionLoading, setVersionLoading] = useState(false);
     const [versionError, setVersionError] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
+    const [accountBusy, setAccountBusy] = useState(false);
+    const [accountMessage, setAccountMessage] = useState<string | null>(null);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
     useEffect(() => {
         if (isOpen && !versionInfo && !versionLoading && !versionError) {
             // Async data-fetch on open: the loading flag gates a one-shot fetch.
             // (CLAUDE.md gotcha #11)
-            // eslint-disable-next-line react-hooks/set-state-in-effect
             setVersionLoading(true);
             fetch('/version', { signal: AbortSignal.timeout(5000) })
                 .then(res => {
@@ -79,6 +83,42 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
             });
         } catch {
             return dateStr;
+        }
+    };
+
+    const handleExportAccount = async () => {
+        setAccountBusy(true);
+        setAccountMessage(null);
+        try {
+            const data = await accountService.exportData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `visualex-dati-${new Date().toISOString().slice(0, 10)}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            setAccountMessage('Export completato.');
+        } catch {
+            setAccountMessage('Impossibile esportare i dati.');
+        } finally {
+            setAccountBusy(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmation !== 'ELIMINA ACCOUNT') return;
+        setAccountBusy(true);
+        setAccountMessage(null);
+        try {
+            await accountService.deleteAccount(deletePassword, deleteConfirmation);
+            // Tokens AND the persisted store (workspace tabs, settings): the
+            // next person on this browser must not inherit them.
+            localStorage.clear();
+            window.location.href = '/login?deleted=1';
+        } catch {
+            setAccountMessage('Impossibile eliminare l’account. Verifica la password e la conferma.');
+            setAccountBusy(false);
         }
     };
 
@@ -228,6 +268,18 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                         </button>
                     </div>
                 )}
+
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5"><Shield size={12} aria-hidden /> Dati e privacy</label>
+                    <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
+                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-950/30 dark:text-blue-300"><Download size={16} /> Esporta i miei dati</button>
+                        <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+                        <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+                        <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
+                        {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
+                    </div>
+                </div>
 
                 {/* Version Info */}
                 <div>

@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import type { NormaVisitata, SearchParams } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } from '../../../services/historyService';
+import { NormaChangesSection } from './NormaChangesSection';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
 // distinct colors so the user can scan the timeline visually; everything
@@ -277,6 +278,11 @@ export function HistoryView() {
         }
     };
 
+    const handleOpenNorma = (params: SearchParams) => {
+        navigate('/');
+        triggerSearch(params);
+    };
+
     const handleItemClick = (item: SearchHistoryItem) => {
         // Navigate to search page and trigger search
         navigate('/');
@@ -346,6 +352,7 @@ export function HistoryView() {
 
     return (
         <div className="max-w-4xl mx-auto animate-in fade-in duration-300">
+            <NormaChangesSection onOpen={handleOpenNorma} />
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {/* Mobile Header */}
                 <div className="md:hidden p-3 border-b border-slate-200 dark:border-slate-700">

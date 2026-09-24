@@ -217,6 +217,14 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
   /* Font-size preference: scales the root font-size so every Tailwind
      rem-based utility (text-*, spacing, button heights) scales together.
      Set on <html> by Layout.tsx via document.documentElement. Default
@@ -316,6 +324,8 @@
 .legal-content {
   @apply font-serif text-lg leading-relaxed text-slate-800 dark:text-slate-200;
   letter-spacing: 0.01em;
+  max-width: 72ch;
+  margin-inline: auto;
 }
 
 .legal-content p {
