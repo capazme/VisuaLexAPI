@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles } from 'lucide-react';
-import type { SearchParams, CustomAlias } from '../../../types';
+import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal } from 'lucide-react';
+import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -11,6 +11,7 @@ import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../.
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { motion, AnimatePresence } from 'framer-motion';
+import { defaultSearchFilters } from '../../../utils/searchFilters';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [includeBrocardi, setIncludeBrocardi] = useState(true);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
 
   // Trigger Command Palette tour on first open
   useEffect(() => {
@@ -267,11 +270,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
         article: alias.searchParams.article || '1',
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: includeBrocardi
+        show_brocardi_info: includeBrocardi,
+        filters,
       });
       onClose();
     }
-  }, [trackAliasUsage, onSearch, onClose, includeBrocardi]);
+  }, [trackAliasUsage, onSearch, onClose, includeBrocardi, filters]);
 
   const handleSelectPreset = useCallback((trigger: string) => {
     const preset = catalog.presets[trigger];
@@ -305,7 +309,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
         date: params.date ? parseItalianDate(params.date) : '',
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: includeBrocardi
+        show_brocardi_info: includeBrocardi,
+        filters,
       });
       onClose();
     } else if (parsedCitation.act_type) {
@@ -325,7 +330,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi, trackAliasUsage]);
+  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi, filters, trackAliasUsage]);
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -337,11 +342,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
       date: actDate ? parseItalianDate(actDate) : '',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: includeBrocardi
+      show_brocardi_info: includeBrocardi,
+      filters,
     });
-
     onClose();
-  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, includeBrocardi]);
+  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, includeBrocardi, filters]);
 
   const handleSubmitDetails = useCallback(() => {
     if (!selectedAct || !actNumber || !actDate) return;
@@ -364,10 +369,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
       version: 'vigente',
       version_date: '',
       show_brocardi_info: includeBrocardi,
+      filters,
     });
 
     onClose();
-  }, [selectedAct, actNumber, actDate, includeBrocardi, onBrowseStructure, onClose]);
+  }, [selectedAct, actNumber, actDate, includeBrocardi, filters, onBrowseStructure, onClose]);
 
   /**
    * The act as a human would name it.
@@ -896,6 +902,47 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
                   transition={{ type: "spring", stiffness: 500, damping: 25 }}
                 />
               </div>
+            </div>
+
+            {/* Advanced legal filters */}
+            <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mb-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters(value => !value)}
+                className="w-full flex items-center justify-between text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
+                aria-expanded={showAdvancedFilters}
+              >
+                <span className="flex items-center gap-2"><SlidersHorizontal size={14} /> Filtri avanzati</span>
+                <span>{showAdvancedFilters ? 'Nascondi' : 'Mostra'}</span>
+              </button>
+              {showAdvancedFilters && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <label className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
+                    Fonte
+                    <select
+                      value={filters.source}
+                      onChange={(event) => setFilters(previous => ({ ...previous, source: event.target.value as SearchFilters['source'] }))}
+                      className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200"
+                    >
+                      <option value="all">Tutte le fonti</option>
+                      <option value="normattiva">Normattiva</option>
+                      <option value="eurlex">EUR-Lex</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" checked={filters.hasBrocardi} onChange={(event) => setFilters(previous => ({ ...previous, hasBrocardi: event.target.checked }))} />
+                    Solo articoli con dottrina
+                  </label>
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300">
+                    <input type="checkbox" checked={filters.onlyHistorical} onChange={(event) => setFilters(previous => ({ ...previous, onlyHistorical: event.target.checked }))} />
+                    Solo versioni storiche
+                  </label>
+                  <div className="flex gap-2">
+                    <input aria-label="Anno iniziale" type="number" placeholder="Dal" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className="w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2" />
+                    <input aria-label="Anno finale" type="number" placeholder="Al" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className="w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2" />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Hint Badges */}

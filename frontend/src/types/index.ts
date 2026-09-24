@@ -126,6 +126,14 @@ export interface ArticleData {
     };
 }
 
+export interface SearchFilters {
+    source: 'all' | 'normattiva' | 'eurlex';
+    hasBrocardi: boolean;
+    onlyHistorical: boolean;
+    yearFrom?: number;
+    yearTo?: number;
+}
+
 export interface SearchParams {
     act_type: string;
     act_number: string;
@@ -134,6 +142,7 @@ export interface SearchParams {
     version: 'vigente' | 'originale';
     version_date?: string;
     show_brocardi_info: boolean;
+    filters?: SearchFilters;
     annex?: string; // Optional annex number/letter (e.g., "1", "2", "A", "B")
     tabLabel?: string; // Optional custom label for the workspace tab
     // Optional pre-existing tab id to merge into (used by dossier "apri tutto" so
@@ -499,4 +508,40 @@ export interface UpdateEnvironmentWithVersionPayload {
     tags?: string[];
     changelog?: string;
     versionMode?: 'replace' | 'coexist';
+}
+
+export interface ArticleDiscussionComment {
+    id: string;
+    threadId: string;
+    parentId?: string | null;
+    body: string;
+    isHidden: boolean;
+    user: { id: string; username: string };
+    createdAt: string;
+    updatedAt: string;
+    voteCount: number;
+    userVoted: boolean;
+    isOwner: boolean;
+}
+
+export interface ArticleDiscussionThread {
+    id: string;
+    normaKey: string;
+    articleId: string;
+    articleLabel?: string | null;
+    version?: string | null;
+    title: string;
+    body: string;
+    user: { id: string; username: string };
+    createdAt: string;
+    updatedAt: string;
+    voteCount: number;
+    userVoted: boolean;
+    isOwner: boolean;
+    comments: ArticleDiscussionComment[];
+}
+
+export interface ArticleDiscussionResponse {
+    data: ArticleDiscussionThread[];
+    pagination: { page: number; limit: number; total: number; pages: number };
 }

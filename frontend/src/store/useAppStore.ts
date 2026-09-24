@@ -298,6 +298,8 @@ interface AppState {
     toggleNormaCollapse: (tabId: string, normaId: string) => void;
     setTabLabel: (id: string, label: string) => void;
     reorderWorkspaceTabs: (fromIndex: number, toIndex: number) => void;
+    arrangeWorkspaceTabs: () => void;
+    closeAllWorkspaceTabs: () => void;
 
     // Structure Window Actions
     /**
@@ -836,6 +838,26 @@ const appStore = createStore<AppState>()(
                     fromIndex >= state.workspaceTabs.length || toIndex >= state.workspaceTabs.length) return;
                 const [moved] = state.workspaceTabs.splice(fromIndex, 1);
                 state.workspaceTabs.splice(toIndex, 0, moved);
+            }),
+
+            arrangeWorkspaceTabs: () => set((state) => {
+                const gap = 24;
+                const startX = 32;
+                const startY = 32;
+                const viewportWidth = typeof window === 'undefined' ? 1200 : window.innerWidth;
+                const columns = Math.max(1, Math.floor((viewportWidth - 96) / 420));
+                state.workspaceTabs.forEach((tab, index) => {
+                    tab.position = {
+                        x: startX + (index % columns) * (Math.min(tab.size.width, 400) + gap),
+                        y: startY + Math.floor(index / columns) * 120,
+                    };
+                    tab.isHidden = false;
+                    tab.isMinimized = false;
+                });
+            }),
+
+            closeAllWorkspaceTabs: () => set((state) => {
+                state.workspaceTabs = [];
             }),
 
             // ── Structure window ─────────────────────────────────────────

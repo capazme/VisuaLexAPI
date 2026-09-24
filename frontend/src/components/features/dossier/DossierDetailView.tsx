@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Folder,
   Trash2,
@@ -49,6 +49,7 @@ import { TreeNavigatorModal } from './TreeNavigatorModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { ToolbarButton } from './ToolbarButton';
 import { AddNoteModal } from './AddNoteModal';
+import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -87,6 +88,18 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
   const [addNoteOpen, setAddNoteOpen] = useState(false);
+  const [snapshots, setSnapshots] = useState<DossierSnapshotApi[]>([]);
+  const [snapshotBusy, setSnapshotBusy] = useState(false);
+
+  // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
+  // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
+  useEffect(() => {
+    let cancelled = false;
+    dossierService.getSnapshots(dossier.id)
+      .then(list => { if (!cancelled) setSnapshots(list); })
+      .catch(err => console.error('Failed to load dossier snapshots:', err));
+    return () => { cancelled = true; };
+  }, [dossier.id]);
 
   // Items filtered by free-text query. Drag-reorder still operates on
   // the full `dossier.items` array, so indexes stay absolute even while filtered.
@@ -305,64 +318,101 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
 
   const handleExportPdf = () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    let y = 50;
+    const margin = 44;
+    const bottom = 770;
+    let y = 54;
 
-    doc.setFontSize(20);
+    const footer = () => {
+      const page = doc.getNumberOfPages();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(`${dossier.title} · VisuaLex`, margin, 810);
+      doc.text(`Pagina ${page}`, 555, 810, { align: 'right' });
+      doc.setTextColor(0);
+    };
+    const ensureSpace = (height: number) => {
+      if (y + height <= bottom) return;
+      footer();
+      doc.addPage();
+      y = 54;
+    };
+    const writeLines = (lines: string[], lineHeight: number) => {
+      lines.forEach(line => {
+        ensureSpace(lineHeight);
+        doc.text(line, margin, y);
+        y += lineHeight;
+      });
+    };
+
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, 595, 12, 'F');
+    doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text(dossier.title, 40, y);
-    y += 30;
+    doc.text(dossier.title, margin, y);
+    y += 28;
 
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Fascicolo normativo · ${dossier.items.length} elementi · Esportato il ${new Date().toLocaleDateString('it-IT')}`, margin, y);
+    y += 18;
     if (dossier.description) {
       doc.setFontSize(11);
       doc.setFont('helvetica', 'italic');
-      const descWrapped = doc.splitTextToSize(dossier.description, 500);
-      doc.text(descWrapped, 40, y);
-      y += descWrapped.length * 14 + 10;
+      writeLines(doc.splitTextToSize(dossier.description, 507) as string[], 14);
+      y += 6;
     }
-
     if (dossier.tags?.length) {
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Tag: ${dossier.tags.join(', ')}`, 40, y);
-      y += 20;
+      writeLines([`Tag: ${dossier.tags.join(' · ')}`], 13);
     }
+    doc.setTextColor(0);
+    doc.setDrawColor(190);
+    doc.line(margin, y + 4, 551, y + 4);
+    y += 22;
 
-    doc.setDrawColor(200);
-    doc.line(40, y, 555, y);
-    y += 20;
-
-    doc.setFont('helvetica', 'normal');
     dossier.items.forEach((item, idx) => {
-      if (y > 760) {
-        doc.addPage();
-        y = 50;
-      }
+      const title = item.type === 'norma'
+        ? `${idx + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
+        : `${idx + 1}. Nota personale`;
+      ensureSpace(32);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      const itemTitle = item.type === 'norma'
-        ? `${idx + 1}. ${item.data.tipo_atto} ${item.data.numero_atto || ''} - Art. ${item.data.numero_articolo}`
-        : `${idx + 1}. Nota`;
-      doc.text(itemTitle, 40, y);
-      y += 18;
-
-      doc.setFontSize(10);
+      doc.text(title, margin, y);
+      y += 17;
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      const content = item.type === 'norma'
-        ? (item.data.article_text || '').replace(/<[^>]+>/g, '').substring(0, 2000)
-        : item.data;
-      const wrapped = doc.splitTextToSize(content, 500);
-      wrapped.slice(0, 50).forEach((line: string) => {
-        if (y > 760) {
-          doc.addPage();
-          y = 50;
-        }
-        doc.text(line, 40, y);
-        y += 13;
-      });
-      y += 15;
+      const rawContent = item.type === 'norma'
+        ? String(item.data.article_text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        : String(item.data || '');
+      const content = rawContent || '(Nessun testo disponibile)';
+      writeLines(doc.splitTextToSize(content, 507) as string[], 12);
+      if (item.type === 'norma') {
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        writeLines([`Fonte: ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''}${item.data.data ? ` del ${item.data.data}` : ''}`], 11);
+        doc.setTextColor(0);
+      }
+      y += 12;
     });
 
+    footer();
     doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+  };
+
+  const handleCreateSnapshot = async () => {
+    setSnapshotBusy(true);
+    try {
+      const snapshot = await dossierService.createSnapshot(dossier.id, `Verifica ${new Date().toLocaleDateString('it-IT')}`);
+      setSnapshots(previous => [snapshot, ...previous.filter(item => item.id !== snapshot.id)]);
+      showToast(snapshot.unchanged ? 'Nessuna modifica: snapshot già aggiornato' : `Snapshot v${snapshot.version} salvato`, 'success');
+    } catch {
+      showToast('Impossibile salvare lo snapshot del dossier', 'error');
+    } finally {
+      setSnapshotBusy(false);
+    }
   };
 
   const handleUpdateDossier = (title: string, description: string, tags: string[]) => {
@@ -416,7 +466,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               </div>
             )}
             <div className="text-xs md:text-sm text-slate-400 mt-2">
-              Creato il {formatTimestampLong(dossier.createdAt)} • {dossier.items.length} elementi
+              Creato il {formatTimestampLong(dossier.createdAt)} • {dossier.items.length} elementi{snapshots.length > 0 ? ` • ${snapshots.length} snapshot` : ''}
             </div>
           </div>
 
@@ -518,6 +568,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
               ariaLabel="Esporta PDF"
               className="dossier-export"
             />
+            <button type="button" onClick={() => void handleCreateSnapshot()} disabled={snapshotBusy} className="rounded-lg border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/30">{snapshotBusy ? 'Salvo…' : 'Snapshot'}</button>
             <ToolbarButton
               color="purple"
               icon={FileJson}

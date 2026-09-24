@@ -48,6 +48,15 @@ export interface DossierItemUpdate {
   position?: number;
 }
 
+export interface DossierSnapshotApi {
+  id: string;
+  version: number;
+  label?: string | null;
+  createdAt: string;
+  fingerprint?: string | null;
+  unchanged?: boolean;
+}
+
 export const dossierService = {
   // Get all dossiers
   async getAll(): Promise<DossierApi[]> {
@@ -98,5 +107,15 @@ export const dossierService = {
   // Reorder dossier items
   async reorderItems(dossierId: string, itemIds: string[]): Promise<void> {
     await apiClient.post(`/dossiers/${dossierId}/reorder`, { itemIds });
+  },
+
+  async createSnapshot(dossierId: string, label?: string): Promise<DossierSnapshotApi> {
+    const response = await apiClient.post(`/dossiers/${dossierId}/snapshots`, { label });
+    return response.data;
+  },
+
+  async getSnapshots(dossierId: string): Promise<DossierSnapshotApi[]> {
+    const response = await apiClient.get(`/dossiers/${dossierId}/snapshots`);
+    return response.data;
   },
 };

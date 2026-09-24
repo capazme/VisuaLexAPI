@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
@@ -13,9 +13,10 @@ import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
 import { GlobalSearch } from '../features/search/GlobalSearch';
-import { CompareView } from '../features/compare/CompareView';
+const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
 import { useAuth } from '../../hooks/useAuth';
+import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -228,11 +229,16 @@ export function Layout() {
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
 
+      <ServiceHealthBanner />
+
       {/* Global Search (Cmd+F) */}
       <GlobalSearch isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
 
-      {/* Article Compare View */}
-      <CompareView />
+      {/* Heavy reader overlays are loaded only when their route/state needs them. */}
+      <Suspense fallback={null}>
+        {/* Article Compare View */}
+        <CompareView />
+      </Suspense>
     </div>
   );
 }

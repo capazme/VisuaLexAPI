@@ -9,7 +9,7 @@ import { TreeViewPanel } from './TreeViewPanel';
 import { AnnexSuggestion } from './AnnexSuggestion';
 import { ArticleNavigation } from '../workspace/ArticleNavigation';
 import { ArticleMinimap } from '../workspace/ArticleMinimap';
-import { StudyMode } from '../workspace/StudyMode';
+import { LazyStudyMode as StudyMode } from '../workspace/LazyStudyMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';

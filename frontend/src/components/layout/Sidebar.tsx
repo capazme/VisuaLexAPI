@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard } from 'lucide-react';
+import { BookOpen, Search, Folder, Clock, Moon, Sun, Settings, Sparkles, Globe, LogOut, Shield, Users, Keyboard, FileSearch } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -273,7 +273,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
         <NavItem to="/environments" icon={Globe} label="Ambienti" onClick={closeMobile} />
         <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
-        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} />
+        <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
+        <NavItem to="/history" icon={Clock} label="Cronologia" onClick={closeMobile} badgeCount={forumNotifications.normaChanges} />
       </nav>
 
       {/* System Actions */}
