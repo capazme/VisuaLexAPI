@@ -127,6 +127,9 @@ startup and the process refuses to boot without them. See
 | `ALLOWED_ORIGINS` | Comma-separated. Must list the production origin |
 | `PORT` / `NODE_ENV` | |
 | `REDIS_ENABLED` / `REDIS_URL` | With Redis off the rate limiter falls back to per-instance memory and logs a warning |
+| `NORMA_WATCH_ENABLED` | Default enabled; `"false"` or `"0"` turns the saved-norm background watcher off |
+| `NORMA_WATCH_INTERVAL_MS` | Default `21600000` (6 h), floored at `60000` (1 min) |
+| `LEGAL_API_URL` | Default `http://localhost:5000`. The Python API's **base** URL: the watcher appends `/fetch_article_text` itself |
 
 **Python API** — all optional, all with defaults:
 
@@ -140,6 +143,7 @@ startup and the process refuses to boot without them. See
 | `FETCH_QUEUE_WORKERS` / `FETCH_QUEUE_DELAY` | | |
 | `AKN_ENABLED` | `true` | Kill switch for the Akoma Ntoso path (article index + last-resort text fallback). Read at call time, so flipping it needs no code change |
 | `AKN_CACHE_MAX_ACTS` | `40` | Article indexes held in memory, a few tens of KB each. Texts are never cached |
+| `HEALTH_DETAILED_TTL` | `120` | Seconds `/health/detailed` caches its three live-source probes; concurrent cold callers share one probe via a lock. Read at call time |
 
 ---
 

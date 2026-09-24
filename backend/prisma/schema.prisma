@@ -25,6 +25,13 @@ model User {
   // Forum-notifications cursor: likes received with createdAt > this are "new".
   // Suggestions use the existing pending-status count, no cursor needed.
   notificationLastSeenAt DateTime? @map("notification_last_seen_at")
+  normaWatches           NormaWatch[]
+  normaNotifications    NormaChangeNotification[]
+  articleThreads        ArticleThread[]
+  articleComments       ArticleComment[]
+  threadVotes           ArticleThreadVote[]
+  commentVotes          ArticleCommentVote[]
+  threadReports         ArticleThreadReport[]
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
@@ -62,6 +69,41 @@ model User {
 // ============================================
 // FOLDER HIERARCHY
 // ============================================
+
+model NormaWatch {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  normaKey    String   @map("norma_key")
+  normaData   Json     @map("norma_data")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications NormaChangeNotification[]
+
+  @@unique([userId, normaKey])
+  @@index([userId])
+  @@map("norma_watches")
+}
+
+model NormaChangeNotification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  watchId   String    @map("watch_id")
+  normaKey  String    @map("norma_key")
+  message   String
+  snapshot  Json
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watch NormaWatch @relation(fields: [watchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([watchId])
+  @@map("norma_change_notifications")
+}
 
 model Folder {
   id          String   @id @default(uuid())
@@ -204,6 +246,7 @@ model Dossier {
   // Relationships
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items            DossierItem[]
+  snapshots        DossierSnapshot[]
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
   originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
@@ -215,6 +258,22 @@ enum DossierItemType {
   norm
   note
   section
+}
+
+model DossierSnapshot {
+  id          String   @id @default(uuid())
+  dossierId   String   @map("dossier_id")
+  version     Int
+  label       String?
+  content     Json
+  fingerprint String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@unique([dossierId, version])
+  @@index([dossierId, createdAt])
+  @@map("dossier_snapshots")
 }
 
 model DossierItem {
@@ -231,6 +290,99 @@ model DossierItem {
 
   @@index([dossierId])
   @@map("dossier_items")
+}
+
+// ============================================
+// ARTICLE DISCUSSIONS
+// ============================================
+
+model ArticleThread {
+  id          String   @id @default(uuid())
+  normaKey    String   @map("norma_key")
+  articleId   String   @map("article_id")
+  articleLabel String? @map("article_label")
+  version     String?
+  title       String
+  body        String
+  userId      String   @map("user_id")
+  isHidden    Boolean  @default(false) @map("is_hidden")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments   ArticleComment[]
+  votes      ArticleThreadVote[]
+  reports    ArticleThreadReport[]
+
+  @@index([normaKey, articleId, createdAt])
+  @@index([userId])
+  @@map("article_threads")
+}
+
+model ArticleComment {
+  id        String   @id @default(uuid())
+  threadId  String   @map("thread_id")
+  parentId  String?  @map("parent_id")
+  body      String
+  userId    String   @map("user_id")
+  isHidden  Boolean  @default(false) @map("is_hidden")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  thread   ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  parent   ArticleComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  children ArticleComment[] @relation("CommentReplies")
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes    ArticleCommentVote[]
+
+  @@index([threadId, createdAt])
+  @@index([parentId])
+  @@map("article_comments")
+}
+
+model ArticleThreadVote {
+  id        String   @id @default(uuid())
+  threadId  String   @map("thread_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+  @@map("article_thread_votes")
+}
+
+model ArticleCommentVote {
+  id        String   @id @default(uuid())
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  comment ArticleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId])
+  @@map("article_comment_votes")
+}
+
+model ArticleThreadReport {
+  id        String   @id @default(uuid())
+  threadId  String   @map("thread_id")
+  userId    String   @map("user_id")
+  reason    String
+  details   String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([status])
+  @@map("article_thread_reports")
 }
 
 // ============================================

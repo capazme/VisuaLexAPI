@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Prisma, PrismaClient, DossierItemType } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 
@@ -328,6 +329,41 @@ export const deleteDossierItem = async (req: Request, res: Response) => {
 /**
  * Reorder dossier items
  */
+const createSnapshotSchema = z.object({
+  label: z.string().trim().max(200).nullish(),
+});
+
+export const createDossierSnapshot = async (req: Request, res: Response) => {
+  const { label } = createSnapshotSchema.parse(req.body ?? {});
+  const dossier = await prisma.dossier.findFirst({
+    where: { id: req.params.id, userId: req.user!.id },
+    include: { items: { orderBy: { position: 'asc' } } },
+  });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+
+  const last = await prisma.dossierSnapshot.findFirst({ where: { dossierId: dossier.id }, orderBy: { version: 'desc' } });
+  const content = {
+    dossier: { name: dossier.name, description: dossier.description, tags: dossier.tags },
+    items: dossier.items.map(item => ({ id: item.id, itemType: item.itemType, title: item.title, content: item.content, position: item.position })),
+  };
+  const fingerprint = createHash('sha256').update(JSON.stringify(content)).digest('hex');
+  if (last?.fingerprint === fingerprint) {
+    res.json({ id: last.id, version: last.version, createdAt: last.createdAt, fingerprint, unchanged: true });
+    return;
+  }
+  const snapshot = await prisma.dossierSnapshot.create({
+    data: { dossierId: dossier.id, version: (last?.version ?? 0) + 1, content, fingerprint, label: label || null },
+  });
+  res.status(201).json({ id: snapshot.id, version: snapshot.version, label: snapshot.label, createdAt: snapshot.createdAt, fingerprint: snapshot.fingerprint, unchanged: false });
+};
+
+export const listDossierSnapshots = async (req: Request, res: Response) => {
+  const dossier = await prisma.dossier.findFirst({ where: { id: req.params.id, userId: req.user!.id }, select: { id: true } });
+  if (!dossier) throw new AppError(404, 'Dossier not found');
+  const snapshots = await prisma.dossierSnapshot.findMany({ where: { dossierId: dossier.id }, orderBy: { version: 'desc' }, take: 50 });
+  res.json(snapshots);
+};
+
 export const reorderDossierItems = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { itemIds } = req.body as { itemIds: string[] };

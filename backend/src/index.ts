@@ -1,7 +1,9 @@
 import { config } from './config';
 import app from './app';
+import { startNormaWatcher } from './utils/normaWatcher';
 
 app.listen(config.port, () => {
+  startNormaWatcher();
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
