@@ -101,6 +101,15 @@ brocardi_scraper = BrocardiScraper()
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
 
+# /health/detailed probes three live sources on the shared throttled client and
+# circuit breakers; the frontend banner polls it, so N open tabs multiply that
+# load. One cached result is shared by every caller for HEALTH_DETAILED_TTL
+# seconds, with a lock so concurrent cold callers trigger a single probe
+# instead of one each. Module-level (like the scrapers above): there is one
+# NormaController instance in the running process.
+_health_detailed_cache: dict = {'response': None, 'status_code': None, 'expires_at': 0.0}
+_health_detailed_lock = asyncio.Lock()
+
 
 class RateLimitedTaskQueue:
     def __init__(self, workers: int, spacing: float) -> None:
@@ -1327,66 +1336,101 @@ class NormaController:
         })
 
     async def health_detailed(self):
-        """Detailed health check - tests connectivity to external sources."""
+        """Detailed health check - tests connectivity to external sources.
+
+        Cached for HEALTH_DETAILED_TTL seconds (read at call time, like
+        AKN_ENABLED) so the frontend's polling banner does not multiply the
+        three live probes by every open tab. A failing probe is cached too,
+        so a flapping source does not get hammered by repeated callers.
+        """
         from datetime import datetime
         import time as time_module
 
-        results = {
-            'status': 'ok',
-            'timestamp': datetime.utcnow().isoformat(),
-            'services': {}
-        }
+        ttl = float(os.getenv('HEALTH_DETAILED_TTL', '120'))
+        now = time_module.time()
 
-        # Test Normattiva (fetch homepage with timeout)
-        try:
-            start = time_module.time()
-            await normattiva_scraper.request_document("https://www.normattiva.it", source="health_check")
-            latency = time_module.time() - start
-            results['services']['normattiva'] = {
+        if _health_detailed_cache['response'] is not None and now < _health_detailed_cache['expires_at']:
+            cached = dict(_health_detailed_cache['response'])
+            cached['cached'] = True
+            cached['cache_ttl_seconds'] = ttl
+            return jsonify(cached), _health_detailed_cache['status_code']
+
+        async with _health_detailed_lock:
+            # Re-check: a concurrent caller may have already run the probe
+            # while this one waited for the lock.
+            now = time_module.time()
+            if _health_detailed_cache['response'] is not None and now < _health_detailed_cache['expires_at']:
+                cached = dict(_health_detailed_cache['response'])
+                cached['cached'] = True
+                cached['cache_ttl_seconds'] = ttl
+                return jsonify(cached), _health_detailed_cache['status_code']
+
+            results = {
                 'status': 'ok',
-                'latency_ms': round(latency * 1000, 2)
+                'timestamp': datetime.utcnow().isoformat(),
+                'services': {}
             }
-        except Exception as e:
-            results['services']['normattiva'] = {
-                'status': 'error',
-                'error': str(e)
-            }
-            results['status'] = 'degraded'
 
-        # Test EUR-Lex (fetch homepage with timeout)
-        try:
-            start = time_module.time()
-            await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
-            latency = time_module.time() - start
-            results['services']['eurlex'] = {
-                'status': 'ok',
-                'latency_ms': round(latency * 1000, 2)
-            }
-        except Exception as e:
-            results['services']['eurlex'] = {
-                'status': 'error',
-                'error': str(e)
-            }
-            results['status'] = 'degraded'
+            # Test Normattiva (fetch homepage with timeout)
+            try:
+                start = time_module.time()
+                await normattiva_scraper.request_document("https://www.normattiva.it", source="health_check")
+                latency = time_module.time() - start
+                results['services']['normattiva'] = {
+                    'status': 'ok',
+                    'latency_ms': round(latency * 1000, 2)
+                }
+            except Exception as e:
+                results['services']['normattiva'] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                results['status'] = 'degraded'
 
-        # Test Brocardi (fetch homepage with timeout)
-        try:
-            start = time_module.time()
-            await brocardi_scraper.request_document("https://www.brocardi.it", source="health_check")
-            latency = time_module.time() - start
-            results['services']['brocardi'] = {
-                'status': 'ok',
-                'latency_ms': round(latency * 1000, 2)
-            }
-        except Exception as e:
-            results['services']['brocardi'] = {
-                'status': 'error',
-                'error': str(e)
-            }
-            results['status'] = 'degraded'
+            # Test EUR-Lex (fetch homepage with timeout)
+            try:
+                start = time_module.time()
+                await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
+                latency = time_module.time() - start
+                results['services']['eurlex'] = {
+                    'status': 'ok',
+                    'latency_ms': round(latency * 1000, 2)
+                }
+            except Exception as e:
+                results['services']['eurlex'] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                results['status'] = 'degraded'
 
-        status_code = 200 if results['status'] == 'ok' else 503
-        return jsonify(results), status_code
+            # Test Brocardi (fetch homepage with timeout)
+            try:
+                start = time_module.time()
+                await brocardi_scraper.request_document("https://www.brocardi.it", source="health_check")
+                latency = time_module.time() - start
+                results['services']['brocardi'] = {
+                    'status': 'ok',
+                    'latency_ms': round(latency * 1000, 2)
+                }
+            except Exception as e:
+                results['services']['brocardi'] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                results['status'] = 'degraded'
+
+            status_code = 200 if results['status'] == 'ok' else 503
+
+            _health_detailed_cache['response'] = results
+            _health_detailed_cache['status_code'] = status_code
+            # From the end of the probe: measured from its start, a slow probe
+            # (up to ~30 s across three sources) ate into the TTL.
+            _health_detailed_cache['expires_at'] = time_module.time() + max(ttl, 0)
+
+            payload = dict(results)
+            payload['cached'] = False
+            payload['cache_ttl_seconds'] = ttl
+            return jsonify(payload), status_code
 
     async def get_version(self):
         """Returns version info, latest git commit details, and changelog."""
