@@ -118,6 +118,11 @@ is `git checkout v1.7.5` plus a re-run with `--allow-branch`, because a tag
 checkout is a detached HEAD and the step-0 guard refuses it (the known gaps
 in `docs/deployment.md` still apply — migrations do not walk backwards).
 
+One tag breaks the "sits on `main`" rule: `v1.7.6` names the server's own
+bump commit, tagged by hand after the script that should have tagged it ran
+its previous version (the known gap in `docs/deployment.md`). `git describe`
+on `main` skips it and answers from `v1.7.7`.
+
 Deploys without a bump (`./deploy.sh` alone) are re-deploys of the current
 version and leave no tag. Use them for a restart, not for shipping a change —
 the `--allow-branch` emergency under Hotfixes is the one exception, and it is

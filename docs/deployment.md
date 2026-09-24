@@ -261,3 +261,12 @@ Recorded rather than fixed, so nobody rediscovers them during an incident.
   deploy without anyone choosing it.
 - **No rollback.** Recovery means checking out the previous `vX.Y.Z` tag and
   re-running the script — and `prisma migrate deploy` does not walk migrations backwards.
+- **A deploy that pulls a new `deploy.sh` finishes on the OLD one.** Bash
+  reads the script as it runs, so the text step 1 pulls in is not what steps
+  2-8 execute. The v1.7.6 deploy (25 September 2026) pulled the tag-and-push
+  version of step 7 and ran the previous one: the bump commit was neither
+  tagged nor pushed, and `v1.7.6` was tagged afterwards from a laptop, on the
+  server's own commit, and pushed on its own — which is why that tag sits
+  beside `main` rather than on it. Until the script re-executes itself from a
+  copy (an `exec` on a temp file at the top), after any deploy that changed
+  `deploy.sh` check `git tag -l 'v*'` on the server and finish step 7 by hand.
