@@ -22,6 +22,33 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("norma.log"),
                               logging.StreamHandler()])
 
+# The single-article grammar, matched AFTER the range test so "473-bis.1" is
+# one article and "3-5" a range. Normattiva's own index lists every one of
+# these shapes (live trees, 2026-09-19 — 156 numbers in 12 acts):
+#   - an ordinal chain with an optional dotted sub-number: "2-bis",
+#     "25-quinquiesdecies", "135-sex-decies", "270-bis.1", "70.1";
+#   - a slash number: "314/2" … "314/28" (c.c., the repealed adozione speciale).
+# The ordinal tokens are "any alphabetic word" on purpose (see
+# tests/test_article_suffixes.py): the validator never enumerated the table
+# and the compound spellings ("sex decies", "vicies semel") are not in it.
+_SINGLE_ARTICLE_RE = re.compile(r'^\d+(?:-[a-z]+)*(?:\.\d+)?$')
+_SLASH_ARTICLE_RE = re.compile(r'^\d+/\d+$')
+
+
+def _canonicalise_article_token(part):
+    """Spell one article the way the URN generator and the tree key expect.
+
+    "2 bis" -> "2-bis", "270 bis.1" -> "270-bis.1", "135 sex decies" ->
+    "135-sex-decies", and "171 octies 1" / "171-octies-1" -> "171-octies.1":
+    a bare digit after an ordinal is a dotted sub-number — probed live,
+    ~art171octies1 makes Normattiva answer Art. 1, ~art171octies.1 the real
+    article. Ranges are untouched: "3-5" has no letter before its digit.
+    """
+    part = re.sub(r'(?<=[0-9a-z])\s+(?=[a-z])', '-', part, flags=re.IGNORECASE)
+    part = re.sub(r'(?<=[a-z])[\s-]+(?=\d+$)', '.', part, flags=re.IGNORECASE)
+    return part
+
+
 async def parse_article_input(article_string, normurn):
     """
     Pulisce e valida la stringa degli articoli, supporta range e articoli separati da virgole.
@@ -58,8 +85,9 @@ async def parse_article_input(article_string, normurn):
         part = part.strip()
         logging.debug(f"Processing part: {part}")
 
-        # Converti "2 bis" in "2-bis" per gestire correttamente le estensioni
-        part = re.sub(r'(\d+)\s+([a-z]+)', r'\1-\2', part, flags=re.IGNORECASE)
+        # Converti "2 bis" in "2-bis", "135 sex decies" in "135-sex-decies",
+        # "171 octies 1" in "171-octies.1" per gestire correttamente le estensioni
+        part = _canonicalise_article_token(part)
         logging.debug(f"Normalized part: {part}")
 
         # Regex per verificare se la parte è un range (numero-numero)
@@ -92,7 +120,7 @@ async def parse_article_input(article_string, normurn):
                         article_num = int(article_number_match.group(1))
                         if start <= article_num <= end:
                             logging.debug(f"Adding article from range: {article_str}")
-                            articles.append(article_str)
+                            articles.append(_canonicalise_article_token(article_str).lower())
 
             except Exception as e:
                 error_message = f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}"
@@ -100,9 +128,11 @@ async def parse_article_input(article_string, normurn):
                 return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
 
         else:
-            # Regex per verificare se la parte è un articolo con estensione (es. 1-bis, 2-ter)
-            single_article_match = re.match(r'^(\d+(-[a-z]+)?)$', part, re.IGNORECASE)
-            if single_article_match:
+            # Articolo singolo: catena di ordinali con eventuale sotto-numero
+            # (1-bis, 270-bis.1, 135-sex-decies, 70.1) oppure numero con barra
+            # (314/2). I suffissi sono resi minuscoli: la URN è "art2bis".
+            part = part.lower()
+            if _SINGLE_ARTICLE_RE.match(part) or _SLASH_ARTICLE_RE.match(part):
                 logging.debug(f"Found single article: {part}")
                 # Aggiungi l'articolo direttamente senza chiamare get_tree
                 articles.append(part)  # Aggiungiamo l'articolo, supponendo che la validità venga gestita successivamente

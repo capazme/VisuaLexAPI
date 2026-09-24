@@ -75,7 +75,8 @@ async def complete_date(act_type: str, date: str, act_number: str) -> str:
         if context:
             await context.close()
 
-def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None, version_date=None, urn_flag=True):
+def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None,
+                 version_date=None, urn_flag=True, celex_consolidated=None):
     """
     Generates the URN for a legal norm.
 
@@ -88,6 +89,7 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     version -- Version of the act (optional)
     version_date -- Date of the version (optional)
     urn_flag -- Boolean flag to include full URN or not
+    celex_consolidated -- Sector-0 CELEX of a consolidated EU version (optional, EU acts only)
 
     Returns:
     str -- The generated URN
@@ -96,17 +98,22 @@ def generate_urn(act_type, date=None, act_number=None, article=None, annex=None,
     base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
     normalized_act_type = normalize_act_type(act_type)
     
-    # Check if 'article' is a valid string before attempting to split it
+    # Check if 'article' is a valid string before attempting to split it.
+    # Every token after the number is the extension, joined: "270-bis.1" ->
+    # "270" + "bis.1" (~art270bis.1) and "135-sex-decies" -> "135" +
+    # "sexdecies" (~art135sexdecies). Unpacking parts[1] alone broke on the
+    # compound ordinals. "314/2" has no dash and stays whole (~art314/2).
     extension = None
     if article and '-' in article:
         parts = article.split('-')
         article = parts[0]
-        extension = parts[1]
+        extension = ''.join(parts[1:]) or None
     
     # Handle EURLEX cases (check before replacing spaces with dots)
     if normalized_act_type.lower() in EURLEX:
         eurlex_scraper = EurlexScraper()
-        return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number)
+        return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number,
+                                      celex_consolidated=celex_consolidated)
 
     # Handle special codes (codice civile, codice penale, etc.)
     # IMPORTANT: Check BEFORE replacing spaces with dots, as the codici table uses spaces
@@ -212,7 +219,8 @@ def append_article_info(urn, article, extension):
     """
     if article:
         if "-" in article:
-            article, extension = article.split("-")
+            parts = article.split("-")
+            article, extension = parts[0], ''.join(parts[1:]) or extension
         article = re.sub(r'\b[Aa]rticoli?\b|\b[Aa]rt\.?\b', "", article).strip()
         urn += f"~art{article}"
         if extension:

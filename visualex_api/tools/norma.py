@@ -18,6 +18,10 @@ class Norma:
     data: str = None
     numero_atto: str = None
     tipo_atto_reale: str = None  # Real act type when tipo_atto is an alias (e.g., "codice civile" -> "regio decreto")
+    # Sector-0 CELEX of a consolidated EU version ("02002L0058-20091219").
+    # EU acts only; when set, `url` points at that version instead of the OJ
+    # page, and so does every NormaVisitata built on this Norma.
+    celex_consolidated: str = None
     _url: str = None
     _tree: any = field(default=None, repr=False)
 
@@ -45,7 +49,8 @@ class Norma:
                 act_type=self.tipo_atto_urn,
                 date=self.data,
                 act_number=self.numero_atto,
-                urn_flag=False
+                urn_flag=False,
+                celex_consolidated=self.celex_consolidated,
             )
         return self._url
 
@@ -63,6 +68,10 @@ class Norma:
             parts.append(f"{self.data},")
         if self.numero_atto:
             parts.append(f"n. {self.numero_atto}")
+        if self.celex_consolidated:
+            # "Articolo N non presente in …" must name the version it looked
+            # in: the OJ text and a consolidation do not have the same articles.
+            parts.append(f"(consolidato {self.celex_consolidated})")
         return " ".join(parts)
 
     def to_dict(self):
@@ -75,6 +84,8 @@ class Norma:
         # Include tipo_atto_reale only when it's an alias (e.g., "codice civile" -> "regio decreto")
         if self.tipo_atto_reale:
             result['tipo_atto_reale'] = self.tipo_atto_reale
+        if self.celex_consolidated:
+            result['celex_consolidated'] = self.celex_consolidated
         return result
 
 @dataclass(eq=False)
@@ -88,7 +99,9 @@ class NormaVisitata:
     #timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def __hash__(self):
-        return hash((self.norma.tipo_atto_urn, self.norma.data, self.norma.numero_atto, self.numero_articolo, self.versione, self.data_versione))
+        return hash((self.norma.tipo_atto_urn, self.norma.data, self.norma.numero_atto,
+                     self.norma.celex_consolidated, self.numero_articolo, self.versione,
+                     self.data_versione))
 
     def __eq__(self, other):
         if not isinstance(other, NormaVisitata):
@@ -96,6 +109,7 @@ class NormaVisitata:
         return (self.norma.tipo_atto_urn == other.norma.tipo_atto_urn and
                 self.norma.data == other.norma.data and
                 self.norma.numero_atto == other.norma.numero_atto and
+                self.norma.celex_consolidated == other.norma.celex_consolidated and
                 self.numero_articolo == other.numero_articolo and
                 self.versione == other.versione and
                 self.data_versione == other.data_versione and self.allegato == other.allegato)
@@ -115,7 +129,8 @@ class NormaVisitata:
                 annex = self.allegato,
                 article=self.numero_articolo,
                 version=self.versione,
-                version_date=self.data_versione
+                version_date=self.data_versione,
+                celex_consolidated=self.norma.celex_consolidated,
             )
         return self._urn
 
@@ -144,6 +159,7 @@ class NormaVisitata:
             tipo_atto=data['tipo_atto'],
             data=data.get('data'),
             numero_atto=data.get('numero_atto'),
+            celex_consolidated=data.get('celex_consolidated'),
             _url=data.get('url'),
             _tree=data.get('tree')
         )

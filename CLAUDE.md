@@ -90,6 +90,17 @@ plus a weekly `pip-audit` / `npm audit`. That is the only automated check in the
 project: `deploy.sh` consults nothing, runs no test and has no rollback, so a red
 `main` still deploys.
 
+## Archivio normativo (`archivio_normativo/`)
+
+A CLI that builds a local archive of the acts in `archivio_normativo/manifest.yaml`
+through this API: `python -m archivio_normativo build [--dry-run] [--only …]
+[--enrich …]`. One SQLite record per article/recital plus one Markdown per act,
+in `archivio_out/` (gitignored). Update runs refetch only the articles whose AKN
+fingerprint moved. Text and structure come from VisuaLex; case law and authority
+practice from the `legal-it` MCP server (optional, `requirements-archivio.txt`).
+Spec: `docs/superpowers/specs/2026-09-19-archivio-normativo-design.md`; how to
+run: `archivio_normativo/README.md`. Tests: `tests/archivio/`.
+
 ## Architecture
 
 ### Python API (`/visualex_api`)
@@ -114,8 +125,18 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     Only the article INDEX is cached — in memory, capped at
     `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
     in-flight registry so N concurrent cold requests download the act once.
-    Article texts are never cached. `AKN_ENABLED=false` disables the whole path
-    and is read at call time.
+    Article texts are never cached. `ParsedPart.dates` carries each article's
+    FRBRWork date (component acts only), and `AktIndex.fingerprints` a sha256
+    per article — both are metadata about the text, not the text. The hash
+    is of the RENDERED AKN text (the markdown `akn_parser` produces,
+    AGGIORNAMENTO blocks included), so a renderer change moves every hash — a
+    harmless full refetch. The top-level map covers the dominant part only;
+    an annex such as the preleggi or the disposizioni di attuazione must be
+    read from `parts_fingerprints` (served as `parts` by
+    `/fetch_act_fingerprints`), which is kept apart from `parts_detail` so
+    the hashes do not ride along on every `/fetch_rubriche` answer. With
+    the fingerprints a codice's in-memory index is a few hundred KB.
+    `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
     article numbers and needs no network.
 - **`tools/`**:
@@ -240,6 +261,19 @@ POST unless noted, JSON bodies.
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index. Structure only: it never carries the display text
+- `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
+  `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
+  Reads the OJ page the tree already uses; a consolidated text has no
+  preamble and answers an empty list. Normattiva acts get a 400
+- `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
+  AKN text plus, for the codici, the FRBRWork date of each article (the day
+  its current text came into force). `urn` is the act's full URL as
+  `norma_data.url` gives it (`https://www.normattiva.it/uri-res/N2Ls?urn:nir:…`),
+  not a bare `urn:nir:` string; an article suffix (`~art2`) is stripped. A
+  change detector, never the text: a client refetches only the articles
+  whose hash moved. `available: false` with empty maps when there is no AKN
+  index, or an index without fingerprints — the caller must then refetch
+  everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
@@ -260,7 +294,8 @@ error page instead of NDJSON.
   "article": "2043",             // required: single, list "1,2", or range "3-5"
   "version": "vigente",          // optional: "vigente" | "originale"
   "version_date": "2024-01-15",  // optional
-  "annex": "A"                   // optional (allegato)
+  "annex": "A",                  // optional (allegato)
+  "celex_consolidated": "02002L0058-20091219"  // optional, EU acts only: serve this consolidated version
 }
 ```
 
@@ -298,6 +333,13 @@ to the cached or synthetic value.
 1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
    EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
    state law, Brocardi for annotations on Normattiva sources.
+   EU acts come from the Official Journal page unless the request names a
+   `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
+   tree, rubriche and article text are read from that consolidated page,
+   whose markup is different (`title-article-norm`, `modref` markers) and
+   handled by its own branch in `eurlex_scraper.py` / `treextractor.py`.
+   Consolidated texts carry no preamble — recitals always come from the OJ
+   page of the base act.
 2. **Parallel fetching** via `asyncio.gather()`.
 3. **Streaming**: `/stream_article_text` uses a Quart `Response` generator.
 4. **Browsers**: always through the `PlaywrightManager` singleton.
@@ -619,8 +661,9 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
 `AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
-call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory,
-a few tens of KB each). Template in `.env.example`.
+call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
+a few tens of KB for an ordinary act, a few hundred KB for a codice because of
+the per-article fingerprints). Template in `.env.example`.
 
 Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
 parser uses; it ships a `cp314` wheel, so `deploy.sh` needs no compiler.
@@ -704,7 +747,10 @@ meant to stay split; add new features as new files, not inside the shells:
    `decies` ("2409 octiesdecies" c.c.). On the frontend the tolerant
    `findArticleByNormalizedId` is still required: a naive `===` silently misses
    and falls back to the first article. Always use it, then canonicalise with
-   `getUniqueArticleId(match)` before storing in state.
+   `getUniqueArticleId(match)` before storing in state. The accepted forms now
+   include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
+   (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
+   normaliser and the archive (`archivio_normativo/hierarchy.py`).
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.

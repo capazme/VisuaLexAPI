@@ -22,6 +22,7 @@ the HTML path, which is the primary source.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -73,6 +74,17 @@ class AktIndex:
     # code body's titles. The caller matches a part to an annex by comparing
     # `keys` against the annex's article numbers.
     parts_detail: list[dict] = field(default_factory=list)
+    # Article key -> {"fingerprint": sha256 of the AKN article text, "date":
+    # the article's FRBRWork date or None}, dominant part. The AKN text is
+    # never served (it transliterates accents), but its hash tells a client
+    # which articles changed since it last looked — one act-level download
+    # instead of one request per article. ~200 KB for the codice civile.
+    fingerprints: dict[str, dict] = field(default_factory=dict)
+    # Part name -> the same map, one per annex. Kept apart from `parts_detail`
+    # on purpose: /fetch_rubriche returns `parts_detail` verbatim on every
+    # index open, and the hashes rode along at +114 B per article — some
+    # 340 KB the frontend never read. Only /fetch_act_fingerprints reads this.
+    parts_fingerprints: dict[str, dict[str, dict]] = field(default_factory=dict)
 
 
 def akn_disabled() -> bool:
@@ -112,6 +124,16 @@ def _extract_params(html: str) -> tuple[str, str] | None:
     return None
 
 
+def _fingerprints(articles: dict[str, str], dates: dict[str, str]) -> dict[str, dict]:
+    return {
+        key: {
+            "fingerprint": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "date": dates.get(key),
+        }
+        for key, text in articles.items()
+    }
+
+
 def _to_index(act, codice: str, data_gu: str) -> AktIndex:
     return AktIndex(
         title=act.title,
@@ -131,6 +153,11 @@ def _to_index(act, codice: str, data_gu: str) -> AktIndex:
             }
             for name, part in act.parts.items()
         ],
+        fingerprints=_fingerprints(act.articles, act.dates),
+        parts_fingerprints={
+            name: _fingerprints(part.articles, part.dates)
+            for name, part in act.parts.items()
+        },
     )
 
 

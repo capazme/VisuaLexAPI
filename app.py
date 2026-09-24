@@ -333,6 +333,8 @@ class NormaController:
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
+        self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
+        self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
@@ -381,6 +383,14 @@ class NormaController:
         act_number = data.get('act_number')
         norma_date = data.get('date')
 
+        # A consolidated EU version. Validated here so a Normattiva request
+        # carrying the field fails loudly instead of being silently ignored.
+        celex_consolidated = data.get('celex_consolidated') or None
+        if celex_consolidated and normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+            raise ValidationError(
+                "celex_consolidated vale solo per atti EUR-Lex (regolamento ue, direttiva ue)"
+            )
+
         # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
         codice_details = extract_codice_details(act_type) if act_type else None
         tipo_atto_reale = None
@@ -409,7 +419,8 @@ class NormaController:
             tipo_atto=act_type,
             data=norma_date if norma_date else None,
             numero_atto=act_number,
-            tipo_atto_reale=tipo_atto_reale
+            tipo_atto_reale=tipo_atto_reale,
+            celex_consolidated=celex_consolidated
         )
         log.info("Norma instance created", norma=norma)
 
@@ -910,6 +921,97 @@ class NormaController:
             # Never fail the index over its decoration.
             log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
             return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
+
+    async def fetch_recitals(self):
+        """All the considerando of an EU act, in one call.
+
+        A separate endpoint rather than a flag on /stream_article_text: a
+        recital is not an article — no URN, no annex, no Brocardi — and the
+        archive that consumes this wants the whole preamble at once. The
+        page is the one the tree and the articles already come from, cached
+        for 24 h, so the call costs one parse and no network on a warm cache.
+        Consolidated texts have no preamble; they answer an empty list.
+        """
+        try:
+            data = await request.get_json() or {}
+            act_type = data.get('act_type')
+            if not act_type:
+                raise ValidationError("Campo obbligatorio mancante: act_type")
+            if normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+                raise ValidationError(
+                    "fetch_recitals accetta solo atti EUR-Lex (regolamento ue, direttiva ue)"
+                )
+            # Validate before building the Norma: the EUR-Lex URL is built
+            # from these two fields, and a missing or malformed one used to
+            # send Playwright to ".../reg/None/None/oj/ita" (or raise a
+            # ValueError out of Norma.__post_init__ into a 500) to discover
+            # what a regex tells for free.
+            # ASCII digits: `\d` alone accepts other scripts' digits, which
+            # do not belong in a URL.
+            act_number = str(data.get('act_number') or '').strip()
+            if not re.fullmatch(r'\d+', act_number, re.ASCII):
+                raise ValidationError(
+                    "Campo act_number mancante o non valido: atteso il numero dell'atto (es. 679)"
+                )
+            date = str(data.get('date') or '').strip()
+            if not re.fullmatch(r'\d{4}(-\d{2}-\d{2})?', date, re.ASCII):
+                raise ValidationError(
+                    "Campo date mancante o non valido: atteso l'anno (es. 2016) o una data AAAA-MM-GG"
+                )
+            norma = Norma(tipo_atto=act_type, data=date, numero_atto=act_number)
+            recitals, url = await eurlex_scraper.get_recitals(norma)
+            return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_recitals')
+
+    async def fetch_act_fingerprints(self):
+        """Per-article change detectors for a Normattiva act.
+
+        One download of the act's AKN export yields a hash of every article's
+        text and, for the codici, the date each article's text came into
+        force. A client that stored the hashes last time can tell which
+        articles to refetch without touching the others — the archive's
+        update run drops from hours to minutes on this.
+
+        The AKN text itself is never served (it transliterates accents; see
+        akn_parser.py). Two answers are deliberately different: no index
+        (AKN disabled or unavailable) is `available: false` with empty maps
+        and 200, so the caller falls back to a full fetch; a crash is a 500,
+        so it is never read as "nothing changed". An index WITHOUT
+        fingerprints gets the first answer too: one written to the persistent
+        cache before this field existed rehydrates with an empty map, and a
+        real index always carries at least one fingerprint — `available:
+        true` over an empty map would read as "every article vanished".
+        """
+        try:
+            data = await request.get_json() or {}
+            urn = data.get('urn')
+            if not urn:
+                raise ValidationError("Missing 'urn' in request data")
+            if 'eur-lex' in str(urn):
+                raise ValidationError(
+                    "fetch_act_fingerprints accetta solo atti Normattiva: EUR-Lex non ha un export AKN"
+                )
+            # The AKN index keys off the ACT, so an article suffix has to go:
+            # ...;241~art2 -> ...;241 (same rule as fetch_rubriche).
+            act_url = str(urn).split('~')[0]
+            index = await fetch_act_index(SimpleNamespace(url=act_url))
+            if index is None or not index.fingerprints:
+                log.info("No AKN fingerprints available", urn=act_url[:100],
+                         reason="no index" if index is None else "index without fingerprints")
+                return jsonify({'available': False, 'fingerprints': {}, 'parts': [], 'count': 0})
+            log.info("Fingerprints served", urn=act_url[:100], count=len(index.fingerprints))
+            return jsonify({
+                'available': True,
+                'fingerprints': index.fingerprints,
+                'parts': [
+                    {'name': name, 'fingerprints': fingerprints}
+                    for name, fingerprints in index.parts_fingerprints.items()
+                ],
+                'count': len(index.fingerprints),
+            })
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_act_fingerprints')
 
     async def fetch_alias_catalog(self):
         """Everything this server already recognises when naming an act.

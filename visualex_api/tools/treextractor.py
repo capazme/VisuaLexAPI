@@ -8,6 +8,7 @@ from aiocache.serializers import JsonSerializer
 from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
+from ..services.akn_parser import normalize_article_key
 
 # Configurazione del logging
 logging.basicConfig(level=logging.INFO,
@@ -376,8 +377,16 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     """
     logging.info(f"Generating article URL for article_number: {article_number}, attachment_number: {attachment_number} based on normurn: {normurn}")
 
-    # Normalize article_number: rimuovi spazi e trattini, converti in minuscolo
-    article_number = article_number.lower().replace(' ', '').replace('-', '')
+    # Normalize article_number: rimuovi spazi e trattini, converti in minuscolo.
+    # "270 bis.1" -> art270bis.1, "19-bis.1" -> art19bis.1, "314/2" -> art314/2,
+    # "135 sex decies" -> art135sexdecies. A bare digit after an ordinal is a
+    # dotted sub-number in Normattiva's URN grammar: "171 octies 1" (l.
+    # 633/1941) is ~art171octies.1 — ~art171octies1, which this used to build,
+    # makes Normattiva answer Art. 1 (gotcha 24). Same rule as
+    # text_op._canonicalise_article_token.
+    article_number = article_number.lower()
+    article_number = re.sub(r'(?<=[a-z])[\s-]+(?=\d+$)', '.', article_number)
+    article_number = article_number.replace(' ', '').replace('-', '')
 
     # Regex per identificare i suffissi di versione e di articolo
     split_pattern = re.compile(r'([~@!])')
@@ -425,6 +434,12 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 
     # Estrai anno e numero dall'URL per generare link ELI
     eli_info = _extract_eli_info(normurn)
+
+    if soup.find("p", class_="title-article-norm"):
+        result, count_articles = _walk_consolidated_tree(soup, normurn, link, details, eli_info)
+        rubriche = _extract_eurlex_rubriche(soup)
+        logging.info(f"Consolidated EUR-Lex tree: {count_articles} articles, {len(rubriche)} rubriche")
+        return result, count_articles, {"rubriche": rubriche}
 
     # Pattern per identificare strutture gerarchiche
     title_pattern = re.compile(r'^(TITOLO|TITLE)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
@@ -515,6 +530,95 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 _EURLEX_ARTICLE_NUM = re.compile(r"^(?:Articolo|Article)\s+([\w.-]+)", re.IGNORECASE)
 
 
+# EUR-Lex marks amended passages inline as well as with block markers:
+# "►M2 … ◄" (amending act), "►C2 … ◄" (corrigendum), "►B" (base act), and
+# "▼M2" / "▼B" at the head of a replaced block. The glyphs are never part of
+# the legal text.
+_AMENDMENT_MARK = re.compile(r"\s*[►◄▼](?:[A-Z]\d*)?\s*")
+
+
+def strip_amendment_markers(text: str) -> str:
+    """Drop inline "►M2 … ◄" / "▼M2" markers and collapse the whitespace they leave."""
+    return re.sub(r"[ \t\xa0]+", " ", _AMENDMENT_MARK.sub(" ", text or "")).strip()
+
+
+def _next_non_modref_sibling(element):
+    """The next sibling that is not a `modref` marker.
+
+    EUR-Lex drops a "▼M2" / "▼B" paragraph before every block an amendment
+    touched, so the element that logically follows a title — its rubrica,
+    or the heading text after a heading number — may sit one marker away.
+    """
+    sibling = element.find_next_sibling()
+    while sibling is not None and "modref" in (sibling.get("class", []) or []):
+        sibling = sibling.find_next_sibling()
+    return sibling
+
+
+def _cons_rubrica_of(marker):
+    """The rubrica element that follows a consolidated article marker.
+
+    Bare `stitle-article-norm` (flat pages) or inside `div.eli-title`
+    (subdivision pages); a `modref` marker may sit in between.
+    """
+    sibling = _next_non_modref_sibling(marker)
+    if sibling is None:
+        return None
+    classes = sibling.get("class", []) or []
+    if "stitle-article-norm" in classes:
+        return sibling
+    if "eli-title" in classes:
+        return sibling.find("p", class_="stitle-article-norm")
+    return None
+
+
+def _extract_consolidated_rubriche(soup):
+    rubriche = {}
+    for marker in soup.find_all("p", class_="title-article-norm"):
+        key = normalize_article_key(marker.get_text(" ", strip=True))
+        if not key:
+            continue
+        rubrica = _cons_rubrica_of(marker)
+        if rubrica is None:
+            continue
+        title = strip_amendment_markers(rubrica.get_text(" ", strip=True))
+        if title:
+            rubriche[key] = title
+    return rubriche
+
+
+def _walk_consolidated_tree(soup, normurn, link, details, eli_info):
+    """Articles and (with details) chapter headings of a consolidated page.
+
+    `title-division-1` is the heading number ("CAPO I", "SEZIONE 1") and the
+    `title-division-2` right after it the heading text; both are kept so the
+    index reads "CAPO I DISPOSIZIONI GENERALI". Article numbers are
+    canonicalised through the shared suffix table: "Articolo 14 bis" is
+    14-bis, not a second 14.
+    """
+    result = []
+    seen = set()
+    count = 0
+    for elem in soup.find_all("p", class_=["title-division-1", "title-article-norm"]):
+        classes = elem.get("class", []) or []
+        if "title-division-1" in classes:
+            if not details:
+                continue
+            heading = elem.get_text(" ", strip=True)
+            nxt = _next_non_modref_sibling(elem)
+            if nxt is not None and "title-division-2" in (nxt.get("class", []) or []):
+                heading = f"{heading} {nxt.get_text(' ', strip=True)}"
+            result.append(strip_amendment_markers(heading))
+            continue
+        key = normalize_article_key(elem.get_text(" ", strip=True))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(_format_eurlex_article(key, normurn, eli_info, link))
+        count += 1
+    return result, count
+
+
 def _extract_eurlex_rubriche(soup):
     """Article number -> title, from an EUR-Lex document.
 
@@ -522,6 +626,8 @@ def _extract_eurlex_rubriche(soup):
     documents label it `eli-title` instead, so both are accepted; an article
     with neither is simply absent from the map.
     """
+    if soup.find("p", class_="title-article-norm"):
+        return _extract_consolidated_rubriche(soup)
     rubriche = {}
     for marker in soup.find_all(class_=lambda c: c and "ti-art" in str(c).lower()
                                 and "sti-art" not in str(c).lower()):
