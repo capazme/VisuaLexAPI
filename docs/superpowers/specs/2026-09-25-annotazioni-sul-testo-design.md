@@ -37,7 +37,7 @@ the text is now a centred 68ch column, so a wide panel has free margins.
 | D2 | In a container too narrow for the margin, the sign **falls back inline at the end of the block**. | April: never squeeze the text. |
 | D3 | The sign opens a **Peek popover** listing that block's notes and highlights: *Vai al passo* (the passage flashes), edit or delete a note with the Notes panel's own cards, remove a highlight. | Owner's choice ("anche modificare"). |
 | D4 | Tab and dossier reader only. **Not Study Mode**, whose "Riepilogo" already lists everything. | Owner confirmed. |
-| D5 | The desktop "Evidenziazioni" box under the article **goes**. | Owner confirmed: redundant with the signs. |
+| D5 | The desktop "Evidenziazioni" box under the article **goes** for everything a sign shows; it stays only for what no sign can reach — highlights in the Brocardi sections and highlights whose text changed — so they can still be removed. | Owner confirmed: redundant with the signs. The final review found the non-redundant part: without it those highlights could be created but never removed. |
 | D6 | The popover never numbers a comma the source does not number: its title is "Annotazioni" plus the printed enumerator when there is one ("1.", "a)"), otherwise the block's opening words. | Round A: no computed comma numbers, no miscount to cite. |
 | D7 | Only anchors that render count: an orphaned note or highlight makes no sign. | Orphans are out of scope; a sign pointing at nothing would mislead. |
 | D8 | The sign is **not text**: no text node; the counts and the icon come from CSS; screen readers get an `aria-label`. | Gotcha 23 — the projection invariant. |

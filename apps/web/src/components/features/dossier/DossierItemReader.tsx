@@ -7,13 +7,14 @@ import { useArticleTextInteractions } from '../../../hooks/useArticleTextInterac
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
+import { LooseHighlightsList } from '../search/LooseHighlightsList';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, NormaVisitata } from '../../../types';
 
 interface Props {
@@ -113,6 +114,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
     () => groupAnnotationsByBlock(rawText, structure, articleHighlights, itemAnnotations),
     [rawText, structure, articleHighlights, itemAnnotations],
   );
+  // Highlights no sign can reach (their text changed): still removable.
+  const looseHighlights = useMemo(() => highlightsWithoutSign(articleHighlights, blockGroups), [articleHighlights, blockGroups]);
   // Update-note references, the foldable AGGIORNAMENTO tail and the
   // annotation signs, as on the dashboard. `enabled` waits for the body: it
   // exists only once the fetch settles.
@@ -214,6 +217,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
         onPopupCopy={handlePopupCopy}
         updatesOpen={updatesOpen}
       />
+      <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
       {openNote && structure.notes[openNote.id] && (
         <UpdateNotePopover
           noteId={openNote.id}

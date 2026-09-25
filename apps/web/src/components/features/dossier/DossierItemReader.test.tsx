@@ -43,10 +43,22 @@ describe('DossierItemReader — annotations on the text', () => {
     expect(removeHighlight).toHaveBeenCalledWith('h1');
   });
 
-  it('no longer lists the highlights in a box under the text', async () => {
+  it('no longer lists the highlights a sign already shows in a box under the text', async () => {
     appStore.setState({ highlights: [highlight], annotations: [] });
     const { container } = render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
     await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
     expect(screen.queryByText('Evidenziazioni')).toBeNull();
+    expect(screen.queryByText('Altre evidenziazioni')).toBeNull();
+  });
+
+  it('still lets the reader remove a highlight whose text is no longer there', async () => {
+    const removeHighlight = vi.fn();
+    const orphan: Highlight = { ...highlight, id: 'gone', text: 'testo che non c\'è più', startOffset: 40 };
+    appStore.setState({ highlights: [highlight, orphan], annotations: [], removeHighlight });
+    render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
+    await screen.findByText('Altre evidenziazioni');
+    expect(screen.getByText('Non più nel testo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi evidenziazione' }));
+    expect(removeHighlight).toHaveBeenCalledWith('gone');
   });
 });

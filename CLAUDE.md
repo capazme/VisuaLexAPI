@@ -1557,8 +1557,10 @@ beside it when the margin has room, else below or above it, never over the
 passage it lists — through a virtual reference that finds the sign again on
 every measurement, because every edit redraws the text. Its focus management
 is modal: with no element in the text for floating-ui to bridge Tab back to,
-Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box that
-listed highlights under the article is gone.
+Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box under
+the article now lists only what no sign can reach (`LooseHighlightsList`,
+desktop): highlights made in the Brocardi sections and highlights whose text
+changed — without it they could no longer be removed.
 
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
@@ -1706,7 +1708,7 @@ Duplicating any of these is a defect, not a shortcut.
   foldable AGGIORNAMENTO tail and the annotation signs (`openBlock`), for any
   surface that renders structured text.
 - `utils/articleAnnotations.ts` — `resolveAnchors`, `groupAnnotationsByBlock`,
-  `describeBlock` (a block named by its printed enumerator or its opening
+  `highlightsWithoutSign`, `describeBlock` (a block named by its printed enumerator or its opening
   words, never a computed number). The renderer and the block popover both
   read it: never re-derive where an anchor lands anywhere else.
 - `utils/revealAnnotation.ts` — `revealAnnotation(root, { kind, id }, near?)`:
@@ -1918,7 +1920,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
   `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
-  highlights, opened from its sign), `NoteCard.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  highlights, opened from its sign), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
   `SearchPanel.tsx` (streaming merge logic, and the mount point for both
   `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).

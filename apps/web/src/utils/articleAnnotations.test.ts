@@ -3,6 +3,7 @@ import {
   describeBlock,
   groupAnnotationsByBlock,
   hasAnnotations,
+  highlightsWithoutSign,
   resolveAnchors,
   signAriaLabel,
   signColors,
@@ -141,5 +142,15 @@ describe('describeBlock', () => {
     expect(describeBlock(RAW, STRUCTURE.blocks[0])).toBe('Art. 1453.');
     expect(describeBlock(RAW, STRUCTURE.blocks[1])).toBe('(Risolubilità del contratto per inadempimento).');
     expect(describeBlock(RAW, STRUCTURE.blocks[2])).toBe('Nei contratti con prestazioni corrispettive…');
+  });
+});
+
+describe('highlightsWithoutSign', () => {
+  it('keeps the highlights no block shows: other sections of the article, and orphans', () => {
+    const shown = hl('shown', 'giudizio', at('giudizio'));
+    const orphan = hl('orphan', 'inesistente', 100);
+    const brocardi: Highlight = { ...hl('b', 'ratio', 0), articleId: '1/brocardi/ratio' };
+    const groups = groupAnnotationsByBlock(RAW, STRUCTURE, [shown, orphan], []);
+    expect(ids(highlightsWithoutSign([shown, orphan, brocardi], groups))).toEqual(['orphan', 'b']);
   });
 });

@@ -26,6 +26,7 @@ import { ArticleBody } from './ArticleBody';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
+import { LooseHighlightsList } from './LooseHighlightsList';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { PluginSlot } from '../../../plugins/PluginSlot';
@@ -37,7 +38,7 @@ import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
 import type { Annotation } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
@@ -668,6 +669,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         () => groupAnnotationsByBlock(article_text || '', structure, articleHighlights, itemAnnotations),
         [article_text, structure, articleHighlights, itemAnnotations],
     );
+    // Highlights no sign can reach — the Brocardi sections', and those whose
+    // text changed — keep a list of their own, so they can still be removed.
+    const looseHighlights = useMemo(
+        () => highlightsWithoutSign(allPanelHighlights, blockGroups),
+        [allPanelHighlights, blockGroups],
+    );
 
     const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
 
@@ -898,6 +905,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupReportCitation={canContribute ? handlePopupReportCitation : undefined}
                 updatesOpen={updatesOpen}
             />
+
+            <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
 
             {openNote && structure.notes[openNote.id] && (
                 <UpdateNotePopover

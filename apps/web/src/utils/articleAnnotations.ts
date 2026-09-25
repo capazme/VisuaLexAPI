@@ -132,6 +132,18 @@ export function groupAnchorsByBlock(
 export const hasAnnotations = (group: BlockAnnotations | undefined): group is BlockAnnotations =>
   !!group && group.notes.length + group.highlights.length > 0;
 
+/**
+ * The highlights no block's sign shows: those of another section of the
+ * article (the Brocardi Ratio and Spiegazione) and those whose text is no
+ * longer where they were saved. They need a place of their own to be removed
+ * from (LooseHighlightsList), since the signs cannot reach them.
+ */
+export function highlightsWithoutSign(highlights: readonly Highlight[], groups: readonly BlockAnnotations[]): Highlight[] {
+  const shown = new Set<Highlight>();
+  for (const group of groups) for (const h of group.highlights) shown.add(h);
+  return highlights.filter((h) => !shown.has(h));
+}
+
 /** The sign's dots: each highlight colour once, in order of appearance. */
 export function signColors(highlights: readonly Highlight[]): HighlightColor[] {
   const out: HighlightColor[] = [];
