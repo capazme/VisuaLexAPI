@@ -40,7 +40,7 @@ Brocardi). Real numbers (verified against a temp container):
 ## Loader (runs automatically on boot)
 
 `merlt/merlt/scripts/load_seed_libro_iv.py`, hooked into the FastAPI lifespan in
-`merlt/merlt/app.py` (~line 132, before `yield`). Verified E2E in the
+`merlt/merlt/app.py` (after the expert system and the buffer rehydration, before `yield`; `MERLT_SKIP_SEED=true` disables it). Verified E2E in the
 `visualex-merlt-api` container: 27.741 nodes + 43.935 edges + 27.117 bridge rows
 in ~43s (embeddings skipped). Idempotent: skips entirely when the graph already
 has >100 nodes.
@@ -70,6 +70,13 @@ docker run -d --name tmp-falkor -p 6383:6379 \
 The container default `dir` is `/var/lib/falkordb/data` (NOT `/data`) and
 `appendonly no` — both must be overridden or the dump never loads and
 `GRAPH.LIST` returns empty.
+
+The same fact decides persistence in the live stack. `docker-compose.merlt.yml`
+mounts the `merlt_falkor_data` volume at `/var/lib/falkordb/data` and sets
+`FALKORDB_ARGS="--save 60 1 --appendonly yes --appendfsync everysec"`. Until
+2026-09-25 the volume sat at `/data`, next to the real data dir, so every
+container recreate dropped the lazily ingested and co-evolved nodes and only
+the seed came back at the next boot.
 
 ## Gotchas (from MERLT-2a.1)
 

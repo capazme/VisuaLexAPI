@@ -152,20 +152,31 @@ When `MERLT_ENABLED=true`, VisuaLex runs an additional **MERL-T** stack (`docker
 ```mermaid
 graph LR
     FE[Frontend] -->|/api/merlt/*| BFF[Node BFF :3001]
-    BFF -->|proxy| API[merlt-api :8000]
+    BFF -->|proxy, X-API-Key, user_id| API[merlt-api :8000]
     API --> PG[(merlt-postgres)]
     API --> FK[(FalkorDB)]
     API --> QD[(Qdrant)]
-    API --> RD[(Redis)]
-    WK[merlt-worker RQ] --> FK
+    API --> RD[(Redis: cache + RQ)]
+    API -->|tools| MCP[mcp-legal-it :8011]
+    RD --> WK[merlt-worker RQ]
+    WK --> FK
     WK --> PG
+    WK -->|job and extraction callbacks| BFF
+    API -->|Q&A progress callback| BFF
+    WK -->|scraping| PY[Python API :5000]
 ```
 
-- **Boundary rule:** the browser never calls `:8000` directly — all MERL-T traffic is proxied by the Node BFF under `/api/merlt/*`.
-- **Services:** `merlt-api` (FastAPI :8000), `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`, `merlt-worker` (RQ).
-- **Status:** the community **graph-enrichment loop** (contribute → vote → consensus → graph) is integrated and closed end-to-end; the **Q&A / reasoning** surface is upstream-only (Slice 3).
+- **Boundary rule:** the browser never calls `:8000` directly. The Node BFF proxies all MERL-T traffic under `/api/merlt/*` and is the trust boundary: MERL-T makes its API key optional, so only `require_role("admin")` routes check it.
+- **Services (7):**
+  - Always on: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`.
+  - Under the `api-in-docker` profile, which is the `start.sh` default: `mcp-legal-it` (a git submodule at `vendor/mcp-legal-it`), `merlt-api` (FastAPI :8000) and `merlt-worker` (RQ on `merlt_ingest`, `merlt_extract`, `merlt_ner_train`).
+  - The containers reach the host BFF and Python API through `host.docker.internal`.
+- **Status:**
+  - The community **graph-enrichment loop** (contribute → vote → consensus → graph) is closed end to end.
+  - The **expert Q&A** is integrated on `/grafo`: async progressive, with RLCF feedback channels and admin-triggered training.
+  - So are the graph co-evolution (provisional nodes, promotion, hygiene), learned NER feedback and admin mechanical ingestion.
 
-For the full picture (the two RLCF loops, existing vs. target, the integration contract) see **[MERL-T × RLCF System Map](merlt/system-map.md)** and the **[docs index](README.md)**.
+For the architecture verified against the code see **[MERL-T blueprint](merlt/blueprint.md)**. For the route contract and the runbook see [contract-matrix.md](merlt/contract-matrix.md) and [integration.md](merlt/integration.md). For the big picture (the two RLCF loops, existing vs. target) see the **[MERL-T × RLCF System Map](merlt/system-map.md)** and the **[docs index](README.md)**.
 
 ---
 

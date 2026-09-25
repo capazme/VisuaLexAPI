@@ -1,5 +1,16 @@
 # Piano Esecutivo `visualex-merlt-main`
 
+> **Stato al 2026-09-25.** Questo piano precede la Slice 1. Tratta `ALIS_CORE/merlt` come sorgente
+> canonica; oggi la fonte di verità è il `merlt/` vendorizzato (vedi `upstream-sync.md`), e lo stato
+> reale è descritto in `blueprint.md` e nelle sezioni MERL-T di `CLAUDE.md`.
+>
+> Sotto il titolo di ogni fase c'è un marcatore di stato, preso da un audit dei criteri di
+> accettazione sul codice. Per le fasi incomplete, il marcatore elenca i criteri ancora aperti.
+>
+> - ✅ soddisfatta
+> - 🟡 in parte
+> - ❌ non soddisfatta
+
 Questo piano guida il branch `visualex-merlt-main`, separato dalla Visualex vanilla in produzione. L'obiettivo non e' una demo MERLT, ma una linea prodotto completa che riusa cio' che esiste gia' in `merlt`, `merlt-models` e `visualex-merlt`.
 
 ## Regole Di Branch
@@ -73,6 +84,8 @@ Rischi da chiudere:
 
 ### Fase 0 - Baseline E Sicurezza Branch
 
+> ✅ **Soddisfatta.** Il branch è dedicato e `main` resta intatto: i merge vanno in un solo verso, `main` → `merlt`. Dal 2026-09-25 la CI (`.github/workflows/ci.yml`) gira anche su `visualex-merlt-main`, compreso il job `merlt` con la suite Python di MERL-T.
+
 Obiettivo: rendere il branch lavorabile senza contaminare `main`.
 
 Da fare:
@@ -89,6 +102,20 @@ Acceptance:
 - Build/test baseline verdi o failure note e tracciate.
 
 ### Fase 1 - Runtime MERLT Reale
+
+> 🟡 **In parte.**
+>
+> Soddisfatto:
+>
+> - `MERLT_ENABLED=true ./start.sh` avvia l'intero stack (api, worker e mcp-legal-it in Docker, più
+>   le 4 dipendenze), con un gate su `/health` e il controllo del worker.
+> - `/api/merlt/health` interroga MERL-T reale.
+>
+> Aperto:
+>
+> - `/api/merlt/ops/dashboard/health` non esiste.
+> - `/health` risponde 200 anche in `degraded`.
+> - `/health` non controlla il worker, mcp-legal-it né la chiave LLM.
 
 Obiettivo: un comando avvia VisuaLex + MERLT completo.
 
@@ -107,6 +134,22 @@ Acceptance:
 - `curl /api/merlt/ops/dashboard/health` mostra dipendenze reali.
 
 ### Fase 2 - Plugin Host In VisuaLexAPI
+
+> 🟡 **In parte.**
+>
+> Soddisfatto:
+>
+> - Con `VITE_FEATURE_MERLT=false` spariscono le superfici.
+> - I test del registry passano.
+> - Il plugin host ha 3 slot: `article_content_after`, `global`, `article_sidebar`. Il
+>   restringimento rispetto al piano è deliberato.
+>
+> Aperto:
+>
+> - `ArticleTabContent` importa ancora `AskMerltEntry`, `useMerltFeatures` e `sendNerFeedback`.
+> - `CitationPreviewPopup` importa `CitationNerFeedback`.
+> - Il FE conosce solo i flag `merlt` e `merlt_graph`. Contribution, validation e ops esistono
+>   solo nel BFF.
 
 Obiettivo: sostituire componenti hardcoded con plugin/slot system.
 
@@ -127,6 +170,17 @@ Acceptance:
 
 ### Fase 3 - Consenso, Audit, Feature Flags Persistenti
 
+> 🟡 **In gran parte.**
+>
+> Soddisfatto:
+>
+> - Il consenso è persistito lato server.
+> - La revoca blocca il tracking.
+> - Le ops sono protette da `requireAdmin` e dal flag ops.
+>
+> Aperto: l'audit del consenso (`MerltConsentAudit`) è solo scritto, nessuna route lo rende
+> consultabile.
+
 Obiettivo: consenso e abilitazioni sono dati prodotto, non `localStorage`.
 
 Da fare:
@@ -144,6 +198,22 @@ Acceptance:
 - Audit consenso consultabile lato admin/dev.
 
 ### Fase 4 - BFF API Contract Forte
+
+> 🟡 **In parte.**
+>
+> Soddisfatto:
+>
+> - Zod su quasi tutte le route.
+> - Test BFF con MERL-T mock, test negativi.
+> - Upload multipart, error mapping, timeout per client.
+>
+> Aperto:
+>
+> - `/ops/rlcf/training/start` inoltra il corpo come `Record<string, unknown>` senza schema.
+> - `/ops/config/:key` e `/graph/provisional-review/:nodeId` validano a mano.
+>
+> Il proxy WebSocket/SSE è stato sostituito per decisione con submit + poll
+> (`qa-async-progressive-contract.md`).
 
 Obiettivo: proxy MERLT robusto, non pass-through fragile.
 
@@ -164,6 +234,21 @@ Acceptance:
 - Nessun endpoint critico accetta `Record<string, unknown>` senza schema.
 
 ### Fase 5 - Sprint 1 Product Core: Enrichment E Validation
+
+> 🟡 **In gran parte.**
+>
+> Soddisfatto:
+>
+> - Lo stato del grafo sull'articolo (side rail).
+> - L'arricchimento lazy.
+> - La validazione di entità e relazioni.
+> - La UI delle proposte.
+>
+> Aperto:
+>
+> - I voti portano `user_id` e `vote`, ma non `article_urn` né l'authority (MERL-T la ricalcola
+>   da sé).
+> - `edit` è accettato dallo schema, ma senza `suggested_edits`.
 
 Obiettivo: prima release funzionale MERLT utile su articolo reale.
 
@@ -186,6 +271,18 @@ Acceptance:
 
 ### Fase 6 - Expert Q&A Completo
 
+> 🟡 **In parte.**
+>
+> Soddisfatto: la Q&A su `/grafo` con sintesi, esperti, confidenza, fonti e reasoning, i modi
+> convergente e divergente, il refine e il feedback inline, detailed, source, preference e
+> relation.
+>
+> Aperto:
+>
+> - La risposta non si può salvare in un dossier.
+> - Il canale `router` non è inoltrato.
+> - Le fonti citate non sono verificate contro quelle recuperate.
+
 Obiettivo: Q&A multi-expert da prodotto.
 
 Da fare:
@@ -207,6 +304,20 @@ Acceptance:
 
 ### Fase 7 - Graph View E Semantic Search
 
+> 🟡 **In parte.**
+>
+> Soddisfatto:
+>
+> - Il sottografo dall'articolo.
+> - I drawer di nodo e arco, l'esplorazione dei vicini.
+> - Lo stato provvisorio o confermato sui nodi.
+>
+> Aperto:
+>
+> - Nessuna ricerca semantica: il BFF usa l'autocomplete fuzzy `/graph/entities/search`, e
+>   `POST /api/v1/graph/search` non è inoltrato.
+> - Il drawer del nodo non apre l'articolo nel lettore.
+
 Obiettivo: FalkorDB/Qdrant visibili e navigabili.
 
 Da fare:
@@ -226,6 +337,23 @@ Acceptance:
 - Click nodo apre dettagli e navigazione articolo.
 
 ### Fase 8 - RLCF Implicito E Authority
+
+> 🟡 **In parte.**
+>
+> Soddisfatto:
+>
+> - I 5 segnali della Slice 1 (lettura con dwell e scroll, highlight e annotation,
+>   bookmark e dossier, citazione, forum) arrivano a MERL-T e sono persistiti in
+>   `tracking_events`.
+> - Il profilo mostra l'authority di MERL-T.
+>
+> Aperto:
+>
+> - Non sono emessi né inoltrati `search_performed`, `result_clicked`, `bookmark_delete`, la
+>   selezione, `citation_detected`, `dossier_export_training` e `issue_*`.
+> - Nessun flush per batch o sessione.
+> - Nessuna authority per dominio, badge o track record in UI.
+> - `tracking_events` non è letto da nessun componente.
 
 Obiettivo: comportamento utente alimenta RLCF in modo verificabile.
 
@@ -248,6 +376,25 @@ Acceptance:
 
 ### Fase 9 - Admin, Training Ops, Monitoring
 
+> ❌ **Non soddisfatta.**
+>
+> Esistono:
+>
+> - l'avvio manuale del training RLCF (senza polling dello stato);
+> - config e riavvio del motore;
+> - l'igiene del grafo su richiesta;
+> - l'ingestion meccanica;
+> - statistiche e training NER.
+>
+> Mancano nel BFF e nel FE:
+>
+> - la dashboard admin;
+> - status e stop del training, stato del buffer;
+> - pesi e storico delle policy. MERL-T li serve: dal 2026-09-25 `/rlcf/policies/history` legge
+>   le `weight_versions`;
+> - run, errori e retry delle pipeline;
+> - il regression runner e la quarantena del feedback.
+
 Obiettivo: MERLT gestibile in produzione.
 
 Da fare:
@@ -269,6 +416,16 @@ Acceptance:
 
 ### Fase 10 - Documenti, Dossier, Community Avanzata
 
+> 🟡 **In gran parte.**
+>
+> Soddisfatto:
+>
+> - Upload multipart via BFF, estrazione e revisione.
+> - I segnali community arrivano a MERL-T.
+> - Il confronto delle tesi divergenti.
+>
+> Aperto: l'export di un dossier come training set. MERL-T ha l'endpoint, il BFF e il FE no.
+
 Obiettivo: chiudere feature avanzate senza secondo frontend.
 
 Da fare:
@@ -287,6 +444,16 @@ Acceptance:
 - Community signals arrivano a MERLT.
 
 ### Fase 11 - Release Candidate
+
+> 🟡 **In parte.**
+>
+> Soddisfatto:
+>
+> - Le suite backend, frontend e MERL-T girano in CI sul branch.
+> - L'harness E2E esiste in `e2e/`.
+> - Il runbook è stato riscritto (`integration.md`).
+>
+> Aperto: nessun run E2E verde con MERL-T reale risulta registrato.
 
 Obiettivo: branch pronto da promuovere.
 
@@ -316,6 +483,6 @@ La prossima slice non deve aggiungere UI. Deve stabilizzare le fondamenta:
 2. Creare runtime MERLT reale e verificabile.
 3. Sostituire l'integrazione hardcoded attuale con plugin host minimo.
 4. Spostare il consenso da `localStorage` a backend/DB.
-5. Aggiungere test BFF per i primi endpoint: features, health, experts query, feedback interaction.
+5. Aggiungere test BFF per i primi endpoint: ~~features~~, health, experts query, ~~feedback interaction~~. *(2026-09-25: `/features` non è mai stato implementato, perché le capability sono derivate lato client in `useMerltFeatures.ts`; `/feedback/interaction` è stato rimosso, e `publishMerltEvent` è puro pub/sub.)*
 
 Solo dopo questa slice ha senso rifinire UI graph, Q&A e dashboard.

@@ -1,6 +1,14 @@
 # MERL-T × RLCF — Mappa del sistema (esistente vs. target)
 
-**Data:** 2026-05-28 · **Branch:** `visualex-merlt-main` · **Stato:** mappa di riferimento (sintesi)
+**Data:** 2026-05-28, aggiornata il 2026-09-25 · **Branch:** `visualex-merlt-main` · **Stato:** mappa di riferimento (sintesi)
+
+> **Aggiornamento 2026-09-25.** Rispetto alla prima stesura, il Loop β non è più «solo in libreria»:
+>
+> - la Q&A multi-esperto è integrata su `/grafo`, in modo sincrono e asincrono progressivo;
+> - i canali di feedback e il training RLCF manuale da admin sono cablati;
+> - il grafo co-evolve con le fonti live.
+>
+> Lo stato verificato sul codice è in [blueprint.md](./blueprint.md) e nelle sezioni MERL-T di `CLAUDE.md`. Questa mappa resta la vista d'insieme «esistente vs. target».
 
 **Scopo.** Documentare **il progetto `VisuaLexAPI`** (`/Users/gpuzio/Desktop/CODE/VisuaLexAPI`): (a) **cosa è implementato** qui oggi e (b) **come dovrebbe diventare** integrando, slice per slice, le capacità del sottosistema MERL-T. È una mappa di lettura, non un piano di lavoro.
 
@@ -29,9 +37,9 @@ MERL-T è un **«IDE per giuristi»**: l'avvocato pone una domanda giuridica, **
 Ma «RLCF» qui si manifesta in **due loop distinti** che condividono authority + consenso:
 
 - **Loop α — Arricchimento del grafo / co-autorialità.** La comunità *costruisce il corpus*: propone nodi/relazioni, vota, e al consenso il nodo entra nel grafo. **Chiuso E2E in VisuaLex.**
-- **Loop β — Ragionamento / qualità delle risposte.** La comunità *addestra il modello*: valuta le risposte Q&A su tre livelli e un policy-gradient aggiorna i pesi di gating/traversal. **Costruito in libreria, non integrato; con bug di pipeline aperti.**
+- **Loop β — Ragionamento / qualità delle risposte.** La comunità *addestra il modello*: valuta le risposte Q&A su tre livelli e un policy-gradient aggiorna i pesi di gating/traversal/tool. **Integrato in VisuaLex su `/grafo`** (Slice 4): Q&A asincrona progressiva, canali di feedback e training manuale da admin. Restano aperti gap di qualità (§5, §8.8).
 
-La co-autorialità (la nostra UX) vive nel **Loop α**. Il **Loop β** è la frontiera (Slice 3).
+La co-autorialità (la nostra UX) vive nel **Loop α**. Il **Loop β** è integrato; la frontiera ora è la sua qualità (fonti citate non verificate contro quelle recuperate, steering per nodo, authority per dominio).
 
 ---
 
@@ -40,15 +48,15 @@ La co-autorialità (la nostra UX) vive nel **Loop α**. Il **Loop β** è la fro
 ### 1.1 Cosa eseguiamo (runtime di VisuaLexAPI)
 - **Python API — Quart, :5000** (`app.py`, `visualex_api/`): ricerca norme, scraping Normattiva/EUR-Lex/Brocardi, export PDF. È il cuore storico del prodotto.
 - **Node BFF — Express + Prisma, :3001** (`backend/`): auth, dati utente, e **tutto il traffico MERL-T via `/api/merlt/*`** — il frontend non chiama mai il sidecar `:8000` direttamente.
-- **Frontend — React + Vite, :5173** (`frontend/`): SPA; le superfici MERL-T (`/grafo`, `/merlt`, `/merlt/valida`, `/merlt/contribuisci`) sono montate via *plugin host*, dietro feature flag.
-- **Sidecar MERL-T** (`docker-compose.merlt.yml`, gate `MERLT_ENABLED`): `merlt-api :8000` + `merlt-postgres` + `merlt-redis` + `merlt-falkordb` + `merlt-qdrant` + `merlt-worker` (RQ). Codice Python **vendorizzato in `merlt/`** (copia selettiva di `ALIS_CORE/merlt`).
+- **Frontend — React + Vite, :5173** (`frontend/`): SPA. Le superfici MERL-T sono `/grafo` (grafo + Q&A), `/merlt` (hub «Assistente»), `/merlt/valida`, `/merlt/contribuisci` e la tab «Ingestione» in `/admin`. Il tracking e il side rail passano dal *plugin host*; `ArticleTabContent` importa comunque alcune parti MERL-T in modo diretto. Tutto è dietro i flag `VITE_FEATURE_MERLT` / `VITE_FEATURE_MERLT_GRAPH`.
+- **Sidecar MERL-T** (`docker-compose.merlt.yml`, gate `MERLT_ENABLED`): 7 servizi. Sempre attivi: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`. Sotto il profilo `api-in-docker`, che è il default di `start.sh`: `mcp-legal-it` (tool giuridici live, :8011), `merlt-api` (:8000) e `merlt-worker` (RQ su `merlt_ingest`, `merlt_extract`, `merlt_ner_train`). Codice Python **vendorizzato in `merlt/`** (copia selettiva di `ALIS_CORE/merlt`, poi divergente: vedi `upstream-sync.md`).
 
 ### 1.2 La direzione che integriamo da MERL-T (visione upstream)
 - **Paradigma:** *«IDE per Giuristi»* — l'avvocato pone una domanda, quattro esperti ermeneutici (art. 12 Preleggi: Positivismo/Finalismo/Costituzionalismo/Empirismo) percorrono il grafo, una sintesi risponde *tracciabile alla fonte/URN*. Momento «aha!»: *«I can use this reasoning trace in a legal brief.»*
 - **Criteri di successo (PRD upstream):** 100% risposte con reasoning trace Expert→Source→URN; zero affermazioni non fontate; authority accurata ±10%.
 - **Permessi:** *non* RBAC tradizionale — *«authority score determines influence, not role hierarchy»*.
 
-> VisuaLexAPI adotta questa direzione **selettivamente, slice per slice** (Slice 1→2c fatte; Q&A/ragionamento = Slice 3). Tutto ciò che segue marca sempre cosa è già **in VisuaLexAPI** (✅) e cosa è ancora solo **upstream** (📦/📐/🧪).
+> VisuaLexAPI adotta questa direzione **selettivamente, slice per slice**: Slice 1→2c, Slice 3 (UX e consenso), Slice 4 (dibattito sul grafo), Loop β (Q&A e NER) e ingestion governance sono fatte. Tutto ciò che segue marca sempre cosa è già **in VisuaLexAPI** (✅) e cosa è ancora solo **upstream** (📦/📐/🧪).
 
 ---
 
@@ -66,7 +74,7 @@ flowchart TB
     A1["1 Segnali + contributo"] --> A2["2 Estrazione LLM (staging)"] --> A3["3 Promozione a proposta (gate copyright)"] --> A4["4 Voto pesato"] --> A5["5 Consenso (net_score ±2.0)"] --> A6["6 Scrittura FalkorDB"] --> A7["7 Authority +"]
   end
 
-  subgraph B["Loop β — Ragionamento (qualità risposte)  📦 non integrato"]
+  subgraph B["Loop β — Ragionamento (qualità risposte)  ✅ integrato su /grafo"]
     direction LR
     B1["1 Gating esperti"] --> B2["2 Trace (log_probs)"] --> B3["3 Esperti + Traversal"] --> B4["4 Sintesi (conv/diverg)"] --> B5["5 Feedback multilivello"] --> B6["6 Authority"] --> B7["7 REINFORCE"] --> B8["8 Ritorno all'utente"]
   end
@@ -76,7 +84,7 @@ flowchart TB
   CONS -. soglia net_score .- A5
   CONS -. entropia δ/τ .- B4
   A6 ==>|"il grafo arricchito"| B3
-  B8 -.->|Slice 3| A1
+  B8 -.->|co-evoluzione del grafo| A1
 ```
 
 **Punto di giunzione:** il Loop α *produce e cura il grafo* che il Loop β *percorre per rispondere*. I due loop **condividono** il modello di authority e la macchina di consenso/disaccordo, ma usano soglie diverse (net_score ±2.0 nell'arricchimento; entropia di Shannon δ con τ=0.4 nel ragionamento).
@@ -163,20 +171,20 @@ Il loop che l'avvocato *guida*. **Chiuso E2E con dati reali il 2026-05-28** (ved
 
 ---
 
-## 5. Loop β — Ragionamento / qualità risposte 📦
+## 5. Loop β — Ragionamento / qualità risposte ✅ (con gap)
 
-Il cuore accademico RLCF. **Costruito in libreria `ALIS_CORE/merlt` (~94% feature v1), ma NON integrato in VisuaLex** e con bug di pipeline aperti.
+Il cuore accademico RLCF. **Integrato in VisuaLex** su `/grafo` (Slice 4, decisione A «assorbi»): Q&A sincrona e asincrona progressiva (`MerltQaJob`), feedback multicanale e training RLCF avviato a mano da admin. Il contratto è in `qa-async-progressive-contract.md`. Le righe sotto segnano cosa resta aperto.
 
 | # | Fase | Meccanismo | Stato | Gap principale |
 |---|---|---|---|---|
-| 1 | Query → selezione esperti | `GatingPolicy` (768→256→128→4 softmax) | 🧪 gating neurale sperimentale; in prod router **statico** | non usato nel routing live |
-| 2 | Execution tracing | `ExecutionTrace` con `log_probs` → `rlcf_traces` | 📦 in libreria | il tracking VisuaLex era in-memory (A1 ha aggiunto `tracking_events`) |
-| 3 | Esecuzione esperti + Traversal | esperti percorrono il grafo con `TraversalPolicy` | 📦 v1 · **🐞** | **i 4 esperti ricevono lo stesso retrieval**; `GraphSearchTool` rotto (`.execute_query` vs `.query`); grounding **20%** (80% fonti allucinate) con confidence 0.90 |
-| 4 | Sintesi | `AdaptiveSynthesizer` convergent/divergent | 📦; **UI Q&A rimossa** | reintrodotta in Slice 3 |
-| 5 | Feedback multilivello | 3 livelli (retrieval/reasoning/synthesis), authority-weighted | 📦 v1; `MultilevelFeedback` v2 📐 | nessuna UI Q&A che lo raccolga in VisuaLex |
+| 1 | Query → selezione esperti | `GatingPolicy` (768→256→128→4 softmax) | ✅ cablato al boot (`engine_bootstrap.py`, `HybridExpertRouter`) quando esiste un checkpoint; altrimenti routing regex | senza checkpoint addestrato resta il router statico |
+| 2 | Execution tracing | `ExecutionTrace` con `log_probs`; tracce Q&A in `qa_traces` | ✅ | i segnali Slice 1 sono persistiti in `tracking_events`, ma nessuno li legge |
+| 3 | Esecuzione esperti + Traversal | esperti ReAct con tool; `TraversalPolicy` all'inference dietro `MERLT_NEURAL_TRAVERSAL_ENABLED` | ✅ · **🐞** | `GraphSearchTool` usa `.query()` (corretto); le fonti **citate** dall'LLM non sono verificate contro quelle recuperate e non hanno provenance (solo le `retrieved_sources` ce l'hanno) |
+| 4 | Sintesi | `AdaptiveSynthesizer` convergent/divergent | ✅ UI su `/grafo` (`DeliberationColumn`) | la modalità scelta dal lettore arriva al synthesizer come `forced_mode` |
+| 5 | Feedback multilivello | inline, fonte, dettagliato (3 livelli), preferenza canone, relazione, confirm-source | ✅ (consenso `full`) | il canale `router` esiste in MERL-T ma il BFF non lo inoltra; `MultilevelFeedback` v2 📐 |
 | 6 | Authority update | `A_u` ricalcolata | ✅ infra condivisa · 🐞 | **calibrazione**: in EXP-023 i `random_noise` salgono a +370% |
-| 7 | Policy gradient | REINFORCE su gating/traversal/rerank/bridge | 📦 trainer pronto; **training MANUALE** (A5: endpoint admin) | non agganciato all'inference live; no auto-training |
-| 8 | Ritorno all'utente | risposta con **incertezza calibrata** + devil's advocate | 📐 Slice 3 | non costruito in VisuaLex |
+| 7 | Policy gradient | REINFORCE su gating/traversal/tool | ✅ training **manuale** da admin (`/ops/rlcf/training/start`); buffer durevole e reidratato al boot | nessun auto-training; nessuna route BFF per status/stop o per lo storico dei pesi (MERL-T li espone) |
+| 8 | Ritorno all'utente | risposta con confidenza, tesi divergenti e archi di contrasto sul grafo | ✅ parziale | incertezza calibrata e devil's advocate come UX restano 📐 |
 
 **Validazione empirica.** `EXP-021` fornisce il framework statistico (4 ipotesi: persistenza, convergenza authority, stabilità pesi, miglioramento risposte) ma non risulta eseguito con esperti reali. `EXP-023` (completato): il loop **funziona meccanicamente** (query→expert→feedback→update validato; authority converge), ma **i target di performance non sono raggiunti** (reward +8.1% vs +15%; load balance 0.49–0.63 vs 0.75; nessun early stopping → overfitting) e l'authority va ricalibrata.
 
@@ -184,7 +192,7 @@ Il cuore accademico RLCF. **Costruito in libreria `ALIS_CORE/merlt` (~94% featur
 
 ## 6. Infrastruttura condivisa (dettaglio)
 
-- **Authority** — calcolata **lato VisuaLex** (`B_u` da qualifica) e **iniettata a ogni chiamata** verso MERL-T (`user_authority`); MERL-T la usa per pesare ma non è l'autorità della verità. **Decadimento temporale (`λ=0.95`) specificato ma non implementato** nel modello live (somma statica). Calibrazione debole (EXP-023).
+- **Authority**: **calcolata da MERL-T** (`/api/v1/profile/full`) e messa in cache dal BFF (`authorityCache.ts`, TTL 1 h, aggiornata quando un voto chiude il consenso). Il BFF la allega (`user_authority`) solo agli eventi di tracking (`eventMapper.ts`); voti e feedback portano solo `user_id` e MERL-T la ricalcola da sé. VisuaLex non ha un percorso per impostare la qualifica, quindi il `B_u` resta al default. **Decadimento temporale (`λ=0.95`) specificato ma non implementato** nel modello live (somma statica). Calibrazione debole (EXP-023).
 - **Consenso/disaccordo** — due regimi: net_score ±2.0 (arricchimento) e entropia δ/τ con tassonomia legale a 6 tipi (ANT/LAC/MET/OVR/GER/SPE, `DISAGREEMENT_DETECTION_SPEC`, 📐 non addestrato).
 - **Governance** — tetti costituzionali (credenziali ≤ 0.6, soglia ≥ 0.1), audit log, ciclo di training a 14 giorni (📐).
 
@@ -202,26 +210,28 @@ Il cuore accademico RLCF. **Costruito in libreria `ALIS_CORE/merlt` (~94% featur
 | Consenso → scrittura grafo | trigger + `entity_writer` | ✅ (A2/A3) | trigger PG ora installati |
 | Authority post-esito | `authority.py` | ✅ (A4) | decadimento 📐; calibrazione 🐞 |
 | Training RL | `PolicyGradientTrainer` | ✅ **solo** endpoint admin manuale (A5) | non agganciato a routing live |
-| **Q&A multi-esperto** | orchestrator + sintesi | 📦 **non integrato** (UI rimossa) | Slice 3 |
-| Gating neurale in prod | `GatingPolicy` | 🧪 | router statico in prod |
+| **Q&A multi-esperto** | orchestrator + sintesi | ✅ su `/grafo` (sync + async progressiva, feedback, refine, cronologia) | fonti citate non verificate; niente salvataggio in dossier |
+| Gating neurale in prod | `GatingPolicy` | ✅ cablato se c'è un checkpoint | senza checkpoint → routing regex |
 | `ExpertWithTools` (v2) | — | 📐 0% | redesign autonomous-tools |
 | Authority multilivello/per-dominio | — | 📐 0% | global only |
-| Devil's Advocate (UX) | logica 📦 | 📐 | UX Slice 3 |
+| Devil's Advocate (UX) | logica 📦 | 📐 | il flag arriva nel DTO (Slice 4 P2), la UX dedicata no |
 | Disagreement neural net | `LegalDisagreementNet` | 📐 | non addestrato |
-| Pipeline retrieval per-esperto | — | 🐞 | bug grounding 20% |
+| Grounding delle fonti citate | — | 🐞 | le fonti citate dall'LLM non sono verificate contro quelle recuperate |
+| Co-evoluzione del grafo | `provisional_writer`, `promotion`, `hygiene` | ✅ | igiene ogni `MERLT_HYGIENE_INTERVAL_HOURS` (compose 24) o su richiesta dall'hub |
+| Ingestion meccanica (admin) | `ingestion_mechanical_router` | ✅ tab «Ingestione» in `/admin` | — |
 
 ---
 
 ## 8. Contraddizioni / incongruenze da risolvere
 
-1. **Enum consenso:** ALIS = `Basic/Learning/Research`; VisuaLex = `none/basic/full`. Serve una mappa documentata (Learning≈basic, Research≈full).
+1. **Enum consenso:** ALIS = `Basic/Learning/Research`; VisuaLex = `none/basic/full`. ✅ *Risolto:* mappa in `glossary.md` (Learning≈basic, Research≈full); verso MERL-T il BFF manda `anonymous/basic/full`.
 2. **`check-article`:** doc vecchi `in_graph: bool`; doc/codice attuali `exists: bool`. Il nostro `graphClient` usa `exists` (corretto).
 3. **Porte MERL-T:** doc oscillano tra `:8000` e `:8001`; il nostro compose espone `:8000` dall'host. Regola ferma: **il FE non chiama mai `:8000`**, tutto via BFF `/api/merlt/*`.
 4. **Authority pesi `α/β/γ`:** `0.4/0.4/0.2` (RLCF.md) vs `0.3/0.5/0.2` (tesi/impl). Scegliere il canonico.
-5. **Esperti v1 vs v2:** in prod girano gli esperti *passivi* v1; `ExpertWithTools` (autonomo) è 📐 0%.
-6. **`merlt/contract-matrix.md`** dichiarava ~44 endpoint «implementato» ma ~20 (`/experts/*`, `/enrichment/*`, `/ops/*`) **non sono montati** sul BFF. ✅ *Risolto:* banner correttivo + elenco di cosa è montato oggi.
-7. **`merlt/integration.md`** aveva un `MERLT_ROOT=…/ALIS_CORE/merlt` hardcoded. ✅ *Risolto:* corretto a `$(pwd)/merlt` + banner sullo stato reale.
-8. **Bug pipeline (β):** stesso retrieval per i 4 esperti, `GraphSearchTool` rotto, grounding 20%. Da risolvere prima di esporre il Q&A (Slice 3).
+5. **Esperti v1 vs v2:** in VisuaLex girano gli esperti v1, ma con il ciclo ReAct e i tool registrati (inclusi quelli di `mcp-legal-it`) quando `MERLT_REACT_ENABLED` è attivo (default `true` in compose). La classe `ExpertWithTools` della v2 non esiste.
+6. **`merlt/contract-matrix.md`** dichiarava ~44 endpoint «implementato» che il BFF non monta. ✅ *Risolto il 2026-09-25:* la matrice è stata rigenerata dai router montati (il banner precedente era a sua volta superato).
+7. **`merlt/integration.md`** aveva un `MERLT_ROOT=…/ALIS_CORE/merlt` hardcoded e descriveva superfici mai montate. ✅ *Risolto il 2026-09-25:* riscritto come runbook da zero.
+8. **Bug pipeline (β):** ⚠️ *In parte risolto.* `GraphSearchTool` ora usa `.query()`; gli esperti lavorano in ReAct con i propri tool. Resta aperto il grounding: le fonti citate dall'LLM non sono verificate contro quelle recuperate e non hanno provenance.
 9. **Roadmap stale:** `ROADMAP_COMPLETE_2026` marca «Phase 1 Not Started» mentre `CURRENT_STATE` (3 gg dopo) la dà completa.
 
 ---
@@ -233,7 +243,7 @@ La filosofia «provenienza e deliberazione in lessico giuridico, mai punteggi» 
 - **fase 6** (nodo nel grafo) → *provenienza* «Proposto da @X · su fonte · accolto il…» nel `NodeDetailsDrawer` (`/grafo`), riusando `AttributionChip`;
 - **fase 7** (authority) → *qualifica*, non punteggio.
 
-Il **Loop β** (Q&A di ritorno con incertezza calibrata) è il terreno della **Slice 3**, e prima va sanata la pipeline (§8.8).
+Il **Loop β** è ora sul grafo stesso (Slice 4). La sua co-autorialità passa da «Ricorda nel grafo» (confirm-source), dalla revisione dei nodi provvisori su `/merlt/valida` e dallo steering di canone e relazione. Il grounding delle fonti citate resta la condizione per fidarsi della risposta (§8.8).
 
 ---
 
@@ -249,7 +259,8 @@ Il **Loop β** (Q&A di ritorno con incertezza calibrata) è il terreno della **S
 - `merlt/docs/MERL_T_IMPLEMENTATION_STATUS.md`, `PIANO_DEFINITIVO_INTEGRAZIONE.md`, `architecture/PIPELINE_ANALYSIS.md` — stato e bug.
 
 **Implementazione (VisuaLexAPI):**
-- `CLAUDE.md` (sezioni MERL-T Slice 1→2c) — verità del nostro repo.
+- `blueprint.md`: architettura verificata sul codice.
+- `CLAUDE.md` (sezioni MERL-T, da Slice 1 a Loop β #2): verità del nostro repo.
 - `slices/rlcf-loop/sprint-plan.md` — chiusura Loop α E2E.
-- `slices/slice*/design.md` — design delle 4 slice.
+- `slices/*/design.md`: design delle slice (1, 2a, 2b, 2c, 3, 4, loop-beta, ingestion-governance).
 - `upstream-sync.md` — cosa è vendorizzato e perché.

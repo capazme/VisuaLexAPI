@@ -1,22 +1,27 @@
-# MERL-T sidecar — dipendenze per VisuaLex Slice 1
+# MERL-T sidecar per VisuaLex (branch visualex-merlt-main)
 #
-# Servizi:
-#   merlt-postgres   — Postgres dedicato a MERL-T (QA traces, RLCF, pending entities)
-#   merlt-redis      — Redis cache MERL-T
-#   merlt-falkordb   — Knowledge graph giuridico
-#   merlt-qdrant     — Vector store (embeddings)
-#   merlt-api        — FastAPI (profile opzionale 'api-in-docker';
-#                     default è gestito da start.sh con uvicorn locale per hot reload)
+# Servizi (7):
+#   merlt-postgres   Postgres dedicato a MERL-T (tracce Q&A, feedback, RLCF, pending_*, staging)
+#   merlt-redis      Redis: cache (DB 0) e code RQ (DB 1)
+#   merlt-falkordb   Knowledge graph giuridico (dati in /var/lib/falkordb/data)
+#   merlt-qdrant     Vector store (embeddings)
+#   mcp-legal-it     Tool giuridici live via MCP HTTP (submodule vendor/mcp-legal-it)   [profilo api-in-docker]
+#   merlt-api        FastAPI merlt.app:app su :8000                                       [profilo api-in-docker]
+#   merlt-worker     RQ worker su merlt_ingest merlt_extract merlt_ner_train              [profilo api-in-docker]
 #
-# Avvio default (dev, hot reload):
-#   docker compose -f docker-compose.merlt.yml up -d
-#   → avvia 4 dipendenze; merlt-api parte via start.sh con uvicorn locale
-#
-# Avvio production-like (API in container):
+# Avvio normale (lo fa start.sh con MERLT_ENABLED=true; api-in-docker è il default):
 #   docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d
-#   → avvia tutti i 5 servizi
+#   → i 7 servizi. start.sh inizializza prima il submodule vendor/mcp-legal-it.
 #
-# Env vars cambiabili: vedi backend/.env.example sezione MERLT_*
+# Solo dipendenze (modalità sviluppatore, MERLT_API_IN_DOCKER=false):
+#   docker compose -f docker-compose.merlt.yml up -d
+#   → le 4 dipendenze; start.sh avvia uvicorn e un rq worker locali da MERLT_PYTHON.
+#
+# Il codice merlt/ è dentro l'immagine (montato solo ./merlt/data, read-only):
+# dopo ogni modifica, build + up -d --force-recreate di merlt-api e merlt-worker.
+#
+# Variabili: vedi .env.merlt.example (compose) e backend/.env.example (BFF);
+# runbook completo in docs/merlt/integration.md.
 
 services:
   merlt-postgres:

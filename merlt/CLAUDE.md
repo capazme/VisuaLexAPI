@@ -1,490 +1,264 @@
-# CLAUDE.md - MERL-T Framework
+# CLAUDE.md: MERL-T (vendored in VisuaLexAPI)
 
-> **Istruzioni per agenti AI che lavorano su questo repository**
+Guidance for agents working under `merlt/`. Keep it true of the code: if the code
+contradicts a line here, fix the line in the same change.
 
----
+## What this directory is
 
-## Contesto Progetto
+`merlt/` is the **vendored MERL-T sidecar** of VisuaLexAPI, branch
+`visualex-merlt-main`. It started as a selective copy of the upstream research
+monorepo `ALIS_CORE/merlt` and has since diverged. **This copy is the source of
+truth** for the code VisuaLex runs. `docs/merlt/upstream-sync.md` records what
+was copied, how to sync, and the local divergences.
 
-**MERL-T** (Multi-Expert Legal Retrieval Transformer) è il **framework di machine learning** per l'analisi giuridica. Implementa:
-- Sistema Multi-Expert (4 esperti che replicano i canoni ermeneutici)
-- RLCF (Reinforcement Learning from Community Feedback)
-- Knowledge Graph giuridico
-- RAG Pipeline per risposte fondate
+It is not a PyPI package and it has no standalone workflow here. It runs as the
+`merlt-api` and `merlt-worker` containers of `docker-compose.merlt.yml`, at the
+repo root, started by the root `start.sh`. `merlt/docker-compose.dev.yml` and
+`merlt/start_dev.sh` are upstream leftovers that VisuaLex does not use.
 
-**Parte di**: Monorepo ALIS_CORE
-**Tipo**: Python ML framework (pubblicato su PyPI)
-**Licenza**: Apache 2.0 (Open Source)
-**PyPI**: `pip install merlt`
+Read first:
 
----
+- `../CLAUDE.md`, the MERL-T sections: topology, BFF contract, gates, gotchas.
+- `../docs/merlt/blueprint.md`: the architecture, verified against the code.
+- `../docs/merlt/integration.md`: the runbook and the env vars.
+- `../docs/merlt/contract-matrix.md`: which MERL-T routes the BFF proxies.
 
-## Fondamenti Teorici
+The browser never calls MERL-T. Every call comes from the Node BFF
+(`/api/merlt/*`), which injects `user_id` into the body and sends `X-API-Key`
+when it is configured.
 
-Questo framework implementa i concetti descritti nei paper:
+## What it does
 
-- **Allega, D., & Puzio, G. (2025b)**: *MERL-T: A multi-expert architecture for trustworthy artificial legal intelligence*
-- **Allega, D., & Puzio, G. (2025c)**: *Reinforcement learning from community feedback (RLCF)*
+A legal question is deliberated by four experts, one per canon of art. 12
+preleggi. Each expert reasons in a ReAct loop with tools. An adaptive
+synthesizer merges their answers (convergent) or keeps the dissent (divergent).
 
-### I 4 Expert (Art. 12 Preleggi)
+| Expert | Canon | File |
+|---|---|---|
+| `LiteralExpert` | letterale | `merlt/experts/literal.py` |
+| `SystemicExpert` | sistematico (walks the graph) | `merlt/experts/systemic.py` |
+| `PrinciplesExpert` | principî | `merlt/experts/principles.py` |
+| `PrecedentExpert` | precedente | `merlt/experts/precedent.py` |
 
-| Expert | Canone | Implementazione |
-|--------|--------|-----------------|
-| LiteralExpert | Interpretazione letterale | Analisi testuale, definizioni |
-| SystemicExpert | Interpretazione sistematica | Query Knowledge Graph |
-| PrinciplesExpert | Ratio legis | Principi costituzionali |
-| PrecedentExpert | Giurisprudenza | Massime, precedenti |
+**RLCF (Reinforcement Learning from Community Feedback)** turns user feedback
+into REINFORCE updates of three policy heads: gating, traversal and
+tool_gating. The authority of the user scales the learning rate.
 
-### I 4 Pilastri RLCF
+The graph co-evolves on its own:
 
-1. **Dynamic Authority Scoring**: Peso feedback basato su competenza
-2. **Uncertainty Preservation**: Mantiene incertezza dove appropriato
-3. **Constitutional Governance**: Principi guida del sistema
-4. **Devil's Advocate System**: Sfida deliberata per evitare conformismo
+- live sources become provisional `live:` nodes;
+- use and feedback promote them;
+- a hygiene sweep decays and prunes the ones nobody uses.
 
----
-
-## Stack Tecnologico
-
-- **Python 3.10+**
-- **PyTorch** per modelli ML
-- **Transformers** (HuggingFace) per LLM
-- **FalkorDB** per Knowledge Graph
-- **Qdrant** per vector search
-- **FastAPI** per API server
-- **Pydantic** per data models
-
----
-
-## Comandi Utili
-
-```bash
-# Installazione development
-pip install -e ".[dev]"
-
-# Test
-pytest                         # Tutti i test
-pytest tests/unit/             # Solo unit test
-pytest -k "expert"             # Test Expert
-
-# Linting
-black merlt/                   # Formattazione
-ruff check merlt/              # Linting
-mypy merlt/                    # Type checking
-
-# API Server
-./start_dev.sh                 # Docker + FastAPI (port 8000)
-
-# Database
-docker-compose up -d falkordb qdrant  # Solo DB
-
-# Experiments
-python -m merlt.experiments.run EXP-001  # Run experiment
-```
-
----
-
-## Struttura Cartelle
+## Real layout
 
 ```
 merlt/
-├── merlt/
-│   ├── __init__.py
-│   │
-│   ├── experts/               # I 4 Expert
-│   │   ├── __init__.py
-│   │   ├── base.py            # BaseExpert abstract
-│   │   ├── literal.py         # LiteralExpert
-│   │   ├── systemic.py        # SystemicExpert
-│   │   ├── principles.py      # PrinciplesExpert
-│   │   └── precedent.py       # PrecedentExpert
-│   │
-│   ├── rlcf/                  # Sistema RLCF
-│   │   ├── __init__.py
-│   │   ├── authority.py       # Calcolo autorità
-│   │   ├── feedback.py        # Gestione feedback
-│   │   ├── training.py        # Training loop
-│   │   ├── dissent.py         # Devil's Advocate
-│   │   └── governance.py      # Constitutional governance
-│   │
-│   ├── retrieval/             # Ricerca ibrida
-│   │   ├── vector.py          # Qdrant search
-│   │   ├── graph.py           # FalkorDB queries
-│   │   └── hybrid.py          # Combinazione
-│   │
-│   ├── synthesis/             # Sintesi risposte
-│   │   ├── synthesizer.py     # Combina Expert
-│   │   └── weighting.py       # Pesi dinamici
-│   │
-│   ├── knowledge_graph/       # Knowledge Graph
-│   │   ├── builder.py         # Costruzione grafo
-│   │   ├── queries.py         # Query Cypher
-│   │   ├── schema.py          # Schema nodi/archi
-│   │   └── ingest.py          # Ingestion pipeline
-│   │
-│   ├── pipeline/              # Pipeline principale
-│   │   ├── __init__.py
-│   │   └── pipeline.py        # Orchestrazione
-│   │
-│   ├── api/                   # FastAPI server
-│   │   ├── app.py             # Main app
-│   │   ├── routes/            # Endpoint
-│   │   └── schemas/           # Request/Response
-│   │
-│   └── config/                # Configurazione
-│       ├── settings.py        # Pydantic Settings
-│       └── defaults.yaml      # Valori default
-│
-├── docs/
-│   ├── experiments/           # Documentazione esperimenti
-│   └── archive/               # Documentazione storica
-│
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── fixtures/
-│
-├── docker-compose.yml
-├── pyproject.toml
-└── start_dev.sh
+├── merlt/                 the Python package (below)
+├── tests/                 pytest suite (api, pipeline, rlcf, scripts, storage, unit, worker)
+├── alembic/ + alembic.ini Alembic revisions 001–008 + baafa63897a6 (not run by the live stack)
+├── config/                RLCF training YAML (`rlcf_training.yaml`)
+├── scripts/               utility scripts
+├── data/                  seeds + dumps, mounted read-only at /app/data in the containers
+├── docs/                  upstream MERL-T docs (historical; VisuaLex docs live in ../docs/merlt/)
+├── Dockerfile             multi-stage, python:3.11-slim, torch CPU + spaCy it_core_news_lg
+└── pyproject.toml         deps; extras [dev]; pytest addopts excludes the `integration` marker
 ```
 
----
+`merlt/merlt/` (the package):
 
-## File Critici - Leggere Prima di Modificare
+| Package | What lives there |
+|---|---|
+| `app.py` | the FastAPI app (`merlt.app:app`), the lifespan boot sequence, `/health`, the router list |
+| `api/` | the routers (below), `engine_bootstrap.py` (builds the orchestrator, also used by "Riavvia motore"), `auth.py` (`verify_api_key`, `require_role`), `api_key_seed.py`, `models/` (Pydantic DTOs) |
+| `experts/` | `orchestrator.py`, the four experts, `base.py`, `react_mixin.py`, `synthesizer.py` (`AdaptiveSynthesizer`), `router.py`, `gating.py`, `neural_gating/` (gating MLP, `HybridExpertRouter`, tool selector), `models.py` (`QATrace`, `QAFeedback`, `ApiKey`), `llm/` |
+| `tools/` | the tools the experts call (`search.py`, `mcp_legal_adapter.py` for mcp-legal-it, `registry.py`, …) |
+| `rlcf/` | `training_scheduler.py` (buffer, `add_experience`, persistence), `replay_buffer.py`, `buffer_rehydration.py`, `policy_gradient.py` (REINFORCE, `GRAPH_TO_POLICY_RELATION`), `policy_manager.py` (loads `*_latest.pt`), `authority.py`, `domain_authority.py`, `authority_sync.py`, `aggregation.py`, `devils_advocate.py`, `quarantine_service.py`, `ai_service.py` (`OpenRouterService`), and more |
+| `weights/` | `store.py` (`WeightStore`, `weight_versions`), `learner.py`, `experiment.py`, `config/` |
+| `pipeline/` | `document_parser.py` (notes → staging, relation endpoint resolution), `provisional_writer.py`, `promotion.py`, `hygiene.py`, `mechanical_ingestion/` (parser, conflict report, promote), `ingestion.py`, `enrichment/`, `semantic_chunking/`, `live_enrichment.py`, `multivigenza.py` |
+| `storage/` | `graph/` (FalkorDB client and config, `entity_writer.py`, `relation_endpoints.py`), `vectors/` (embeddings, `collection.py`), `retriever/`, `bridge/`, `trace/`, `temporal/`, `enrichment/` (SQLAlchemy models, `database.py`, `consensus_triggers.py`, `schema_additions.py`, `deduplication.py`), `migrations/` (plain SQL for the `create_tables()` stack) |
+| `worker/` | RQ tasks: `tasks.py` (article ingest), `extraction_tasks.py` (`extract_to_staging`), `mechanical_ingest_tasks.py`, `ner_training_tasks.py` |
+| `ner/` | spaCy model, feedback buffer, training data conversion |
+| `disagreement/` | the companion `LegalDisagreementNet` classifier (not part of the policy gradient) |
+| `citation/`, `clients/`, `config/`, `core/`, `utils/`, `scripts/`, `benchmark/` | URN parsing/formatting; the client to the VisuaLex Python API; `RuntimeConfig`; `LegalKnowledgeGraph`; `urn_labels.py`, `urngenerator.py`, ordinals, maps; the seed loader and backfills; the RAG benchmark |
+| `models/`, `services/`, `sources/` | mappings; empty placeholder packages |
 
-| File | Importanza | Note |
-|------|------------|------|
-| `experts/base.py` | **CRITICO** | Interfaccia base Expert - non modificare signature |
-| `rlcf/authority.py` | **CRITICO** | Algoritmo autorità - richiede approvazione |
-| `rlcf/governance.py` | **CRITICO** | Principi costituzionali - immutabili |
-| `synthesis/synthesizer.py` | **ALTA** | Combina risposte Expert |
-| `knowledge_graph/schema.py` | **ALTA** | Schema grafo - richiede migration |
-| `pipeline/pipeline.py` | **ALTA** | Orchestrazione principale |
+## HTTP API
 
----
+The app is `merlt.app:app`. `/health` and `/` are the only root routes. Every
+router is mounted with `prefix="/api/v1"` plus its own prefix:
 
-## Pattern da Seguire
+| Router | Prefix |
+|---|---|
+| `feedback_api` | `/feedback` |
+| `auth_api` | `/auth` |
+| `experts_router` | `/experts` |
+| `admin_router` | `/admin` |
+| `enrichment_router` | `/enrichment` |
+| `document_router` | `/documents`, `/amendments`, `/candidates` |
+| `graph_router` | `/graph` |
+| `pipeline_router` | `/pipeline` |
+| `training_router` | `/training` |
+| `trace_router` | `/traces` |
+| `validity_router` | `/validity` |
+| `citation_router` | `/citations` |
+| `dashboard_router` | `/dashboard` |
+| `profile_router` | `/profile` |
+| `rlcf_router` | `/rlcf` |
+| `expert_metrics_router` | `/expert-metrics` |
+| `ws_router` | `/ws` |
+| `tracking_router` | `/tracking` |
+| `policy_evolution_router` | `/policy-evolution` |
+| `export_router` | `/export` |
+| `devils_advocate_router` | `/devils-advocate` |
+| `audit_router` | `/audit` |
+| `circuit_breaker_router` | `/circuit-breaker` |
+| `regression_router` | `/regression` |
+| `quarantine_router` | `/feedback` (same prefix as `feedback_api`, different paths) |
+| `api_keys_router` | `/api-keys` |
+| `ner_router` | `/ner` |
+| `ingestion_mechanical_router` | `/ingestion/mechanical` |
 
-### Expert Implementation
-```python
-# experts/nuovo_expert.py
-from merlt.experts.base import BaseExpert, ExpertResponse
-from merlt.retrieval import HybridRetriever
+**Auth.** `app.py` sets `app.dependency_overrides[verify_api_key] = optional_api_key`,
+so a route that declares only `verify_api_key` accepts requests without a key.
+Only `require_role("admin")` checks the key.
 
-class NuovoExpert(BaseExpert):
-    """Expert per interpretazione X."""
+- Among the routes the BFF uses, those are `/rlcf/training/{start,stop}` and
+  `/ingestion/mechanical/*`.
+- `/admin/*` and `/ner/*` are therefore open at this layer. Never expose :8000,
+  and design every new sensitive route assuming `verify_api_key` filters
+  nothing.
+- The admin key is seeded at boot from `MERLT_ADMIN_API_KEY`
+  (`api/api_key_seed.py`).
 
-    def __init__(self, retriever: HybridRetriever):
-        super().__init__(name="nuovo", retriever=retriever)
+**Callbacks to the BFF.** They carry `X-Internal-Secret` (`MERLT_INTERNAL_SECRET`):
 
-    async def analyze(self, query: str, context: dict) -> ExpertResponse:
-        """
-        Analizza query secondo canone X.
+- the worker posts to `BFF_CALLBACK_URL` and `BFF_EXTRACTION_CALLBACK_URL`;
+- the api's async Q&A task posts to `BFF_QA_CALLBACK_URL`.
 
-        Args:
-            query: Domanda giuridica
-            context: Contesto (articolo, dominio, etc.)
+## Boot (the `app.py` lifespan)
 
-        Returns:
-            ExpertResponse con answer, sources, confidence
-        """
-        # 1. Retrieve relevant documents
-        docs = await self.retriever.search(query, filters=context)
+Each step is failure-isolated: if one fails, it logs and the boot goes on.
 
-        # 2. Generate response
-        answer = await self._generate(query, docs)
+1. `init_db()` and `create_tables()`.
+2. `ensure_consensus_triggers()`.
+3. `ensure_schema_additions()`.
+4. `ensure_admin_api_key()`.
+5. The expert system (`engine_bootstrap.build_orchestrator`).
+6. Replay-buffer rehydration, when no buffer file was loaded.
+7. The Libro IV seed (`MERLT_SKIP_SEED`).
+8. The hygiene loop, when `MERLT_HYGIENE_INTERVAL_HOURS > 0`.
 
-        # 3. Calculate confidence
-        confidence = self._calculate_confidence(docs, answer)
+**The live stack never runs Alembic.** A column added to a model must also go
+into `storage/enrichment/schema_additions.py`, and into a SQL file under
+`storage/migrations/` and an Alembic revision for parity. Otherwise the ORM
+selects a column that Postgres does not have.
 
-        return ExpertResponse(
-            expert_name=self.name,
-            answer=answer,
-            sources=[d.source for d in docs],
-            confidence=confidence,
-            reasoning=self._explain_reasoning(docs)
-        )
-```
+The RQ worker has no lifespan: every task that touches the enrichment DB calls
+`await init_db()` first.
 
-### RLCF Authority Calculation
-```python
-# rlcf/authority.py
-from dataclasses import dataclass
+## Critical files: read before editing
 
-@dataclass
-class AuthorityScore:
-    value: float  # 0.0 - 1.0
-    components: dict  # breakdown
+| File | Why |
+|---|---|
+| `experts/base.py` | the expert contract and the LLM call path; keep the signatures |
+| `experts/orchestrator.py`, `experts/synthesizer.py` | query flow, `forced_mode`, progress callbacks, disagreement |
+| `rlcf/authority.py` | the authority algorithm: needs the owner's explicit approval |
+| `rlcf/policy_gradient.py`, `rlcf/training_scheduler.py` | REINFORCE and the buffer; `GRAPH_TO_POLICY_RELATION` must map every floor relation |
+| `storage/enrichment/models.py`, `schema_additions.py`, `consensus_triggers.py` | the schema and the vote → consensus chain |
+| `storage/graph/entity_writer.py`, `relation_endpoints.py` | what consensus writes into FalkorDB; the `user_document` placeholder must never become a node |
+| `pipeline/provisional_writer.py`, `promotion.py`, `hygiene.py` | the graph co-evolution; match nodes by `URN OR node_id OR source_url` |
+| `utils/urn_labels.py` | URN → label, the article-suffix regex (longest-first) |
+| `api/experts_router.py`, `api/enrichment_router.py`, `api/graph_router.py` | the BFF-facing contract; see `../docs/merlt/contract-matrix.md` |
 
-def calculate_authority(
-    user_id: str,
-    domain: str,
-    feedback_history: list
-) -> AuthorityScore:
-    """
-    Calcola autorità utente per dominio.
+## Running
 
-    Componenti:
-    - background: Titoli, esperienza dichiarata
-    - consistency: Coerenza feedback nel tempo
-    - consensus: Allineamento con altri esperti
-    - domain_expertise: Competenza specifica dominio
-    """
-    background = _evaluate_background(user_id)
-    consistency = _evaluate_consistency(feedback_history)
-    consensus = _evaluate_consensus(feedback_history)
-    domain_exp = _evaluate_domain_expertise(user_id, domain)
+**In Docker (the supported path), from the repo root.** Only `merlt/data` is
+mounted, so after any code change rebuild and recreate:
 
-    value = (
-        0.25 * background +
-        0.25 * consistency +
-        0.30 * consensus +
-        0.20 * domain_exp
-    )
-
-    return AuthorityScore(
-        value=value,
-        components={
-            "background": background,
-            "consistency": consistency,
-            "consensus": consensus,
-            "domain_expertise": domain_exp
-        }
-    )
-```
-
-### Knowledge Graph Query
-```python
-# knowledge_graph/queries.py
-from merlt.knowledge_graph.schema import NodeType, EdgeType
-
-CYPHER_QUERIES = {
-    "neighbors": """
-        MATCH (n)-[r]-(m)
-        WHERE n.urn = $urn
-        RETURN n, r, m
-        LIMIT $limit
-    """,
-
-    "path_between": """
-        MATCH path = shortestPath((a)-[*..5]-(b))
-        WHERE a.urn = $urn1 AND b.urn = $urn2
-        RETURN path
-    """,
-
-    "related_by_concept": """
-        MATCH (n)-[:DEFINISCE]->(c:Concept)<-[:DEFINISCE]-(m)
-        WHERE n.urn = $urn
-        RETURN DISTINCT m
-        LIMIT $limit
-    """
-}
-```
-
----
-
-## Convenzioni Codice
-
-### Python Style
-- **Black** formattazione (line length 88)
-- **Ruff** linting
-- **Type hints** obbligatori
-- **Docstrings** Google style
-
-### Naming
-- Expert: `{Name}Expert` (PascalCase)
-- Funzioni/variabili: snake_case
-- Costanti: UPPER_SNAKE_CASE
-- Query Cypher: UPPER_SNAKE_CASE
-
-### Async
-- Pipeline e Expert sono async
-- Knowledge Graph queries sono async
-- Database operations sono async
-
-### Logging
-```python
-import structlog
-
-logger = structlog.get_logger(__name__)
-
-logger.info("analysis_started", query=query, expert=self.name)
-logger.debug("documents_retrieved", count=len(docs))
-```
-
----
-
-## Anti-Pattern - Cosa NON Fare
-
-❌ **Non** modificare authority algorithm senza approvazione
-   - È il cuore del sistema RLCF
-
-❌ **Non** modificare Constitutional Governance
-   - I principi sono immutabili per design
-
-❌ **Non** aggiungere Expert senza implementare tutti i metodi astratti
-   - BaseExpert definisce il contratto
-
-❌ **Non** bypassare Synthesizer per risposte dirette
-   - Tutte le risposte devono passare dalla sintesi
-
-❌ **Non** modificare schema Knowledge Graph senza migration
-   - Dati esistenti devono essere preservati
-
-❌ **Non** ignorare confidence scores
-   - L'incertezza è parte del design (Uncertainty Preservation)
-
----
-
-## Testing
-
-### Unit Tests
-```python
-# tests/unit/test_literal_expert.py
-import pytest
-from merlt.experts import LiteralExpert
-from merlt.experts.base import ExpertResponse
-
-@pytest.fixture
-def literal_expert(mock_retriever):
-    return LiteralExpert(retriever=mock_retriever)
-
-async def test_analyze_returns_response(literal_expert):
-    response = await literal_expert.analyze(
-        query="Cos'è la risoluzione del contratto?",
-        context={"domain": "civile"}
-    )
-
-    assert isinstance(response, ExpertResponse)
-    assert response.expert_name == "literal"
-    assert 0 <= response.confidence <= 1
-    assert len(response.sources) > 0
-```
-
-### Integration Tests
-```python
-# tests/integration/test_pipeline.py
-import pytest
-from merlt.pipeline import Pipeline
-
-@pytest.mark.integration
-async def test_full_pipeline():
-    pipeline = Pipeline()
-
-    result = await pipeline.analyze(
-        document=test_document,
-        question="Quali sono le conseguenze dell'inadempimento?"
-    )
-
-    assert result.answer is not None
-    assert len(result.expert_responses) == 4
-    assert result.agreement_score >= 0
-```
-
----
-
-## Experiments
-
-Gli esperimenti sono documentati in `docs/experiments/`.
-
-### Struttura Esperimento
-```
-EXP-XXX_nome_esperimento/
-├── README.md           # Obiettivo, metodologia, risultati
-├── config.yaml         # Configurazione
-├── run.py              # Script esecuzione
-├── results/            # Output
-└── analysis.ipynb      # Analisi risultati
-```
-
-### Esecuzione
 ```bash
-python -m merlt.experiments.run EXP-023
+MERLT_ENABLED=true ./start.sh
+docker compose -f docker-compose.merlt.yml --profile api-in-docker build merlt-api merlt-worker
+docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d --force-recreate merlt-api merlt-worker
 ```
 
----
+**Locally** (developer mode, deps still in Docker):
 
-## API Server
-
-### Endpoints Principali
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/analyze` | Analisi multi-expert |
-| GET | `/api/v1/experts` | Lista Expert disponibili |
-| POST | `/api/v1/feedback` | Submit RLCF feedback |
-| GET | `/api/v1/authority/{user_id}` | Authority score |
-| GET | `/api/v1/graph/neighbors/{urn}` | Graph neighbors |
-
-### Avvio
 ```bash
-./start_dev.sh              # Docker + FastAPI
-uvicorn merlt.api.app:app   # Solo API
+python3.11 -m venv merlt/.venv
+merlt/.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+merlt/.venv/bin/pip install -e 'merlt[dev]'
+MERLT_ENABLED=true MERLT_API_IN_DOCKER=false MERLT_COMPOSE_ENABLED=true ./start.sh
 ```
 
----
+In this mode `start.sh` runs `uvicorn merlt.app:app --reload` and a local
+`rq worker merlt_ingest merlt_extract merlt_ner_train`, from `MERLT_PYTHON`
+(default `merlt/.venv/bin/python`).
 
-## Database
+The host ports, all bound to 127.0.0.1: postgres 5436, redis 6381, FalkorDB
+6382, Qdrant 6343, api 8000, mcp-legal-it 8011. Inside the compose network the
+services use their container ports (FalkorDB and Redis on 6379, Qdrant on 6333).
 
-### FalkorDB (Knowledge Graph)
-- **Port**: 6379 (default Redis port)
-- **Browser**: Non disponibile di default
-- **Query**: Cypher
+## Tests
 
-### Qdrant (Vector Search)
-- **Port**: 6333
-- **Dashboard**: http://localhost:6333/dashboard
-- **Collections**: `legal_chunks`, `case_law`
+CI (`.github/workflows/ci.yml`, job `merlt`, branch `visualex-merlt-main`) is
+the reference run. On Python 3.11 it:
 
----
+1. installs CPU torch, then `pip install -e ".[dev]"`;
+2. bootstraps a Postgres service with `init_db()`, `create_tables()` and
+   `ensure_schema_additions()`;
+3. runs `python -m pytest tests/ -q`.
 
-## Dipendenze del Progetto
+Tests marked `integration` (live FalkorDB) are excluded by `pyproject.toml`
+`addopts`. Run them with `-m integration`.
 
-### Usa
-- **visualex**: Per scraping dati (PyPI)
+Locally, from the venv. The DB-backed tests write rows, so point them at a
+disposable database, never at the dev stack's data:
 
-### Usato da
-- **visualex-merlt**: Integration layer
-- **merlt-models**: Carica pesi addestrati
+```bash
+cd merlt
+export ENRICHMENT_DATABASE_URL=postgresql+asyncpg://merlt:merlt@localhost:5436/merlt_test
+export RLCF_DATABASE_URL=postgresql://merlt:merlt@localhost:5436/merlt_test
+export RLCF_ASYNC_DATABASE_URL=postgresql+asyncpg://merlt:merlt@localhost:5436/merlt_test
+export DATABASE_URL=postgresql://merlt:merlt@localhost:5436/merlt_test
+.venv/bin/python -c "import asyncio
+from merlt.storage.enrichment.database import init_db, create_tables
+from merlt.storage.enrichment.schema_additions import ensure_schema_additions
+async def main():
+    await init_db(); await create_tables(); await ensure_schema_additions()
+asyncio.run(main())"
+.venv/bin/python -m pytest tests/ -q
+```
 
----
+(`merlt_test` must exist: `createdb -h localhost -p 5436 -U merlt merlt_test`.)
 
-## Workflow di Sviluppo
+**In the container:** `docker exec -w /app visualex-merlt-api python -m pytest tests/ -q`.
+The Dockerfile copies `tests/` and installs pytest, and this works only if
+`merlt/.dockerignore` does not exclude `tests/`. The command runs against the
+stack's own database.
 
-1. **Branch** da main: `feature/nome-feature`
-2. **Sviluppa** con test
-3. **Test** con `pytest`
-4. **Lint** con `black` e `ruff`
-5. **Type check** con `mypy`
-6. **Documenta** esperimento se rilevante
-7. **PR** con descrizione dettagliata
+**Two test gotchas:**
 
----
+- `merlt.api` re-exports every router under its module's name.
+  `from merlt.api import graph_router` gives you the `APIRouter`, not the
+  module. To patch module globals, use
+  `importlib.import_module("merlt.api.graph_router")`.
+- Tests that pin shared vocabularies (the systemic relation floor, for
+  example) must import the source list, not copy it.
 
-## Agenti Consigliati per Task
+## Conventions
 
-| Task | Agente |
-|------|--------|
-| Nuovo Expert | `architect` poi `builder` |
-| Modifica RLCF | Richiede approvazione, poi `builder` |
-| Knowledge Graph | `graph-engineer` |
-| Pipeline optimization | `builder` |
-| Bug investigation | `debugger` |
-| Esperimenti | `builder` + documentazione |
-| API endpoints | `api-designer` poi `builder` |
-
----
-
-## Riferimenti
-
-- [README Principale](../README.md)
-- [Architettura](../ARCHITETTURA.md)
-- [Glossario](../GLOSSARIO.md)
-- [Guida Navigazione](../GUIDA_NAVIGAZIONE.md)
-- [Paper MERL-T](../papers/markdown/DA%20GP%20-%20MERLT.md)
-- [Paper RLCF](../papers/markdown/DA%20GP%20-%20RLCF.md)
-- [Experiments README](docs/experiments/README.md)
-
----
-
-*Ultimo aggiornamento: Gennaio 2026*
+- Async everywhere (FastAPI, SQLAlchemy async, FalkorDB client). Log with
+  `structlog`.
+- `user_id` is an opaque `varchar(100)` string (the VisuaLex user id), never a
+  foreign key.
+- RQ job ids use `-`, never `:`, and every enqueue sets an explicit
+  `job_timeout`: RQ's 180 s default kills with SIGALRM and skips the task's
+  `except`.
+- The FalkorDB graph key for a norm is the full Normattiva URL, without the
+  version marker. Strip only the marker (`!vig=`, `@originale`), never the URL
+  wrapper.
+- One graph name (`merl_t_legal`) and one Qdrant collection
+  (`storage/vectors/collection.default_chunks_collection()`).
+- Do not change the authority algorithm or the synthesizer's contract without
+  the owner's approval.

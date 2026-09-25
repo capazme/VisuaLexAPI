@@ -16,6 +16,72 @@
 > Riferimenti al codice nella forma `file:line` (es. `orchestrator.py:656`) sono ancore reali,
 > relative a `merlt/merlt/` salvo diversa indicazione.
 
+> **Stato al 2026-09-25.** Il blueprint descrive il working tree del 17 luglio 2026. Da allora, e in
+> particolare nella sessione del 25 settembre, sono stati chiusi questi punti. Le sezioni toccate
+> sono già aggiornate qui sotto.
+>
+> **Runtime e infrastruttura**
+>
+> - **Stack da un clone vuoto.** `start.sh` usa `api-in-docker` di default e inizializza il
+>   submodule `vendor/mcp-legal-it`. Legge `MERLT_INTERNAL_SECRET` e `MERLT_API_KEY` da
+>   `backend/.env`. In modalità locale avvia anche un worker RQ sulle tre code. FalkorDB persiste in
+>   `/var/lib/falkordb/data`. Il sweep di igiene gira ogni 24 h (`MERLT_HYGIENE_INTERVAL_HOURS`).
+>   (`2a68ab3`)
+> - **Boot.** Il boot semina la chiave admin da `MERLT_ADMIN_API_KEY` e applica
+>   `ensure_schema_additions`. `/health` riporta `graph.nodes`. Un solo default per il nome del grafo
+>   (`merl_t_legal`) e per la collection Qdrant (`storage/vectors/collection.py`).
+>   (`af803d9`, `2a1d1f4`)
+> - **Integrità dei dati.** La regex dei suffissi degli articoli è completa, dalla più lunga alla
+>   più corta. Le abbreviazioni dei codici vengono da una tabella esplicita. Una Norma stub con
+>   «Art. N» non è più un conflitto. La lunghezza dei path nel retriever è letta dal livello giusto.
+>   (`af803d9`)
+> - **CI.** La CI copre `visualex-merlt-main` con la suite Python di MERL-T. Il nock shim del
+>   backend onora `reqheaders`. (`195b885`)
+>
+> **Loop α e contributi**
+>
+> - **Promozione.** Riporta `created`, `message` e i duplicati. Conserva l'`entity_type`. Porta la
+>   provenienza: `fonte='community'`, `source_reference` e `source_document_id`, con la colonna
+>   `source_reference` (migrazione 007 e `storage/migrations/003`). (`58b5944`, `553a968`)
+> - **Relazioni.** Le proposte di relazione persistono (valore wire, non Enum). Il segnaposto
+>   `user_document` non diventa mai una `:Norma`. Gli estremi delle relazioni vengono risolti in
+>   staging e scritti per MATCH al consenso (migrazione 008, `storage/migrations/004`).
+>   (`9365353`, `c7d0844`)
+> - **Estrazione.** Ha un `job_timeout` esplicito e riporta i fallimenti al BFF. (`9365353`)
+> - **Authority.** Il consenso sulle relazioni ricalcola l'authority come quello sulle entità. Il
+>   BFF aggiorna la cache quando un voto chiude il consenso. (`553a968`, `d148af4`)
+>
+> **Loop β e grafo**
+>
+> - **Confirm-source.** `POST /api/v1/enrichment/confirm-source` («Ricorda nel grafo») ora esiste.
+>   (`553a968`)
+> - **Q&A.** La modalità convergente o divergente scelta dal lettore arriva al synthesizer
+>   (`forced_mode`). Il peso parziale è il peso di routing. (`abec0f4`)
+> - **Buffer RLCF.** È durevole (`MERLT_RLCF_BUFFER_PATH` sul volume dei checkpoint) e viene
+>   reidratato al boot. (`abec0f4`)
+> - **Provenienza.** La lookup delle fonti Q&A trova i nodi provvisori per `source_url`, e il segnale
+>   di co-evoluzione accredita i nodi serviti (`coevo_served_keys`). (`abec0f4`)
+> - **Vocabolario.** `CORRELATO` è mappato nel vocabolario della traversal policy. (`75794f5`)
+> - **Igiene.** Si può lanciare dall'hub (`POST /api/merlt/ops/graph/hygiene`, `2b9e23f`). Non pota
+>   più un nodo per cui un utente ha garantito con confirm-source (`HUMAN_SIGNAL_PREDICATE`,
+>   `62318b8`).
+> - **Storico delle policy.** `GET /api/v1/rlcf/policies/history` legge le `weight_versions`
+>   salvate. (`23bdc47`)
+> - **NER.** Il training ha una baseline A/B reale e un report persistito
+>   (`GET /api/v1/ner/training/report/latest`). (`7e3782e`)
+>
+> **BFF e frontend**
+>
+> - **Watchdog.** L'estrazione ha una sua rete di 45 min. (`d148af4`)
+> - **Ingestione lazy.** È indicizzata per articolo normalizzato, con una riga per lettore e fan-out
+>   della callback. (`7970c1b`)
+> - **Feedback NER.** È uscito dal flag ops. Un enqueue Q&A rifiutato fallisce subito.
+>   `@originale` viene rimosso dagli URN. (`1cc47dd`, `44ad3d2`)
+> - **Frontend.** I canali di insegnamento chiedono il consenso Completo, `qa_chip` è attivo, e
+>   c'è il campo «Approfondisci». La voce «Grafo» è in sidebar e la provenienza `confirmed` è di
+>   prima classe. (`3a26245`)
+> - **Tracking.** La soglia del 30 % di `article:viewed` ora scatta davvero. (`8de14a0`)
+
 ---
 
 ## Indice
@@ -387,8 +453,16 @@ flowchart TB
 | `router` | 1.0 se rating ≥ 4, altrimenti 0.0 |
 
 **② Buffer.** Singleton di processo (`get_scheduler()`), `PrioritizedReplayBuffer` (capacità 10000,
-α=0.6, SumTree), persistito su `data/rlcf/replay_buffer.json`. Scarta feedback
-`quarantined/flagged/deleted`.
+α=0.6, SumTree). Scarta feedback `quarantined/flagged/deleted`.
+
+- **Dove.** Il file è `MERLT_RLCF_BUFFER_PATH`. Il default è `checkpoints/rlcf/replay_buffer.json`,
+  relativo alla working dir; compose lo fissa a `/app/checkpoints/rlcf/replay_buffer.json`, sul
+  volume durevole `merlt_checkpoints`. Il vecchio percorso `data/rlcf/` stava sul mount di sola
+  lettura `/app/data`, quindi ogni restart svuotava il buffer.
+- **Scrittura.** `add_experience` salva con debounce e sostituzione atomica, e uno shutdown pulito
+  fa il flush.
+- **Boot.** Se non si carica nessun file, `rlcf/buffer_rehydration.py` ricostruisce il buffer da
+  `QAFeedback JOIN QATrace`, deduplicato su `feedback_id`, e non addestra.
 
 **③ Trigger.** `should_train()` è vero quando `buffer_size ≥ buffer_threshold` (default **100**) e sono
 passati `min_interval_seconds` (3600s) dall'ultimo run; oppure per *idle timeout*. Manuale via
@@ -425,9 +499,19 @@ Oltre ai pesi, **il grafo stesso evolve**. Tre movimenti (memoria `merlt_graph_c
   confermati. Trust basso (~0.6) → pesano meno nel retrieval.
 - **Impara** (Signal 2 + promozione): credito d'uso per gli URN serviti; un nodo che accumula
   uso+feedback+citazioni oltre `promotion_threshold` (0.6) viene *promosso* (trust sale).
-- **Autocorreggi** (igiene, Slice C): un loop periodico opzionale
-  (`MERLT_HYGIENE_INTERVAL_HOURS`, default 0 = off) applica decay/prune ai nodi provvisori;
-  i nodi *dubbi* finiscono in **review** umana (`GET/POST /graph/provisional-review`, in `/merlt/valida`).
+- **Autocorreggi** (igiene, Slice C, `pipeline/hygiene.py`). Ogni sweep riconcilia i gemelli di
+  nodi confermati, applica il decay e mette in quarantena i nodi *dubbi*, che finiscono in
+  **review** umana (`GET/POST /graph/provisional-review`, in `/merlt/valida`). Pota i nodi sbiaditi.
+  - **Quando gira.** Periodicamente, se `MERLT_HYGIENE_INTERVAL_HOURS > 0` (default 0 nel codice,
+    24 in compose). Oppure su richiesta dall'hub (`POST /api/merlt/ops/graph/hygiene` →
+    `/api/v1/admin/graph/hygiene`).
+  - **Segnale umano** (`HUMAN_SIGNAL_PREDICATE`). Conta come segnale umano il feedback, l'uso, e
+    anche la garanzia data con confirm-source: `confirmed_by` non vuoto o `pending_entity_id`
+    stampato. Un nodo con segnale va in revisione e non viene mai potato. `reconcile_duplicates`
+    lascia stare i gemelli garantiti.
+  - **Limite noto.** Una proposta rifiutata conserva lo stampo, quindi un nuovo confirm risponde
+    «Fonte gia' proposta alla comunita'». Il nodo sbiadisce comunque in quarantena, dove il
+    rifiuto lo pota.
 
 ### 2.6 Il disaccordo: due meccanismi distinti (da non confondere)
 
@@ -529,7 +613,8 @@ flowchart TB
 **Principio portante:** il grafo **non è mai toccato prima di una promozione esplicita** — admin per la
 meccanica, community RLCF per l'interpretativo, utente per gli appunti. Nel flusso (c) il **verbatim non
 entra mai** in `pending_*`: la promozione crea righe fresche dal testo riformulato, con copyright gate
-ri-verificato server-side sul verbatim autoritativo, e il file caricato è cancellato dopo l'estrazione.
+ri-verificato server-side sul verbatim autoritativo, e il file caricato è cancellato dopo l'estrazione
+(salvo quando nulla è finito in staging, così un nuovo tentativo resta possibile).
 
 ### 3.6 Il worker RQ
 
@@ -538,13 +623,20 @@ Un unico worker ascolta **tre code load-bearing**:
 job restano `queued` per sempre. Gli id dei job usano il **trattino** (`ingest-<sha>`, `extract-<sha>`,
 `mech-parse-<id>`), mai i due punti (RQ ≥2.0 li rifiuta). Il worker **non ha lifespan FastAPI**: ogni
 task che apre il DB enrichment deve chiamare `init_db()` prima. I callback al BFF viaggiano in camelCase
-con header `X-Internal-Secret`.
+con header `X-Internal-Secret` e fanno un solo tentativo; solo la callback terminale della Q&A (dal
+processo api) ritenta, fino a 3 volte.
+
+Ogni accodamento fissa un `job_timeout` esplicito: estrazione `MERLT_EXTRACT_JOB_TIMEOUT` (1800 s),
+ingest di un articolo 600 s, ingestion meccanica 1800 s, training NER 3600 s. Il default di RQ
+(180 s) uccideva i job con SIGALRM, che salta l'`except` del task: al BFF non arrivava nessuna
+callback di fallimento.
 
 ### 3.7 La trappola `!vig=` (da conoscere una volta per tutte)
 
 Il grafo indicizza gli URN **senza** il marker di versione. VisuaLex li produce **con** `…!vig=`.
 Passare un URN grezzo con `!vig=` al grafo fa tornare `exists:false` / subgraph vuoto → *lazy-ingestion
-infinita*. Perciò lo strip del marker (dal primo `!`) è applicato in **tre punti**: BFF
+infinita*. Lo stesso vale per il suffisso `@originale` della versione originale. Perciò lo strip
+del marker (dal primo `!` o `@` lato BFF) è applicato in **tre punti**: BFF
 (`graphClient.normalizeGraphUrn`), Python (`utils/urn_labels`, `_canonical_urn`), e nei tool grafo. Non
 bypassarlo quando aggiungi nuove chiamate keyed su URN.
 
@@ -665,7 +757,7 @@ blocca, vedi 6.6); **ADMIN** = `require_role("admin")` (blocca davvero).
 | `tracking_router` | `/tracking` | `POST /events` (batch RLCF Slice-1) | OPT |
 | `experts_router` | `/experts` | `POST /query`, `/query/async`, `/feedback/{inline,detailed,source,preference,relation,router}`, `/feedback/refine`, `GET /history`, `/trace/{id}` | OPT |
 | `graph_router` | `/graph` | `GET /check-article`, `/subgraph`, `/node/{id}`, `/entities/search`, `POST /resolve-norm`, `/ingest-article`, `/search`, `GET/POST /provisional-review[/{id}]` | OPT |
-| `ner_router` | `/ner` | `POST /feedback`, `GET /feedback/stats`, `POST /training/start`, `GET /training/jobs/{id}` | OPT |
+| `ner_router` | `/ner` | `POST /feedback`, `GET /feedback/stats`, `POST /training/start`, `GET /training/jobs/{id}`, `GET /training/report/latest` | OPT |
 | `document_router` | `/documents` `/amendments` `/candidates` | upload, `POST /{id}/extract-async`, `GET /{id}/candidates`, `POST /candidates/{id}/mark-promoted` | OPT |
 | `profile_router` | `/profile` | `GET /full`, `/authority/domains`, `PATCH /qualification` | OPT (+JWT) |
 
@@ -673,11 +765,11 @@ blocca, vedi 6.6); **ADMIN** = `require_role("admin")` (blocca davvero).
 
 | Router | Prefix | Endpoint principali | Auth |
 |---|---|---|---|
-| `rlcf_router` | `/rlcf` | `POST /training/{start,stop}`, `GET /training/status`, `/buffer/status`, `/policies/{weights,history}`, `WS /training/stream` | start/stop **ADMIN** |
+| `rlcf_router` | `/rlcf` | `POST /training/{start,stop}`, `GET /training/status`, `/buffer/status`, `/policies/{weights,history}` (entrambi leggono `weight_versions`; `history` tramite `WeightStore.list_versions`, dal più vecchio), `WS /training/stream` | start/stop **ADMIN** |
 | `training_router` | `/training` | scheduler autopilota legacy (`/start`, `/pause`, `/config`, `/add-experience`) | pause/config **ADMIN** |
-| `admin_router` | `/admin` | `GET/PUT /config[/{key}]`, `POST /engine/reinitialize`, `/graph/hygiene` | **ADMIN** |
+| `admin_router` | `/admin` | `GET/PUT /config[/{key}]`, `POST /engine/reinitialize`, `/graph/hygiene` | **OPT** (dichiara solo `verify_api_key`: a monte è aperto, il solo cancello è `requireAdmin` del BFF, quindi `:8000` non va mai esposto) |
 | `ingestion_mechanical_router` | `/ingestion/mechanical` | `POST /run`, `GET /batches[/{id}]`, `POST /batches/{id}/{promote,reject}` | **ADMIN** |
-| `enrichment_router` | `/enrichment` | live enrichment, `propose/validate entity/relation`, pending, issue tracking | perlopiù OPT |
+| `enrichment_router` | `/enrichment` | live enrichment, `propose/validate entity/relation`, `confirm-source`, pending, issue tracking | perlopiù OPT |
 | `quarantine_router` | `/feedback` | `POST /{id}/{flag,quarantine,approve}`, `GET /{flagged,quarantined}` | **ADMIN** |
 
 **Osservabilità:** `dashboard_router`, `pipeline_router`, `trace_router`, `expert_metrics_router`,
@@ -687,11 +779,22 @@ PUB), `auth_api` (sync authority, PUB), `api_keys_router`.
 
 ### 6.2 Boot / lifespan (`app.py`)
 
-1. `load_dotenv` → 2. `init_db()` (pool async Postgres) → 3. `create_tables()` (crea tabelle mancanti,
-incl. `extraction_candidates`) → 4. **`ensure_consensus_triggers()`** (reinstalla idempotente i trigger
-PL/pgSQL RLCF vote→net_score→consenso→promozione; *root-cause storica del loop RLCF rotto*) → 5.
-Expert System (`OpenRouterService` → `build_orchestrator` → `initialize_expert_system`) → 6. Seed loader
-(gated `MERLT_SKIP_SEED`) → 7. Hygiene loop (gated `MERLT_HYGIENE_INTERVAL_HOURS`) → 8. ready.
+1. `load_dotenv`.
+2. `init_db()`: pool async Postgres.
+3. `create_tables()`: crea le tabelle mancanti, incluse `extraction_candidates` e `tracking_events`.
+4. **`ensure_consensus_triggers()`**: reinstalla in modo idempotente i trigger PL/pgSQL
+   vote→net_score→consenso→promozione. Era la *root-cause storica del loop RLCF rotto*.
+5. **`ensure_schema_additions()`**: le colonne aggiunte dopo il primo boot (`ADD COLUMN IF NOT
+   EXISTS`, più l'allargamento di `target_entity_id`). Serve perché `create_tables()` non altera mai
+   una tabella esistente.
+6. **`ensure_admin_api_key()`**: semina `MERLT_ADMIN_API_KEY` come chiave `admin`, per hash.
+7. Expert System: `OpenRouterService` → `build_orchestrator` → `initialize_expert_system`.
+8. Reidratazione del replay buffer RLCF, al massimo 120 s.
+9. Seed loader (condizionato da `MERLT_SKIP_SEED`).
+10. Hygiene loop (condizionato da `MERLT_HYGIENE_INTERVAL_HOURS`).
+11. Ready.
+
+Ogni passo è isolato: se fallisce, logga e il boot prosegue.
 
 ### 6.3 Topologia Docker (`docker-compose.merlt.yml`)
 
@@ -699,7 +802,7 @@ Expert System (`OpenRouterService` → `build_orchestrator` → `initialize_expe
 |---|---|---|---|
 | `merlt-postgres` | 5436→5432 | `merlt_postgres_data` | sempre |
 | `merlt-redis` | 6381→6379 | — (effimero: cache + coda RQ) | sempre |
-| `merlt-falkordb` | 6382→6379 | `merlt_falkor_data` (`restart: unless-stopped`) | sempre |
+| `merlt-falkordb` | 6382→6379 | `merlt_falkor_data` montato su `/var/lib/falkordb/data`, con `FALKORDB_ARGS="--save 60 1 --appendonly yes --appendfsync everysec"` (`restart: unless-stopped`) | sempre |
 | `merlt-qdrant` | 6343→6333 | `merlt_qdrant_data` | sempre |
 | `mcp-legal-it` | 8011→8011 | — | `api-in-docker` |
 | `merlt-api` | 8000→8000 | (condivisi) | `api-in-docker` |
@@ -720,25 +823,32 @@ obbligatorio su Linux/prod).
 | `FALKORDB_HOST/PORT` | localhost/6380 → container `merlt-falkordb:6379` | Grafo |
 | `QDRANT_HOST/PORT` | localhost/6333 | Vettori |
 | `MERLT_INTERNAL_SECRET` | `dev-internal-secret` | Callback worker/api↔BFF |
-| `MERLT_API_KEY` | — | Solo ops admin (BFF invia come `X-API-Key`) |
+| `MERLT_API_KEY` (BFF) / `MERLT_ADMIN_API_KEY` (api) | — | Ogni client BFF la invia come `X-API-Key` quando è impostata. Serve davvero solo alle route `require_role("admin")` (`/rlcf/training/{start,stop}`, `/ingestion/mechanical/*`). L'api la semina al boot come chiave `admin` |
+| `MERLT_RLCF_BUFFER_PATH` | `checkpoints/rlcf/replay_buffer.json` (compose: `/app/checkpoints/rlcf/replay_buffer.json`) | Replay buffer RLCF durevole |
+| `MERLT_EXTRACT_JOB_TIMEOUT` | 1800 | `job_timeout` RQ dell'estrazione appunti (sull'api, che accoda) |
+| `QDRANT_COLLECTION` | `<FALKORDB_GRAPH_NAME>_chunks` → `merl_t_legal_chunks` | Collection dei chunk (`storage/vectors/collection.py`) |
 | `OPENROUTER_API_KEY` | — | LLM |
 | `MERLT_SKIP_SEED` / `MERLT_SKIP_EMBEDDINGS` | false(api)/true(worker) / true | Salta seed / embeddings |
 | `MERLT_NER_LEARNED_ENABLED` | false | NER appreso all'inference |
 | `MERLT_NEURAL_TRAVERSAL_ENABLED` | true | TraversalPolicy addestrata |
-| `MERLT_HYGIENE_INTERVAL_HOURS` | 0 (off) | Sweep igiene grafo |
+| `MERLT_HYGIENE_INTERVAL_HOURS` | 0 nel codice (off); 24 in compose | Sweep igiene grafo |
 | `MCP_LEGAL_IT_URL` | `http://mcp-legal-it:8011/mcp` | Tool legali live |
 | `BFF_{,EXTRACTION_,QA_}CALLBACK_URL` | `host.docker.internal:3001/api/merlt/internal/*` | Callback verso BFF |
 
 ### 6.5 Avvio & migrazioni
 
-`start.sh` (root) gate: `MERLT_ENABLED` (default false) accende il sidecar;
-`MERLT_COMPOSE_ENABLED` avvia le deps; `MERLT_API_IN_DOCKER` sceglie tra api in container
-(`--profile api-in-docker`) e uvicorn locale con hot-reload. Ordine deps: api/worker attendono
+`start.sh` (root) gate: `MERLT_ENABLED` (default false) accende il sidecar. `MERLT_API_IN_DOCKER`
+(default `true`) sceglie l'api in container (`--profile api-in-docker`) e implica
+`MERLT_COMPOSE_ENABLED=true`. Con `false` parte la modalità sviluppatore: uvicorn locale con
+hot-reload più un worker RQ locale sulle tre code, senza mcp-legal-it. Il runbook è in
+`integration.md`. Ordine deps: api/worker attendono
 postgres+redis+falkordb+qdrant *healthy*.
 
-**Migrazioni Alembic** (7 revision) **non sono invocate automaticamente**: lo schema al boot è garantito
-da `create_tables()` + `ensure_consensus_triggers()`. Le migration vanno lanciate a mano; i trigger
-PL/pgSQL invece si reinstallano idempotenti a ogni boot.
+**Migrazioni Alembic** (9 revision: `001`–`008` più `baafa63897a6`, incatenata tra 002 e 003)
+**non sono invocate automaticamente**. Lo schema al boot è garantito da `create_tables()`,
+`ensure_consensus_triggers()` e `ensure_schema_additions()`: quest'ultima applica le aggiunte di
+colonne che le revision 007/008 e `storage/migrations/003`/`004` registrano. Le migration Alembic
+restano il registro per i DB che tracciano la storia, e vanno lanciate a mano.
 
 ### 6.6 Sicurezza: il trust boundary è il BFF
 
@@ -757,7 +867,9 @@ basta un restart.
 
 ## Appendice A — Divergenze dal CLAUDE.md (il codice è avanti)
 
-Il `CLAUDE.md` di progetto è stratificato per slice e in più punti è indietro rispetto al codice reale:
+Il `CLAUDE.md` di progetto è stratificato per slice e al 17 luglio era in più punti indietro rispetto
+al codice reale. *Il 2026-09-25 le sezioni MERL-T del `CLAUDE.md` sono state riallineate: le
+divergenze qui sotto sono recepite e restano come registro.*
 
 1. **La Q&A vive su `/grafo`, non su `/merlt/chiedi`.** Le rotte `/merlt/chiedi` e `/merlt/qa`
    **redirigono a `/grafo`**: la deliberazione è integrata nell'esploratore del grafo (decisione
@@ -768,7 +880,7 @@ Il `CLAUDE.md` di progetto è stratificato per slice e in più punti è indietro
 3. **Nuove superfici ops non documentate:** `/ops/config`, `/ops/config/:key`,
    `/ops/engine/reinitialize` (→ `/api/v1/admin/*`) e l'intero `opsIngestion` (`/ops/ingestion/*` →
    `/api/v1/ingestion/mechanical/*`, con `IngestionAdminPanel` sotto `/admin`).
-4. **Nuove route grafo:** `/graph/provisional-review[/:nodeId]` (igiene grafo), `/graph/search`,
+4. **Nuove route grafo:** `/graph/provisional-review[/:nodeId]` (igiene grafo),
    `/experts/trace/:traceId`, `/experts/feedback/relation`, `/contrib/me/jobs`, più `subgraphCache`.
 5. **Il tracking NON è più solo in-memory.** `tracking_router` ora persiste su Postgres
    `tracking_events` con fallback buffer; il replay buffer RLCF è persistito su JSON e i pesi su volume
@@ -801,10 +913,11 @@ Consolidato dalle "domande aperte" dei 7 agenti. Utile sapere dove sono le lame.
 - **Due schemi feedback** coesistono: `rlcf/persistence.py` (`RLCFTrace`/`RLCFFeedback`) vs
   `experts/models.py` (`QATrace`/`QAFeedback`). Il path live usa i secondi; verificare se i primi siano
   ancora scritti o dead schema.
-- **Mismatch collection Qdrant:** `RetrieverConfig` default `merl_t_dev_chunks`, ma la collection
-  popolata è `merl_t_legal_chunks` (il bootstrap la passa esplicitamente). Ogni nuovo consumer del
-  retriever deve impostare `collection_name`.
-- **Nome grafo:** il seed live usa `merl_t_dev`, l'env default è `merl_t_legal`. Da uniformare.
+- ~~**Mismatch collection Qdrant**~~ *(risolto il 2026-09-25, `2a1d1f4`)*: ogni consumer usa
+  `storage/vectors/collection.default_chunks_collection()`, cioè `QDRANT_COLLECTION` oppure
+  `<FALKORDB_GRAPH_NAME>_chunks` (`merl_t_legal_chunks`).
+- ~~**Nome grafo**~~ *(risolto il 2026-09-25, `af803d9`)*: `FalkorDBConfig` usa di default
+  `merl_t_legal`, come il seed loader e il worker.
 - **Collisione prefix `/feedback`:** `feedback_api` (PUB) e `quarantine_router` (ADMIN) montano lo
   stesso prefix con path distinti.
 - **Disallineamento label NER:** `spacy_model.NER_LABELS` dichiara 6 etichette, ma buffer/trainer/mining
@@ -816,8 +929,6 @@ Consolidato dalle "domande aperte" dei 7 agenti. Utile sapere dove sono le lame.
 - `resolved_urn` nel NER è un **TODO**: l'inferenza restituisce surface form senza URN risolto (la
   risoluzione è demandata a `visualex_client.parse_query`).
 - `shortest_path` in FalkorDB è manuale (≤2 hop reali); `max_hops≥3` non trova path >2.
-- L'estrazione di **relazioni** dal testo libero degli appunti è deferita (il path esiste, manca il
-  produttore di candidati-relazione da note).
 - Health-check FalkorDB con default porta 6380 vs interno 6379: rischio di falso "unhealthy" se
   `FALKORDB_PORT` non è settato.
 

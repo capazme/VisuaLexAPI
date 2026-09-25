@@ -7,7 +7,7 @@ project_name: "Visualex Platform"
 project_level: 3
 current_sprint: 2
 sprint_plan_path: "docs/sprint-plan-visualex-platform-2026-03-12.md"
-merlt_sprint_plan_path: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
+merlt_sprint_plan_path: "docs/merlt/slices/slice1/sprint-plan.md"
 
 sprints:
   - sprint_number: 1
@@ -48,7 +48,7 @@ sprints:
   - sprint_number: 2
     sprint_id: "MERLT-1a"
     goal: "MERL-T integration Slice 1a — Fondamenta + vertical slice article:viewed"
-    sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
+    sprint_plan_ref: "docs/merlt/slices/slice1/sprint-plan.md"
     capacity_points: 30
     committed_points: 25
     completed_points: 25
@@ -109,7 +109,7 @@ sprints:
   - sprint_number: 3
     sprint_id: "MERLT-1b"
     goal: "MERL-T integration Slice 1b — Plugin host + replica 4 eventi + closure"
-    sprint_plan_ref: "docs/sprint-plan-merlt-slice1-2026-05-22.md"
+    sprint_plan_ref: "docs/merlt/slices/slice1/sprint-plan.md"
     capacity_points: 30
     committed_points: 17
     completed_points: 17
@@ -159,7 +159,7 @@ sprints:
         status: "completed"
         completed_on: "2026-05-23"
         depends_on: ["MERLT-1.5", "MERLT-1.6"]
-        note: "Attribution decision (option B per docs/merlt-forum-authoring-decision.md): target_author_id = suggester for suggestion_*, env owner for like/download. New plugin slot 'global' mounted in Layout for cross-route bus subscribers (useForumSignalTracker). 5 backend integration tests + 8 frontend hook tests. Emissions added to BulletinBoardPage (handleLike/handleTakeItem/handleDeclineItem) and ImportEnvironmentModal (handleImport)."
+        note: "Attribution decision (option B per docs/merlt/decisions/forum-authoring.md): target_author_id = suggester for suggestion_*, env owner for like/download. New plugin slot 'global' mounted in Layout for cross-route bus subscribers (useForumSignalTracker). 5 backend integration tests + 8 frontend hook tests. Emissions added to BulletinBoardPage (handleLike/handleTakeItem/handleDeclineItem) and ImportEnvironmentModal (handleImport)."
       - story_id: "MERLT-1.11"
         title: "Doc finali + smoke E2E completo"
         points: 2
@@ -167,7 +167,7 @@ sprints:
         status: "completed"
         completed_on: "2026-05-23"
         depends_on: ["MERLT-1.7", "MERLT-1.8", "MERLT-1.9", "MERLT-1.10"]
-        notes: "Smoke checklist estesa con tutti 5 eventi (article:viewed, highlight+annotation, dossier+bookmark, citation, forum). CLAUDE.md sezione MERL-T integration aggiunta con entry points + gotchas + file rules. docs/merlt-forum-authoring-decision.md creato in MERLT-1.10."
+        notes: "Smoke checklist estesa con tutti 5 eventi (article:viewed, highlight+annotation, dossier+bookmark, citation, forum). CLAUDE.md sezione MERL-T integration aggiunta con entry points + gotchas + file rules. docs/merlt/decisions/forum-authoring.md creato in MERLT-1.10."
       - story_id: "MERLT-1.12"
         title: "PR ready + solutioning gate finale"
         points: 1

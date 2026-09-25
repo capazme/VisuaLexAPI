@@ -208,165 +208,1022 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
 
-### MERL-T Integration (Slice 1, branch `visualex-merlt-main`)
+### MERL-T Integration (branch `visualex-merlt-main`): where to look
 
-Slice 1 wires 5 user-action signals from VisuaLex into MERL-T's RLCF tracking buffer. Implementation lives across both backends and the frontend; the design doc is `docs/superpowers/specs/2026-05-22-merlt-integration-slice1-design.md`, the smoke checklist is `docs/merlt-smoke-checklist.md`, and the forum attribution decision is `docs/merlt-forum-authoring-decision.md`.
+MERL-T is the legal knowledge graph + RLCF sidecar. It exists only on this
+branch. Start from these, in `docs/merlt/`:
 
-**Runtime topology.** MERL-T is a separate FastAPI sidecar (Python, port 8000) defined in `docker-compose.merlt.yml` with 5 services: `merlt-api` + `merlt-postgres` + `merlt-redis` + `merlt-falkordb` + `merlt-qdrant`. Source lives in `VisuaLexAPI/merlt/` (selective copy of `ALIS_CORE/merlt` — see `docs/merlt-upstream-sync.md`). Two env flags control startup: `MERLT_ENABLED` gates the whole stack in `start.sh`, `MERLT_API_IN_DOCKER` switches between `--profile api-in-docker` (full container) and local uvicorn. The compose-network host names matter: BFF talks to `merlt-postgres:5432` and `merlt-api:8000` from inside Docker, and `localhost:5436` / `localhost:8000` from the host. `RLCF_DATABASE_URL`, `ENRICHMENT_DB_*`, `REDIS_URL`, `FALKORDB_HOST`, `QDRANT_HOST` are explicit env vars on the merlt-api service — MERL-T code has hardcoded defaults pointing at `localhost:5433/rlcf_dev` which break inside the container network.
+- `blueprint.md`: the architecture reference, verified against the code.
+- `contract-matrix.md`: every route mounted on the BFF, with its guard, its
+  MERL-T path and its FE consumer.
+- `integration.md`: the runbook, from a fresh clone to a working stack, plus
+  the env var tables.
+- `smoke-checklist.md`: the manual E2E checklist for every surface.
+- `seed-libro-iv.md`, `upstream-sync.md`, `qa-async-progressive-contract.md`.
+- Slice designs and sprint plans: `slices/<slice>/{design,sprint-plan}.md`.
+  Decisions: `decisions/`.
 
-**BFF (Node, port 3001).** All MERL-T traffic flows through `/api/merlt/*` — frontend never calls `:8000` directly. Routes:
-- `routes/merlt/index.ts` — mount point, **must be registered BEFORE the catch-all auth routers** (folders/bookmarks/etc. use `router.use(authenticate)` with no path prefix, so Express would 401 anything reaching them first; `app.ts` puts `app.use('/api/merlt', merltRoutes)` at line ~71 before the auth-only routers).
-- `routes/merlt/consent.ts` — GET/POST/DELETE `/consent` with Prisma transaction (upsert preference + append audit) and the `MerltConsentLevel` enum (none|basic|full); the `preferencesForLevel()` helper in `schemas/merlt/consent.ts` is the single source of truth for the 3 toggles (contribution / validation / graph).
-- `routes/merlt/events.ts` — 5 event endpoints (`article-viewed`, `highlight-annotation`, `dossier-bookmark`, `citation-clicked`, `forum-signal`). Each chain: `authenticate → consentGuard → Zod → authorityCache (best-effort) → eventMapper → merltClient.sendEvent → 202 { received, timestamp }`. The `_resetMerltClientForTests` export wipes the singleton client when integration tests swap `MERLT_API_URL`.
-- `routes/merlt/health.ts` — GET `/health`, no auth; proxies MERL-T `:8000/health` and surfaces upstream dependency status.
-- `routes/merlt/profile.ts` — GET `/profile` reads `MerltUserAuthorityCache` and falls back to cache-only on MERL-T outage (503 only on cache miss + outage).
-- `services/merlt/merltClient.ts` — typed HTTP client over native `fetch` + `AbortController`. Hits `/api/v1/tracking/events` (plural, batch-wrapped) and `/api/v1/profile/full` — both prefixes are mandatory. Typed error hierarchy: `MerltTimeoutError` / `MerltServerError` / `MerltBadRequestError` so the route can map 503/passthrough/dead-letter correctly.
-- `services/merlt/eventMapper.ts` — 5 `toMerlt*` functions. Each lifts `type` out, puts the rest into `data`, and merltClient wraps as `{events: [{type, data, timestamp}]}` before POSTing. `normalizeArticleUrn()` collapses `art1 bis` / `art1bis` / `art1_bis` / `art1BIS` to the canonical `art1-bis` form (gotcha #9 anti-regression).
-- `services/merlt/authorityCache.ts` — 1h TTL, falls back to stale cache when MERL-T is unreachable; returns null only when cache is missing AND sync fails.
-- `services/merlt/deadLetterLog.ts` — NDJSON in `backend/logs/merlt-dead-letter.jsonl` when MERL-T is down; skipped in `NODE_ENV=test` unless `MERLT_DEAD_LETTER_LOG_IN_TESTS=1`.
-- Prisma models (in main `schema.prisma`): `MerltUserPreference` (consent level + 3 toggles, enum-backed — kept from commit `81be277`), `MerltConsentAudit` (full transition trail with ip/userAgent), `MerltUserAuthorityCache` (added MERLT-1.2 — separated from the PRD-doc's two-bool model in favour of the existing enum design).
+The subsections below go slice by slice. Where a later slice changed an
+earlier one, the text says what is true today.
 
-**Frontend (`/frontend`).** Plugin host pattern — `ArticleTabContent` does NOT import MERL-T directly:
-- `plugins/registry.tsx` + `plugins/types.ts` — typed slot registry. `requiredFlag: 'VITE_FEATURE_MERLT'` gate, default ON (explicit `false`/`0`/`""` to disable). Two slots in use: `article_content_after` (mounts `ArticleMerltSlot` from `ArticleTabContent`) and `global` (mounts `GlobalMerltSlot` from `Layout`, survives route changes).
-- `features/merlt/ArticleMerltSlot.tsx` — null-renderer, hosts the 4 article-scoped tracker hooks: `useArticleViewedTracker`, `useHighlightAnnotationTracker`, `useDossierBookmarkTracker`, `useCitationTracker`. The legacy commit-`81be277` Q&A UI is gone (Slice 3 reintroduces it).
-- `features/merlt/GlobalMerltSlot.tsx` — null-renderer, hosts `useForumSignalTracker` (forum is outside any article view, needs Layout-level mount).
-- `features/merlt/merltEventBus.ts` — pub/sub between call-sites and the trackers. `MERLT_EVENT_TYPES` includes `articleViewed, highlightCreated, annotationCreated, bookmarkCreated, dossierItemAdded, citationClicked, forumLike/Download/SuggestionAccepted/SuggestionDeclined`. The legacy `trackMerltInteraction()` call inside `publishMerltEvent` still hits a 404 endpoint — its catch swallows the warn; new BFF endpoints are reached via the subscriber hooks instead.
-- `features/merlt/tracking/useArticleViewedTracker.ts` — IntersectionObserver-based dwell tracker (≥3s OR scroll ≥30%). Fire-and-forget on unmount/visibility-change.
-- `features/merlt/tracking/use{HighlightAnnotation,DossierBookmark,Citation,ForumSignal}Tracker.ts` — bus subscribers that filter on `interaction_type`, map metadata → BFF payload, fire-and-forget.
-- `features/merlt/consent/{ConsentContext,ConsentDialog,useConsent}.ts` — minimal consent UI (`docs/superpowers/specs/...` describes the full design; Slice 1 ships the read-side, the visible dialog flow is at Slice 3 polish).
-- `services/merltService.ts` — typed BFF clients: `sendArticleViewedEvent`, `sendHighlightAnnotationEvent`, `sendDossierBookmarkEvent`, `sendCitationClickedEvent`, `sendForumSignalEvent`. Same shape (`{ received, timestamp }` response) for all.
-- Emission call-sites (kept thin — tracker hooks do the BFF talk):
-  - `useAppStore.addBookmark` → `bookmark_add`
-  - `useAppStore.addToDossier` (type='norma' + urn) → `dossier_item_add`
-  - `ArticleTabContent.handlePopupHighlight` → `highlight_create` (with `anchor_text` in metadata)
-  - `ArticleTabContent.handleAddNote` → `annotation_create` (with `note_text + anchor_text`)
-  - `ArticleTabContent.handleOpenCitationInTab` → `citation_click` (with `source_urn + target_urn + citation_text`)
-  - `BulletinBoardPage.{handleLike, handleTakeItem, handleDeclineItem}` → forum signals
-  - `ImportEnvironmentModal.handleImport` → `forum_download`
+**Runtime topology.** `docker-compose.merlt.yml` defines 7 services:
 
-**Testing.** 143 backend tests (vitest + supertest, real Postgres test DB, nock for MERL-T mock). 63 frontend tests (vitest + jsdom, hook tests + plugin registry). Integration test setup: `backend/tests/setup.ts` TRUNCATEs MERL-T tables (`merlt_consent_audits`, `merlt_user_preferences`, `merlt_user_authority_cache`) between tests. Smoke E2E in `docs/merlt-smoke-checklist.md`.
+- Always on: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`.
+- Under the `api-in-docker` profile:
+  - `mcp-legal-it`: a git submodule at `vendor/mcp-legal-it`, serving HTTP MCP
+    on :8011.
+  - `merlt-api`: FastAPI `merlt.app:app`, on :8000.
+  - `merlt-worker`: an RQ worker on the queues `merlt_ingest`, `merlt_extract`
+    and `merlt_ner_train`.
 
-**Critical gotchas:**
-1. **Express mount order** beats prefix specificity. `merltRoutes` must be `app.use('/api/merlt', merltRoutes)` BEFORE the catch-all-auth routers; otherwise GET `/api/merlt/health` returns 401 from `folders.ts`'s authenticate middleware.
-2. **`rsync --exclude` pattern without leading `/`** matches anywhere in the tree, not just root. The initial MERL-T copy excluded `models/` and `data/` and silently dropped `merlt/merlt/models/` (BridgeMapping) + `merlt/merlt/api/models/` + `merlt/merlt/disagreement/data/`. Always use `--exclude='/models/'` for top-level-only exclusion.
-3. **MERL-T's tracking is in-memory** (`merlt/api/tracking_router.py:6` says "future: PostgreSQL"). The 202 + `received:1` response is the only confirmation; no `qa_traces` or `tracking_events` table exists in MERL-T Postgres for Slice 1 to query against. Future MERL-T iterations will add persistence.
-4. **MERL-T endpoint paths use `/api/v1/` prefix** (per `merlt/app.py:175-194`), with `/health` as the only root-level route. The initial Story 1.5 client hit `/api/tracking/event` (singular, no prefix) → 404 in production but green tests with nock mocking the wrong URL. MERLT-1.5.1 fixed this; same pitfall applies if extending the client.
+Every host port is bound to 127.0.0.1: postgres 5436, redis 6381, falkordb
+6382, qdrant 6343/6344, mcp 8011, api 8000.
 
-### MERL-T Integration (Slice 2a — Graph read-only, branch `visualex-merlt-main`)
+The BFF runs on the host. It reaches MERL-T through `MERLT_API_URL`
+(`http://localhost:8000`) and keeps its own Prisma database, so it never
+connects to `merlt-postgres`. The api and the worker call the BFF (:3001) and
+the Python API (:5000) through `host.docker.internal`. That name needs
+`extra_hosts: host-gateway`, which Linux requires.
 
-Slice 2a brings the legal knowledge graph (FalkorDB) to the frontend **read-only**, from a pre-loaded Libro IV CC seed (27.7k nodes), with automatic lazy ingestion for articles not yet indexed. Two surfaces: a collapsible **side rail** inside `ArticleTabContent` and a dedicated **`/grafo` explorer page**. Sprint plan: `docs/sprint-plan-merlt-slice2a-2026-05-23.md`; seed how-to: `docs/legacy-libro-iv-seed.md`; smoke: `docs/merlt-smoke-checklist.md` (Slice 2a section).
+Compose sets `ENRICHMENT_DB_*`, `RLCF_DATABASE_URL`, `RQ_REDIS_URL`,
+`FALKORDB_HOST`, `QDRANT_HOST` and their siblings explicitly. The MERL-T code
+defaults point at `localhost:5433/rlcf_dev`, which does not exist inside the
+container network.
 
-**Seed + worker (MERL-T, Python).** `merlt/merlt/scripts/load_seed_libro_iv.py` runs in the FastAPI lifespan, idempotent (skip if graph >100 nodes), loads `merlt/data/seeds/libro-iv-cc-graph.json` via MERGE on `URN`/`node_id`. Embeddings skipped by default in dev (`MERLT_SKIP_EMBEDDINGS=true` — the e5-large model is ~2s/text on docker CPU). Lazy ingestion runs on an **RQ** worker (NOT arq — arq's redis pin conflicts with falkordb's; see `legacy_libro_iv_recovery` memory), container `merlt-worker`. Endpoints added to `graph_router.py`: `POST /api/v1/graph/ingest-article` (enqueue, job_id = `ingest:`+sha256(urn) for idempotency) + the worker callbacks the **BFF** (not MERL-T) at `/api/merlt/internal/job-callback`.
+**`start.sh`.** `MERLT_ENABLED=true` turns the sidecar on. `MERLT_API_IN_DOCKER`
+defaults to `true`, the supported path, and implies `MERLT_COMPOSE_ENABLED=true`,
+so the script runs `docker compose --profile api-in-docker up -d`. Before it
+starts anything, the script:
 
-**BFF (Node, `/api/merlt/graph/*`).** All in `backend/src/`:
-- `services/merlt/graphClient.ts` — mirror of `merltClient.ts` (native fetch + AbortController, reuses the typed error hierarchy). Methods: `checkArticle` (returns `{exists}`, NOT `in_graph`), `getSubgraph(urn, depth, maxNodes)`, `ingestArticle(urn, bffJobId)`, `searchEntities(q, limit)` (param is `q`).
-- `services/merlt/lazyIngest.ts` — `ensureIngestionJob(prisma, graphClient, urn, userId)`: idempotency `findFirst` on `(articleUrn, status in pending|running)`, else create + best-effort enqueue. **Shared** by the explicit `POST /graph/ingest` route AND the `article:viewed` lazy trigger (gotcha: don't duplicate this logic).
-- `routes/merlt/graph.ts` — `GET /graph/article/:urn` (authenticate-only, NOT consent-gated — passive read; reads `depth` 1..3 / `limit` 1..500 from query, clamped via `clampInt`), `POST /graph/ingest` (authenticate+consentGuard), `GET /graph/jobs/:jobId/status` (owner-scoped → no IDOR), `GET /graph/search` (authenticate, 400 on blank q), `POST /internal/job-callback` (internalAuth shared-secret, NO jwt). Registered in `routes/merlt/index.ts` **before** the catch-all auth routers (extends Slice 1 gotcha #1).
-- `routes/merlt/events.ts` — the `article-viewed` handler, after forwarding the event, calls `checkArticle`; if `!exists` it `ensureIngestionJob` and enriches the 202 with `{ ingestionJob }`. Fully failure-isolated (dead-letters, never fails the P0 event).
-- Prisma `MerltIngestionJob` (`@@map merlt_ingestion_jobs`) + enum `MerltJobStatus {pending running completed failed timeout}` (value `completed`, NOT `succeeded` — matches the worker callback).
+- initialises the `vendor/mcp-legal-it` submodule when the directory is empty.
+  A fresh clone has an empty directory, and the compose build then fails.
+- reads `MERLT_INTERNAL_SECRET` and `MERLT_API_KEY` from `backend/.env` when
+  the shell does not set them.
+- exports the key a second time as `MERLT_ADMIN_API_KEY`. This keeps the BFF,
+  compose and the seeded admin key in agreement.
 
-**Frontend (`frontend/src/features/merlt/graph/`).** Cytoscape, code-split via `React.lazy`.
-- `shared/` — reused by both surfaces: `CytoscapeView.tsx` (default export so it's lazy-importable; registers cose-bilkent/dagre once; manual double-tap detection), `graphStyles.ts` (~20 node labels + 15 rel types + base fallback), `graphTransform.ts` (`transformSubgraphResponse` — drops dangling edges, de-dupes nodes, synthesizes edge id), `useArticleGraph.ts` (discriminated-union async state `idle|loading|success|error` + refetch + stale-response discard; args `(urn, depth, limit?)`), `useIngestionJob.ts` (2s poll, stops on terminal, cleanup on unmount), `graphApi.ts` (typed BFF clients), `types.ts`, `cytoscape-modules.d.ts` (ambient decls — cytoscape 3.33 ships its own types, so `@types/cytoscape` is NOT installed; use `StylesheetJsonBlock[]`, `Css.NodeShape`, `Ext`).
-- `side-rail/ArticleGraphSideRail.tsx` — collapsible right rail, mounted via the `article_sidebar` plugin slot (flag `VITE_FEATURE_MERLT_GRAPH`), depth=1 ≤25 nodes, empty→lazy-ingest→poll→refetch, node click → `/grafo?urn=`.
-- `page/` — `GraphExplorerPage.tsx` (URL-driven `?urn=&depth=&layout=`, fully deeplink-reproducible), `GraphSearchBox.tsx` (300ms debounce, latest-wins, keyboard nav), `NodeDetailsDrawer.tsx`, `BreadcrumbHistory.tsx` + `useBreadcrumbHistory.ts` (sessionStorage, cap 5, consecutive-dup collapse), `DepthSelector.tsx` + `graphLayouts.ts`. Route `/grafo` + Sidebar entry gated by `featureFlag.ts:isMerltGraphEnabled()`.
-- `plugins/PluginSlot.tsx` — the `PluginSlot` component lives here (split out of `registry.tsx` so the registry exports only data/functions — React Fast Refresh boundary). `registry.tsx` keeps `getSlotComponents` + the slot table.
+After the containers are up, the script:
+
+- waits for `:8000/health` (`MERLT_HEALTH_TIMEOUT`, default 60 s). On timeout
+  it prints a failure and carries on.
+- prints an error if `merlt-worker` is not running.
+
+Cleanup also runs on `EXIT`, so a failed step no longer leaves the other
+services orphaned.
+
+`MERLT_API_IN_DOCKER=false` is a developer mode. The deps stay in Docker, and
+`MERLT_PYTHON` runs `uvicorn merlt.app:app --reload` plus a local `rq worker`
+on the same three queues. `MERLT_PYTHON` defaults to `merlt/.venv/bin/python`,
+and the script checks that it can import `merlt.app`. The mode exports the
+wiring compose gives the containers: graph name, `RQ_REDIS_URL` on DB 1 of the
+MERL-T redis, callback URLs, collection and feature flags. It runs without the
+mcp-legal-it tools: `MERLT_MCP_LEGAL_TOOLS_ENABLED=false` unless you set
+`MCP_LEGAL_IT_URL`.
+
+**MERL-T code is baked into the image.** Only `merlt/data` is mounted, and it
+is read-only. After any change under `merlt/`, a restart is not enough: rebuild
+and recreate.
+
+```bash
+docker compose -f docker-compose.merlt.yml --profile api-in-docker build merlt-api merlt-worker
+docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d --force-recreate merlt-api merlt-worker
+```
+
+**Boot, in order (`merlt/merlt/app.py` lifespan).** Each step is failure-isolated:
+if one fails, it logs and the api boots anyway.
+
+1. `init_db()` and `create_tables()`.
+2. `ensure_consensus_triggers()`: the PL/pgSQL chain vote → net_score →
+   consensus.
+3. `ensure_schema_additions()` (`storage/enrichment/schema_additions.py`):
+   additive `ADD COLUMN IF NOT EXISTS` statements. `create_tables()` never
+   alters an existing table and the stack runs no Alembic, so a column added
+   to a model reaches Postgres only through this step. Keep its list in step
+   with `storage/migrations/*.sql` and `alembic/versions/`.
+4. `ensure_admin_api_key()` (`api/api_key_seed.py`): seeds `MERLT_ADMIN_API_KEY`
+   by hash as an `admin` key. It is idempotent, and skipped when the variable
+   is unset.
+5. The expert system (`api/engine_bootstrap.build_orchestrator`).
+6. Replay-buffer rehydration, only when no buffer file was loaded. It rebuilds
+   from persisted `QAFeedback JOIN QATrace`, is capped at 120 s, and never
+   trains.
+7. The Libro IV seed (`MERLT_SKIP_SEED`).
+8. The graph hygiene loop, when `MERLT_HYGIENE_INTERVAL_HOURS > 0`.
+
+**Persistence.** These volumes survive a recreate: `merlt_postgres_data`,
+`merlt_falkor_data`, `merlt_qdrant_data`, `merlt_uploads` (shared api↔worker),
+`merlt_hf_cache`, `merlt_checkpoints` and `merlt_ner_models`. Redis is not
+durable: the RQ queue and the cache are lost on recreate.
+
+- **FalkorDB.** The image writes to `/var/lib/falkordb/data`, and the volume
+  is mounted there, with `FALKORDB_ARGS="--save 60 1 --appendonly yes
+  --appendfsync everysec"`. The volume used to sit at `/data`, next to the
+  real data dir, so every recreate dropped the lazily ingested and co-evolved
+  nodes and only the seed came back.
+- **RLCF replay buffer.** It lives at `MERLT_RLCF_BUFFER_PATH`, which compose
+  sets to `/app/checkpoints/rlcf/replay_buffer.json`. It cannot go under
+  `/app/data`, which is read-only.
+
+**BFF mount and feature gates.** `app.ts` mounts
+`app.use('/api/merlt', merltKillSwitch, merltRoutes)` before the catch-all auth
+routers (gotcha 1). `MERLT_ENABLED=false` in the BFF env 404s the whole
+namespace with `merlt_disabled`. `backend/.env.example` ships it `"false"`;
+`MERLT_ENABLED=true ./start.sh` still wins, because dotenv never overwrites a
+variable that is already set.
+
+Inside `routes/merlt/index.ts`, `featureGate(flag, prefixes, exactPaths)` gates
+router groups by path. The `config.ts` getters read `process.env` on every
+access and default to `true`:
+
+| Flag | Paths it owns |
+|---|---|
+| `MERLT_GRAPH_ENABLED` | `/graph/*`, `/internal/job-callback` |
+| `MERLT_CONTRIBUTION_ENABLED` | `/contrib/*`, `/internal/extraction-callback`, and exactly `POST /ner/feedback` |
+| `MERLT_VALIDATION_ENABLED` | `/validate/*` |
+| `MERLT_OPS_ENABLED` | `/ops/*` (including `/ops/ingestion/*`), `/ner/training/*`, `/ner/feedback/stats` |
+| none (kill switch only) | `/health`, `/consent`, `/profile`, `/events/*`, `/experts/*`, `/internal/qa-callback` |
+
+The gate must filter by path because every sub-router is mounted at `/`. An
+unconditional 404 in front of one router would end the fall-through for every
+router after it. Turning `graph` or `contribution` off also 404s the worker
+callback that group owns.
+
+The FE sees only `VITE_FEATURE_MERLT` and `VITE_FEATURE_MERLT_GRAPH`. Both are
+on by default; `false`, `0` or `""` disables them. So a group that is switched
+off server-side still shows its hub card, and its calls get 404s.
+
+**Guards.**
+
+| Guard | Passes | Otherwise |
+|---|---|---|
+| `consentGuard` | consent `basic` or `full` | 403 `consent_required` |
+| `contributionGuard` | consent `full` | 403 `contribution_consent_required` |
+| `validationGuard` | consent `full` | 403 `validation_consent_required` |
+| `requireAdmin` | admin user (runs after `authenticate`) | 403 `admin_required` |
+| `internalAuth` | `X-Internal-Secret` equals `MERLT_INTERNAL_SECRET` | 500 `internal_auth_not_configured` when the env is empty, 401 when the header differs |
+
+`requireAdmin` is live on every ops route and every NER admin route.
+`MERLT_INTERNAL_SECRET` authenticates all three callbacks: `job-callback`,
+`extraction-callback` and `qa-callback`. It must equal the value compose
+interpolates. That value defaults to `dev-internal-secret`, and
+`backend/.env.example` ships the same one.
+
+**MERL-T auth and the API key.** Every BFF client sends `MERLT_API_KEY` as
+`X-API-Key` when it is set: `merltClient`, `graphClient`, `contribClient`,
+`expertsClient`, `nerClient`, `opsClient` and `opsIngestionClient`. No JWT and
+no `X-User-ID` is forwarded. MERL-T learns who the user is only from the
+`user_id` the BFF injects into the body.
+
+`merlt/merlt/app.py` overrides `verify_api_key` with `optional_api_key`, so only
+`require_role("admin")` routes need the key. Of the routes the BFF proxies,
+those are `/rlcf/training/start` and `/ingestion/mechanical/*`. The `/admin/*`
+routes (config, engine reinitialize, graph hygiene) and `/ner/*` declare only
+`verify_api_key`, so MERL-T itself leaves them open. The BFF `requireAdmin` is
+their only gate, and `:8000` must never be exposed.
+
+The admin key is seeded at boot from `MERLT_ADMIN_API_KEY`; compose passes it
+`${MERLT_API_KEY}`. A fresh stack therefore no longer needs the manual
+`POST /api/v1/api-keys/bootstrap`, which nothing ever called.
+
+When MERL-T refuses the key:
+
+- the `ops.ts` routes answer 503 `merlt_auth_misconfigured` on an upstream
+  401/403;
+- `opsIngestion.ts` collapses every upstream 4xx except 404/409 to 503
+  `merlt_unavailable`.
+
+**Job nets (`services/merlt/jobWatchdog.ts`).** `backend/src/index.ts` schedules
+the watchdog every 5 min; it is off in tests. The watchdog is what unblocks a
+poll whose callback was lost. Worker callbacks for ingestion and extraction
+make a single attempt, and only the Q&A terminal callback retries (3 attempts).
+
+The watchdog flips pending/running rows to `timeout`:
+
+| Job | Env var | Default | Measured from |
+|---|---|---|---|
+| Ingestion | `MERLT_INGEST_STALE_MS` | 10 min | `createdAt` |
+| Extraction | `MERLT_EXTRACT_STALE_MS` | 45 min | `createdAt` |
+| Q&A | `MERLT_QA_STALE_MS` | 20 min of silence | `updatedAt`, which every per-expert callback bumps |
+
+`lazyIngest` also uses `MERLT_INGEST_STALE_MS` to supersede a stale in-flight
+job. Terminal Q&A rows are purged after `MERLT_QA_RETENTION_DAYS` (default 30).
+See gotcha 4 of the 2026-09-25 list for how a net must relate to the RQ job
+timeout.
+
+### MERL-T Slice 1: tracking signals
+
+Slice 1 wires 5 user-action signals into MERL-T.
+
+- Design: `docs/merlt/slices/slice1/design.md`.
+- Sprint plan: `docs/merlt/slices/slice1/sprint-plan.md`.
+- Forum attribution: `docs/merlt/decisions/forum-authoring.md`.
+
+**BFF (`backend/src/`).**
+
+- `routes/merlt/consent.ts`: GET, POST and DELETE on `/consent`, with body
+  `{ level, reason? }`. Each change runs in a Prisma transaction that upserts
+  `MerltUserPreference` and appends a `MerltConsentAudit` row. The enum is
+  `MerltConsentLevel` (none|basic|full), and `preferencesForLevel()` in
+  `schemas/merlt/consent.ts` derives the 3 toggles. The audit is write-only:
+  no route lists it.
+- `routes/merlt/events.ts`: 5 endpoints (`article-viewed`,
+  `highlight-annotation`, `dossier-bookmark`, `citation-clicked`,
+  `forum-signal`). Each one runs `authenticate → consentGuard → Zod →
+  authorityCache (best-effort) → eventMapper → merltClient.sendEvent` and
+  answers `202 { received, timestamp }`. `_resetMerltClientForTests` resets the
+  singleton client.
+- `routes/merlt/health.ts`: GET `/health`, no auth, proxies MERL-T `/health`.
+  - It answers 200 `{ bff, merlt: 'reachable', upstream }` whenever MERL-T
+    answers, including when `upstream.status` is `degraded`, and 503
+    `unreachable` otherwise.
+  - MERL-T checks postgres, falkordb, qdrant and redis, and reports
+    `graph.nodes`. It checks neither the worker, nor mcp-legal-it, nor the
+    LLM key.
+- `routes/merlt/profile.ts`: GET `/profile`. It reads `MerltUserAuthorityCache`
+  and falls back to the cache when MERL-T is down; it answers 503 only on a
+  cache miss during an outage.
+- `services/merlt/merltClient.ts`: a typed client over native `fetch` +
+  `AbortController`. It posts to `/api/v1/tracking/events`, batch-wrapped as
+  `{events: [{type, data, timestamp}]}`, and reads `/api/v1/profile/full`.
+  - The errors are typed: `MerltTimeoutError` (with the subclass
+    `MerltNetworkError` for a refused connection), `MerltServerError` and
+    `MerltBadRequestError`.
+  - `eventMapper.ts` lifts `type` out of each event, attaches `user_id` and
+    the cached `user_authority`, and normalises `art1 bis` to `art1-bis`.
+- `services/merlt/authorityCache.ts`: MERL-T computes the authority, and the
+  BFF caches it with a 1 h TTL. When MERL-T is unreachable it serves the stale
+  entry, and returns null only when there is no cache and the sync fails. A
+  vote that closes a consensus refreshes the voter's entry (`validate.ts`).
+- `services/merlt/deadLetterLog.ts`: NDJSON at
+  `backend/logs/merlt-dead-letter.jsonl` (`MERLT_DEAD_LETTER_DIR`). It holds
+  the full event payload, is capped at 50 MB, and is skipped under
+  `NODE_ENV=test` unless `MERLT_DEAD_LETTER_LOG_IN_TESTS=1`.
+- Prisma models: `MerltUserPreference`, `MerltConsentAudit` and
+  `MerltUserAuthorityCache`. The cache column `baselineQual` holds MERL-T's
+  authority tier, and the hub labels it "Livello di autorevolezza".
+
+**Frontend.** The plugin host (`plugins/registry.tsx`, `plugins/types.ts`)
+declares three slots. `PluginSlot` itself lives in `plugins/PluginSlot.tsx`.
+
+| Slot | Component | Flag |
+|---|---|---|
+| `article_content_after` | `ArticleMerltSlot` | `VITE_FEATURE_MERLT` |
+| `global` (mounted once in `Layout`) | `GlobalMerltSlot` | `VITE_FEATURE_MERLT` |
+| `article_sidebar` | `ArticleGraphSideRail` | `VITE_FEATURE_MERLT_GRAPH` |
+
+- `ArticleMerltSlot` hosts **only** `useArticleViewedTracker`, the
+  IntersectionObserver dwell tracker (≥3 s, or ≥30 % read progress).
+  - Progress is how much of the article has been revealed inside its nearest
+    scrolling ancestor, or the viewport.
+  - The article element itself does not scroll, so measuring its own
+    `scrollTop` always read 0.
+- `GlobalMerltSlot` hosts the four bus-subscriber trackers (forum,
+  highlight/annotation, dossier/bookmark, citation) and `ConsentBanner`. A
+  single mount means one BFF POST per bus event (Slice 3 §3.9); mounting them
+  per article card duplicated every event.
+- `merltEventBus.ts` is pure pub/sub: `publishMerltEvent` makes no network
+  call. `MERLT_EVENT_TYPES` also declares types that nothing publishes or
+  forwards, such as `search_performed`, `dossier_export_training` and
+  `issue_*`.
+- The plugin host is not the only door. `ArticleTabContent` imports
+  `AskMerltEntry`, `useMerltFeatures`, `publishMerltEvent` and
+  `sendNerFeedback` directly, and `CitationPreviewPopup` imports
+  `CitationNerFeedback`. Each of them is hidden at runtime when
+  `VITE_FEATURE_MERLT` is off.
+
+Emission call-sites. Keep them thin: the tracker hooks do the BFF talk.
+
+- `useAppStore.addBookmark` → `bookmark_add`.
+- `useAppStore.addToDossier` (type `'norma'` with a urn) → `dossier_item_add`.
+- `ArticleTabContent`:
+  - `handlePopupHighlight` → `highlight_create`
+  - `handleAddNote` → `annotation_create`
+  - `handleOpenCitationInTab` → `citation_click`
+- `BulletinBoardPage` → forum like, suggestion accepted and suggestion
+  declined, keyed on `sharedEnvironmentId`. The tracker drops an event
+  without it.
+- `ImportEnvironmentModal.handleImport` → `forum_download`.
+
+**Slice 1 gotchas:**
+1. **Express mount order beats prefix specificity.** `merltRoutes` must be
+   mounted before the catch-all auth routers. Otherwise `folders.ts`'s pathless
+   `authenticate` 401s `/api/merlt/health`.
+2. **An `rsync --exclude` pattern without a leading `/`** matches anywhere in the
+   tree. The first MERL-T copy silently dropped `merlt/merlt/models/`,
+   `merlt/merlt/api/models/` and `merlt/merlt/disagreement/data/`. Use
+   `--exclude='/models/'` to exclude the top level only.
+3. **Tracking is persisted.** `tracking_router` writes `tracking_events`
+   (`TrackingEventRecord`). When the DB is unreachable it falls back to a
+   bounded in-memory buffer and still answers 202. Verify with
+   `SELECT event_type, user_id, created_at FROM tracking_events ORDER BY created_at DESC`.
+   Nothing in MERL-T reads the table yet, so the signals feed neither
+   authority nor training.
+4. **MERL-T paths carry the `/api/v1/` prefix.** See the `include_router` list
+   in `merlt/merlt/app.py`. `/health` and `/` are the only root-level routes.
+   A nock mock of the wrong path stays green: the Story 1.5 client, and later
+   `confirm-source`, proxied to routes that did not exist while their tests
+   passed.
+   - `backend/tests/nockShim.ts` now honours `reqheaders`/`badheaders`, so
+     header assertions such as `X-API-Key` actually run.
+   - A mocked upstream still proves nothing about MERL-T. Check the MERL-T
+     router.
+
+### MERL-T Slice 2a: the graph, read-only
+
+Slice 2a brings the FalkorDB graph to the frontend, starting from a pre-loaded
+Libro IV CC seed (about 27.7k nodes), with lazy ingestion for articles not yet
+indexed. It has two surfaces: the side rail in `ArticleTabContent` and the
+`/grafo` page, which Slice 4 turned into the Q&A surface.
+
+- Sprint plan: `docs/merlt/slices/slice2a/sprint-plan.md`.
+- Seed how-to: `docs/merlt/seed-libro-iv.md`.
+
+**Seed and worker (MERL-T).** `merlt/merlt/scripts/load_seed_libro_iv.py` runs
+in the lifespan. It is idempotent (it skips when the graph has >100 nodes) and
+MERGEs `merlt/data/seeds/libro-iv-cc-graph.json` on `URN`/`node_id`.
+Embeddings are skipped by default (`MERLT_SKIP_EMBEDDINGS=true`).
+
+Lazy ingestion runs on RQ, not arq: arq's redis pin conflicts with falkordb's.
+`POST /api/v1/graph/ingest-article` enqueues on `merlt_ingest` with
+`job_id = "ingest-" + sha256(urn)[:40]` and `job_timeout=600`. The worker
+calls the BFF back at `/api/merlt/internal/job-callback`.
+
+**BFF (`/api/merlt/graph/*`).**
+
+- `services/merlt/graphClient.ts` has these methods:
+  - `checkArticle`, which returns `{exists}`, not `in_graph`.
+  - `getSubgraph(urn, depth, maxNodes)`.
+  - `ingestArticle(urn, bffJobId)`.
+  - `searchEntities(q, limit)`, a fuzzy name autocomplete. The semantic
+    `POST /api/v1/graph/search` is not proxied.
+  - `listProvisionalReview` and `adjudicateProvisional`.
+- `services/merlt/lazyIngest.ts`: `ensureIngestionJob(prisma, graphClient, urn,
+  userId)`. The explicit `POST /graph/ingest` and the `article:viewed` trigger
+  both use it; do not duplicate it.
+  - It keys rows on `normalizeGraphUrn(urn)`.
+  - Every further reader of an in-flight article gets a mirror row of their
+    own, with no second enqueue.
+  - It judges staleness on the oldest in-flight row, and supersedes a stale
+    one (flip to `timeout`, then re-enqueue).
+  - The job-callback fans out, status-guarded, to every in-flight row of the
+    article, and invalidates the subgraph cache for that URN.
+- `services/merlt/subgraphCache.ts`: an in-memory TTL + LRU cache with request
+  coalescing on `GET /graph/article/:urn`, keyed on
+  (normalised urn, depth, limit). Two env vars tune it:
+  `MERLT_SUBGRAPH_CACHE_TTL_MS` (clamped to 60 000..300 000, default 120 000)
+  and `MERLT_SUBGRAPH_CACHE_MAX_ENTRIES` (default 200). It is single-instance
+  state.
+- `routes/merlt/graph.ts`:
+
+| Route | Guard | Notes |
+|---|---|---|
+| `GET /graph/article/:urn` | authenticate | `depth` 1..3 (default 2), `limit` 1..200 (default 200): MERL-T caps `max_nodes` at 200 |
+| `GET /graph/search` | authenticate | 400 on a blank `q` |
+| `GET` and `POST /graph/provisional-review[/:nodeId]` | authenticate + validationGuard | see the co-evolution section |
+| `POST /graph/ingest` | authenticate + consentGuard | |
+| `GET /graph/jobs/:jobId/status` | authenticate | owner-scoped |
+| `POST /internal/job-callback` | internalAuth | |
+
+  Reading is not consent-gated (Slice 3 D2).
+- `routes/merlt/events.ts`: after forwarding `article-viewed`, the handler
+  calls `checkArticle`. On `!exists` it calls `ensureIngestionJob` and adds
+  `{ ingestionJob }` to the 202. All of this is failure-isolated.
+- Prisma: `MerltIngestionJob` plus the enum `MerltJobStatus
+  {pending running completed failed timeout}`. The enum value is
+  `completed`, not `succeeded`.
+
+**Frontend (`features/merlt/graph/`).**
+
+- `shared/`:
+  - `GraphCanvas.tsx`: the G6 v5 canvas (`@antv/g6`), default export, loaded
+    with `React.lazy`.
+  - `graphStyles.ts` and `graphTransform.ts`.
+  - `useArticleGraph.ts`: args `(urn, depth, limit?)`; a discriminated union
+    with stale-response discard.
+  - `useIngestionJob.ts`: polls every 2 s within a 60 s budget.
+  - `graphApi.ts`.
+  - `snapshotIO.ts`: the local export and reload of a slice.
+- `side-rail/ArticleGraphSideRail.tsx`: depth 1, at most 25 nodes. It fetches
+  only while open. An empty result starts lazy ingest, then polls, then
+  refetches. A node click navigates to `/grafo?urn=`.
+- `page/GraphExplorerPage.tsx`: driven by the URL
+  (`?urn=&depth=&layout=&type=`).
+  - Search and navigation: `GraphSearchBox` (300 ms debounce),
+    `BreadcrumbHistory` / `useBreadcrumbHistory` (sessionStorage, cap 5),
+    `DepthSelector`, `GraphFilterPanel`.
+  - Detail drawers: `NodeDetailsDrawer`, `EdgeDetailsDrawer`.
+  - The Q&A column: see Slice 4.
+- The route `/grafo` and the Sidebar entry "Grafo" are gated by
+  `isMerltEnabled() && isMerltGraphEnabled()`.
 
 **Slice 2a gotchas:**
-1. **cytoscape 3.33 ships its own `.d.ts`** (wins over `@types/cytoscape` → removed to avoid duplicate-identifier conflicts). Stylesheet type is `StylesheetJsonBlock[]`, shapes/line-styles under the `Css` namespace, extensions typed `Ext`. `react-cytoscapejs` + the two layout extensions are untyped → narrow ambient decls in `shared/cytoscape-modules.d.ts`.
-2. **`react-hooks/set-state-in-effect`** is enforced. Synchronous `setState` resets at the top of an effect must instead be **derived during render** via a prev-input tracker (`const [tracked,setTracked]=useState(input); if(input!==tracked){setTracked(input); setState(reset)}`) — see `useArticleGraph`, `useIngestionJob`, `GraphSearchBox`. The rule only flags **direct** useState setters, so calling an indirect setter (e.g. a `useCallback` `push`) inside an effect is allowed (used for the deeplink breadcrumb seed).
-3. **react-cytoscapejs `cy` callback fires once** (componentDidMount), not per render — but keep tap handlers in refs anyway and scope `cy.removeListener('tap','node')` to nodes.
-4. **The BFF `/graph/article/:urn` returns the subgraph verbatim, no 404 for "not indexed"** — an empty `nodes` array IS the "not in graph" signal that triggers lazy ingestion (both side rail and page). `checkArticle.exists` is the explicit probe used by the `article:viewed` trigger.
-5. **`MERLT_INTERNAL_SECRET`** (shared worker↔BFF secret) is in `backend/.env.example`. `VITE_FEATURE_MERLT_GRAPH` (default ON) gates the whole graph UI — `false` hides the Sidebar entry, the side rail slot, and renders `/grafo` as "non disponibile".
-6. **URN version-marker mismatch (the `!vig=` trap).** The graph seeds Normattiva URNs WITHOUT the version marker (`...~art2043`), but VisuaLex's `norma_data.urn` carries it (`...~art2043!vig=`). Passed verbatim, `check-article`/`subgraph` return `exists:false`/empty → the side rail and `/grafo` spin forever on lazy ingestion. `graphClient.normalizeGraphUrn()` strips everything from the first `!` (the NIR version/annex separator) before every MERL-T graph call. Don't bypass it when adding new urn-keyed graph calls.
+1. **The graph is G6, not Cytoscape.** `cytoscape`, `react-cytoscapejs` and
+   their ambient `.d.ts` are gone.
+   - `GraphCanvas` applies selection imperatively from its props and does not
+     register G6's `click-select`, so React and G6 cannot diverge.
+   - Filters use `setElementVisibility`/`setElementState` without re-running
+     the layout.
+2. **`react-hooks/set-state-in-effect` is enforced.** Reset state by deriving
+   it during render with a prev-input tracker (see `useArticleGraph`,
+   `useIngestionJob`, `GraphSearchBox`). The rule flags only direct setters.
+3. **An empty `nodes` array is the "not indexed" signal.** The BFF returns the
+   subgraph verbatim and never 404s for a missing article. `checkArticle.exists`
+   is the explicit probe the `article:viewed` trigger uses.
+4. **`VITE_FEATURE_MERLT_GRAPH=false`** hides the side-rail slot and the
+   Sidebar entry, and renders `/grafo` as "Grafo non disponibile".
+5. **The URN version-marker trap.** The seed keys Normattiva URNs by the full
+   URL form (`https://www.normattiva.it/uri-res/N2Ls?urn:nir:…~art2043`), with
+   no version marker. VisuaLex urns carry `!vig=`, `!orig=…` or `@originale`.
+   - `graphClient.normalizeGraphUrn()` cuts from the first `!` or `@`, and
+     every urn-keyed graph call, the lazy-ingest key, the subgraph cache key
+     and the `/grafo` center matcher go through it.
+   - Never strip the URL wrapper: seeded nodes would become unreachable and
+     re-trigger lazy ingestion forever.
 
-### MERL-T Integration (Slice 2b — Hub & Consent, branch `visualex-merlt-main`)
+### MERL-T Slice 2b: hub and consent
 
-Slice 2b turns `/merlt` from a dead developer UI (5 JSON tabs calling unmounted endpoints) into a user-facing **hub**, and fixes the fragmented consent. Design: `docs/superpowers/specs/2026-05-26-merlt-slice2b-hub-consent-design.md`; sprint plan: `docs/sprint-plan-merlt-slice2b-2026-05-26.md`.
+- Design: `docs/merlt/slices/slice2b/design.md`.
+- Sprint plan: `docs/merlt/slices/slice2b/sprint-plan.md`.
 
-**Consent = server SoT, client = synced cache.** The Prisma `MerltUserPreference` + BFF `GET/POST/DELETE /api/merlt/consent` (body `{ level, reason? }`) is authoritative; the server `consentGuard` is the hard gate (defence in depth). Frontend:
-- `features/merlt/consent/context.ts` — the React `ConsentContext` object + `ConsentContextValue` type, kept in a non-component file (react-refresh/only-export-components boundary, same split as graph's `PluginSlot`).
-- `features/merlt/consent/ConsentContext.tsx` — `ConsentProvider` (mounted in `App.tsx` wrapping the authenticated `Layout`). Hydrates via `GET /consent` on mount (inline `.then/.catch`, never a synchronous in-effect setState), exposes `setConsent`/`revokeConsent`/`refresh`, and writes the level to `localStorage` (now a **boot cache only** — server wins on reconcile). `inFlightRef` prevents overlapping fetches.
-- `features/merlt/consent/useConsent.ts` — consumer hook (throws outside provider). Exposes `level`, `canTrack`, `status`.
-- `features/merlt/merltConsent.ts` — repurposed as the boot cache (NOT SoT).
-- The 5 Slice 1 trackers now gate on `useConsent().canTrack` instead of `hasMerltConsent()` localStorage. Bus-subscribers hold the live value in a `canTrackRef` updated in a `useEffect` (NOT during render — react-hooks/refs). `useArticleViewedTracker` keeps `canTrack` OUT of its main effect deps and gates the cleanup-path emission on `canTrackRef.current`, because the effect cleanup runs BEFORE the ref-sync effect — including `canTrack` in deps would emit a stale `true` on revoke (gotcha below).
+**The server is the source of truth for consent; the client is a synced
+cache.** The server `consentGuard` family is the hard gate.
 
-**Feature gating is derived client-side — there is no `GET /api/merlt/features`** (it was never implemented; the dependency is removed). `features/merlt/useMerltFeatures.ts` combines `isMerltEnabled()` (flag `VITE_FEATURE_MERLT`) + `isMerltGraphEnabled()` + `useConsent().level` + `useAuth().isAdmin` into `{ merltEnabled, graphEnabled, consentLevel, canTrack, canContribute, canValidate, graphReadable, opsVisible }`. `canContribute/canValidate = level==='full'`; `opsVisible = isAdmin`.
+- `features/merlt/consent/context.ts` holds the context object, in a
+  non-component file for the react-refresh boundary.
+- `ConsentContext.tsx`: `ConsentProvider`, which wraps the authenticated
+  `Layout` in `App.tsx`.
+  - It hydrates from `GET /consent` with inline `.then/.catch`, and uses
+    `inFlightRef` to prevent overlapping fetches.
+  - It exposes `setConsent`, `revokeConsent` and `refresh`.
+  - It writes the level to `localStorage`, which is only a boot cache
+    (`merltConsent.ts`).
+- `useConsent.ts` exposes `level`, `canTrack` and `status`.
+- The trackers gate on `useConsent().canTrack`, held in a `canTrackRef` that a
+  `useEffect` syncs.
 
-**Consent UI.** `ConsentDialog.tsx` (3 levels none/basic/full with privacy-first copy, granular capability preview) and `ConsentBanner.tsx` (non-blocking first-run prompt). The banner mounts on the `global` plugin slot (via `GlobalMerltSlot`) and triggers only on the **real RLCF bus events** (`TRACKED_EVENT_TYPES` set), not passive ones like `scroll`/`text_selection`. `pages/MerltHubPage.tsx` is the dashboard (replaces the deleted `MerltWorkspacePage`): consent/profile/graph cards + "in arrivo" placeholders + an admin-only ops card.
+**Feature gating is derived on the client.** There is no
+`GET /api/merlt/features`. `features/merlt/useMerltFeatures.ts` combines the two
+Vite flags, the consent level and `useAuth().isAdmin` into:
 
-**BFF.** `middleware/merlt/requireAdmin.ts` (after `authenticate`, 403 `admin_required` if `!req.user.isAdmin`) — scaffold for the Phase-4 ops routes; today the consent route was already correct (the bug was the old client `PUT { consentLevel }`).
+| Field | Value |
+|---|---|
+| `merltEnabled`, `graphEnabled` | the Vite flags |
+| `canTrack` | the consent context's `canTrack` |
+| `qaAskable` | `level !== 'none'` |
+| `canContribute`, `canValidate` | `level === 'full'` |
+| `graphReadable` | the graph flag only |
+| `opsVisible` | `isAdmin` |
+
+**Hub (`pages/MerltHubPage.tsx`, route `/merlt`, Sidebar label "Assistente").**
+The cards are `QaCard`, `ValidateCard`, `GraphCard` (when `graphEnabled`),
+`ContribCard`, `ConsentCard` and `ProfileCard`. `useHubData` loads their live
+data. Two more cards are admin-only (`opsVisible`):
+
+- "Ops (admin)": `OpsTrainingButton`, `OpsHygieneButton` and `NerOpsCard`.
+- "Regolazione motore (admin)": `OpsConfigPanel`.
+
+`ConsentDialog.tsx` offers the three levels. `ConsentBanner.tsx` is a
+non-blocking first-run prompt in `GlobalMerltSlot`. It fires only on the real
+RLCF bus events (`TRACKED_EVENT_TYPES`), never on `scroll` or `text_selection`.
 
 **Slice 2b gotchas:**
-1. **Consent revoke + tracker cleanup ordering.** React runs an effect's cleanup BEFORE the ref-sync effect on a re-render, so a `canTrack`-in-deps tracker would fire its cleanup-path emission with the stale `true`. Keep `canTrack` out of the main effect deps and gate on a separately-synced `canTrackRef.current`, which is correct at unmount/article-change.
-2. **The consent route is correct; the client was the bug.** Use `setMerltConsent(level, reason?)` (POST) / `revokeMerltConsent` (DELETE) — never reintroduce a PUT or `{ consentLevel }`.
-3. **`MerltEventResponse` is `{ received, timestamp }`**, NOT `{ trace_id }` — the BFF `/events/*` 202 shape. `ArticleViewedEventResponse` additionally carries optional `ingestionJob` (Slice 2a lazy trigger).
+1. **Revoking consent while a tracker is mounted.** React runs an effect's
+   cleanup before the ref-sync effect. A tracker with `canTrack` in its deps
+   would therefore emit its cleanup-path event with the stale `true`.
+   `useArticleViewedTracker` keeps `canTrack` out of its main effect deps and
+   gates on `canTrackRef.current`.
+2. **The consent route was always right; the old client was the bug.** Use
+   `setMerltConsent(level, reason?)` (POST) and `revokeMerltConsent` (DELETE).
+   Never reintroduce a PUT or `{ consentLevel }`.
+3. **`MerltEventResponse` is `{ received, timestamp }`**, not `{ trace_id }`.
+   `ArticleViewedEventResponse` can also carry `ingestionJob`.
 
-### MERL-T Integration (Slice 2c — "Apprendi dai miei appunti", branch `visualex-merlt-main`)
+### MERL-T Slice 2c: "Apprendi dai miei appunti", and validation
 
-Upload study notes → async LLM extraction → per-item review → promotion to RLCF `pending_*`. Design: `docs/superpowers/specs/2026-05-26-merlt-slice2c-learn-from-notes-design.md`; sprint plan: `docs/sprint-plan-merlt-slice2c-2026-05-26.md`. Depends on Slice 2b consent (`full`).
+The flow: upload notes → async LLM extraction into ephemeral staging →
+per-item review → promotion to RLCF `pending_*` → community vote.
 
-**Load-bearing model (resource cost, not privacy):** the server hosts ONLY the central graph + RLCF proposals — no per-user graphs. Extracted candidates live in an **ephemeral** MERL-T `extraction_candidates` staging table (purged after promotion / TTL); the verbatim NEVER enters `pending_*`. The user's "personal slice" is a **local snapshot** (download/reload, `snapshotIO.ts`). Promotion creates fresh `pending_*` rows from the **reformulated** text.
+- Design: `docs/merlt/slices/slice2c/design.md`.
+- Sprint plan: `docs/merlt/slices/slice2c/sprint-plan.md`.
+- The server keeps only the central graph and the RLCF proposals.
+  Candidates live in the MERL-T `extraction_candidates` table, with a TTL of
+  `MERLT_STAGING_TTL_HOURS` (48). The verbatim never enters `pending_*`.
 
-**BFF (`/api/merlt/contrib/*`)** — done & tested (205 BE tests):
-- `services/merlt/contribClient.ts` — mirror of graphClient; `uploadDocument` (multipart→MERL-T `/documents/upload`), `extractAsync`, `listCandidates`, `getCandidate`, `proposeEntity/Relation`, `markPromoted`.
-- `services/merlt/promotionGate.ts` — **copyright gate** (`fonte` non-empty AND text ≠ verbatim AND `attested`). Enforced server-side, not just UI.
-- `services/merlt/contributionGuard.ts` — requires consent level `full` (stricter than `consentGuard`).
-- `routes/merlt/contrib.ts` — `POST /contrib/documents` (multer, validates PDF/TXT/DOCX ≤50MB before forward), `/documents/:id/extract` (creates `MerltExtractionJob`, enqueues), `/documents/:id/candidates` (IDOR-scoped), `/jobs/:jobId/status` (owner-scoped), `/candidates/:id/promote` (gate→propose→markPromoted), `/internal/extraction-callback` (internalAuth). Registered in `routes/merlt/index.ts` BEFORE the catch-all auth routers.
-- Prisma `MerltExtractionJob` (`@@map merlt_extraction_jobs`, reuses `MerltJobStatus`).
+**BFF (`/api/merlt/contrib/*`, `/api/merlt/validate/*`).**
 
-**Frontend (`features/merlt/contrib/`)** — done & tested (190 FE tests): `UploadDropzone`, `useExtractionJob` (2s poll, mirrors `useIngestionJob`), `CandidateCard` (gate UI: promote disabled until fonte+reformulation+attestation), `CandidateReviewList`, `snapshotIO` (local export/import), `ContribPage` (orchestrator; route `/merlt/contribuisci`, lazy). Hub "Contributi" card links here when `canContribute`.
+- `services/merlt/contribClient.ts` has these methods: `uploadDocument`
+  (multipart), `getDocument`, `extractAsync`, `listCandidates`, `getCandidate`,
+  `proposeEntity`, `proposeRelation`, `markPromoted`, `getPending`,
+  `validateEntity` and `validateRelation`. Its timeout is
+  `MERLT_CONTRIB_TIMEOUT_MS`, falling back to `MERLT_TIMEOUT_MS`, then 30 s.
+- `services/merlt/promotionGate.ts` is the copyright gate. A candidate passes
+  only with a non-empty `fonte`, a text that differs from the verbatim, and
+  `attested`. The gate is re-checked server-side against the authoritative
+  verbatim from `getCandidate`.
+- `routes/merlt/contrib.ts` (contributionGuard unless noted):
 
-**MERL-T side (Python, vendored `merlt/`)** — DEPLOYED to the live stack (`ExtractionCandidate` model + migration `005`, `document_parser.py` `persist_target="staging"` branch, `worker/extraction_tasks.py` `extract_to_staging`, `document_router.py` extract-async/candidates + `candidates_router`). Gap-closure additions (also live): **#3** the parser sets `expires_at` (env `MERLT_STAGING_TTL_HOURS`=48), the worker deletes the uploaded file post-extraction, and `list_document_candidates` lazy-purges promoted+expired rows; **#4** the parser staging branch runs `EntityDeduplicator.find_duplicates` (best-effort) to set `potential_duplicate_of`.
+| Route | Notes |
+|---|---|
+| `POST /contrib/documents` | multer; PDF, TXT or DOCX up to 50 MB |
+| `POST /contrib/documents/:id/extract` | creates a `MerltExtractionJob` and enqueues |
+| `GET /contrib/documents/:id/candidates` | MERL-T scopes it with the caller's `user_id` |
+| `GET /contrib/jobs/:jobId/status`, `GET /contrib/me/jobs` | authenticate only, owner-scoped |
+| `POST /contrib/candidates/:id/promote` | gate → propose → `markPromoted` |
+| `POST /internal/extraction-callback` | internalAuth |
 
-**Validation (Slice 2c #8) — vote on the community's pending proposals.** BFF `routes/merlt/validate.ts` (`GET /validate/pending`, `POST /validate/entity|relation`, gated by `validationGuard` = full consent) + contribClient `getPending/validateEntity/validateRelation` (votes carry `user_id`=VisuaLex id; `VoteType` = approve|reject|edit). FE `features/merlt/validate/` (`validateApi` + `ValidationPage`), route `/merlt/valida`, hub card. The local-snapshot affordance (#7) lives on `/grafo` (`graph/shared/snapshotIO.ts` + Esporta/Carica slice in `GraphExplorerPage`), NOT in contrib.
+  **The BFF is the ownership boundary.** MERL-T document and candidate ids are
+  sequential, and MERL-T does not scope extract or the candidate reads by
+  user. So `extract`, `candidates` and `promote` first check that the caller
+  uploaded the document (`getDocument(...).uploaded_by`). Otherwise they
+  answer 404 `document_not_found` / `candidate_not_found`, never 403.
+- **The promote response.** Read `created`, not the status code. It returns
+  `{ pendingId, created, hasDuplicates, duplicateActionRequired, message,
+  duplicates }`.
+  - MERL-T answers 200 without an id when it defers on a duplicate or refuses
+    the name. The card then offers "Invia comunque", which retries with
+    `skipDuplicateCheck` plus `acknowledgedDuplicateOf`. That skips the dedup,
+    never the copyright gate.
+  - The candidate's `entity_type` is re-read from the authoritative candidate,
+    so a principio is not filed as a concetto.
+  - The provenance sent is `fonte: 'community'`, `source_reference` (the
+    user's citation) and `source_document_id` (the MERL-T `user_documents`
+    id, never the staging id).
+- `routes/merlt/validate.ts` (validationGuard):
+  - `GET /validate/pending`, `POST /validate/entity|relation`.
+  - A vote carries `user_id`, `vote` and `reason`. MERL-T computes the
+    authority itself.
+  - `VoteType` is approve|reject|edit; the FE sends only approve|reject.
 
-**Deferred by decision: relation EXTRACTION from free-text notes (#5).** MERL-T has no free-text relation extractor (`MechanisticExtractor` is Brocardi-structured-data only; the LLM extractors cover concept/principle/definition entities). The relation *path* (staging schema, `CandidateCard`, `proposeRelation`) is complete — only producing relation candidates from notes is absent (a new research-grade LLM extractor). Entities-first is the MVP.
+**MERL-T side.**
+
+- `document_parser.py`: `persist_target="staging"` sets `expires_at` and runs
+  `EntityDeduplicator.find_duplicates` (best-effort).
+- `worker/extraction_tasks.py` `extract_to_staging`:
+  - It is enqueued with `job_id = "extract-" + sha256(docId)[:40]` and
+    `job_timeout = MERLT_EXTRACT_JOB_TIMEOUT` (1800 s).
+  - It sends a `failed` callback when the upload was already purged or every
+    extractor failed.
+  - It deletes the file after extraction, except when nothing was staged, so
+    a retry stays possible.
+- **Relation candidates are extracted from notes** (loop-closure B1).
+  - The worker calls `parse_document(extract_relations=True)`, which writes
+    `ExtractionCandidate(candidate_type="relation")` through
+    `canonical_relation_type`.
+  - `propose-relation` stores the resolved wire value, not the Enum object,
+    so relation promotion no longer fails the INSERT.
+- **Relation endpoints are resolved at staging** (`document_parser.py`).
+  Each endpoint becomes one of: the URN or URL as written; a same-document
+  entity candidate, matched by normalised name; or the pending entity id of
+  an EXACT/HIGH deduplicator match.
+  - The candidate read model carries `source_text`/`target_text` (the raw
+    LLM names, null on older rows) and `source_resolved`/`target_resolved`
+    (null on entity candidates).
+  - `get_pending` relations carry `source_label`/`target_label`.
+  - `target_entity_id` is `varchar(300)` on `extraction_candidates` and
+    `pending_relations`. Three places apply the widening: `schema_additions`
+    at boot, Alembic 008 and `storage/migrations/004_relation_endpoints.sql`.
+  - The shared helpers live in `storage/graph/relation_endpoints.py`.
+- **At consensus, `_write_relation_to_graph` (`enrichment_router.py`) only
+  MATCHes existing nodes.** It matches by norm URN, by pending entity id (the
+  Entity id convention `entity_writer.entity_node_id`), by Entity id, by
+  `node_id`, or by a unique case-insensitive Entity name.
+  - Only a `urn:nir:` value may create a Norma stub, and `user_document` is
+    refused.
+  - A relation that points at a pending entity not yet in the graph is
+    deferred. `_write_deferred_relations_for_entity` writes it once that
+    entity is written.
+  - Known limit: `propose_relation` (the manual/legacy path) still stores
+    endpoints verbatim and only marks `target_is_pending`, so the cascade
+    does not reset a rejected pending *source*.
+- On the BFF side, the promote schema (`schemas/merlt/contrib.ts`) accepts
+  only resolved relation endpoints: a `urn:nir:` URN or URL, or a
+  `<tipo>:<slug>` id. Anything else gets 400 `unresolved_endpoint`.
+
+**Frontend.**
+
+- `features/merlt/contrib/` (route `/merlt/contribuisci`):
+  - `ContribPage` orchestrates `UploadDropzone`, `useExtractionJob` (2 s
+    poll), `CandidateReviewList` and `CandidateCard`.
+  - `CandidateCard` enables promote only once `fonte`, the reformulation and
+    the attestation are all present, and shows the entity type as a badge.
+  - `NormaPicker` picks the norma the candidate refers to.
+- `features/merlt/validate/` (route `/merlt/valida`): `ValidationPage`,
+  `ValidationCard` (provenance, norm link, one-tap reject) and
+  `ProvisionalReviewSection`.
+- Snapshot export and import live on `/grafo` (`graph/shared/snapshotIO.ts`),
+  not in contrib.
 
 **Slice 2c gotchas:**
-1. **MERL-T `parse_document` was SYNC + wrote straight to `pending_*`.** Slice 2c adds the async staging path (`persist_target`); the legacy sync path is unchanged. The personal staging level did not exist before.
-2. **`user_id` is a varchar(100) string everywhere toward MERL-T** (the VisuaLex user id), never an FK.
-3. **Copyright gate lives in `promotionGate.ts` and is re-checked server-side against the AUTHORITATIVE verbatim** fetched from MERL-T (`getCandidate`) — the client cannot supply the verbatim.
-4. **RQ job ids cannot contain `:`** (this RQ version validates `[A-Za-z0-9_-]`). The extraction job id is `"extract-"+sha256(docId)` (dash, not colon). The graph `"ingest:"` prefix predates this RQ and would break the same way if re-enqueued.
-5. **`merlt-api` must define `RQ_REDIS_URL`**, not just the worker — the api is what ENQUEUES (extract-async / ingest-article). Without it the api defaults to `localhost:6379` inside the container and enqueue fails (`Connection refused`). Added to `docker-compose.merlt.yml` api env.
-6. **The RQ worker has NO FastAPI lifespan**, so `init_db()` (enrichment Postgres engine) is never auto-called — any worker task that opens `get_db_session()` must `await init_db()` first (idempotent: guarded on `_engine is not None`). The graph ingest task sidesteps this by using FalkorDB only. MERL-T code in `merlt/` is **baked into the image at build** (only `data/` is volume-mounted) → code changes need a `docker compose --profile api-in-docker build` + recreate; the staging table auto-creates at api boot via lifespan `create_tables()`.
+1. **MERL-T `parse_document` has two paths.** The legacy sync path writes
+   straight to `pending_*`, and it is unchanged. The staging path is async.
+2. **`user_id` is a varchar(100) string everywhere toward MERL-T.** It is the
+   VisuaLex id, never an FK.
+3. **The copyright gate is re-checked server-side.** The client cannot supply
+   the verbatim.
+4. **RQ job ids cannot contain `:`.** They must match `[A-Za-z0-9_-]`. Use
+   `extract-…` and `ingest-…`, with a dash.
+5. **`merlt-api` needs `RQ_REDIS_URL` too, not only the worker.** The api is
+   the process that enqueues. Without it, it enqueues to `localhost:6379`
+   inside the container and fails.
+6. **The RQ worker has no FastAPI lifespan.** Any worker task that opens
+   `get_db_session()` must `await init_db()` first; the call is idempotent.
 
-### MERL-T Integration (Loop β — co-evolution Q&A + ops, branch `visualex-merlt-main`)
+### MERL-T Slice 3: UX decisions, and the absorb into `/grafo`
 
-Loop β closes the Q&A user-facing loop and adds admin-triggered RLCF training. Three policy heads (gating / traversal / tool_gating) train via REINFORCE on user feedback; weights persist on the durable `merlt_checkpoints` volume and load at MERL-T boot. Detailed sprint sessions in memory `merlt_loopbeta_progress`; loop-closure A1-A5+B1 in `merlt_rlcf_loop_closure_plan`.
+Design: `docs/merlt/slices/slice3-ux/design.md`. The data-quality follow-up is
+in `data-quality-plan.md`. These are the owner decisions:
 
-**BFF (Node, `/api/merlt/experts/*` + `/api/merlt/ops/*`).**
-- `routes/merlt/experts.ts` — `POST /experts/query` (authenticate + `contributionGuard` = full consent, injects `user_id`, maps `consentLevel`, forwards to MERL-T `:8000/api/v1/experts/query`), `GET /experts/history?limit=N` (clampInt 1..100), `POST /experts/refine` (follow-up on `traceId`), `POST /experts/confirm-source` (Zod `nodeId` regex `^live:`), and the 4 feedback channels `/experts/feedback/{inline,source,detailed,preference}`. Trace identifier on every response is `trace_id` (NOT `query_id`) — `e2e-setup` plus all FE code reads `trace_id`. Schema gotchas: `inline.rating` is `1 | 5` literal (binary like/dislike, not a 5-star scale), `source.relevance` is **int** 1..5, `detailed.{retrieval|reasoning|synthesis}Score` are floats **0..1** (not 1..5), `preference.preferredExpert` is one of `literal | systemic | principles | precedent`.
-- `services/merlt/expertsClient.ts` — mirror of `merltClient.ts` (native fetch + AbortController, `MERLT_EXPERTS_TIMEOUT_MS` default 120s — Q&A is slow under cold-start).
-- `routes/merlt/ops.ts` + `services/merlt/opsClient.ts` — admin RLCF training (loop-closure A5). `POST /ops/rlcf/training/start` (authenticate + `requireAdmin`), forwards to MERL-T `:8000/api/v1/rlcf/training/start` carrying `MERLT_API_KEY` as **`X-API-Key` header** (NOT `Authorization: Bearer`, that auth scheme is rejected by MERL-T's `verify_api_key` → 401 "API key required"). The opsClient is the only BFF client that needs the admin api-key — feedback/training routes that NER and Q&A use are authenticated client-side (JWT) and proxied with user_id injection. Body is forwarded verbatim (MERL-T defaults the rest); response shape `{success, training_id?, message?, config?}`. Buffer threshold has Pydantic floor `ge=50` on MERL-T side — runs return `{success: false, message: "Buffer insufficiente (N/50)..."}` until enough feedback exists; this is correct (not a bug).
+- **D1, navigation.** One Sidebar entry, "Assistente" (the hub).
+  - This was later amended by Slice 4 Decision A: the Sidebar now also has
+    "Grafo" → `/grafo`, gated on both flags.
+  - `/merlt/qa` and `/merlt/chiedi` redirect to `/grafo`.
+- **D2, "reading is free, asking needs basic, teaching needs full".**
+  - Reading the graph needs no consent.
+  - Asking (Q&A) needs `basic`.
+  - The teaching channels need `full`: Q&A feedback, confirm-source,
+    contributions, votes and NER feedback.
+- **D3, hub-dashboard.** The hub shows live data (last question, pending
+  count, graph health, profile), not static cards.
+- **D4, open community surfaces.** Junk is cleaned by votes, so every
+  validation card shows its provenance, a link to the norm and a one-tap
+  reject.
 
-**Frontend (`features/merlt/qa/` + ops button).** Q&A UI at `/merlt/chiedi`, gated by `useMerltFeatures().canContribute` (= full consent) + `VITE_FEATURE_MERLT`. `useQaThread` orchestrates ask/refine/rate/rateSrc/prefer/detailed/confirm with latest-wins; `QaSourceChip` jumps to `/grafo` by URN and surfaces a "ricorda nel grafo" only for `live_unconfirmed` nodes with a `node_id`. The deliberation panel ("Come ci sono arrivato") summarises canons + sources + 3-layer evaluation. Admin-only ops button (`features/merlt/ops/OpsTrainingButton`) is mounted on `MerltHubPage` behind `useMerltFeatures().opsVisible`.
+### MERL-T Slice 4: the debate on the graph
 
-**Loop β gotchas:**
-1. **`opsClient.ts` uses `X-API-Key` header**, not `Authorization: Bearer`. Header drift was committed once (HEAD `e5efe5c`) and stayed silent because nock didn't assert the header; the live test against MERL-T rejected every ops call with 401 → BFF mapped to 503 "merlt_unavailable". The regression guard now lives in `tests/integration/merlt/ops-routes.test.ts` (`expect(sentApiKey).toBe('test-admin-key')`).
-2. **`MERLT_API_KEY` env required for ops only.** Missing → opsClient sends no auth header → MERL-T 401 → BFF 503. Listed in `backend/.env.example` as the canonical place. Other clients (`merltClient`, `expertsClient`, `nerClient`, `graphClient`, `contribClient`) don't need it — they carry the user's JWT through.
-3. **Q&A response `trace_id` is the canonical handle.** The MERL-T raw response has historical aliases (`query_id`, etc.), but feedback/refine/history all key off `trace_id`. Don't follow legacy code paths that read `query_id`.
+Design: `docs/merlt/slices/slice4-graph-deliberation/design.md`. The decisions
+were locked 2026-07-03.
 
-### MERL-T Integration (Loop β #2 — Learned NER via RLCF, branch `visualex-merlt-main`)
+- **Decision A, absorb.** `/grafo` is the only Q&A surface. The history lives
+  in the deliberation column. The hub `QaCard`, the article entry and the
+  Sidebar all point to `/grafo`.
 
-Learned legal-reference NER trained on user corrections across 4 capture surfaces. spaCy 3.7 + `it_core_news_lg`, trained on a custom `RIFERIMENTO` label, gated behind `MERLT_NER_LEARNED_ENABLED` (default `false` — A/B verification first). Memory: `merlt_ner_rlcf_progress`.
+The Q&A pieces:
+
+- `AskGraphField` ("Chiedi al grafo").
+- `DeliberationColumn`: turns, the history view (`QaHistoryPanel`), sources as
+  `QaSourceChip`, the process trace, divergent theses and "Mi convince"
+  (preference).
+  - `RefineField` ("Approfondisci questa risposta") appears on settled turns
+    and calls `useQaThread.refine` with the turn's `trace_id`.
+  - `QaSynthesisWithCitations` renders the `qa_chip` NER bar.
+- `MobileDeliberationSheet`.
+- `GraphTraversalPlayer`: the traversal walk.
+
+On the canvas:
+
+- Canon nodes and contrast arcs come from `shared/graphDeliberation.ts`.
+- Provenance styling: `seed`, `community_validated`, `confirmed` and
+  `live_unconfirmed`. `confirmed` is first-class: it is what promotion and
+  review write.
+
+Other entry points and leftovers:
+
+- `components/features/search/AskMerltEntry.tsx` in `ArticleTabContent`
+  navigates to `/grafo?urn=`.
+- `qa/QaTurn.tsx` and `qa/QaDeliberationPanel.tsx` are dead: only tests import
+  them.
+
+**Teaching controls render only with `canContribute`.** A basic-consent reader
+sees a consent upsell in their place. A failed rating reverts and reports
+through the shared Toast, and the detailed form confirms only after the server
+does.
+
+**Steering that trains (L2).** `preferredExpert` feeds the gating head, and the
+heads are authority-weighted (scaled learning rate). The per-relation steer is
+`POST /experts/feedback/relation`. Per-node steering and a shareable trace URL
+are not built.
+
+### MERL-T Loop β: expert Q&A, sync and async progressive
+
+The async contract is frozen in `docs/merlt/qa-async-progressive-contract.md`.
+
+**BFF routes (`routes/merlt/experts.ts`; `services/merlt/expertsClient.ts`).**
+
+| Kind | Routes | Guard |
+|---|---|---|
+| Ask | `POST /experts/query` (sync), `POST /experts/query/async`, `GET /experts/history?limit=` (1..100, default 20), `GET /experts/trace/:traceId`, `POST /experts/refine` | authenticate + consentGuard (basic or full) |
+| Poll | `GET /experts/jobs/:jobId/status` | authenticate, owner-scoped (404 otherwise) |
+| Teach | `/experts/feedback/{inline,source,detailed,preference,relation}`, `/experts/confirm-source` | authenticate + contributionGuard (full) |
+| Callback | `POST /internal/qa-callback` | internalAuth |
+
+- `/experts/trace/:traceId` returns the full stored trace, redacted by the
+  caller's current consent level.
+- **Trace ownership.** Every traceId-keyed route (trace, refine,
+  `feedback/*`) first proves that the caller owns the trace
+  (`callerOwnsTrace`), and answers 404 `trace_not_found` otherwise. The
+  proofs, in order:
+  1. a `MerltQaJob` of the caller carries the trace id;
+  2. the stored trace names the caller;
+  3. the trace is among the caller's last 100 history turns.
+- `/experts/refine` stays sync; it calls MERL-T `/experts/feedback/refine`.
+- The three steer channels (preference, relation, confirm-source) are deduped
+  in memory per (user, channel, trace, target) for 10 minutes. This is
+  single-instance state.
+
+**The BFF injects `user_id` and maps the consent level** (none→anonymous,
+basic, full). `trace_id` is the handle on every response. Do not follow
+legacy code that reads `query_id`.
+
+The feedback schemas:
+
+- `inline.rating` is `1 | 5`.
+- `source.relevance` is an int from 1 to 5.
+- `detailed.{retrieval,reasoning,synthesis}Score` are floats from 0 to 1.
+- `preference.preferredExpert` is one of `literal | systemic | principles |
+  precedent`.
+- `confirmSource.nodeId` must match `^live:`.
+
+The client timeouts are `MERLT_EXPERTS_TIMEOUT_MS` (sync, default 120 s) and
+`MERLT_EXPERTS_ASYNC_TIMEOUT_MS` (submit, default 10 s).
+
+**The async flow.** The FE asks through the async path by default.
+
+1. `POST /experts/query/async` creates a `MerltQaJob`. The row stores the
+   query, the mode and the consent level captured at submit, so a later
+   downgrade does not apply.
+2. The BFF asks MERL-T to run the deliberation in-process on `merlt-api`, in
+   an `asyncio.create_task`, not on the RQ worker. This needs
+   `BFF_QA_CALLBACK_URL` and the secret on `merlt-api`.
+3. MERL-T calls `qa-callback` once per expert with `running` and a partial.
+   The BFF upserts the partial by expert and sorts the list in canon order
+   (letterale, sistematico, principî, precedente). The final callback carries
+   the result.
+4. The FE polls the job status every 2 s.
+
+A definite refusal at submit flips the row to `failed` and answers
+`202 {status:'failed'}`: a refused connection (`MerltNetworkError`) or a MERL-T
+4xx/5xx. A timeout stays `pending`, because MERL-T may still call back.
+
+**The FE state.** `useQaThread` orchestrates ask, refine, rate, rateSrc,
+prefer, detailed and confirm, latest-wins. It persists the active thread in
+`localStorage` (`merlt-qa-thread-v1`).
+
+**MERL-T side.**
+
+- The reader's convergent/divergent choice reaches the synthesizer as a
+  per-request `forced_mode`: `orchestrator.process` →
+  `AdaptiveSynthesizer.synthesize`. It is never written to the shared config.
+  A forced divergent with fewer than two usable experts falls back to
+  convergent and says so. Refine keeps the original answer's mode.
+- The partial weight is the normalised routing weight, not the confidence.
+- `POST /api/v1/enrichment/confirm-source` ("ricorda nel grafo") exists as of
+  2026-09-25. It:
+  - validates the `live:` node, and 404s when it is gone;
+  - for a Normattiva article, lazily ingests it through the shared enqueue
+    helper (same `ingest-` job id);
+  - turns any other source into a pending entity through `propose_entity`'s
+    gates, with a capped excerpt (never the verbatim);
+  - stamps `pending_entity_id` on the node, records the confirmer, and raises
+    trust (never lowers it). It is idempotent.
+
+**RLCF training.** The replay buffer (`rlcf/training_scheduler.py`) saves on
+`add_experience` with a debounce and an atomic replace, and it is flushed on
+shutdown. An empty buffer is rehydrated at boot (`rlcf/buffer_rehydration.py`).
+
+Training starts manually from the hub:
+
+- `POST /ops/rlcf/training/start` (admin) → MERL-T `/api/v1/rlcf/training/start`.
+- The body is forwarded verbatim; it is not Zod-validated.
+- MERL-T's Pydantic floor is `buffer_threshold ≥ 50`. Below it the answer is
+  `{success:false, message:"Buffer insufficiente (N/…)"}`, which is correct
+  behaviour.
+
+Checkpoints land on `merlt_checkpoints`, and `PolicyManager` loads them.
+
+**Policy history.** MERL-T `GET /api/v1/rlcf/policies/history` reads the saved
+`weight_versions` rows, the same table `/policies/weights` reads. It uses
+`WeightStore.list_versions(experiment_id, limit)` (`weights/store.py`) for the
+experiment that `_resolve_experiment_id()` resolves, and projects each row
+through the shared `_config_to_status()`.
+
+- Rows come oldest first, so `epochs` rise over time.
+- An unreadable row is skipped with a warning.
+- The history is empty when `RLCF_DATABASE_URL` is unset.
+- Nothing in the BFF or the FE calls it yet.
+
+**What Loop β does not have.** There is no SSE or WebSocket proxy (submit and
+poll replaced it). There is no training status/stop route, no dashboard,
+policy, pipeline, regression or quarantine proxy, and no save-to-dossier for
+an answer. The LLM-cited sources are not checked against the retrieved set.
+
+### MERL-T ops, ingestion governance and graph co-evolution
+
+**Ops (`routes/merlt/ops.ts`, `services/merlt/opsClient.ts`).** Every route is
+authenticate + requireAdmin, under the `ops` flag:
+
+| BFF route | MERL-T route |
+|---|---|
+| `POST /ops/rlcf/training/start` | `/api/v1/rlcf/training/start` |
+| `POST /ops/graph/hygiene` | `/api/v1/admin/graph/hygiene` |
+| `GET /ops/config` | `/api/v1/admin/config` |
+| `PUT /ops/config/:key` | `/api/v1/admin/config/{key}` (hand-validated) |
+| `POST /ops/engine/reinitialize` | `/api/v1/admin/engine/reinitialize` (30 s timeout) |
+
+FE: the hub ops cards (Slice 2b). `OpsTrainingButton` fires and forgets, with
+no status poll. `OpsHygieneButton` reports the reconciled, decayed,
+quarantined and pruned counts.
+
+**Mechanical ingestion (admin, zero-LLM).** The design is
+`docs/merlt/slices/ingestion-governance/design.md`. It is implemented, even
+though that doc's header still says DRAFT.
+
+- `routes/merlt/opsIngestion.ts` and `opsIngestionClient.ts` →
+  `/api/v1/ingestion/mechanical/*` (`require_role("admin")`):
+  - `POST /ops/ingestion/run`, with `{source: visualex_tree|italia_corpus,
+    source_ref, …}`. It enqueues on `merlt_ingest` with `job_timeout=1800`.
+  - `GET /ops/ingestion/batches[/:batchId]`.
+  - `POST …/promote`, which answers 409 while conflicts are unresolved.
+  - `POST …/reject`.
+- Each batch carries a conflict report: `urn_conflicts`, `node_updates` and
+  `node_new`.
+- Status writes are conditional. A reject that races a promote gets 409
+  `batch_status_changed_concurrently`, and the worker writes only while the
+  batch is still `promoting`.
+- The parser (`pipeline/mechanical_ingestion/parser.py`) derives code
+  abbreviations from an explicit table, `_CODE_ABBREVIATIONS`, never from
+  initials. An unknown act keeps its name.
+- FE: `ops/ingestion/IngestionAdminPanel`, under the `/admin` tab
+  "Ingestione".
+
+**Graph co-evolution.** The design is
+`docs/superpowers/specs/2026-07-16-merlt-graph-coevolution-design.md`; see
+also blueprint §2.5.
+
+- **Absorb.** The experts pull live sources from mcp-legal-it.
+  `pipeline/provisional_writer.py` writes each one as a `live_unconfirmed`
+  node: `URN = node_id = "live:<hash>"`, the real article URL in `source_url`,
+  trust 0.6, not community-validated. A Qdrant chunk goes with it, keyed by
+  `source_url`, and the node is linked `(confirmed)-[:CORRELATO]->(provisional)`.
+- **Learn.** `pipeline/promotion.py` bumps three counters: usage, positive
+  feedback and confirmed citation. Above `promotion_threshold` (0.6,
+  `RuntimeConfig`) the node becomes `provenance='confirmed'`, trust 1.0.
+  Promotion is monotonic. The served provisional nodes of an answer are
+  persisted in `full_trace` as `coevo_served_keys`, so positive feedback
+  credits them.
+- **Self-correct.** `pipeline/hygiene.py` touches only `live_unconfirmed`
+  nodes, in four steps: reconcile twins of confirmed nodes, decay stale
+  nodes, quarantine doubtful ones for review, prune faded ones.
+  - It runs every `MERLT_HYGIENE_INTERVAL_HOURS`: compose sets 24, the code
+    default is 0 (off). The first sweep comes one interval after boot.
+  - A node carries "human signal" when it has feedback or usage, or when a
+    user vouched for it through confirm-source (`confirmed_by` non-empty or
+    `pending_entity_id` stamped). `HUMAN_SIGNAL_PREDICATE` expresses this, and
+    three steps share it:
+    - `quarantine_doubtful` sends such nodes to human review;
+    - `prune_faded` deletes only nodes without it;
+    - `reconcile_duplicates` leaves vouched twins alone.
+
+    The reason: `entity_writer._link_provisional_source` finds the node again
+    by `pending_entity_id` at approval.
+  - Known limit: a rejected proposal keeps its stamp. A later confirm of the
+    same node answers `"Fonte gia' proposta alla comunita'"` and reuses the
+    rejected entity id. The node fades into quarantine, where a reject prunes
+    it.
+  - It can also run on demand from the hub.
+  - The doubtful nodes appear on `/merlt/valida` (`ProvisionalReviewSection`
+    → `/graph/provisional-review`, decision approve|reject).
+- **The Qdrant collection.** `storage/vectors/collection.default_chunks_collection()`
+  names it: `QDRANT_COLLECTION` if set, else `<FALKORDB_GRAPH_NAME>_chunks`
+  (`merl_t_legal_chunks`). The graph name defaults to `merl_t_legal`
+  everywhere.
+
+### MERL-T Loop β #2: learned NER via RLCF
+
+A spaCy 3.7 + `it_core_news_lg` model is trained on a custom `RIFERIMENTO`
+label from user corrections. `MERLT_NER_LEARNED_ENABLED` (default `false`)
+gates it at inference.
 
 **BFF (`/api/merlt/ner/*`).**
-- `routes/merlt/ner.ts` — `POST /ner/feedback` (authenticate + `contributionGuard`, accepts the 4 surfaces and 4 feedback types, caps `context_window` at 1200 chars to enforce a `±500` privacy budget around the citation, forwards to MERL-T `:8000/api/v1/ner/feedback`), `GET /ner/feedback/stats` (admin only, MERL-T proxy), `POST /ner/training/start` (admin, maps `nIter → n_iter`, enqueues an RQ job on queue `merlt_ner_train`), `GET /ner/training/jobs/:jobId` (admin, RQ status passthrough).
-- `services/merlt/nerClient.ts` — mirror of `merltClient.ts`, `MERLT_NER_TIMEOUT_MS` default 10s; `submitFeedback / stats / startTraining / trainingStatus / _resetNerClientForTests`.
-- `schemas/merlt/ner.ts` — Zod schema with `refine` rule: `feedbackType ∈ {correction, missed}` requires `correctReference`. `correctReference` shape (`actType / article / date / actNumber / annex / displayText`) is passed through camelCase verbatim into the MERL-T `JSON` opaque payload — the trainer reads those keys.
 
-**4 capture surfaces (FE):**
-1. **`article_xref`** — primary. `CitationPreviewPopup` mounts `CitationNerFeedback` (✓ confirm / ✗ Ban false_positive / ✏ Correggi opens an actType+article mini-editor → emits a `correction` with `correctReference`). Gated `useMerltFeatures().canContribute`. Wired in `ArticleTabContent.handleCitationNerFeedback`.
-2. **`qa_chip`** — same `CitationNerFeedback` component (extracted to `features/merlt/ner/`), rendered inline inside the Q&A synthesis by `QaSynthesisWithCitations`. Context is ±500 around the citation **inside the answer**, never the user query.
-3. **`implicit`** — automatic, low-weight. `ArticleTabContent.handleOpenCitationInTab` emits a `confirmation` whenever a citation chip is clicked through to a tab.
-4. **`search_mining`** — automatic, server-side. MERL-T `orchestrator.process` fires `_mine_ner_confirmations` after merging `legal_references` for refs that grounded to a canonical URN. **Idempotent per `(user_id, urn)`** with deterministic `feedback_id = ner-mining-<sha>`; full-consent only (gated via `consent_level == 'full'` in the metadata MERL-T receives); stores only ref + URN, never the query.
+- `POST /ner/feedback`: authenticate + contributionGuard, under the
+  `contribution` flag. It accepts 4 surfaces and 4 feedback types, and caps
+  `context_window` at 1200 chars.
+- The admin routes run under the `ops` flag, with requireAdmin:
+  - `GET /ner/feedback/stats`
+  - `POST /ner/training/start` (`nIter` → `n_iter`; RQ queue
+    `merlt_ner_train`, `job_timeout=3600`)
+  - `GET /ner/training/jobs/:jobId`
+- `nerClient.ts` times out after `MERLT_NER_TIMEOUT_MS` (default 10 s).
+- `schemas/merlt/ner.ts` requires `correctReference` when the feedback type
+  is `correction` or `missed`.
 
-**Training (Phase 4).** spaCy custom NER trained in RQ on the worker. The worker MUST listen on `merlt_ner_train` queue (the queue list is `merlt_ingest merlt_extract merlt_ner_train` in `docker-compose.merlt.yml`'s worker `command`). Model + checkpoints live on the shared `merlt_ner_models` volume (mounted on both api + worker), so the api can hot-load `legal_ner_latest` symlink at inference time. A/B precision/recall/F1 reported in the training job result (baseline vs learned on a hash-split 80/20).
+**The 4 capture surfaces.**
+
+1. **`article_xref`**: `CitationPreviewPopup` → `CitationNerFeedback`
+   (✓ / ✗ / Correggi), gated on `canContribute`.
+2. **`qa_chip`**: `QaSynthesisWithCitations` in `DeliberationColumn`, which
+   passes `sendNerFeedback` with the answer text as the context. Without a
+   handler the component shows no affordance.
+3. **`implicit`**: `ArticleTabContent.handleOpenCitationInTab` emits a
+   `confirmation`.
+4. **`search_mining`**: server-side, in `orchestrator.process`, only when
+   `consent_level == 'full'`. It is idempotent per (user, urn), with
+   `feedback_id = ner-mining-<sha>`.
+
+**Training.** The A/B report (`worker/ner_training_tasks.py`) scores three
+systems on a 20 % hash split:
+
+- `baseline`: the query analyzer's `ARTICLE_PATTERNS` spans joined with the
+  VisuaLex `extract_citations` offsets;
+- `learned`: the fine-tuned model;
+- `combined`: baseline ∪ learned, which is what the flag turns on.
+
+When VisuaLex is unreachable, `baseline` is null, `baseline_available` is
+false and `baseline_status.reason` says why. Training still runs.
+
+The report keeps `test_examples`, `baseline` and `learned`. It adds:
+
+- `combined`, `baseline_available`, `baseline_status {available, reason,
+  system}`;
+- `headline_surfaces` (`article_xref` and `qa_chip`), `match`, and `gold`.
+  Precision is a lower bound, because only the confirmed span is annotated;
+- `by_surface`, and `counts {records, train, test, by_surface,
+  train_only_surfaces}`. `search_mining` rows always go to training;
+- `created_at`, `checkpoint_path`, `finetuned_from`, `n_iter`,
+  `only_untrained`, `test_percent`.
+
+The report is written atomically to `<checkpoint>/ab_report.json` and to
+`models/legal_ner_reports/latest.json`; `MERLT_NER_REPORTS_DIR` overrides the
+directory. MERL-T serves it at `GET /api/v1/ner/training/report/latest`, which
+declares `verify_api_key` and answers 404 `no_report` before the first run and
+500 `report_unreadable` on a bad file. No BFF route proxies it yet. The RQ
+training result is kept for 7 days.
+
+The model and its checkpoints live on `merlt_ner_models`, which the api and
+the worker share.
 
 **Loop β #2 gotchas:**
-1. **Worker queue list is load-bearing.** If `merlt_ner_train` is dropped from the worker `command` (regression: the docker-compose was once rolled back to a 2-queue version), every training POST stays in `queued` forever. The fix is one-line in compose + `docker compose ... up -d --no-deps --force-recreate merlt-worker`.
-2. **The privacy budget lives in the BFF.** `routes/merlt/ner.ts` caps `context_window` at 1200; the FE already trims to ~1000 (±500 around the span). Server-side cap is the trust boundary.
-3. **`feedback_id` for `search_mining` is deterministic.** Re-firing the same query for the same user does NOT create duplicate rows. Verified live; test idempotency by re-POST `/experts/query` with the same body and watching `ner_feedback WHERE source_surface='search_mining'` row count.
+1. **The worker queue list is load-bearing.** If `merlt_ner_train` drops out
+   of the worker `command`, every training POST stays `queued`. Fix the
+   compose file, then run
+   `docker compose … up -d --no-deps --force-recreate merlt-worker`.
+2. **The privacy budget lives in the BFF.** `ner.ts` caps `context_window` at
+   1200.
+3. **The `search_mining` `feedback_id` is deterministic.** Re-running a query
+   does not duplicate rows.
+
+### MERL-T testing
+
+- **Backend.** vitest + supertest on a real Postgres test DB, with nock
+  through `backend/tests/nockShim.ts`. `backend/tests/setup.ts` truncates
+  `merlt_qa_jobs`, `merlt_ingestion_jobs`, `merlt_extraction_jobs`,
+  `merlt_consent_audits`, `merlt_user_preferences` and
+  `merlt_user_authority_cache` between tests.
+- **Frontend.** vitest + jsdom.
+- **CI.** `.github/workflows/ci.yml` triggers on `visualex-merlt-main` too. Its
+  `merlt` job, scoped to this branch, runs the MERL-T suite on Python 3.11
+  against a Postgres service, after `create_tables()` and
+  `ensure_schema_additions()`. Tests marked `integration` (live FalkorDB) are
+  excluded by `pyproject.toml` `addopts`.
+- **The MERL-T suite locally.** Commands are in `merlt/CLAUDE.md`. Use a venv
+  in `merlt/`, with `ENRICHMENT_DATABASE_URL` pointing at a disposable
+  Postgres: the DB-backed tests write rows.
+
+### MERL-T gotchas learned 2026-09-25
+
+1. **npm 11 writes the lockfiles.** npm 10 (Node 20) wants the full platform
+   matrix for optional deps. So `npm ci` on npm 10 fails with
+   "Missing: @esbuild/... from lock file", and `npm install` on npm 10
+   rewrites the lock. CI pins Node 24. Locally, use npm 11, or never commit a
+   lock that npm 10 rewrote.
+2. **Every floor relation needs a policy mapping.** `CORRELATO` is in
+   `SystemicExpert.STATIC_SYSTEMIC_RELATIONS` because co-evolution writes it.
+   `GRAPH_TO_POLICY_RELATION` in `rlcf/policy_gradient.py` must map it
+   (`correlato` → `RELATED_TO`). Otherwise it collapses onto the fallback, and
+   the relation-preference channel treats it as unknown vocabulary.
+   `tests/unit/test_traversal_inference_steering.py` imports the expert's list
+   instead of copying it.
+3. **`merlt.api` re-exports every router under its module's name.**
+   `from merlt.api import graph_router` gives you the `APIRouter`, not the
+   module. A test that patches module globals must call
+   `importlib.import_module("merlt.api.graph_router")`.
+4. **RQ job timeouts vs the BFF nets.** RQ's default `job_timeout` is 180 s.
+   When it expires, SIGALRM kills the job and bypasses the task's `except`,
+   so no failure callback reaches the BFF.
+   - Every enqueue sets `job_timeout` explicitly: extraction
+     `MERLT_EXTRACT_JOB_TIMEOUT` (1800 s), article ingest 600 s, mechanical
+     ingestion 1800 s, NER training 3600 s.
+   - The BFF net for a job must exceed its `job_timeout` plus the queue wait
+     plus the 5-minute sweep. The extraction net is 45 min for that reason.
+   - The ingestion net (10 min) equals the ingest `job_timeout`, so a job
+     that uses its whole budget can be flipped just before its callback
+     lands.
+5. **Match provisional nodes by `source_url` too.** A provisional node's
+   `URN`/`node_id` is `live:<hash>`, while Qdrant chunks and `QATrace.sources`
+   carry the article URL. Every lookup must match
+   `URN OR node_id OR source_url`, with exact hits first: the promotion signal
+   writers, the Q&A provenance lookup, and hygiene's twin reconcile.
+6. **`user_document` never becomes a graph node.** Stand-alone note entities
+   carry `article_urn='user_document'`, because the column is NOT NULL.
+   `entity_writer.PLACEHOLDER_ARTICLE_URNS` makes the graph writer skip the
+   relation (and record the source as `user_note`), and the relation helper
+   refuses placeholders. Without that, consensus MERGEd a
+   `:Norma {URN:'user_document'}` hub that every such concept hung off.
+7. **The URN suffix regex is longest-first.** The article-suffix list in
+   `utils/urn_labels.py` is complete, sorted longest-first, and ends with a
+   boundary. Before, `2409-terdecies` became `2409-ter` and collided with the
+   real 2409-ter. The BFF `eventMapper.normalizeArticleUrn` still knows only
+   `bis`..`decies`.
 
 ## Key API Endpoints
 

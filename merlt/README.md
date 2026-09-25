@@ -1,135 +1,94 @@
-# MERL-T: Multi-Expert Reinforcement Learning from AI Feedback
+# MERL-T: Multi-Expert Reasoning with Legal Texts (vendored in VisuaLexAPI)
 
-> Advanced NLP framework for Italian legal text analysis
-
-[![PyPI version](https://badge.fury.io/py/merlt.svg)](https://pypi.org/project/merlt/)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+> **This is a vendored fork.** VisuaLexAPI (branch `visualex-merlt-main`) runs this code as the
+> MERL-T sidecar, started by the repo-root `start.sh` through `docker-compose.merlt.yml`. It is not
+> installed from PyPI, and the upstream standalone flow (`start_dev.sh`,
+> `docker-compose.dev.yml`) is not used here. For the architecture, the runbook and the agent
+> guidance, see:
+>
+> - [`../docs/merlt/blueprint.md`](../docs/merlt/blueprint.md)
+> - [`../docs/merlt/integration.md`](../docs/merlt/integration.md)
+> - [`CLAUDE.md`](CLAUDE.md)
 
 ## Overview
 
-MERL-T is a research framework for legal text analysis using:
-- **Multi-Expert Architecture**: Specialized models for different legal interpretation tasks
-- **RLCF**: Reinforcement Learning from AI Feedback for continuous improvement
-- **Knowledge Graph**: FalkorDB-based legal knowledge representation
-- **RAG Pipeline**: Retrieval-Augmented Generation for accurate responses
+MERL-T answers Italian legal questions by *deliberation*. Four experts, one per interpretive canon
+of art. 12 preleggi (literal, systemic, principles, precedent), each reason in a ReAct loop with
+tools over:
 
-## Installation
+- a FalkorDB legal knowledge graph;
+- a Qdrant vector store;
+- live legal sources reached through the `mcp-legal-it` MCP server.
 
-```bash
-pip install merlt
-```
+An adaptive synthesizer merges their positions, or keeps the dissent.
 
-MERL-T depends on the `visualex` package for data scraping:
-```bash
-pip install visualex
-```
+The system learns from its users through **RLCF** (Reinforcement Learning from Community
+Feedback): feedback on answers trains three policy heads (gating, traversal, tool gating) with
+REINFORCE, weighted by the user's authority. Community proposals, votes and consensus grow the
+graph, and live sources the experts used are absorbed as provisional nodes, then promoted or
+pruned.
 
 ## Architecture
 
 ```
-                    +-------------------+
-                    |   User Query      |
-                    +--------+----------+
-                             |
-                    +--------v----------+
-                    |   RAG Pipeline    |
-                    +--------+----------+
-                             |
-         +-------------------+-------------------+
-         |                   |                   |
-+--------v--------+ +--------v--------+ +--------v--------+
-|  Literal Expert | | Systemic Expert | | Precedent Expert|
-+-----------------+ +-----------------+ +-----------------+
-         |                   |                   |
-         +-------------------+-------------------+
-                             |
-                    +--------v----------+
-                    | Disagreement Mod  |
-                    +--------+----------+
-                             |
-                    +--------v----------+
-                    |   RLCF Scoring    |
-                    +-------------------+
+            BFF (VisuaLex Node, /api/merlt/*)
+                         |
+                  merlt-api :8000  (merlt.app:app)
+                         |
+      +------------------+------------------+
+      |                  |                  |
+ Orchestrator        RQ queues         Graph co-evolution
+ 4 ReAct experts     (merlt-worker)    provisional → promote → hygiene
+ + AdaptiveSynth.    ingest / extract
+      |              / NER training
+      |
+ FalkorDB · Qdrant · Postgres (traces, feedback, pending_*, RLCF) · Redis
 ```
 
-## Features
+The package layout, the router list and the boot sequence are in [`CLAUDE.md`](CLAUDE.md).
 
-### Multi-Expert System
-Four specialized experts for different interpretive approaches:
-- **Literal Expert**: Textual interpretation
-- **Systemic Expert**: System-wide legal coherence
-- **Principles Expert**: Constitutional and fundamental principles
-- **Precedent Expert**: Case law and jurisprudence
+## Quick start (inside VisuaLexAPI)
 
-### RLCF Framework
-- Authority scoring for knowledge sources
-- Feedback aggregation from expert disagreement
-- Policy gradient optimization
-
-### Knowledge Graph
-- Legal concepts and relationships
-- Cross-reference resolution
-- Temporal versioning (multivigenza)
-
-## Quick Start
-
-```python
-from merlt.pipeline import Pipeline
-from merlt.experts import LiteralExpert, SystemicExpert
-from visualex.scrapers import NormattivaScraper
-
-# Initialize pipeline
-pipeline = Pipeline()
-
-# Fetch a legal document
-scraper = NormattivaScraper()
-document = await scraper.fetch_by_urn(
-    "urn:nir:stato:decreto.legislativo:2003-06-30;196"
-)
-
-# Process with multi-expert analysis
-result = await pipeline.analyze(document, question="What are the main obligations?")
-
-print(f"Answer: {result.answer}")
-print(f"Confidence: {result.confidence}")
-print(f"Expert agreement: {result.agreement_score}")
-```
-
-## Development
+From the repo root:
 
 ```bash
-git clone https://github.com/merlt/merlt
+git submodule update --init --recursive vendor/mcp-legal-it   # or let start.sh do it
+cp backend/.env.example backend/.env                          # then set MERLT_API_KEY, DATABASE_URL, JWT_SECRET
+MERLT_ENABLED=true ./start.sh                                 # builds and starts the 7-service stack
+curl -s http://localhost:8000/health
+```
+
+After changing any code under `merlt/`, rebuild and recreate: the code is baked into the image.
+
+```bash
+docker compose -f docker-compose.merlt.yml --profile api-in-docker build merlt-api merlt-worker
+docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d --force-recreate merlt-api merlt-worker
+```
+
+To use the engine from Python, go through the HTTP API (`POST /api/v1/experts/query` and friends).
+In process, the entry point is `merlt.experts.orchestrator.MultiExpertOrchestrator`, which
+`merlt.api.engine_bootstrap.build_orchestrator(ai_service)` builds.
+
+## Tests
+
+```bash
 cd merlt
-pip install -e ".[dev]"
-pytest
+python3.11 -m venv .venv
+.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/python -m pytest tests/ -q
 ```
 
-### Local start script
-
-```bash
-./start_dev.sh
-```
-
-This script starts the dev databases via Docker Compose and runs the FastAPI
-server on `http://localhost:8000`.
+The DB-backed tests need `ENRICHMENT_DATABASE_URL` and the `RLCF_*` URLs pointing at a disposable
+Postgres, bootstrapped with `create_tables()` and `ensure_schema_additions()`. See
+[`CLAUDE.md`](CLAUDE.md) for the exact commands. CI runs the same suite in the `merlt` job of
+`.github/workflows/ci.yml`.
 
 ## Research
 
-This framework is part of ongoing research in:
-- Legal AI and expert systems
-- Reinforcement learning from human/AI feedback
-- Knowledge graph construction for legal domains
-
-## Citation
-
-If you use MERL-T in your research, please cite:
-```bibtex
-@software{merlt2026,
-  title = {MERL-T: Multi-Expert Reinforcement Learning from AI Feedback},
-  year = {2026},
-  url = {https://github.com/merlt/merlt}
-}
-```
+MERL-T implements the architecture described in Allega & Puzio (2025), *MERL-T: A multi-expert
+architecture for trustworthy artificial legal intelligence*, and *Reinforcement learning from
+community feedback (RLCF)*.
 
 ## License
 
