@@ -3,12 +3,15 @@ import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
+import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { ArticleBody } from '../search/ArticleBody';
+import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
+import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import type { Annotation, ArticleData, NormaVisitata } from '../../../types';
 
 interface Props {
@@ -100,7 +103,14 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
   );
 
   const rawText = state.phase === 'ready' ? (state.article.article_text || '') : '';
-  const markedHtml = useArticleMarkers({ rawText, highlights: articleHighlights, annotations: itemAnnotations });
+  const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
+  const markedHtml = useArticleMarkers({ rawText, highlights: articleHighlights, annotations: itemAnnotations, structure });
+  // Update-note references and the foldable AGGIORNAMENTO tail, as on the
+  // dashboard. `enabled` waits for the body: it exists only once the fetch settles.
+  const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, itemKey, {
+    enabled: isReady,
+    contentKey: markedHtml,
+  });
 
   // Delegated click on the article body: tapping a wavy `.note-anchor`
   // opens the compact InlineNotePopover for that single note, exactly as
@@ -194,7 +204,16 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
         }}
         onPopupCopy={handlePopupCopy}
         onRemoveHighlight={removeHighlight}
+        updatesOpen={updatesOpen}
       />
+      {openNote && structure.notes[openNote.id] && (
+        <UpdateNotePopover
+          noteId={openNote.id}
+          paragraphs={getUpdateNoteParagraphs(rawText, structure.notes[openNote.id])}
+          anchorEl={openNote.anchorEl}
+          onClose={closeNote}
+        />
+      )}
       {composer && (
         <InlineNoteComposer
           anchorRect={composer.rect}
