@@ -539,11 +539,14 @@
   @apply text-slate-600 dark:text-slate-300;
 }
 
+/* A phone column is narrow: nested items would leave the text a sliver. */
 @media (max-width: 639px) {
   .vlx-art {
-    --vlx-hang: 1.75em;
-    --vlx-hang-item: 2em;
-    --vlx-indent: 0.9em;
+    --vlx-hang: 1.6em;
+    --vlx-hang-item: 1.9em;
+    --vlx-indent: 0.4em;
+    font-size: 1.0625rem;
+    line-height: 1.65;
   }
 }
 
