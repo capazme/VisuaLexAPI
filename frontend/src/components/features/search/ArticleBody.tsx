@@ -2,6 +2,7 @@ import { useRef, type RefObject } from 'react';
 import type { Highlight } from '../../../types';
 import { Highlighter, X } from 'lucide-react';
 import { SafeHTML } from '../../../utils/sanitize';
+import { cn } from '../../../lib/utils';
 import { SelectionPopup } from './SelectionPopup';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
 
@@ -14,6 +15,8 @@ export interface ArticleBodyProps {
     onPopupAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onPopupCopy: (text: string) => Promise<void> | void;
     onRemoveHighlight: (id: string) => void;
+    /** Unfolds the AGGIORNAMENTO notes at the bottom of the text (useArticleTextInteractions). */
+    updatesOpen?: boolean;
 }
 
 export function ArticleBody({
@@ -25,6 +28,7 @@ export function ArticleBody({
     onPopupAddNote,
     onPopupCopy,
     onRemoveHighlight,
+    updatesOpen = false,
 }: ArticleBodyProps) {
     // The text alone, without the selection popup: stored offsets are measured
     // from here (see SelectionPopup's textRootRef).
@@ -40,7 +44,7 @@ export function ArticleBody({
                     onAddNote={onPopupAddNote}
                     onCopy={onPopupCopy}
                 />
-                <div ref={textRef} className="vlx-art px-2 sm:px-4" id={`article-content-${itemKey}`}>
+                <div ref={textRef} className={cn('vlx-art px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent ? (
                         <SafeHTML html={processedContent} />
                     ) : (

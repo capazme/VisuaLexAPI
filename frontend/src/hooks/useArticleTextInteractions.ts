@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 
 export interface OpenUpdateNote {
   id: string;
@@ -33,6 +33,10 @@ export interface ArticleTextInteractionOptions {
  * and has no React handlers of its own; Enter and Space activate, as on a
  * button.
  *
+ * Folding is a class on the text container (`vlx-updates-open`, applied by
+ * the caller from `updatesOpen`), not part of the rendered HTML: toggling
+ * never replaces the text, so keyboard focus and any open selection survive.
+ *
  * State belongs to one article: `resetKey` changing (another article in the
  * same component) returns to closed. Both resets are derived during render,
  * not performed in an effect (CLAUDE.md gotcha 11).
@@ -48,10 +52,6 @@ export function useArticleTextInteractions(
     current.openNote && current.openNote.contentKey === contentKey
       ? { id: current.openNote.id, anchorEl: current.openNote.anchorEl }
       : null;
-  // Set when the toggle had focus: the re-render that folds or unfolds the
-  // notes replaces its element, so focus goes back to the new one.
-  const refocusToggle = useRef(false);
-
   const closeNote = useCallback(() => {
     setState((s) => (s.key === resetKey ? { ...s, openNote: null } : fresh(resetKey)));
   }, [resetKey]);
@@ -79,7 +79,6 @@ export function useArticleTextInteractions(
       }
       const toggle = target.closest<HTMLElement>('.vlx-updates-toggle');
       if (toggle && container.contains(toggle)) {
-        refocusToggle.current = document.activeElement === toggle;
         setState((s) => {
           const b = base(s);
           return { ...b, updatesOpen: !b.updatesOpen, openNote: null };
@@ -106,11 +105,13 @@ export function useArticleTextInteractions(
     };
   }, [containerRef, resetKey, enabled, contentKey]);
 
+  // The toggle lives in SafeHTML's markup, which React does not own: keep its
+  // aria-expanded in step with the state (a DOM write, not a state update).
   useEffect(() => {
-    if (!refocusToggle.current) return;
-    refocusToggle.current = false;
-    containerRef.current?.querySelector<HTMLElement>('.vlx-updates-toggle')?.focus();
-  }, [current.updatesOpen, containerRef]);
+    containerRef.current
+      ?.querySelector<HTMLElement>('.vlx-updates-toggle')
+      ?.setAttribute('aria-expanded', current.updatesOpen ? 'true' : 'false');
+  }, [current.updatesOpen, containerRef, contentKey]);
 
   return { updatesOpen: current.updatesOpen, openNote, closeNote };
 }

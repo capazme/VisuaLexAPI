@@ -492,21 +492,24 @@
   content: '▸';
 }
 
-.vlx-art .vlx-updates[data-open="true"] .vlx-updates-toggle::before {
-  content: '▾';
-}
-
 .vlx-art .vlx-updates-toggle::after {
   content: attr(data-label);
 }
 
-.vlx-art .vlx-updates[data-open="false"] .vlx-updates-body {
-  display: none;
-}
-
+/* Folded unless the container carries .vlx-updates-open (set from React by
+   useArticleTextInteractions): opening the notes never re-renders the text. */
 .vlx-art .vlx-updates-body {
+  display: none;
   margin-top: 0.4em;
   font-size: 0.9em;
+}
+
+.vlx-art.vlx-updates-open .vlx-updates-body {
+  display: block;
+}
+
+.vlx-art.vlx-updates-open .vlx-updates-toggle::before {
+  content: '▾';
 }
 
 /* The source's "-------------" line: kept in the text, drawn as a rule. */

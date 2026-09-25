@@ -29,8 +29,6 @@ export interface RenderArticleInput {
   highlights: Highlight[];
   annotations: Annotation[];
   searchQuery?: string | null;
-  /** Whether the AGGIORNAMENTO tail is expanded. */
-  updatesOpen?: boolean;
 }
 
 type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'search';
@@ -173,21 +171,23 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   if (!structure) return renderSpan(raw, 0, raw.length, marks, true);
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
-  return renderBlocks(raw, structure, marks, !!input.updatesOpen);
+  return renderBlocks(raw, structure, marks);
 }
 
-function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[], updatesOpen: boolean): string {
+function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[]): string {
   const parts: string[] = [];
   const tail = structure.updates;
   let inTail = false;
   for (const block of structure.blocks) {
     if (tail && !inTail && block.start >= tail.start) {
       inTail = true;
+      // Folded by CSS through a class on the container (useArticleTextInteractions),
+      // so opening the notes never re-renders this HTML; the toggle's label is
+      // CSS-generated, never a text node.
       const label = `Note di aggiornamento (${Object.keys(structure.notes).length})`;
-      const open = updatesOpen ? 'true' : 'false';
       parts.push(
-        `<div class="vlx-updates" data-open="${open}">` +
-          `<span class="vlx-updates-toggle" role="button" tabindex="0" aria-expanded="${open}" aria-label="${label}" data-label="${label}"></span>` +
+        '<div class="vlx-updates">' +
+          `<span class="vlx-updates-toggle" role="button" tabindex="0" aria-expanded="false" aria-label="${label}" data-label="${label}"></span>` +
           '<div class="vlx-updates-body">',
       );
     }

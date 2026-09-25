@@ -37,16 +37,14 @@ describe('the projection invariant — every real text', () => {
         const len = 1 + Math.floor(next() * Math.min(80, plain.length - a - 1));
         highlights.push(hl(`h${i}`, plain.slice(a, a + len), a));
       }
-      for (const updatesOpen of [false, true]) {
-        const div = mount(render(raw, { highlights, updatesOpen }));
-        expect(div.textContent).toBe(plain);
-        for (const h of highlights) {
-          const found = pieces(div, `[data-highlight="${h.id}"]`);
-          expect(found.length, h.id).toBeGreaterThan(0);
-          expect(found.map((e) => e.textContent).join('')).toBe(h.text);
-          const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
-          expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
-        }
+      const div = mount(render(raw, { highlights }));
+      expect(div.textContent).toBe(plain);
+      for (const h of highlights) {
+        const found = pieces(div, `[data-highlight="${h.id}"]`);
+        expect(found.length, h.id).toBeGreaterThan(0);
+        expect(found.map((e) => e.textContent).join('')).toBe(h.text);
+        const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
+        expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
       }
     },
   );
@@ -180,19 +178,18 @@ describe('marks', () => {
 });
 
 describe('Normattiva markers', () => {
-  it('c.p. 640: references are buttons, modifications dashed, the tail collapsed with a CSS label', () => {
+  it('c.p. 640: references are buttons, modifications dashed, the tail foldable with a CSS label', () => {
     const raw = fixtureText('nrm-cp-640');
     const html = render(raw);
     expect(html).toContain('<span class="vlx-ref" role="button" tabindex="0"');
     expect(html).toContain('data-note="119"');
-    expect(html).toContain('data-open="false"');
     expect(html).toContain('data-label="Note di aggiornamento (2)"');
     const div = mount(html);
     expect(pieces(div, '.vlx-ref').map((e) => e.textContent)).toEqual(['(119)', '(154)']);
     expect(pieces(div, '.vlx-mod').length).toBe(2);
     expect(pieces(div, '.vlx-notice').map((e) => e.textContent)).toEqual(['((NUMERO ABROGATO DAL D.L. 11 APRILE 2025, N. 48))']);
     expect(div.querySelector('.vlx-updates-toggle')?.textContent).toBe('');
-    expect(mount(render(raw, { updatesOpen: true })).querySelector('.vlx-updates')?.getAttribute('data-open')).toBe('true');
+    expect(div.querySelector('.vlx-updates .vlx-updates-body .vlx-update-head')?.textContent).toBe('AGGIORNAMENTO (119)');
   });
 
   it('keeps the chip and the toggle keyboard-reachable through the sanitizer', () => {

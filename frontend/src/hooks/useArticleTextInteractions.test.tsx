@@ -50,8 +50,10 @@ describe('useArticleTextInteractions', () => {
     fireEvent.click(chip('119'));
     fireEvent.keyDown(toggle(), { key: ' ' });
     expect(state()).toEqual({ updatesOpen: true, note: null });
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
     fireEvent.click(toggle());
     expect(state().updatesOpen).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
   });
 
   it('lets a note the reader anchored on the reference win the click', () => {

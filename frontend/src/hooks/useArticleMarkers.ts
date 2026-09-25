@@ -14,8 +14,6 @@ interface UseArticleMarkersInput {
    * have no commi to divide.
    */
   structure?: ArticleStructure | null;
-  /** Whether the AGGIORNAMENTO tail is expanded. Structured rendering only. */
-  updatesOpen?: boolean;
 }
 
 /**
@@ -34,13 +32,12 @@ export function useArticleMarkers({
   highlights,
   annotations,
   structure = null,
-  updatesOpen = false,
 }: UseArticleMarkersInput): string {
   const [searchQuery, setSearchQuery] = useState<string | null>(() => getGlobalHighlight());
   useEffect(() => subscribeToHighlight(setSearchQuery), []);
 
   return useMemo(
-    () => renderArticleHtml({ raw: rawText || '', structure, highlights, annotations, searchQuery, updatesOpen }),
-    [rawText, structure, highlights, annotations, searchQuery, updatesOpen],
+    () => renderArticleHtml({ raw: rawText || '', structure, highlights, annotations, searchQuery }),
+    [rawText, structure, highlights, annotations, searchQuery],
   );
 }
