@@ -144,7 +144,78 @@ describe('useArticleViewedTracker', () => {
     perfSpy.mockRestore();
   });
 
-  it('emits when scroll threshold (30%) is met even with short dwell', () => {
+  it('emits when the article is revealed ≥30% inside its scrolling column, even with short dwell', () => {
+    // The real layout: a non-scrolling article inside a scrolling reading
+    // column. The tracker must measure the reveal of the article, not the
+    // (always zero) scrollTop of the article itself.
+    const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const column = document.createElement('div');
+    column.style.overflowY = 'auto';
+    Object.defineProperty(column, 'scrollHeight', { value: 2000, configurable: true });
+    Object.defineProperty(column, 'clientHeight', { value: 600, configurable: true });
+    column.getBoundingClientRect = () =>
+      ({ top: 0, bottom: 600, height: 600, left: 0, right: 0, width: 0, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    const article = document.createElement('div');
+    let articleTop = 0;
+    article.getBoundingClientRect = () =>
+      ({ top: articleTop, bottom: articleTop + 1500, height: 1500, left: 0, right: 0, width: 0, x: 0, y: articleTop, toJSON: () => ({}) }) as DOMRect;
+    column.appendChild(article);
+    document.body.appendChild(column);
+
+    const { unmount } = renderHook(() => {
+      const ref = useRef<HTMLElement | null>(article);
+      useArticleViewedTracker({
+        articleUrn: 'urn:nir~art2043',
+        containerRef: ref,
+        sessionId: '11111111-1111-1111-1111-111111111111',
+      });
+      return null;
+    });
+
+    // Scroll the column so that 1000px of the 1500px article have passed the
+    // column's bottom edge: 66% revealed.
+    articleTop = -400;
+    column.dispatchEvent(new Event('scroll'));
+
+    act(() => triggerVisible(true));
+    perfSpy.mockReturnValue(500);
+    act(() => triggerVisible(false));
+
+    unmount();
+    document.body.removeChild(column);
+
+    expect(sendEventMock).toHaveBeenCalledTimes(1);
+    const payload = sendEventMock.mock.calls[0][0];
+    expect(payload.scrollMaxPct).toBeGreaterThanOrEqual(60);
+    expect(payload.scrollMaxPct).toBeLessThanOrEqual(70);
+    perfSpy.mockRestore();
+  });
+
+  it('counts a tall article as visible when its visible band fills half the viewport', () => {
+    const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const { unmount } = renderTrackerHook({});
+
+    act(() => {
+      lastIOCallback?.([
+        {
+          isIntersecting: true,
+          intersectionRatio: 0.3, // <50% of a very tall article on screen…
+          intersectionRect: { height: 600 } as DOMRectReadOnly,
+          rootBounds: { height: 600 } as DOMRectReadOnly, // …but it fills the viewport
+        } as IntersectionObserverEntry,
+      ]);
+    });
+    perfSpy.mockReturnValue(3500);
+    act(() => triggerVisible(false));
+
+    unmount();
+
+    expect(sendEventMock).toHaveBeenCalledTimes(1);
+    expect(sendEventMock.mock.calls[0][0].dwellMs).toBeGreaterThanOrEqual(3000);
+    perfSpy.mockRestore();
+  });
+
+  it('keeps the scrollTop ratio for an article panel that scrolls by itself', () => {
     const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
     const { container, unmount } = renderTrackerHook({});
 

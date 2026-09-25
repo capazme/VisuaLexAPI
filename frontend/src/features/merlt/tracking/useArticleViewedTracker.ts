@@ -17,11 +17,50 @@ import { publishMerltEvent, MERLT_EVENT_TYPES } from '../merltEventBus';
 
 const DWELL_THRESHOLD_MS = 3000;
 const SCROLL_THRESHOLD_PCT = 30;
+/** Minimum gap between two progress measurements on a scroll burst. */
+const SCROLL_MEASURE_GAP_MS = 100;
+
+/**
+ * The nearest ancestor that actually scrolls, or null for the window. The
+ * article element itself (contentRef in ArticleTabContent) has no overflow:
+ * the reading column, or the page, scrolls it into view.
+ */
+function findScrollParent(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * ≥50% of the article on screen, OR, for an article taller than twice the
+ * viewport (where 50% can never be visible at once), the visible part fills
+ * at least half of the viewport. Entries from older observers (no
+ * intersectionRect) fall back to the isIntersecting flag.
+ */
+function isEffectivelyVisible(entry: IntersectionObserverEntry): boolean {
+  if (!entry.isIntersecting) return false;
+  const ratio = typeof entry.intersectionRatio === 'number' ? entry.intersectionRatio : 1;
+  if (ratio >= 0.5) return true;
+  const visibleHeight = entry.intersectionRect?.height ?? 0;
+  const rootHeight = entry.rootBounds?.height ?? window.innerHeight;
+  return rootHeight > 0 && visibleHeight >= 0.5 * rootHeight;
+}
 
 export interface UseArticleViewedTrackerOptions {
   articleUrn: string | undefined;
   normaVisitataId?: string;
-  /** Required: a ref to the scrollable article container. */
+  /**
+   * Required: a ref to the ARTICLE element (not necessarily scrollable). Read
+   * progress is measured as how far the article has been revealed inside its
+   * nearest scrolling ancestor (or the window); an element that scrolls by
+   * itself keeps the scrollTop ratio.
+   */
   containerRef: React.RefObject<HTMLElement | null>;
   /** Optional override for stable session identification. */
   sessionId?: string;
@@ -80,11 +119,13 @@ export function useArticleViewedTracker({
     state.emitted = false;
 
     // ---- IntersectionObserver: track viewport visibility (≥50% visible) ----
+    // Two thresholds: 0.5 for the usual case, 0 so a tall article (never 50%
+    // on screen) still reports its visible band, judged by isEffectivelyVisible.
     let lastEntry: IntersectionObserverEntry | undefined;
     const observer = new IntersectionObserver(
       ([entry]) => {
         lastEntry = entry;
-        if (entry.isIntersecting) {
+        if (isEffectivelyVisible(entry)) {
           if (!state.isVisible) {
             state.isVisible = true;
             state.lastVisibleAt = performance.now();
@@ -96,25 +137,54 @@ export function useArticleViewedTracker({
           }
         }
       },
-      { threshold: 0.5 }
+      { threshold: [0, 0.5] }
     );
     observer.observe(el);
 
-    // ---- Scroll tracking on the container ----
-    const onScroll = (): void => {
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      if (maxScroll <= 0) return;
-      const pct = Math.min(100, Math.max(0, (el.scrollTop / maxScroll) * 100));
+    // ---- Scroll tracking ----
+    // Before this, the listener sat on the article element and read its own
+    // scrollTop; that element never scrolls (ArticleBody has no overflow), so
+    // scroll_max_pct was always 0 and the "scroll ≥ 30%" criterion never fired.
+    // Progress is now "how much of the article's height has been revealed"
+    // inside the scroll ancestor (or the viewport), measured on scroll only:
+    // a short article that fits on screen still needs the dwell to count.
+    const scrollParent = findScrollParent(el);
+    let lastMeasureAt = 0;
+    const measure = (): void => {
+      let pct: number;
+      const maxSelf = el.scrollHeight - el.clientHeight;
+      if (maxSelf > 0) {
+        // The element clips and scrolls its own content (a panel).
+        pct = (el.scrollTop / maxSelf) * 100;
+      } else {
+        const rect = el.getBoundingClientRect();
+        if (!(rect.height > 0)) return;
+        const rootBottom = scrollParent
+          ? scrollParent.getBoundingClientRect().bottom
+          : window.innerHeight;
+        pct = ((rootBottom - rect.top) / rect.height) * 100;
+      }
+      pct = Math.min(100, Math.max(0, pct));
       if (pct > state.scrollMaxPct) state.scrollMaxPct = pct;
     };
-    el.addEventListener('scroll', onScroll, { passive: true });
+    const onScroll = (): void => {
+      const now = performance.now();
+      if (now - lastMeasureAt < SCROLL_MEASURE_GAP_MS && lastMeasureAt !== 0) return;
+      lastMeasureAt = now;
+      measure();
+    };
+    const scrollTargets: (HTMLElement | Window)[] = [el, window];
+    if (scrollParent) scrollTargets.push(scrollParent);
+    for (const target of scrollTargets) {
+      target.addEventListener('scroll', onScroll, { passive: true });
+    }
 
     // ---- Pause-on-blur (tab hidden) so we don't count time when away ----
     const onVisibilityChange = (): void => {
       if (document.hidden && state.isVisible) {
         state.dwellMs += performance.now() - state.lastVisibleAt;
         state.isVisible = false;
-      } else if (!document.hidden && lastEntry?.isIntersecting) {
+      } else if (!document.hidden && lastEntry && isEffectivelyVisible(lastEntry)) {
         state.isVisible = true;
         state.lastVisibleAt = performance.now();
       }
@@ -124,7 +194,9 @@ export function useArticleViewedTracker({
     // ---- Cleanup → emit event if threshold met ----
     return () => {
       observer.disconnect();
-      el.removeEventListener('scroll', onScroll);
+      for (const target of scrollTargets) {
+        target.removeEventListener('scroll', onScroll);
+      }
       document.removeEventListener('visibilitychange', onVisibilityChange);
 
       if (state.isVisible) {
