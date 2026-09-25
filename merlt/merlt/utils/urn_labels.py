@@ -29,14 +29,23 @@ from typing import Any, Dict, Optional, Tuple
 _ARTICLE_SUFFIXES = (
     "bis", "ter", "quater", "quinquies", "sexies", "septies", "octies",
     "novies", "decies", "undecies", "duodecies", "terdecies", "quaterdecies",
-    "quindecies", "sexdecies", "septiesdecies", "duodevicies", "undevicies",
-    "vicies",
+    "quindecies", "quinquiesdecies", "sexdecies", "sexiesdecies",
+    "septiesdecies", "octiesdecies", "noviesdecies", "duodevicies",
+    "undevicies", "vicies",
 )
 
 # ~art<digits><optional-suffix>, anchored so trailing "-com3" / "!vig=" don't
-# bleed into the capture. Suffix is matched only against the known list.
+# bleed into the capture. Suffix is matched only against the known list,
+# LONGEST FIRST and with a right boundary: an ordered "ter|...|terdecies"
+# alternation matched the shortest prefix, so 2409-terdecies (a real Codice
+# civile article) became "2409-ter" and collided with the real 2409-ter in
+# every stub label, estremi and backfill. The boundary sits on the optional
+# group only: a bare (?![a-z]) after it would let \d+ backtrack on
+# "2409xyz" and yield "240".
 _ART_URN_RE = re.compile(
-    r"~art(\d+)(" + "|".join(_ARTICLE_SUFFIXES) + r")?",
+    r"~art(\d+)(?:("
+    + "|".join(sorted(_ARTICLE_SUFFIXES, key=len, reverse=True))
+    + r")(?![a-z]))?(?![0-9])",
     re.IGNORECASE,
 )
 
@@ -107,7 +116,10 @@ def derive_article_fields_from_urn(urn: Optional[str]) -> Tuple[Optional[str], O
     Returns:
         ``(numero_articolo, estremi)`` — both ``None`` when the URN has no
         article segment (so the caller can skip the SET without inventing
-        bogus data). ``estremi`` mirrors the seed convention ("Art. N").
+        bogus data). ``estremi`` is the minimal URN-derived identity
+        ("Art. N"): it deliberately omits the act, because the URN alone does
+        not say "c.c." vs "c.p.", and the mechanical-ingestion conflict report
+        recognises this bare form as a stub value rather than a conflict.
 
     Examples:
         >>> derive_article_fields_from_urn("urn:nir:...~art467")

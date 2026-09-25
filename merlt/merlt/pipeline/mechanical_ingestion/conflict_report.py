@@ -14,6 +14,7 @@ from typing import Any, Optional
 import structlog
 
 from merlt.pipeline.ingestion import _canonical_urn
+from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
 
@@ -87,8 +88,17 @@ async def build_conflict_report(
         node_updates.append(urn)
         batch_estremi = props.get("estremi")
         batch_tipo = props.get("tipo_documento")
+        # A Norma stub written by entity_writer (A2) or the backfill carries
+        # the bare URN-derived estremi ("Art. 2043"); the adapter writes the
+        # full form ("Art. 2043 c.c."). That is an enrichment the promotion
+        # should apply, not a conflict for the admin to force past.
+        _, stub_estremi = derive_article_fields_from_urn(urn)
+        live_estremi = live.get("estremi")
         estremi_conflict = bool(
-            batch_estremi and live.get("estremi") and batch_estremi != live.get("estremi")
+            batch_estremi
+            and live_estremi
+            and batch_estremi != live_estremi
+            and live_estremi != stub_estremi
         )
         tipo_conflict = bool(
             batch_tipo and live.get("tipo_documento") and batch_tipo != live.get("tipo_documento")

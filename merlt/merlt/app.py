@@ -20,6 +20,7 @@ Usage:
 """
 
 import os
+from typing import Any
 import structlog
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -103,6 +104,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             log.error("Failed to install consensus triggers", error=str(e), exc_info=True)
             log.warning("Community votes will NOT reach consensus until triggers are installed")
+        # Columns added to the ORM after the first boot (create_tables never
+        # alters an existing table, and the stack runs no Alembic): applied
+        # idempotently here so a rebuilt image never selects a missing column.
+        try:
+            from merlt.storage.enrichment.schema_additions import ensure_schema_additions
+            await ensure_schema_additions()
+        except Exception as e:
+            log.error("Failed to apply schema additions", error=str(e), exc_info=True)
+            log.warning("pending_* reads will fail until storage/migrations/003_pending_source_reference.sql is applied")
+        # Admin API key for the ops routes (training, hygiene, ingestion, NER):
+        # seeded from MERLT_ADMIN_API_KEY so the BFF's MERLT_API_KEY works on a
+        # fresh stack without the manual /api-keys/bootstrap call.
+        try:
+            from merlt.api.api_key_seed import ensure_admin_api_key
+            await ensure_admin_api_key()
+        except Exception as e:
+            log.error("Failed to seed the admin API key", error=str(e), exc_info=True)
         log.info("✅ Enrichment database initialized")
 
         # Initialize Expert System (MultiExpertOrchestrator)
@@ -120,6 +138,18 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
             log.warning("Expert System endpoints will return 503 errors")
+
+        # RLCF replay buffer: when no buffer file was loaded (fresh volume,
+        # unreadable file), rebuild it from the persisted feedback so admin
+        # training does not wait for a new batch after every restart. Bounded
+        # and best-effort: a DB problem never blocks boot. Never trains.
+        try:
+            import asyncio as _asyncio
+            from merlt.rlcf.buffer_rehydration import rehydrate_buffer
+
+            await _asyncio.wait_for(rehydrate_buffer(), timeout=120)
+        except Exception as e:  # noqa: BLE001
+            log.error("RLCF replay buffer rehydration failed (non-fatal)", error=str(e))
 
         # Seed loader (Slice 2a, MERLT-2a.1) — idempotent, non-fatal.
         # Loads the Libro IV CC graph (~27.7k nodes) from merlt/data/seeds/
@@ -264,6 +294,7 @@ async def health_check():
     from merlt.storage.enrichment import check_db_health
 
     checks: dict[str, str] = {}
+    graph_nodes: int | None = None
 
     # PostgreSQL
     checks["postgresql"] = "healthy" if await check_db_health() else "unhealthy"
@@ -277,6 +308,21 @@ async def health_check():
         )
         fdb.connection.ping()
         checks["falkordb"] = "healthy"
+        # Cheap count for the VisuaLex hub's graph card (`upstream.graph.nodes`,
+        # which it always read and never received). Guarded: a slow or failed
+        # count leaves the key out and never flips the status.
+        try:
+            import asyncio as _asyncio
+
+            graph_name = os.environ.get("FALKORDB_GRAPH_NAME", "merl_t_legal")
+
+            def _count() -> int:
+                res = fdb.select_graph(graph_name).query("MATCH (n) RETURN count(n)")
+                return int(res.result_set[0][0])
+
+            graph_nodes = await _asyncio.wait_for(_asyncio.to_thread(_count), timeout=2.0)
+        except Exception as e:  # noqa: BLE001
+            log.debug("health_graph_count_failed", error=str(e))
     except Exception as e:
         log.debug("health_falkordb_failed", error=str(e))
         checks["falkordb"] = "unhealthy"
@@ -312,11 +358,14 @@ async def health_check():
 
     all_healthy = all(v == "healthy" for v in checks.values())
 
-    return {
+    payload: dict[str, Any] = {
         "status": "healthy" if all_healthy else "degraded",
         "version": "1.0.0",
         "dependencies": checks,
     }
+    if graph_nodes is not None:
+        payload["graph"] = {"nodes": graph_nodes}
+    return payload
 
 
 # Root endpoint

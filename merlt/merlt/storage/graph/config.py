@@ -18,14 +18,16 @@ Usage:
 Environment Variables:
     FALKORDB_HOST: Host del server (default: localhost)
     FALKORDB_PORT: Porta del server (default: 6380)
-    FALKORDB_GRAPH_NAME: Nome del grafo (default: merl_t_dev)
+    FALKORDB_GRAPH_NAME: Nome del grafo (default: merl_t_legal)
     FALKORDB_PASSWORD: Password (default: vuota)
     FALKORDB_MAX_CONNECTIONS: Max connessioni pool (default: 10)
     FALKORDB_TIMEOUT_MS: Timeout operazioni in ms (default: 5000)
 
 Convenzione Naming:
-    - merl_t_dev: Ambiente sviluppo
-    - merl_t_prod: Ambiente produzione
+    - merl_t_legal: il grafo seedato (Libro IV c.c.) che api, worker e seed
+      loader condividono; è l'unico default, così un processo senza
+      FALKORDB_GRAPH_NAME legge lo stesso grafo degli altri
+    - merl_t_prod: Ambiente produzione (solo via env)
 """
 
 import os
@@ -60,7 +62,10 @@ class FalkorDBConfig:
     """
     host: str = field(default_factory=lambda: _get_env_str("FALKORDB_HOST", "localhost"))
     port: int = field(default_factory=lambda: _get_env_int("FALKORDB_PORT", 6380))
-    graph_name: str = field(default_factory=lambda: _get_env_str("FALKORDB_GRAPH_NAME", "merl_t_dev"))
+    # One default for every process: the seed loader and the worker already used
+    # "merl_t_legal", while this config said "merl_t_dev", so an api started
+    # without FALKORDB_GRAPH_NAME (the local start.sh path) read an empty graph.
+    graph_name: str = field(default_factory=lambda: _get_env_str("FALKORDB_GRAPH_NAME", "merl_t_legal"))
     max_connections: int = field(default_factory=lambda: _get_env_int("FALKORDB_MAX_CONNECTIONS", 10))
     timeout_ms: int = field(default_factory=lambda: _get_env_int("FALKORDB_TIMEOUT_MS", 5000))
     password: Optional[str] = field(default_factory=lambda: _get_env_str("FALKORDB_PASSWORD", "") or None)

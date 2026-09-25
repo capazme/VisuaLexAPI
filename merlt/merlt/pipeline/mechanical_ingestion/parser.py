@@ -122,27 +122,61 @@ def _article_urn(base_urn: str, numero: str) -> str:
 # VisuaLex tree adapter helpers
 # ---------------------------------------------------------------------------
 
-# Words dropped when deriving a code's dotted abbreviation from its act_type
-# name ("codice di procedura civile" -> drop "di" -> "c.p.c."). Not an
-# Italian-grammar stopword list in general — scoped to what appears in
-# NORMATTIVA_URN_CODICI act names.
-_CODE_ABBREV_STOPWORDS = {"di", "del", "della", "dello", "dei", "degli", "delle"}
+# Abbreviations used in `estremi` ("Art. 1982 c.c."), keyed on the lowercased
+# act name as VisuaLex spells it in NORMATTIVA_URN_CODICI (visualex_api/tools/
+# map.py; copied, MERL-T must not import visualex_api). An explicit table
+# replaced a first-letter initialism that turned "codice del consumo" into
+# "c.c." (the Codice civile) and "codice in materia di protezione dei dati
+# personali" into "c.i.m.p.d.p.".
+_CODE_ABBREVIATIONS: dict[str, str] = {
+    "codice civile": "c.c.",
+    "codice penale": "c.p.",
+    "codice di procedura civile": "c.p.c.",
+    "codice di procedura penale": "c.p.p.",
+    "codice del consumo": "cod. cons.",
+    "codice della strada": "C.d.S.",
+    "codice in materia di protezione dei dati personali": "cod. privacy",
+    "codice della privacy": "cod. privacy",
+    "codice del processo amministrativo": "c.p.a.",
+    "codice della navigazione": "cod. nav.",
+    "codice dei contratti pubblici": "cod. contr. pubbl.",
+    "codice dell'amministrazione digitale": "CAD",
+    "codice della proprieta' industriale": "c.p.i.",
+    "codice della proprietà industriale": "c.p.i.",
+    "codice delle assicurazioni private": "cod. ass.",
+    "codice del turismo": "cod. tur.",
+    "codice dell'ambiente": "cod. amb.",
+    "codice dei beni culturali e del paesaggio": "cod. beni cult.",
+    "codice antimafia": "cod. antimafia",
+    "codice della crisi d'impresa e dell'insolvenza": "CCII",
+    "codice del terzo settore": "CTS",
+    "codice delle comunicazioni elettroniche": "cod. com. el.",
+    "codice del processo tributario": "c.p.t.",
+    "codice di giustizia contabile": "c.g.c.",
+    "codice della nautica da diporto": "cod. naut.",
+    "codice dell'ordinamento militare": "c.o.m.",
+    "codice delle pari opportunita'": "cod. pari opp.",
+    "codice delle pari opportunità": "cod. pari opp.",
+    "costituzione": "Cost.",
+}
 
 
 def _code_abbreviation(act_type: str) -> str:
-    """`"codice civile"` -> `"c.c."`, `"codice di procedura civile"` ->
-    `"c.p.c."` — first letter of each significant word, dotted. Deterministic
-    and generic (no hardcoded per-code table): verified against the real seed
-    (`estremi: "Art. 1982 c.c."`) for `codice civile`/`codice penale`.
+    """`"codice civile"` -> `"c.c."`, `"codice del consumo"` -> `"cod. cons."`.
+
+    Case-insensitive lookup in the explicit table (the same trap as
+    `codice_urn`: six VisuaLex keys carry capitals). An unknown act returns
+    its own name rather than an invented initialism, so `estremi` stays
+    readable ("Art. 3 legge sulla privacy") and never collides with a codice.
     """
-    words = [
-        w
-        for w in re.split(r"\s+", act_type.strip().lower())
-        if w and w not in _CODE_ABBREV_STOPWORDS
-    ]
-    if not words:
+    key = " ".join(act_type.strip().lower().split())
+    if not key:
         return act_type.strip()
-    return "".join(f"{w[0]}." for w in words)
+    hit = _CODE_ABBREVIATIONS.get(key)
+    if hit is None:
+        log.info("visualex_tree.abbrev_fallback", act_type=act_type)
+        return act_type.strip()
+    return hit
 
 
 def _parse_visualex_source_ref(source_ref: str) -> tuple[str, Optional[str]]:

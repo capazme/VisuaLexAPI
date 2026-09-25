@@ -491,11 +491,20 @@ class GraphAwareRetriever:
 
             if result and result.get("path"):
                 path_data = result["path"]
+                edges = path_data.get("edges", [])
+                # client.shortest_path returns {"path": {"edges": [...]}, "length": N}:
+                # the length sits NEXT to "path", not inside it. Reading it from
+                # the inner dict gave 0 for every path, so 1-hop and 2-hop paths
+                # scored the same distance (1/(0+1)). Fallbacks keep any future
+                # client shape working, and a real path is never a self-loop.
+                length = result.get("length", path_data.get("length", len(edges)))
+                if edges and length < 1:
+                    length = len(edges)
                 return GraphPath(
                     source_node=source,
                     target_node=target,
-                    edges=path_data.get("edges", []),
-                    length=path_data.get("length", 0)
+                    edges=edges,
+                    length=length,
                 )
 
             return None

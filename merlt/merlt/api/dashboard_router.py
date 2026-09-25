@@ -89,7 +89,7 @@ async def _check_falkordb_health() -> ServiceHealth:
                 status=ServiceStatus.ONLINE,
                 latency_ms=latency,
                 details={
-                    "database": "merl_t_dev",
+                    "database": os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal"),
                     "connected": True,
                 }
             )
@@ -688,7 +688,11 @@ async def get_node_details(
         "falkordb": {
             "label": "FalkorDB",
             "description": "Graph database Redis-compatible per il Knowledge Graph legale. Memorizza nodi (articoli, entità, concetti) e relazioni (citazioni, modifiche, correlazioni).",
-            "config": {"host": "localhost", "port": 6380, "db": "merl_t_dev"},
+            "config": {
+                "host": os.getenv("FALKORDB_HOST", "localhost"),
+                "port": int(os.getenv("FALKORDB_PORT", "6380")),
+                "db": os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal"),
+            },
             "links": {
                 "docs": "https://docs.falkordb.com",
                 "code": "merlt/storage/graph/client.py",

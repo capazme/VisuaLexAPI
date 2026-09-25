@@ -127,7 +127,20 @@ async def _callback_bff(
     secret = os.getenv("MERLT_INTERNAL_SECRET", "")
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(url, json=payload, headers={"X-Internal-Secret": secret})
+            resp = await client.post(url, json=payload, headers={"X-Internal-Secret": secret})
+        if resp.status_code >= 400:
+            # 401/500 = MERLT_INTERNAL_SECRET differs between this worker and
+            # the BFF (or is empty on the BFF); 404 = the BFF row is gone.
+            # Best-effort by design, but silence here hid every such
+            # misconfiguration behind jobs that stayed "in corso".
+            log.error(
+                "%s refused" % "BFF callback",
+                bff_job_id=bff_job_id,
+                status=status,
+                http_status=resp.status_code,
+                body=resp.text[:300],
+                hint="check MERLT_INTERNAL_SECRET on the BFF and the worker" if resp.status_code in (401, 500) else None,
+            )
     except Exception as e:
         log.error("BFF callback failed", bff_job_id=bff_job_id, status=status, exc=str(e))
 
