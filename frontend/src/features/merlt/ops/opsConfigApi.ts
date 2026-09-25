@@ -31,6 +31,19 @@ export function setOpsConfig(key: string, value: number | boolean | string): Pro
   return putMerlt<RuntimeConfigItem>(`/merlt/ops/config/${encodeURIComponent(key)}`, { value });
 }
 
+export interface GraphHygieneResponse {
+  success: boolean;
+  reconciled?: number;
+  decayed?: number;
+  quarantined?: number;
+  pruned?: number;
+}
+
+/** POST /api/merlt/ops/graph/hygiene — one co-evolution hygiene sweep, now. */
+export function runGraphHygiene(): Promise<GraphHygieneResponse> {
+  return postMerlt<GraphHygieneResponse>('/merlt/ops/graph/hygiene');
+}
+
 export interface ReinitEngineResponse {
   reinitialized: boolean;
   engine: Record<string, unknown>;

@@ -27,6 +27,33 @@ export function _resetOpsClientForTests(): void {
   cached = null;
 }
 
+/**
+ * POST /api/merlt/ops/graph/hygiene — run the co-evolution hygiene sweep now.
+ * The periodic sweep needs MERLT_HYGIENE_INTERVAL_HOURS on merlt-api; this is
+ * the admin's way to run one on demand (and to see that it works at all).
+ */
+router.post(
+  '/ops/graph/hygiene',
+  authenticate,
+  requireAdmin,
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await client().runGraphHygiene();
+      res.status(200).json(result);
+    } catch (err) {
+      if (err instanceof MerltClientError) {
+        if (err.status === 401 || err.status === 403) {
+          res.status(503).json({ detail: 'merlt_auth_misconfigured' });
+          return;
+        }
+        res.status(503).json({ detail: 'merlt_unavailable' });
+        return;
+      }
+      throw err;
+    }
+  }
+);
+
 router.post(
   '/ops/rlcf/training/start',
   authenticate,

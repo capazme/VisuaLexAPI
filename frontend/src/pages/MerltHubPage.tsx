@@ -5,6 +5,7 @@ import { useMerltFeatures } from '../features/merlt/useMerltFeatures';
 import { useConsent } from '../features/merlt/consent/useConsent';
 import { ConsentDialog } from '../features/merlt/consent/ConsentDialog';
 import { OpsTrainingButton } from '../features/merlt/ops/OpsTrainingButton';
+import { OpsHygieneButton } from '../features/merlt/ops/OpsHygieneButton';
 import { OpsConfigPanel } from '../features/merlt/ops/OpsConfigPanel';
 import { NerOpsCard } from '../features/merlt/ner/NerOpsCard';
 import {
@@ -90,6 +91,7 @@ export function MerltHubPage() {
               Avvia manualmente un ciclo di training RLCF sui feedback raccolti.
             </p>
             <OpsTrainingButton />
+            <OpsHygieneButton />
             <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
               <NerOpsCard />
             </div>

@@ -99,6 +99,39 @@ describe('POST /api/merlt/ops/rlcf/training/start (loop-closure A5)', () => {
   });
 });
 
+describe('POST /api/merlt/ops/graph/hygiene (co-evolution sweep on demand)', () => {
+  it('403s admin_required for a non-admin user', async () => {
+    const user = await createTestUser('ops-hyg-nonadmin');
+    const res = await request(app).post('/api/merlt/ops/graph/hygiene').set(authHeader(user));
+    expect(res.status).toBe(403);
+  });
+
+  it('proxies to MERL-T with the admin key and passes the sweep stats through', async () => {
+    const admin = await createTestUser('ops-hyg-admin');
+    await makeAdmin(admin);
+    let sentApiKey: string | undefined;
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/admin/graph/hygiene')
+      .reply(function () {
+        sentApiKey = this.req.headers['x-api-key'] as string | undefined;
+        return [200, { success: true, reconciled: 1, decayed: 4, quarantined: 2, pruned: 0 }];
+      });
+    const res = await request(app).post('/api/merlt/ops/graph/hygiene').set(authHeader(admin));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, reconciled: 1, decayed: 4, quarantined: 2, pruned: 0 });
+    expect(sentApiKey).toBe('test-admin-key');
+  });
+
+  it('503 merlt_auth_misconfigured when MERL-T refuses the key', async () => {
+    const admin = await createTestUser('ops-hyg-admin2');
+    await makeAdmin(admin);
+    nock(TEST_MERLT_BASE).post('/api/v1/admin/graph/hygiene').reply(401, { detail: 'API key required' });
+    const res = await request(app).post('/api/merlt/ops/graph/hygiene').set(authHeader(admin));
+    expect(res.status).toBe(503);
+    expect(res.body.detail).toBe('merlt_auth_misconfigured');
+  });
+});
+
 describe('GET/PUT /api/merlt/ops/config', () => {
   it('passes through an enum param with its choices array on GET', async () => {
     const user = await createTestUser('ops-config-get-admin');

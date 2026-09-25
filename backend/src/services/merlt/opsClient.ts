@@ -25,6 +25,14 @@ export interface OpsClientConfig {
 }
 
 /** MERL-T training-start response (rlcf_router.py TrainingStartResponse). */
+export interface GraphHygieneResponse {
+  success: boolean;
+  reconciled?: number;
+  decayed?: number;
+  quarantined?: number;
+  pruned?: number;
+}
+
 export interface TrainingStartResponse {
   success: boolean;
   training_id?: string;
@@ -69,6 +77,15 @@ export class OpsClient {
    * timeout: the rebuild re-wires tools + checkpoints (models are already cached
    * singletons, so a few seconds, not a cold boot).
    */
+  /**
+   * POST /api/v1/admin/graph/hygiene — one on-demand sweep of the provisional
+   * graph (reconcile duplicates, decay stale nodes, quarantine doubtful ones,
+   * prune faded noise). Seed/confirmed nodes are never touched.
+   */
+  async runGraphHygiene(): Promise<GraphHygieneResponse> {
+    return this.request('POST', '/api/v1/admin/graph/hygiene', {});
+  }
+
   async reinitEngine(): Promise<{ reinitialized: boolean; engine: Record<string, unknown> }> {
     return this.request('POST', '/api/v1/admin/engine/reinitialize', undefined, 30000);
   }
