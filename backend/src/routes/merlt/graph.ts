@@ -290,18 +290,30 @@ router.post('/internal/job-callback', internalAuth, async (req: Request, res: Re
   }
 
   const isTerminal = ['completed', 'failed', 'timeout'].includes(status);
-  await prisma.merltIngestionJob.update({
-    where: { id: bffJobId },
-    data: {
-      status,
-      nodesCreated: nodesCreated ?? undefined,
-      edgesCreated: edgesCreated ?? undefined,
-      errorMessage: error ?? undefined,
-      // A `running` callback marks the worker actually started; terminal callbacks
-      // stamp completion. This also closes the previously-dead startedAt column.
-      startedAt: status === 'running' ? new Date() : undefined,
-      completedAt: isTerminal ? new Date() : undefined,
+  const data = {
+    status,
+    nodesCreated: nodesCreated ?? undefined,
+    edgesCreated: edgesCreated ?? undefined,
+    errorMessage: error ?? undefined,
+    // A `running` callback marks the worker actually started; terminal callbacks
+    // stamp completion. This also closes the previously-dead startedAt column.
+    startedAt: status === 'running' ? new Date() : undefined,
+    completedAt: isTerminal ? new Date() : undefined,
+  };
+  await prisma.merltIngestionJob.update({ where: { id: bffJobId }, data });
+
+  // MERL-T runs ONE job per article and calls back ONE bff_job_id. Every
+  // other in-flight row for the same article (another reader's mirror row
+  // from lazyIngest, or a row recreated after a stale flip while the RQ job
+  // was still running) follows it. Status-guarded: a terminal row is never
+  // regressed by a late or duplicate callback.
+  await prisma.merltIngestionJob.updateMany({
+    where: {
+      articleUrn: job.articleUrn,
+      id: { not: bffJobId },
+      status: { in: ['pending', 'running'] },
     },
+    data,
   });
 
   // P1.12: a completed ingestion changes the graph around this URN — drop every

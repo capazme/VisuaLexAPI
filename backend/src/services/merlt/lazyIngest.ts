@@ -1,5 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
-import type { GraphClient } from './graphClient';
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { normalizeGraphUrn, type GraphClient } from './graphClient';
 
 /**
  * Idempotently ensure an ingestion job exists for an article URN (Slice 2a).
@@ -50,19 +50,54 @@ export async function ensureIngestionJob(
   urn: string,
   userId: string
 ): Promise<EnsureIngestionResult> {
-  const existing = await prisma.merltIngestionJob.findFirst({
-    where: { articleUrn: urn, status: { in: ['pending', 'running'] } },
+  // One key per article. VisuaLex urns carry version markers (`!vig=`,
+  // `@originale`) that never reach MERL-T, which dedupes on the normalized
+  // urn and answers `already_queued` WITHOUT recording a second bff_job_id:
+  // a row keyed on a raw variant would never receive its callback and would
+  // sit pending until the watchdog. The same key also lets the job-callback
+  // fan out to every row of this article (see routes/merlt/graph.ts).
+  const key = normalizeGraphUrn(urn);
+  const inFlight: Prisma.MerltIngestionJobWhereInput = {
+    articleUrn: key,
+    status: { in: ['pending', 'running'] },
+  };
+
+  // The OLDEST in-flight row is the one MERL-T is actually running; mirror
+  // rows (below) are younger and must not hide a stale primary.
+  const primary = await prisma.merltIngestionJob.findFirst({
+    where: inFlight,
+    orderBy: { createdAt: 'asc' },
   });
-  if (existing) {
-    const isStale = existing.createdAt.getTime() < Date.now() - ingestStaleAfterMs();
+  if (primary) {
+    const isStale = primary.createdAt.getTime() < Date.now() - ingestStaleAfterMs();
     if (!isStale) {
-      return { jobId: existing.id, status: existing.status, created: false };
+      const own =
+        primary.userId === userId
+          ? primary
+          : await prisma.merltIngestionJob.findFirst({ where: { ...inFlight, userId } });
+      if (own) {
+        return { jobId: own.id, status: own.status, created: false };
+      }
+      // Another reader already started this ingestion. The status route is
+      // owner-scoped (no IDOR), so handing this user the foreign id would
+      // make their poll 404 and the rail give up. Give them a row of their
+      // own that tracks the running job; the worker callback fans out to it.
+      const mirror = await prisma.merltIngestionJob.create({
+        data: {
+          articleUrn: key,
+          userId,
+          status: primary.status,
+          taskId: primary.taskId,
+          startedAt: primary.startedAt,
+        },
+      });
+      return { jobId: mirror.id, status: mirror.status, created: false };
     }
-    // Deadlock-breaker: flip the zombie row to timeout so a fresh job can be
-    // created below. Status-guarded updateMany so a late worker callback that
-    // already completed the row in the meantime is never clobbered.
+    // Deadlock-breaker: flip the zombie rows (primary and its mirrors) to
+    // timeout so a fresh job can be created below. Status-guarded updateMany
+    // so a late worker callback that already completed a row is never clobbered.
     await prisma.merltIngestionJob.updateMany({
-      where: { id: existing.id, status: { in: ['pending', 'running'] } },
+      where: inFlight,
       data: {
         status: 'timeout',
         errorMessage: STALE_MARKER,
@@ -72,11 +107,11 @@ export async function ensureIngestionJob(
   }
 
   const job = await prisma.merltIngestionJob.create({
-    data: { articleUrn: urn, userId, status: 'pending' },
+    data: { articleUrn: key, userId, status: 'pending' },
   });
 
   try {
-    const enqueued = await graphClient.ingestArticle(urn, job.id);
+    const enqueued = await graphClient.ingestArticle(key, job.id);
     if (enqueued?.task_id) {
       await prisma.merltIngestionJob.update({
         where: { id: job.id },

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ensureIngestionJob } from '../../../../src/services/merlt/lazyIngest';
 import type { GraphClient, IngestArticleResponse } from '../../../../src/services/merlt/graphClient';
-import { prisma, createTestUser, type TestUser } from '../../../helpers';
+import { prisma, createTestUser, request, app, type TestUser } from '../../../helpers';
 
 /**
  * Wave 1 cluster D — ingestion deadlock fix.
@@ -39,6 +39,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env.MERLT_INGEST_STALE_MS;
+  delete process.env.MERLT_INTERNAL_SECRET;
 });
 
 describe('ensureIngestionJob stale-TTL deadlock breaker', () => {
@@ -140,5 +141,113 @@ describe('ensureIngestionJob stale-TTL deadlock breaker', () => {
 
     expect(result.created).toBe(true);
     expect(calls).toHaveLength(1);
+  });
+});
+
+/**
+ * Per-article key + per-user rows.
+ *
+ * MERL-T runs ONE job per normalized urn and calls back ONE bff_job_id. The
+ * BFF therefore (a) keys rows on the normalized urn so `!vig=` variants never
+ * create a second, callback-less row, (b) gives a second reader a MIRROR row
+ * of their own (the status route is owner-scoped, a foreign id would 404 their
+ * poll) and (c) fans the worker callback out to every in-flight row of the
+ * article.
+ */
+describe('ensureIngestionJob per-article key and per-user rows', () => {
+  it('coalesces urn version variants onto one normalized key and one enqueue', async () => {
+    const { client, calls } = fakeGraphClient();
+
+    const first = await ensureIngestionJob(prisma, client, `${URN}!vig=`, user.id);
+    const second = await ensureIngestionJob(prisma, client, `${URN}@originale`, user.id);
+    const third = await ensureIngestionJob(prisma, client, `${URN}!vig=2024-01-15`, user.id);
+
+    expect(first.created).toBe(true);
+    expect(second.jobId).toBe(first.jobId);
+    expect(third.jobId).toBe(first.jobId);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].urn).toBe(URN);
+    const rows = await prisma.merltIngestionJob.findMany({ where: { userId: user.id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].articleUrn).toBe(URN);
+  });
+
+  it('gives a second reader a mirror row instead of the foreign job id', async () => {
+    const bob = await createTestUser('stale-ingest-bob');
+    const { client, calls } = fakeGraphClient();
+
+    const alice = await ensureIngestionJob(prisma, client, URN, user.id);
+    const mirror = await ensureIngestionJob(prisma, client, URN, bob.id);
+
+    expect(mirror.created).toBe(false);
+    expect(mirror.jobId).not.toBe(alice.jobId);
+    expect(calls).toHaveLength(1); // no second enqueue
+    const row = await prisma.merltIngestionJob.findUnique({ where: { id: mirror.jobId } });
+    expect(row?.userId).toBe(bob.id);
+    expect(row?.status).toBe('pending');
+    expect(row?.taskId).toBe('rq-task-1');
+
+    // Bob asks again: his own row, still no enqueue.
+    const again = await ensureIngestionJob(prisma, client, URN, bob.id);
+    expect(again.jobId).toBe(mirror.jobId);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('the worker callback on the primary completes the mirror rows too', async () => {
+    process.env.MERLT_INTERNAL_SECRET = 'test-internal-secret';
+    const bob = await createTestUser('stale-ingest-bob2');
+    const { client } = fakeGraphClient();
+    const alice = await ensureIngestionJob(prisma, client, URN, user.id);
+    const mirror = await ensureIngestionJob(prisma, client, URN, bob.id);
+    // A row of a DIFFERENT article must not be touched.
+    const other = await prisma.merltIngestionJob.create({
+      data: { articleUrn: `${URN}bis`, userId: bob.id, status: 'pending' },
+    });
+
+    const running = await request(app)
+      .post('/api/merlt/internal/job-callback')
+      .set('X-Internal-Secret', 'test-internal-secret')
+      .send({ bffJobId: alice.jobId, status: 'running' });
+    expect(running.status).toBe(200);
+    expect((await prisma.merltIngestionJob.findUnique({ where: { id: mirror.jobId } }))?.status).toBe(
+      'running'
+    );
+
+    const done = await request(app)
+      .post('/api/merlt/internal/job-callback')
+      .set('X-Internal-Secret', 'test-internal-secret')
+      .send({ bffJobId: alice.jobId, status: 'completed', nodesCreated: 7, edgesCreated: 4 });
+    expect(done.status).toBe(200);
+
+    const mirrorRow = await prisma.merltIngestionJob.findUnique({ where: { id: mirror.jobId } });
+    expect(mirrorRow?.status).toBe('completed');
+    expect(mirrorRow?.nodesCreated).toBe(7);
+    expect(mirrorRow?.completedAt).not.toBeNull();
+    expect((await prisma.merltIngestionJob.findUnique({ where: { id: other.id } }))?.status).toBe(
+      'pending'
+    );
+  });
+
+  it('a stale primary flips its (younger) mirror rows too before re-enqueueing', async () => {
+    const bob = await createTestUser('stale-ingest-bob3');
+    const staleCreated = new Date(Date.now() - 20 * 60 * 1000);
+    const zombie = await prisma.merltIngestionJob.create({
+      data: { articleUrn: URN, userId: user.id, status: 'running', createdAt: staleCreated },
+    });
+    const mirror = await prisma.merltIngestionJob.create({
+      data: { articleUrn: URN, userId: bob.id, status: 'running' },
+    });
+    const { client, calls } = fakeGraphClient();
+
+    const result = await ensureIngestionJob(prisma, client, URN, bob.id);
+
+    expect(result.created).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect((await prisma.merltIngestionJob.findUnique({ where: { id: zombie.id } }))?.status).toBe(
+      'timeout'
+    );
+    expect((await prisma.merltIngestionJob.findUnique({ where: { id: mirror.id } }))?.status).toBe(
+      'timeout'
+    );
   });
 });
