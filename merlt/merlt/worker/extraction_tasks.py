@@ -71,6 +71,13 @@ async def _run_extract(document_id: int, user_id: str, bff_job_id: Optional[str]
             await _callback_extraction(bff_job_id, "failed", error="document_not_found")
             return {"document_id": document_id, "status": "failed", "error": "document_not_found"}
 
+        # The uploaded file is deleted after a successful extraction (#3), so a
+        # second run on the same document id (re-upload dedup, retry after the
+        # TTL) has nothing to read: say so instead of a silent "0 candidati".
+        if not doc.storage_path or not os.path.exists(doc.storage_path):
+            await _callback_extraction(bff_job_id, "failed", error="document_file_purged")
+            return {"document_id": document_id, "status": "failed", "error": "document_file_purged"}
+
         parser = DocumentParserService()
         try:
             result = await parser.parse_document(
@@ -87,11 +94,19 @@ async def _run_extract(document_id: int, user_id: str, bff_job_id: Optional[str]
                 document_id=document_id,
             )
             await session.commit()
+            # parse_document swallows extractor failures into result.errors and
+            # still returns; when nothing at all was staged that is a failed
+            # extraction for the user, not a completed one with zero candidates.
+            parse_errors = [str(e) for e in (getattr(result, "errors", None) or [])]
+            if parse_errors and (result.entities_count + result.relations_count) == 0:
+                err = "; ".join(parse_errors)[:500]
+                await _callback_extraction(bff_job_id, "failed", error=err)
+                log.error("Document extraction produced nothing", document_id=document_id, errors=err)
+                # keep the file: a retry is still possible
+                return {"document_id": document_id, "status": "failed", "error": err}
             # #3: the verbatim now lives in staging — drop the uploaded file so
             # the server keeps no raw personal document on disk.
             try:
-                import os
-
                 if doc.storage_path and os.path.exists(doc.storage_path):
                     os.remove(doc.storage_path)
             except Exception as rm_exc:

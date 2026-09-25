@@ -74,6 +74,19 @@ class WriteResult:
     error: Optional[str] = None
 
 
+# `pending_entities.article_urn` is NOT NULL, so a note-derived entity that is
+# not bound to a norm carries the `user_document` placeholder (document_parser
+# staging + BFF promote fallback). The placeholder must never reach the graph:
+# MERGE (art:Norma {URN: 'user_document'}) created one fake hub every
+# stand-alone concept hung off, visible on /grafo.
+PLACEHOLDER_ARTICLE_URNS = frozenset({"", "user_document"})
+
+
+def is_real_article_urn(urn: object) -> bool:
+    """True when `urn` names an actual norm (not blank, not the placeholder)."""
+    return isinstance(urn, str) and urn.strip() not in PLACEHOLDER_ARTICLE_URNS
+
+
 class EntityGraphWriter:
     """
     Writes validated entities to FalkorDB with 3-layer deduplication.
@@ -143,8 +156,11 @@ class EntityGraphWriter:
         # No duplicate found → Create new node
         node_id = await self._create_new_entity_node(entity)
 
-        # Create relation to article
-        await self._create_entity_relation(entity, node_id)
+        # Create relation to article (a stand-alone note entity has none)
+        if is_real_article_urn(entity.article_urn):
+            await self._create_entity_relation(entity, node_id)
+        else:
+            log.info("Entity has no source norm, written stand-alone", node_id=node_id)
 
         # Loop β D.2: if this approved entity originated from a confirmed live
         # source (Phase D.1 confirm-source stamped `pending_entity_id` on the
@@ -304,7 +320,7 @@ class EntityGraphWriter:
             "trust": trust,
             "approval_score": entity.approval_score or 0.0,
             "votes_count": entity.votes_count or 0,
-            "source": entity.article_urn,
+            "source": entity.article_urn if is_real_article_urn(entity.article_urn) else "user_note",
             "contributed_by": entity.contributed_by or "",
             "contributor_authority": entity.contributor_authority or 0.0,
             "timestamp": self._timestamp,
@@ -362,7 +378,7 @@ class EntityGraphWriter:
 
         params = {
             "id": existing_id,
-            "source": entity.article_urn,
+            "source": entity.article_urn if is_real_article_urn(entity.article_urn) else "user_note",
             "new_score": entity.approval_score or 0.0,
             "new_votes": entity.votes_count or 0,
             "provenance": "community_validated",
@@ -399,6 +415,10 @@ class EntityGraphWriter:
         }
 
         relation_type = relation_mapping.get(entity.entity_type, "DISCIPLINA")
+
+        # Belt and braces for any other caller: the placeholder never becomes a node.
+        if not is_real_article_urn(entity.article_urn):
+            return
 
         # A2: give a freshly-created Norma stub a minimal identity derived from
         # the URN so it never renders as a raw URL. ON CREATE only — an existing

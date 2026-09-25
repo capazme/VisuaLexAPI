@@ -2251,9 +2251,18 @@ async def propose_relation(
     - Se EXACT match: blocca la creazione
     - Se fuzzy match: crea comunque ma ritorna info duplicati
     """
+    # RelationType is a plain Enum (not str-based): its f-string form is
+    # "RelationType.CITA" and asyncpg rejects the object as a varchar param,
+    # so every relation proposal used to fail the INSERT (500 → BFF 503).
+    # Resolve the wire value once and use it everywhere below.
+    rel_type = (
+        request.tipo_relazione.value
+        if hasattr(request.tipo_relazione, "value")
+        else str(request.tipo_relazione)
+    )
     log.info(
         "API: propose_relation",
-        tipo=request.tipo_relazione,
+        tipo=rel_type,
         source=request.source_urn,
         target=request.target_entity_id,
         skip_duplicate_check=request.skip_duplicate_check,
@@ -2269,7 +2278,7 @@ async def propose_relation(
         dedup_result = await deduplicator.find_duplicates(
             source_entity_id=request.source_urn,
             target_entity_id=request.target_entity_id,
-            relation_type=request.tipo_relazione.value if hasattr(request.tipo_relazione, 'value') else str(request.tipo_relazione),
+            relation_type=rel_type,
         )
 
         # Map duplicates to response format
@@ -2332,14 +2341,14 @@ async def propose_relation(
         )
 
     # Generate relation ID
-    relation_id = f"{request.tipo_relazione}:{uuid4().hex[:8]}"
+    relation_id = f"{rel_type}:{uuid4().hex[:8]}"
 
     # Create pending relation with target_is_pending flag
     pending_relation = PendingRelation(
         relation_id=relation_id,
         article_urn=request.article_urn,
         source_type="manual",
-        relation_type=request.tipo_relazione,
+        relation_type=rel_type,
         source_node_urn=request.source_urn,
         target_entity_id=request.target_entity_id,
         target_is_pending=target_is_pending,  # Track if target is pending

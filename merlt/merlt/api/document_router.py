@@ -628,6 +628,13 @@ async def extract_document_async(
                 request.user_id,
                 bff_job_id,
                 job_id=job_id,
+                # Each 2000-char chunk costs 4 sequential LLM calls; RQ's default
+                # 180s killed anything beyond short notes with SIGALRM, which
+                # bypasses the task's except → no "failed" callback, and the
+                # BFF row sat "pending" until the watchdog.
+                job_timeout=int(os.getenv("MERLT_EXTRACT_JOB_TIMEOUT", "1800")),
+                result_ttl=86400,
+                failure_ttl=86400,
             )
         )
     except Exception as e:

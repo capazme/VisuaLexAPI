@@ -8,6 +8,7 @@ callback/return payload must sum entities AND relations, not just entities
 
 from __future__ import annotations
 
+import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -36,10 +37,17 @@ def _fake_session(doc: object) -> AsyncMock:
     return session
 
 
-def _fake_doc() -> MagicMock:
+def _fake_doc(storage_path: str | None = None) -> MagicMock:
+    """A document row whose file EXISTS: the task refuses a purged file up front
+    (the upload is deleted after the first extraction), so a successful run
+    needs a real path. The task removes it afterwards, as in production."""
     doc = MagicMock()
     doc.id = 1
-    doc.storage_path = "/tmp/merlt-test-extraction-tasks-does-not-exist.pdf"
+    if storage_path is None:
+        with tempfile.NamedTemporaryFile(prefix="merlt-test-extraction-", suffix=".pdf", delete=False) as fh:
+            fh.write(b"%PDF-1.4 fake")
+            storage_path = fh.name
+    doc.storage_path = storage_path
     doc.file_type = "pdf"
     doc.document_type = "manuale"
     doc.legal_domain = "civile"
@@ -115,3 +123,62 @@ async def test_extract_document_not_found_calls_failed_callback():
     assert out["status"] == "failed"
     assert out["error"] == "document_not_found"
     mock_callback.assert_awaited_once_with("job-1", "failed", error="document_not_found")
+
+
+async def test_extract_purged_file_calls_failed_callback():
+    """Re-upload dedup / retry after the TTL: the file was deleted after the
+    first extraction, so the run must fail loudly, not report 0 candidates."""
+    doc = _fake_doc("/tmp/merlt-test-extraction-tasks-does-not-exist.pdf")
+    session = _fake_session(doc)
+
+    parser_instance = MagicMock()
+    parser_instance.parse_document = AsyncMock()
+
+    with patch(
+        "merlt.storage.enrichment.database.init_db", new=AsyncMock()
+    ), patch(
+        "merlt.storage.enrichment.database.get_db_session",
+        return_value=_FakeSessionCM(session),
+    ), patch(
+        "merlt.pipeline.document_parser.DocumentParserService",
+        return_value=parser_instance,
+    ), patch(
+        "merlt.worker.extraction_tasks._callback_extraction", new=AsyncMock()
+    ) as mock_callback:
+        out = await _run_extract(document_id=1, user_id="user-1", bff_job_id="job-1")
+
+    assert out["status"] == "failed"
+    assert out["error"] == "document_file_purged"
+    parser_instance.parse_document.assert_not_awaited()
+    mock_callback.assert_awaited_once_with("job-1", "failed", error="document_file_purged")
+
+
+async def test_extract_with_errors_and_nothing_staged_is_failed_and_keeps_the_file():
+    doc = _fake_doc()
+    session = _fake_session(doc)
+
+    parser_instance = MagicMock()
+    parser_instance.parse_document = AsyncMock(
+        return_value=ParseResult(entities_count=0, relations_count=0, errors=["LLM timeout on chunk 1"])
+    )
+
+    with patch(
+        "merlt.storage.enrichment.database.init_db", new=AsyncMock()
+    ), patch(
+        "merlt.storage.enrichment.database.get_db_session",
+        return_value=_FakeSessionCM(session),
+    ), patch(
+        "merlt.pipeline.document_parser.DocumentParserService",
+        return_value=parser_instance,
+    ), patch(
+        "merlt.worker.extraction_tasks._callback_extraction", new=AsyncMock()
+    ) as mock_callback:
+        out = await _run_extract(document_id=1, user_id="user-1", bff_job_id="job-1")
+
+    assert out["status"] == "failed"
+    mock_callback.assert_awaited_once_with("job-1", "failed", error="LLM timeout on chunk 1")
+    # a retry is still possible: the upload was not deleted
+    import os
+
+    assert os.path.exists(doc.storage_path)
+    os.remove(doc.storage_path)

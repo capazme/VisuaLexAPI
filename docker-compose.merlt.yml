@@ -152,6 +152,10 @@ services:
       # needs the queue Redis too (not just the worker). Without this the api
       # defaults to localhost:6379 and enqueue fails inside the container.
       RQ_REDIS_URL: "redis://merlt-redis:6379/1"
+      # Slice 2c: RQ job timeout (seconds) for note extraction; the api is the
+      # enqueuer, so the value lives here. Must stay below the BFF extraction
+      # watchdog threshold (MERLT_EXTRACT_STALE_MS) or jobs flip to timeout early.
+      MERLT_EXTRACT_JOB_TIMEOUT: "${MERLT_EXTRACT_JOB_TIMEOUT:-1800}"
       # Loop β #2 Phase 4: gate the learned NER at inference. OFF until A/B proves it.
       MERLT_NER_LEARNED_ENABLED: "false"
       # Slice 4 L3: the trained TraversalPolicy ranks/extends the systemic
