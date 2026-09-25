@@ -1756,7 +1756,9 @@ async def search_graph(
             port=int(os.getenv("QDRANT_PORT", "6333")),
         )
 
-        collection_name = os.getenv("QDRANT_COLLECTION", "merl_t_dev_chunks")
+        from merlt.storage.vectors.collection import default_chunks_collection
+
+        collection_name = default_chunks_collection()
 
         # Over-retrieve for better coverage (then re-rank)
         over_retrieve_factor = 3

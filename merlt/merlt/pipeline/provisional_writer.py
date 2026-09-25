@@ -188,15 +188,11 @@ def _infer_labels_and_source_type(source: Dict[str, Any]) -> "tuple[str, str]":
 
 
 def _resolve_collection() -> str:
-    """Qdrant collection name, matching the seed/app resolution.
+    """Qdrant collection name, shared with the seed/app resolution
+    (``storage.vectors.collection.default_chunks_collection``)."""
+    from merlt.storage.vectors.collection import default_chunks_collection
 
-    ``QDRANT_COLLECTION`` env wins; else ``<FALKORDB_GRAPH_NAME>_chunks``
-    (default graph ``merl_t_legal`` → ``merl_t_legal_chunks``). Confirmed
-    against ``app.py:180-182`` and ``scripts/load_seed_libro_iv.py``.
-    """
-    return os.getenv("QDRANT_COLLECTION") or (
-        os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal") + "_chunks"
-    )
+    return default_chunks_collection()
 
 
 async def _get_graph_client(graph_client):

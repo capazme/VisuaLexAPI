@@ -175,14 +175,11 @@ async def _build_tools() -> list:
                     host=os.getenv("QDRANT_HOST", "localhost"),
                     port=int(os.getenv("QDRANT_PORT", "6333")),
                 )
-                # RetrieverConfig defaults to 'merl_t_dev_chunks' — the populated
-                # collection is 'merl_t_legal_chunks' (backfill_embeddings default),
-                # so name it explicitly or vector search hits an empty collection.
-                collection = (
-                    os.getenv("QDRANT_COLLECTION")
-                    or os.getenv("MERLT_SEED_COLLECTION")
-                    or "merl_t_legal_chunks"
-                )
+                # One resolution for the populated collection (env-aware), shared
+                # with the seed loader and the provisional writer.
+                from merlt.storage.vectors.collection import default_chunks_collection
+
+                collection = os.getenv("MERLT_SEED_COLLECTION") or default_chunks_collection()
                 retriever = GraphAwareRetriever(
                     vector_db=qdrant,
                     graph_db=falkordb,

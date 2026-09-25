@@ -259,6 +259,7 @@ async def promote_batch_endpoint(
     new_stats = (
         {**(batch.stats or {}), "promotion_reason": req.reason} if req.reason else batch.stats
     )
+    prev_status = batch.status  # what the enqueue-failure revert restores
     transition = await session.execute(
         update(MerltIngestionBatch)
         .where(
@@ -290,11 +291,13 @@ async def promote_batch_endpoint(
         log.error(
             "Failed to enqueue mechanical ingestion promote job", batch_id=batch_id, exc_info=True
         )
-        # Revert so the batch isn't stuck "promoting" with no job behind it.
+        # Revert to the status the batch HAD (pending_review or failed), and
+        # only while it is still ours ('promoting'): nothing else may have
+        # moved it, and a 'failed' batch must not come back as reviewable.
         await session.execute(
             update(MerltIngestionBatch)
-            .where(MerltIngestionBatch.id == batch_id)
-            .values(status="pending_review")
+            .where(MerltIngestionBatch.id == batch_id, MerltIngestionBatch.status == "promoting")
+            .values(status=prev_status)
         )
         await session.commit()
         raise HTTPException(status_code=503, detail=f"Job queue non disponibile: {e}")
@@ -317,10 +320,22 @@ async def reject_batch(
     if batch.status not in ("pending_review", "failed"):
         raise HTTPException(status_code=409, detail=f"batch_not_rejectable: {batch.status}")
 
-    batch.status = "rejected"
-    batch.rejected_at = datetime.utcnow()
-    batch.reviewed_by = req.reviewed_by
-    batch.stats = {**(batch.stats or {}), "rejection_reason": req.reason}
+    # Conditional on the status just read, like promote: a plain ORM write by
+    # id could overwrite a concurrent 'promoting' while the worker MERGEs into
+    # the graph, leaving a batch marked rejected whose nodes are live.
+    res = await session.execute(
+        update(MerltIngestionBatch)
+        .where(MerltIngestionBatch.id == batch_id, MerltIngestionBatch.status == batch.status)
+        .values(
+            status="rejected",
+            rejected_at=datetime.utcnow(),
+            reviewed_by=req.reviewed_by,
+            stats={**(batch.stats or {}), "rejection_reason": req.reason},
+        )
+    )
+    if res.rowcount != 1:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="batch_status_changed_concurrently")
     await session.commit()
 
     log.info("mechanical_ingestion.reject", batch_id=batch_id)

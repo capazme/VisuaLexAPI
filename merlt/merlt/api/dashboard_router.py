@@ -247,13 +247,22 @@ async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
     # Embeddings count from Qdrant
     try:
         from qdrant_client import QdrantClient
-        import os
-        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6343")
-        qdrant = QdrantClient(url=qdrant_url)
+        from merlt.storage.vectors.collection import default_chunks_collection
 
-        # Get collection info for merl_t_dev_chunks
+        # Same host/port resolution as the other routers (QDRANT_URL kept as an
+        # explicit override): inside the container "localhost:6343" is nothing.
+        qdrant_url = os.getenv("QDRANT_URL")
+        qdrant = (
+            QdrantClient(url=qdrant_url)
+            if qdrant_url
+            else QdrantClient(
+                host=os.getenv("QDRANT_HOST", "localhost"),
+                port=int(os.getenv("QDRANT_PORT", "6333")),
+            )
+        )
+
         try:
-            collection_info = qdrant.get_collection("merl_t_dev_chunks")
+            collection_info = qdrant.get_collection(default_chunks_collection())
             embeddings_count = collection_info.points_count or 0
         except Exception as e:
             log.debug("qdrant_collection_unavailable", error=str(e))
@@ -701,7 +710,12 @@ async def get_node_details(
         "qdrant": {
             "label": "Qdrant",
             "description": "Vector database per embeddings semantici. Permette ricerca per similarità sui chunk di testo.",
-            "config": {"host": "localhost", "port": 6333, "collection": "merl_t_dev_chunks"},
+            "config": {
+                "host": os.getenv("QDRANT_HOST", "localhost"),
+                "port": int(os.getenv("QDRANT_PORT", "6333")),
+                "collection": os.getenv("QDRANT_COLLECTION")
+                or (os.getenv("FALKORDB_GRAPH_NAME", "merl_t_legal") + "_chunks"),
+            },
             "links": {"docs": "https://qdrant.tech/documentation"},
         },
         "literal": {

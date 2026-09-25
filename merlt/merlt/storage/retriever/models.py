@@ -10,6 +10,9 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 
+from merlt.storage.vectors.collection import default_chunks_collection as _default_collection
+
+
 @dataclass
 class RetrievalResult:
     """
@@ -87,14 +90,16 @@ class RetrieverConfig:
         enable_graph_enrichment: Enable/disable graph scoring (for A/B testing)
                                  Default: True
         collection_name: Qdrant collection name
-                         Default: 'merl_t_dev_chunks'
+                         Default: QDRANT_COLLECTION or <graph>_chunks (merl_t_legal_chunks)
     """
     alpha: float = 0.7
     over_retrieve_factor: int = 3
     max_graph_hops: int = 3
     default_graph_score: float = 0.5
     enable_graph_enrichment: bool = True
-    collection_name: str = "merl_t_dev_chunks"
+    # Resolved at construction (env-aware) so every consumer reads the populated
+    # collection; see storage/vectors/collection.py.
+    collection_name: str = field(default_factory=_default_collection)
 
     def __post_init__(self):
         """Validate configuration values."""
