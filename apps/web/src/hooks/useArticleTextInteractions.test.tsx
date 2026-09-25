@@ -156,6 +156,18 @@ describe('useArticleTextInteractions', () => {
     expect(block()).toBe('');
   });
 
+  it('forgets an open block or note when the reader comes back to the article', () => {
+    const { rerender } = render(<Harness resetKey="a" />);
+    fireEvent.click(sign(0));
+    act(() => rerender(<Harness resetKey="b" />));
+    act(() => rerender(<Harness resetKey="a" />));
+    expect(block()).toBe('');
+    fireEvent.click(chip('119'));
+    act(() => rerender(<Harness resetKey="b" />));
+    act(() => rerender(<Harness resetKey="a" />));
+    expect(state().note).toBeNull();
+  });
+
   it('closes a block on demand and when the update notes fold', () => {
     render(<Harness resetKey="a" />);
     fireEvent.click(sign(0));

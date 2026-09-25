@@ -1,4 +1,4 @@
-import { useCallback, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, type RefObject } from 'react';
 import {
     FloatingFocusManager,
     FloatingPortal,
@@ -10,13 +10,13 @@ import {
     useFloating,
     useInteractions,
     useRole,
-    type Placement,
 } from '@floating-ui/react';
 import { LocateFixed, Trash2, X } from 'lucide-react';
 import type { Highlight } from '../../../types';
 import type { BlockAnnotations } from '../../../utils/articleAnnotations';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { getTransformOrigin } from '../../../utils/floatingOrigin';
+import { signReference } from '../../../utils/blockAnchorRect';
 import { revealAnnotation, type AnnotationTarget } from '../../../utils/revealAnnotation';
 import { useNoteEditing } from '../../../hooks/useNoteEditing';
 import { cn } from '../../../lib/utils';
@@ -43,20 +43,6 @@ export interface BlockAnnotationsPopoverProps {
     onRemoveHighlight: (id: string) => void;
 }
 
-type Side = 'margin' | 'inline';
-
-/**
- * Never over the passage itself. A sign in the margin is level with its
- * block's first line: beside it, or above the block. An inline sign ends the
- * block: below it.
- */
-const PLACEMENTS: Record<Side, { placement: Placement; fallbacks: Placement[] }> = {
-    margin: { placement: 'right-start', fallbacks: ['top-end', 'bottom-end'] },
-    inline: { placement: 'bottom-end', fallbacks: ['bottom-start', 'top-end', 'top-start'] },
-};
-
-const EMPTY_RECT = { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0 };
-
 /**
  * The annotations of one block of an article, opened from its sign in the
  * margin or at the end of the block (round B). Lists the block's notes —
@@ -76,7 +62,6 @@ export function BlockAnnotationsPopover({
     onRemoveHighlight,
 }: BlockAnnotationsPopoverProps) {
     const titleId = useId();
-    const [side, setSide] = useState<Side>('inline');
     // Where focus goes on close: the sign after Esc, the close button or "Vai
     // al passo"; nowhere after an outside press.
     const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -94,30 +79,26 @@ export function BlockAnnotationsPopover({
         onClose();
     }, [findSign, onClose]);
 
-    const { placement: preferred, fallbacks } = PLACEMENTS[side];
+    // Placed against the whole block (blockAnchorRect): beside it when the
+    // margin has room, else below it, else above it — never over the passage
+    // it lists, wherever the container query put the sign.
     const { refs, floatingStyles, context, placement, isPositioned, update } = useFloating({
         open: true,
         onOpenChange: (open, _event, reason) => { if (!open) close(reason === 'escape-key'); },
-        placement: preferred,
-        middleware: [offset(8), flip({ fallbackPlacements: fallbacks }), shift({ padding: 12 })],
+        placement: 'right-start',
+        middleware: [
+            offset(8),
+            flip({ fallbackPlacements: ['bottom-end', 'top-end'] }),
+            shift({ padding: 12, crossAxis: true }),
+        ],
         whileElementsMounted: autoUpdate,
     });
 
-    // A virtual reference that measures the live sign, keeping the last rect
-    // while it is momentarily gone; hidden until positioned (gotcha 13).
+    // A virtual reference that finds the live sign on every measurement and
+    // keeps its last place while the sign has no box; hidden until positioned
+    // (gotcha 13).
     useLayoutEffect(() => {
-        const sign = findSign();
-        let last: typeof EMPTY_RECT = sign?.getBoundingClientRect() ?? EMPTY_RECT;
-        // Where the CSS container query put the sign, read once before paint.
-        setSide(sign && getComputedStyle(sign).position === 'absolute' ? 'margin' : 'inline');
-        refs.setPositionReference({
-            getBoundingClientRect: () => {
-                const live = findSign();
-                if (live) last = live.getBoundingClientRect();
-                return last;
-            },
-            contextElement: containerRef.current ?? undefined,
-        });
+        refs.setPositionReference(signReference(findSign, containerRef.current ?? undefined));
     }, [findSign, refs, containerRef]);
 
     // A redraw replaced the sign: measure the new one.

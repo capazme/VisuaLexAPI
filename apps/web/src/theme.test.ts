@@ -43,7 +43,8 @@ describe('the primary colour scale', () => {
 describe('the reading surface', () => {
   it('compiles the sign rules and the container query that moves them to the margin', async () => {
     const css = await compile(['block']);
-    expect(css).toMatch(/@container\s+vlx-frame\s*\(/);
+    // Room for a sign with notes and four dots (~5.5rem) on each side of the 68ch column.
+    expect(css).toMatch(/@container\s+vlx-frame\s*\(min-width:\s*calc\(68ch \+ 11rem\)\)/);
     expect(css).toContain('.vlx-sign-dot[data-color="yellow"]');
     expect(css).toContain('.vlx-flash');
   }, 30000);

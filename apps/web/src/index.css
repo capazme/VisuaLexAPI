@@ -592,6 +592,7 @@
   align-items: center;
   gap: 0.25rem;
   margin-left: 0.45em;
+  min-height: 1.2rem; /* the same pill with or without the note icon */
   padding: 0.2rem 0.45rem;
   border-radius: 9999px;
   font-size: 0.72rem;
@@ -671,6 +672,7 @@
 .vlx-art .vlx-flash {
   border-radius: 2px;
   box-shadow: 0 0 0 3px hsl(43 96% 56% / 0.75);
+  transition: none; /* on at once; the fade is on the way out */
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
@@ -689,9 +691,10 @@
   }
 }
 
-/* Room for the 68ch column plus a sign on each side: every sign moves to the
-   right margin, level with its block's first line, all at the same x. */
-@container vlx-frame (min-width: calc(68ch + 9rem)) {
+/* Room for the 68ch column plus a sign on each side (with notes and four
+   dots a sign is ~5.5rem): every sign moves to the right margin, level with
+   its block's first line, all at the same x. */
+@container vlx-frame (min-width: calc(68ch + 11rem)) {
   .vlx-art .vlx-b {
     position: relative;
   }

@@ -41,8 +41,8 @@ export interface ArticleTextInteractionOptions {
  * never replaces the text, so keyboard focus and any open selection survive.
  *
  * State belongs to one article: `resetKey` changing (another article in the
- * same component) returns to closed. Both resets are derived during render,
- * not performed in an effect (CLAUDE.md gotcha 11).
+ * same component) returns to closed, adjusted during render rather than in an
+ * effect (CLAUDE.md gotcha 11); a changed `contentKey` closes an open note.
  */
 export function useArticleTextInteractions(
   containerRef: RefObject<HTMLElement | null>,
@@ -63,6 +63,10 @@ export function useArticleTextInteractions(
   closeBlock: () => void;
 } {
   const [state, setState] = useState<State>(() => fresh(resetKey));
+  // Another article: start closed, and store it. Deriving alone would let an
+  // A → B → A round trip find its old state valid again and reopen a note or
+  // a block nobody asked for (React's pattern for state that follows a prop).
+  if (state.key !== resetKey) setState(fresh(resetKey));
   const current = state.key === resetKey ? state : fresh(resetKey);
   const openNote =
     current.openNote && current.openNote.contentKey === contentKey
