@@ -39,13 +39,7 @@ from merlt.rlcf.database import get_async_session_dep
 from merlt.rlcf.training_scheduler import get_scheduler
 from merlt.rlcf.pii_service import PIIMaskingService
 from merlt.rlcf.audit_service import AuditService
-from merlt.rlcf.multilevel_feedback import (
-    MultilevelFeedback,
-    RetrievalFeedback,
-    ReasoningFeedback,
-    SynthesisFeedback,
-    create_feedback_from_user_rating,
-)
+from merlt.rlcf.buffer_rehydration import build_experience
 from merlt.rlcf.authority import update_track_record, update_authority_score
 from merlt.rlcf.database import get_async_session
 from merlt.rlcf import models as rlcf_models
@@ -515,21 +509,40 @@ async def _lookup_provenance_batch(urns: List[str]) -> Dict[str, dict]:
         return out
     try:
         client = await _get_provenance_graph_client()
+        # A provisional (live_unconfirmed) node's URN is its `live:<hash>`
+        # node_id, while the id the retriever serves and the LLM cites is the
+        # article URL stored in `source_url` (promotion.py matches the same
+        # way). Without the third clause no provisional node was ever found, so
+        # "ricorda nel grafo" never had a target. An exact URN/node_id hit
+        # always beats a source_url hit, and a LiveSource beats other labels.
         rows = await client.query(
-            "UNWIND $urns AS u MATCH (n) WHERE n.URN = u OR n.node_id = u "
+            "UNWIND $urns AS u MATCH (n) "
+            "WHERE n.URN = u OR n.node_id = u OR n.source_url = u "
             "RETURN u AS urn, n.provenance AS provenance, n.trust AS trust, "
-            "n.node_id AS node_id, n.source_url AS source_url",
+            "n.node_id AS node_id, n.source_url AS source_url, "
+            "(n.URN = u OR n.node_id = u) AS exact, labels(n) AS labels",
             {"urns": urns},
         )
+        ranks: Dict[str, int] = {}
         for r in rows:
             urn = r.get("urn")
-            if urn and urn not in out:
-                out[urn] = {
-                    "provenance": r.get("provenance"),
-                    "trust": r.get("trust"),
-                    "node_id": r.get("node_id"),
-                    "source_url": r.get("source_url"),
-                }
+            if not urn:
+                continue
+            if r.get("exact"):
+                rank = 0
+            elif "LiveSource" in (r.get("labels") or []):
+                rank = 1
+            else:
+                rank = 2
+            if urn in out and ranks.get(urn, 99) <= rank:
+                continue
+            ranks[urn] = rank
+            out[urn] = {
+                "provenance": r.get("provenance"),
+                "trust": r.get("trust"),
+                "node_id": r.get("node_id"),
+                "source_url": r.get("source_url"),
+            }
     except Exception as e:  # noqa: BLE001
         # Drop the cached client so a stale/broken connection is rebuilt next call.
         global _provenance_graph_client
@@ -652,6 +665,17 @@ async def build_and_persist_query_response(
     full_trace_data = dict(pipeline_trace_data) if pipeline_trace_data else {}
     if execution_trace_data:
         full_trace_data["execution_trace"] = execution_trace_data
+    # Graph co-evolution signal 1 keys: everything this answer was served
+    # (orchestrator served_urns + the consulted sources' urn/node_id/
+    # source_url). Persisted inside full_trace so no column is needed;
+    # stripped from the trace GET like execution_trace.
+    served_keys: set = set((result.metadata or {}).get("served_urns") or [])
+    for rs in retrieved_sources or []:
+        for key in (getattr(rs, "urn", None), getattr(rs, "node_id", None), getattr(rs, "source_url", None)):
+            if key:
+                served_keys.add(key)
+    if served_keys:
+        full_trace_data["coevo_served_keys"] = sorted(served_keys)
     full_trace_data = full_trace_data or None
 
     # Extract routing metadata for new fields
@@ -878,7 +902,8 @@ def _wire_feedback_to_training(
     """
     Wire a feedback submission to the RLCF training buffer.
 
-    Computes reward, builds MultilevelFeedback, and pushes to scheduler.
+    Computes reward, builds MultilevelFeedback (both via
+    ``merlt.rlcf.buffer_rehydration.build_experience``), and pushes to scheduler.
     Wrapped in try/except so it never breaks the feedback submission.
 
     Slice 4 P2b (L2) — teach-the-weights:
@@ -895,94 +920,13 @@ def _wire_feedback_to_training(
       no authority are unchanged.
     """
     try:
-        # 1. Compute reward based on feedback type
-        if feedback_type == "inline":
-            reward = (feedback.inline_rating - 1) / 4  # 1→0, 5→1
-        elif feedback_type == "detailed":
-            reward = (
-                0.3 * feedback.retrieval_score
-                + 0.4 * feedback.reasoning_score
-                + 0.3 * feedback.synthesis_score
-            )
-        elif feedback_type == "source":
-            reward = (feedback.source_relevance - 1) / 4  # 1→0, 5→1
-        elif feedback_type == "preference":
-            # Positive return above the neutral baseline: "I prefer this canon"
-            # is an endorsement, not a neutral event. The DIRECTIONAL signal
-            # (which canon) rides in metadata below and is what actually shifts
-            # the gating weights via per-expert shaping.
-            reward = 0.7
-        elif feedback_type == "relation":
-            # Slice 4 L3: "privilegia questa relazione" is a positive endorsement
-            # — mirror of the preference channel (0.7). The DIRECTIONAL signal
-            # (which relation) rides in metadata['preferred_relation'] below and
-            # is what shapes the traversal head (advantage = authority·(r + β)).
-            reward = 0.7
-        elif feedback_type == "refine":
-            reward = 0.3
-        elif feedback_type == "router":
-            reward = 1.0 if feedback.inline_rating and feedback.inline_rating >= 4 else 0.0
-        else:
-            reward = 0.5
-
-        # 2. Reconstruct the RLCF ExecutionTrace from storage (Loop β Bug-4 0.3).
-        # full_trace nests the execution_trace (query_id + Actions carrying
-        # query_embedding/log_prob) under 'execution_trace'. Older rows stored
-        # only the flat pipeline trace (no actions) → fall back to it so legacy
-        # feedback still no-ops gracefully instead of erroring.
-        _stored_trace = trace.full_trace if trace.full_trace else {}
-        trace_data = _stored_trace.get("execution_trace") or _stored_trace
-
-        # 3. Build MultilevelFeedback
-        if feedback_type == "detailed":
-            ml_feedback = MultilevelFeedback(
-                query_id=trace.trace_id,
-                retrieval_feedback=RetrievalFeedback(
-                    precision=feedback.retrieval_score,
-                    ranking_quality=feedback.retrieval_score,
-                ),
-                reasoning_feedback=ReasoningFeedback(
-                    logical_coherence=feedback.reasoning_score,
-                    legal_soundness=feedback.reasoning_score,
-                ),
-                synthesis_feedback=SynthesisFeedback(
-                    clarity=feedback.synthesis_score,
-                    usefulness=feedback.synthesis_score,
-                    user_satisfaction=feedback.synthesis_score,
-                ),
-                overall_rating=reward,
-                user_id=feedback.user_id,
-            )
-        else:
-            ml_feedback = create_feedback_from_user_rating(
-                query_id=trace.trace_id,
-                user_rating=reward,
-                user_id=feedback.user_id,
-            )
-
-        # 3b. Slice 4 P2b (L2) — attach the teach-the-weights signals to
-        # ml_feedback.metadata. This dict round-trips through the replay buffer
-        # (MultilevelFeedback.to_dict/from_dict) and is read by the gating/tool
-        # trainers (policy_gradient._extract_authority / _preferred_expert_index).
-        # preferred_expert: only the preference channel carries a canon; other
-        # channels leave it absent → no per-expert shaping (pure baseline).
-        preferred_expert = getattr(feedback, "preferred_expert", None)
-        if preferred_expert:
-            ml_feedback.metadata["preferred_expert"] = preferred_expert
-        # Slice 4 L3: relation-preference rows encode the relation in source_id
-        # ("relation:<TYPE>", no schema change). Carry it through metadata so
-        # traversal trainers can shape on it (mirror of preferred_expert).
-        from merlt.rlcf.policy_gradient import preferred_relation_from_source_id
-        preferred_relation = preferred_relation_from_source_id(
-            getattr(feedback, "source_id", None)
+        # 1-3. Reward, stored ExecutionTrace and MultilevelFeedback (+ the
+        # preferred_expert / preferred_relation / authority metadata). Built by
+        # the same function the boot-time buffer rehydration uses, so replayed
+        # feedback trains exactly like live feedback.
+        trace_data, ml_feedback, reward, metadata = build_experience(
+            trace, feedback, feedback_type, authority=authority
         )
-        if preferred_relation:
-            ml_feedback.metadata["preferred_relation"] = preferred_relation
-        # authority: explicit arg wins; else fall back to the value already
-        # stored on the feedback row (may be None → downstream defaults to 1.0).
-        eff_authority = authority if authority is not None else getattr(feedback, "user_authority", None)
-        if eff_authority is not None:
-            ml_feedback.metadata["authority"] = eff_authority
 
         # 4. Push to training buffer
         scheduler = get_scheduler()
@@ -990,11 +934,7 @@ def _wire_feedback_to_training(
             trace=trace_data,
             feedback=ml_feedback,
             reward=reward,
-            metadata={
-                "feedback_type": feedback_type,
-                "feedback_id": feedback.id,
-                "trace_id": trace.trace_id,
-            },
+            metadata=metadata,
         )
 
         # 5. Log result
@@ -1155,6 +1095,7 @@ async def query_experts(
             metadata={"user_id": request.user_id, "consent_level": request.consent_level},
             include_trace=request.include_trace,
             max_experts=request.max_experts,
+            forced_mode=(request.context or {}).get("mode"),
         )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -1194,14 +1135,13 @@ class ExpertQueryAsyncRequest(ExpertQueryRequest):
 _background_qa_tasks: set = set()
 
 
-def _to_partial(resp: ExpertResponse) -> Dict[str, Any]:
+def _to_partial(resp: ExpertResponse, weight: Optional[float] = None) -> Dict[str, Any]:
     """Map an `ExpertResponse` onto the wire `QaPartialExpert` shape (contract
-    §Tipi condivisi). `weight` falls back to `confidence` — the real
-    gating/routing weight lives on the orchestrator side (selected_experts),
-    not on the response itself, and isn't available at per-expert-completion
-    time (weights are only known once routing has picked the whole collegio).
+    §Tipi condivisi). `weight` is the expert's gating/routing weight, which the
+    orchestrator fixes before any expert runs and passes to the progress
+    callback; without one it falls back to `confidence`, as the contract says.
 
-    `confidence` is cast to `float(...)`: some retrieval/scoring paths can
+    Both numbers are cast to `float(...)`: some retrieval/scoring paths can
     hand back a numpy scalar (e.g. `np.float32`), which `json.dumps` (used by
     httpx to serialize this dict — it is NOT a Pydantic model) cannot encode,
     silently dropping the 'running' callback for that expert.
@@ -1211,7 +1151,7 @@ def _to_partial(resp: ExpertResponse) -> Dict[str, Any]:
         "expert": resp.expert_type,
         "thesis": resp.interpretation,
         "confidence": confidence,
-        "weight": confidence,
+        "weight": float(weight) if weight is not None else confidence,
     }
 
 
@@ -1313,8 +1253,8 @@ async def run_query_progressive(
     bff_job_id = request.bff_job_id
     start_time = time.time()
 
-    async def on_expert_complete(resp: ExpertResponse) -> None:
-        await _post_qa_callback(bff_job_id, "running", partial_expert=_to_partial(resp))
+    async def on_expert_complete(resp: ExpertResponse, weight: Optional[float] = None) -> None:
+        await _post_qa_callback(bff_job_id, "running", partial_expert=_to_partial(resp, weight))
 
     try:
         result = await orchestrator.process(
@@ -1325,6 +1265,7 @@ async def run_query_progressive(
             include_trace=request.include_trace,
             max_experts=request.max_experts,
             on_expert_complete=on_expert_complete,
+            forced_mode=(request.context or {}).get("mode"),
         )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -1480,7 +1421,12 @@ async def submit_inline_feedback(
             source_urns = [
                 (s or {}).get("article_urn") for s in (trace.sources or [])
             ]
-            source_urns = [u for u in source_urns if u]
+            # The LLM cites chunk ids (Qdrant point uuids) that no graph node
+            # carries, so the cited list alone never credited a provisional
+            # node served from Qdrant: add the served set persisted at answer
+            # time (urn / node_id / source_url of every consulted source).
+            source_urns.extend((trace.full_trace or {}).get("coevo_served_keys") or [])
+            source_urns = list(dict.fromkeys(u for u in source_urns if u))
             if source_urns:
                 async def _signal_positive_feedback(urns: List[str]) -> None:
                     try:
@@ -2025,6 +1971,15 @@ async def submit_router_feedback(
         raise HTTPException(status_code=500, detail=f"Failed to save feedback: {str(e)}")
 
 
+def _refine_mode(original_trace: QATrace) -> Optional[str]:
+    """The synthesis mode a follow-up must keep: the mode the user asked for
+    on the original question when the trace recorded one, else the mode that
+    answer was given in."""
+    execution_trace = (original_trace.full_trace or {}).get("execution_trace") or {}
+    synthesis = (execution_trace.get("metadata") or {}).get("synthesis_result") or {}
+    return synthesis.get("requested_mode") or original_trace.synthesis_mode
+
+
 @router.post("/feedback/refine", response_model=ExpertQueryResponse)
 async def submit_refine_feedback(
     request: RefineFeedbackRequest,
@@ -2081,7 +2036,9 @@ async def submit_refine_feedback(
                 "refine_from": request.trace_id,
                 "original_query": original_trace.query
             },
-            include_trace=True
+            include_trace=True,
+            # A follow-up stays in the mode of the answer it refines.
+            forced_mode=_refine_mode(original_trace),
         )
 
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -2275,6 +2232,7 @@ async def get_trace(
     # returned to clients (leaks the embedding, bloats the payload). Strip it. If
     # nothing else remains, the query ran without include_trace=True.
     full_trace.pop("execution_trace", None)
+    full_trace.pop("coevo_served_keys", None)
     if not full_trace:
         raise HTTPException(
             status_code=404,

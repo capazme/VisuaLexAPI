@@ -76,6 +76,30 @@ from merlt.rlcf.execution_trace import ExecutionTrace, Action
 log = structlog.get_logger()
 
 
+def coerce_synthesis_mode(value: Any) -> Optional[SynthesisMode]:
+    """Map a per-request mode ('convergent' / 'divergent' / 'auto') onto
+    ``SynthesisMode``. None or an unknown value yields None, which leaves the
+    choice to the synthesizer (automatic mode): a bad value is not an error."""
+    if value is None or isinstance(value, SynthesisMode):
+        return value
+    try:
+        return SynthesisMode(str(value).strip().lower())
+    except ValueError:
+        log.warning("Ignoring unknown synthesis mode", mode=str(value)[:40])
+        return None
+
+
+def _normalized_routing_weights(selected_experts: List[tuple]) -> Dict[str, float]:
+    """Routing weights of the selected experts, normalised the way
+    ``AdaptiveSynthesizer.synthesize`` normalises them, so the weight reported
+    for a partial result matches the one in the terminal expert_contributions."""
+    weights = {exp: float(w) for exp, w in selected_experts}
+    total = sum(weights.values())
+    if total > 0 and abs(total - 1.0) > 0.01:
+        weights = {exp: w / total for exp, w in weights.items()}
+    return weights
+
+
 @dataclass
 class OrchestratorConfig:
     """
@@ -662,7 +686,8 @@ class MultiExpertOrchestrator:
         return_trace: bool = False,
         include_trace: bool = False,
         max_experts: Optional[int] = None,
-        on_expert_complete: Optional[Callable[[ExpertResponse], Awaitable[None]]] = None,
+        on_expert_complete: Optional[Callable[[ExpertResponse, Optional[float]], Awaitable[None]]] = None,
+        forced_mode: Optional[str] = None,
     ) -> SynthesisResult:
         """
         Processa una query attraverso il sistema multi-expert.
@@ -674,13 +699,20 @@ class MultiExpertOrchestrator:
             metadata: Metadati aggiuntivi
             return_trace: Se True, ritorna (result, trace) invece di solo result
             include_trace: Se True, popola pipeline_trace nel risultato
-            on_expert_complete: async callback invoked with the ExpertResponse
-                as soon as EACH expert finishes (success, timeout OR error
-                branch alike) — used by the async progressive Q&A path to push
-                per-canon partial results to the BFF while the rest of the
-                collegio is still deliberating. Best-effort: a callback
-                failure is swallowed and logged, never propagated (an expert
-                must never fail because progress reporting failed).
+            on_expert_complete: async callback invoked as
+                ``on_expert_complete(response, routing_weight)`` as soon as EACH
+                expert finishes (success, timeout OR error branch alike) — used
+                by the async progressive Q&A path to push per-canon partial
+                results to the BFF while the rest of the collegio is still
+                deliberating. ``routing_weight`` is the expert's gating weight,
+                fixed by routing before any expert runs and normalised like the
+                synthesizer's (None if the expert was not in the selection).
+                Best-effort: a callback failure is swallowed and logged, never
+                propagated (an expert must never fail because progress
+                reporting failed).
+            forced_mode: per-request synthesis mode chosen by the user
+                ('convergent' / 'divergent'). Passed to the synthesizer for
+                THIS call only; an unknown value is ignored (automatic mode).
 
         Returns:
             SynthesisResult con sintesi finale (o tuple se return_trace=True)
@@ -708,6 +740,10 @@ class MultiExpertOrchestrator:
         experts = self._build_experts()
 
         trace_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+        # Per-request synthesis mode, forwarded to synthesize() for this call
+        # only; the shared synthesizer config is never touched.
+        requested_mode = coerce_synthesis_mode(forced_mode)
 
         # Inizializza ExecutionTrace (RLCF)
         trace = ExecutionTrace(
@@ -1051,15 +1087,25 @@ class MultiExpertOrchestrator:
         # shared context BEFORE dispatch. Failure-isolated; no-op when disabled.
         self._apply_tool_gating(context, trace, selected_experts)
 
+        # Routing weights are final here, before any expert runs, so each
+        # progress callback can report the expert's gating weight instead of
+        # its self-confidence (async contract: weight = gating weight).
+        expert_done_cb = None
+        if on_expert_complete is not None:
+            routing_weights = _normalized_routing_weights(selected_experts)
+
+            async def expert_done_cb(response: ExpertResponse) -> None:
+                await on_expert_complete(response, routing_weights.get(response.expert_type))
+
         # Step 5: Esegui Expert (con tracing)
         expert_t0 = time.perf_counter()
         if self.config.parallel_execution:
             results_with_timing = await self._run_experts_parallel(
-                selected_experts, context, experts, on_expert_complete=on_expert_complete
+                selected_experts, context, experts, on_expert_complete=expert_done_cb
             )
         else:
             results_with_timing = await self._run_experts_sequential(
-                selected_experts, context, experts, on_expert_complete=on_expert_complete
+                selected_experts, context, experts, on_expert_complete=expert_done_cb
             )
 
         # Extract plain responses for downstream (synthesis etc.)
@@ -1129,7 +1175,8 @@ class MultiExpertOrchestrator:
             query=query,
             responses=responses,
             weights=weights_dict,
-            trace_id=trace_id
+            trace_id=trace_id,
+            forced_mode=requested_mode,
         )
         synthesis_time_ms = (time.perf_counter() - synthesis_t0) * 1000
 
@@ -1141,6 +1188,7 @@ class MultiExpertOrchestrator:
             synthesis_stage = {
                 "time_ms": round(synthesis_time_ms, 2),
                 "mode": synthesis_result.mode.value,
+                "requested_mode": requested_mode.value if requested_mode else None,
                 "confidence": round(synthesis_result.confidence, 3),
             }
             if synthesis_result.disagreement_analysis:
@@ -1160,6 +1208,10 @@ class MultiExpertOrchestrator:
         # Aggiungi trace summary ai metadati (RLCF)
         trace.metadata["synthesis_result"] = {
             "mode": synthesis_result.mode.value,
+            # The user's choice, when there was one. Preference feedback is
+            # accepted only on divergent traces, so forced-divergent traces
+            # shift the training signal: this keeps them distinguishable.
+            "requested_mode": requested_mode.value if requested_mode else None,
             "confidence": synthesis_result.confidence,
             "experts_used": [r.expert_type for r in responses],
             "has_disagreement": synthesis_result.disagreement_analysis.has_disagreement if synthesis_result.disagreement_analysis else False,
@@ -1212,6 +1264,11 @@ class MultiExpertOrchestrator:
                             if u:
                                 served_urns_set.add(u)
             served_urns = sorted(served_urns_set)
+            # Kept on the result so the router can persist the served set with
+            # the trace: signal 1 (positive feedback) credits the provisional
+            # nodes this answer was built on, which the LLM cites by Qdrant
+            # chunk id rather than by URN (data only, nothing else reads it).
+            synthesis_result.metadata["served_urns"] = served_urns
 
             # Signal 2 (re-retrieval): credit each re-retrieved live_unconfirmed
             # node exactly ONCE per question (bump_usage is a no-op on confirmed

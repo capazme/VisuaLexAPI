@@ -184,6 +184,15 @@ class SynthesisResult:
         return result
 
 
+def _is_usable_response(response: ExpertResponse) -> bool:
+    """True when an expert produced an actual interpretation.
+
+    Failed, timed-out and circuit-open experts come back with confidence 0.0
+    (see orchestrator._run_experts_* and circuit_breaker.create_unavailable_response).
+    """
+    return (response.confidence or 0.0) > 0.0 and bool((response.interpretation or "").strip())
+
+
 class AdaptiveSynthesizer:
     """
     Sintetizzatore adattivo basato su disagreement detection.
@@ -250,6 +259,7 @@ class AdaptiveSynthesizer:
         weights: Optional[Dict[str, float]] = None,
         trace_id: str = "",
         user_profile: Optional[str] = None,
+        forced_mode: Optional[SynthesisMode] = None,
     ) -> SynthesisResult:
         """
         Sintetizza le risposte degli expert.
@@ -260,6 +270,11 @@ class AdaptiveSynthesizer:
             weights: Pesi per ogni expert (opzionale)
             trace_id: ID per tracing
             user_profile: Profilo utente per sintesi adattiva
+            forced_mode: Per-request mode chosen by the user (convergent /
+                divergent). Takes precedence over ``self.config.mode``; None or
+                AUTO leaves the decision to the disagreement analysis. It is
+                never written to ``self.config``: the synthesizer is shared by
+                concurrent requests.
 
         Returns:
             SynthesisResult con sintesi e metadata
@@ -270,6 +285,8 @@ class AdaptiveSynthesizer:
             trace_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
         profile = self._resolve_profile(user_profile)
+        if forced_mode is not None:
+            forced_mode = SynthesisMode(forced_mode)  # accept the plain string value too
 
         log.info(
             "Synthesizing responses",
@@ -299,7 +316,11 @@ class AdaptiveSynthesizer:
         )
 
         # Step 2: Determina modalita'
-        mode = self._determine_mode(disagreement_analysis)
+        mode = self._determine_mode(
+            disagreement_analysis,
+            forced_mode=forced_mode,
+            usable_responses=sum(1 for r in responses if _is_usable_response(r)),
+        )
 
         # Step 3: Esegui sintesi appropriata
         if mode == SynthesisMode.CONVERGENT:
@@ -365,6 +386,7 @@ class AdaptiveSynthesizer:
         log.info(
             "Synthesis completed",
             mode=mode.value,
+            requested_mode=forced_mode.value if forced_mode is not None else None,
             has_disagreement=has_disagreement,
             execution_time_ms=result.execution_time_ms,
             trace_id=trace_id,
@@ -597,10 +619,38 @@ class AdaptiveSynthesizer:
     def _determine_mode(
         self,
         analysis: Optional[DisagreementAnalysis],
+        forced_mode: Optional[SynthesisMode] = None,
+        usable_responses: Optional[int] = None,
     ) -> SynthesisMode:
-        """Determina la modalita' di sintesi."""
-        if self.config.mode != SynthesisMode.AUTO:
-            return self.config.mode
+        """Determina la modalita' di sintesi.
+
+        Precedence: the per-request ``forced_mode`` (unless None/AUTO), then
+        ``self.config.mode`` (unless AUTO), then the automatic decision from the
+        disagreement analysis. An explicit DIVERGENT with fewer than 2 usable
+        expert responses falls back to CONVERGENT: there is nothing to set
+        side by side, and the alternatives list would be empty or a single item.
+        """
+        explicit = next(
+            (
+                m for m in (forced_mode, self.config.mode)
+                if m is not None and m != SynthesisMode.AUTO
+            ),
+            None,
+        )
+        if explicit is not None:
+            if (
+                explicit == SynthesisMode.DIVERGENT
+                and usable_responses is not None
+                and usable_responses < 2
+            ):
+                log.info(
+                    "Divergent mode requested with fewer than 2 usable experts, "
+                    "falling back to convergent",
+                    requested_mode=explicit.value,
+                    usable_responses=usable_responses,
+                )
+                return SynthesisMode.CONVERGENT
+            return explicit
 
         if analysis is None:
             return SynthesisMode.CONVERGENT

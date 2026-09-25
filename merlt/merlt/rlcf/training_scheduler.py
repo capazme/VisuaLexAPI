@@ -35,11 +35,15 @@ Esempio:
 """
 
 import asyncio
+import atexit
+import contextlib
+import os
+import tempfile
 import time
 import structlog
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, UTC
-from typing import Dict, Any, Optional, List, Callable, Tuple
+from typing import Dict, Any, Optional, List, Callable, Iterable, Set, Tuple
 from enum import Enum
 from pathlib import Path
 import threading
@@ -53,6 +57,19 @@ log = structlog.get_logger()
 # =============================================================================
 # ENUMS AND DATACLASSES
 # =============================================================================
+
+# Relative to the working directory, like `checkpoint_dir`: in the container
+# (WORKDIR /app) this is /app/checkpoints, the durable, writable
+# merlt_checkpoints volume. /app/data is mounted read-only there.
+DEFAULT_BUFFER_PERSISTENCE_PATH = "checkpoints/rlcf/replay_buffer.json"
+
+
+def _default_buffer_persistence_path() -> Optional[str]:
+    """Replay-buffer file from MERLT_RLCF_BUFFER_PATH, read when the config is
+    built. An empty value disables persistence."""
+    value = os.getenv("MERLT_RLCF_BUFFER_PATH", DEFAULT_BUFFER_PERSISTENCE_PATH)
+    return value.strip() or None
+
 
 class TrainingStatus(str, Enum):
     """Stato del training."""
@@ -97,7 +114,11 @@ class SchedulerConfig:
     experiment_id: str = "rlcf_training"
     idle_timeout_days: int = 7
     error_cooldown_seconds: int = 300  # 5 min cooldown after ERROR before retry
-    buffer_persistence_path: Optional[str] = "data/rlcf/replay_buffer.json"
+    buffer_persistence_path: Optional[str] = field(default_factory=_default_buffer_persistence_path)
+    # Debounced persistence from add_experience(): save once this many
+    # experiences are pending, or once this many seconds have passed.
+    buffer_save_every_n: int = 10
+    buffer_save_interval_seconds: float = 30.0
     on_training_start: Optional[List[Callable]] = None
     on_training_complete_callbacks: Optional[List[Callable]] = None
     on_training_error_callbacks: Optional[List[Callable]] = None
@@ -117,6 +138,8 @@ class SchedulerConfig:
             "idle_timeout_days": self.idle_timeout_days,
             "error_cooldown_seconds": self.error_cooldown_seconds,
             "buffer_persistence_path": self.buffer_persistence_path,
+            "buffer_save_every_n": self.buffer_save_every_n,
+            "buffer_save_interval_seconds": self.buffer_save_interval_seconds,
         }
 
 
@@ -266,6 +289,14 @@ class TrainingScheduler:
         self._on_training_complete: Optional[Callable] = None
         self._on_training_error: Optional[Callable] = None
 
+        # Buffer persistence (debounced, see _schedule_buffer_save)
+        self._persist_lock = threading.Lock()
+        self._save_lock = threading.Lock()
+        self._unsaved_changes = 0
+        self._last_save_attempt = time.monotonic()
+        self._flush_timer: Optional[asyncio.TimerHandle] = None
+        self._flush_timer_loop: Optional[asyncio.AbstractEventLoop] = None
+
         # Auto-load buffer from disk if available
         if self.config.buffer_persistence_path:
             self._try_load_buffer()
@@ -301,6 +332,61 @@ class TrainingScheduler:
         Returns:
             ID dell'esperienza
         """
+        exp_id = self._add_to_buffer(trace, feedback, reward, td_error, metadata)
+        if exp_id:
+            self._schedule_buffer_save()
+        return exp_id
+
+    def add_experiences_bulk(self, experiences: Iterable[Tuple[Any, Any, float, Dict[str, Any]]]) -> int:
+        """
+        Add many experiences at once, e.g. when rebuilding the buffer from
+        persisted feedback, and save the buffer once at the end.
+
+        Each item is ``(trace, feedback, reward, metadata)``. An item whose
+        ``metadata['feedback_id']`` is already in the buffer, or earlier in
+        the same batch, is skipped, so the same feedback is never counted
+        twice.
+
+        Returns:
+            Number of experiences added
+        """
+        seen = self.buffered_feedback_ids()
+        added = 0
+        for trace, feedback, reward, metadata in experiences:
+            feedback_id = (metadata or {}).get("feedback_id")
+            if feedback_id is not None:
+                if feedback_id in seen:
+                    continue
+                seen.add(feedback_id)
+            if self._add_to_buffer(trace, feedback, reward, None, metadata):
+                added += 1
+        if added:
+            self._try_save_buffer()
+        return added
+
+    def buffered_feedback_ids(self) -> Set[Any]:
+        """The ``metadata['feedback_id']`` values of the experiences in the buffer."""
+        if isinstance(self.buffer, PrioritizedReplayBuffer):
+            tree = self.buffer.tree
+            experiences = [e for e in list(tree.data[: tree.n_entries]) if e is not None]
+        else:
+            experiences = self.buffer.get_all()
+        ids: Set[Any] = set()
+        for exp in experiences:
+            feedback_id = (exp.metadata or {}).get("feedback_id")
+            if feedback_id is not None:
+                ids.add(feedback_id)
+        return ids
+
+    def _add_to_buffer(
+        self,
+        trace: Any,
+        feedback: Any,
+        reward: float,
+        td_error: Optional[float],
+        metadata: Optional[Dict[str, Any]],
+    ) -> str:
+        """Add one experience without persisting. Returns "" when rejected."""
         # Skip quarantined feedback (Story 9-5)
         feedback_status = getattr(feedback, "status", None)
         if metadata:
@@ -787,14 +873,104 @@ class TrainingScheduler:
                 error=str(e),
             )
 
-    def _try_save_buffer(self) -> None:
-        """Save buffer to disk. Graceful on errors."""
+    def _try_save_buffer(self) -> bool:
+        """
+        Save the buffer to disk atomically: write a temp file in the same
+        directory, then os.replace() it over the target, so a reader never
+        sees a half-written file. Never raises. Returns True on success.
+        """
         path = self.config.buffer_persistence_path
+        if not path:
+            return False
+        # Serialise writers: the snapshot taken last is the one replaced last.
+        with self._save_lock:
+            with self._persist_lock:
+                self._unsaved_changes = 0
+                self._last_save_attempt = time.monotonic()
+            tmp_path: Optional[str] = None
+            try:
+                target = Path(path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                fd, tmp_path = tempfile.mkstemp(
+                    prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent)
+                )
+                os.close(fd)
+                self.buffer.save(tmp_path)
+                os.replace(tmp_path, target)
+                tmp_path = None
+                return True
+            except Exception as e:
+                with self._persist_lock:
+                    self._unsaved_changes = max(self._unsaved_changes, 1)
+                log.error("Replay buffer save failed", path=path, error=str(e))
+                return False
+            finally:
+                if tmp_path is not None:
+                    with contextlib.suppress(OSError):
+                        os.unlink(tmp_path)
+
+    def flush_buffer(self) -> bool:
+        """Save the buffer now if some experiences are not on disk yet."""
+        with self._persist_lock:
+            pending = self._unsaved_changes > 0
+        return self._try_save_buffer() if pending else False
+
+    def _schedule_buffer_save(self) -> None:
+        """
+        Debounced persistence after add_experience(). Saves once
+        ``buffer_save_every_n`` experiences are pending or
+        ``buffer_save_interval_seconds`` have passed since the last save;
+        otherwise arms a one-shot timer, so a quiet period is still flushed.
+        With a running event loop the write happens in a worker thread, so a
+        feedback request never waits on it.
+        """
+        if not self.config.buffer_persistence_path:
+            return
+        now = time.monotonic()
+        with self._persist_lock:
+            self._unsaved_changes += 1
+            due = (
+                self._unsaved_changes >= max(1, self.config.buffer_save_every_n)
+                or now - self._last_save_attempt >= self.config.buffer_save_interval_seconds
+            )
+            if due:
+                # Claim this save so a concurrent add does not start another.
+                self._unsaved_changes = 0
+                self._last_save_attempt = now
         try:
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-            self.buffer.save(path)
-        except Exception as e:
-            log.warning("Buffer save failed", path=path, error=str(e))
+            loop: Optional[asyncio.AbstractEventLoop] = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if due:
+            self._save_in_background(loop)
+        elif loop is not None:
+            self._arm_flush_timer(loop)
+
+    def _save_in_background(self, loop: Optional[asyncio.AbstractEventLoop]) -> None:
+        if loop is not None:
+            try:
+                loop.run_in_executor(None, self._try_save_buffer)
+                return
+            except RuntimeError:
+                pass  # executor already shut down: save inline
+        self._try_save_buffer()
+
+    def _arm_flush_timer(self, loop: asyncio.AbstractEventLoop) -> None:
+        with self._persist_lock:
+            if self._flush_timer is not None and self._flush_timer_loop is loop:
+                return
+            self._flush_timer_loop = loop
+            self._flush_timer = loop.call_later(
+                self.config.buffer_save_interval_seconds, self._on_flush_timer, loop
+            )
+
+    def _on_flush_timer(self, loop: asyncio.AbstractEventLoop) -> None:
+        with self._persist_lock:
+            self._flush_timer = None
+            self._flush_timer_loop = None
+            pending = self._unsaved_changes > 0
+        if pending:
+            self._save_in_background(loop)
 
     # -------------------------------------------------------------------------
     # POLICY CHECKPOINT MANAGEMENT
@@ -1148,6 +1324,15 @@ class TrainingScheduler:
 
 _scheduler_instance: Optional[TrainingScheduler] = None
 _scheduler_lock = threading.Lock()
+_exit_flush_registered = False
+
+
+def _flush_scheduler_at_exit() -> None:
+    """On a clean shutdown (e.g. container recreate), write the experiences
+    the debounce had not saved yet."""
+    instance = _scheduler_instance
+    if instance is not None:
+        instance.flush_buffer()
 
 
 def get_scheduler(config: Optional[SchedulerConfig] = None) -> TrainingScheduler:
@@ -1160,11 +1345,14 @@ def get_scheduler(config: Optional[SchedulerConfig] = None) -> TrainingScheduler
     Returns:
         TrainingScheduler singleton
     """
-    global _scheduler_instance
+    global _scheduler_instance, _exit_flush_registered
 
     with _scheduler_lock:
         if _scheduler_instance is None:
             _scheduler_instance = TrainingScheduler(config)
+            if not _exit_flush_registered:
+                atexit.register(_flush_scheduler_at_exit)
+                _exit_flush_registered = True
         return _scheduler_instance
 
 
