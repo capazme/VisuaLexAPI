@@ -105,6 +105,18 @@ describe('BlockAnnotationsPopover', () => {
     await waitFor(() => expect(document.activeElement).toBe(sign()));
   });
 
+  it('takes the focus when it opens, so Tab goes through its buttons', async () => {
+    setup();
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
+
+  it('holds keyboard and screen-reader focus while open: the text behind is hidden from them', async () => {
+    const { container } = setup();
+    await screen.findByRole('dialog', { name: TITLE });
+    await waitFor(() => expect(container.getAttribute('aria-hidden')).toBe('true'));
+  });
+
   it('does not treat a press on its own sign as outside, but does elsewhere', async () => {
     const { props, sign } = setup();
     await screen.findByRole('dialog', { name: TITLE });

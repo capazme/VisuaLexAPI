@@ -132,15 +132,29 @@ export function BlockAnnotationsPopover({
 
     return (
         <FloatingPortal>
-            <FloatingFocusManager context={context} modal={false} initialFocus={-1} returnFocus={returnFocusRef}>
+            {/* Modal focus: with a virtual reference there is no element in the
+                text for floating-ui to bridge Tab back to, so Tab cycles in
+                here and Esc returns to the sign. */}
+            {/* Focus goes to the dialog itself (not its first button, which
+                would scroll): `initialFocus={-1}` would mean no focus at all. */}
+            <FloatingFocusManager
+                context={context}
+                // eslint-disable-next-line react-hooks/refs -- the ref object is handed over; floating-ui reads it in an effect
+                initialFocus={refs.floating}
+                returnFocus={returnFocusRef}
+            >
                 {/* Outer element: floating-ui positioning only. */}
                 <div
                     // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
                     ref={refs.setFloating}
-                    style={{ ...floatingStyles, visibility: isPositioned ? 'visible' : 'hidden' }}
+                    // Transparent, not `visibility: hidden`, until positioned
+                    // (gotcha 13): a hidden element refuses the initial focus,
+                    // and a keyboard user would be left on the sign.
+                    style={{ ...floatingStyles, opacity: isPositioned ? 1 : 0, pointerEvents: isPositioned ? undefined : 'none' }}
                     {...getFloatingProps()}
                     aria-labelledby={titleId}
-                    className={Z_INDEX.citationPreview}
+                    tabIndex={-1}
+                    className={cn(Z_INDEX.citationPreview, 'outline-none')}
                 >
                     {/* Inner element: the entry animation (gotcha 10). */}
                     <div
