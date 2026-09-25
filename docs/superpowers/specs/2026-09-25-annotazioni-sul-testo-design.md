@@ -102,9 +102,11 @@ the text is now a centred 68ch column, so a wide panel has free margins.
 - Anchor: a **virtual reference** (`refs.setPositionReference`) whose
   `getBoundingClientRect` looks up `.vlx-sign[data-block="i"]` in the
   container on every call, so the popover stays attached when an edit redraws
-  the sign; hidden until positioned (gotcha 13). Placement follows the sign:
-  in the margin beside it (`right-start`, else above the block), inline below
-  the block, so the block itself stays readable.
+  the sign; transparent until positioned (gotcha 13). The reference is the
+  whole block (from the sign to the block's right edge, over its visible
+  height): the popover opens beside it when the margin has room, else below,
+  else above — never over the passage. Focus is modal: Tab stays inside, Esc
+  returns to the sign.
 - Body: notes first — `NoteCard`, extracted from `NotesPeekPanel.tsx` into its
   own file and reused by both (its delete button now visible, at 44 px, below
   `md`) — each with *Vai al passo*; then

@@ -1552,9 +1552,13 @@ text in `ArticleBody`) has room for the 68ch column plus a sign. It opens
 a time with the update notes): the block's notes, edited and deleted in place
 with the Notes panel's own `NoteCard`, and its highlights, removed; *Vai al
 passo* scrolls to the passage and makes it glow (`utils/revealAnnotation.ts`).
-The popover's anchor is a virtual reference that finds the sign again on every
-measurement, because every edit redraws the text. The "Evidenziazioni" box
-that listed highlights under the article is gone.
+The popover is placed against the whole block (`utils/blockAnchorRect.ts`) —
+beside it when the margin has room, else below or above it, never over the
+passage it lists — through a virtual reference that finds the sign again on
+every measurement, because every edit redraws the text. Its focus management
+is modal: with no element in the text for floating-ui to bridge Tab back to,
+Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box that
+listed highlights under the article is gone.
 
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
@@ -1710,6 +1714,8 @@ Duplicating any of these is a defect, not a shortcut.
   Mode's summary.
 - `utils/floatingOrigin.ts` — `getTransformOrigin(placement)` for a popover's
   entry animation.
+- `utils/blockAnchorRect.ts` — `blockAnchorRect` / `signReference`: the
+  rectangle and the virtual reference a block's popover is placed against.
 - `hooks/useNoteEditing.ts` + `features/search/NoteCard.tsx` — a note edited in
   place; the Notes panel and the block popover.
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
