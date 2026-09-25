@@ -14,6 +14,8 @@ interface UseArticleMarkersInput {
    * have no commi to divide.
    */
   structure?: ArticleStructure | null;
+  /** The annotation signs of the tab and the dossier reader; see RenderArticleInput. */
+  signs?: boolean;
 }
 
 /**
@@ -32,12 +34,13 @@ export function useArticleMarkers({
   highlights,
   annotations,
   structure = null,
+  signs = false,
 }: UseArticleMarkersInput): string {
   const [searchQuery, setSearchQuery] = useState<string | null>(() => getGlobalHighlight());
   useEffect(() => subscribeToHighlight(setSearchQuery), []);
 
   return useMemo(
-    () => renderArticleHtml({ raw: rawText || '', structure, highlights, annotations, searchQuery }),
-    [rawText, structure, highlights, annotations, searchQuery],
+    () => renderArticleHtml({ raw: rawText || '', structure, highlights, annotations, searchQuery, signs }),
+    [rawText, structure, highlights, annotations, searchQuery, signs],
   );
 }

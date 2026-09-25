@@ -21,7 +21,13 @@
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from './highlightColors';
 import type { ArticleStructure, DecorationKind, StructureBlock } from './articleStructure';
-import { resolveAnchors } from './articleAnnotations';
+import {
+  groupAnchorsByBlock,
+  resolveAnchors,
+  signAriaLabel,
+  signColors,
+  type BlockAnnotations,
+} from './articleAnnotations';
 
 export interface RenderArticleInput {
   raw: string;
@@ -30,6 +36,12 @@ export interface RenderArticleInput {
   highlights: Highlight[];
   annotations: Annotation[];
   searchQuery?: string | null;
+  /**
+   * Draw each annotated block's sign (round B): the tab and the dossier
+   * reader. Study Mode has its own summary and leaves it off; flat mode has
+   * no blocks and ignores it.
+   */
+  signs?: boolean;
 }
 
 type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'search';
@@ -151,14 +163,15 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   }
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
-  return renderBlocks(raw, structure, marks);
+  const groups = input.signs ? groupAnchorsByBlock(raw, structure, anchors) : null;
+  return renderBlocks(raw, structure, marks, groups);
 }
 
-function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[]): string {
+function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[], groups: BlockAnnotations[] | null): string {
   const parts: string[] = [];
   const tail = structure.updates;
   let inTail = false;
-  for (const block of structure.blocks) {
+  for (const [index, block] of structure.blocks.entries()) {
     if (tail && !inTail && block.start >= tail.start) {
       inTail = true;
       // Folded by CSS through a class on the container (useArticleTextInteractions),
@@ -184,10 +197,31 @@ function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[]): 
     }
     parts.push(`<div class="${blockClass(block)}"${blockAttributes(block)}>`);
     parts.push(renderSpan(raw, block.start, block.end, blockMarks, false));
+    // After renderSpan has closed every mark, so a sign is never inside one.
+    if (groups) parts.push(signHtml(index, groups[index]));
     parts.push('</div>');
   }
   if (inTail) parts.push('</div></div>');
   return parts.join('');
+}
+
+/**
+ * An annotated block's sign: a button without a single text node. The note
+ * icon, the count and the colour dots are drawn by CSS from the data
+ * attributes (index.css, READING SURFACE), so the projection holds
+ * (gotcha 23). useArticleTextInteractions opens it; the popover finds it
+ * again by `data-block`.
+ */
+function signHtml(index: number, group: BlockAnnotations | undefined): string {
+  const notes = group?.notes.length ?? 0;
+  const highlights = group?.highlights.length ?? 0;
+  if (!group || notes + highlights === 0) return '';
+  let html =
+    `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
+    ` data-notes="${notes}" data-highlights="${highlights}" aria-label="${signAriaLabel(notes, highlights)}">`;
+  if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
+  for (const color of signColors(group.highlights)) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
+  return `${html}</span>`;
 }
 
 function coversText(structure: ArticleStructure, length: number): boolean {
