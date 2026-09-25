@@ -39,6 +39,13 @@ async function grantFull(user: TestUser): Promise<void> {
   await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'full' });
 }
 
+/** MERL-T GET /api/v1/documents/:id answering with `uploadedBy` as the uploader. */
+function documentUploadedBy(documentId: number, uploadedBy: string) {
+  return nock(TEST_MERLT_BASE)
+    .get(`/api/v1/documents/${documentId}`)
+    .reply(200, { id: documentId, filename: 'x.txt', uploaded_by: uploadedBy, processing_status: 'uploaded' });
+}
+
 describe('POST /api/merlt/contrib/documents (upload)', () => {
   let user: TestUser;
   beforeEach(async () => {
@@ -98,6 +105,7 @@ describe('POST /api/merlt/contrib/documents/:id/extract', () => {
 
   it('creates a job and enqueues the extraction (202)', async () => {
     await grantFull(user);
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE)
       .post('/api/v1/documents/42/extract-async')
       .reply(202, { task_id: 'task-xyz' });
@@ -115,12 +123,54 @@ describe('POST /api/merlt/contrib/documents/:id/extract', () => {
 
   it('still returns the job when MERL-T enqueue fails', async () => {
     await grantFull(user);
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE).post('/api/v1/documents/42/extract-async').reply(503, 'down');
     const res = await request(app)
       .post('/api/merlt/contrib/documents/42/extract')
       .set(authHeader(user));
     expect(res.status).toBe(202);
     expect(res.body.jobId).toBeTruthy();
+  });
+
+  // sec-contrib-extract-idor: document ids are sequential integers; extracting
+  // someone else's upload would stage their verbatim excerpts under the caller.
+  it("404s on another user's document: no job row, nothing enqueued", async () => {
+    await grantFull(user);
+    const other = await createTestUser('contrib-mallory');
+    documentUploadedBy(42, other.id);
+    const enqueue = nock(TEST_MERLT_BASE)
+      .post('/api/v1/documents/42/extract-async')
+      .reply(202, { task_id: 'task-stolen' });
+
+    const res = await request(app)
+      .post('/api/merlt/contrib/documents/42/extract')
+      .set(authHeader(user));
+
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('document_not_found');
+    expect(enqueue.isDone()).toBe(false);
+    expect(await prisma.merltExtractionJob.count()).toBe(0);
+  });
+
+  it('404s when MERL-T does not know the document', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/documents/42').reply(404, { detail: 'Document not found' });
+    const res = await request(app)
+      .post('/api/merlt/contrib/documents/42/extract')
+      .set(authHeader(user));
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('document_not_found');
+    expect(await prisma.merltExtractionJob.count()).toBe(0);
+  });
+
+  it('503s (and creates no job) when MERL-T cannot say who uploaded the document', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/documents/42').reply(500, 'boom');
+    const res = await request(app)
+      .post('/api/merlt/contrib/documents/42/extract')
+      .set(authHeader(user));
+    expect(res.status).toBe(503);
+    expect(await prisma.merltExtractionJob.count()).toBe(0);
   });
 });
 
@@ -132,6 +182,7 @@ describe('GET /api/merlt/contrib/documents/:id/candidates', () => {
 
   it('proxies candidates scoped to the contributor', async () => {
     await grantFull(user);
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/documents/42/candidates')
       .query((q) => q.contributor_id === user.id)
@@ -146,11 +197,39 @@ describe('GET /api/merlt/contrib/documents/:id/candidates', () => {
 
   it('503s when MERL-T is unavailable', async () => {
     await grantFull(user);
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE).get('/api/v1/documents/42/candidates').query(true).reply(500, 'boom');
     const res = await request(app)
       .get('/api/merlt/contrib/documents/42/candidates')
       .set(authHeader(user));
     expect(res.status).toBe(503);
+  });
+
+  it("404s on another user's document without listing anything", async () => {
+    await grantFull(user);
+    const other = await createTestUser('contrib-eve');
+    documentUploadedBy(42, other.id);
+    const list = nock(TEST_MERLT_BASE)
+      .get('/api/v1/documents/42/candidates')
+      .query(true)
+      .reply(200, { candidates: [{ id: 1, candidate_type: 'entity', entity_text: 'X' }] });
+
+    const res = await request(app)
+      .get('/api/merlt/contrib/documents/42/candidates')
+      .set(authHeader(user));
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('document_not_found');
+    expect(list.isDone()).toBe(false);
+  });
+
+  it('404s when MERL-T does not know the document', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/documents/42').reply(404, { detail: 'Document not found' });
+    const res = await request(app)
+      .get('/api/merlt/contrib/documents/42/candidates')
+      .set(authHeader(user));
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('document_not_found');
   });
 });
 
@@ -195,7 +274,8 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/candidates/7')
-      .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: 'raw verbatim' });
+      .reply(200, { id: 7, candidate_type: 'entity', document_id: 42, verbatim_excerpt: 'raw verbatim' });
+    documentUploadedBy(42, user.id);
 
     const res = await request(app)
       .post('/api/merlt/contrib/candidates/7/promote')
@@ -210,7 +290,8 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/candidates/7')
-      .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: entityBody.descrizione });
+      .reply(200, { id: 7, candidate_type: 'entity', document_id: 42, verbatim_excerpt: entityBody.descrizione });
+    documentUploadedBy(42, user.id);
 
     const res = await request(app)
       .post('/api/merlt/contrib/candidates/7/promote')
@@ -225,7 +306,8 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/candidates/7')
-      .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: 'raw verbatim text' });
+      .reply(200, { id: 7, candidate_type: 'entity', document_id: 42, verbatim_excerpt: 'raw verbatim text' });
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE)
       .post('/api/v1/enrichment/propose-entity', (b) => (b as { contributed_by: string }).contributed_by === user.id)
       // Real MERL-T shape: id is nested under pending_entity (EntityProposalResponse).
@@ -245,7 +327,8 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/candidates/7')
-      .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: 'raw verbatim text' });
+      .reply(200, { id: 7, candidate_type: 'entity', document_id: 42, verbatim_excerpt: 'raw verbatim text' });
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE)
       .post('/api/v1/enrichment/propose-entity')
       // Dedup-defer: no pending_entity, just the duplicate warning.
@@ -282,6 +365,7 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
       document_id: 42,
       verbatim_excerpt: 'raw verbatim text',
     });
+    documentUploadedBy(42, user.id);
     nock(TEST_MERLT_BASE)
       .post('/api/v1/enrichment/propose-entity', (b) => {
         sent = b as Record<string, unknown>;
@@ -304,6 +388,160 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     expect(sent?.source_document_id).toBe(42);
     expect(sent?.skip_duplicate_check).toBe(true);
     expect(sent?.acknowledged_duplicate_of).toBe('concetto:r');
+  });
+
+  // sec-contrib-promote-idor: candidate ids are sequential too; promoting
+  // someone else's candidate would file their note as the caller's proposal
+  // and, by marking it promoted, purge it from the owner's review list.
+  it("404s on a candidate from another user's document: nothing proposed, nothing marked", async () => {
+    await grantFull(user);
+    const other = await createTestUser('contrib-trudy');
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/candidates/7')
+      .reply(200, { id: 7, candidate_type: 'entity', document_id: 42, verbatim_excerpt: 'raw verbatim text' });
+    documentUploadedBy(42, other.id);
+    const propose = nock(TEST_MERLT_BASE)
+      .post('/api/v1/enrichment/propose-entity')
+      .reply(200, { success: true, pending_entity: { id: 'pe-stolen' } });
+    const mark = nock(TEST_MERLT_BASE).post('/api/v1/candidates/7/mark-promoted').reply(200, { ok: true });
+
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send(entityBody);
+
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('candidate_not_found');
+    expect(propose.isDone()).toBe(false);
+    expect(mark.isDone()).toBe(false);
+  });
+
+  it('404s on a candidate whose contributor is someone else, even on an owned document', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/candidates/7').reply(200, {
+      id: 7,
+      candidate_type: 'entity',
+      document_id: 42,
+      contributor_id: 'someone-else',
+      verbatim_excerpt: 'raw verbatim text',
+    });
+    documentUploadedBy(42, user.id);
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send(entityBody);
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('candidate_not_found');
+  });
+
+  it('404s on a candidate without a document_id (ownership cannot be proved)', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/candidates/7')
+      .reply(200, { id: 7, candidate_type: 'entity', verbatim_excerpt: 'raw verbatim text' });
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send(entityBody);
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('candidate_not_found');
+  });
+
+  it('404s (not 503) when MERL-T does not know the candidate', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/candidates/7').reply(404, { detail: 'Candidate not found' });
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send(entityBody);
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('candidate_not_found');
+  });
+
+  it('404s when the candidate document is unknown to MERL-T', async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/candidates/7')
+      .reply(200, { id: 7, candidate_type: 'entity', document_id: 42, verbatim_excerpt: 'raw verbatim text' });
+    nock(TEST_MERLT_BASE).get('/api/v1/documents/42').reply(404, { detail: 'Document not found' });
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send(entityBody);
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('candidate_not_found');
+  });
+
+  // B1: note-derived relations used to forward the LLM's concept names, which
+  // the consensus writer then MERGEd as phantom :Norma nodes.
+  const relationBody = {
+    candidateType: 'relation' as const,
+    articleUrn: 'urn:nir:stato:regio.decreto:1942-03-16;262~art1453',
+    sourceUrn: 'urn:nir:stato:regio.decreto:1942-03-16;262~art1453',
+    targetEntityId: 'concetto:risoluzione_del_contratto',
+    tipoRelazione: 'DISCIPLINA',
+    descrizione: "L'art. 1453 disciplina la risoluzione per inadempimento.",
+    fonte: 'Appunti personali',
+    attested: true,
+  };
+
+  it('400 unresolved_endpoint on a relation endpoint that is a bare name (no MERL-T call)', async () => {
+    await grantFull(user);
+    for (const bad of [
+      { sourceUrn: 'risoluzione del contratto' },
+      { targetEntityId: 'inadempimento' },
+      { targetEntityId: 'Concetto:risoluzione' },
+      { sourceUrn: 'https://example.com/risoluzione' },
+      { targetEntityId: 'concetto: risoluzione del contratto' },
+    ]) {
+      const res = await request(app)
+        .post('/api/merlt/contrib/candidates/7/promote')
+        .set(authHeader(user))
+        .send({ ...relationBody, ...bad });
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+      expect(res.body.detail).toBe('unresolved_endpoint');
+    }
+  });
+
+  it('forwards resolved relation endpoints (URN, Normattiva URL, entity id, pending id)', async () => {
+    await grantFull(user);
+    const cases: Array<{ sourceUrn: string; targetEntityId: string }> = [
+      { sourceUrn: relationBody.sourceUrn, targetEntityId: 'concetto:risoluzione_del_contratto' },
+      {
+        sourceUrn: 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art1455',
+        targetEntityId: 'concetto:1a2b3c4d',
+      },
+      { sourceUrn: 'principio:buona_fede', targetEntityId: relationBody.sourceUrn },
+    ];
+    for (const endpoints of cases) {
+      let sent: Record<string, unknown> | undefined;
+      nock(TEST_MERLT_BASE).get('/api/v1/candidates/9').reply(200, {
+        id: 9,
+        candidate_type: 'relation',
+        document_id: 42,
+        verbatim_excerpt: 'estratto originale',
+      });
+      documentUploadedBy(42, user.id);
+      nock(TEST_MERLT_BASE)
+        .post('/api/v1/enrichment/propose-relation', (b) => {
+          sent = b as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, { success: true, relation_id: 'rel-1' });
+      nock(TEST_MERLT_BASE).post('/api/v1/candidates/9/mark-promoted').reply(200, { ok: true });
+
+      const res = await request(app)
+        .post('/api/merlt/contrib/candidates/9/promote')
+        .set(authHeader(user))
+        .send({ ...relationBody, ...endpoints, sourceUrn: `  ${endpoints.sourceUrn} ` });
+
+      expect(res.status, JSON.stringify(endpoints)).toBe(200);
+      expect(res.body.pendingId).toBe('rel-1');
+      // Trimmed, otherwise verbatim: the resolved identifier is the contract.
+      expect(sent?.source_urn).toBe(endpoints.sourceUrn);
+      expect(sent?.target_entity_id).toBe(endpoints.targetEntityId);
+      expect(sent?.tipo_relazione).toBe('DISCIPLINA');
+    }
   });
 
   it('403s without full consent', async () => {

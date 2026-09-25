@@ -6,6 +6,7 @@
  *
  * MERL-T paths (merlt/merlt/api/document_router.py + enrichment_router.py):
  *  - POST /api/v1/documents/upload                  (multipart) → { document_id, duplicate? }
+ *  - GET  /api/v1/documents/{id}                    → DocumentInfo (incl. uploaded_by)
  *  - POST /api/v1/documents/{id}/extract-async      { user_id, options:{bff_job_id} } → { task_id }
  *  - GET  /api/v1/documents/{id}/candidates?contributor_id=<id>  → { candidates: [...] }
  *  - GET  /api/v1/candidates/{id}                   → ExtractionCandidate (incl. verbatim)
@@ -43,8 +44,31 @@ export interface ExtractionCandidate {
   /** LLM-assigned type (concetto | principio | definizione); the promote route uses it as the authoritative tipo. */
   entity_type?: string | null;
   article_urn?: string | null;
-  /** MERL-T user_documents id the candidate came from (provenance). */
+  /** MERL-T user_documents id the candidate came from (provenance + ownership). */
   document_id?: number | null;
+  /** The VisuaLex user the candidate was staged for, when MERL-T exposes it. */
+  contributor_id?: string | null;
+  /**
+   * B1 relation endpoints: the names the LLM wrote, and whether the staging
+   * parser already resolved each endpoint to an identifier (norm URN/URL,
+   * graph node id, pending entity id). Missing means unresolved.
+   */
+  source_text?: string | null;
+  target_text?: string | null;
+  source_resolved?: boolean | null;
+  target_resolved?: boolean | null;
+}
+
+/**
+ * MERL-T GET /api/v1/documents/{id} (DocumentInfo). Only `uploaded_by` is
+ * load-bearing for the BFF: document ids are sequential integers, so every
+ * document-keyed route checks it against the caller before forwarding.
+ */
+export interface UserDocumentInfo {
+  id: number;
+  uploaded_by?: string | null;
+  processing_status?: string | null;
+  [k: string]: unknown;
 }
 
 export interface ListCandidatesResponse {
@@ -157,6 +181,10 @@ export class ContribClient {
     if (input.legalDomain) form.append('legal_domain', input.legalDomain);
     if (input.title) form.append('title', input.title);
     return this.send('POST', '/api/v1/documents/upload', form);
+  }
+
+  async getDocument(documentId: number): Promise<UserDocumentInfo> {
+    return this.request('GET', `/api/v1/documents/${documentId}`);
   }
 
   async extractAsync(

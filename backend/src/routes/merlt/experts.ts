@@ -106,6 +106,8 @@ function mergePartial(existing: unknown, incoming: QaPartialExpert): QaPartialEx
  *   - ASK is consumption → consentGuard (basic OR full): /query, /refine, /history
  *   - TEACH writes to the shared model → contributionGuard (full): all
  *     /feedback/* channels + /confirm-source
+ * Every traceId-keyed route (/trace, /refine, /feedback/*) also requires the
+ * caller to own the trace (callerOwnsTrace), 404 trace_not_found otherwise.
  * Registered in routes/merlt/index.ts BEFORE the catch-all auth routers
  * (per-route auth → order-safe; gotcha #1).
  */
@@ -174,6 +176,78 @@ function markSteerSeen(key: string): void {
 
 export function _resetSteerDedupeForTests(): void {
   steerSeen.clear();
+}
+
+// --- Trace ownership (sec-experts-trace-idor) ------------------------------
+// Every traceId-keyed route (trace, refine, feedback/*) forwards a trace id the
+// client chose. Trace ids are random, but MERL-T selects by id alone, so a
+// leaked id would let anyone read the query, rate the answer or steer the RLCF
+// policies on it. The BFF therefore proves the caller owns the trace before
+// forwarding and answers 404 `trace_not_found` otherwise (never 403, so a
+// foreign id reads exactly like a missing one). Nothing is cached: ownership
+// is re-derived on every call.
+const HISTORY_OWNERSHIP_WINDOW = 100; // MERL-T /history caps limit at 100
+const REDACTED = '[REDACTED]';
+
+/** The user id a stored MERL-T trace names, when it names one (not redacted). */
+function traceUserId(trace: Record<string, unknown> | null | undefined): string | null {
+  if (!trace) return null;
+  const input = trace.input;
+  const candidates = [
+    trace.user_id,
+    input && typeof input === 'object' ? (input as Record<string, unknown>).user_id : undefined,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c && c !== REDACTED) return c;
+  }
+  return null;
+}
+
+/**
+ * Whether `userId` owns trace `traceId`, cheapest proof first:
+ *  (a) an async answer: a MerltQaJob row of this user carries the trace id;
+ *  (b) the MERL-T trace payload names its user (`user_id`, top level or under
+ *      `input`); a different, unredacted user id is a definite no;
+ *  (c) sync answers and refinements: the trace is among the user's latest
+ *      HISTORY_OWNERSHIP_WINDOW turns in MERL-T's own history, which MERL-T
+ *      filters by QATrace.user_id. (b) alone does not suffice today: the stored
+ *      pipeline trace does not carry user_id.
+ * `prefetched` is the trace payload when the caller already holds it (the
+ * trace route), `null` when MERL-T said it does not exist. A MERL-T 404 is
+ * "no proof", any other MERL-T failure throws (→ 503 via handleMerltError).
+ */
+async function callerOwnsTrace(
+  userId: string,
+  traceId: string,
+  prefetched?: Record<string, unknown> | null
+): Promise<boolean> {
+  const job = await prisma.merltQaJob.findFirst({
+    where: { traceId, userId },
+    select: { id: true },
+  });
+  if (job) return true;
+
+  let trace = prefetched;
+  if (trace === undefined) {
+    try {
+      trace = await getExpertsClient().getTrace(traceId);
+    } catch (err) {
+      if (!(err instanceof MerltBadRequestError && err.status === 404)) throw err;
+      trace = null;
+    }
+  }
+  const named = traceUserId(trace);
+  if (named) return named === userId;
+
+  const history = await getExpertsClient().history(userId, HISTORY_OWNERSHIP_WINDOW);
+  return Array.isArray(history) && history.some((item) => item?.trace_id === traceId);
+}
+
+/** Answer 404 trace_not_found unless the caller owns the trace. True = proceed. */
+async function requireTraceOwner(res: Response, userId: string, traceId: string): Promise<boolean> {
+  if (await callerOwnsTrace(userId, traceId)) return true;
+  res.status(404).json({ detail: 'trace_not_found' });
+  return false;
 }
 
 router.post('/experts/query', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
@@ -334,8 +408,9 @@ router.get('/experts/history', authenticate, consentGuard, async (req: Request, 
 // past deliberation lost the canvas overlay and the sources panel. This proxy
 // returns the FULL stored pipeline trace; the FE parses it back into the
 // deliberation details. READ → consentGuard (basic OR full), like /history.
-// 404 from MERL-T (unknown/expired trace, or asked without include_trace)
-// passes through — the FE keeps the slim turn and notes the missing details.
+// 404 trace_not_found for an unknown/expired trace (or one asked without
+// include_trace) AND for another user's trace — the FE keeps the slim turn
+// and notes the missing details.
 router.get('/experts/trace/:traceId', authenticate, consentGuard, async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ detail: 'Authentication required' });
@@ -353,7 +428,19 @@ router.get('/experts/trace/:traceId', authenticate, consentGuard, async (req: Re
     select: { consentLevel: true },
   });
   try {
-    res.status(200).json(await getExpertsClient().getTrace(traceId, mapConsentLevel(pref?.consentLevel)));
+    let trace: Record<string, unknown> | null;
+    try {
+      trace = await getExpertsClient().getTrace(traceId, mapConsentLevel(pref?.consentLevel));
+    } catch (err) {
+      if (!(err instanceof MerltBadRequestError && err.status === 404)) throw err;
+      trace = null;
+    }
+    // One answer for "unknown", "expired" and "someone else's": no oracle.
+    if (!trace || !(await callerOwnsTrace(req.user.id, traceId, trace))) {
+      res.status(404).json({ detail: 'trace_not_found' });
+      return;
+    }
+    res.status(200).json(trace);
   } catch (err) {
     handleMerltError(err, res);
   }
@@ -370,6 +457,7 @@ router.post('/experts/feedback/inline', authenticate, contributionGuard, async (
     return;
   }
   try {
+    if (!(await requireTraceOwner(res, req.user.id, parsed.data.traceId))) return;
     res.status(200).json(
       await getExpertsClient().feedbackInline({
         trace_id: parsed.data.traceId,
@@ -393,6 +481,7 @@ router.post('/experts/feedback/source', authenticate, contributionGuard, async (
     return;
   }
   try {
+    if (!(await requireTraceOwner(res, req.user.id, parsed.data.traceId))) return;
     res.status(200).json(
       await getExpertsClient().feedbackSource({
         trace_id: parsed.data.traceId,
@@ -417,6 +506,7 @@ router.post('/experts/feedback/detailed', authenticate, contributionGuard, async
     return;
   }
   try {
+    if (!(await requireTraceOwner(res, req.user.id, parsed.data.traceId))) return;
     res.status(200).json(
       await getExpertsClient().feedbackDetailed({
         trace_id: parsed.data.traceId,
@@ -449,6 +539,7 @@ router.post('/experts/feedback/preference', authenticate, contributionGuard, asy
     return;
   }
   try {
+    if (!(await requireTraceOwner(res, req.user.id, parsed.data.traceId))) return;
     const result = await getExpertsClient().feedbackPreference({
       trace_id: parsed.data.traceId,
       user_id: req.user.id,
@@ -482,6 +573,7 @@ router.post('/experts/feedback/relation', authenticate, contributionGuard, async
     return;
   }
   try {
+    if (!(await requireTraceOwner(res, req.user.id, parsed.data.traceId))) return;
     const result = await getExpertsClient().feedbackRelation({
       trace_id: parsed.data.traceId,
       user_id: req.user.id,
@@ -506,6 +598,7 @@ router.post('/experts/refine', authenticate, consentGuard, async (req: Request, 
     return;
   }
   try {
+    if (!(await requireTraceOwner(res, req.user.id, parsed.data.traceId))) return;
     res.status(200).json(
       await getExpertsClient().refine({
         trace_id: parsed.data.traceId,

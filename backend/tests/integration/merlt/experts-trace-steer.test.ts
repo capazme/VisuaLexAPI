@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import nock from 'nock';
-import { request, app, createTestUser, authHeader, type TestUser } from '../../helpers';
+import { request, app, createTestUser, authHeader, prisma, type TestUser } from '../../helpers';
 import { _resetExpertsClientForTests } from '../../../src/services/merlt/expertsClient';
 import { _resetSteerDedupeForTests } from '../../../src/routes/merlt/experts';
 
@@ -55,6 +55,13 @@ const TRACE_OK = {
 
 const FEEDBACK_OK = { success: true, feedback_id: 7, message: 'ok' };
 
+/** A completed async answer of `user` carrying `traceId` (proves ownership). */
+async function ownAsyncTrace(user: TestUser, traceId: string): Promise<void> {
+  await prisma.merltQaJob.create({
+    data: { userId: user.id, query: 'art 2043?', mode: 'convergent', consentLevel: 'full', status: 'completed', traceId },
+  });
+}
+
 describe('GET /api/merlt/experts/trace/:traceId (Wave 2 P2.6)', () => {
   let user: TestUser;
   beforeEach(async () => {
@@ -83,6 +90,7 @@ describe('GET /api/merlt/experts/trace/:traceId (Wave 2 P2.6)', () => {
 
   it('proxies with the CURRENT consent level as caller_consent and strips embedding payloads', async () => {
     await grantBasic(user);
+    await ownAsyncTrace(user, 'trace_hist1');
     nock(TEST_MERLT_BASE)
       .get('/api/v1/experts/trace/trace_hist1')
       .query({ caller_consent: 'basic' })
@@ -100,7 +108,7 @@ describe('GET /api/merlt/experts/trace/:traceId (Wave 2 P2.6)', () => {
     expect(res.body.execution_trace).toBeUndefined();
   });
 
-  it('404 passthrough when the trace expired / was never stored', async () => {
+  it('404 trace_not_found when the trace expired / was never stored', async () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/experts/trace/trace_gone')
@@ -108,6 +116,45 @@ describe('GET /api/merlt/experts/trace/:traceId (Wave 2 P2.6)', () => {
       .reply(404, { detail: 'Trace trace_gone not found' });
     const res = await request(app).get('/api/merlt/experts/trace/trace_gone').set(authHeader(user));
     expect(res.status).toBe(404);
+    // Same body as a foreign trace: the two must not be told apart.
+    expect(res.body).toEqual({ detail: 'trace_not_found' });
+  });
+
+  // sec-experts-trace-idor: a full-consent trace read by a full-consent caller
+  // came back unredacted, the other user's query included.
+  it("404 trace_not_found on another user's trace (the payload is never returned)", async () => {
+    await grantFull(user);
+    const owner = await createTestUser('trace-bob');
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/trace/trace_bob')
+      .query({ caller_consent: 'full' })
+      .reply(200, { ...TRACE_OK, trace_id: 'trace_bob', query_text: 'la domanda di Bob', user_id: owner.id });
+    const res = await request(app).get('/api/merlt/experts/trace/trace_bob').set(authHeader(user));
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ detail: 'trace_not_found' });
+  });
+
+  it("404 on a foreign trace that names nobody and is not in the caller's history", async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/experts/trace/trace_anon').query(true).reply(200, TRACE_OK);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/history')
+      .query((q) => q.user_id === user.id && q.limit === '100')
+      .reply(200, []);
+    const res = await request(app).get('/api/merlt/experts/trace/trace_anon').set(authHeader(user));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns a sync trace the caller owns (found in the caller's MERL-T history)", async () => {
+    await grantFull(user);
+    nock(TEST_MERLT_BASE).get('/api/v1/experts/trace/trace_hist1').query(true).reply(200, TRACE_OK);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/history')
+      .query((q) => q.user_id === user.id && q.limit === '100')
+      .reply(200, [{ trace_id: 'trace_hist1' }]);
+    const res = await request(app).get('/api/merlt/experts/trace/trace_hist1').set(authHeader(user));
+    expect(res.status).toBe(200);
+    expect(res.body.trace_id).toBe('trace_hist1');
   });
 
   it('503 when MERL-T is unreachable', async () => {
@@ -127,6 +174,7 @@ describe('steer idempotency on the teaching channels (Wave 2 P2.7)', () => {
   beforeEach(async () => {
     user = await createTestUser('steer-alice');
     await grantFull(user);
+    await ownAsyncTrace(user, 'trace_1');
     _resetSteerDedupeForTests();
   });
 
@@ -195,16 +243,21 @@ describe('steer idempotency on the teaching channels (Wave 2 P2.7)', () => {
     expect(second.status).toBe(200);
     expect(second.body).toEqual({ success: true, deduped: true });
 
-    // Same steer from ANOTHER user forwards (per-user key).
+    // The dedupe key is per user, but ANOTHER user never reaches it on this
+    // trace: steering a trace you do not own is refused (sec-experts-trace-idor).
     const other = await createTestUser('steer-bob');
     await grantFull(other);
-    nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/relation').times(1).reply(200, FEEDBACK_OK);
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/trace/trace_1')
+      .reply(200, { trace_id: 'trace_1', user_id: user.id });
+    const upstream = nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/relation').times(1).reply(200, FEEDBACK_OK);
     const otherRes = await request(app)
       .post('/api/merlt/experts/feedback/relation')
       .set(authHeader(other))
       .send(body);
-    expect(otherRes.status).toBe(200);
-    expect(otherRes.body.deduped).toBeUndefined();
+    expect(otherRes.status).toBe(404);
+    expect(otherRes.body.detail).toBe('trace_not_found');
+    expect(upstream.isDone()).toBe(false);
   });
 
   it('confirm-source: duplicate nodeId is deduped', async () => {

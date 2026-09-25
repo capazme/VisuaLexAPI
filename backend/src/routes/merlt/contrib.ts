@@ -6,9 +6,17 @@ import { authenticate } from '../../middleware/auth';
 import { internalAuth } from '../../middleware/internalAuth';
 import { contributionGuard } from '../../services/merlt/contributionGuard';
 import { validatePromotionGate } from '../../services/merlt/promotionGate';
-import { promoteRequestSchema, extractionCallbackSchema } from '../../schemas/merlt/contrib';
-import { createContribClient, ContribClient } from '../../services/merlt/contribClient';
-import { MerltClientError } from '../../services/merlt/merltClient';
+import {
+  promoteRequestSchema,
+  extractionCallbackSchema,
+  RELATION_ENDPOINT_ERROR,
+} from '../../schemas/merlt/contrib';
+import {
+  createContribClient,
+  ContribClient,
+  type ExtractionCandidate,
+} from '../../services/merlt/contribClient';
+import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
 
 /**
  * MERL-T contribution layer BFF routes (Slice 2c — "Apprendi dai miei appunti").
@@ -16,13 +24,19 @@ import { MerltClientError } from '../../services/merlt/merltClient';
  * Mounted at /api/merlt (see routes/merlt/index.ts), per-route middleware (the
  * internal callback skips JWT, like graph.ts).
  *
- *  - POST /contrib/documents/:id/extract        authenticate + contributionGuard
- *  - GET  /contrib/documents/:id/candidates     authenticate + contributionGuard
+ *  - POST /contrib/documents/:id/extract        authenticate + contributionGuard (document owner)
+ *  - GET  /contrib/documents/:id/candidates     authenticate + contributionGuard (document owner)
  *  - GET  /contrib/jobs/:jobId/status           authenticate (owner-scoped)
- *  - POST /contrib/candidates/:id/promote       authenticate + contributionGuard (+ copyright gate)
+ *  - POST /contrib/candidates/:id/promote       authenticate + contributionGuard (document owner + copyright gate)
  *  - POST /internal/extraction-callback         internalAuth
  *
  * Upload (POST /contrib/documents, multipart) is added separately (needs multer).
+ *
+ * Ownership: MERL-T document and candidate ids are sequential integers and
+ * MERL-T scopes neither extract-async nor the candidate reads by user, so the
+ * BFF is the trust boundary. Every document-keyed route asks MERL-T who
+ * uploaded the document (`uploaded_by`) and answers 404 on a mismatch, never
+ * 403, so a caller cannot tell someone else's id from a missing one.
  */
 
 const router = Router();
@@ -63,6 +77,25 @@ function contribClient(): ContribClient {
 }
 export function _resetContribClientForTests(): void {
   cachedContribClient = null;
+}
+
+function isMerltNotFound(err: unknown): boolean {
+  return err instanceof MerltBadRequestError && err.status === 404;
+}
+
+/**
+ * True when `userId` uploaded MERL-T document `documentId`. A document MERL-T
+ * does not know is "not yours" (false). Any other MERL-T failure throws, so an
+ * outage stays a 503 and is never read as a verdict on ownership.
+ */
+async function ownsDocument(documentId: number, userId: string): Promise<boolean> {
+  try {
+    const doc = await contribClient().getDocument(documentId);
+    return typeof doc?.uploaded_by === 'string' && doc.uploaded_by === userId;
+  } catch (err) {
+    if (isMerltNotFound(err)) return false;
+    throw err;
+  }
 }
 
 /**
@@ -108,8 +141,10 @@ router.post(
 
 /**
  * POST /api/merlt/contrib/documents/:id/extract
- * Create a pending extraction job, best-effort ask MERL-T to enqueue the async
- * extract-to-staging task (threading the job id through). Returns 202.
+ * Check that the caller uploaded the document (404 document_not_found
+ * otherwise; 503 when MERL-T cannot say), then create a pending extraction job
+ * and best-effort ask MERL-T to enqueue the async extract-to-staging task
+ * (threading the job id through). Returns 202.
  */
 router.post(
   '/contrib/documents/:id/extract',
@@ -125,6 +160,22 @@ router.post(
     if (Number.isNaN(docIdNum)) {
       res.status(400).json({ detail: 'invalid_document_id' });
       return;
+    }
+
+    // Ownership before any side effect: no job row, no enqueue for a document
+    // someone else uploaded (the worker would otherwise stage their verbatim
+    // excerpts under the caller's contributor id).
+    try {
+      if (!(await ownsDocument(docIdNum, req.user.id))) {
+        res.status(404).json({ detail: 'document_not_found' });
+        return;
+      }
+    } catch (err) {
+      if (err instanceof MerltClientError) {
+        res.status(503).json({ detail: 'merlt_unavailable' });
+        return;
+      }
+      throw err;
     }
 
     const job = await prisma.merltExtractionJob.create({
@@ -146,7 +197,8 @@ router.post(
 
 /**
  * GET /api/merlt/contrib/documents/:id/candidates
- * Proxy to MERL-T, scoped to the current contributor (no IDOR). 503 on outage.
+ * Proxy to MERL-T, scoped to the document's uploader (404 document_not_found
+ * for anyone else) and to the current contributor. 503 on outage.
  */
 router.get(
   '/contrib/documents/:id/candidates',
@@ -163,6 +215,10 @@ router.get(
       return;
     }
     try {
+      if (!(await ownsDocument(docIdNum, req.user.id))) {
+        res.status(404).json({ detail: 'document_not_found' });
+        return;
+      }
       const result = await contribClient().listCandidates(docIdNum, req.user.id);
       res.status(200).json(result);
     } catch (err) {
@@ -240,6 +296,12 @@ router.get(
  * the canonical RLCF proposal. The authoritative verbatim is fetched from
  * MERL-T (the client cannot supply it) and the reformulated text is checked
  * against it. 422 promotion_rejected on a gate failure.
+ *
+ * Ownership: the candidate must come from a document the caller uploaded
+ * (candidate.document_id → document.uploaded_by), else 404
+ * candidate_not_found, so nobody can file, or consume by marking it promoted,
+ * a candidate staged from someone else's notes. A relation's endpoints must
+ * be resolved identifiers (400 unresolved_endpoint, see the schema).
  */
 router.post(
   '/contrib/candidates/:id/promote',
@@ -252,7 +314,11 @@ router.post(
     }
     const parsed = promoteRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+      const unresolvedEndpoint = parsed.error.issues.some((i) => i.message === RELATION_ENDPOINT_ERROR);
+      res.status(400).json({
+        detail: unresolvedEndpoint ? RELATION_ENDPOINT_ERROR : 'invalid_body',
+        issues: parsed.error.flatten(),
+      });
       return;
     }
     const candidateId = Number.parseInt(req.params.id, 10);
@@ -263,7 +329,31 @@ router.post(
     const body = parsed.data;
 
     try {
-      const candidate = await contribClient().getCandidate(candidateId);
+      let candidate: ExtractionCandidate;
+      try {
+        candidate = await contribClient().getCandidate(candidateId);
+      } catch (err) {
+        if (isMerltNotFound(err)) {
+          res.status(404).json({ detail: 'candidate_not_found' });
+          return;
+        }
+        throw err;
+      }
+      // A candidate carries the document it was extracted from; without one
+      // ownership cannot be proved, so it is refused like a foreign one.
+      if (typeof candidate.document_id !== 'number') {
+        // eslint-disable-next-line no-console
+        console.warn(`merlt contrib promote: candidate ${candidateId} has no document_id, refused`);
+        res.status(404).json({ detail: 'candidate_not_found' });
+        return;
+      }
+      if (
+        (candidate.contributor_id != null && candidate.contributor_id !== req.user.id) ||
+        !(await ownsDocument(candidate.document_id, req.user.id))
+      ) {
+        res.status(404).json({ detail: 'candidate_not_found' });
+        return;
+      }
 
       const gate = validatePromotionGate({
         fonte: body.fonte,

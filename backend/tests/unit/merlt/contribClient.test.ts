@@ -44,6 +44,20 @@ describe('ContribClient', () => {
     expect(res.candidates[0].entity_text).toBe('Risoluzione');
   });
 
+  it('getDocument GETs /documents/{id} and exposes uploaded_by (ownership)', async () => {
+    nock(BASE)
+      .get('/api/v1/documents/42')
+      .reply(200, { id: 42, filename: 'note.txt', uploaded_by: 'u1', processing_status: 'uploaded' });
+
+    const res = await client.getDocument(42);
+    expect(res.uploaded_by).toBe('u1');
+  });
+
+  it('getDocument surfaces a MERL-T 404 as MerltBadRequestError(404)', async () => {
+    nock(BASE).get('/api/v1/documents/42').reply(404, { detail: 'Document not found' });
+    await expect(client.getDocument(42)).rejects.toMatchObject({ name: 'MerltBadRequestError', status: 404 });
+  });
+
   it('getCandidate GETs /candidates/{id} (includes verbatim)', async () => {
     nock(BASE)
       .get('/api/v1/candidates/7')

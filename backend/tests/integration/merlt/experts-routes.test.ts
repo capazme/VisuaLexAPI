@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 import nock from 'nock';
-import { request, app, createTestUser, authHeader, type TestUser } from '../../helpers';
+import { request, app, createTestUser, authHeader, prisma, type TestUser } from '../../helpers';
 import { _resetExpertsClientForTests } from '../../../src/services/merlt/expertsClient';
+import { _resetSteerDedupeForTests } from '../../../src/routes/merlt/experts';
 
 const TEST_MERLT_BASE = 'http://experts-test.local:8000';
 
@@ -27,6 +28,20 @@ async function grantFull(user: TestUser): Promise<void> {
 
 async function grantBasic(user: TestUser): Promise<void> {
   await request(app).post('/api/merlt/consent').set(authHeader(user)).send({ level: 'basic' });
+}
+
+/** A completed async answer of `user` carrying `traceId`: the cheapest ownership proof. */
+async function ownAsyncTrace(user: TestUser, traceId: string): Promise<void> {
+  await prisma.merltQaJob.create({
+    data: {
+      userId: user.id,
+      query: 'art 1453?',
+      mode: 'convergent',
+      consentLevel: 'full',
+      status: 'completed',
+      traceId,
+    },
+  });
 }
 
 const QUERY_OK = {
@@ -84,6 +99,10 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
   let user: TestUser;
   beforeEach(async () => {
     user = await createTestUser('experts-alice');
+    // The traceId-keyed routes require the caller to own the trace.
+    for (const traceId of ['trace_abc', 'trace_xyz', 'trace_rel', 'trace_debate']) {
+      await ownAsyncTrace(user, traceId);
+    }
   });
 
   it('401 without auth', async () => {
@@ -614,5 +633,137 @@ describe('MERL-T experts routes (Loop β Phase F)', () => {
     expect(res.body.disagreement_analysis.conflicts[0].conflict_score).toBe(0.68);
     expect(res.body.devils_advocate_flag.active).toBe(true);
     expect(res.body.expert_contributions).toHaveLength(2);
+  });
+});
+
+// sec-experts-trace-idor: /refine and /feedback/* used to forward any traceId,
+// so a leaked id let anyone rate or steer another jurist's answer (poisoning
+// the RLCF buffer) or pull its query into their own refinement.
+describe('trace ownership on the traceId-keyed routes', () => {
+  let owner: TestUser;
+  let intruder: TestUser;
+  beforeEach(async () => {
+    owner = await createTestUser('trace-owner');
+    intruder = await createTestUser('trace-intruder');
+    await grantFull(owner);
+    await grantFull(intruder);
+    _resetSteerDedupeForTests();
+  });
+
+  const ROUTES: Array<{ path: string; upstream: string; body: Record<string, unknown> }> = [
+    { path: '/api/merlt/experts/feedback/inline', upstream: '/api/v1/experts/feedback/inline', body: { rating: 5 } },
+    {
+      path: '/api/merlt/experts/feedback/source',
+      upstream: '/api/v1/experts/feedback/source',
+      body: { sourceId: 'urn:nir:x~art1453', relevance: 4 },
+    },
+    {
+      path: '/api/merlt/experts/feedback/detailed',
+      upstream: '/api/v1/experts/feedback/detailed',
+      body: { retrievalScore: 0.8, reasoningScore: 0.7, synthesisScore: 0.9 },
+    },
+    {
+      path: '/api/merlt/experts/feedback/preference',
+      upstream: '/api/v1/experts/feedback/preference',
+      body: { preferredExpert: 'literal' },
+    },
+    {
+      path: '/api/merlt/experts/feedback/relation',
+      upstream: '/api/v1/experts/feedback/relation',
+      body: { relationType: 'DISCIPLINA' },
+    },
+    {
+      path: '/api/merlt/experts/refine',
+      upstream: '/api/v1/experts/feedback/refine',
+      body: { followUpQuery: 'e la buona fede?' },
+    },
+  ];
+
+  it("404s every route on another user's async trace, forwarding nothing", async () => {
+    await ownAsyncTrace(owner, 'trace_owned');
+    for (const route of ROUTES) {
+      // The intruder has no job row, so the BFF asks MERL-T: the trace names its owner.
+      nock(TEST_MERLT_BASE)
+        .get('/api/v1/experts/trace/trace_owned')
+        .reply(200, { trace_id: 'trace_owned', user_id: owner.id, stages: {} });
+      const upstream = nock(TEST_MERLT_BASE).post(route.upstream).reply(200, { success: true });
+      const res = await request(app)
+        .post(route.path)
+        .set(authHeader(intruder))
+        .send({ traceId: 'trace_owned', ...route.body });
+      expect(res.status, route.path).toBe(404);
+      expect(res.body.detail).toBe('trace_not_found');
+      expect(upstream.isDone(), route.path).toBe(false);
+      nock.cleanAll();
+    }
+  });
+
+  it('the owner of an async trace passes on every route (job row, no MERL-T lookup)', async () => {
+    await ownAsyncTrace(owner, 'trace_owned');
+    for (const route of ROUTES) {
+      nock(TEST_MERLT_BASE)
+        .post(route.upstream, (b) => (b as { trace_id: string }).trace_id === 'trace_owned')
+        .reply(200, route.path.endsWith('/refine') ? QUERY_OK : { success: true });
+      const res = await request(app)
+        .post(route.path)
+        .set(authHeader(owner))
+        .send({ traceId: 'trace_owned', ...route.body });
+      expect(res.status, route.path).toBe(200);
+    }
+    expect(nock.isDone()).toBe(true);
+  });
+
+  it('a sync trace is owned when the MERL-T trace names the caller', async () => {
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/trace/trace_sync')
+      .reply(200, { trace_id: 'trace_sync', input: { user_id: owner.id } });
+    nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/inline').reply(200, { success: true });
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/inline')
+      .set(authHeader(owner))
+      .send({ traceId: 'trace_sync', rating: 1 });
+    expect(res.status).toBe(200);
+  });
+
+  it("a sync trace is owned when it is in the caller's MERL-T history (the stored trace names no user)", async () => {
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/trace/trace_sync')
+      .reply(200, { trace_id: 'trace_sync', stages: {} });
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/history')
+      .query((q) => q.user_id === owner.id && q.limit === '100')
+      .reply(200, [{ trace_id: 'trace_other' }, { trace_id: 'trace_sync' }]);
+    nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/inline').reply(200, { success: true });
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/inline')
+      .set(authHeader(owner))
+      .send({ traceId: 'trace_sync', rating: 5 });
+    expect(res.status).toBe(200);
+  });
+
+  it("404 when the trace is neither the caller's job, nor named for them, nor in their history", async () => {
+    nock(TEST_MERLT_BASE).get('/api/v1/experts/trace/trace_sync').reply(404, { detail: 'Trace trace_sync not found' });
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/history')
+      .query((q) => q.user_id === intruder.id)
+      .reply(200, [{ trace_id: 'trace_mine' }]);
+    const upstream = nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/inline').reply(200, { success: true });
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/inline')
+      .set(authHeader(intruder))
+      .send({ traceId: 'trace_sync', rating: 5 });
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('trace_not_found');
+    expect(upstream.isDone()).toBe(false);
+  });
+
+  it('503 (not a verdict) when MERL-T cannot be asked about the trace', async () => {
+    nock(TEST_MERLT_BASE).get('/api/v1/experts/trace/trace_sync').reply(502, 'down');
+    const res = await request(app)
+      .post('/api/merlt/experts/feedback/inline')
+      .set(authHeader(owner))
+      .send({ traceId: 'trace_sync', rating: 5 });
+    expect(res.status).toBe(503);
+    expect(res.body.detail).toBe('merlt_unavailable');
   });
 });

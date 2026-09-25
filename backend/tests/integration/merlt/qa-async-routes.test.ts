@@ -441,3 +441,49 @@ describe('POST /api/merlt/internal/qa-callback (qa-async-progressive-contract.md
     expect(res.body.detail).toBe('invalid_body');
   });
 });
+
+// sec-experts-trace-idor: the MerltQaJob row the completion callback stamps
+// with the trace id is what proves ownership of an async answer.
+describe('async trace ownership (MerltQaJob.traceId)', () => {
+  it('the owner may rate the completed answer; another user gets 404 and nothing is forwarded', async () => {
+    const owner = await createTestUser('qa-async-owner');
+    const other = await createTestUser('qa-async-other');
+    await grantFull(owner);
+    await grantFull(other);
+    const job = await prisma.merltQaJob.create({
+      data: { userId: owner.id, query: 'art 1453?', mode: 'convergent', consentLevel: 'full', status: 'running' },
+    });
+    const cb = await request(app)
+      .post('/api/merlt/internal/qa-callback')
+      .set('X-Internal-Secret', INTERNAL_SECRET)
+      .send({ bffJobId: job.id, status: 'completed', result: { trace_id: 'trace_async_owned', synthesis: 'x' } });
+    expect(cb.status).toBe(200);
+
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/experts/feedback/inline', (b) => (b as { user_id: string }).user_id === owner.id)
+      .reply(200, { success: true });
+    const mine = await request(app)
+      .post('/api/merlt/experts/feedback/inline')
+      .set(authHeader(owner))
+      .send({ traceId: 'trace_async_owned', rating: 5 });
+    expect(mine.status).toBe(200);
+
+    // The intruder has no row; MERL-T's stored trace names no user and the
+    // trace is not in the intruder's history.
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/trace/trace_async_owned')
+      .reply(200, { trace_id: 'trace_async_owned', stages: {} });
+    nock(TEST_MERLT_BASE)
+      .get('/api/v1/experts/history')
+      .query((q) => q.user_id === other.id)
+      .reply(200, []);
+    const upstream = nock(TEST_MERLT_BASE).post('/api/v1/experts/feedback/inline').reply(200, { success: true });
+    const theirs = await request(app)
+      .post('/api/merlt/experts/feedback/inline')
+      .set(authHeader(other))
+      .send({ traceId: 'trace_async_owned', rating: 1 });
+    expect(theirs.status).toBe(404);
+    expect(theirs.body.detail).toBe('trace_not_found');
+    expect(upstream.isDone()).toBe(false);
+  });
+});
