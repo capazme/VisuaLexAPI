@@ -20,8 +20,13 @@ export interface NerPrf {
 
 export interface NerAbReport {
   test_examples: number;
+  /** Regex + VisuaLex citation baseline; null when VisuaLex was unreachable. */
   baseline: NerPrf | null;
   learned: NerPrf | null;
+  /** Union of baseline and learned spans; null with the baseline. */
+  combined?: NerPrf | null;
+  baseline_available?: boolean;
+  baseline_status?: { available: boolean; reason?: string | null; system?: string };
 }
 
 export interface NerTrainingResult {

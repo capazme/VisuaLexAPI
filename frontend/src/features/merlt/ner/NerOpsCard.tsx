@@ -153,9 +153,20 @@ export function NerOpsCard() {
                   <p>
                     <PrfLine label="Baseline" prf={train.result.ab_report.baseline} />
                   </p>
+                  {train.result.ab_report.baseline === null &&
+                    train.result.ab_report.baseline_status?.reason && (
+                      <p className="text-slate-400">
+                        Baseline non disponibile: {train.result.ab_report.baseline_status.reason}
+                      </p>
+                    )}
                   <p>
                     <PrfLine label="Appreso" prf={train.result.ab_report.learned} />
                   </p>
+                  {train.result.ab_report.combined !== undefined && (
+                    <p>
+                      <PrfLine label="Combinato" prf={train.result.ab_report.combined} />
+                    </p>
+                  )}
                 </>
               )}
             </div>
