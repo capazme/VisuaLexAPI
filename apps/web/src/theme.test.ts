@@ -39,3 +39,12 @@ describe('the primary colour scale', () => {
     expect(css).toContain('.bg-background');
   }, 30000);
 });
+
+describe('the reading surface', () => {
+  it('compiles the sign rules and the container query that moves them to the margin', async () => {
+    const css = await compile(['block']);
+    expect(css).toMatch(/@container\s+vlx-frame\s*\(/);
+    expect(css).toContain('.vlx-sign-dot[data-color="yellow"]');
+    expect(css).toContain('.vlx-flash');
+  }, 30000);
+});

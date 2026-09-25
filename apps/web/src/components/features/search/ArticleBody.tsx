@@ -48,15 +48,19 @@ export function ArticleBody({
                     onCopy={onPopupCopy}
                     onReportCitation={onPopupReportCitation}
                 />
-                <div ref={textRef} className={cn('vlx-art px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
-                    {processedContent ? (
-                        <SafeHTML html={processedContent} />
-                    ) : (
-                        <div className="text-slate-400 italic text-center py-8 flex flex-col items-center gap-2">
-                            <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-primary-500 animate-spin" />
-                            Caricamento testo...
-                        </div>
-                    )}
+                {/* A size container: with room beside the 68ch column, each
+                    block's annotation sign moves to the right margin (index.css). */}
+                <div className="vlx-frame">
+                    <div ref={textRef} className={cn('vlx-art px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
+                        {processedContent ? (
+                            <SafeHTML html={processedContent} />
+                        ) : (
+                            <div className="text-slate-400 italic text-center py-8 flex flex-col items-center gap-2">
+                                <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-primary-500 animate-spin" />
+                                Caricamento testo...
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

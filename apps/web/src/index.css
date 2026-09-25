@@ -485,7 +485,8 @@
 }
 
 .vlx-art .vlx-ref:focus-visible,
-.vlx-art .vlx-updates-toggle:focus-visible {
+.vlx-art .vlx-updates-toggle:focus-visible,
+.vlx-art .vlx-sign:focus-visible {
   outline: none;
   @apply ring-2 ring-primary-500;
 }
@@ -566,6 +567,147 @@
 .vlx-art .vlx-update-para {
   margin-bottom: 0.5em;
   @apply text-slate-600 dark:text-slate-300;
+}
+
+/* ── Annotation signs (round B) ───────────────────────────────
+   One per block holding the reader's notes or highlights (articleRender,
+   `signs: true`). Empty elements: the icon, the count and the dots are
+   drawn here, never as text (gotcha 23). Inline at the end of the block by
+   default; in the right margin when the frame has room (container query
+   below). The frame is a size container, so its content no longer widens a
+   shrink-to-fit ancestor: keep it inside block-level parents. */
+.vlx-frame {
+  container: vlx-frame / inline-size;
+  /* The query measures in the column's own font: 68ch is the column. */
+  font-size: 1.125rem;
+  @apply font-serif;
+}
+
+.vlx-art {
+  --vlx-note-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z'/%3E%3Cpath d='M15 3v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
+}
+
+.vlx-art .vlx-sign {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.45em;
+  padding: 0.2rem 0.45rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  text-indent: 0; /* inherited from hanging commi and items */
+  vertical-align: 0.1em;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  @apply font-sans bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100;
+}
+
+.vlx-art .vlx-sign-notes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.vlx-art .vlx-sign-notes::before {
+  content: '';
+  width: 0.8rem;
+  height: 0.8rem;
+  background-color: currentColor;
+  -webkit-mask: var(--vlx-note-icon) center / contain no-repeat;
+  mask: var(--vlx-note-icon) center / contain no-repeat;
+}
+
+.vlx-art .vlx-sign-notes::after {
+  content: attr(data-count);
+  font-variant-numeric: tabular-nums;
+}
+
+.vlx-art .vlx-sign-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1px solid;
+  border-radius: 9999px;
+}
+
+.vlx-art .vlx-sign-dot[data-color="yellow"] {
+  background-color: hsl(var(--hl-yellow-bg));
+  border-color: hsl(var(--hl-yellow-fg) / 0.5);
+}
+
+.vlx-art .vlx-sign-dot[data-color="green"] {
+  background-color: hsl(var(--hl-green-bg));
+  border-color: hsl(var(--hl-green-fg) / 0.5);
+}
+
+.vlx-art .vlx-sign-dot[data-color="red"] {
+  background-color: hsl(var(--hl-red-bg));
+  border-color: hsl(var(--hl-red-fg) / 0.5);
+}
+
+.vlx-art .vlx-sign-dot[data-color="blue"] {
+  background-color: hsl(var(--hl-blue-bg));
+  border-color: hsl(var(--hl-blue-fg) / 0.5);
+}
+
+/* "Nascondi evidenziazioni" means the plain text: the dots go, and so does a
+   sign that holds only highlights. */
+.highlights-hidden .vlx-art .vlx-sign-dot,
+.highlights-hidden .vlx-art .vlx-sign[data-notes="0"] {
+  display: none;
+}
+
+/* "Vai al passo": the passage glows for 1.6 s (utils/revealAnnotation.ts).
+   A box-shadow, not a background, so the highlight's own colour stays. */
+.vlx-art .highlight-mark,
+.vlx-art .note-anchor {
+  transition: box-shadow 0.4s ease;
+}
+
+.vlx-art .vlx-flash {
+  border-radius: 2px;
+  box-shadow: 0 0 0 3px hsl(43 96% 56% / 0.75);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* A larger, invisible hit area on touch screens, as for the "(119)" chips.
+   Before the margin rule: there `position: absolute` must win. */
+@media (pointer: coarse) {
+  .vlx-art .vlx-sign {
+    position: relative;
+  }
+
+  .vlx-art .vlx-sign::after {
+    content: '';
+    position: absolute;
+    inset: -12px -8px;
+  }
+}
+
+/* Room for the 68ch column plus a sign on each side: every sign moves to the
+   right margin, level with its block's first line, all at the same x. */
+@container vlx-frame (min-width: calc(68ch + 9rem)) {
+  .vlx-art .vlx-b {
+    position: relative;
+  }
+
+  .vlx-art .vlx-sign {
+    position: absolute;
+    top: 0.3rem;
+    left: calc(100% + 0.75rem);
+    margin-left: 0;
+  }
+}
+
+@media print {
+  .vlx-art .vlx-sign {
+    display: none;
+  }
 }
 
 /* A phone column is narrow: nested items would leave the text a sliver. */
