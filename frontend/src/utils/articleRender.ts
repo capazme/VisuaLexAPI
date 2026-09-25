@@ -33,7 +33,13 @@ export interface RenderArticleInput {
 
 type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'search';
 
-/** Nesting order, outermost first. */
+/**
+ * Nesting order, outermost first. The printed enumerator is outermost and so
+ * never split: it is an inline-block with a minimum width (the hanging
+ * number), and two pieces would be two boxes. A ((modification)) that starts
+ * with the number is split around it instead — its dashed line pauses after
+ * the number, which is only cosmetic.
+ */
 const RANK: Record<MarkKind, number> = {
   marker: 0,
   ref: 1,
@@ -169,6 +175,16 @@ export function renderArticleHtml(input: RenderArticleInput): string {
 
   const structure = input.structure;
   if (!structure) return renderSpan(raw, 0, raw.length, marks, true);
+  if (!coversText(structure, raw.length)) {
+    // A structure parsed from another text (a stale memo, a caller bug) would
+    // drop every character past its last block — and every anchor after them.
+    console.warn('[articleRender] structure does not partition the text; rendering flat', {
+      textLength: raw.length,
+      blocks: structure.blocks.length,
+      lastEnd: structure.blocks[structure.blocks.length - 1]?.end ?? null,
+    });
+    return renderSpan(raw, 0, raw.length, marks, true);
+  }
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
   return renderBlocks(raw, structure, marks);
@@ -208,6 +224,12 @@ function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[]): 
   }
   if (inTail) parts.push('</div></div>');
   return parts.join('');
+}
+
+function coversText(structure: ArticleStructure, length: number): boolean {
+  const { blocks } = structure;
+  if (blocks.length === 0 || blocks[0].start !== 0 || blocks[blocks.length - 1].end !== length) return false;
+  return blocks.every((b, i) => b.end > b.start && (i === 0 || b.start === blocks[i - 1].end));
 }
 
 const blockClass = (b: StructureBlock): string => `vlx-b vlx-${b.kind}${b.marker ? ' vlx-has-marker' : ''}`;

@@ -178,7 +178,8 @@ describe('Normattiva — Akoma Ntoso detailed format', () => {
     expect(items.map((i) => i.marker)).toContain('((s-ter)');
     expect(items.every((i) => i.level === 1)).toBe(true);
     expect(decorations(raw, s, 'notice')).toContain('LETTERA ABROGATA DALLA L. 27 MAGGIO 2015, N. 69;');
-    expect(decorations(raw, s, 'ref-missing')).toContain('(9)');
+    // Normattiva's "(9)" has no note in this format: plain text, as the spec says.
+    expect(s.decorations.filter((d) => d.kind === 'ref' || d.kind === 'ref-missing')).toEqual([]);
   });
 
   it('l. 241/1990 art. 3: a rubric inserted by a later act', () => {
@@ -252,11 +253,10 @@ describe('EUR-Lex', () => {
     expect(ofKind(s, 'item').slice(0, 3).map((b) => marker(raw, b))).toEqual(['a)', 'b)', 'c)']);
   });
 
-  it('an OJ footnote reference has no note to open', () => {
+  it('leaves an OJ footnote reference as plain text: its note is not in the text', () => {
     const raw = 'Articolo 2\nAmbito di applicazione\n4. Il presente regolamento non pregiudica il regolamento (UE) 2016/679 del Parlamento europeo e del Consiglio (1).';
     const s = parseArticleStructure(raw);
-    expect(decorations(raw, s, 'ref')).toEqual([]);
-    expect(decorations(raw, s, 'ref-missing')).toEqual(['(1)']);
+    expect(s.decorations.filter((d) => d.kind === 'ref' || d.kind === 'ref-missing')).toEqual([]);
   });
 });
 
@@ -296,10 +296,24 @@ describe('prose that only looks like structure', () => {
     expect(ofKind(s, 'heading')).toEqual([]);
   });
 
-  it('leaves a bare "(1)" plain when the text has no notes and no parentheses around it', () => {
-    const raw = 'Art. 1\n\nIl comma(1) resta.';
+  it.each([
+    'Art. 1\n\nLa riforma (1990) ha introdotto il comma.',
+    'Art. 1\n\nSi veda il comma (1) del presente articolo.',
+    'Art. 1\n\nIl comma(1) resta.',
+  ])('leaves a bare number in parentheses plain when the text has no such note: %j', (raw) => {
     const s = parseArticleStructure(raw);
     expect(s.decorations.filter((d) => d.kind === 'ref' || d.kind === 'ref-missing')).toEqual([]);
+  });
+
+  it('dims "((49))" even without its note: that form is only ever a reference', () => {
+    const raw = 'Art. 1\n\n1. Testo del comma. ((49))';
+    expect(decorations(raw, parseArticleStructure(raw), 'ref-missing')).toEqual(['((49))']);
+  });
+
+  it('leaves a modification that spans two commi undecorated, and still reads the next one', () => {
+    const raw = 'Art. 1\n\n((1. Primo comma.\n\n2. Secondo comma ((con parte)) finale.))';
+    const s = parseArticleStructure(raw);
+    expect(decorations(raw, s, 'mod')).toEqual(['((con parte))']);
   });
 });
 

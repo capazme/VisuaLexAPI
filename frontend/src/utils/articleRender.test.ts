@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderArticleHtml, type RenderArticleInput } from './articleRender';
 import { parseArticleStructure } from './articleStructure';
 import { sanitizeHTML } from './sanitize';
@@ -37,8 +37,24 @@ describe('the projection invariant — every real text', () => {
         const len = 1 + Math.floor(next() * Math.min(80, plain.length - a - 1));
         highlights.push(hl(`h${i}`, plain.slice(a, a + len), a));
       }
-      const div = mount(render(raw, { highlights }));
+      const annotations: Annotation[] = [];
+      for (let i = 0; i < 6; i++) {
+        const a = Math.floor(next() * (plain.length - 1));
+        const len = 1 + Math.floor(next() * Math.min(40, plain.length - a - 1));
+        annotations.push(note(`n${i}`, plain.slice(a, a + len), a));
+      }
+      const html = render(raw, { highlights, annotations, searchQuery: 'del' });
+      // Well-formed before the sanitizer gets a chance to repair it.
+      const xml = new DOMParser().parseFromString(`<root>${html}</root>`, 'application/xml');
+      expect(xml.getElementsByTagName('parsererror')).toHaveLength(0);
+      const div = mount(html);
       expect(div.textContent).toBe(plain);
+      for (const a of annotations) {
+        const found = pieces(div, `[data-note-id="${a.id}"]`);
+        expect(found.map((e) => e.textContent).join(''), a.id).toBe(a.anchorText);
+        const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
+        expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(a.startOffset);
+      }
       for (const h of highlights) {
         const found = pieces(div, `[data-highlight="${h.id}"]`);
         expect(found.length, h.id).toBeGreaterThan(0);
@@ -139,6 +155,15 @@ describe('marks', () => {
     expect(pieces(div, '[data-highlight="b"]').map((e) => e.textContent).join('')).toBe('FGHIJKLMNO');
   });
 
+  it('draws a highlight and a note anchor that overlap only in part', () => {
+    const raw = 'Art. 1\n\nABCDEFGHIJKLMNO';
+    const plain = raw.replace(/\n/g, '');
+    const at = plain.indexOf('ABCDE');
+    const div = mount(render(raw, { highlights: [hl('h', 'ABCDEFGHIJ', at)], annotations: [note('n', 'FGHIJKLMNO', at + 5)] }));
+    expect(pieces(div, '[data-highlight="h"]').map((e) => e.textContent).join('')).toBe('ABCDEFGHIJ');
+    expect(pieces(div, '[data-note-id="n"]').map((e) => e.textContent).join('')).toBe('FGHIJKLMNO');
+  });
+
   it('rescues a highlight stored with the newlines of a rendered selection', () => {
     const raw = fixtureText('nrm-cc-1453');
     const plain = raw.replace(/\n/g, '');
@@ -177,7 +202,31 @@ describe('marks', () => {
   });
 });
 
+describe('a structure that does not fit the text', () => {
+  it('renders flat, losing nothing, instead of cutting the text short', () => {
+    const raw = 'Art. 1\n\nPrimo.\n\nSecondo comma molto lungo.';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const html = renderArticleHtml({ raw, structure: parseArticleStructure('Art. 1\n\nPrimo.'), highlights: [], annotations: [] });
+    expect(mount(html).textContent).toBe(raw.replace(/\n/g, ''));
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+});
+
 describe('Normattiva markers', () => {
+  it('never splits a printed number, even inside a modification', () => {
+    const raw = fixtureText('nrm-fx-fallback');
+    const plain = raw.replace(/\n/g, '');
+    // a highlight that starts on the number, after the "(("
+    const at = plain.indexOf('1. Il responsabile');
+    const div = mount(render(raw, { highlights: [hl('h', '1. Il responsabile', at)] }));
+    const comma = div.querySelector('.vlx-comma')!;
+    expect(comma.querySelectorAll('.vlx-marker')).toHaveLength(1);
+    expect(comma.firstElementChild?.className).toBe('vlx-marker');
+    expect(comma.firstElementChild?.textContent).toBe('((1. ');
+    expect(pieces(comma as HTMLElement, '[data-highlight="h"]').map((e) => e.textContent).join('')).toBe('1. Il responsabile');
+  });
+
   it('c.p. 640: references are buttons, modifications dashed, the tail foldable with a CSS label', () => {
     const raw = fixtureText('nrm-cp-640');
     const html = render(raw);

@@ -115,7 +115,11 @@ const TAIL_RE = new RegExp(
 );
 const TAIL_SEP_RE = new RegExp(`^${HWS}*-{3,}${HWS}*$`);
 const TAIL_HEAD_RE = new RegExp(`^${HWS}*AGGIORNAMENTO${HWS}*\\(${HWS}*(\\d{1,4}[a-z]?)${HWS}*\\)`);
-/** "(119)", "(129a)" standing on its own: Normattiva's reference to an AGGIORNAMENTO note. */
+/**
+ * "(119)", "(129a)" standing on its own: Normattiva's reference to an
+ * AGGIORNAMENTO note. Decorated only when that note is in the text — a bare
+ * "(1990)" or an OJ footnote "(1)" is ordinary text and stays so.
+ */
 const REF_RE = /(^|\s)\((\d{1,4}[a-z]?)\)(?=$|[\s.,;:)])/g;
 const NOTE_ID_RE = /^\d{1,4}[a-z]?$/;
 const NOTICE_WORDS = /ABROGAT|SOPPRESS|SOSTITUIT|MODIFICAT|OMISSIS/;
@@ -537,7 +541,12 @@ function addParenthesisedMarks(
       const open = raw.indexOf('((', from);
       if (open === -1 || open >= block.end) break;
       const close = raw.indexOf('))', open + 2);
-      if (close === -1 || close + 2 > block.end) break;
+      if (close === -1 || close + 2 > block.end) {
+        // Unclosed in this block (a modification spanning two commi): leave
+        // this "((" plain and keep reading the rest of the block.
+        from = open + 2;
+        continue;
+      }
       const inner = raw.slice(open + 2, close).trim();
       if (!inTail && NOTE_ID_RE.test(inner)) {
         decorations.push({ kind: notes[inner] ? 'ref' : 'ref-missing', start: open, end: close + 2, noteId: inner });
@@ -555,7 +564,11 @@ function addParenthesisedMarks(
   }
 }
 
-/** A standalone "(119)" in the body: a button when its note exists, dimmed otherwise. */
+/**
+ * A standalone "(119)" in the body is a button when its note exists; without
+ * one it stays plain text (only the unmistakable "((49))" form is dimmed, in
+ * addParenthesisedMarks).
+ */
 function addReferences(
   raw: string,
   blocks: StructureBlock[],
@@ -571,7 +584,7 @@ function addReferences(
     while ((m = REF_RE.exec(text)) !== null) {
       const start = block.start + m.index + m[1].length;
       const id = m[2];
-      decorations.push({ kind: notes[id] ? 'ref' : 'ref-missing', start, end: start + id.length + 2, noteId: id });
+      if (notes[id]) decorations.push({ kind: 'ref', start, end: start + id.length + 2, noteId: id });
     }
   }
 }

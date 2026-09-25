@@ -407,11 +407,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vlx-art .vlx-comma > .vlx-marker {
+.vlx-art .vlx-comma .vlx-marker {
   min-width: calc(var(--vlx-hang) - 0.25em);
 }
 
-.vlx-art .vlx-item > .vlx-marker {
+.vlx-art .vlx-item .vlx-marker {
   min-width: calc(var(--vlx-hang-item) - 0.25em);
 }
 
