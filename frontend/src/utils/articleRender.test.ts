@@ -195,6 +195,15 @@ describe('Normattiva markers', () => {
     expect(mount(render(raw, { updatesOpen: true })).querySelector('.vlx-updates')?.getAttribute('data-open')).toBe('true');
   });
 
+  it('keeps the chip and the toggle keyboard-reachable through the sanitizer', () => {
+    const div = mount(render(fixtureText('nrm-cp-640')));
+    for (const el of [div.querySelector('.vlx-ref'), div.querySelector('.vlx-updates-toggle')]) {
+      expect(el?.getAttribute('role')).toBe('button');
+      expect(el?.getAttribute('tabindex')).toBe('0');
+    }
+    expect(div.querySelector('.vlx-updates-toggle')?.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('a reference with no note is dimmed, not a button', () => {
     const div = mount(render(fixtureText('nrm-privacy-2ter')));
     expect(pieces(div, '.vlx-ref-missing').map((e) => e.textContent)).toEqual(['((49))']);

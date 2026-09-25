@@ -3,10 +3,18 @@ import { Highlighter, StickyNote, Copy, Search, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
-import { getPlainTextOffset, alignOffsetToTrimmedText } from '../../../utils/selectionOffset';
+import { getSelectionAnchor } from '../../../utils/selectionOffset';
 
 interface SelectionPopupProps {
+  /** Where selections are listened for (mouseup) and where the popup is positioned. */
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /**
+   * The element that holds the article text and nothing else — the root the
+   * stored offsets are measured from. Defaults to `containerRef`. It must not
+   * contain this popup: a text label added to the popup would otherwise shift
+   * every offset measured while it is open.
+   */
+  textRootRef?: React.RefObject<HTMLElement | null>;
   onHighlight: (text: string, color: HighlightColor, startOffset: number) => void;
   // rect is the viewport-space bounding box of the selection at the moment the
   // action was fired; consumers can use it to anchor a tooltip composer on the
@@ -20,18 +28,23 @@ interface PopupState {
   visible: boolean;
   x: number;
   y: number;
+  /** The anchor text, read from the DOM text nodes (matches the stored projection). */
   text: string;
-  startOffset: number; // plain-text offset of the selection start in container.textContent
+  /** Plain-text offset of `text` in the text root. */
+  startOffset: number;
+  /** What the reader sees (line breaks included) — for copy and search only. */
+  displayText: string;
 }
 
 export function SelectionPopup({
   containerRef,
+  textRootRef,
   onHighlight,
   onAddNote,
   onCopy,
   onSearch
 }: SelectionPopupProps) {
-  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1 });
+  const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
   const [showColorPicker, setShowColorPicker] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -51,8 +64,8 @@ export function SelectionPopup({
     // Small delay to let selection finalize
     setTimeout(() => {
       const selection = window.getSelection();
-      // Keep the untrimmed string until the range offset is known: the offset
-      // and the text must describe the same span (see alignOffsetToTrimmedText).
+      // The rendered text: it decides whether there is a selection at all and
+      // is what copy and search use. The stored anchor is read separately.
       const rawSelected = selection?.toString() ?? '';
 
       if (rawSelected.trim().length < 2) {
@@ -78,20 +91,26 @@ export function SelectionPopup({
       const x = rect.left + rect.width / 2 - containerRect.left;
       const y = rect.top - containerRect.top - 10;
 
-      // Capture the plain-text offset of the selection start so the renderer
-      // can pin the mark to this exact occurrence (not every copy of the string).
-      const rawOffset = getPlainTextOffset(containerRef.current, range.startContainer, range.startOffset);
-      const { text: selectedText, startOffset } = alignOffsetToTrimmedText(rawSelected, rawOffset);
+      // The anchor (text + plain-text offset) is read from the text root's
+      // DOM text, so it pins the mark to this exact occurrence and always
+      // matches what the renderer checks — Selection.toString() would add a
+      // newline for every line or comma boundary the selection crosses.
+      const anchor = getSelectionAnchor(textRootRef?.current ?? containerRef.current, selection);
+      if (!anchor) {
+        hideTimeoutRef.current = setTimeout(hidePopup, 200);
+        return;
+      }
 
       setPopup({
         visible: true,
         x: Math.max(80, Math.min(x, containerRect.width - 80)), // Keep within bounds
         y: Math.max(50, y), // Ensure not too high
-        text: selectedText,
-        startOffset,
+        text: anchor.text,
+        startOffset: anchor.startOffset,
+        displayText: rawSelected.trim(),
       });
     }, 10);
-  }, [containerRef, hidePopup]);
+  }, [containerRef, textRootRef, hidePopup]);
 
   // Handle mousedown outside popup to hide it
   useEffect(() => {
@@ -163,12 +182,12 @@ export function SelectionPopup({
         break;
       }
       case 'copy':
-        onCopy(popup.text);
+        onCopy(popup.displayText || popup.text);
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;
       case 'search':
-        onSearch?.(popup.text);
+        onSearch?.(popup.displayText || popup.text);
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;

@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import type { Highlight } from '../../../types';
 import { Highlighter, X } from 'lucide-react';
 import { SafeHTML } from '../../../utils/sanitize';
@@ -26,17 +26,21 @@ export function ArticleBody({
     onPopupCopy,
     onRemoveHighlight,
 }: ArticleBodyProps) {
+    // The text alone, without the selection popup: stored offsets are measured
+    // from here (see SelectionPopup's textRootRef).
+    const textRef = useRef<HTMLDivElement>(null);
     return (
         <>
-            {/* Article Content with Prose Styling */}
+            {/* Article text — typography and structure from `.vlx-art` (index.css, READING SURFACE) */}
             <div className="relative group/content" ref={contentRef}>
                 <SelectionPopup
                     containerRef={contentRef}
+                    textRootRef={textRef}
                     onHighlight={onPopupHighlight}
                     onAddNote={onPopupAddNote}
                     onCopy={onPopupCopy}
                 />
-                <div className="prose prose-lg dark:prose-invert max-w-none legal-prose prose-slate prose-headings:font-bold font-serif px-2 sm:px-4" id={`article-content-${itemKey}`}>
+                <div ref={textRef} className="vlx-art px-2 sm:px-4" id={`article-content-${itemKey}`}>
                     {processedContent ? (
                         <SafeHTML html={processedContent} />
                     ) : (
