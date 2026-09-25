@@ -20,6 +20,9 @@ export interface ExtractionCandidate {
   verbatim_excerpt?: string;
   llm_confidence?: number;
   potential_duplicate_of?: string | null;
+  /** LLM-assigned entity type (concetto | principio | definizione). */
+  entity_type?: string | null;
+  status?: string;
 }
 
 export interface ExtractDocumentResponse {
@@ -48,6 +51,8 @@ export type PromoteCandidatePayload =
       descrizione: string;
       fonte: string;
       attested: boolean;
+      skipDuplicateCheck?: boolean;
+      acknowledgedDuplicateOf?: string;
     }
   | {
       candidateType: 'relation';
@@ -58,8 +63,25 @@ export type PromoteCandidatePayload =
       descrizione: string;
       fonte: string;
       attested: boolean;
+      skipDuplicateCheck?: boolean;
+      acknowledgedDuplicateOf?: string;
     };
 
+export interface PromoteDuplicate {
+  id: string;
+  text: string;
+}
+
+/**
+ * A 200 is not a success: `created` says whether a pending_* row exists.
+ * `duplicateActionRequired` asks the user to confirm or drop; any other
+ * non-created answer carries MERL-T's reason in `message`.
+ */
 export interface PromoteResponse {
-  pendingId: string;
+  pendingId: string | null;
+  created?: boolean;
+  hasDuplicates?: boolean;
+  duplicateActionRequired?: boolean;
+  message?: string | null;
+  duplicates?: PromoteDuplicate[];
 }

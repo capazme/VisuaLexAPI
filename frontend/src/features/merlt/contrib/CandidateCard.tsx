@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Check, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { promoteCandidate } from './contribApi';
 import { NormaPicker } from './NormaPicker';
-import type { ExtractionCandidate, PromoteCandidatePayload } from './types';
+import type { ExtractionCandidate, PromoteCandidatePayload, PromoteDuplicate } from './types';
 
 /**
  * Per-requirement checklist for the copyright gate (Slice 3 §3.8): makes each
@@ -54,6 +54,12 @@ function normalize(text: string): string {
 
 const PLACEHOLDER_URN = 'user_document';
 
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  concetto: 'Concetto',
+  principio: 'Principio',
+  definizione: 'Definizione',
+};
+
 export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onPromoted }: CandidateCardProps) {
   const verbatim = candidate.verbatim_excerpt ?? '';
   const [descrizione, setDescrizione] = useState(candidate.descrizione ?? '');
@@ -75,6 +81,8 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // MERL-T deferred on an identical proposal: the user confirms or drops.
+  const [duplicates, setDuplicates] = useState<PromoteDuplicate[] | null>(null);
 
   const hasFonte = fonte.trim().length > 0;
   const reformulated = normalize(descrizione).length > 0 && normalize(descrizione) !== normalize(verbatim);
@@ -92,20 +100,26 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
     ...(articleRequired ? [{ label: 'Norma di riferimento selezionata', met: hasArticle }] : []),
   ];
 
-  const handlePromote = async () => {
+  const handlePromote = async (confirmDuplicate?: PromoteDuplicate) => {
     setSubmitting(true);
     setError(null);
+    setDuplicates(null);
     try {
+      const retry = confirmDuplicate
+        ? { skipDuplicateCheck: true, acknowledgedDuplicateOf: confirmDuplicate.id || undefined }
+        : {};
       const payload: PromoteCandidatePayload =
         candidate.candidate_type === 'entity'
           ? {
               candidateType: 'entity',
               articleUrn,
               nome: candidate.entity_text ?? '',
-              tipo: candidate.relation_type ?? 'concetto',
+              // The LLM-assigned type; the BFF re-reads it from the candidate.
+              tipo: candidate.entity_type || 'concetto',
               descrizione,
               fonte,
               attested,
+              ...retry,
             }
           : {
               candidateType: 'relation',
@@ -116,10 +130,18 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
               descrizione,
               fonte,
               attested,
+              ...retry,
             };
-      await promoteCandidate(candidate.id, payload);
-      setDone(true);
-      onPromoted(candidate.id);
+      const result = await promoteCandidate(candidate.id, payload);
+      // A 200 is not a success: only a pending id means a proposal exists.
+      if (result.pendingId) {
+        setDone(true);
+        onPromoted(candidate.id);
+      } else if (result.duplicateActionRequired) {
+        setDuplicates(result.duplicates ?? []);
+      } else {
+        setError(result.message || 'Proposta non creata: MERL-T non ha accettato la voce.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Promozione non riuscita');
     } finally {
@@ -150,6 +172,14 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
             {candidate.candidate_type === 'entity' ? 'Entità' : 'Relazione'}
             {typeof candidate.llm_confidence === 'number' && ` · conf. ${candidate.llm_confidence.toFixed(2)}`}
           </span>
+          {candidate.candidate_type === 'entity' && candidate.entity_type && (
+            <span
+              data-testid="entity-type-badge"
+              className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
+            >
+              {ENTITY_TYPE_LABELS[candidate.entity_type] ?? candidate.entity_type}
+            </span>
+          )}
         </div>
         {candidate.candidate_type === 'relation' ? (
           <span className="flex min-w-0 flex-wrap items-center justify-end gap-1 text-sm font-medium text-slate-900 dark:text-white">
@@ -227,6 +257,32 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
         <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
+      )}
+
+      {duplicates && (
+        <div
+          data-testid="duplicate-confirm"
+          role="alert"
+          className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+        >
+          <p>
+            Esiste già una proposta identica
+            {duplicates[0]?.text ? `: ${duplicates[0].text}` : ''}. La proposta non è stata creata.
+          </p>
+          <div className="mt-2 flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setDuplicates(null)}>
+              Annulla
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={submitting}
+              onClick={() => void handlePromote(duplicates[0] ?? { id: '', text: '' })}
+            >
+              Invia comunque
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* When the gate blocks promotion, spell out the missing requirements so

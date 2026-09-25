@@ -40,6 +40,11 @@ export interface ExtractionCandidate {
   llm_confidence?: number;
   potential_duplicate_of?: string | null;
   status?: string;
+  /** LLM-assigned type (concetto | principio | definizione); the promote route uses it as the authoritative tipo. */
+  entity_type?: string | null;
+  article_urn?: string | null;
+  /** MERL-T user_documents id the candidate came from (provenance). */
+  document_id?: number | null;
 }
 
 export interface ListCandidatesResponse {
@@ -57,6 +62,10 @@ export interface ProposeEntityPayload {
   // send as `contributed_by`); omitting it returns 422 → BFF surfaces 503.
   user_id: string;
   source_document_id?: number;
+  /** The contributor's bibliographic citation (the copyright gate's "fonte"); `fonte` itself is the pipeline tag. */
+  source_reference?: string;
+  skip_duplicate_check?: boolean;
+  acknowledged_duplicate_of?: string;
 }
 
 export interface ProposeRelationPayload {
@@ -69,6 +78,9 @@ export interface ProposeRelationPayload {
   contributed_by: string;
   user_id: string;
   source_document_id?: number;
+  source_reference?: string;
+  skip_duplicate_check?: boolean;
+  acknowledged_duplicate_of?: string;
 }
 
 export interface ProposeResponse {
@@ -81,6 +93,14 @@ export interface ProposeResponse {
   /** Set when MERL-T defers on a possible duplicate (no pending_* row created). */
   has_duplicates?: boolean;
   duplicate_action_required?: boolean;
+  /** Entity duplicates (DuplicateCandidateData) or relation duplicates (relation_id / source_text / target_text). */
+  duplicates?: Array<{
+    entity_id?: string;
+    entity_text?: string;
+    relation_id?: string;
+    source_text?: string;
+    target_text?: string;
+  }>;
 }
 
 export type MerltVote = 'approve' | 'reject' | 'edit';

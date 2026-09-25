@@ -276,20 +276,34 @@ router.post(
         return;
       }
 
-      const fonte = `utente:${req.user.id}`.slice(0, 50);
+      // Provenance the proposal carries into pending_*: `fonte` is the pipeline
+      // tag ("community" = a VisuaLex user proposed it), `source_reference` is
+      // the bibliographic citation the copyright gate required, and
+      // `source_document_id` is the MERL-T user_documents row (never the
+      // staging candidate id, which is purged after promotion).
+      const provenance = {
+        fonte: 'community',
+        source_reference: body.fonte.trim().slice(0, 300),
+        source_document_id: candidate.document_id ?? undefined,
+        skip_duplicate_check: body.skipDuplicateCheck || undefined,
+        acknowledged_duplicate_of: body.acknowledgedDuplicateOf,
+      };
       const proposal =
         body.candidateType === 'entity'
           ? await contribClient().proposeEntity({
               // Stand-alone proposals fall back to the staging placeholder so
-              // free-text notes without a clear norma still create a proposal.
+              // free-text notes without a clear norma still create a proposal
+              // (the graph writer never turns the placeholder into a node).
               article_urn: body.articleUrn?.trim() || 'user_document',
               nome: body.nome,
-              tipo: body.tipo,
+              // The LLM-assigned type on the authoritative candidate wins over
+              // the client's: a principio must not be filed as a concetto
+              // (the graph edge label depends on it).
+              tipo: candidate.entity_type?.trim() || body.tipo,
               descrizione: body.descrizione,
-              fonte: body.fonte.slice(0, 50) || fonte,
               contributed_by: req.user.id,
               user_id: req.user.id,
-              source_document_id: candidate.id,
+              ...provenance,
             })
           : await contribClient().proposeRelation({
               article_urn: body.articleUrn,
@@ -297,10 +311,9 @@ router.post(
               target_entity_id: body.targetEntityId,
               tipo_relazione: body.tipoRelazione,
               descrizione: body.descrizione,
-              fonte: body.fonte.slice(0, 50) || fonte,
               contributed_by: req.user.id,
               user_id: req.user.id,
-              source_document_id: candidate.id,
+              ...provenance,
             });
 
       // Entity proposals nest the id under `pending_entity`; relations return a
@@ -313,10 +326,21 @@ router.post(
         await contribClient().markPromoted(candidateId);
       }
 
+      // `created` is what the client must read: a null pendingId with
+      // duplicateActionRequired means "confirm or drop", any other null means
+      // MERL-T refused (invalid name...) and `message` says why.
       res.status(200).json({
         pendingId,
+        created: Boolean(pendingId),
         hasDuplicates: proposal.has_duplicates ?? false,
         duplicateActionRequired: proposal.duplicate_action_required ?? false,
+        message: proposal.message ?? null,
+        duplicates: (proposal.duplicates ?? []).slice(0, 5).map((d) => ({
+          id: d.entity_id ?? d.relation_id ?? '',
+          text:
+            d.entity_text ??
+            (d.source_text && d.target_text ? `${d.source_text} → ${d.target_text}` : ''),
+        })),
       });
     } catch (err) {
       if (err instanceof MerltClientError) {

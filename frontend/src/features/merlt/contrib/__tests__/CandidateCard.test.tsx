@@ -208,4 +208,75 @@ describe('CandidateCard', () => {
     );
     expect(screen.getByTestId('dedup-hint')).toBeInTheDocument();
   });
+
+  it('sends the LLM-assigned entity type and shows its badge', async () => {
+    const onPromoted = vi.fn();
+    render(
+      <CandidateCard
+        candidate={{ ...candidate, entity_type: 'principio' }}
+        articleUrn="urn:test"
+        onPromoted={onPromoted}
+      />,
+    );
+    expect(screen.getByTestId('entity-type-badge')).toHaveTextContent('Principio');
+    fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+    fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+      target: { value: 'La risoluzione estingue il contratto.' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    await act(async () => {
+      fireEvent.click(promoteBtn());
+    });
+    expect(promote).toHaveBeenCalledWith(7, expect.objectContaining({ tipo: 'principio' }));
+  });
+
+  it('asks to confirm when MERL-T defers on a duplicate, then retries with the skip flags', async () => {
+    const onPromoted = vi.fn();
+    promote.mockResolvedValueOnce({
+      pendingId: null,
+      created: false,
+      hasDuplicates: true,
+      duplicateActionRequired: true,
+      duplicates: [{ id: 'concetto:risoluzione', text: 'Risoluzione' }],
+    });
+    render(<CandidateCard candidate={candidate} articleUrn="urn:test" onPromoted={onPromoted} />);
+    fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+    fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+      target: { value: 'La risoluzione estingue il contratto.' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    await act(async () => {
+      fireEvent.click(promoteBtn());
+    });
+
+    expect(screen.getByTestId('duplicate-confirm')).toHaveTextContent(/proposta identica/i);
+    expect(onPromoted).not.toHaveBeenCalled();
+    expect(screen.queryByText(/proposta inviata/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /invia comunque/i }));
+    });
+    expect(promote).toHaveBeenLastCalledWith(
+      7,
+      expect.objectContaining({ skipDuplicateCheck: true, acknowledgedDuplicateOf: 'concetto:risoluzione' }),
+    );
+    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(7));
+  });
+
+  it("shows MERL-T's reason instead of a false success when nothing was created", async () => {
+    const onPromoted = vi.fn();
+    promote.mockResolvedValueOnce({ pendingId: null, created: false, message: 'Nome entità non valido' });
+    render(<CandidateCard candidate={candidate} articleUrn="urn:test" onPromoted={onPromoted} />);
+    fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+    fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+      target: { value: 'La risoluzione estingue il contratto.' },
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    await act(async () => {
+      fireEvent.click(promoteBtn());
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Nome entità non valido');
+    expect(onPromoted).not.toHaveBeenCalled();
+    expect(screen.queryByText(/proposta inviata/i)).not.toBeInTheDocument();
+  });
 });

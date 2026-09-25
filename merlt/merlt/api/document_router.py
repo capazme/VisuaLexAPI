@@ -585,6 +585,9 @@ class ExtractionCandidateOut(BaseModel):
     llm_confidence: Optional[float] = None
     potential_duplicate_of: Optional[str] = None
     status: Optional[str] = None
+    # The user_documents id the candidate was extracted from: the BFF needs it
+    # to stamp source_document_id on the promoted proposal (provenance).
+    document_id: Optional[int] = None
 
 
 class ListCandidatesResponse(BaseModel):
@@ -606,6 +609,7 @@ def _candidate_to_out(c: ExtractionCandidate) -> ExtractionCandidateOut:
         llm_confidence=c.llm_confidence,
         potential_duplicate_of=c.potential_duplicate_of,
         status=c.status,
+        document_id=c.document_id,
     )
 
 

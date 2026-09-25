@@ -16,6 +16,10 @@ export const promoteRequestSchema = z.discriminatedUnion('candidateType', [
     descrizione: z.string().min(1),
     fonte: z.string().min(1),
     attested: z.boolean(),
+    // Set on the "Invia comunque" retry after MERL-T deferred on a duplicate.
+    // They bypass the dedup only, never the copyright gate.
+    skipDuplicateCheck: z.boolean().optional(),
+    acknowledgedDuplicateOf: z.string().min(1).max(200).optional(),
   }),
   z.object({
     candidateType: z.literal('relation'),
@@ -26,6 +30,8 @@ export const promoteRequestSchema = z.discriminatedUnion('candidateType', [
     descrizione: z.string().min(1),
     fonte: z.string().min(1),
     attested: z.boolean(),
+    skipDuplicateCheck: z.boolean().optional(),
+    acknowledgedDuplicateOf: z.string().min(1).max(200).optional(),
   }),
 ]);
 export type PromoteRequest = z.infer<typeof promoteRequestSchema>;

@@ -241,7 +241,7 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     expect(res.body.pendingId).toBe('pe-99');
   });
 
-  it('does not mark a candidate promoted when MERL-T defers on a duplicate', async () => {
+  it('does not mark a candidate promoted when MERL-T defers on a duplicate, and says so', async () => {
     await grantFull(user);
     nock(TEST_MERLT_BASE)
       .get('/api/v1/candidates/7')
@@ -249,7 +249,13 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
     nock(TEST_MERLT_BASE)
       .post('/api/v1/enrichment/propose-entity')
       // Dedup-defer: no pending_entity, just the duplicate warning.
-      .reply(200, { success: false, has_duplicates: true, duplicate_action_required: true, duplicates: [] });
+      .reply(200, {
+        success: false,
+        message: "Entita' identica gia' esistente",
+        has_duplicates: true,
+        duplicate_action_required: true,
+        duplicates: [{ entity_id: 'concetto:risoluzione', entity_text: 'Risoluzione', entity_type: 'concetto' }],
+      });
     // Deliberately NO mark-promoted interceptor: the route must NOT call it when
     // no pending id came back (nock would throw on an unexpected request).
 
@@ -260,7 +266,44 @@ describe('POST /api/merlt/contrib/candidates/:id/promote', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.pendingId).toBeNull();
+    expect(res.body.created).toBe(false);
     expect(res.body.duplicateActionRequired).toBe(true);
+    expect(res.body.message).toBe("Entita' identica gia' esistente");
+    expect(res.body.duplicates).toEqual([{ id: 'concetto:risoluzione', text: 'Risoluzione' }]);
+  });
+
+  it('files the entity under the candidate LLM type and carries provenance to MERL-T', async () => {
+    await grantFull(user);
+    let sent: Record<string, unknown> | undefined;
+    nock(TEST_MERLT_BASE).get('/api/v1/candidates/7').reply(200, {
+      id: 7,
+      candidate_type: 'entity',
+      entity_type: 'definizione',
+      document_id: 42,
+      verbatim_excerpt: 'raw verbatim text',
+    });
+    nock(TEST_MERLT_BASE)
+      .post('/api/v1/enrichment/propose-entity', (b) => {
+        sent = b as Record<string, unknown>;
+        return true;
+      })
+      .reply(200, { success: true, pending_entity: { id: 'pe-100', nome: 'X', tipo: 'definizione' } });
+    nock(TEST_MERLT_BASE).post('/api/v1/candidates/7/mark-promoted').reply(200, { ok: true });
+
+    const res = await request(app)
+      .post('/api/merlt/contrib/candidates/7/promote')
+      .set(authHeader(user))
+      .send({ ...entityBody, tipo: 'concetto', skipDuplicateCheck: true, acknowledgedDuplicateOf: 'concetto:r' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.created).toBe(true);
+    // The client said concetto; the authoritative candidate says definizione.
+    expect(sent?.tipo).toBe('definizione');
+    expect(sent?.fonte).toBe('community');
+    expect(sent?.source_reference).toBe('Torrente, Manuale, p.120');
+    expect(sent?.source_document_id).toBe(42);
+    expect(sent?.skip_duplicate_check).toBe(true);
+    expect(sent?.acknowledged_duplicate_of).toBe('concetto:r');
   });
 
   it('403s without full consent', async () => {
