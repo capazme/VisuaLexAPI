@@ -33,7 +33,7 @@ the text is now a centred 68ch column, so a wide panel has free margins.
 
 | # | Decision | Rationale |
 |---|---|---|
-| D1 | Each block holding annotations — comma, item, rubric, heading, update paragraph — gets a **sign in its right margin**, aligned with its first line: a note icon with the number of notes, and one dot per highlight colour (three at most, then "+N"). | Owner's choice over a left stripe (says nothing about how many or which) and an end-of-comma chip (ragged, harder to scan). |
+| D1 | Each block holding annotations — comma, item, rubric, heading, update paragraph — gets a **sign in its right margin**, aligned with its first line: a note icon with the number of notes, and one dot per highlight colour, in order of appearance (four at most: the palette has four). | Owner's choice over a left stripe (says nothing about how many or which) and an end-of-comma chip (ragged, harder to scan). |
 | D2 | In a container too narrow for the margin, the sign **falls back inline at the end of the block**. | April: never squeeze the text. |
 | D3 | The sign opens a **Peek popover** listing that block's notes and highlights: *Vai al passo* (the passage flashes), edit or delete a note with the Notes panel's own cards, remove a highlight. | Owner's choice ("anche modificare"). |
 | D4 | Tab and dossier reader only. **Not Study Mode**, whose "Riepilogo" already lists everything. | Owner confirmed. |
@@ -48,8 +48,10 @@ the text is now a centred 68ch column, so a wide panel has free margins.
 
 ### 1. Grouping — `utils/articleAnnotations.ts` (new, pure)
 
-- `anchorEnd(plain, start, text)` moves here from `articleRender.ts`, so the
-  grouping and the renderer share one definition of "this anchor renders".
+- `resolveAnchors(plain, highlights, annotations)` moves here from
+  `articleRender.ts`, with `anchorEnd`: the whole decision of where a
+  highlight or a note renders, legacy occurrences included, so the grouping
+  and the renderer share one definition of "this anchor renders, here".
 - `groupAnnotationsByBlock(raw, structure, highlights, annotations)` returns,
   per block index, `{ notes: Annotation[]; highlights: Highlight[] }`. A mark
   belongs to every block its range touches (a highlight across two commi
@@ -60,28 +62,28 @@ the text is now a centred 68ch column, so a wide panel has free margins.
 
 - New input `signs?: boolean` (default false). With it, after a block's
   content, when its group is not empty:
-  `<span class="vlx-sign" role="button" tabindex="0" data-block="i"
-  data-notes="n" data-highlights="h" aria-label="2 note e 1 evidenziazione in
-  questo passo">`, then `<span class="vlx-sign-notes" data-count="n">` when
-  there are notes, up to three `<span class="vlx-sign-dot"
-  data-color="yellow">` (distinct colours, in order of appearance) and a
-  `<span class="vlx-sign-more" data-count="+k">` beyond three. Every child is
-  empty; nothing adds a text node.
+  `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog"
+  data-block="i" data-notes="n" data-highlights="h" aria-label="2 note e 1
+  evidenziazione in questo passo">`, then `<span class="vlx-sign-notes"
+  data-count="n">` when there are notes, and one `<span class="vlx-sign-dot"
+  data-color="yellow">` per distinct colour, in order of appearance. Every
+  child is empty; nothing adds a text node.
 - The projection invariant test runs with signs on.
 
 ### 3. Styles — `index.css`, READING SURFACE
 
-- The text container (`ArticleBody`'s outer element) becomes a size container
-  (`container-type: inline-size`, class `vlx-frame`).
+- A new wrapper around the text, inside `ArticleBody`'s outer element so the
+  selection popup stays outside it, is a size container (`div.vlx-frame`,
+  `container: vlx-frame / inline-size`), set in the column's own font.
 - Default (narrow): the sign is an inline pill after the block's text.
-- `@container (min-width: 52em)` — room for the 68ch column plus a margin
-  each side: `.vlx-b` is `position: relative` and the sign sits at
-  `left: calc(100% + 1em); top: .2em`, the same x for every block.
+- `@container vlx-frame (min-width: calc(68ch + 9rem))` — room for the 68ch
+  column plus a sign each side: `.vlx-b` is `position: relative` and the sign
+  sits at `left: calc(100% + 0.75rem); top: 0.3rem`, the same x for every
+  block.
 - Note icon via a CSS mask (inline SVG data URI); counts via
   `content: attr(data-count)`; dots painted with the highlight tokens
   (`hsl(var(--hl-yellow-bg))` …) and a hairline border.
-- `.highlights-hidden` hides the dots and "+N", and a sign with
-  `data-notes="0"`.
+- `.highlights-hidden` hides the dots, and a sign with `data-notes="0"`.
 - Touch: a larger invisible hit area on coarse pointers (as the `(119)` chip).
 
 ### 4. Interactions — `hooks/useArticleTextInteractions.ts`
@@ -91,7 +93,7 @@ the text is now a centred 68ch column, so a wide panel has free margins.
   vice versa (D10).
 - Unlike an update note, an open block **survives a re-render**: editing or
   removing inside it redraws the text. It closes on `resetKey` (another
-  article), and the host closes it when its group becomes empty.
+  article); the popover closes it when its last annotation goes.
 
 ### 5. `BlockAnnotationsPopover` (new, `features/search/`)
 
@@ -100,14 +102,18 @@ the text is now a centred 68ch column, so a wide panel has free margins.
 - Anchor: a **virtual reference** (`refs.setPositionReference`) whose
   `getBoundingClientRect` looks up `.vlx-sign[data-block="i"]` in the
   container on every call, so the popover stays attached when an edit redraws
-  the sign; hidden until positioned (gotcha 13).
-- Body: notes first — `NoteCard`, extracted as-is from `NotesPeekPanel.tsx`
-  into its own file and reused by both — each with *Vai al passo*; then
+  the sign; hidden until positioned (gotcha 13). Placement follows the sign:
+  in the margin beside it (`right-start`, else above the block), inline below
+  the block, so the block itself stays readable.
+- Body: notes first — `NoteCard`, extracted from `NotesPeekPanel.tsx` into its
+  own file and reused by both (its delete button now visible, at 44 px, below
+  `md`) — each with *Vai al passo*; then
   highlights — a card with a 4 px stripe of the highlight's colour (UI
   conventions), the quoted text, *Vai al passo* and *Rimuovi*.
-- *Vai al passo*: the popover closes, the first element of the anchor
-  (`[data-note-id]` / `[data-highlight]`) scrolls to the centre and flashes
-  (`vlx-flash`, 1.6 s).
+- *Vai al passo* (`utils/revealAnnotation.ts`, which Study Mode's summary
+  adopts too): the popover closes, the anchor's piece inside the block
+  (`[data-note-id]` / `[data-highlight]`) scrolls to the centre and every piece
+  glows (`vlx-flash`, 1.6 s).
 - Esc and an outside press close it; focus returns to the sign when it still
   exists. Icon-only buttons keep a 44 px target on mobile.
 
