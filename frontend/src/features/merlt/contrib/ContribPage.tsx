@@ -7,6 +7,7 @@ import { UploadDropzone } from './UploadDropzone';
 import { CandidateReviewList } from './CandidateReviewList';
 import { useExtractionJob } from './useExtractionJob';
 import { uploadContribDocument, extractContribDocument, fetchContribCandidates } from './contribApi';
+import type { PromotedEntity } from './relationEndpoints';
 import type { ExtractionCandidate } from './types';
 
 /**
@@ -35,6 +36,9 @@ export function ContribPage() {
   const [candidates, setCandidates] = useState<ExtractionCandidate[] | null>(null);
   const [candidatesError, setCandidatesError] = useState(false);
   const [promotedIds, setPromotedIds] = useState<Set<number>>(new Set());
+  // Entities of this document promoted in this session: a relation candidate
+  // can point one of its ends at them (B1, "usa la proposta appena promossa").
+  const [promotedEntities, setPromotedEntities] = useState<PromotedEntity[]>([]);
   if (validSeed !== seedSync) {
     setSeedSync(validSeed);
     setDocumentId(validSeed);
@@ -42,6 +46,7 @@ export function ContribPage() {
     setCandidates(null);
     setCandidatesError(false);
     setPromotedIds(new Set());
+    setPromotedEntities([]);
   }
 
   const job = useExtractionJob(jobId);
@@ -90,6 +95,20 @@ export function ContribPage() {
     setCandidatesError(false);
     setUploadError(null);
     setPromotedIds(new Set());
+    setPromotedEntities([]);
+  };
+
+  const handlePromoted = (candidateId: number, pendingId: string): void => {
+    setPromotedIds((prev) => new Set(prev).add(candidateId));
+    const promoted = candidates?.find((c) => c.id === candidateId);
+    if (promoted?.candidate_type !== 'entity' || !pendingId) return;
+    const entry: PromotedEntity = {
+      candidateId,
+      pendingId,
+      label: promoted.entity_text || pendingId,
+      tipo: promoted.entity_type ?? undefined,
+    };
+    setPromotedEntities((prev) => [...prev.filter((p) => p.candidateId !== candidateId), entry]);
   };
 
   if (!merltEnabled) {
@@ -178,7 +197,8 @@ export function ContribPage() {
             <CandidateReviewList
               candidates={candidates.filter((c) => !promotedIds.has(c.id))}
               articleUrn=""
-              onPromoted={(id) => setPromotedIds((prev) => new Set(prev).add(id))}
+              onPromoted={handlePromoted}
+              promotedEntities={promotedEntities}
             />
           )}
         </section>

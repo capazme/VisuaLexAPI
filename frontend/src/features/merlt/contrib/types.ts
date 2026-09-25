@@ -23,6 +23,17 @@ export interface ExtractionCandidate {
   /** LLM-assigned entity type (concetto | principio | definizione). */
   entity_type?: string | null;
   status?: string;
+  /** MERL-T user_documents id the candidate was extracted from. */
+  document_id?: number | null;
+  /**
+   * B1 relation endpoints: the names the extractor wrote, and whether the
+   * staging parser already resolved `source_node_urn` / `target_entity_id` to
+   * a graph identifier. A missing flag means unresolved: the card asks.
+   */
+  source_text?: string | null;
+  target_text?: string | null;
+  source_resolved?: boolean | null;
+  target_resolved?: boolean | null;
 }
 
 export interface ExtractDocumentResponse {

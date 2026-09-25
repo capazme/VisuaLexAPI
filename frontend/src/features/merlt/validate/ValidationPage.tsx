@@ -17,6 +17,7 @@ import {
   type MerltVote,
   type PendingQueue,
   type ProvisionalReviewItem,
+  type PendingRelationItem,
 } from './validateApi';
 
 type QueueState =
@@ -39,6 +40,20 @@ interface VoteToast {
  * relation proposals. Gated by full (validation) consent. setState lives in
  * handlers / promise callbacks (react-hooks/set-state-in-effect).
  */
+
+/**
+ * "TIPO · origine → destinazione": a voter cannot judge a relation from its
+ * type alone. MERL-T sends the derived labels when it has them; older rows
+ * fall back to the stored endpoint (a norm URN, an Entity id or a pending id).
+ */
+function relationTitle(r: PendingRelationItem): string {
+  const source = r.source_label ?? r.source_urn;
+  const target = r.target_label ?? r.target_urn;
+  const type = r.relation_type ?? r.id;
+  if (!source && !target) return type;
+  return `${type} · ${source ?? '?'} → ${target ?? '?'}`;
+}
+
 export function ValidationPage() {
   const { canValidate, merltEnabled } = useMerltFeatures();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
@@ -229,7 +244,7 @@ export function ValidationPage() {
               .filter((r) => !resolved.has(r.id))
               .map((r) => ({
                 id: r.id,
-                title: r.relation_type ?? r.id,
+                title: relationTitle(r),
                 body: r.evidence,
                 fonte: r.fonte,
                 contributedBy: r.contributed_by,

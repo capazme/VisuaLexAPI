@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 
 const promote = vi.fn();
 vi.mock('../contribApi', () => ({ promoteCandidate: (...a: unknown[]) => promote(...a) }));
+const search = vi.fn();
+vi.mock('../../graph/shared/graphApi', () => ({ searchGraph: (...a: unknown[]) => search(...a) }));
 
 import { CandidateCard } from '../CandidateCard';
 import type { ExtractionCandidate } from '../types';
@@ -22,7 +24,23 @@ function promoteBtn() {
 
 beforeEach(() => {
   promote.mockReset().mockResolvedValue({ pendingId: 'pe-1' });
+  search.mockReset().mockResolvedValue([]);
 });
+
+/** Fill the copyright gate (fonte + reformulation + attestation). */
+function satisfyCopyrightGate() {
+  fireEvent.change(screen.getByLabelText('Fonte'), { target: { value: 'Torrente p.120' } });
+  fireEvent.change(screen.getByLabelText(/la tua riformulazione/i), {
+    target: { value: 'La risoluzione estingue il contratto.' },
+  });
+  fireEvent.click(screen.getByRole('checkbox'));
+}
+
+/** Pick the reference norma through the NL picker's URN-paste path. */
+async function pickReferenceNorma(urn = 'urn:nir:stato:codice.civile:1942;262~art1453') {
+  fireEvent.change(screen.getByLabelText(/norma di riferimento/i), { target: { value: urn } });
+  fireEvent.click(await screen.findByTestId('norma-picker-apply'));
+}
 
 describe('CandidateCard', () => {
   it('disables promote until fonte + reformulation + attestation are present', () => {
@@ -69,7 +87,7 @@ describe('CandidateCard', () => {
         descrizione: 'La risoluzione estingue il contratto.',
       }),
     );
-    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(7, 'pe-1'));
   });
 
   it('allows promoting an entity WITHOUT a reference norma (stand-alone, BFF fallback)', () => {
@@ -86,7 +104,14 @@ describe('CandidateCard', () => {
   });
 
   it('still requires the article URN for RELATIONS — picked via NL → URN picker', async () => {
-    const relation = { ...candidate, candidate_type: 'relation' as const };
+    const relation = {
+      ...candidate,
+      candidate_type: 'relation' as const,
+      source_node_urn: 'concetto:inadempimento',
+      source_resolved: true,
+      target_entity_id: 'concetto:risoluzione',
+      target_resolved: true,
+    };
     // Picker hits /api/parse_query; intercept and return a recognized URN.
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -149,8 +174,11 @@ describe('CandidateCard', () => {
     expect(card).toHaveTextContent('urn:nir:stato:codice.civile:1942;262~art1453');
     expect(card).toHaveTextContent('DISCIPLINA');
     expect(card).toHaveTextContent('ent:risoluzione');
-    // the relation checklist also demands a reference norma
+    // the relation checklist also demands a reference norma and resolved ends
     expect(screen.getByTestId('promotion-checklist')).toHaveTextContent(/norma di riferimento/i);
+    expect(screen.getByTestId('promotion-checklist')).toHaveTextContent(
+      /estremi della relazione collegati al grafo/i,
+    );
   });
 
   it('promotes a relation candidate with the source/target/relation-type payload', async () => {
@@ -166,8 +194,11 @@ describe('CandidateCard', () => {
       ...candidate,
       candidate_type: 'relation' as const,
       source_node_urn: 'urn:nir:stato:codice.civile:1942;262~art1453',
+      source_resolved: true,
       relation_type: 'DISCIPLINA',
       target_entity_id: 'ent:risoluzione',
+      target_text: 'risoluzione',
+      target_resolved: true,
     };
     const onPromoted = vi.fn();
     render(<CandidateCard candidate={relation} articleUrn="" onPromoted={onPromoted} />);
@@ -195,7 +226,7 @@ describe('CandidateCard', () => {
         attested: true,
       }),
     );
-    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(relation.id));
+    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(relation.id, 'pe-1'));
   });
 
   it('shows a dedup hint when potential_duplicate_of is set', () => {
@@ -260,7 +291,7 @@ describe('CandidateCard', () => {
       7,
       expect.objectContaining({ skipDuplicateCheck: true, acknowledgedDuplicateOf: 'concetto:risoluzione' }),
     );
-    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(7, 'pe-1'));
   });
 
   it("shows MERL-T's reason instead of a false success when nothing was created", async () => {
@@ -278,5 +309,132 @@ describe('CandidateCard', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Nome entità non valido');
     expect(onPromoted).not.toHaveBeenCalled();
     expect(screen.queryByText(/proposta inviata/i)).not.toBeInTheDocument();
+  });
+
+  describe('relation endpoints (B1)', () => {
+    // As staged by the extractor: the two ends are the names it wrote.
+    const unresolved: ExtractionCandidate = {
+      id: 21,
+      candidate_type: 'relation',
+      relation_type: 'DISCIPLINA',
+      source_node_urn: 'inadempimento',
+      source_text: 'inadempimento',
+      target_entity_id: 'risoluzione del contratto',
+      target_text: 'risoluzione del contratto',
+      descrizione: '',
+      verbatim_excerpt: "L'inadempimento consente la risoluzione del contratto.",
+    };
+
+    it('keeps promote disabled until both ends are resolved, and says why', async () => {
+      render(<CandidateCard candidate={unresolved} articleUrn="" onPromoted={() => {}} />);
+      satisfyCopyrightGate();
+      await pickReferenceNorma();
+
+      expect(promoteBtn()).toBeDisabled();
+      const checklist = screen.getByTestId('promotion-checklist');
+      expect(checklist).toHaveTextContent(/estremi della relazione collegati al grafo/i);
+      // the title still reads source → TYPE → target in the extractor's words
+      expect(screen.getByTestId('candidate-21')).toHaveTextContent('inadempimento');
+      expect(screen.getByTestId('candidate-21')).toHaveTextContent('risoluzione del contratto');
+      expect(screen.getByTestId('endpoint-source-picker')).toBeInTheDocument();
+      expect(screen.getByTestId('endpoint-target-picker')).toBeInTheDocument();
+    });
+
+    it('resolves the ends from graph search and from a just-promoted entity, then sends the ids', async () => {
+      search.mockImplementation(async (q: string) =>
+        q === 'inadempimento'
+          ? [
+              { id: 'live:abc', nome: 'Inadempimento (provvisorio)' },
+              { id: 'inadempimento', nome: 'nome nudo, non un id' },
+              { id: 'concetto:inadempimento', nome: 'Inadempimento', tipo: 'concetto' },
+            ]
+          : [],
+      );
+      const onPromoted = vi.fn();
+      render(
+        <CandidateCard
+          candidate={unresolved}
+          articleUrn=""
+          onPromoted={onPromoted}
+          promotedEntities={[{ candidateId: 3, pendingId: 'concetto:1a2b3c4d', label: 'Risoluzione del contratto' }]}
+        />,
+      );
+      satisfyCopyrightGate();
+      await pickReferenceNorma();
+
+      // Source: the graph search is pre-filled with the extractor's name and
+      // runs once the field is reached; only identifiers a relation can point
+      // at are offered.
+      expect(search).not.toHaveBeenCalled();
+      const sourceInput = screen.getByLabelText('Nodo di origine');
+      expect(sourceInput).toHaveValue('inadempimento');
+      fireEvent.focus(sourceInput);
+      const option = await screen.findByRole('option', { name: /^Inadempimento/ });
+      expect(screen.queryByText('Inadempimento (provvisorio)')).not.toBeInTheDocument();
+      expect(screen.queryByText('nome nudo, non un id')).not.toBeInTheDocument();
+      expect(search).toHaveBeenCalledWith('inadempimento', expect.any(Number));
+      fireEvent.mouseDown(option);
+      expect(screen.getByTestId('endpoint-source-selected')).toHaveTextContent('concetto:inadempimento');
+
+      // Target: the entity promoted a moment ago from the same document.
+      const target = screen.getByTestId('endpoint-target-picker');
+      fireEvent.click(within(target).getByRole('tab', { name: /proposta promossa/i }));
+      fireEvent.click(within(target).getByRole('button', { name: /risoluzione del contratto/i }));
+      expect(screen.getByTestId('endpoint-target-selected')).toHaveTextContent('Risoluzione del contratto');
+
+      expect(promoteBtn()).toBeEnabled();
+      await act(async () => {
+        fireEvent.click(promoteBtn());
+      });
+      expect(promote).toHaveBeenCalledWith(
+        21,
+        expect.objectContaining({
+          candidateType: 'relation',
+          sourceUrn: 'concetto:inadempimento',
+          targetEntityId: 'concetto:1a2b3c4d',
+          tipoRelazione: 'DISCIPLINA',
+        }),
+      );
+      await waitFor(() => expect(onPromoted).toHaveBeenCalledWith(21, 'pe-1'));
+    });
+
+    it('resolves an end to a norm through the NL norma picker', async () => {
+      render(<CandidateCard candidate={unresolved} articleUrn="" onPromoted={() => {}} />);
+      const source = screen.getByTestId('endpoint-source-picker');
+      fireEvent.click(within(source).getByRole('tab', { name: /^norma$/i }));
+      fireEvent.change(screen.getByLabelText(/norma di origine/i), {
+        target: { value: 'urn:nir:stato:regio.decreto:1942-03-16;262~art1453' },
+      });
+      fireEvent.click(await within(source).findByTestId('norma-picker-apply'));
+      expect(screen.getByTestId('endpoint-source-selected')).toHaveTextContent(
+        'urn:nir:stato:regio.decreto:1942-03-16;262~art1453',
+      );
+    });
+
+    it('does not offer the "proposta promossa" option when nothing was promoted', () => {
+      render(<CandidateCard candidate={unresolved} articleUrn="" onPromoted={() => {}} />);
+      expect(screen.queryByRole('tab', { name: /proposta promossa/i })).not.toBeInTheDocument();
+    });
+
+    it('trusts ends the staging parser resolved, and lets the user change them', () => {
+      render(
+        <CandidateCard
+          candidate={{
+            ...unresolved,
+            source_node_urn: 'concetto:inadempimento',
+            source_resolved: true,
+            // resolved flag without an identifier-shaped value is not trusted
+            target_resolved: true,
+          }}
+          articleUrn=""
+          onPromoted={() => {}}
+        />,
+      );
+      expect(screen.getByTestId('endpoint-source-selected')).toHaveTextContent('inadempimento');
+      expect(screen.getByTestId('endpoint-target-picker')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /cambia origine/i }));
+      expect(screen.getByTestId('endpoint-source-picker')).toBeInTheDocument();
+    });
   });
 });

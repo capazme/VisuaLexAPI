@@ -32,9 +32,16 @@ export interface PendingRelationItem {
   id: string;
   /** `relation_type` on the wire (RelationType enum serialized as string). */
   relation_type?: string;
-  /** Source node URN — the "source norm" link target for a relation. */
+  /** The endpoints as stored: a norm URN, an Entity id or a pending entity id. */
   source_urn?: string;
   target_urn?: string;
+  /**
+   * Human labels MERL-T derives for the endpoints (a pending entity's name,
+   * "Art. N" for a norm, the humanised slug of an Entity id). Absent on
+   * older rows: fall back to the raw endpoint.
+   */
+  source_label?: string;
+  target_label?: string;
   /** Textual evidence for the relation (used as the card body). */
   evidence?: string;
   ambito?: string;

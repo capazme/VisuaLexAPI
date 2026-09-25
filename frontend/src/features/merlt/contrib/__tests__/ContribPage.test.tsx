@@ -23,8 +23,22 @@ vi.mock('../UploadDropzone', () => ({
   ),
 }));
 vi.mock('../CandidateReviewList', () => ({
-  CandidateReviewList: ({ candidates }: { candidates: unknown[] }) => (
-    <div data-testid="review-list">{candidates.length} candidati</div>
+  CandidateReviewList: ({
+    candidates,
+    onPromoted,
+    promotedEntities,
+  }: {
+    candidates: unknown[];
+    onPromoted: (id: number, pendingId: string) => void;
+    promotedEntities?: Array<{ pendingId: string; label: string }>;
+  }) => (
+    <div>
+      <div data-testid="review-list">{candidates.length} candidati</div>
+      <div data-testid="promoted-entities">
+        {(promotedEntities ?? []).map((p) => `${p.pendingId}=${p.label}`).join(',')}
+      </div>
+      <button onClick={() => onPromoted(1, 'concetto:aaaa1111')}>promote-entity-1</button>
+    </div>
   ),
 }));
 
@@ -81,5 +95,23 @@ describe('ContribPage', () => {
       fireEvent.click(screen.getByText('pick-file'));
     });
     await waitFor(() => expect(screen.getByTestId('review-list')).toHaveTextContent('2 candidati'));
+  });
+
+  // B1: an entity promoted from this document becomes a possible relation end
+  // for the other candidates ("usa la proposta appena promossa").
+  it('hands the entities promoted in this session to the review list, and drops them from it', async () => {
+    useExtractionJobMock.mockReturnValue({ status: 'completed', error: null, candidatesCreated: 2 });
+    renderPage();
+    await act(async () => {
+      fireEvent.click(screen.getByText('pick-file'));
+    });
+    await waitFor(() => expect(screen.getByTestId('review-list')).toHaveTextContent('2 candidati'));
+    expect(screen.getByTestId('promoted-entities')).toHaveTextContent('');
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('promote-entity-1'));
+    });
+    expect(screen.getByTestId('review-list')).toHaveTextContent('1 candidati');
+    expect(screen.getByTestId('promoted-entities')).toHaveTextContent('concetto:aaaa1111=A');
   });
 });

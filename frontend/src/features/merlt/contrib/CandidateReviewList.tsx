@@ -1,15 +1,23 @@
 import { CandidateCard } from './CandidateCard';
+import type { PromotedEntity } from './relationEndpoints';
 import type { ExtractionCandidate } from './types';
 
 export interface CandidateReviewListProps {
   candidates: ExtractionCandidate[];
   /** Article URN proposals are attached to (the document's primary article). */
   articleUrn: string;
-  onPromoted: (candidateId: number) => void;
+  onPromoted: (candidateId: number, pendingId: string) => void;
+  /** Entities of this document promoted in this session (relation endpoints). */
+  promotedEntities?: PromotedEntity[];
 }
 
 /** Renders the extracted candidates for per-item review + promotion (Slice 2c). */
-export function CandidateReviewList({ candidates, articleUrn, onPromoted }: CandidateReviewListProps) {
+export function CandidateReviewList({
+  candidates,
+  articleUrn,
+  onPromoted,
+  promotedEntities,
+}: CandidateReviewListProps) {
   if (candidates.length === 0) {
     return (
       <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -25,6 +33,7 @@ export function CandidateReviewList({ candidates, articleUrn, onPromoted }: Cand
           candidate={candidate}
           articleUrn={articleUrn}
           onPromoted={onPromoted}
+          promotedEntities={promotedEntities}
         />
       ))}
     </div>

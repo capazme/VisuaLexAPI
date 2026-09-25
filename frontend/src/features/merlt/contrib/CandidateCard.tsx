@@ -3,6 +3,9 @@ import { AlertTriangle, ArrowRight, Check, X } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { promoteCandidate } from './contribApi';
 import { NormaPicker } from './NormaPicker';
+import { RelationEndpointPicker } from './RelationEndpointPicker';
+import { stagedEndpoint } from './relationEndpoints';
+import type { PromotedEntity, RelationEndpoint } from './relationEndpoints';
 import type { ExtractionCandidate, PromoteCandidatePayload, PromoteDuplicate } from './types';
 
 /**
@@ -45,8 +48,16 @@ function PromotionChecklist({ requirements }: { requirements: GateRequirement[] 
 export interface CandidateCardProps {
   candidate: ExtractionCandidate;
   articleUrn: string;
-  onPromoted: (candidateId: number) => void;
+  /** Called once a pending_* row exists, with its MERL-T id. */
+  onPromoted: (candidateId: number, pendingId: string) => void;
+  /**
+   * Entity candidates of the same document promoted in this session: a
+   * relation end can point at one of them ("usa la proposta appena promossa").
+   */
+  promotedEntities?: PromotedEntity[];
 }
+
+const NO_PROMOTED_ENTITIES: PromotedEntity[] = [];
 
 function normalize(text: string): string {
   return text.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -60,7 +71,12 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   definizione: 'Definizione',
 };
 
-export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onPromoted }: CandidateCardProps) {
+export function CandidateCard({
+  candidate,
+  articleUrn: defaultArticleUrn,
+  onPromoted,
+  promotedEntities = NO_PROMOTED_ENTITIES,
+}: CandidateCardProps) {
   const verbatim = candidate.verbatim_excerpt ?? '';
   const [descrizione, setDescrizione] = useState(candidate.descrizione ?? '');
   // Pre-filled with a sensible default so the user doesn't have to type
@@ -83,14 +99,28 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
   const [done, setDone] = useState(false);
   // MERL-T deferred on an identical proposal: the user confirms or drops.
   const [duplicates, setDuplicates] = useState<PromoteDuplicate[] | null>(null);
+  // B1: the two ends of a relation, as identifiers the graph knows. Seeded
+  // only when the staging parser already resolved them; a concept name the
+  // extractor wrote is never sent as an endpoint.
+  const isRelation = candidate.candidate_type === 'relation';
+  const sourceText = candidate.source_text || candidate.source_node_urn || '';
+  const targetText = candidate.target_text || candidate.target_entity_id || '';
+  const [sourceEndpoint, setSourceEndpoint] = useState<RelationEndpoint | null>(() =>
+    stagedEndpoint(candidate.source_node_urn, candidate.source_text, candidate.source_resolved),
+  );
+  const [targetEndpoint, setTargetEndpoint] = useState<RelationEndpoint | null>(() =>
+    stagedEndpoint(candidate.target_entity_id, candidate.target_text, candidate.target_resolved),
+  );
 
   const hasFonte = fonte.trim().length > 0;
   const reformulated = normalize(descrizione).length > 0 && normalize(descrizione) !== normalize(verbatim);
   // For entities the article URN is optional (BFF fallback). For relations it
   // still carries semantic weight (source endpoint), so we keep requiring it.
-  const articleRequired = candidate.candidate_type === 'relation';
+  const articleRequired = isRelation;
   const hasArticle = articleUrn.trim().length > 0 && articleUrn.trim() !== PLACEHOLDER_URN;
-  const canPromote = hasFonte && attested && reformulated && (!articleRequired || hasArticle) && !submitting;
+  const endpointsResolved = !isRelation || (sourceEndpoint !== null && targetEndpoint !== null);
+  const canPromote =
+    hasFonte && attested && reformulated && (!articleRequired || hasArticle) && endpointsResolved && !submitting;
 
   // Legible copyright gate — each requirement mirrors a `canPromote` condition.
   const requirements: GateRequirement[] = [
@@ -98,6 +128,7 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
     { label: 'Riformulazione diversa dall’estratto originale', met: reformulated },
     { label: 'Dichiarazione di riformulazione originale', met: attested },
     ...(articleRequired ? [{ label: 'Norma di riferimento selezionata', met: hasArticle }] : []),
+    ...(isRelation ? [{ label: 'Estremi della relazione collegati al grafo', met: endpointsResolved }] : []),
   ];
 
   const handlePromote = async (confirmDuplicate?: PromoteDuplicate) => {
@@ -124,8 +155,9 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
           : {
               candidateType: 'relation',
               articleUrn,
-              sourceUrn: candidate.source_node_urn ?? '',
-              targetEntityId: candidate.target_entity_id ?? '',
+              // Resolved identifiers only: canPromote guarantees both are set.
+              sourceUrn: sourceEndpoint?.id ?? '',
+              targetEntityId: targetEndpoint?.id ?? '',
               tipoRelazione: candidate.relation_type ?? '',
               descrizione,
               fonte,
@@ -136,7 +168,7 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
       // A 200 is not a success: only a pending id means a proposal exists.
       if (result.pendingId) {
         setDone(true);
-        onPromoted(candidate.id);
+        onPromoted(candidate.id, result.pendingId);
       } else if (result.duplicateActionRequired) {
         setDuplicates(result.duplicates ?? []);
       } else {
@@ -181,15 +213,15 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
             </span>
           )}
         </div>
-        {candidate.candidate_type === 'relation' ? (
+        {isRelation ? (
           <span className="flex min-w-0 flex-wrap items-center justify-end gap-1 text-sm font-medium text-slate-900 dark:text-white">
-            <span className="truncate">{candidate.source_node_urn || '—'}</span>
+            <span className="truncate">{sourceText || '—'}</span>
             <ArrowRight size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               {candidate.relation_type || '—'}
             </span>
             <ArrowRight size={12} className="shrink-0 text-slate-400" aria-hidden="true" />
-            <span className="truncate">{candidate.target_entity_id || '—'}</span>
+            <span className="truncate">{targetText || '—'}</span>
           </span>
         ) : (
           <span className="font-medium text-slate-900 dark:text-white">{candidate.entity_text}</span>
@@ -226,6 +258,25 @@ export function CandidateCard({ candidate, articleUrn: defaultArticleUrn, onProm
           />
         </div>
       </div>
+
+      {isRelation && (
+        <div className="mt-3 grid gap-3 md:grid-cols-2" data-testid="relation-endpoints">
+          <RelationEndpointPicker
+            end="source"
+            rawText={sourceText}
+            value={sourceEndpoint}
+            onChange={setSourceEndpoint}
+            promotedEntities={promotedEntities}
+          />
+          <RelationEndpointPicker
+            end="target"
+            rawText={targetText}
+            value={targetEndpoint}
+            onChange={setTargetEndpoint}
+            promotedEntities={promotedEntities}
+          />
+        </div>
+      )}
 
       <div className="mt-3 flex flex-col gap-2">
         <input
