@@ -37,6 +37,22 @@ log = structlog.get_logger()
 # factor twice in one window. reconcile/prune are idempotent (DETACH DELETE by id).
 _hygiene_lock = asyncio.Lock()
 
+# "Human signal" on a provisional node. Feedback and re-use were always counted;
+# a node a user VOUCHED for through confirm-source (``confirmed_by`` set,
+# ``pending_entity_id`` stamped while its proposal awaits consensus) is human
+# signal too: ``entity_writer._link_provisional_source`` matches the approved
+# entity back to the node by ``pending_entity_id``, so deleting the node under
+# an open proposal silently loses the source the entity was born from. Nodes
+# with signal are routed to human review (``quarantine_doubtful``), never
+# deleted by the sweep.
+HUMAN_SIGNAL_PREDICATE = (
+    "(coalesce(n.positive_feedback_count, 0) > 0"
+    " OR coalesce(n.usage_count, 0) > 0"
+    " OR size(coalesce(n.confirmed_by, [])) > 0"
+    " OR coalesce(n.pending_entity_id, '') <> '')"
+)
+NO_HUMAN_SIGNAL_PREDICATE = f"NOT {HUMAN_SIGNAL_PREDICATE}"
+
 
 async def reconcile_duplicates(graph_client) -> List[str]:
     """Delete provisional nodes whose article (``source_url``) is already a
@@ -44,12 +60,15 @@ async def reconcile_duplicates(graph_client) -> List[str]:
 
     The provisional node's ``URN`` property is its opaque ``live:<hash>`` id;
     the real article URL lives in ``source_url`` (== a confirmed node's ``URN``),
-    so the twin match is ``live.source_url = c.URN``.
+    so the twin match is ``live.source_url = c.URN``. A twin a user vouched for
+    (confirm-source) is left alone: its open proposal links back to it.
     """
     rows = await graph_client.query(
         """
         MATCH (live:LiveSource)
         WHERE live.provenance = $prov AND coalesce(live.source_url, '') <> ''
+          AND size(coalesce(live.confirmed_by, [])) = 0
+          AND coalesce(live.pending_entity_id, '') = ''
         MATCH (c) WHERE c.URN = live.source_url AND NOT c:LiveSource
         RETURN collect(DISTINCT live.node_id) AS ids
         """,
@@ -104,22 +123,23 @@ async def quarantine_doubtful(
     instead of letting ``prune_faded`` delete them.
 
     These are the "conflicting signal" cases from the design: a node that was
-    useful to someone (``positive_feedback_count`` or ``usage_count`` > 0) yet
-    never crossed the promotion threshold and has now faded (old + stale + low
+    useful to someone (``positive_feedback_count`` or ``usage_count`` > 0, or a
+    user vouched for it through confirm-source) yet never crossed the
+    promotion threshold and has now faded (old + stale + low
     trust). Rather than silently discard human signal, it is frozen (decay/prune
     skip ``pending_review`` nodes) and surfaced for human adjudication in
     ``/merlt/valida`` (approve -> promote, reject -> prune). Returns the count
     newly flagged.
     """
     rows = await graph_client.query(
-        """
+        f"""
         MATCH (n:LiveSource)
         WHERE n.provenance = $prov
           AND coalesce(n.review_status, '') <> 'pending_review'
           AND coalesce(n.created_at, n.first_seen_at, '') < $ttl_cutoff
           AND coalesce(n.last_used_at, n.created_at, '') < $decay_cutoff
           AND coalesce(n.trust, 0.0) < $min_trust
-          AND (coalesce(n.positive_feedback_count, 0) > 0 OR coalesce(n.usage_count, 0) > 0)
+          AND {HUMAN_SIGNAL_PREDICATE}
         SET n.review_status = 'pending_review',
             n.review_reason = 'faded_with_positive_signal',
             n.review_flagged_at = $timestamp
@@ -149,21 +169,21 @@ async def prune_faded(
     (``created_at < ttl_cutoff``) AND idle since before the decay window
     (``last_used_at < decay_cutoff`` — so a recently re-used node is spared even
     if its trust decayed earlier) AND its (decayed) ``trust`` is below the floor
-    AND it carries NO positive signal (``positive_feedback_count`` and
-    ``usage_count`` both 0 — nodes with signal are routed to human review by
-    ``quarantine_doubtful`` instead) AND it is not already flagged for review.
+    AND it carries NO human signal (no feedback, no re-use, nobody vouched for
+    it: see ``HUMAN_SIGNAL_PREDICATE`` — nodes with signal are routed to human
+    review by ``quarantine_doubtful`` instead) AND it is not already flagged
+    for review.
     Returns the deleted node ids (caller drops their Qdrant chunks).
     """
     rows = await graph_client.query(
-        """
+        f"""
         MATCH (n:LiveSource)
         WHERE n.provenance = $prov
           AND coalesce(n.review_status, '') <> 'pending_review'
           AND coalesce(n.created_at, n.first_seen_at, '') < $ttl_cutoff
           AND coalesce(n.last_used_at, n.created_at, '') < $decay_cutoff
           AND coalesce(n.trust, 0.0) < $min_trust
-          AND coalesce(n.positive_feedback_count, 0) = 0
-          AND coalesce(n.usage_count, 0) = 0
+          AND {NO_HUMAN_SIGNAL_PREDICATE}
         RETURN collect(n.node_id) AS ids
         """,
         {
@@ -250,6 +270,8 @@ async def _run_graph_hygiene_locked(graph_client) -> Dict[str, Any]:
 
 
 __all__ = [
+    "HUMAN_SIGNAL_PREDICATE",
+    "NO_HUMAN_SIGNAL_PREDICATE",
     "reconcile_duplicates",
     "decay_stale",
     "quarantine_doubtful",
