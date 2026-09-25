@@ -29,6 +29,30 @@ type QueryMatcher =
   | Record<string, string>
   | ((q: Record<string, string>) => boolean);
 type ReplyFn = (uri: string, body: any) => [number, Json] | Json;
+type HeaderMatcher = string | RegExp | ((value: string) => boolean);
+/** nock(base, options): `reqheaders` must ALL match, `badheaders` must be absent. */
+interface ScopeOptions {
+  reqheaders?: Record<string, HeaderMatcher>;
+  badheaders?: string[];
+}
+
+function matchHeaders(
+  opts: ScopeOptions | undefined,
+  headers: Record<string, string>
+): boolean {
+  if (!opts) return true;
+  for (const [name, matcher] of Object.entries(opts.reqheaders ?? {})) {
+    const value = headers[name.toLowerCase()];
+    if (value === undefined) return false;
+    if (typeof matcher === 'string' && matcher !== value) return false;
+    if (matcher instanceof RegExp && !matcher.test(value)) return false;
+    if (typeof matcher === 'function' && !matcher(value)) return false;
+  }
+  for (const name of opts.badheaders ?? []) {
+    if (headers[name.toLowerCase()] !== undefined) return false;
+  }
+  return true;
+}
 
 interface Interceptor {
   method: string;
@@ -42,6 +66,8 @@ interface Interceptor {
   error?: unknown;
   delayMs?: number;
   remaining: number;
+  /** Header expectations inherited from nock(base, options). */
+  scopeOptions?: ScopeOptions;
 }
 
 const interceptors: Interceptor[] = [];
@@ -167,6 +193,9 @@ const mockFetch = async (
     if (ic.path !== url.pathname) continue;
     if (!matchQuery(ic.queryMatcher, query)) continue;
     if (!matchBody(ic.bodyMatcher, body)) continue;
+    // Before this check the options were silently ignored, so a test written
+    // as nock(base, { reqheaders: { 'x-api-key': 'k' } }) asserted nothing.
+    if (!matchHeaders(ic.scopeOptions, lowerHeaders(init))) continue;
 
     ic.remaining -= 1;
 
@@ -233,9 +262,13 @@ class Interceptable {
 
 class Scope {
   private own: Interceptor[] = [];
-  constructor(private origin: string) {}
+  constructor(
+    private origin: string,
+    private options?: ScopeOptions
+  ) {}
   /** Push a fully-built interceptor to the global registry + this scope. */
   register(ic: Interceptor): Scope {
+    ic.scopeOptions = this.options;
     interceptors.push(ic);
     this.own.push(ic);
     return this;
@@ -269,7 +302,7 @@ function normalizeBase(base: string): string {
 }
 
 interface NockFn {
-  (base: string): Scope;
+  (base: string, options?: ScopeOptions): Scope;
   activate(): void;
   restore(): void;
   cleanAll(): void;
@@ -281,7 +314,8 @@ interface NockFn {
   abortPendingRequests(): void;
 }
 
-const nock = ((base: string): Scope => new Scope(normalizeBase(base))) as NockFn;
+const nock = ((base: string, options?: ScopeOptions): Scope =>
+  new Scope(normalizeBase(base), options)) as NockFn;
 
 nock.activate = (): void => {
   if (active) return;

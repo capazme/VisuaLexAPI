@@ -53,9 +53,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
+# Copy application code (+ the test suite: the documented smoke command runs
+# `python -m pytest tests/` inside the container, so pytest and tests/ must be
+# in the image; a few MB).
 COPY merlt/ ./merlt/
+COPY tests/ ./tests/
 COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir "pytest>=7.4.0" "pytest-asyncio>=0.21.0"
 
 # Install the package itself
 RUN pip install -e . --no-deps

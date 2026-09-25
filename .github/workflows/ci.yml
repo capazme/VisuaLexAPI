@@ -2,11 +2,13 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, visualex-merlt-main]
   # main is included so its state is never unverified between deploys: deploy.sh
   # runs no tests and has no rollback, so a red main is a production risk.
+  # visualex-merlt-main is the MERL-T line: never deployed, but nothing else
+  # gates it, and its backend/frontend suites carry the MERL-T integration.
   push:
-    branches: [main]
+    branches: [main, visualex-merlt-main]
 
 permissions:
   contents: read
@@ -100,3 +102,58 @@ jobs:
         working-directory: backend
       - run: npm run test
         working-directory: backend
+
+  merlt:
+    name: MERL-T python tests
+    runs-on: ubuntu-latest
+    # The vendored sidecar (merlt/) has its own suite. Tests marked
+    # `integration` (live FalkorDB) are excluded by pyproject's addopts; the
+    # DB-backed ones run against this Postgres after create_tables() plus the
+    # boot-time schema additions, the same way the api bootstraps itself.
+    if: github.ref == 'refs/heads/visualex-merlt-main' || github.base_ref == 'visualex-merlt-main'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: merlt
+          POSTGRES_PASSWORD: merlt
+          POSTGRES_DB: merlt
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U merlt -d merlt"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ENRICHMENT_DATABASE_URL: postgresql+asyncpg://merlt:merlt@localhost:5432/merlt
+      RLCF_DATABASE_URL: postgresql://merlt:merlt@localhost:5432/merlt
+      RLCF_ASYNC_DATABASE_URL: postgresql+asyncpg://merlt:merlt@localhost:5432/merlt
+      DATABASE_URL: postgresql://merlt:merlt@localhost:5432/merlt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # The image is python:3.11-slim (merlt/Dockerfile).
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: merlt/pyproject.toml
+      # CPU wheels first, as the Dockerfile does: the default index pulls the
+      # CUDA build (several GB) for nothing.
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -e ".[dev]"
+        working-directory: merlt
+      - run: |
+          python -c "
+          import asyncio
+          from merlt.storage.enrichment.database import init_db, create_tables
+          from merlt.storage.enrichment.schema_additions import ensure_schema_additions
+          async def main():
+              await init_db()
+              await create_tables()
+              await ensure_schema_additions()
+          asyncio.run(main())
+          "
+        working-directory: merlt
+      - run: python -m pytest tests/ -q -p no:cacheprovider
+        working-directory: merlt
