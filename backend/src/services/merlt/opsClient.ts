@@ -13,6 +13,7 @@
 
 import {
   MerltTimeoutError,
+  MerltNetworkError,
   MerltServerError,
   MerltBadRequestError,
 } from './merltClient';
@@ -93,7 +94,7 @@ export class OpsClient {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new MerltTimeoutError(`Timeout after ${this.config.timeoutMs}ms calling ${path}`);
       }
-      throw new MerltTimeoutError(
+      throw new MerltNetworkError(
         `Network error calling ${path}: ${err instanceof Error ? err.message : String(err)}`
       );
     }

@@ -101,7 +101,7 @@ describe('POST /api/merlt/experts/query/async (qa-async-progressive-contract.md 
     expect(sentBody?.consent_level).toBe('full');
   });
 
-  it('still returns 202 (best-effort enqueue) when the MERL-T call errors', async () => {
+  it('still returns 202 but marks the job failed when MERL-T refuses the enqueue', async () => {
     await grantBasic(user);
     nock(TEST_MERLT_BASE)
       .post('/api/v1/experts/query/async')
@@ -113,10 +113,12 @@ describe('POST /api/merlt/experts/query/async (qa-async-progressive-contract.md 
       .send({ query: 'art 1453 risoluzione', mode: 'convergent' });
 
     expect(res.status).toBe(202);
-    expect(res.body.status).toBe('pending');
+    expect(res.body.status).toBe('failed');
     const job = await prisma.merltQaJob.findUnique({ where: { id: res.body.jobId } });
     expect(job).not.toBeNull();
-    expect(job?.status).toBe('pending');
+    expect(job?.status).toBe('failed');
+    expect(job?.errorMessage).toBe('merlt_unavailable');
+    expect(job?.completedAt).not.toBeNull();
     expect(job?.consentLevel).toBe('basic');
   });
 

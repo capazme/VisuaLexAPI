@@ -34,6 +34,20 @@ describe('normalizeGraphUrn — strip ONLY the NIR version marker', () => {
     expect(normalizeGraphUrn(bare)).toBe(bare);
   });
 
+  it('strips the @originale suffix of the "originale" version, keeping the wrapper', () => {
+    expect(
+      normalizeGraphUrn(
+        'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942~art2043@originale',
+      ),
+    ).toBe('https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:codice.civile:1942~art2043');
+  });
+
+  it('cuts at whichever marker comes first when both appear', () => {
+    expect(normalizeGraphUrn('urn:nir:stato:costituzione~art1@originale!vig=')).toBe(
+      'urn:nir:stato:costituzione~art1',
+    );
+  });
+
   it('strips the marker on a bare NIR urn too', () => {
     expect(normalizeGraphUrn('urn:nir:stato:costituzione~art1!vig=')).toBe(
       'urn:nir:stato:costituzione~art1',

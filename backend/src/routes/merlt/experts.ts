@@ -21,7 +21,12 @@ import {
   confirmSourceRequestSchema,
 } from '../../schemas/merlt/experts';
 import { getExpertsClient } from '../../services/merlt/expertsClient';
-import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
+import {
+  MerltClientError,
+  MerltBadRequestError,
+  MerltTimeoutError,
+  MerltNetworkError,
+} from '../../services/merlt/merltClient';
 
 function clampInt(raw: unknown, def: number, min: number, max: number): number {
   const n = typeof raw === 'string' ? Number.parseInt(raw, 10) : NaN;
@@ -262,6 +267,22 @@ router.post('/experts/query/async', authenticate, consentGuard, async (req: Requ
       `merlt qa async: failed to enqueue MERL-T job jobId=${job.id}:`,
       err instanceof Error ? err.message : String(err)
     );
+    // A definite refusal (connection refused, MERL-T 4xx/5xx, "orchestrator
+    // not initialized") means the deliberation never started: flip the row
+    // now so the very first poll ends the turn, instead of a live spinner
+    // until the watchdog sweeps it ~20 minutes later. A timeout is NOT
+    // definite (MERL-T may have accepted the job and will still call back),
+    // so it stays pending. The status-guarded updateMany never clobbers a
+    // callback that raced in first.
+    const definite = !(err instanceof MerltTimeoutError) || err instanceof MerltNetworkError;
+    if (definite) {
+      await prisma.merltQaJob.updateMany({
+        where: { id: job.id, status: 'pending' },
+        data: { status: 'failed', errorMessage: 'merlt_unavailable', completedAt: new Date() },
+      });
+      res.status(202).json({ jobId: job.id, status: 'failed' });
+      return;
+    }
   }
 
   res.status(202).json({ jobId: job.id, status: 'pending' });

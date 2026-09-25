@@ -21,6 +21,7 @@
 
 import {
   MerltTimeoutError,
+  MerltNetworkError,
   MerltServerError,
   MerltBadRequestError,
 } from './merltClient';
@@ -90,8 +91,11 @@ export interface AdjudicateProvisionalResponse {
  * Trasforma "…~art2043!vig=" → "…~art2043" e lascia tutto il resto invariato.
  */
 export function normalizeGraphUrn(urn: string): string {
-  const bang = urn.indexOf('!');
-  return bang === -1 ? urn : urn.slice(0, bang);
+  // Two NIR version markers exist after the article segment: `!vig=`/`!orig=…`
+  // (vigente / historic) and the `@originale` suffix urngenerator appends for
+  // version "originale". The seed keys carry neither, so both are cut.
+  const cuts = [urn.indexOf('!'), urn.indexOf('@')].filter((i) => i !== -1);
+  return cuts.length === 0 ? urn : urn.slice(0, Math.min(...cuts));
 }
 
 export class GraphClient {
@@ -191,7 +195,7 @@ export class GraphClient {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new MerltTimeoutError(`Timeout after ${this.config.timeoutMs}ms calling ${path}`);
       }
-      throw new MerltTimeoutError(
+      throw new MerltNetworkError(
         `Network error calling ${path}: ${err instanceof Error ? err.message : String(err)}`
       );
     }

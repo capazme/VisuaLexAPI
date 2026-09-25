@@ -33,11 +33,14 @@ export function merltKillSwitch(_req: Request, res: Response, next: NextFunction
   next();
 }
 
-export function featureGate(flag: MerltSubFlag, prefixes: string[]) {
+export function featureGate(flag: MerltSubFlag, prefixes: string[], exactPaths: string[] = []) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const ownsPath = prefixes.some(
-      (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`)
-    );
+    // `prefixes` own a whole subtree; `exactPaths` own one path only, which is
+    // how a user-facing route (POST /ner/feedback) can sit under a different
+    // flag than the admin routes nested beneath it (/ner/feedback/stats).
+    const ownsPath =
+      prefixes.some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`)) ||
+      exactPaths.includes(req.path);
     if (!ownsPath) {
       next();
       return;

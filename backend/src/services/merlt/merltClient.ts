@@ -25,6 +25,20 @@ export class MerltTimeoutError extends MerltClientError {
   }
 }
 
+/**
+ * A failed connection (ECONNREFUSED, DNS, reset) as opposed to a request that
+ * MERL-T may have accepted but did not answer in time. Subclass of
+ * MerltTimeoutError so every existing `instanceof MerltTimeoutError` mapping
+ * (503 merlt_unavailable) still holds; routes that must tell "never started"
+ * from "still running" (the async Q&A submit) check for this class first.
+ */
+export class MerltNetworkError extends MerltTimeoutError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MerltNetworkError';
+  }
+}
+
 export class MerltServerError extends MerltClientError {
   constructor(message: string, status: number) {
     super(message, status);
@@ -159,7 +173,7 @@ export class MerltClient {
       if (err instanceof Error && err.name === 'AbortError') {
         throw new MerltTimeoutError(`Timeout after ${this.config.timeoutMs}ms calling ${path}`);
       }
-      throw new MerltTimeoutError(
+      throw new MerltNetworkError(
         `Network error calling ${path}: ${err instanceof Error ? err.message : String(err)}`
       );
     }

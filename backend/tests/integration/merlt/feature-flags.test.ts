@@ -57,6 +57,49 @@ describe('MERLT_ENABLED global kill switch', () => {
   });
 });
 
+describe('MERLT_OPS_ENABLED gates only the admin half of /ner', () => {
+  let user: TestUser;
+
+  beforeEach(async () => {
+    user = await createTestUser('flag-ner-user');
+  });
+
+  it('keeps the user-facing POST /ner/feedback reachable when ops is off', async () => {
+    process.env.MERLT_OPS_ENABLED = 'false';
+    process.env.MERLT_CONTRIBUTION_ENABLED = 'true';
+
+    // No full consent → contributionGuard answers 403: the route was reached,
+    // the gate did not 404 it away.
+    const feedbackRes = await request(app)
+      .post('/api/merlt/ner/feedback')
+      .set(authHeader(user))
+      .send({});
+    expect(feedbackRes.status).not.toBe(404);
+
+    const statsRes = await request(app).get('/api/merlt/ner/feedback/stats').set(authHeader(user));
+    expect(statsRes.status).toBe(404);
+    expect(statsRes.body).toEqual({ detail: 'merlt_disabled' });
+
+    const trainRes = await request(app)
+      .post('/api/merlt/ner/training/start')
+      .set(authHeader(user))
+      .send({});
+    expect(trainRes.status).toBe(404);
+  });
+
+  it('404s POST /ner/feedback when contribution is off, even with ops on', async () => {
+    process.env.MERLT_OPS_ENABLED = 'true';
+    process.env.MERLT_CONTRIBUTION_ENABLED = 'false';
+
+    const feedbackRes = await request(app)
+      .post('/api/merlt/ner/feedback')
+      .set(authHeader(user))
+      .send({});
+    expect(feedbackRes.status).toBe(404);
+    expect(feedbackRes.body).toEqual({ detail: 'merlt_disabled' });
+  });
+});
+
 describe('MERLT_GRAPH_ENABLED per-group gate', () => {
   let user: TestUser;
 

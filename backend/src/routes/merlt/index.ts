@@ -49,7 +49,11 @@ import { featureGate } from '../../middleware/merlt/featureGate';
  *  - flags.contribution   → contribRouter (/contrib, /internal/extraction-callback)
  *  - flags.validation     → validateRouter (/validate)
  *  - flags.ops            → opsRouter (/ops) + opsIngestionRouter (/ops, mechanical
- *                            ingestion) + nerRouter (/ner)
+ *                            ingestion) + the ADMIN half of nerRouter
+ *                            (/ner/training/*, /ner/feedback/stats)
+ *  - flags.contribution → POST /ner/feedback (the user-facing capture surface:
+ *                            a contribution gated by contributionGuard like
+ *                            /contrib, so it must not vanish with ops)
  */
 const router = Router();
 
@@ -64,7 +68,12 @@ router.use('/', featureGate('ops', ['/ops']), opsIngestionRouter);
 // catch-all auth routers (gotcha #1).
 router.use('/', expertsRouter);
 // Loop β #2 — NER feedback. Per-route auth → order-safe; before catch-all (gotcha #1).
-router.use('/', featureGate('ops', ['/ner']), nerRouter);
+router.use(
+  '/',
+  featureGate('ops', ['/ner/training', '/ner/feedback/stats']),
+  featureGate('contribution', [], ['/ner/feedback']),
+  nerRouter
+);
 router.use('/', consentRouter);
 router.use('/', profileRouter);
 router.use('/', eventsRouter);
