@@ -9,6 +9,8 @@ import { NodeDetailsDrawer } from './NodeDetailsDrawer';
 import { EdgeDetailsDrawer } from './EdgeDetailsDrawer';
 import { QaHistoryPanel } from '../../qa/QaHistoryPanel';
 import { QaSynthesisWithCitations } from '../../ner/QaSynthesisWithCitations';
+import { sendNerFeedback } from '../../../../services/merltService';
+import { RefineField } from './RefineField';
 import { normRefToSearchParams } from '../../validate/provenance';
 import { downloadAnswerJson } from '../../qa/answerExport';
 import { CANON_LABEL, sourceLabel, provenanceMeta, urnKind, toolLabel, formatRetrievedUrn } from '../../qa/format';
@@ -50,8 +52,13 @@ import type {
  *    is selected) — the graph-inspection surface.
  *
  * Presentational: it does NOT own `useQaThread` — the page passes `turns` and
- * the handlers. The teaching channels (rate/prefer/detailed/confirm) are P2
- * (design §5 L2); P1 shows the debate, it does not train the weights.
+ * the handlers. Consent ladder (Slice 3 D2, mirrored by the BFF guards):
+ * ASKING (compose field, "Approfondisci" refine) needs basic consent
+ * (`qaAskable`); every TEACHING channel (answer rating, detailed assessment,
+ * source relevance, "ricorda nel grafo", canon/relation steer, in-prose NER)
+ * needs full consent (`canContribute`). A basic-consent user sees a compact
+ * consent upsell in place of the teaching controls, never a control whose
+ * request the BFF would refuse.
  */
 export interface DeliberationColumnProps {
   activeTab: 'dibattito' | 'nodo';
@@ -101,19 +108,32 @@ export interface DeliberationColumnProps {
    */
   onLoadHistoryTurn?: (item: QaHistoryItem) => void;
   /**
-   * Wave C (gap C1): inline 👍/👎 on an answer (`useQaThread.rate`). Basic-consent
-   * feedback (like ask), NOT gated on `canContribute` — absent → the control hides.
+   * Wave C (gap C1): inline 👍/👎 on an answer (`useQaThread.rate`). A TEACHING
+   * channel: the BFF `/experts/feedback/inline` sits behind `contributionGuard`,
+   * so the control renders only with `canContribute` (full consent, D2); with
+   * basic consent a compact consent upsell takes its place. Absent → hidden.
    */
   onRate?: (turnId: string, traceId: string, rating: 1 | 5) => void;
-  /** Wave C: per-source relevance feedback (`useQaThread.rateSrc`). */
+  /** Wave C: per-source relevance feedback (`useQaThread.rateSrc`). Teaching channel — `canContribute` only. */
   onRateSource?: (traceId: string, sourceId: string, relevant: boolean) => void;
-  /** Wave C: the 3-dimension detailed assessment (`useQaThread.detailed`). */
+  /**
+   * Wave C: the 3-dimension detailed assessment (`useQaThread.detailed`).
+   * Teaching channel — `canContribute` only. When it returns a Promise, the
+   * "registrata" confirmation waits for it and shows only on a truthy result.
+   */
   onDetailed?: (
     traceId: string,
     scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number },
-  ) => void;
-  /** Wave C (gap C1): "ricorda nel grafo" confirm-source (`useQaThread.confirm`). */
+  ) => void | Promise<boolean>;
+  /** Wave C (gap C1): "ricorda nel grafo" confirm-source (`useQaThread.confirm`). Teaching channel — `canContribute` only. */
   onConfirmSource?: (turnId: string, source: QaRetrievedSource) => void;
+  /**
+   * Loop β refine: a follow-up on a settled turn, linked to its `trace_id`
+   * (`useQaThread.refine`). Refining is ASKING (BFF `consentGuard`), so the
+   * "Approfondisci questa risposta" composer renders with `qaAskable` and is
+   * blocked while `askBusy`. Absent → no follow-up composer.
+   */
+  onRefine?: (traceId: string, followUp: string) => void;
   selectedNode?: GraphNode | null;
   /**
    * Slice 4 P2a — the current canvas edge selection (discriminated union from
@@ -130,7 +150,11 @@ export interface DeliberationColumnProps {
    * column reading the same contributions.
    */
   expertContributions?: ExpertContribution[];
-  /** Full consent (D2): enables in-prose NER feedback in the synthesis. */
+  /**
+   * Full consent (D2): unlocks every teaching channel (rating, detailed
+   * assessment, source relevance, confirm-source, canon/relation steer and the
+   * in-prose NER feedback, surface qa_chip).
+   */
   canContribute: boolean;
   /**
    * Slice 4 P2b (L2, design §5) — "pesa di più questo canone". Fires the EXISTING
@@ -329,6 +353,7 @@ export function DeliberationColumn({
   onRateSource,
   onDetailed,
   onConfirmSource,
+  onRefine,
   selectedNode,
   selectedEdge,
   expertContributions,
@@ -440,6 +465,7 @@ export function DeliberationColumn({
           onRateSource={onRateSource}
           onDetailed={onDetailed}
           onConfirmSource={onConfirmSource}
+          onRefine={onRefine}
           expertContributions={expertContributions}
           canContribute={canContribute}
           onPreferCanon={onPreferCanon}
@@ -596,6 +622,7 @@ function DibattitoTab({
   onRateSource,
   onDetailed,
   onConfirmSource,
+  onRefine,
   expertContributions,
   canContribute,
   onPreferCanon,
@@ -624,8 +651,9 @@ function DibattitoTab({
   onDetailed?: (
     traceId: string,
     scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number },
-  ) => void;
+  ) => void | Promise<boolean>;
   onConfirmSource?: (turnId: string, source: QaRetrievedSource) => void;
+  onRefine?: (traceId: string, followUp: string) => void;
   expertContributions?: ExpertContribution[];
   canContribute: boolean;
   onPreferCanon?: (traceId: string, expert: string) => void;
@@ -753,6 +781,8 @@ function DibattitoTab({
                 onRateSource={onRateSource}
                 onDetailed={onDetailed}
                 onConfirmSource={onConfirmSource}
+                onRefine={onRefine}
+                askBusy={askBusy}
                 qaAskable={qaAskable}
                 canContribute={canContribute}
                 onPreferCanon={onPreferCanon}
@@ -802,8 +832,8 @@ function DibattitoTab({
  *
  * Wave C (gaps C1/C2/C3): surfaces the deliberation signals MERL-T already
  * computes but the FE never showed — inline 👍/👎 + detailed assessment
- * (`onRate`/`onDetailed`, basic-consent, gated on `qaAskable` not
- * `canContribute`), a "Come ha ragionato" reasoning-trace disclosure
+ * (`onRate`/`onDetailed`, teaching channels gated on `canContribute`, with a
+ * consent upsell at basic consent), a "Come ha ragionato" reasoning-trace disclosure
  * (`pipeline_trace`/`pipeline_metrics`), and a dissent banner
  * (`disagreement_analysis`/`disagreement_explanation`). Absent handlers hide
  * their affordance entirely (no dead controls).
@@ -825,6 +855,8 @@ function DeliberationTurn({
   onRateSource,
   onDetailed,
   onConfirmSource,
+  onRefine,
+  askBusy = false,
   qaAskable,
   canContribute,
   onPreferCanon,
@@ -846,8 +878,10 @@ function DeliberationTurn({
   onDetailed?: (
     traceId: string,
     scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number },
-  ) => void;
+  ) => void | Promise<boolean>;
   onConfirmSource?: (turnId: string, source: QaRetrievedSource) => void;
+  onRefine?: (traceId: string, followUp: string) => void;
+  askBusy?: boolean;
   qaAskable: boolean;
   canContribute: boolean;
   onPreferCanon?: (traceId: string, expert: string) => void;
@@ -971,7 +1005,10 @@ function DeliberationTurn({
           return (
             <div className="rounded-2xl rounded-tl-sm border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
               {/* The synthesis stays the primary readable prose (design §C). */}
-              <QaSynthesisWithCitations text={a.synthesis} enabled={canContribute} />
+              {/* Loop β #2, surface qa_chip: in-prose citations take NER
+                  feedback (full consent). The payload's context window is cut
+                  from the ANSWER only, never the user's question. */}
+              <QaSynthesisWithCitations text={a.synthesis} enabled={canContribute} onSubmit={sendNerFeedback} />
 
               {/* Wave 2 (P2.6): hydration state of a history-loaded turn — the
                   slim DTO landed instantly; the full trace details follow (or
@@ -1071,8 +1108,13 @@ function DeliberationTurn({
                         onHover={onSourceHover}
                         isSelected={sourceMatchesNode(s, selectedNode)}
                         onOpenNorm={onOpenNorm}
-                        onRate={onRateSource ? (relevant) => onRateSource(a.trace_id, s.urn, relevant) : undefined}
-                        onConfirm={onConfirmSource ? () => onConfirmSource(turn.id, s) : undefined}
+                        // Teaching channels (BFF contributionGuard): full consent only.
+                        onRate={
+                          canContribute && onRateSource
+                            ? (relevant) => onRateSource(a.trace_id, s.urn, relevant)
+                            : undefined
+                        }
+                        onConfirm={canContribute && onConfirmSource ? () => onConfirmSource(turn.id, s) : undefined}
                         confirmState={s.node_id ? turn.confirmed[s.node_id] : undefined}
                       />
                     ))}
@@ -1099,15 +1141,30 @@ function DeliberationTurn({
                   arrive on every answer but were never rendered. Closed by default. */}
               <ReasoningTraceDisclosure answer={a} toolUsages={a.toolUsages ?? []} reactSteps={a.reactSteps ?? []} />
 
-              {/* Wave C (gap C1): inline 👍/👎 + detailed assessment. Basic-consent
-                  feedback (like ask) — gated on qaAskable, NOT canContribute. */}
-              {(onRate || onDetailed) && qaAskable && (
-                <TurnFeedback
-                  turn={turn}
-                  traceId={a.trace_id}
-                  onRate={onRate}
-                  onDetailed={onDetailed}
-                />
+              {/* Wave C (gap C1): inline 👍/👎 + detailed assessment. Teaching
+                  channels (D2): the BFF refuses them below full consent, so a
+                  basic-consent jurist gets the consent upsell instead. */}
+              {(onRate || onDetailed) &&
+                (canContribute ? (
+                  <TurnFeedback
+                    turn={turn}
+                    traceId={a.trace_id}
+                    onRate={onRate}
+                    onDetailed={onDetailed}
+                  />
+                ) : qaAskable ? (
+                  <TeachUpsell
+                    message="Per valutare le risposte e le fonti serve il consenso completo."
+                    onOpenConsent={onOpenConsent}
+                    className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800"
+                  />
+                ) : null)}
+
+              {/* Loop β refine: a follow-up linked to THIS turn's trace. Asking,
+                  not teaching, so basic consent suffices. MERL-T re-reads the
+                  stored trace, so a history turn whose trace is gone offers none. */}
+              {onRefine && qaAskable && a.trace_id && turn.historyDetail !== 'unavailable' && (
+                <RefineField busy={askBusy} onRefine={(followUp) => onRefine(a.trace_id, followUp)} />
               )}
             </div>
           );
@@ -1540,11 +1597,49 @@ const DETAILED_DIMENSIONS: { key: 'retrieval' | 'reasoning' | 'synthesis'; label
 ];
 
 /**
- * Inline 👍/👎 + "Valutazione dettagliata" (Wave C gap C1). Basic-consent
- * feedback (like ask), gated on `qaAskable` — NOT `canContribute` (that's the
- * TEACH ladder for canon/relation steering). Rating reflects `turn.rating`
- * (optimistic, set by useQaThread.rate); the detailed assessment is local
- * component state (fire-and-forget, no server echo to reconcile against).
+ * Compact consent upsell (D2): shown in place of a teaching control when the
+ * jurist can ask (basic consent) but not teach (full consent). "Attiva" opens
+ * the consent dialog. The click stops propagation because some hosts sit inside
+ * a `<details>` body (the canon steer) that must not toggle. Never a dead button.
+ */
+function TeachUpsell({
+  message,
+  onOpenConsent,
+  className,
+}: {
+  message: string;
+  onOpenConsent?: () => void;
+  className?: string;
+}): React.ReactElement {
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400', className)}>
+      <Lock size={12} className="shrink-0" aria-hidden="true" />
+      <span>{message}</span>
+      {onOpenConsent && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenConsent();
+          }}
+          className="font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:underline focus-visible:outline-none dark:text-primary-400"
+        >
+          Attiva
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Inline 👍/👎 + "Valutazione dettagliata" (Wave C gap C1). TEACHING channels
+ * (D2): the caller renders this only with `canContribute` (the BFF refuses both
+ * below full consent). Rating reflects `turn.rating` — optimistic, set by
+ * useQaThread.rate and reverted there on failure. The detailed assessment shows
+ * its "registrata" confirmation only once `onDetailed`'s Promise resolves
+ * truthy; on failure the graded form stays so the jurist can resend (the error
+ * itself surfaces through the page Toast). A void-returning `onDetailed`
+ * confirms immediately (no server echo to wait for).
  */
 function TurnFeedback({
   turn,
@@ -1558,20 +1653,28 @@ function TurnFeedback({
   onDetailed?: (
     traceId: string,
     scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number },
-  ) => void;
+  ) => void | Promise<boolean>;
 }): React.ReactElement {
   const [grades, setGrades] = useState<Record<string, 0.3 | 0.6 | 0.9>>({});
-  const [detailedSent, setDetailedSent] = useState(false);
+  const [detailedStatus, setDetailedStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const allGraded = DETAILED_DIMENSIONS.every((d) => grades[d.key] !== undefined);
 
   const submitDetailed = (): void => {
-    if (!allGraded || !onDetailed) return;
-    onDetailed(traceId, {
+    if (!allGraded || !onDetailed || detailedStatus !== 'idle') return;
+    const result = onDetailed(traceId, {
       retrievalScore: grades.retrieval,
       reasoningScore: grades.reasoning,
       synthesisScore: grades.synthesis,
     });
-    setDetailedSent(true);
+    if (!result) {
+      setDetailedStatus('sent');
+      return;
+    }
+    setDetailedStatus('sending');
+    result.then(
+      (ok) => setDetailedStatus(ok ? 'sent' : 'idle'),
+      () => setDetailedStatus('idle'),
+    );
   };
 
   return (
@@ -1615,7 +1718,7 @@ function TurnFeedback({
             Valutazione dettagliata
           </summary>
           <div className="mt-2 space-y-2">
-            {detailedSent ? (
+            {detailedStatus === 'sent' ? (
               <p className="text-xs text-emerald-600 dark:text-emerald-400">Grazie, valutazione registrata.</p>
             ) : (
               <>
@@ -1644,12 +1747,13 @@ function TurnFeedback({
                 ))}
                 <button
                   type="button"
-                  disabled={!allGraded}
+                  disabled={!allGraded || detailedStatus === 'sending'}
                   onClick={submitDetailed}
                   title={allGraded ? undefined : 'Valuta tutte e tre le dimensioni'}
-                  className="text-xs font-medium text-primary-600 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-primary-400 dark:disabled:text-slate-600"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 disabled:cursor-not-allowed disabled:text-slate-300 dark:text-primary-400 dark:disabled:text-slate-600"
                 >
-                  Invia valutazione
+                  {detailedStatus === 'sending' && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}
+                  {detailedStatus === 'sending' ? 'Invio in corso…' : 'Invia valutazione'}
                 </button>
               </>
             )}
@@ -1827,22 +1931,11 @@ function CanonSteer({
 }): React.ReactElement {
   if (!canContribute) {
     return (
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        <Lock size={12} className="shrink-0" aria-hidden="true" />
-        <span>Per orientare il collegio serve il consenso completo.</span>
-        {onOpenConsent && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenConsent();
-            }}
-            className="font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:underline focus-visible:outline-none dark:text-primary-400"
-          >
-            Attiva
-          </button>
-        )}
-      </div>
+      <TeachUpsell
+        message="Per orientare il collegio serve il consenso completo."
+        onOpenConsent={onOpenConsent}
+        className="mt-2.5 border-t border-slate-100 pt-2.5 dark:border-slate-800"
+      />
     );
   }
 
@@ -1908,19 +2001,11 @@ function RelationSteer({
 }): React.ReactElement {
   if (!canContribute) {
     return (
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-t border-slate-200 px-3 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        <Lock size={12} className="shrink-0" aria-hidden="true" />
-        <span>Per orientare il collegio serve il consenso completo.</span>
-        {onOpenConsent && (
-          <button
-            type="button"
-            onClick={onOpenConsent}
-            className="font-medium text-primary-600 transition-colors hover:text-primary-700 focus-visible:underline focus-visible:outline-none dark:text-primary-400"
-          >
-            Attiva
-          </button>
-        )}
-      </div>
+      <TeachUpsell
+        message="Per orientare il collegio serve il consenso completo."
+        onOpenConsent={onOpenConsent}
+        className="shrink-0 border-t border-slate-200 px-3 py-2.5 dark:border-slate-800"
+      />
     );
   }
 

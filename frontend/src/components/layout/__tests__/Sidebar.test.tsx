@@ -55,14 +55,15 @@ beforeEach(() => {
 });
 
 describe('Sidebar navigation (MERL-T single entry)', () => {
-  it('flag on → single "Assistente" entry to /merlt, no /grafo entry, Cronologia above it', () => {
+  it('flag on → "Assistente" (hub) plus "Grafo" (the deliberation surface), Cronologia above them', () => {
+    // Slice 3 D1 had a single entry; Slice 4 Decision A (absorb) made /grafo
+    // the Q&A surface and points the sidebar at it too, the hub stays /merlt.
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/environments', '/forum', '/history', '/merlt']);
-    // exactly one MERL-T entry, none for the graph
+    expect(hrefs).toEqual(['/', '/dossier', '/environments', '/forum', '/history', '/merlt', '/grafo']);
+    // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
-    expect(hrefs).not.toContain('/grafo');
-    // Cronologia (/history) sits above the Assistente entry
+    // Cronologia (/history) sits above the MERL-T entries
     expect(hrefs.indexOf('/history')).toBeLessThan(hrefs.indexOf('/merlt'));
   });
 

@@ -135,6 +135,9 @@ export const PROVENANCE_STYLE: Record<NodeProvenance, ProvenanceStyle> = {
   seed: { lineWidth: 1.75 },
   community_validated: { lineWidth: 3 },
   live_unconfirmed: { lineWidth: 2, lineDash: [4, 3], strokeOverride: PROVISIONAL_AMBER },
+  // Promoted by use and feedback: solid like a seed node, a touch heavier so
+  // it reads as "earned" without the community-validated weight.
+  confirmed: { lineWidth: 2.5 },
 };
 
 /**

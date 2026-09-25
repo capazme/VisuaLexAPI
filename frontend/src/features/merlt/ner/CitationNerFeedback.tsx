@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { Check, Ban, Pencil } from 'lucide-react';
+import { Check, Ban, Loader2, Pencil } from 'lucide-react';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
 import { formatCitationLabel } from '../../../utils/citationMatcher';
 import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
 
 export interface CitationNerFeedbackProps {
   citation: ParsedCitationData;
-  onSubmit: (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => void;
+  /**
+   * Forward one feedback. When it returns a Promise the confirmation waits for
+   * it: resolved → the thank-you line; rejected → the choice row comes back
+   * with a "non registrato" note, so a failed request never reads as saved. A
+   * void return keeps the immediate (optimistic) confirmation.
+   */
+  onSubmit: (feedbackType: NerFeedbackType, correctReference?: NerCorrectReference) => void | Promise<unknown>;
 }
 
 /**
@@ -19,15 +25,43 @@ export interface CitationNerFeedbackProps {
  */
 export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackProps) {
   const [done, setDone] = useState<NerFeedbackType | null>(null);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [actType, setActType] = useState(citation.act_type ?? '');
   const [article, setArticle] = useState(citation.article ?? '');
 
   const submit = (type: NerFeedbackType, correctReference?: NerCorrectReference) => {
-    onSubmit(type, correctReference);
+    if (pending) return;
+    const result = onSubmit(type, correctReference);
     setEditing(false);
-    setDone(type);
+    if (!result) {
+      setDone(type);
+      return;
+    }
+    setPending(true);
+    setFailed(false);
+    result.then(
+      () => {
+        setPending(false);
+        setDone(type);
+      },
+      (err: unknown) => {
+        console.error('NER feedback failed:', err);
+        setPending(false);
+        setFailed(true);
+      },
+    );
   };
+
+  if (pending) {
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400" role="status">
+        <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+        Invio del riscontro…
+      </p>
+    );
+  }
 
   if (done) {
     return (
@@ -88,7 +122,13 @@ export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackP
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-slate-500 dark:text-slate-400">Citazione corretta?</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400">
+        {failed ? (
+          <span role="alert" className="text-amber-700 dark:text-amber-400">Riscontro non registrato. Riprova.</span>
+        ) : (
+          'Citazione corretta?'
+        )}
+      </span>
       <div className="flex items-center gap-1">
         <button
           type="button"

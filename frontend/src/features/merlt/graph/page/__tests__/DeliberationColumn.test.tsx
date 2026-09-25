@@ -52,6 +52,13 @@ vi.mock('../../../qa/qaApi', () => ({
   fetchHistory: (...a: unknown[]) => fetchHistoryMock(...a),
 }));
 
+// Loop β #2 qa_chip: the column forwards in-prose citation feedback straight to
+// the BFF NER client — spied so the wiring (and its payload) is assertable.
+const sendNerFeedbackMock = vi.fn();
+vi.mock('../../../../../services/merltService', () => ({
+  sendNerFeedback: (...a: unknown[]) => sendNerFeedbackMock(...a),
+}));
+
 const noop = vi.fn();
 
 function successTurn(): QaTurnModel {
@@ -150,6 +157,8 @@ beforeEach(() => {
   noop.mockReset();
   fetchHistoryMock.mockReset();
   fetchHistoryMock.mockResolvedValue([]);
+  sendNerFeedbackMock.mockReset();
+  sendNerFeedbackMock.mockResolvedValue({ received: true, feedback_id: 'f1', sample_weight: 1 });
 });
 
 function historyItem(): QaHistoryItem {
@@ -899,11 +908,11 @@ describe('DeliberationColumn collapse (Wave 2 UX — collapsible desktop column)
 // Wave C — surfacing deliberation signals already computed but never shown
 // ---------------------------------------------------------------------------
 
-describe('DeliberationColumn inline feedback (Wave C gap C1 — rate/detailed)', () => {
-  it('calls onRate with (turnId, traceId, rating) when 👍/👎 is clicked, gated on qaAskable', () => {
+describe('DeliberationColumn inline feedback (Wave C gap C1 — rate/detailed, full consent per D2)', () => {
+  it('calls onRate with (turnId, traceId, rating) when 👍/👎 is clicked, gated on canContribute', () => {
     const onRate = vi.fn();
     render(
-      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onRate={onRate} />,
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onRate={onRate} />,
     );
     fireEvent.click(screen.getByRole('button', { name: /risposta utile/i }));
     expect(onRate).toHaveBeenCalledWith('turn-1', 'trace-1', 5);
@@ -913,25 +922,78 @@ describe('DeliberationColumn inline feedback (Wave C gap C1 — rate/detailed)',
 
   it('reflects turn.rating optimistically on the pressed button', () => {
     const turn = { ...successTurn(), rating: 5 as const };
-    render(<DeliberationColumn {...baseProps()} turns={[turn]} qaAskable onRate={vi.fn()} />);
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} canContribute onRate={vi.fn()} />);
     expect(screen.getByRole('button', { name: /risposta utile/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /risposta non utile/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('un-presses the thumb when the rating is reverted after a failed request', () => {
+    const turn = { ...successTurn(), rating: 5 as const };
+    const { rerender } = render(
+      <DeliberationColumn {...baseProps()} turns={[turn]} canContribute onRate={vi.fn()} />,
+    );
+    expect(screen.getByRole('button', { name: /risposta utile/i })).toHaveAttribute('aria-pressed', 'true');
+    // useQaThread.rate patches the turn back to its acknowledged rating (none).
+    rerender(<DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onRate={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /risposta utile/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('hides the rate control when onRate is absent', () => {
-    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable />);
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute />);
     expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
   });
 
-  it('hides the rate control when asking is not unlocked (qaAskable false)', () => {
-    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable={false} onRate={vi.fn()} />);
+  it('basic consent (qaAskable, !canContribute): no 👍/👎 nor detailed assessment, the consent upsell instead', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[successTurn()]}
+        qaAskable
+        canContribute={false}
+        onRate={vi.fn()}
+        onDetailed={vi.fn()}
+        onOpenConsent={vi.fn()}
+      />,
+    );
     expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/valutazione dettagliata/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/per valutare le risposte e le fonti serve il consenso completo/i)).toBeInTheDocument();
+  });
+
+  it('the feedback upsell "Attiva" opens the consent dialog', () => {
+    const onOpenConsent = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[successTurn()]}
+        canContribute={false}
+        onRate={vi.fn()}
+        onOpenConsent={onOpenConsent}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^attiva$/i }));
+    expect(onOpenConsent).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders neither the controls nor the upsell when asking is not unlocked either (consent none)', () => {
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[successTurn()]}
+        qaAskable={false}
+        canContribute={false}
+        onRate={vi.fn()}
+        onDetailed={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/per valutare le risposte/i)).not.toBeInTheDocument();
   });
 
   it('submits the detailed 3-dimension assessment via onDetailed(traceId, scores)', () => {
     const onDetailed = vi.fn();
     render(
-      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onDetailed={onDetailed} />,
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onDetailed={onDetailed} />,
     );
     fireEvent.click(screen.getByText(/valutazione dettagliata/i));
     // Three dimensions, each with 3 grade buttons — grade all "adeguato" (0.6).
@@ -944,19 +1006,52 @@ describe('DeliberationColumn inline feedback (Wave C gap C1 — rate/detailed)',
       reasoningScore: 0.6,
       synthesisScore: 0.6,
     });
+    // A void-returning handler confirms immediately (nothing to wait for).
     expect(screen.getByText(/grazie, valutazione registrata/i)).toBeInTheDocument();
   });
 
+  it('shows "registrata" only once a Promise-returning onDetailed resolves true', async () => {
+    let resolve!: (ok: boolean) => void;
+    const onDetailed = vi.fn(() => new Promise<boolean>((r) => (resolve = r)));
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onDetailed={onDetailed} />,
+    );
+    fireEvent.click(screen.getByText(/valutazione dettagliata/i));
+    for (const b of screen.getAllByRole('button', { name: /^ottimo$/i })) fireEvent.click(b);
+    fireEvent.click(screen.getByRole('button', { name: /invia valutazione/i }));
+    // In flight: no confirmation yet, the send button is locked.
+    expect(screen.queryByText(/grazie, valutazione registrata/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /invio in corso/i })).toBeDisabled();
+    resolve(true);
+    expect(await screen.findByText(/grazie, valutazione registrata/i)).toBeInTheDocument();
+  });
+
+  it('keeps the graded form (no false "registrata") when onDetailed resolves false', async () => {
+    const onDetailed = vi.fn(() => Promise.resolve(false));
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onDetailed={onDetailed} />,
+    );
+    fireEvent.click(screen.getByText(/valutazione dettagliata/i));
+    for (const b of screen.getAllByRole('button', { name: /^scarso$/i })) fireEvent.click(b);
+    fireEvent.click(screen.getByRole('button', { name: /invia valutazione/i }));
+    // The form comes back, still graded, so the jurist can resend.
+    const resend = await screen.findByRole('button', { name: /invia valutazione/i });
+    expect(resend).toBeEnabled();
+    expect(screen.queryByText(/grazie, valutazione registrata/i)).not.toBeInTheDocument();
+    expect(onDetailed).toHaveBeenCalledTimes(1);
+  });
+
   it('disables the "Invia valutazione" button until all three dimensions are graded', () => {
-    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onDetailed={vi.fn()} />);
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onDetailed={vi.fn()} />);
     fireEvent.click(screen.getByText(/valutazione dettagliata/i));
     expect(screen.getByRole('button', { name: /invia valutazione/i })).toBeDisabled();
   });
 
-  it('hides the entire feedback row when neither onRate nor onDetailed is wired', () => {
+  it('hides the entire feedback row (and the upsell) when neither onRate nor onDetailed is wired', () => {
     render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable />);
     expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/valutazione dettagliata/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/per valutare le risposte/i)).not.toBeInTheDocument();
   });
 });
 
@@ -978,7 +1073,7 @@ describe('DeliberationColumn confirm-source (Wave C gap C1 — ricorda nel grafo
         { urn: 'live:abc123', provenance: 'live_unconfirmed', trust: 0.4, node_id: 'live-node-1' },
       ];
     }
-    render(<DeliberationColumn {...baseProps()} turns={[turn]} onConfirmSource={onConfirmSource} />);
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} canContribute onConfirmSource={onConfirmSource} />);
     const btn = screen.getByRole('button', { name: /ricorda nel grafo/i });
     fireEvent.click(btn);
     expect(onConfirmSource).toHaveBeenCalledTimes(1);
@@ -996,7 +1091,7 @@ describe('DeliberationColumn confirm-source (Wave C gap C1 — ricorda nel grafo
       ];
     }
     turn.confirmed = { 'live-node-1': 'done' };
-    render(<DeliberationColumn {...baseProps()} turns={[turn]} onConfirmSource={vi.fn()} />);
+    render(<DeliberationColumn {...baseProps()} turns={[turn]} canContribute onConfirmSource={vi.fn()} />);
     expect(screen.getByText(/ricordata/i)).toBeInTheDocument();
   });
 
@@ -1013,9 +1108,136 @@ describe('DeliberationColumn confirm-source (Wave C gap C1 — ricorda nel grafo
 
   it('calls onRateSource(traceId, urn, relevant) from the per-source rating buttons', () => {
     const onRateSource = vi.fn();
-    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} onRateSource={onRateSource} />);
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} canContribute onRateSource={onRateSource} />);
     fireEvent.click(screen.getAllByRole('button', { name: /segna .* come pertinente/i })[0]);
     expect(onRateSource).toHaveBeenCalledWith('trace-1', 'urn:x~art2043', true);
+  });
+
+  it('source chips carry neither relevance nor "ricorda nel grafo" below full consent (teaching channels)', () => {
+    const turn = successTurn();
+    if (turn.state.status === 'success') {
+      turn.state.answer.retrieved_sources = [
+        { urn: 'urn:x~art2043', provenance: 'seed', trust: 0.9, node_id: 'node-2043' },
+        { urn: 'live:abc123', provenance: 'live_unconfirmed', trust: 0.4, node_id: 'live-node-1' },
+      ];
+    }
+    const onRateSource = vi.fn();
+    const onConfirmSource = vi.fn();
+    render(
+      <DeliberationColumn
+        {...baseProps()}
+        turns={[turn]}
+        qaAskable
+        canContribute={false}
+        onRateSource={onRateSource}
+        onConfirmSource={onConfirmSource}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /segna .* come pertinente/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /segna .* come non pertinente/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ricorda nel grafo/i })).not.toBeInTheDocument();
+    // The chip itself (re-center) stays usable.
+    expect(screen.getByText('Fonti consultate (2)')).toBeInTheDocument();
+  });
+});
+
+describe('DeliberationColumn qa_chip NER feedback (Loop β #2)', () => {
+  function citedTurn(): QaTurnModel {
+    const turn = successTurn();
+    if (turn.state.status === 'success') {
+      turn.state.answer.synthesis = 'La responsabilità extracontrattuale è regolata dall’art. 2043 c.c. e seguenti.';
+    }
+    return turn;
+  }
+
+  it('forwards a confirmed in-prose citation to sendNerFeedback with surface qa_chip', async () => {
+    render(<DeliberationColumn {...baseProps()} turns={[citedTurn()]} canContribute />);
+    fireEvent.click(screen.getAllByRole('button', { name: /citazione:/i })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /conferma la citazione/i }));
+    expect(sendNerFeedbackMock).toHaveBeenCalledTimes(1);
+    const payload = sendNerFeedbackMock.mock.calls[0][0] as { contextWindow: string };
+    expect(payload).toEqual(expect.objectContaining({ surface: 'qa_chip', feedbackType: 'confirmation' }));
+    // Context comes from the ANSWER only — never the user's question.
+    expect(payload.contextWindow).toContain('2043');
+    expect(payload.contextWindow).not.toContain('Qual è la ratio');
+    expect(await screen.findByText(/grazie per il riscontro/i)).toBeInTheDocument();
+  });
+
+  it('does not claim success when the NER request fails', async () => {
+    sendNerFeedbackMock.mockRejectedValueOnce({ status: 503, message: 'down' });
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<DeliberationColumn {...baseProps()} turns={[citedTurn()]} canContribute />);
+    fireEvent.click(screen.getAllByRole('button', { name: /citazione:/i })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /segnala citazione errata/i }));
+    expect(await screen.findByText(/riscontro non registrato/i)).toBeInTheDocument();
+    expect(screen.queryByText(/grazie per il riscontro/i)).not.toBeInTheDocument();
+    err.mockRestore();
+  });
+
+  it('renders the citations as plain prose below full consent (no NER affordance)', () => {
+    render(<DeliberationColumn {...baseProps()} turns={[citedTurn()]} canContribute={false} />);
+    expect(screen.queryByRole('button', { name: /citazione:/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/responsabilità extracontrattuale/i)).toBeInTheDocument();
+  });
+});
+
+describe('DeliberationColumn refine ("Approfondisci questa risposta", Loop β)', () => {
+  it('sends a follow-up linked to the turn trace_id via onRefine', () => {
+    const onRefine = vi.fn();
+    render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable onRefine={onRefine} />);
+    fireEvent.click(screen.getByRole('button', { name: /approfondisci questa risposta/i }));
+    const input = screen.getByRole('textbox', { name: /domanda di approfondimento/i });
+    fireEvent.change(input, { target: { value: 'E per il danno non patrimoniale?' } });
+    fireEvent.click(screen.getByRole('button', { name: /invia l’approfondimento/i }));
+    expect(onRefine).toHaveBeenCalledWith('trace-1', 'E per il danno non patrimoniale?');
+    // The composer collapses after sending.
+    expect(screen.queryByRole('textbox', { name: /domanda di approfondimento/i })).not.toBeInTheDocument();
+  });
+
+  it('is available at basic consent (refining is asking, not teaching)', () => {
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable canContribute={false} onRefine={vi.fn()} />,
+    );
+    expect(screen.getByRole('button', { name: /approfondisci questa risposta/i })).toBeInTheDocument();
+  });
+
+  it('blocks sending while a deliberation is in flight (askBusy); Enter is a no-op too', () => {
+    const onRefine = vi.fn();
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable askBusy onRefine={onRefine} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /approfondisci questa risposta/i }));
+    const input = screen.getByRole('textbox', { name: /domanda di approfondimento/i });
+    fireEvent.change(input, { target: { value: 'seguito?' } });
+    expect(screen.getByRole('button', { name: /invia l’approfondimento/i })).toBeDisabled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onRefine).not.toHaveBeenCalled();
+  });
+
+  it('is hidden when asking is not unlocked (consent none)', () => {
+    render(
+      <DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable={false} onRefine={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: /approfondisci questa risposta/i })).not.toBeInTheDocument();
+  });
+
+  it('is hidden on a history turn whose stored trace is no longer available', () => {
+    const gone = { ...successTurn(), historyDetail: 'unavailable' as const };
+    render(<DeliberationColumn {...baseProps()} turns={[gone]} qaAskable onRefine={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /approfondisci questa risposta/i })).not.toBeInTheDocument();
+  });
+
+  it('is hidden when onRefine is not wired, and on turns that have not settled', () => {
+    const loading: QaTurnModel = {
+      id: 'turn-2',
+      question: 'in corso?',
+      confirmed: {},
+      state: { status: 'loading' },
+    };
+    const { rerender } = render(<DeliberationColumn {...baseProps()} turns={[successTurn()]} qaAskable />);
+    expect(screen.queryByRole('button', { name: /approfondisci questa risposta/i })).not.toBeInTheDocument();
+    rerender(<DeliberationColumn {...baseProps()} turns={[loading]} qaAskable onRefine={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /approfondisci questa risposta/i })).not.toBeInTheDocument();
   });
 });
 

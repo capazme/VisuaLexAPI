@@ -61,6 +61,44 @@ describe('QaSynthesisWithCitations (surface: qa_chip)', () => {
     expect(payload.contextWindow).not.toContain('###');
   });
 
+  it('renders no NER affordance without an onSubmit handler, even when enabled (nothing wired → no false thanks)', () => {
+    render(<QaSynthesisWithCitations text={TEXT} enabled />);
+    expect(screen.queryByRole('button', { name: /citazione:/i })).toBeNull();
+    expect(screen.getByText(/La risoluzione per inadempimento/)).toBeInTheDocument();
+  });
+
+  it('a void-returning handler confirms immediately (article_xref-style optimistic path)', () => {
+    render(<QaSynthesisWithCitations text={TEXT} enabled onSubmit={vi.fn()} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /citazione:/i })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /conferma la citazione/i }));
+    expect(screen.getByText(/grazie per il riscontro/i)).toBeInTheDocument();
+  });
+
+  it('waits for a Promise-returning handler before thanking the user', async () => {
+    let resolve!: () => void;
+    const onSubmit = vi.fn(() => new Promise<void>((r) => (resolve = r)));
+    render(<QaSynthesisWithCitations text={TEXT} enabled onSubmit={onSubmit} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /citazione:/i })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /conferma la citazione/i }));
+    expect(screen.getByText(/invio del riscontro/i)).toBeInTheDocument();
+    expect(screen.queryByText(/grazie per il riscontro/i)).toBeNull();
+    resolve();
+    expect(await screen.findByText(/grazie per il riscontro/i)).toBeInTheDocument();
+  });
+
+  it('a rejected handler never reads as saved: the choices come back with a "non registrato" note', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onSubmit = vi.fn(() => Promise.reject(new Error('503')));
+    render(<QaSynthesisWithCitations text={TEXT} enabled onSubmit={onSubmit} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /citazione:/i })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /segnala citazione errata/i }));
+    expect(await screen.findByText(/riscontro non registrato/i)).toBeInTheDocument();
+    expect(screen.queryByText(/grazie per il riscontro/i)).toBeNull();
+    // The jurist can send again.
+    expect(screen.getByRole('button', { name: /conferma la citazione/i })).toBeInTheDocument();
+    err.mockRestore();
+  });
+
   it('detects citations inside list items and renders chips there', () => {
     render(
       <QaSynthesisWithCitations

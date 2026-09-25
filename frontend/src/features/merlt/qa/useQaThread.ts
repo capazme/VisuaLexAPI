@@ -66,6 +66,31 @@ function friendlyQaError(err: unknown): string {
   return 'Non è stato possibile ottenere una risposta. Riprova.';
 }
 
+/** Which teaching channel failed — picks the copy of {@link friendlyFeedbackError}. */
+type FeedbackKind = 'rating' | 'confirm';
+
+/**
+ * Map a failed teaching-channel request (rate / rateSrc / detailed / confirm)
+ * to user-facing Italian copy. These channels sit behind the BFF
+ * `contributionGuard` (full consent, Slice 3 D2): a 403 means the consent was
+ * never granted or was revoked mid-thread, so the copy points at consent
+ * rather than at a retry that cannot succeed.
+ */
+function friendlyFeedbackError(err: unknown, kind: FeedbackKind): string {
+  const status =
+    typeof err === 'object' && err !== null && 'status' in err
+      ? (err as { status?: number }).status
+      : undefined;
+  if (status === 403) {
+    return kind === 'confirm'
+      ? 'Per ricordare le fonti nel grafo serve il consenso completo.'
+      : 'Per inviare valutazioni serve il consenso completo.';
+  }
+  return kind === 'confirm'
+    ? 'Fonte non ricordata nel grafo. Riprova più tardi.'
+    : 'Valutazione non registrata. Riprova più tardi.';
+}
+
 // qa-async-progressive-contract.md §2: same cadence as the ingestion/extraction
 // job polls (useIngestionJob.ts / useExtractionJob.ts) — 2s.
 const QA_POLL_INTERVAL_MS = 2000;
@@ -170,15 +195,39 @@ async function askAsync(
   return pollQaJob(jobId, signal, onPartial);
 }
 
+export interface UseQaThreadOptions {
+  /**
+   * Receives Italian user-facing copy when a teaching-channel request (rate /
+   * rateSrc / detailed / confirm) fails, so the owner can surface it (the
+   * /grafo page renders it through the shared Toast). Absent → the failure is
+   * only logged; the optimistic state is reverted either way.
+   */
+  onFeedbackError?: (message: string) => void;
+}
+
 /**
  * Conversational Q&A thread over the MERL-T experts. Holds the turns, drives
  * ask/refine, and the granular feedback channels (inline / per-source /
- * preference / detailed) + confirm-source. All feedback is fire-and-forget and
- * optimistic. Latest-wins per turn via a request token (a stale response for a
- * turn that was re-run is discarded). All setState lives in callbacks — never
- * synchronously inside an effect (react-hooks/set-state-in-effect).
+ * preference / detailed) + confirm-source. The teaching channels are
+ * optimistic but never silently lossy: a failed rate reverts `turn.rating`, a
+ * failed detailed assessment resolves `false`, a failed confirm marks the
+ * source 'error', and every one of them reports through `onFeedbackError`
+ * (`prefer` stays fire-and-forget: its steer is gated on full consent upstream
+ * and a failed steer is deliberately not surfaced). Latest-wins per turn via a
+ * request token (a stale response for a turn that was re-run is discarded).
+ * All setState lives in callbacks — never synchronously inside an effect
+ * (react-hooks/set-state-in-effect).
  */
-export function useQaThread() {
+export function useQaThread(options: UseQaThreadOptions = {}) {
+  const { onFeedbackError } = options;
+  // Latest reporter in a ref, synced in an effect (never written during render —
+  // react-hooks/refs), so the feedback callbacks below stay stable even when the
+  // owner passes an inline function.
+  const onFeedbackErrorRef = useRef(onFeedbackError);
+  useEffect(() => {
+    onFeedbackErrorRef.current = onFeedbackError;
+  }, [onFeedbackError]);
+
   // Hydrate the completed thread from localStorage so a reload doesn't lose
   // past answers (Loop β #1 option A). Lazy initializer → runs once.
   const [turns, setTurns] = useState<QaTurnModel[]>(() => {
@@ -315,27 +364,77 @@ export function useQaThread() {
     controllers.current[turnId]?.abort();
   }, []);
 
+  const reportFeedbackError = useCallback((err: unknown, kind: FeedbackKind): void => {
+    onFeedbackErrorRef.current?.(friendlyFeedbackError(err, kind));
+  }, []);
+
+  // Inline 👍/👎 (teaching channel, full consent). Optimistic, but reverted on
+  // failure. Latest-wins per turn: only the failure of the NEWEST click reverts
+  // and reports (an older click's outcome is superseded by the newer intent).
+  // The revert target is the last server-acknowledged rating, baselined on the
+  // first click of the session from the turn's current value (a restored turn
+  // keeps its persisted rating) — so a double failure never leaves a pressed
+  // thumb that nothing stored.
+  const ratingTokens = useRef<Record<string, number>>({});
+  const ackedRatings = useRef<Record<string, 1 | 5 | undefined>>({});
   const rate = useCallback(
     (turnId: string, traceId: string, rating: 1 | 5): void => {
+      if (!(turnId in ackedRatings.current)) {
+        ackedRatings.current[turnId] = turns.find((t) => t.id === turnId)?.rating;
+      }
+      const token = (ratingTokens.current[turnId] = (ratingTokens.current[turnId] ?? 0) + 1);
       patch(turnId, (t) => ({ ...t, rating }));
-      void rateAnswer(traceId, rating).catch((e) => console.error('rate failed:', e));
+      void rateAnswer(traceId, rating).then(
+        () => {
+          ackedRatings.current[turnId] = rating;
+        },
+        (e: unknown) => {
+          console.error('rate failed:', e);
+          if (ratingTokens.current[turnId] !== token) return;
+          const acked = ackedRatings.current[turnId];
+          patch(turnId, (t) => ({ ...t, rating: acked }));
+          reportFeedbackError(e, 'rating');
+        },
+      );
     },
-    [patch],
+    [turns, patch, reportFeedbackError],
   );
 
-  const rateSrc = useCallback((traceId: string, sourceId: string, relevant: boolean): void => {
-    void rateSource(traceId, sourceId, relevant).catch((e) => console.error('rateSource failed:', e));
-  }, []);
+  // Per-source relevance: no optimistic UI to revert, but the failure is
+  // reported instead of only logged.
+  const rateSrc = useCallback(
+    (traceId: string, sourceId: string, relevant: boolean): void => {
+      void rateSource(traceId, sourceId, relevant).catch((e: unknown) => {
+        console.error('rateSource failed:', e);
+        reportFeedbackError(e, 'rating');
+      });
+    },
+    [reportFeedbackError],
+  );
 
   const prefer = useCallback((traceId: string, expert: string): void => {
     void preferExpert(traceId, expert).catch((e) => console.error('preferExpert failed:', e));
   }, []);
 
+  // Detailed 3-dimension assessment. Resolves `true` once the BFF stored it and
+  // `false` on failure (reported through onFeedbackError), so the caller shows
+  // its "registrata" confirmation only for a real success. Never rejects.
   const detailed = useCallback(
-    (traceId: string, scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number }, comment?: string): void => {
-      void rateDetailed(traceId, scores, comment).catch((e) => console.error('rateDetailed failed:', e));
+    async (
+      traceId: string,
+      scores: { retrievalScore: number; reasoningScore: number; synthesisScore: number },
+      comment?: string,
+    ): Promise<boolean> => {
+      try {
+        await rateDetailed(traceId, scores, comment);
+        return true;
+      } catch (e) {
+        console.error('rateDetailed failed:', e);
+        reportFeedbackError(e, 'rating');
+        return false;
+      }
     },
-    [],
+    [reportFeedbackError],
   );
 
   const confirm = useCallback(
@@ -351,9 +450,10 @@ export function useQaThread() {
       } catch (e) {
         console.error('confirm-source failed:', e);
         patch(turnId, (t) => ({ ...t, confirmed: { ...t.confirmed, [nodeId]: 'error' } }));
+        reportFeedbackError(e, 'confirm');
       }
     },
-    [patch],
+    [patch, reportFeedbackError],
   );
 
   const clear = useCallback((): void => {

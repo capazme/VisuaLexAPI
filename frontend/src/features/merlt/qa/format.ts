@@ -107,6 +107,8 @@ const PROVENANCE_META: Record<string, ProvenanceMeta> = {
   seed: { label: 'fondativa', stripe: 'bg-slate-400', chip: 'text-slate-500 dark:text-slate-400' },
   lazy_ingest: { label: 'acquisita', stripe: 'bg-sky-400', chip: 'text-sky-600 dark:text-sky-400' },
   community_validated: { label: 'validata dalla community', stripe: 'bg-emerald-500', chip: 'text-emerald-600 dark:text-emerald-400' },
+  // `confirmed` is the value the promotion engine writes; `live_confirmed` is a legacy alias.
+  confirmed: { label: "confermata dall'uso", stripe: 'bg-teal-500', chip: 'text-teal-600 dark:text-teal-400' },
   live_confirmed: { label: 'confermata', stripe: 'bg-emerald-500', chip: 'text-emerald-600 dark:text-emerald-400' },
   live_unconfirmed: { label: 'provvisoria', stripe: 'bg-amber-400', chip: 'text-amber-600 dark:text-amber-400' },
 };

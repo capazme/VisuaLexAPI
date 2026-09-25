@@ -233,11 +233,21 @@ export function GraphExplorerPage(): React.ReactElement {
   const [pendingExpandId, setPendingExpandId] = useState<string | null>(null);
   const expandEpochRef = useRef(0);
 
+  // Page-level toast (shared ui/Toast): graph refresh/expansion notices and the
+  // Q&A teaching-channel failures reported by useQaThread below.
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  // A failed rating / detailed assessment / confirm-source (403 below full
+  // consent, BFF or MERL-T down) must never read as saved: useQaThread reverts
+  // its optimistic state and hands the Italian copy here.
+  const handleQaFeedbackError = useCallback((message: string): void => {
+    setToast({ message, type: 'error' });
+  }, []);
+
   // Slice 4 P1: the page OWNS the Q&A thread (useQaThread lifted here); the
   // header field + deliberation column are presentational and receive turns +
   // handlers. `ask`/`retry`/`cancel` are stable callbacks (useCallback in the
   // hook), so passing them down does not thrash the column.
-  const qa = useQaThread();
+  const qa = useQaThread({ onFeedbackError: handleQaFeedbackError });
   // MARQUEE feature: "Segui il ragionamento sul grafo" — which turn's walk (if
   // any) is being replayed on the MAIN canvas. Lifted here (not in
   // DeliberationColumn) because the replay takes over the main region, not the
@@ -384,7 +394,6 @@ export function GraphExplorerPage(): React.ReactElement {
   const [triggerError, setTriggerError] = useState<IngestionTriggerErrorKind | null>(null);
   const job = useIngestionJob(jobId);
   const triggeredRef = useRef(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
   // Filtering / legend state (client-side, no refetch — hides via G6 visibility).
   const [hiddenNodeTypes, setHiddenNodeTypes] = useState<ReadonlySet<string>>(new Set());
@@ -925,6 +934,20 @@ export function GraphExplorerPage(): React.ReactElement {
     [qa, urn, centerLabel, centerType, switchTab, revealColumn, contextBasket],
   );
 
+  // Loop β refine ("Approfondisci questa risposta"): a follow-up linked to a
+  // settled turn's trace_id. It CONTINUES that deliberation, so the ask-time
+  // scope (defect #10) is left untouched; the column reveals the new turn.
+  // Still the sync BFF /experts/refine route (single round-trip under the
+  // experts timeout) until an async refine lands.
+  const handleRefine = useCallback(
+    (traceId: string, followUp: string): void => {
+      switchTab('dibattito');
+      revealColumn();
+      void qa.refine(traceId, followUp);
+    },
+    [qa, switchTab, revealColumn],
+  );
+
   // P1.10: one collegial run at a time — both AskGraphField instances share this.
   // 'partial' (async progressive Q&A) is still an in-flight deliberation.
   const qaBusy = qa.turns.some((t) => t.state.status === 'loading' || t.state.status === 'partial');
@@ -1335,6 +1358,7 @@ export function GraphExplorerPage(): React.ReactElement {
             onRateSource={qa.rateSrc}
             onDetailed={qa.detailed}
             onConfirmSource={qa.confirm}
+            onRefine={handleRefine}
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
             expertContributions={expertContributions}

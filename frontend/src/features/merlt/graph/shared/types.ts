@@ -25,7 +25,12 @@ export interface GraphNode {
  *  - `community_validated`→ ring / emphasized border (peer-reviewed)
  *  - `live_unconfirmed`   → dashed amber (provisional, cleared no consensus)
  */
-export type NodeProvenance = 'seed' | 'community_validated' | 'live_unconfirmed';
+/**
+ * `confirmed` is what the co-evolution promotion engine and the provisional
+ * review write when a live-retrieved node earns its place (community_validated
+ * stays false): it used to fall into the `seed` bucket and read "Corpus".
+ */
+export type NodeProvenance = 'seed' | 'community_validated' | 'live_unconfirmed' | 'confirmed';
 
 /**
  * Transformed node data carried on the G6 item (`node.data`) after
@@ -52,6 +57,7 @@ const PROVENANCE_VALUES: ReadonlySet<string> = new Set<NodeProvenance>([
   'seed',
   'community_validated',
   'live_unconfirmed',
+  'confirmed',
 ]);
 
 function coerceTrust(value: unknown): number | undefined {

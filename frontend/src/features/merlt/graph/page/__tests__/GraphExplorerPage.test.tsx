@@ -40,26 +40,37 @@ vi.mock('../../../useMerltFeatures', () => ({
 }));
 
 const qaAskMock = vi.fn();
+const qaRefineMock = vi.fn();
 const loadHistoryTurnMock = vi.fn();
-const qaThreadState: { turns: QaTurnModel[] } = { turns: [] };
+// The options the page hands useQaThread (the teaching-channel error reporter).
+const qaThreadState: {
+  turns: QaTurnModel[];
+  options?: { onFeedbackError?: (message: string) => void };
+} = { turns: [] };
 vi.mock('../../../qa/useQaThread', () => ({
-  useQaThread: () => ({
-    turns: qaThreadState.turns,
-    ask: (...a: unknown[]) => {
-      qaAskMock(...a);
-      return Promise.resolve();
-    },
-    refine: vi.fn(),
-    retry: vi.fn(),
-    cancel: vi.fn(),
-    rate: vi.fn(),
-    rateSrc: vi.fn(),
-    prefer: vi.fn(),
-    detailed: vi.fn(),
-    confirm: vi.fn(),
-    clear: vi.fn(),
-    loadHistoryTurn: (...a: unknown[]) => loadHistoryTurnMock(...a),
-  }),
+  useQaThread: (options?: { onFeedbackError?: (message: string) => void }) => {
+    qaThreadState.options = options;
+    return {
+      turns: qaThreadState.turns,
+      ask: (...a: unknown[]) => {
+        qaAskMock(...a);
+        return Promise.resolve();
+      },
+      refine: (...a: unknown[]) => {
+        qaRefineMock(...a);
+        return Promise.resolve();
+      },
+      retry: vi.fn(),
+      cancel: vi.fn(),
+      rate: vi.fn(),
+      rateSrc: vi.fn(),
+      prefer: vi.fn(),
+      detailed: vi.fn(),
+      confirm: vi.fn(),
+      clear: vi.fn(),
+      loadHistoryTurn: (...a: unknown[]) => loadHistoryTurnMock(...a),
+    };
+  },
 }));
 
 // The deliberation column's "Cronologia" affordance mounts QaHistoryPanel, which
@@ -129,12 +140,14 @@ beforeEach(() => {
   featuresMock.mockReset();
   featuresMock.mockReturnValue(features());
   qaAskMock.mockReset();
+  qaRefineMock.mockReset();
   loadHistoryTurnMock.mockReset();
   fetchHistoryMock.mockReset();
   fetchHistoryMock.mockResolvedValue([]);
   sendRelationFeedbackMock.mockReset();
   sendRelationFeedbackMock.mockResolvedValue(undefined);
   qaThreadState.turns = [];
+  qaThreadState.options = undefined;
   lastCanvasProps = {};
   canvasFitMock.mockReset();
   canvasFocusNodeMock.mockReset();
@@ -867,8 +880,88 @@ describe('GraphExplorerPage', () => {
 
       selectRelationEdge();
       expect(screen.queryByRole('button', { name: /privilegia questa relazione/i })).not.toBeInTheDocument();
-      expect(screen.getByText(/serve il consenso completo/i)).toBeInTheDocument();
+      expect(screen.getByText(/per orientare il collegio serve il consenso completo/i)).toBeInTheDocument();
       expect(sendRelationFeedbackMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Loop β teaching channels + refine on /grafo (consent ladder D2)', () => {
+    function settled(traceId: string): QaTurnModel {
+      return {
+        id: `turn-${traceId}`,
+        question: 'Domanda deliberata',
+        confirmed: {},
+        state: {
+          status: 'success',
+          answer: {
+            trace_id: traceId,
+            synthesis: 'Sintesi.',
+            mode: 'convergent',
+            alternatives: null,
+            sources: [],
+            retrieved_sources: [],
+            experts_used: ['literal'],
+            confidence: 0.8,
+            execution_time_ms: 10,
+          },
+        },
+      } as QaTurnModel;
+    }
+
+    function setOneNodeGraph(): void {
+      setGraph({
+        status: 'success',
+        data: { nodes: [{ id: 'node-2043', type: 'Norma', label: 'Art. 2043', urn: 'urn:x~art2043' }], edges: [] },
+        elements: { nodes: [{ id: 'node-2043' }], edges: [] },
+      });
+    }
+
+    it('full consent: the answer carries 👍/👎', () => {
+      qaThreadState.turns = [settled('trace-a')];
+      setOneNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(screen.getByRole('button', { name: /risposta utile/i })).toBeInTheDocument();
+    });
+
+    it('basic consent: no 👍/👎, the consent upsell instead (the BFF would refuse the rating)', () => {
+      featuresMock.mockReturnValue(features({ canContribute: false, canValidate: false, consentLevel: 'basic' }));
+      qaThreadState.turns = [settled('trace-a')];
+      setOneNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(screen.queryByRole('button', { name: /risposta utile/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/per valutare le risposte e le fonti serve il consenso completo/i)).toBeInTheDocument();
+    });
+
+    it('surfaces a failed teaching-channel request through the page Toast', () => {
+      setOneNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(qaThreadState.options?.onFeedbackError).toEqual(expect.any(Function));
+      act(() => {
+        qaThreadState.options?.onFeedbackError?.('Per inviare valutazioni serve il consenso completo.');
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent(/per inviare valutazioni serve il consenso completo/i);
+    });
+
+    it('"Approfondisci questa risposta" refines the turn by its trace_id (basic consent is enough)', () => {
+      featuresMock.mockReturnValue(features({ canContribute: false, canValidate: false, consentLevel: 'basic' }));
+      qaThreadState.turns = [settled('trace-a')];
+      setOneNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      fireEvent.click(screen.getByRole('button', { name: /approfondisci questa risposta/i }));
+      fireEvent.change(screen.getByRole('textbox', { name: /domanda di approfondimento/i }), {
+        target: { value: 'E la prescrizione?' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /invia l’approfondimento/i }));
+      expect(qaRefineMock).toHaveBeenCalledWith('trace-a', 'E la prescrizione?');
+      expect(qaAskMock).not.toHaveBeenCalled();
+    });
+
+    it('no refine composer when asking is not unlocked', () => {
+      featuresMock.mockReturnValue(features({ qaAskable: false, canContribute: false }));
+      qaThreadState.turns = [settled('trace-a')];
+      setOneNodeGraph();
+      renderAt('/grafo?urn=urn%3Ax~art2043');
+      expect(screen.queryByRole('button', { name: /approfondisci questa risposta/i })).not.toBeInTheDocument();
     });
   });
 

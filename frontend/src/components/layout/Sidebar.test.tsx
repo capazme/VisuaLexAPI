@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -69,5 +69,28 @@ describe('Sidebar — accessible names', () => {
       'aria-expanded',
       'false',
     );
+  });
+});
+
+describe('Sidebar — MERL-T graph entry (Slice 4 Decision A)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('links to /grafo when both MERL-T flags are on (default)', () => {
+    renderSidebar();
+    expect(screen.getByRole('link', { name: /Grafo/ })).toHaveAttribute('href', '/grafo');
+  });
+
+  it('hides the entry when VITE_FEATURE_MERLT_GRAPH is off', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
+    renderSidebar();
+    expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
+  });
+
+  it('hides the entry when MERL-T itself is off', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    renderSidebar();
+    expect(screen.queryByRole('link', { name: /Grafo/ })).not.toBeInTheDocument();
   });
 });

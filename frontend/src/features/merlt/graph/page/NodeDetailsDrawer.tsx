@@ -40,6 +40,7 @@ const PROVENANCE_META: Record<NodeProvenance, { label: string; color: string }> 
   seed: { label: 'Corpus', color: '#2563eb' },
   community_validated: { label: 'Validato dalla comunità', color: '#059669' },
   live_unconfirmed: { label: 'Non confermato', color: '#d97706' },
+  confirmed: { label: "Confermato dall'uso", color: '#0d9488' },
 };
 
 function asText(value: unknown): string | null {

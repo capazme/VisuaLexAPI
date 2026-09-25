@@ -7,6 +7,7 @@ const refineQuestion = vi.fn();
 const rateAnswer = vi.fn();
 const rateSource = vi.fn();
 const confirmSource = vi.fn();
+const rateDetailed = vi.fn();
 // Wave 2 P2.6: loadHistoryTurn hydrates details via fetchQaTrace — default to a
 // pending promise so history tests stay focused unless they override it.
 const fetchQaTrace = vi.fn<(...a: unknown[]) => Promise<unknown>>(() => new Promise(() => {}));
@@ -18,7 +19,7 @@ vi.mock('../qaApi', () => ({
   rateAnswer: (...a: unknown[]) => rateAnswer(...a),
   rateSource: (...a: unknown[]) => rateSource(...a),
   preferExpert: vi.fn(),
-  rateDetailed: vi.fn(),
+  rateDetailed: (...a: unknown[]) => rateDetailed(...a),
   confirmSource: (...a: unknown[]) => confirmSource(...a),
   fetchQaTrace: (...a: unknown[]) => fetchQaTrace(...a),
 }));
@@ -216,6 +217,146 @@ describe('useQaThread', () => {
     });
     await waitFor(() => expect(result.current.turns[0].rating).toBe(5));
     expect(rateAnswer).toHaveBeenCalledWith('t1', 5);
+  });
+
+  // The teaching channels sit behind the BFF contributionGuard (full consent).
+  // A refused or failed request must never leave a success state behind.
+  describe('teaching-channel failures (revert + report, never silent)', () => {
+    async function askedThread(onFeedbackError = vi.fn()) {
+      mockAskSucceedsOnFirstTick();
+      const hook = renderHook(() => useQaThread({ onFeedbackError }));
+      await act(async () => {
+        await hook.result.current.ask('q', 'convergent');
+      });
+      await waitFor(() => expect(hook.result.current.turns[0].state.status).toBe('success'));
+      return { ...hook, onFeedbackError };
+    }
+
+    it('rate() failure reverts the optimistic rating and reports the consent copy on a 403', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rateAnswer.mockRejectedValueOnce({ status: 403, message: 'contribution_consent_required' });
+      const { result, onFeedbackError } = await askedThread();
+      act(() => {
+        result.current.rate(result.current.turns[0].id, 't1', 5);
+      });
+      expect(result.current.turns[0].rating).toBe(5); // optimistic
+      await waitFor(() => expect(result.current.turns[0].rating).toBeUndefined());
+      expect(onFeedbackError).toHaveBeenCalledWith('Per inviare valutazioni serve il consenso completo.');
+      err.mockRestore();
+    });
+
+    it('rate() failure on a non-consent error reports the generic copy', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rateAnswer.mockRejectedValueOnce({ status: 503, message: 'merlt_unavailable' });
+      const { result, onFeedbackError } = await askedThread();
+      act(() => {
+        result.current.rate(result.current.turns[0].id, 't1', 1);
+      });
+      await waitFor(() => expect(onFeedbackError).toHaveBeenCalledWith('Valutazione non registrata. Riprova più tardi.'));
+      expect(result.current.turns[0].rating).toBeUndefined();
+      err.mockRestore();
+    });
+
+    it('rate() reverts to the last ACKNOWLEDGED rating, not to a failed optimistic one', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rateAnswer.mockResolvedValueOnce(undefined).mockRejectedValueOnce({ status: 503 });
+      const { result, onFeedbackError } = await askedThread();
+      await act(async () => {
+        result.current.rate(result.current.turns[0].id, 't1', 5);
+      });
+      await waitFor(() => expect(rateAnswer).toHaveBeenCalledTimes(1));
+      act(() => {
+        result.current.rate(result.current.turns[0].id, 't1', 1);
+      });
+      expect(result.current.turns[0].rating).toBe(1);
+      await waitFor(() => expect(result.current.turns[0].rating).toBe(5));
+      expect(onFeedbackError).toHaveBeenCalledTimes(1);
+      err.mockRestore();
+    });
+
+    it('rate() latest-wins: an older click failing after a newer click does not revert it', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      let rejectFirst!: (e: unknown) => void;
+      rateAnswer
+        .mockImplementationOnce(() => new Promise((_, rej) => (rejectFirst = rej)))
+        .mockResolvedValueOnce(undefined);
+      const { result, onFeedbackError } = await askedThread();
+      act(() => {
+        result.current.rate(result.current.turns[0].id, 't1', 5);
+      });
+      act(() => {
+        result.current.rate(result.current.turns[0].id, 't1', 1);
+      });
+      await act(async () => {
+        rejectFirst({ status: 503 });
+      });
+      expect(result.current.turns[0].rating).toBe(1);
+      expect(onFeedbackError).not.toHaveBeenCalled();
+      err.mockRestore();
+    });
+
+    it('rateSrc() failure is reported, not only logged', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      rateSource.mockRejectedValueOnce({ status: 403 });
+      const { result, onFeedbackError } = await askedThread();
+      act(() => {
+        result.current.rateSrc('t1', 'urn:x', true);
+      });
+      await waitFor(() => expect(onFeedbackError).toHaveBeenCalledWith('Per inviare valutazioni serve il consenso completo.'));
+      err.mockRestore();
+    });
+
+    it('detailed() resolves true on success and false (reported) on failure', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const scores = { retrievalScore: 0.6, reasoningScore: 0.6, synthesisScore: 0.9 };
+      rateDetailed.mockResolvedValueOnce(undefined).mockRejectedValueOnce({ status: 403 });
+      const { result, onFeedbackError } = await askedThread();
+      let ok: boolean | undefined;
+      await act(async () => {
+        ok = await result.current.detailed('t1', scores);
+      });
+      expect(ok).toBe(true);
+      expect(onFeedbackError).not.toHaveBeenCalled();
+      await act(async () => {
+        ok = await result.current.detailed('t1', scores);
+      });
+      expect(ok).toBe(false);
+      expect(onFeedbackError).toHaveBeenCalledWith('Per inviare valutazioni serve il consenso completo.');
+      err.mockRestore();
+    });
+
+    it('confirm() failure marks the source "error" and reports the confirm-specific copy', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      confirmSource.mockRejectedValueOnce({ status: 403 });
+      const { result, onFeedbackError } = await askedThread();
+      await act(async () => {
+        await result.current.confirm(result.current.turns[0].id, {
+          urn: 'live:abc',
+          provenance: 'live_unconfirmed',
+          node_id: 'live:abc',
+        });
+      });
+      expect(result.current.turns[0].confirmed['live:abc']).toBe('error');
+      expect(onFeedbackError).toHaveBeenCalledWith('Per ricordare le fonti nel grafo serve il consenso completo.');
+      err.mockRestore();
+    });
+
+    it('without an onFeedbackError the failure still reverts (logged only, no throw)', async () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockAskSucceedsOnFirstTick();
+      rateAnswer.mockRejectedValueOnce({ status: 500 });
+      const { result } = renderHook(() => useQaThread());
+      await act(async () => {
+        await result.current.ask('q', 'convergent');
+      });
+      await waitFor(() => expect(result.current.turns[0].state.status).toBe('success'));
+      act(() => {
+        result.current.rate(result.current.turns[0].id, 't1', 5);
+      });
+      await waitFor(() => expect(result.current.turns[0].rating).toBeUndefined());
+      expect(err).toHaveBeenCalledWith('rate failed:', expect.anything());
+      err.mockRestore();
+    });
   });
 
   it('loadHistoryTurn() appends a read-only success turn (deduped)', async () => {

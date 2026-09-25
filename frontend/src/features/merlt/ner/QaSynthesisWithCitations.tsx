@@ -11,8 +11,14 @@ export interface QaSynthesisWithCitationsProps {
   text: string;
   /** Enable interactive in-prose NER feedback (full-consent contributor). */
   enabled?: boolean;
-  /** Build + forward one NER feedback payload (surface=qa_chip). */
-  onSubmit?: (payload: NerFeedbackInput) => void;
+  /**
+   * Forward one NER feedback payload (surface=qa_chip). REQUIRED for the
+   * affordance: without it the citations render as plain prose, so no caller
+   * can show the "Grazie per il riscontro" confirmation with nothing wired. A
+   * returned Promise makes the confirmation wait for it (see
+   * CitationNerFeedback).
+   */
+  onSubmit?: (payload: NerFeedbackInput) => void | Promise<unknown>;
 }
 
 const TEXT_CLS = 'text-sm leading-relaxed text-slate-800 dark:text-slate-200';
@@ -26,15 +32,17 @@ const TEXT_CLS = 'text-sm leading-relaxed text-slate-800 dark:text-slate-200';
  * WITHIN THE ANSWER — never the user's raw query (privacy, decision 4).
  * Citations and their context are extracted from the marker-stripped plain
  * text, so offsets stay stable and the NER trainer never sees `**` noise.
- * Loop β #2, surface qa_chip.
+ * Loop β #2, surface qa_chip. Interactive only when `enabled` AND `onSubmit`
+ * is wired.
  */
 export function QaSynthesisWithCitations({ text, enabled, onSubmit }: QaSynthesisWithCitationsProps) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const parsed = useMemo(() => parseQaMarkdown(text), [text]);
+  const interactive = Boolean(enabled && onSubmit);
 
   const matches = useMemo(() => {
-    if (!enabled) return [];
+    if (!interactive) return [];
     const sorted = [...extractCitations(parsed.plainText)].sort((a, b) => a.startIndex - b.startIndex);
     // Drop overlapping matches (keep the earliest), mirroring the previous
     // cursor-based skip.
@@ -46,7 +54,7 @@ export function QaSynthesisWithCitations({ text, enabled, onSubmit }: QaSynthesi
       cursor = m.endIndex;
     }
     return out;
-  }, [parsed, enabled]);
+  }, [parsed, interactive]);
 
   const active = activeIdx !== null ? (matches[activeIdx] ?? null) : null;
 
@@ -57,7 +65,7 @@ export function QaSynthesisWithCitations({ text, enabled, onSubmit }: QaSynthesi
         Math.max(0, startIndex - CONTEXT_RADIUS),
         Math.min(parsed.plainText.length, endIndex + CONTEXT_RADIUS),
       );
-      onSubmit?.({
+      return onSubmit?.({
         surface: 'qa_chip',
         feedbackType,
         selectedText,
