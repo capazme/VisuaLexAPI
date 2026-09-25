@@ -57,7 +57,6 @@ weights/
 *.safetensors
 
 # Tests (not needed in production)
-tests/
 docs/
 examples/
 *.md
