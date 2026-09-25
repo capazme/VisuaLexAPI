@@ -17,6 +17,7 @@ Endpoint:
 
 import asyncio
 import os
+import re
 import structlog
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
@@ -30,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
 from merlt.api.models.enrichment_models import (
+    ConfirmSourceRequest,
+    ConfirmSourceResponse,
     EntityProposalRequest,
     EntityProposalResponse,
     EntityValidationRequest,
@@ -82,6 +85,8 @@ from merlt.storage.enrichment import (
     # Issue Reporting
     EntityIssueReport,
     EntityIssueVote,
+    # Promotion provenance
+    UserDocument,
 )
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.entity_writer import EntityGraphWriter
@@ -92,6 +97,12 @@ from merlt.rlcf.domain_authority import (
 from merlt.rlcf.edit_merge import process_entity_consensus, process_relation_consensus
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 from merlt.pipeline.enrichment.quality import is_valid_entity_name
+from merlt.pipeline.provisional_writer import (
+    PROVISIONAL_LABEL,
+    _canonical_url,
+    _get_graph_client,
+)
+from merlt.api.graph_router import IngestionQueueUnavailable, enqueue_article_ingestion
 
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
@@ -425,6 +436,76 @@ async def check_article_in_graph(
         }
 
 
+# =============================================================================
+# PROVENANCE HELPERS (pending_* wire shape)
+# =============================================================================
+
+# Pipeline tag of a proposal made by a user (propose-entity / propose-relation /
+# confirm-source) when the caller names none.
+COMMUNITY_FONTE = "community"
+
+
+def _utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Tag a naive DB timestamp as UTC.
+
+    The pending_* columns are TIMESTAMP WITHOUT TIME ZONE filled by `now()` on a
+    Postgres running in UTC (the stack's default); serialised naive, a browser in
+    Italy reads them as local time and every card is off by 1-2 hours.
+    """
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _created_at_kwargs(row: Any) -> Dict[str, datetime]:
+    """`created_at` for PendingEntityData/PendingRelationData, from the DB row.
+
+    Omitted when the row has none, so the model default applies instead of a
+    validation error on None.
+    """
+    created = _utc(getattr(row, "created_at", None))
+    return {"created_at": created} if created is not None else {}
+
+
+def _relation_fonte(rel: Any) -> str:
+    """Pipeline tag of a pending relation, for display.
+
+    propose-relation never set `fonte`, so community relations were stored with
+    the column default 'llm_extraction' and shown as an LLM extraction. Only
+    propose-relation writes `source_type='manual'`, so the correction is
+    targeted: a real LLM row keeps its label (migration 007 backfills the same).
+    """
+    fonte = getattr(rel, "fonte", None)
+    if getattr(rel, "source_type", None) == "manual" and fonte in (None, "", "llm_extraction"):
+        return COMMUNITY_FONTE
+    return fonte or "unknown"
+
+
+def _clean_text(value: Optional[str]) -> Optional[str]:
+    """Strip a free-text provenance field; blank becomes None."""
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+async def _existing_document_id(session: AsyncSession, document_id: Optional[int]) -> Optional[int]:
+    """Return `document_id` only when that user_documents row exists.
+
+    `source_document_id` is an FK: an id for a document purged in the meantime
+    (or a staging id sent by mistake) would fail the whole INSERT. Provenance is
+    worth keeping, not worth losing the proposal over.
+    """
+    if document_id is None:
+        return None
+    found = (
+        await session.execute(select(UserDocument.id).where(UserDocument.id == document_id))
+    ).scalar_one_or_none()
+    if found is None:
+        log.warning("source_document_id not found, provenance link dropped", document_id=document_id)
+    return found
+
+
 async def _get_existing_enrichment(
     session: AsyncSession,
     article_key: str,
@@ -462,6 +543,7 @@ async def _get_existing_enrichment(
             articoli_correlati=[entity.article_urn] if entity.article_urn else [],
             ambito=entity.ambito or "",
             fonte=entity.fonte or "unknown",
+            source_reference=entity.source_reference,
             llm_confidence=entity.llm_confidence or 0.0,
             raw_context="",
             validation_status=ValidationStatus.PENDING,
@@ -470,6 +552,7 @@ async def _get_existing_enrichment(
             votes_count=entity.votes_count or 0,
             contributed_by=entity.contributed_by or "unknown",
             contributor_authority=entity.contributor_authority or 0.0,
+            **_created_at_kwargs(entity),
         )
         for entity in entities
     ]
@@ -489,7 +572,9 @@ async def _get_existing_enrichment(
             source_urn=rel.source_node_urn or "",
             target_urn=rel.target_entity_id or "",
             relation_type=rel.relation_type,
-            fonte=rel.fonte if hasattr(rel, 'fonte') else "unknown",
+            fonte=_relation_fonte(rel),
+            source_reference=rel.source_reference,
+            article_urn=rel.article_urn,
             llm_confidence=rel.llm_confidence or 0.0,
             evidence=rel.relation_description or "",
             validation_status=ValidationStatus.PENDING,
@@ -498,6 +583,7 @@ async def _get_existing_enrichment(
             votes_count=rel.votes_count or 0,
             contributed_by=rel.contributed_by or "unknown",
             contributor_authority=0.5,
+            **_created_at_kwargs(rel),
         )
         for rel in relations
     ]
@@ -1642,6 +1728,7 @@ async def get_pending(
             articoli_correlati=[entity.article_urn] if entity.article_urn else [],
             ambito=entity.ambito or "",
             fonte=entity.fonte or "unknown",
+            source_reference=entity.source_reference,
             llm_confidence=entity.llm_confidence or 0.0,
             raw_context="",  # Not stored in DB for now
             validation_status=ValidationStatus.PENDING,
@@ -1650,6 +1737,9 @@ async def get_pending(
             votes_count=entity.votes_count or 0,
             contributed_by=entity.contributed_by or "unknown",
             contributor_authority=entity.contributor_authority or 0.0,
+            # The real creation time: the model default is "now", which made
+            # every validation card read "meno di un minuto fa".
+            **_created_at_kwargs(entity),
         )
         for entity in entities
     ]
@@ -1724,7 +1814,11 @@ async def get_pending(
                 source_urn=rel.source_node_urn or "",
                 target_urn=rel.target_entity_id or "",
                 relation_type=rel_type,
-                fonte=getattr(rel, 'fonte', None) or "llm_extraction",
+                fonte=_relation_fonte(rel),
+                source_reference=rel.source_reference,
+                # The norm the relation is bound to: source_urn is a concept
+                # name for note-derived relations, so it cannot link a norm.
+                article_urn=rel.article_urn,
                 llm_confidence=rel.llm_confidence or 0.0,
                 evidence=rel.relation_description or "",
                 validation_status=ValidationStatus.PENDING,
@@ -1733,6 +1827,7 @@ async def get_pending(
                 votes_count=rel.votes_count or 0,
                 contributed_by=rel.contributed_by or "unknown",
                 contributor_authority=rel.contributor_authority or 0.5,
+                **_created_at_kwargs(rel),
             )
         )
 
@@ -2021,16 +2116,25 @@ async def propose_entity(
     # === CREATE ENTITY ===
     entity_id = f"{tipo_str}:{uuid4().hex[:8]}"
 
+    # Provenance: `fonte` is the pipeline tag (a user proposal is 'community'
+    # unless the caller names its channel); the contributor's citation goes to
+    # source_reference, never to the varchar(50) tag.
+    fonte = _clean_text(request.fonte) or COMMUNITY_FONTE
+    source_reference = _clean_text(request.source_reference)
+    source_document_id = await _existing_document_id(session, request.source_document_id)
+
     # Create pending entity
     pending_entity = PendingEntity(
         entity_id=entity_id,
         article_urn=request.article_urn,
         source_type="manual",
+        source_document_id=source_document_id,
         entity_type=tipo_str,
         entity_text=request.nome,
         descrizione=request.descrizione,
         ambito=request.ambito,
-        fonte="community",
+        fonte=fonte,
+        source_reference=source_reference,
         validation_status="pending",
         contributed_by=request.user_id,
         contributor_authority=voter_authority,
@@ -2052,7 +2156,8 @@ async def propose_entity(
         descrizione=request.descrizione,
         articoli_correlati=[request.article_urn],
         ambito=request.ambito,
-        fonte="community",  # Manual proposal from user
+        fonte=fonte,
+        source_reference=source_reference,
         llm_confidence=0.0,  # Manual proposal, no LLM
         raw_context=request.evidence,  # Evidence provided by user
         validation_status=ValidationStatus.PENDING,
@@ -2071,6 +2176,316 @@ async def propose_entity(
         duplicates=found_duplicates,
         duplicate_action_required=False,  # Non-blocking, just info
     )
+
+
+# =============================================================================
+# CONFIRM SOURCE (Loop β D.1: provisional live node → pending_* / lazy ingest)
+# =============================================================================
+
+# Trust of a live source a user vouched for in dialogue: above the provisional
+# baseline (provisional_writer.PROVISIONAL_TRUST), below the 1.0 that only
+# community consensus grants
+# (entity_writer._link_provisional_source lifts it once the entity is approved).
+CONFIRMED_SOURCE_TRUST = 0.8
+
+# Copyright gate (Slice 2c): the live verbatim never enters pending_*. The
+# description carries a quotation-length excerpt plus the source URL.
+CONFIRM_SOURCE_EXCERPT_CHARS = 280
+
+# pending_entities.article_urn is NOT NULL. A ruling or a commentary is not
+# bound to one norm, so the entity takes the placeholder the graph writer keeps
+# off the graph (entity_writer.PLACEHOLDER_ARTICLE_URNS): it is written
+# stand-alone, and its provenance is the CITA edge to the LiveSource node.
+NO_NORM_ARTICLE_URN = "user_document"
+
+# provisional_writer's domain label → entity type of the proposal.
+_LIVE_LABEL_ENTITY_TYPE = {
+    "AttoGiudiziario": EntityType.ATTO_GIUDIZIARIO.value,
+    "Dottrina": EntityType.DOTTRINA.value,
+    "Norma": EntityType.NORMA.value,
+}
+_DEFAULT_LIVE_ENTITY_TYPE = EntityType.DOTTRINA.value
+
+# A Normattiva norm ARTICLE (NIR URN with an article marker), bare or wrapped in
+# the Normattiva URL. Only these go to the lazy-ingest path: the worker cannot
+# ingest an act without an article ("URN privo di articolo").
+_NORM_ARTICLE_RE = re.compile(r"urn:nir:\S*~art\w", re.IGNORECASE)
+
+_LOAD_LIVE_SOURCE_CYPHER = f"""
+MATCH (n:{PROVISIONAL_LABEL} {{node_id: $node_id}})
+RETURN n.node_id AS node_id, labels(n) AS labels, n.source_url AS source_url,
+       n.text AS text, n.provenance AS provenance, n.trust AS trust,
+       n.pending_entity_id AS pending_entity_id
+LIMIT 1
+"""
+
+# Records the confirmation on the provisional node. Never touches provenance
+# (it stays live_unconfirmed until community consensus) and never lowers trust
+# (same non-downgrade CASE as provisional_writer). confirmed_by is a set.
+# pending_entity_id is first-writer-wins: it is the key
+# entity_writer._link_provisional_source matches on, so it must equal the
+# pending entity_id exactly and never be swapped under an open proposal.
+_STAMP_LIVE_SOURCE_CYPHER = f"""
+MATCH (n:{PROVISIONAL_LABEL} {{node_id: $node_id}})
+SET n.confirmed_by = CASE
+        WHEN $user_id IN coalesce(n.confirmed_by, []) THEN n.confirmed_by
+        ELSE coalesce(n.confirmed_by, []) + [$user_id]
+    END,
+    n.trust = CASE WHEN coalesce(n.trust, 0.0) >= $trust THEN n.trust ELSE $trust END,
+    n.pending_entity_id = coalesce(n.pending_entity_id, $pending_entity_id),
+    n.updated_at = $timestamp
+RETURN n.pending_entity_id AS pending_entity_id
+"""
+
+
+async def _open_live_graph():
+    """Connected FalkorDB client, the same one provisional_writer writes with."""
+    return await _get_graph_client(None)
+
+
+def _is_norm_article_url(url: Optional[str]) -> bool:
+    return bool(url) and bool(_NORM_ARTICLE_RE.search(url))
+
+
+def _source_excerpt(text: Optional[str], limit: int = CONFIRM_SOURCE_EXCERPT_CHARS) -> str:
+    """Quotation-length excerpt of a live source body, cut on a word boundary."""
+    flat = " ".join((text or "").split())
+    if len(flat) <= limit:
+        return flat
+    cut = flat[:limit]
+    space = cut.rfind(" ")
+    if space > limit // 2:
+        cut = cut[:space]
+    return cut.rstrip(" ,;:.") + "…"
+
+
+def _confirm_description(text: Optional[str], source_url: str) -> str:
+    excerpt = _source_excerpt(text)
+    parts = [f"«{excerpt}»"] if excerpt else []
+    if source_url:
+        parts.append(f"Fonte: {source_url}")
+    return "\n\n".join(parts)
+
+
+def _label_from_live_text(text: Optional[str]) -> Optional[str]:
+    """Fallback entity name: the first line of the source body, markdown-free."""
+    for line in (text or "").splitlines():
+        label = line.strip().lstrip("#*>- ").rstrip("* ").strip()
+        if label:
+            return label[:120]
+    return None
+
+
+_ENTITY_TYPE_VALUES = frozenset(t.value for t in EntityType)
+
+
+def _confirm_entity_type(requested: Optional[str], labels: Any) -> EntityType:
+    """Entity type of the proposal: the caller's override when it names a real
+    type, else the node's domain label. The override is optional in a one-click
+    flow, so an unknown value falls back instead of failing the confirmation."""
+    wanted = (requested or "").strip().lower()
+    if wanted in _ENTITY_TYPE_VALUES:
+        return EntityType(wanted)
+    if wanted:
+        log.warning("confirm_source: unknown entity_type override ignored", entity_type=requested)
+    for label in labels or []:
+        if label in _LIVE_LABEL_ENTITY_TYPE:
+            return EntityType(_LIVE_LABEL_ENTITY_TYPE[label])
+    return EntityType(_DEFAULT_LIVE_ENTITY_TYPE)
+
+
+async def _stamp_live_source(
+    graph,
+    node_id: str,
+    user_id: str,
+    pending_entity_id: Optional[str] = None,
+) -> Optional[str]:
+    """Record the user's confirmation on the LiveSource node.
+
+    Returns the node's pending_entity_id after the write (the one actually
+    linked, when a concurrent confirm got there first), or None on failure.
+    Best-effort: the pending row, when there is one, is already committed and
+    is the outcome the user asked for; a retry re-links it through the exact
+    duplicate path.
+    """
+    try:
+        rows = await graph.query(
+            _STAMP_LIVE_SOURCE_CYPHER,
+            {
+                "node_id": node_id,
+                "user_id": user_id,
+                "trust": CONFIRMED_SOURCE_TRUST,
+                "pending_entity_id": pending_entity_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        return (rows[0].get("pending_entity_id") if rows else None) or None
+    except Exception as e:  # noqa: BLE001 - see docstring
+        log.error(
+            "confirm_source: failed to stamp the live source",
+            node_id=node_id,
+            pending_entity_id=pending_entity_id,
+            error=str(e),
+        )
+        return None
+
+
+@router.post(
+    "/confirm-source",
+    response_model=ConfirmSourceResponse,
+    summary="Conferma una fonte live provvisoria (→ pending_entity o ingestion)",
+)
+async def confirm_source(
+    request: ConfirmSourceRequest,
+    session: AsyncSession = Depends(get_db_session_dependency),
+    api_key: ApiKey = Depends(verify_api_key),
+) -> ConfirmSourceResponse:
+    """
+    "Ricorda nel grafo": a user vouches for a provisional ``live_unconfirmed``
+    source the experts retrieved live (Loop β D.1, hybrid promotion).
+
+    - A Normattiva norm article goes to the existing lazy-ingest path (the
+      article enters the graph through the regular ingestion, not as a
+      proposal): ``promoted_as='lazy_ingest'``.
+    - Any other (interpretative) source becomes a ``pending_entity``
+      attributed to the user, through the same code path as propose-entity
+      (quality gate + duplicate check). Its description is a capped excerpt
+      plus the source URL, never the full verbatim. The LiveSource node gets
+      ``pending_entity_id`` (so the approved entity links back to it with a
+      CITA edge), the user in ``confirmed_by`` and a trust bump; its
+      provenance stays ``live_unconfirmed`` until community consensus:
+      ``promoted_as='pending_entity'``.
+
+    Idempotent: a node that already carries ``pending_entity_id`` returns that
+    entity without creating a second row.
+    """
+    node_id = (request.node_id or "").strip()
+    if not node_id.startswith("live:"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="node_id must be a provisional live source id (live:...)",
+        )
+
+    log.info("API: confirm_source", node_id=node_id, user_id=request.user_id)
+
+    try:
+        graph = await _open_live_graph()
+    except Exception as e:
+        log.error("confirm_source: graph unavailable", node_id=node_id, error=str(e))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Grafo non disponibile")
+
+    try:
+        try:
+            rows = await graph.query(_LOAD_LIVE_SOURCE_CYPHER, {"node_id": node_id})
+        except Exception as e:
+            log.error("confirm_source: live source lookup failed", node_id=node_id, error=str(e))
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Grafo non disponibile")
+        if not rows:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Fonte provvisoria {node_id} non trovata: potrebbe essere stata rimossa o gia' consolidata",
+            )
+        node = rows[0]
+        # Graph key form: strip only the NIR version/annex marker (the `!vig=`
+        # trap), keep the URL wrapper.
+        source_url = _canonical_url((node.get("source_url") or "").strip())
+
+        # (c) A Normattiva article enters the graph through the ingestion.
+        if _is_norm_article_url(source_url):
+            try:
+                task_id, queue_status = await enqueue_article_ingestion(source_url)
+            except IngestionQueueUnavailable:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Job queue non disponibile",
+                )
+            await _stamp_live_source(graph, node_id, request.user_id)
+            log.info("confirm_source: lazy ingest", node_id=node_id, urn=source_url, task_id=task_id)
+            return ConfirmSourceResponse(
+                node_id=node_id,
+                promoted_as="lazy_ingest",
+                article_urn=source_url,
+                ingest_job_id=task_id,
+                message=(
+                    "Articolo gia' in coda per l'inserimento nel grafo"
+                    if queue_status == "already_queued"
+                    else "Articolo in coda per l'inserimento nel grafo"
+                ),
+            )
+
+        # (e) Idempotency: this source was already turned into a proposal.
+        existing_entity_id = node.get("pending_entity_id")
+        if existing_entity_id:
+            await _stamp_live_source(graph, node_id, request.user_id)
+            return ConfirmSourceResponse(
+                node_id=node_id,
+                promoted_as="pending_entity",
+                entity_id=existing_entity_id,
+                article_urn=source_url or None,
+                message="Fonte gia' proposta alla comunita'",
+            )
+
+        # (d) Interpretative source → pending entity, as propose-entity does it.
+        entity_text = _clean_text(request.entity_text) or _label_from_live_text(node.get("text"))
+        if not entity_text:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="entity_text mancante e non ricavabile dalla fonte",
+            )
+        tipo = _confirm_entity_type(request.entity_type, node.get("labels"))
+
+        proposal = EntityProposalRequest(
+            article_urn=NO_NORM_ARTICLE_URN,
+            nome=entity_text,
+            tipo=tipo,
+            descrizione=_confirm_description(node.get("text"), source_url),
+            ambito=_clean_text(request.ambito) or "generale",
+            fonte=COMMUNITY_FONTE,
+            source_reference=source_url[:300] or None,
+            user_id=request.user_id,
+            skip_duplicate_check=request.skip_duplicate_check,
+        )
+        result = await propose_entity(proposal, session=session, api_key=api_key)
+
+        message = "Fonte proposta alla comunita' per la validazione"
+        if result.success and result.pending_entity is not None:
+            entity_id = result.pending_entity.id
+        else:
+            exact = next(
+                (d for d in result.duplicates if d.confidence == DuplicateConfidenceLevel.EXACT),
+                None,
+            )
+            if not (result.duplicate_action_required and exact is not None):
+                # Quality gate: the name looks like an identifier, not a source.
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=result.message)
+            # The same source is already a proposal: link the node to it
+            # instead of asking the user to create a twin.
+            entity_id = exact.entity_id
+            message = "Fonte collegata a una proposta gia' esistente"
+
+        linked = await _stamp_live_source(graph, node_id, request.user_id, pending_entity_id=entity_id)
+        if linked and linked != entity_id:
+            log.warning(
+                "confirm_source: concurrent confirm linked another proposal",
+                node_id=node_id,
+                created=entity_id,
+                linked=linked,
+            )
+            entity_id = linked
+
+        log.info("confirm_source: pending entity", node_id=node_id, entity_id=entity_id, user_id=request.user_id)
+        return ConfirmSourceResponse(
+            node_id=node_id,
+            promoted_as="pending_entity",
+            entity_id=entity_id,
+            article_urn=source_url or None,
+            message=message,
+        )
+    finally:
+        try:
+            await graph.close()
+        except Exception:  # noqa: BLE001 - closing is best-effort
+            pass
 
 
 # =============================================================================
@@ -2206,6 +2621,30 @@ async def validate_relation(
 
             except Exception as e:
                 log.error(f"Failed to process relation consensus: {e}", exc_info=True)
+
+    # Authority feedback (loop-closure A4), mirror of validate_entity: once a
+    # relation reaches consensus, recompute the domain authority of everyone who
+    # voted on it plus the contributor, so relation-only voters are not left
+    # waiting for some later entity consensus. PendingRelation has no ambito:
+    # voters are grouped by the legal_domain stored on their vote. Best-effort.
+    if relation.consensus_reached:
+        try:
+            voter_rows = (
+                await session.execute(
+                    select(RelationVote.user_id, RelationVote.legal_domain).where(
+                        RelationVote.relation_id == relation_id
+                    )
+                )
+            ).all()
+            users_by_domain: Dict[str, set] = defaultdict(set)
+            for voter_id, legal_domain in voter_rows:
+                users_by_domain[legal_domain or "generale"].add(voter_id)
+            if relation.contributed_by:
+                users_by_domain["generale"].add(relation.contributed_by)
+            for legal_domain, users in users_by_domain.items():
+                await recalculate_authorities_after_consensus(session, sorted(users), legal_domain)
+        except Exception as e:
+            log.error("Authority recalc after relation consensus failed", relation_id=relation_id, error=str(e))
 
     # Build response
     status_map = {
@@ -2343,11 +2782,18 @@ async def propose_relation(
     # Generate relation ID
     relation_id = f"{rel_type}:{uuid4().hex[:8]}"
 
+    # Provenance: without an explicit fonte the column default 'llm_extraction'
+    # labelled every community relation as an LLM extraction.
+    source_document_id = await _existing_document_id(session, request.source_document_id)
+
     # Create pending relation with target_is_pending flag
     pending_relation = PendingRelation(
         relation_id=relation_id,
         article_urn=request.article_urn,
         source_type="manual",
+        source_document_id=source_document_id,
+        fonte=_clean_text(request.fonte) or COMMUNITY_FONTE,
+        source_reference=_clean_text(request.source_reference),
         relation_type=rel_type,
         source_node_urn=request.source_urn,
         target_entity_id=request.target_entity_id,

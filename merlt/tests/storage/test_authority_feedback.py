@@ -89,3 +89,79 @@ async def test_authority_updates_after_consensus(db):
                 text("DELETE FROM user_domain_authority WHERE user_id = ANY(:ids)"),
                 {"ids": approvers + [rejecter]},
             )
+
+
+async def test_relation_consensus_recalculates_authority(db, monkeypatch):
+    """A4 for relations: validate_relation used to skip the recalc that
+    validate_entity runs, so a relation-only voter's authority waited for some
+    later entity consensus. The vote that tips a relation into consensus now
+    recomputes every voter plus the contributor."""
+    import importlib
+    from unittest.mock import AsyncMock, MagicMock
+
+    from merlt.api.models.enrichment_models import RelationValidationRequest
+
+    er = importlib.import_module("merlt.api.enrichment_router")
+    # FalkorDB is not part of this test: the graph write is a no-op here.
+    monkeypatch.setattr(er, "_write_relation_to_graph", AsyncMock())
+
+    engine, factory = db
+    rid = f"CITA:a4-{uuid.uuid4().hex[:8]}"
+    early = [f"early-{i}-{rid}" for i in range(2)]
+    closer = f"closer-{rid}"
+    contributor = f"author-{rid}"
+    everyone = early + [closer, contributor]
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO pending_relations "
+                "(relation_id, article_urn, source_type, relation_type, source_node_urn, "
+                "target_entity_id, validation_status, contributed_by) "
+                "VALUES (:rid, 'urn:test:a4r', 'manual', 'CITA', 'concetto:a', 'concetto:b', "
+                "'pending', :author)"
+            ),
+            {"rid": rid, "author": contributor},
+        )
+        # 2 approvals at authority 0.9: net +1.8, below the +2.0 threshold. The
+        # closing vote (default authority 0.5) tips it (the trigger recomputes
+        # consensus on every insert).
+        for uid in early:
+            await conn.execute(
+                text(
+                    "INSERT INTO relation_votes (relation_id, user_id, vote_value, vote_type, "
+                    "voter_authority, legal_domain) VALUES (:rid, :uid, 1, 'accuracy', 0.9, 'generale')"
+                ),
+                {"rid": rid, "uid": uid},
+            )
+
+    try:
+        async with factory() as session:
+            response = await er.validate_relation(
+                RelationValidationRequest(relation_id=rid, user_id=closer, vote="approve"),
+                session=session,
+                api_key=MagicMock(),
+            )
+        assert response.threshold_reached is True
+
+        async with factory() as session:
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT user_id, domain_authority, total_feedbacks FROM user_domain_authority "
+                        "WHERE user_id = ANY(:ids) AND legal_domain = 'generale'"
+                    ),
+                    {"ids": everyone},
+                )
+            ).mappings().all()
+        by_user = {r["user_id"]: r for r in rows}
+        assert set(by_user) == set(everyone)
+        for uid in early + [closer]:
+            assert by_user[uid]["total_feedbacks"] == 1, uid
+            assert by_user[uid]["domain_authority"] == 1.0, uid
+    finally:
+        async with engine.begin() as conn:
+            await conn.execute(text("DELETE FROM pending_relations WHERE relation_id = :rid"), {"rid": rid})
+            await conn.execute(
+                text("DELETE FROM user_domain_authority WHERE user_id = ANY(:ids)"), {"ids": everyone}
+            )

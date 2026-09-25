@@ -57,6 +57,10 @@ class PendingEntityData(BaseModel):
 
     # Provenance
     fonte: str = Field(..., description="Fonte estrazione (brocardi, llm, manual)")
+    source_reference: Optional[str] = Field(
+        None,
+        description="Citazione bibliografica del contributore o URL della fonte live confermata",
+    )
     llm_confidence: float = Field(
         1.0,
         ge=0.0,
@@ -97,6 +101,13 @@ class PendingRelationData(BaseModel):
 
     # Provenance
     fonte: str = Field(..., description="Fonte estrazione")
+    source_reference: Optional[str] = Field(
+        None, description="Citazione bibliografica del contributore"
+    )
+    article_urn: Optional[str] = Field(
+        None,
+        description="URN dell'articolo a cui la relazione e' legata ('user_document' se nessuno)",
+    )
     llm_confidence: float = Field(1.0, ge=0.0, le=1.0)
     evidence: str = Field("", description="Evidenza testuale per la relazione")
 
@@ -344,9 +355,20 @@ class EntityProposalRequest(BaseModel):
         default="",
         description="Evidenza testuale/motivazione per la proposta"
     )
+    # Provenance (all optional: existing callers keep working unchanged)
     source_reference: Optional[str] = Field(
         None,
+        max_length=300,
         description="Riferimento fonte (es. 'Torrente, p.123')"
+    )
+    fonte: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Tag della pipeline di provenienza; default 'community'",
+    )
+    source_document_id: Optional[int] = Field(
+        None,
+        description="ID user_documents da cui deriva la proposta (Slice 2c)",
     )
 
     # User
@@ -440,6 +462,22 @@ class RelationProposalRequest(BaseModel):
     article_urn: str = Field(..., description="URN articolo correlato")
     descrizione: str = Field(..., description="Motivazione/descrizione relazione")
     certezza: float = Field(default=0.7, ge=0.0, le=1.0, description="Livello certezza")
+
+    # Provenance (all optional: existing callers keep working unchanged)
+    fonte: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Tag della pipeline di provenienza; default 'community'",
+    )
+    source_reference: Optional[str] = Field(
+        None,
+        max_length=300,
+        description="Citazione bibliografica del contributore",
+    )
+    source_document_id: Optional[int] = Field(
+        None,
+        description="ID user_documents da cui deriva la proposta (Slice 2c)",
+    )
 
     # User
     user_id: str

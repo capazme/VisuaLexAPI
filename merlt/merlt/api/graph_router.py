@@ -1146,28 +1146,41 @@ def _get_rq_queue() -> Queue:
     return Queue(_RQ_QUEUE_NAME, connection=_rq_connection)
 
 
-@router.post("/ingest-article", response_model=IngestArticleResponse, status_code=202)
-async def ingest_article(
-    request: IngestArticleRequest,
-    api_key: ApiKey = Depends(verify_api_key),
-) -> IngestArticleResponse:
-    """
-    Accoda un job di ingestion per un articolo non ancora presente nel grafo.
+class IngestionQueueUnavailable(RuntimeError):
+    """The RQ queue could not be reached, or the enqueue itself failed."""
 
-    Idempotente sull'URN: il job usa un `job_id` derivato da sha256(urn) per
-    evitare problemi con caratteri speciali dell'URN come chiave Redis. RQ
-    sovrascrive i job con lo stesso id invece di deduplicarli, quindi
-    l'idempotenza è gestita con un pre-check esplicito: se esiste già un job
-    attivo per l'URN non se ne accoda un altro. Con `force_refresh=True` il
-    pre-check viene bypassato e una re-ingestion viene sempre accodata.
+
+def ingest_job_id(urn: str) -> str:
+    """Deterministic RQ job id for an article ingestion.
+
+    Dash separator, NOT colon — RQ >= 2.0 validates [A-Za-z0-9_-] via
+    `validate_job_id` (rq/job.py:85). Same fix already applied to the
+    extraction job id (CLAUDE.md Slice 2c gotcha #4).
     """
-    urn = request.urn
-    bff_job_id = request.options.bff_job_id if request.options else None
-    force_refresh = request.options.force_refresh if request.options else False
-    # Job ID uses a dash separator (NOT colon) — RQ ≥ 2.0 validates [A-Za-z0-9_-]
-    # via `validate_job_id` (rq/job.py:85). Same fix already applied to the
-    # extraction job id (CLAUDE.md Slice 2c gotcha #4).
-    job_id = "ingest-" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
+    return "ingest-" + hashlib.sha256(urn.encode("utf-8")).hexdigest()[:40]
+
+
+async def enqueue_article_ingestion(
+    urn: str,
+    bff_job_id: Optional[str] = None,
+    force_refresh: bool = False,
+) -> Tuple[str, str]:
+    """Enqueue the lazy ingestion of one article, idempotently on the URN.
+
+    Shared by `POST /graph/ingest-article` and the Loop β confirm-source
+    (`POST /enrichment/confirm-source`) for a Normattiva article.
+
+    RQ overwrites a job with the same id instead of deduplicating it, so
+    idempotency is an explicit pre-check: an active job for the URN is reused.
+    `force_refresh=True` bypasses the pre-check and always enqueues.
+
+    Returns:
+        `(task_id, status)`, status being 'queued' or 'already_queued'.
+
+    Raises:
+        IngestionQueueUnavailable: the queue is unreachable or the enqueue failed.
+    """
+    job_id = ingest_job_id(urn)
 
     log.info("Enqueuing article ingestion job", urn=urn, bff_job_id=bff_job_id)
 
@@ -1175,7 +1188,7 @@ async def ingest_article(
         queue = await asyncio.to_thread(_get_rq_queue)
     except Exception as e:
         log.error(f"Failed to connect to RQ job queue: {e}", urn=urn, exc_info=True)
-        raise HTTPException(status_code=503, detail="Job queue non disponibile")
+        raise IngestionQueueUnavailable(str(e)) from e
 
     # Idempotency: explicit pre-check (RQ enqueue overwrites, doesn't dedupe)
     def _existing_active_job():
@@ -1194,7 +1207,7 @@ async def ingest_article(
 
     if existing is not None:
         log.info("Ingestion job already active, idempotency hit", urn=urn, task_id=job_id)
-        return IngestArticleResponse(task_id=job_id, status="already_queued", urn=urn)
+        return job_id, "already_queued"
 
     try:
         job = await asyncio.to_thread(
@@ -1209,10 +1222,37 @@ async def ingest_article(
         )
     except Exception as e:
         log.error(f"Failed to enqueue ingestion job: {e}", urn=urn, exc_info=True)
-        raise HTTPException(status_code=503, detail="Job queue non disponibile")
+        raise IngestionQueueUnavailable(str(e)) from e
 
     log.info("Ingestion job queued", urn=urn, task_id=job.id)
-    return IngestArticleResponse(task_id=job.id, status="queued", urn=urn)
+    return job.id, "queued"
+
+
+@router.post("/ingest-article", response_model=IngestArticleResponse, status_code=202)
+async def ingest_article(
+    request: IngestArticleRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+) -> IngestArticleResponse:
+    """
+    Accoda un job di ingestion per un articolo non ancora presente nel grafo.
+
+    Idempotente sull'URN: il job usa un `job_id` derivato da sha256(urn) per
+    evitare problemi con caratteri speciali dell'URN come chiave Redis. RQ
+    sovrascrive i job con lo stesso id invece di deduplicarli, quindi
+    l'idempotenza è gestita con un pre-check esplicito: se esiste già un job
+    attivo per l'URN non se ne accoda un altro. Con `force_refresh=True` il
+    pre-check viene bypassato e una re-ingestion viene sempre accodata.
+    """
+    urn = request.urn
+    bff_job_id = request.options.bff_job_id if request.options else None
+    force_refresh = request.options.force_refresh if request.options else False
+
+    try:
+        task_id, status = await enqueue_article_ingestion(urn, bff_job_id, force_refresh)
+    except IngestionQueueUnavailable:
+        raise HTTPException(status_code=503, detail="Job queue non disponibile")
+
+    return IngestArticleResponse(task_id=task_id, status=status, urn=urn)
 
 
 @router.get("/overview", response_model=SubgraphResponse)
@@ -2246,6 +2286,9 @@ __all__ = [
     "GraphSearchResponse",
     "GraphSearchFilters",
     "ingest_article",
+    "enqueue_article_ingestion",
+    "ingest_job_id",
+    "IngestionQueueUnavailable",
     "IngestArticleRequest",
     "IngestArticleResponse",
     "IngestArticleOptions",

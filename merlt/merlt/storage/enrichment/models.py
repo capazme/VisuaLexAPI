@@ -80,7 +80,11 @@ class PendingEntity(Base):
     entity_text = Column(Text, nullable=False)
     descrizione = Column(Text)
     ambito = Column(String(50))
-    fonte = Column(String(50), default="llm_extraction")
+    fonte = Column(String(50), default="llm_extraction")  # pipeline tag, never a free-text citation
+    # The contributor's bibliographic citation ("Torrente, p. 123") or the URL
+    # of a confirmed live source. Free text, so it cannot live in `fonte`
+    # (varchar(50) pipeline tag). Migration 007.
+    source_reference = Column(Text)
 
     # LLM metadata
     llm_confidence = Column(Float)
@@ -195,6 +199,7 @@ class PendingRelation(Base):
     relation_description = Column(Text)
     certezza = Column(Float)
     fonte = Column(String(50), default="llm_extraction")  # Source: llm_extraction, community, mechanistic
+    source_reference = Column(Text)  # contributor's citation, see PendingEntity.source_reference
     llm_confidence = Column(Float)
     llm_model = Column(String(100))
     llm_reasoning = Column(Text)
