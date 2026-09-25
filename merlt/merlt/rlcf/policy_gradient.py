@@ -183,6 +183,10 @@ GRAPH_TO_POLICY_RELATION = {
     "rinvia": "RIFERIMENTO",
     "cita": "CITATO_DA",
     "connesso_a": "RELATED_TO",
+    # The generic "systematically related" edge the co-evolution writes for
+    # live-retrieved norms ((confirmed)-[:CORRELATO]->(provisional)); it is in
+    # the systemic floor, so it must score instead of collapsing to the fallback.
+    "correlato": "RELATED_TO",
     "contiene": "RELATED_TO",
     "disciplina": "APPLIES_TO",
     "impone": "APPLIES_TO",

@@ -48,7 +48,11 @@ from merlt.rlcf.traversal_training_service import (
 # helpers
 # ---------------------------------------------------------------------------
 
-STATIC_FLOOR = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE"]
+# The floor is the expert's own curated list, imported rather than copied: it
+# grew (CORRELATO, co-evolution edges) and a hardcoded twin silently drifted.
+from merlt.experts.systemic import SystemicExpert
+
+STATIC_FLOOR = list(SystemicExpert.STATIC_SYSTEMIC_RELATIONS)
 
 
 def _run(coro):
