@@ -25,7 +25,7 @@ describe('alignOffsetToTrimmedText', () => {
 
   it('does not shift for a newline-only prefix', () => {
     // A line break is a <br /> in the rendered body, so it contributes zero
-    // characters to the offset space (getPlainTextOffset walks textContent;
+    // characters to the offset space (the offset space counts textContent;
     // plainToRaw skips '\n'). Selection.toString() still emits '\n' for it, so
     // counting those newlines would push the anchor off its own text and the
     // marker would be dropped — the failure this helper exists to prevent.
