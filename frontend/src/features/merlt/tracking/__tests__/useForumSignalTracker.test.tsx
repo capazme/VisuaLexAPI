@@ -70,7 +70,7 @@ describe('useForumSignalTracker', () => {
     unmount();
   });
 
-  it('falls back to suggestion_id when shared_env_id missing', () => {
+  it('drops a suggestion event that carries no shared_env_id (a suggestion id is never a substitute)', () => {
     const { unmount } = renderHook(() => useForumSignalTracker());
 
     act(() => {
@@ -83,9 +83,27 @@ describe('useForumSignalTracker', () => {
       });
     });
 
+    expect(sendEventMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('keys a suggestion event to the shared environment, not to the suggestion', () => {
+    const { unmount } = renderHook(() => useForumSignalTracker());
+
+    act(() => {
+      publishMerltEvent({
+        interaction_type: MERLT_EVENT_TYPES.forumSuggestionDeclined,
+        metadata: {
+          suggestion_id: '00000000-0000-0000-0000-0000000000bb',
+          shared_env_id: '00000000-0000-0000-0000-0000000000ee',
+          original_author_id: null,
+        },
+      });
+    });
+
     expect(sendEventMock).toHaveBeenCalledWith({
-      action: 'suggestion_accepted',
-      sharedEnvId: '00000000-0000-0000-0000-0000000000bb',
+      action: 'suggestion_declined',
+      sharedEnvId: '00000000-0000-0000-0000-0000000000ee',
       originalAuthorId: null,
     });
     unmount();

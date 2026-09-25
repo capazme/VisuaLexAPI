@@ -92,7 +92,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500 dark:text-slate-400">Qualifica</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Livello di autorevolezza</dt>
               <dd className="font-semibold text-slate-900 dark:text-white">
                 {profile.data.baselineQual}
               </dd>

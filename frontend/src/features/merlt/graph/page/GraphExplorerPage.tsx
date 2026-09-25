@@ -1411,8 +1411,11 @@ function appendExpansion(
  * (gotcha #6). Best-effort center matching only — the canvas keeps the raw urn.
  */
 function stripVersionMarker(urn: string): string {
-  const i = urn.indexOf('!');
-  return i === -1 ? urn : urn.slice(0, i);
+  // `!vig=`/`!orig=` and the `@originale` suffix are both NIR version
+  // markers VisuaLex appends after the article segment; the seed keys
+  // carry neither.
+  const cuts = [urn.indexOf('!'), urn.indexOf('@')].filter((i) => i !== -1);
+  return cuts.length === 0 ? urn : urn.slice(0, Math.min(...cuts));
 }
 
 /** Preserve the current center `type` param across depth/layout URL updates. */

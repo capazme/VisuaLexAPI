@@ -41,8 +41,11 @@ const cache = new Map<string, CacheEntry>();
 
 /** Strip the NIR version/annex marker (`!vig=`, …) — mirrors the BFF's normalizeGraphUrn. */
 function normalizeUrn(urn: string): string {
-  const i = urn.indexOf('!');
-  return i === -1 ? urn : urn.slice(0, i);
+  // `!vig=`/`!orig=` and the `@originale` suffix are both NIR version
+  // markers VisuaLex appends after the article segment; the seed keys
+  // carry neither.
+  const cuts = [urn.indexOf('!'), urn.indexOf('@')].filter((i) => i !== -1);
+  return cuts.length === 0 ? urn : urn.slice(0, Math.min(...cuts));
 }
 
 function cacheKey(urn: string, depth: number, limit?: number): string {

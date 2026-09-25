@@ -53,7 +53,10 @@ export function useForumSignalTracker(disabled = false): void {
             if (!action) return;
 
             const meta = (event.metadata ?? {}) as Metadata;
-            const sharedEnvId = meta.shared_env_id ?? meta.suggestion_id;
+            // The signal is keyed to the shared environment. A suggestion id is
+            // never a substitute: MERL-T could not join it with the like/download
+            // signals on the same environment, so the event is dropped instead.
+            const sharedEnvId = meta.shared_env_id;
             if (typeof sharedEnvId !== 'string') return;
 
             const payload: ForumSignalEventInput = {

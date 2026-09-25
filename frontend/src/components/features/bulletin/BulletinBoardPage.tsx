@@ -228,7 +228,7 @@ export function BulletinBoardPage() {
         interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
         metadata: {
           suggestion_id: reviewingSuggestion.id,
-          shared_env_id: reviewingSuggestion.id,
+          shared_env_id: reviewingSuggestion.sharedEnvironmentId,
           original_author_id: reviewingSuggestion.suggester?.id ?? null,
         },
       });
@@ -256,7 +256,7 @@ export function BulletinBoardPage() {
         interaction_type: MERLT_EVENT_TYPES.forumSuggestionDeclined,
         metadata: {
           suggestion_id: reviewingSuggestion.id,
-          shared_env_id: reviewingSuggestion.id,
+          shared_env_id: reviewingSuggestion.sharedEnvironmentId,
           original_author_id: reviewingSuggestion.suggester?.id ?? null,
           reason: reviewNote ?? null,
         },
@@ -582,7 +582,7 @@ export function BulletinBoardPage() {
                   interaction_type: MERLT_EVENT_TYPES.forumSuggestionAccepted,
                   metadata: {
                     suggestion_id: reviewingSuggestion.id,
-                    shared_env_id: reviewingSuggestion.id,
+                    shared_env_id: reviewingSuggestion.sharedEnvironmentId,
                     original_author_id: reviewingSuggestion.suggester?.id ?? null,
                   },
                 });
