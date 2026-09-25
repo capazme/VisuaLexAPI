@@ -108,7 +108,7 @@ export function BlockAnnotationsPopover({
     useLayoutEffect(() => {
         const sign = findSign();
         let last: typeof EMPTY_RECT = sign?.getBoundingClientRect() ?? EMPTY_RECT;
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- reads where the CSS container query put the sign, once, before paint
+        // Where the CSS container query put the sign, read once before paint.
         setSide(sign && getComputedStyle(sign).position === 'absolute' ? 'margin' : 'inline');
         refs.setPositionReference({
             getBoundingClientRect: () => {
