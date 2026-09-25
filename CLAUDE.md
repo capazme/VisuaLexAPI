@@ -468,6 +468,41 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 uses the same two functions, and they must stay byte-identical or annotations
 made on one surface stop appearing on the other.
 
+**The text is structured, never rewritten** (round A, spec
+`docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
+`parseArticleStructure` (`utils/articleStructure.ts`) reads heading, rubric,
+commi, items with their printed enumerator and level, Normattiva's
+`((modifications))` and repeal notices, `(119)` references and the
+AGGIORNAMENTO notes, as raw ranges that partition `article_text`;
+`renderArticleHtml` (`utils/articleRender.ts`, behind `useArticleMarkers`)
+emits one `div.vlx-b.vlx-{kind}` per block, cutting the text at every block and
+mark edge and nesting marks with a stack, so the HTML is always well-formed and
+escaped. Styles are the `.vlx-*` rules in `index.css` (READING SURFACE): a 68ch
+measure, commi divided by space, hanging numbers and items. The contract is
+gotcha 23: the rendered text nodes spell `article_text` minus `\n` — any new
+label goes in CSS (`content: attr(...)`), never in a text node.
+`articleRender.test.ts` enforces it on 27 real texts
+(`utils/__fixtures__/articleTexts.ts`). Tab, dossier reader and Study Mode all
+render this way; Study Mode hides the heading and rubric blocks
+(`vlx-hide-header`) instead of cutting them, so its offsets are
+document-relative like everywhere else. The Brocardi sections render flat
+(`structure: null`).
+
+**Offsets are measured from the text alone.** `SelectionPopup` takes a
+`textRootRef` (the element holding only the article text) and stores the anchor
+from `getSelectionAnchor` (`utils/selectionOffset.ts`), which reads
+`Range.toString()`: `Selection.toString()` is rendered text and writes a newline
+per line or comma boundary, which made every cross-comma highlight unmatched.
+The renderer also accepts, at the same offset, a stored text that differs only
+in whitespace, so those older highlights show again.
+
+**Normattiva's update notes** are interactive and out of the way:
+`useArticleTextInteractions` delegates click and Enter/Space on the body — a
+`(119)` chip opens `UpdateNotePopover`, the "Note di aggiornamento (N)" toggle
+folds the tail through the `vlx-updates-open` class on the text container
+(the HTML never changes when it opens). A reference whose note is not in the
+text is plain text; only `((49))` is dimmed.
+
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
 anchored note; `InlineNotePopover` when clicking an existing wavy underline.
@@ -600,6 +635,15 @@ Duplicating any of these is a defect, not a shortcut.
   (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
   copyable citation string.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
+- `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
+  reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
+  `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
+  calls. Real test texts in `utils/__fixtures__/articleTexts.ts`.
+- `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
+  plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
+  Every surface that creates a highlight or an anchored note goes through it.
+- `hooks/useArticleTextInteractions.ts` — the update-note chips and the
+  foldable AGGIORNAMENTO tail, for any surface that renders structured text.
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
   `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
@@ -769,7 +813,7 @@ Breaking one of these breaks the product. Read before editing.
 
 **Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
 `utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
-`utils/dateUtils.ts` ·
+`utils/articleStructure.ts` · `utils/articleRender.ts` · `utils/dateUtils.ts` ·
 `utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
 `utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
 `hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
@@ -797,7 +841,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
-  `InlineNotePopover.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
+  opened from its `(119)`), `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
   `SearchPanel.tsx` (streaming merge logic, and the mount point for both
   `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
@@ -909,13 +954,20 @@ meant to stay split; add new features as new files, not inside the shells:
 23. **`article_text` is a data contract, not a string.** Highlights and anchored
     notes are pinned by `(startOffset, text)` where the offset counts characters
     in a projection of `article_text` in which only `\n` is invisible.
-    `useArticleMarkers` requires exact equality between the stored text and the
-    slice at that offset and drops the marker silently on mismatch — no fuzzy
-    fallback, no log, no visual difference from "never existed". Changing the
-    scraper's output formatting by one space deletes every anchor after it, for
-    every user, with no way to detect it afterwards. Measured: AKN vs HTML is
-    0/19 identical. This is why `normattiva_scraper._estrai_testo_*` output is
-    frozen and why AKN is never the display text.
+    The renderer (`utils/articleRender.ts`) requires the stored text to equal
+    the slice at that offset (case-insensitive; whitespace-only differences
+    tolerated, nothing else) and drops the marker silently on mismatch — no
+    fuzzy fallback, no log, no visual difference from "never existed". Changing
+    the scraper's output formatting by one space deletes every anchor after it,
+    for every user, with no way to detect it afterwards. Measured: AKN vs HTML
+    is 0/19 identical. This is why `normattiva_scraper._estrai_testo_*` output
+    is frozen and why AKN is never the display text. The same holds on the
+    rendering side: the structured reading surface may wrap characters in
+    elements but never add, drop or change one — `articleRender.test.ts`
+    checks the rendered text nodes against `article_text` on 27 real texts.
+    (Inserting only `\n` would not move any offset — newlines are invisible in
+    the projection — but the saved-norm watcher compares `article_text`
+    verbatim, so it would still raise false "changed" notifications.)
 
 24. **A missing article gets you a different one.** Normattiva answers a request
     for a nonexistent article with the act's Art. 1 and HTTP 200. The existence

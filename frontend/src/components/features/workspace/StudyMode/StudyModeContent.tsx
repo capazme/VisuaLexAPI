@@ -5,11 +5,13 @@ import { SelectionPopup } from '../../search/SelectionPopup';
 import { SafeHTML } from '../../../../utils/sanitize';
 import { cn } from '../../../../lib/utils';
 import { extractArticleRefs } from '../../../../utils/citationParser';
-import { getSelectionPlainOffset } from '../../../../utils/selectionOffset';
+import { getSelectionAnchor } from '../../../../utils/selectionOffset';
 import type { ArticleData, NormaVisitata, Highlight, Annotation, Footnote } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
-import { extractPreamble } from './extractPreamble';
+import { useArticleTextInteractions } from '../../../../hooks/useArticleTextInteractions';
+import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '../../../../utils/articleStructure';
+import { UpdateNotePopover } from '../../search/UpdateNotePopover';
 
 const COLOR_SHORTCUTS: Record<string, 'yellow' | 'green' | 'red' | 'blue'> = {
   '1': 'yellow',
@@ -45,18 +47,6 @@ interface StudyModeContentProps {
   onCrossReferenceNavigate?: (articleNumber: string, normaData: NormaVisitata) => void;
 }
 
-const THEME_CONTENT_STYLES: Record<StudyModeTheme, { prose: string }> = {
-  light: {
-    prose: 'prose-slate'
-  },
-  dark: {
-    prose: 'prose-invert'
-  },
-  sepia: {
-    prose: 'prose-stone'
-  }
-};
-
 export function StudyModeContent({
   article,
   fontSize,
@@ -71,17 +61,15 @@ export function StudyModeContent({
   onCrossReferenceNavigate
 }: StudyModeContentProps) {
   // `scrollRef` tracks the outer scrollable container (used for the
-  // progress bar). `contentRef` wraps only the prose so selection
-  // offsets exclude the title / rubric — otherwise `getPlainTextOffset`
-  // would count the H2 characters and the highlight anchor would land
-  // way off the actual text once shifted into document coords.
+  // progress bar). `contentRef` wraps the body and its selection popup;
+  // `textRef` is the text alone, the root stored offsets are measured from.
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [activeFootnote, setActiveFootnote] = useState<Footnote | null>(null);
 
   const { article_text, norma_data } = article;
-  const styles = THEME_CONTENT_STYLES[theme];
 
   // Track scroll progress
   useEffect(() => {
@@ -100,77 +88,20 @@ export function StudyModeContent({
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Split off the "Art. N. (Rubrica)." preamble so the rendered body doesn't
-  // duplicate what the H2 + rubric subtitle already show.
-  const { rubric, body: bodyText, plainOffset: preambleOffset } = useMemo(
-    () => extractPreamble(article_text || ''),
-    [article_text],
-  );
+  // The full text, structured like the dashboard's. The heading and rubric
+  // blocks stay in it but are hidden (`vlx-hide-header`): Study Mode shows
+  // its own header, and hidden text still counts in the offsets, so stored
+  // highlights and notes need no shifting — they are document-relative here
+  // exactly as on the dashboard and in the dossier.
+  const structure = useMemo(() => parseArticleStructure(article_text || ''), [article_text]);
+  const rubric = useMemo(() => getRubricText(article_text || '', structure), [article_text, structure]);
 
-  // Highlights and annotations are stored document-relative in *plain-text*
-  // coordinates (DOM textContent, no newlines). `preambleOffset` is also
-  // plain-text, so this shift keeps the two sides of the conversion in the
-  // same coordinate space. Using the raw `offset` here would skew every
-  // offset by one per newline inside the preamble and the highlight would
-  // land on the wrong position in the main article view.
-  const bodyHighlights = useMemo<Highlight[]>(() => {
-    if (preambleOffset === 0) return highlights;
-    return highlights.flatMap((h) => {
-      if (typeof h.startOffset !== 'number') return [h];
-      const shifted = h.startOffset - preambleOffset;
-      if (shifted < 0) return [];
-      return [{ ...h, startOffset: shifted }];
-    });
-  }, [highlights, preambleOffset]);
-
-  const bodyAnnotations = useMemo<Annotation[]>(() => {
-    if (preambleOffset === 0) return annotations;
-    return annotations.flatMap((a) => {
-      if (typeof a.startOffset !== 'number') return [a];
-      const shifted = a.startOffset - preambleOffset;
-      if (shifted < 0) return [];
-      return [{ ...a, startOffset: shifted }];
-    });
-  }, [annotations, preambleOffset]);
-
-  // Shared marker pipeline: pins highlights to specific occurrences via
-  // startOffset, renders note-anchor spans for annotations, and handles
-  // adjacent/nested boundaries correctly. Same hook the main article flow
-  // uses — Study Mode no longer has its own divergent renderer.
   const markedHtml = useArticleMarkers({
-    rawText: bodyText,
-    highlights: bodyHighlights,
-    annotations: bodyAnnotations,
+    rawText: article_text || '',
+    highlights,
+    annotations,
+    structure,
   });
-
-  // Cross-references are Study-Mode-specific: simple `art. N` → button wrap.
-  // Applied after marker insertion so highlights/note anchors don't get
-  // mangled by the cross-reference regex.
-  const processedContent = useMemo(() => {
-    return markedHtml.replace(/art\.?\s+(\d+)/gi, (_match, p1) => {
-      return `<button type="button" class="cross-reference text-primary-600 dark:text-primary-400 hover:underline cursor-pointer font-medium" data-article="${p1}">art. ${p1}</button>`;
-    });
-  }, [markedHtml]);
-
-  // Handle cross-reference clicks
-  useEffect(() => {
-    if (!onCrossReferenceNavigate) return;
-    const container = contentRef.current;
-    if (!container) return;
-
-    const handler = (event: Event) => {
-      const target = event.target as HTMLElement;
-      if (target.classList.contains('cross-reference')) {
-        const articleNumber = target.getAttribute('data-article');
-        if (articleNumber) {
-          onCrossReferenceNavigate(articleNumber, norma_data);
-        }
-      }
-    };
-
-    container.addEventListener('click', handler);
-    return () => container.removeEventListener('click', handler);
-  }, [onCrossReferenceNavigate, norma_data]);
 
   // Toggle footnotes panel
   const toggleFootnotesPanel = useCallback(() => {
@@ -195,12 +126,8 @@ export function StudyModeContent({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeFootnote]);
 
-  // Handle highlight from selection popup. SelectionPopup supplies the
-  // plain-text startOffset relative to the rendered body (which now
-  // excludes the preamble). Shift it back to document coords so the
-  // stored offset matches what the main article view would produce for
-  // the same span — otherwise the same highlight would point to
-  // different places depending on where it was created.
+  // Handle highlight from selection popup. The offset is already
+  // document-relative (the text root holds the whole text).
   //
   // `uniqueArticleId` mirrors ArticleTabContent's builder: highlights
   // live under `all{N}:{numero}` for annex articles so the main view's
@@ -211,16 +138,20 @@ export function StudyModeContent({
   );
   const handleHighlight = useCallback(
     (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
-      const documentOffset = startOffset + preambleOffset;
       const alreadyHighlighted = highlights.some(h =>
-        h.text.toLowerCase() === text.toLowerCase() && h.startOffset === documentOffset
+        h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
       );
       if (!alreadyHighlighted) {
-        onAddHighlight(normaKey, uniqueArticleId, text, '', color, documentOffset);
+        onAddHighlight(normaKey, uniqueArticleId, text, '', color, startOffset);
       }
     },
-    [preambleOffset, highlights, onAddHighlight, normaKey, uniqueArticleId],
+    [highlights, onAddHighlight, normaKey, uniqueArticleId],
   );
+
+  // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
+  const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, uniqueArticleId, {
+    contentKey: markedHtml,
+  });
 
   // Colour shortcut: 1/2/3/4 highlight the current selection when it
   // sits inside the article body. Runs in the capture phase with
@@ -228,7 +159,7 @@ export function StudyModeContent({
   // useStudyModeShortcuts (also bound to 1/2/3 on window) doesn't also
   // fire and flip the theme while the user wanted a yellow highlight.
   useEffect(() => {
-    const container = contentRef.current;
+    const container = textRef.current;
     if (!container) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -240,18 +171,15 @@ export function StudyModeContent({
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
 
       const selection = window.getSelection();
-      const text = selection?.toString().trim();
-      if (!text || !selection?.rangeCount) return;
-
-      const range = selection.getRangeAt(0);
-      if (!container.contains(range.commonAncestorContainer)) return;
-
-      const offset = getSelectionPlainOffset(container, selection);
-      if (offset < 0) return;
+      if (!selection?.toString().trim()) return;
+      // Text and offset from the DOM text itself (see getSelectionAnchor):
+      // a rendered selection string would carry newlines the text has not.
+      const anchor = getSelectionAnchor(container, selection);
+      if (!anchor) return;
 
       e.preventDefault();
       e.stopImmediatePropagation();
-      handleHighlight(text, color, offset);
+      handleHighlight(anchor.text, color, anchor.startOffset);
       selection.removeAllRanges();
     };
 
@@ -259,16 +187,11 @@ export function StudyModeContent({
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [handleHighlight]);
 
-  // Handle note from selection popup. Shift the body-relative startOffset
-  // back to document coords — same trick as handleHighlight — so the
-  // saved annotation's anchor resolves to the right span in the main
-  // article view too.
+  // Handle note from selection popup; the offset is document-relative
+  // already, so the anchor resolves on the dashboard and in the dossier too.
   const handleAddNote = (text: string, startOffset: number) => {
     if (!onRequestAddNote) return;
-    onRequestAddNote({
-      anchorText: text,
-      startOffset: startOffset + preambleOffset,
-    });
+    onRequestAddNote({ anchorText: text, startOffset });
   };
 
   // Handle copy from selection popup
@@ -319,30 +242,29 @@ export function StudyModeContent({
               )}
             </header>
 
-            {/* Article body — ref scoped to this wrapper so selection
-                offsets align with the body text fed to useArticleMarkers.
-                The id is consumed by the colour-shortcut handler in
-                StudyMode.tsx to anchor document.getSelection() offsets. */}
+            {/* Article body. The id is read by StudyModeToolsPanel to scroll
+                to a highlight or a note anchor. */}
             <div className="relative" id="study-mode-article-body" ref={contentRef}>
               <SelectionPopup
                 containerRef={contentRef}
+                textRootRef={textRef}
                 onHighlight={handleHighlight}
                 onAddNote={handleAddNote}
                 onCopy={handleCopy}
               />
 
+              {/* Structured like the dashboard (`vlx-art`); size, leading
+                  and theme colours come from Study Mode's own settings. */}
               <div
-                className={cn(
-                  "prose max-w-none font-serif leading-relaxed",
-                  styles.prose
-                )}
+                ref={textRef}
+                className={cn('vlx-art vlx-art--study vlx-hide-header', updatesOpen && 'vlx-updates-open')}
                 style={{
                   fontSize: `${fontSize}px`,
                   lineHeight: lineHeight
                 }}
               >
-                {processedContent ? (
-                  <SafeHTML html={processedContent} />
+                {markedHtml ? (
+                  <SafeHTML html={markedHtml} />
                 ) : (
                   <div className="text-center py-8 opacity-50 flex flex-col items-center gap-2">
                     <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -354,6 +276,15 @@ export function StudyModeContent({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {openNote && structure.notes[openNote.id] && (
+        <UpdateNotePopover
+          noteId={openNote.id}
+          paragraphs={getUpdateNoteParagraphs(article_text || '', structure.notes[openNote.id])}
+          anchorEl={openNote.anchorEl}
+          onClose={closeNote}
+        />
+      )}
 
       {/* Floating Footnotes Indicator */}
       {footnotes && footnotes.length > 0 && (

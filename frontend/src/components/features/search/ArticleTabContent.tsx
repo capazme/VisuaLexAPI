@@ -23,6 +23,9 @@ import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
+import { UpdateNotePopover } from './UpdateNotePopover';
+import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import type { Annotation } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
@@ -41,14 +44,6 @@ interface ArticleTabContentProps {
      */
     readingOrigin?: { tabId: string; blockId: string };
 }
-
-const DICTIONARY_TERMS: Record<string, string> = {
-    'ratio legis': 'Motivazione giuridica alla base della norma.',
-    'ultra vires': 'Atto compiuto oltre i poteri conferiti.',
-    'erga omnes': 'Efficace nei confronti di tutti.',
-    'ex tunc': 'Con effetti retroattivi.',
-    'ex nunc': 'Con effetti solo per il futuro.',
-};
 
 export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
@@ -517,27 +512,25 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    // Highlights + note anchors are applied by the shared useArticleMarkers
-    // hook (reusable on Brocardi sections too). Dictionary + citation
-    // wrapping are article-specific and happen after.
+    // The structure (heading, rubric, commi, items, Normattiva's modifications
+    // and update notes) is read once per text; the shared useArticleMarkers
+    // hook renders it with the highlights and note anchors (the dossier reader
+    // and Study Mode use the same pair). Citation wrapping is article-specific
+    // and happens after.
+    const structure = useMemo(() => parseArticleStructure(article_text || ''), [article_text]);
     const markedHtml = useArticleMarkers({
         rawText: article_text || '',
         highlights: articleHighlights,
         annotations: itemAnnotations,
+        structure,
     });
 
-    const processedContent = useMemo(() => {
-        let html = markedHtml;
+    const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
 
-        Object.entries(DICTIONARY_TERMS).forEach(([term, definition]) => {
-            const regex = new RegExp(`(?<!<mark[^>]*>)\\b${term}\\b(?!</mark>)`, 'gi');
-            html = html.replace(regex, (match) => `<span class="dictionary-term" data-definition="${definition}">${match}</span>`);
-        });
-
-        html = wrapCitationsInHtml(html, norma_data);
-
-        return html;
-    }, [markedHtml, norma_data]);
+    // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
+    const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, itemKey, {
+        contentKey: processedContent,
+    });
 
     // Handle citation hover and click events
     useEffect(() => {
@@ -714,7 +707,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupAddNote={handlePopupAddNote}
                 onPopupCopy={handlePopupCopy}
                 onRemoveHighlight={removeHighlight}
+                updatesOpen={updatesOpen}
             />
+
+            {openNote && structure.notes[openNote.id] && (
+                <UpdateNotePopover
+                    noteId={openNote.id}
+                    paragraphs={getUpdateNoteParagraphs(article_text || '', structure.notes[openNote.id])}
+                    anchorEl={openNote.anchorEl}
+                    onClose={closeNote}
+                />
+            )}
 
             <ArticleDiscussionPanel
                 anchor={discussionAnchor}

@@ -319,23 +319,235 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   LEGAL TEXT — The core reading experience
+   READING SURFACE — the structured article text
+   Markup from utils/articleRender.ts. Every label here comes from CSS
+   (`content: ...`), never from a text node: the text nodes must spell
+   article_text exactly, or stored highlights and notes move (CLAUDE.md
+   gotcha 23).
    ═══════════════════════════════════════════════════════════ */
-.legal-content {
-  @apply font-serif text-lg leading-relaxed text-slate-800 dark:text-slate-200;
-  letter-spacing: 0.01em;
-  max-width: 72ch;
+.vlx-art {
+  --vlx-hang: 2em;         /* hanging width of a printed comma number */
+  --vlx-hang-item: 2.25em; /* hanging width of an item enumerator */
+  --vlx-indent: 1.75em;    /* item indent per level */
+  max-width: 68ch;
   margin-inline: auto;
+  font-size: 1.125rem;
+  line-height: 1.7;
+  overflow-wrap: break-word;
+  @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
-.legal-content p {
-  @apply mb-4;
+/* Study Mode sets size, leading and theme colours itself. */
+.vlx-art--study {
+  max-width: none;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
-.legal-content h1,
-.legal-content h2,
-.legal-content h3 {
-  @apply font-sans font-semibold text-slate-900 dark:text-slate-100 mt-6 mb-3;
+/* Hidden, not removed: hidden text still counts in the offsets. */
+.vlx-hide-header .vlx-heading,
+.vlx-hide-header .vlx-rubrica,
+.vlx-art .vlx-hidden {
+  display: none;
+}
+
+.vlx-art .vlx-heading {
+  margin-bottom: 0.1em;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  @apply font-sans text-slate-500 dark:text-slate-400;
+}
+
+.vlx-art .vlx-rubrica {
+  margin-bottom: 0.9em;
+  font-size: 1.22em;
+  font-weight: 600;
+  line-height: 1.35;
+  @apply text-slate-900 dark:text-slate-50;
+}
+
+.vlx-art .vlx-comma {
+  margin-bottom: 0.75em;
+}
+
+.vlx-art .vlx-comma.vlx-has-marker {
+  padding-left: var(--vlx-hang);
+  text-indent: calc(-1 * var(--vlx-hang));
+}
+
+.vlx-art .vlx-item {
+  margin-bottom: 0.4em;
+  margin-left: var(--vlx-indent);
+  padding-left: var(--vlx-hang-item);
+  text-indent: calc(-1 * var(--vlx-hang-item));
+}
+
+.vlx-art .vlx-item[data-level="2"] {
+  margin-left: calc(2 * var(--vlx-indent));
+}
+
+/* A list reads as part of the comma that introduces it. */
+.vlx-art .vlx-comma + .vlx-item {
+  margin-top: -0.3em;
+}
+
+.vlx-art .vlx-item + .vlx-comma {
+  margin-top: 0.6em;
+}
+
+/* The printed enumerator hangs in the margin; text-indent is inherited by
+   inline-blocks, hence the reset. */
+.vlx-art .vlx-marker {
+  display: inline-block;
+  margin-right: 0.25em;
+  text-indent: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.vlx-art .vlx-comma .vlx-marker {
+  min-width: calc(var(--vlx-hang) - 0.25em);
+}
+
+.vlx-art .vlx-item .vlx-marker {
+  min-width: calc(var(--vlx-hang-item) - 0.25em);
+}
+
+/* Normattiva's ((…)): text a later act changed. A border, not a
+   text-decoration, so it never collides with a note's wavy underline. */
+.vlx-art .vlx-mod {
+  cursor: help;
+  border-bottom: 1px dashed rgb(217 119 6 / 0.5);
+}
+
+.dark .vlx-art .vlx-mod {
+  border-bottom-color: rgb(251 191 36 / 0.45);
+}
+
+.vlx-art .vlx-paren {
+  @apply text-slate-400 dark:text-slate-500;
+}
+
+/* "((ARTICOLO ABROGATO …))", "((...))": present, but quiet. */
+.vlx-art .vlx-notice {
+  font-size: 0.78em;
+  letter-spacing: 0.02em;
+  @apply font-sans text-slate-500 dark:text-slate-400;
+}
+
+/* "(119)": opens its AGGIORNAMENTO note. */
+.vlx-art .vlx-ref {
+  margin-inline: 0.1em;
+  padding: 0.05em 0.4em;
+  border-radius: 0.35em;
+  font-size: 0.7em;
+  font-weight: 600;
+  vertical-align: 0.15em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  @apply font-sans bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300;
+}
+
+.vlx-art .vlx-ref:hover {
+  @apply bg-primary-100 dark:bg-primary-900;
+}
+
+.vlx-art .vlx-ref:focus-visible,
+.vlx-art .vlx-updates-toggle:focus-visible {
+  outline: none;
+  @apply ring-2 ring-primary-500;
+}
+
+/* A reference whose note is not in the downloaded text. */
+.vlx-art .vlx-ref-missing {
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+  @apply font-sans text-slate-400 dark:text-slate-500;
+}
+
+.vlx-art .vlx-updates {
+  margin-top: 1.5em;
+  padding-top: 0.6em;
+  border-top: 1px solid;
+  @apply border-slate-200 dark:border-slate-700;
+}
+
+.vlx-art .vlx-updates-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  margin-left: -0.4em;
+  padding: 0.2em 0.4em;
+  border-radius: 0.35em;
+  font-size: 0.78em;
+  font-weight: 600;
+  cursor: pointer;
+  @apply font-sans text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100;
+}
+
+.vlx-art .vlx-updates-toggle::before {
+  content: '▸';
+}
+
+.vlx-art .vlx-updates-toggle::after {
+  content: attr(data-label);
+}
+
+/* Folded unless the container carries .vlx-updates-open (set from React by
+   useArticleTextInteractions): opening the notes never re-renders the text. */
+.vlx-art .vlx-updates-body {
+  display: none;
+  margin-top: 0.4em;
+  font-size: 0.9em;
+}
+
+.vlx-art.vlx-updates-open .vlx-updates-body {
+  display: block;
+}
+
+.vlx-art.vlx-updates-open .vlx-updates-toggle::before {
+  content: '▾';
+}
+
+/* The source's "-------------" line: kept in the text, drawn as a rule. */
+.vlx-art .vlx-update-sep {
+  height: 0;
+  margin: 0.9em 0 0.5em;
+  overflow: hidden;
+  border-top: 1px dashed;
+  @apply border-slate-200 dark:border-slate-700;
+}
+
+.vlx-art .vlx-updates-body > .vlx-update-sep:first-child {
+  margin-top: 0;
+  border-top-color: transparent;
+}
+
+.vlx-art .vlx-update-head {
+  margin-bottom: 0.2em;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  @apply font-sans text-slate-500 dark:text-slate-400;
+}
+
+.vlx-art .vlx-update-para {
+  margin-bottom: 0.5em;
+  @apply text-slate-600 dark:text-slate-300;
+}
+
+/* A phone column is narrow: nested items would leave the text a sliver. */
+@media (max-width: 639px) {
+  .vlx-art {
+    --vlx-hang: 1.6em;
+    --vlx-hang-item: 1.9em;
+    --vlx-indent: 0.4em;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -39,6 +39,11 @@ const DEFAULT_CONFIG: Config = {
     'href', 'title', 'class', 'id', 'target', 'rel',
     'style', // Needed for inline highlight colors (HIGHLIGHT_STYLES CSS vars)
     'data-*', // Allow data attributes for custom functionality
+    // Keyboard access to the interactive parts of an article's text: the
+    // "(119)" update-note references and the collapsed AGGIORNAMENTO toggle
+    // (utils/articleRender.ts). Both attributes are inert — neither runs code.
+    // `aria-*` needs no entry: DOMPurify allows it by default.
+    'role', 'tabindex',
   ],
   ALLOW_DATA_ATTR: true,
   // Force links to open in new tab and add noopener
