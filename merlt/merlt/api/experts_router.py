@@ -2239,6 +2239,13 @@ async def get_trace(
             detail=f"No pipeline trace available for {trace_id}. Was the query executed with include_trace=True?"
         )
 
+    # The pipeline trace never carried the asking user: the BFF ownership
+    # check on /experts/trace, /refine and the feedback routes needs it (and
+    # otherwise falls back to scanning the caller's history). The column is
+    # the source; the anonymous redaction below still applies to it.
+    if qa_trace.user_id and not full_trace.get("user_id"):
+        full_trace["user_id"] = qa_trace.user_id
+
     consent_levels = {"anonymous": 0, "basic": 1, "full": 2}
     stored_level = consent_levels.get(qa_trace.consent_level, 0)
     # None means no caller restriction; invalid value defaults to most restrictive

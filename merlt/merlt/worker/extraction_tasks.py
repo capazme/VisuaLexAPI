@@ -80,7 +80,9 @@ async def _run_extract(document_id: int, user_id: str, bff_job_id: Optional[str]
         doc = (
             await session.execute(select(UserDocument).where(UserDocument.id == document_id))
         ).scalar_one_or_none()
-        if not doc:
+        # A foreign document is reported exactly like a missing one: the api
+        # already refused the enqueue, this guards a job enqueued any other way.
+        if not doc or doc.uploaded_by != user_id:
             await _callback_extraction(bff_job_id, "failed", error="document_not_found")
             return {"document_id": document_id, "status": "failed", "error": "document_not_found"}
 

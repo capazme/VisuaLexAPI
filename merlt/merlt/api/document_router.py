@@ -136,8 +136,13 @@ async def upload_document(
     # Calculate file hash (SHA-256) for deduplication
     file_hash = hashlib.sha256(content).hexdigest()
 
-    # Check for duplicate
-    stmt = select(UserDocument).where(UserDocument.file_hash == file_hash)
+    # Check for a duplicate OF THIS USER. The same file uploaded by another
+    # user is that user's document: never hand its id out (it would be an
+    # existence oracle on other people's notes, and the owner checks
+    # downstream would refuse every call on it anyway).
+    stmt = select(UserDocument).where(
+        UserDocument.file_hash == file_hash, UserDocument.uploaded_by == user_id
+    )
     result = await session.execute(stmt)
     existing = result.scalar_one_or_none()
 
@@ -640,8 +645,20 @@ async def extract_document_async(
     document_id: int,
     request: ExtractAsyncRequest,
     api_key: ApiKey = Depends(verify_api_key),
+    session: AsyncSession = Depends(get_db_session_dependency),
 ) -> ExtractAsyncResponse:
-    """Enqueue async extraction of a document into the staging buffer (Slice 2c)."""
+    """Enqueue async extraction of a document into the staging buffer (Slice 2c).
+
+    Only the uploader may extract: a foreign or unknown document answers 404
+    (never 403, so ids cannot be enumerated). The BFF checks the same thing
+    before calling; this is the trust boundary when :8000 is reached directly.
+    """
+    doc = (
+        await session.execute(select(UserDocument).where(UserDocument.id == document_id))
+    ).scalar_one_or_none()
+    if doc is None or doc.uploaded_by != request.user_id:
+        raise HTTPException(status_code=404, detail="document_not_found")
+
     bff_job_id = request.options.bff_job_id if request.options else None
     # RQ job ids allow only [A-Za-z0-9_-] — no ':' separator here.
     job_id = "extract-" + hashlib.sha256(str(document_id).encode("utf-8")).hexdigest()[:40]

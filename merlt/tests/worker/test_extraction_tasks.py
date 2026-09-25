@@ -43,6 +43,7 @@ def _fake_doc(storage_path: str | None = None) -> MagicMock:
     needs a real path. The task removes it afterwards, as in production."""
     doc = MagicMock()
     doc.id = 1
+    doc.uploaded_by = "user-1"  # the task refuses a document of another user
     if storage_path is None:
         with tempfile.NamedTemporaryFile(prefix="merlt-test-extraction-", suffix=".pdf", delete=False) as fh:
             fh.write(b"%PDF-1.4 fake")

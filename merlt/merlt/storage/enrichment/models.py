@@ -437,6 +437,13 @@ class UserDocument(Base):
     """
 
     __tablename__ = "user_documents"
+    __table_args__ = (
+        # The upload dedup is PER USER: the same file uploaded by two users is
+        # two documents, each owned by its uploader. A global unique on
+        # file_hash handed user B user A's document id (and let B probe which
+        # files A had uploaded); see migrations/005_user_documents_owner_dedup.sql.
+        UniqueConstraint("file_hash", "uploaded_by", name="uq_user_documents_hash_owner"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -445,7 +452,7 @@ class UserDocument(Base):
     original_filename = Column(String(500), nullable=False)
     file_type = Column(String(50), nullable=False)
     file_size_bytes = Column(BigInteger)
-    file_hash = Column(String(64), unique=True, index=True)
+    file_hash = Column(String(64), index=True)
 
     # Storage
     storage_path = Column(Text, nullable=False)

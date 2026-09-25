@@ -43,6 +43,23 @@ _STATEMENTS = (
         "END IF; END $$"
         for table in ("extraction_candidates", "pending_relations")
     ),
+    # 005_user_documents_owner_dedup.sql: dedup uploads per user. The global
+    # unique on file_hash gave user B user A's document id for a byte-identical
+    # file. On a database created with the new model the composite constraint
+    # already backs an index of the same name, so the CREATE is a no-op.
+    # unique=True + index=True made SQLAlchemy emit a UNIQUE INDEX named
+    # ix_user_documents_file_hash: demote it to a plain index (guarded on its
+    # definition, so a database created with the new model is untouched).
+    "DO $$ BEGIN "
+    "IF EXISTS (SELECT 1 FROM pg_indexes "
+    "WHERE schemaname = current_schema() AND indexname = 'ix_user_documents_file_hash' "
+    "AND indexdef LIKE 'CREATE UNIQUE INDEX%') THEN "
+    "DROP INDEX ix_user_documents_file_hash; "
+    "CREATE INDEX ix_user_documents_file_hash ON user_documents (file_hash); "
+    "END IF; END $$",
+    "ALTER TABLE user_documents DROP CONSTRAINT IF EXISTS user_documents_file_hash_key",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_documents_hash_owner "
+    "ON user_documents (file_hash, uploaded_by)",
 )
 
 
