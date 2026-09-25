@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Highlighter, StickyNote, Copy, Search, X } from 'lucide-react';
+import { Highlighter, StickyNote, Copy, Search, Flag, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
@@ -14,6 +14,10 @@ interface SelectionPopupProps {
   onAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
   onCopy: (text: string) => void;
   onSearch?: (text: string) => void;
+  // Optional "Segnala come citazione" action: rendered only when the host
+  // passes it (same rect contract as onAddNote). The popup knows nothing about
+  // who consumes it; hosts that do not pass it keep the three core actions.
+  onReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
 }
 
 interface PopupState {
@@ -29,7 +33,8 @@ export function SelectionPopup({
   onHighlight,
   onAddNote,
   onCopy,
-  onSearch
+  onSearch,
+  onReportCitation
 }: SelectionPopupProps) {
   const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1 });
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -152,7 +157,15 @@ export function SelectionPopup({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, hidePopup]);
 
-  const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search') => {
+  // The live selection rect (viewport coords), read BEFORE the popup hides
+  // and the selection is cleared (gotcha 16); falls back to the popup anchor.
+  const captureSelectionRect = () => {
+    const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
+    const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  };
+
+  const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report') => {
     switch (action) {
       case 'highlight':
         setShowColorPicker(true);
@@ -160,9 +173,7 @@ export function SelectionPopup({
       case 'note': {
         // Capture the live selection rect BEFORE hiding / clearing — the
         // composer will anchor on this rect (viewport coords).
-        const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
-        const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
-        onAddNote(popup.text, popup.startOffset, { x: r.x, y: r.y, width: r.width, height: r.height });
+        onAddNote(popup.text, popup.startOffset, captureSelectionRect());
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;
@@ -177,6 +188,13 @@ export function SelectionPopup({
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;
+      case 'report': {
+        const rect = captureSelectionRect();
+        onReportCitation?.(popup.text, popup.startOffset, rect);
+        hidePopup();
+        window.getSelection()?.removeAllRanges();
+        break;
+      }
     }
   };
 
@@ -260,6 +278,19 @@ export function SelectionPopup({
                   title="Cerca"
                 >
                   <Search size={16} className="text-purple-400" />
+                </button>
+              </>
+            )}
+            {onReportCitation && (
+              <>
+                <div className="w-px h-5 bg-slate-700" />
+                <button
+                  onClick={() => handleAction('report')}
+                  className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  title="Segnala come citazione"
+                  aria-label="Segnala come citazione"
+                >
+                  <Flag size={16} className="text-sky-400" />
                 </button>
               </>
             )}

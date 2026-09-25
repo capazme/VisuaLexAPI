@@ -29,6 +29,9 @@ import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
 import { sendNerFeedback } from '../../../services/merltService';
 import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
 import { buildArticleXrefNerPayload } from './articleXrefNer';
+import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
+import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
+import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
 import type { Annotation } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
@@ -131,6 +134,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // When null, the composer isn't open; when set, `noteAnchor` carries the
     // corresponding anchorText / offset / scope.
     const [composerRect, setComposerRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+    // Loop β #2 "missed" surface: a selection the user flagged as a legal
+    // reference the citation detector did not link. Offset is in the same
+    // marker projection as highlights; the rect was captured before the
+    // selection was cleared.
+    const [missedCitation, setMissedCitation] = useState<{
+        text: string;
+        startOffset: number;
+        rect: { x: number; y: number; width: number; height: number };
+    } | null>(null);
     const versionDateInputRef = useRef<HTMLInputElement>(null);
 
     // Citation preview hook - destructure to get stable function references
@@ -564,6 +576,37 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         [citationPreviewState.citation, citationPreviewState.targetElement, article_text, norma_data.urn],
     );
 
+    // Loop β #2, surface=article_xref, feedbackType=missed: "Segnala come
+    // citazione" from the selection popup. Only wired for full-consent
+    // contributors (the prop stays undefined otherwise, so the popup hides the
+    // action); SelectionPopup / ArticleBody stay free of MERL-T imports.
+    const handlePopupReportCitation = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
+        if (text.length > MISSED_SELECTION_MAX) {
+            showToast(`Seleziona solo il riferimento normativo (al massimo ${MISSED_SELECTION_MAX} caratteri).`, 'info');
+            return;
+        }
+        setMissedCitation({ text, startOffset, rect });
+    };
+
+    const submitMissedCitation = (reference: NerReference) => {
+        if (!missedCitation) return;
+        const payload = buildMissedNerPayload({
+            articleUrn: norma_data.urn,
+            articleText: article_text || '',
+            selectedText: missedCitation.text,
+            startOffset: missedCitation.startOffset,
+            actType: reference.actType,
+            article: reference.article,
+        });
+        setMissedCitation(null);
+        void sendNerFeedback(payload)
+            .then(() => showToast('Segnalazione inviata. Grazie.', 'success'))
+            .catch((err) => {
+                console.error('NER missed-citation feedback failed:', err);
+                showToast('Segnalazione non registrata. Riprova.', 'error');
+            });
+    };
+
     const handleCompare = () => {
         const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
         openCompareWithArticle({
@@ -769,6 +812,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
+            {canContribute && missedCitation && (
+                <MissedCitationReporter
+                    anchorRect={missedCitation.rect}
+                    selectedText={missedCitation.text}
+                    onSubmit={submitMissedCitation}
+                    onClose={() => setMissedCitation(null)}
+                />
+            )}
+
             <ArticleBody
                 contentRef={contentRef}
                 itemKey={itemKey}
@@ -777,6 +829,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupHighlight={handlePopupHighlight}
                 onPopupAddNote={handlePopupAddNote}
                 onPopupCopy={handlePopupCopy}
+                onPopupReportCitation={canContribute ? handlePopupReportCitation : undefined}
                 onRemoveHighlight={removeHighlight}
             />
 

@@ -3,6 +3,7 @@ import { Check, Ban, Loader2, Pencil } from 'lucide-react';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
 import { formatCitationLabel } from '../../../utils/citationMatcher';
 import type { NerFeedbackType, NerCorrectReference } from '../../../services/merltService';
+import { NerReferenceEditor } from './NerReferenceEditor';
 
 export interface CitationNerFeedbackProps {
   citation: ParsedCitationData;
@@ -28,8 +29,6 @@ export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackP
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [actType, setActType] = useState(citation.act_type ?? '');
-  const [article, setArticle] = useState(citation.article ?? '');
 
   const submit = (type: NerFeedbackType, correctReference?: NerCorrectReference) => {
     if (pending) return;
@@ -73,50 +72,15 @@ export function CitationNerFeedback({ citation, onSubmit }: CitationNerFeedbackP
   }
 
   if (editing) {
-    const canSave = actType.trim().length > 0 && article.trim().length > 0;
     return (
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Riferimento corretto</p>
-        <div className="flex gap-2">
-          <input
-            value={actType}
-            onChange={(e) => setActType(e.target.value)}
-            placeholder="Tipo atto (es. codice civile)"
-            aria-label="Tipo atto corretto"
-            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
-          />
-          <input
-            value={article}
-            onChange={(e) => setArticle(e.target.value)}
-            placeholder="Articolo"
-            aria-label="Articolo corretto"
-            className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
-          />
-        </div>
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            className="rounded-md px-2 py-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-          >
-            Annulla
-          </button>
-          <button
-            type="button"
-            disabled={!canSave}
-            onClick={() =>
-              submit('correction', {
-                actType: actType.trim(),
-                article: article.trim(),
-                displayText: formatCitationLabel(citation),
-              })
-            }
-            className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
-          >
-            Salva
-          </button>
-        </div>
-      </div>
+      <NerReferenceEditor
+        initialActType={citation.act_type ?? ''}
+        initialArticle={citation.article ?? ''}
+        onCancel={() => setEditing(false)}
+        onSave={({ actType, article }) =>
+          submit('correction', { actType, article, displayText: formatCitationLabel(citation) })
+        }
+      />
     );
   }
 

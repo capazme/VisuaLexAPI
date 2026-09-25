@@ -13,6 +13,8 @@ export interface ArticleBodyProps {
     onPopupHighlight: (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => void;
     onPopupAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onPopupCopy: (text: string) => Promise<void> | void;
+    /** Optional "Segnala come citazione" action; the popup hides it when absent. */
+    onPopupReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onRemoveHighlight: (id: string) => void;
 }
 
@@ -24,6 +26,7 @@ export function ArticleBody({
     onPopupHighlight,
     onPopupAddNote,
     onPopupCopy,
+    onPopupReportCitation,
     onRemoveHighlight,
 }: ArticleBodyProps) {
     return (
@@ -35,6 +38,7 @@ export function ArticleBody({
                     onHighlight={onPopupHighlight}
                     onAddNote={onPopupAddNote}
                     onCopy={onPopupCopy}
+                    onReportCitation={onPopupReportCitation}
                 />
                 <div className="prose prose-lg dark:prose-invert max-w-none legal-prose prose-slate prose-headings:font-bold font-serif px-2 sm:px-4" id={`article-content-${itemKey}`}>
                     {processedContent ? (
