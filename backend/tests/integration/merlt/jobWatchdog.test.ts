@@ -42,6 +42,24 @@ describe('sweepStuckJobs (loop-closure reliability)', () => {
     expect(result.extractFlipped).toBe(0);
   });
 
+  it('keeps a 20-minute-old extraction alive under the longer extraction net, but flips ingestion', async () => {
+    const twentyMinAgo = new Date(Date.now() - 20 * 60 * 1000);
+    const extraction = await prisma.merltExtractionJob.create({
+      data: { documentId: '77', userId: user.id, status: 'running', createdAt: twentyMinAgo },
+    });
+    const ingestion = await prisma.merltIngestionJob.create({
+      data: { articleUrn: 'urn:test~art1', userId: user.id, status: 'pending', createdAt: twentyMinAgo },
+    });
+
+    // Ingestion net 10 min, extraction net 45 min (the RQ extraction timeout is 30 min).
+    const result = await sweepStuckJobs(prisma, 10 * 60 * 1000, 20 * 60 * 1000, 30, 45 * 60 * 1000);
+
+    expect(result.ingestFlipped).toBe(1);
+    expect(result.extractFlipped).toBe(0);
+    expect((await prisma.merltExtractionJob.findUnique({ where: { id: extraction.id } }))?.status).toBe('running');
+    expect((await prisma.merltIngestionJob.findUnique({ where: { id: ingestion.id } }))?.status).toBe('timeout');
+  });
+
   it('flips stuck ingestion jobs too', async () => {
     const oldCreated = new Date(Date.now() - 30 * 60 * 1000);
     await prisma.merltIngestionJob.create({

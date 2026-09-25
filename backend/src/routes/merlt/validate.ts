@@ -7,7 +7,8 @@ import {
   validateRelationRequestSchema,
 } from '../../schemas/merlt/contrib';
 import { createContribClient, ContribClient } from '../../services/merlt/contribClient';
-import { MerltClientError } from '../../services/merlt/merltClient';
+import { MerltClientError, createMerltClient } from '../../services/merlt/merltClient';
+import { getOrSyncAuthority } from '../../services/merlt/authorityCache';
 
 /**
  * MERL-T RLCF validation routes (Slice 2c #8) — vote on the community's pending
@@ -52,6 +53,25 @@ router.get('/validate/pending', authenticate, validationGuard, async (req: Reque
   }
 });
 
+/**
+ * Loop α A4: a vote that closes the consensus makes MERL-T recompute the
+ * authority of the voters and the contributor. The VisuaLex hub reads the
+ * 1h-TTL MerltUserAuthorityCache, so without this the juror kept seeing the
+ * old value for up to an hour. Best-effort, fire-and-forget: the vote is
+ * already recorded, a failed refresh only leaves the cache on its TTL.
+ */
+function refreshAuthorityAfterConsensus(userId: string, result: unknown): void {
+  const reached = (result as { threshold_reached?: boolean } | null)?.threshold_reached === true;
+  if (!reached) return;
+  void getOrSyncAuthority(userId, createMerltClient(), 0).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `merlt validate: authority refresh after consensus failed for user=${userId}:`,
+      err instanceof Error ? err.message : String(err)
+    );
+  });
+}
+
 router.post('/validate/entity', authenticate, validationGuard, async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ detail: 'Authentication required' });
@@ -69,6 +89,7 @@ router.post('/validate/entity', authenticate, validationGuard, async (req: Reque
       user_id: req.user.id,
       reason: parsed.data.reason,
     });
+    refreshAuthorityAfterConsensus(req.user.id, result);
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {
@@ -96,6 +117,7 @@ router.post('/validate/relation', authenticate, validationGuard, async (req: Req
       user_id: req.user.id,
       reason: parsed.data.reason,
     });
+    refreshAuthorityAfterConsensus(req.user.id, result);
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof MerltClientError) {

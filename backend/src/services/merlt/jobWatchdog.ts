@@ -22,6 +22,12 @@ const TIMEOUT_MARKER = 'watchdog: callback never arrived, flipped to timeout';
 
 const DEFAULT_QA_STALE_AFTER_MS = 20 * 60 * 1000; // 20 minutes
 const DEFAULT_QA_RETENTION_DAYS = 30;
+// Note extraction runs up to MERLT_EXTRACT_JOB_TIMEOUT (1800s on the RQ side)
+// plus queue wait and callback retries: sweeping it on the 10-minute ingestion
+// net flipped every real extraction to `timeout` while the worker was still
+// working, and the late `completed` callback then fought the UI.
+export const DEFAULT_EXTRACT_STALE_AFTER_MS = 45 * 60 * 1000; // 45 minutes
+export const DEFAULT_INGEST_STALE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Sweep stuck extraction/ingestion jobs on `createdAt` (unchanged, tighter
@@ -32,15 +38,19 @@ const DEFAULT_QA_RETENTION_DAYS = 30;
  */
 export async function sweepStuckJobs(
   prisma: PrismaClient,
-  staleAfterMs: number = 10 * 60 * 1000, // 10 minutes
+  staleAfterMs: number = DEFAULT_INGEST_STALE_AFTER_MS,
   qaStaleAfterMs: number = DEFAULT_QA_STALE_AFTER_MS,
   qaRetentionDays: number = DEFAULT_QA_RETENTION_DAYS,
+  // Defaults to the ingestion threshold so existing positional callers keep
+  // one net; the scheduler passes the (much longer) extraction net explicitly.
+  extractStaleAfterMs: number = staleAfterMs,
 ): Promise<SweepResult> {
   const cutoff = new Date(Date.now() - staleAfterMs);
+  const extractCutoff = new Date(Date.now() - extractStaleAfterMs);
   const extract = await prisma.merltExtractionJob.updateMany({
     where: {
       status: { in: ['pending', 'running'] },
-      createdAt: { lt: cutoff },
+      createdAt: { lt: extractCutoff },
     },
     data: {
       status: 'timeout',
@@ -105,18 +115,20 @@ export function scheduleStuckJobSweeper(
   options: {
     intervalMs?: number;
     staleAfterMs?: number;
+    extractStaleAfterMs?: number;
     qaStaleAfterMs?: number;
     qaRetentionDays?: number;
     logger?: (msg: string, data?: unknown) => void;
   } = {},
 ): NodeJS.Timeout {
   const intervalMs = options.intervalMs ?? 5 * 60 * 1000;
-  const staleAfterMs = options.staleAfterMs ?? 10 * 60 * 1000;
+  const staleAfterMs = options.staleAfterMs ?? DEFAULT_INGEST_STALE_AFTER_MS;
+  const extractStaleAfterMs = options.extractStaleAfterMs ?? DEFAULT_EXTRACT_STALE_AFTER_MS;
   const qaStaleAfterMs = options.qaStaleAfterMs ?? DEFAULT_QA_STALE_AFTER_MS;
   const qaRetentionDays = options.qaRetentionDays ?? DEFAULT_QA_RETENTION_DAYS;
   const log = options.logger ?? ((msg: string, data?: unknown) => console.log(`[watchdog] ${msg}`, data ?? ''));
   const run = (): void => {
-    sweepStuckJobs(prisma, staleAfterMs, qaStaleAfterMs, qaRetentionDays)
+    sweepStuckJobs(prisma, staleAfterMs, qaStaleAfterMs, qaRetentionDays, extractStaleAfterMs)
       .then((r) => {
         if (r.extractFlipped > 0 || r.ingestFlipped > 0 || r.qaFlipped > 0 || r.qaJobsPurged > 0) {
           log('flipped stuck jobs', r);

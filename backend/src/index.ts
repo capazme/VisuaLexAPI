@@ -1,11 +1,22 @@
 import { config } from './config';
 import app from './app';
 import { prisma } from './lib/prisma';
-import { scheduleStuckJobSweeper } from './services/merlt/jobWatchdog';
+import {
+  scheduleStuckJobSweeper,
+  DEFAULT_EXTRACT_STALE_AFTER_MS,
+  DEFAULT_INGEST_STALE_AFTER_MS,
+} from './services/merlt/jobWatchdog';
+
+/** Positive integer from env, or the default (also on garbage input). */
+function envMs(name: string, fallback: number): number {
+  const parsed = parseInt(process.env[name] || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 // MERL-T job watchdog: callbacks worker→BFF have retry+backoff, but if they
 // ever fail past that, this catches the stragglers (transitions pending/running
-// rows older than 10min → 'timeout' so the polling UI unblocks). Skipped in
+// rows older than their net → 'timeout' so the polling UI unblocks: 10min for
+// ingestion, 45min for note extraction, 20min of silence for Q&A). Skipped in
 // tests (where the harness reset is sufficient).
 //
 // The async progressive Q&A jobs (qa-async-progressive-contract.md) get a
@@ -18,9 +29,13 @@ let watchdogInterval: NodeJS.Timeout | null = null;
 if (config.nodeEnv !== 'test') {
   watchdogInterval = scheduleStuckJobSweeper(prisma, {
     intervalMs: 5 * 60 * 1000,
-    staleAfterMs: 10 * 60 * 1000,
-    qaStaleAfterMs: parseInt(process.env.MERLT_QA_STALE_MS || String(20 * 60 * 1000), 10),
-    qaRetentionDays: parseInt(process.env.MERLT_QA_RETENTION_DAYS || '30', 10),
+    // Ingestion net (also lazyIngest's stale flip) and the longer extraction
+    // net: MERLT_EXTRACT_STALE_MS must stay above the RQ job timeout
+    // (MERLT_EXTRACT_JOB_TIMEOUT, 1800s) plus queue wait and sweep interval.
+    staleAfterMs: envMs('MERLT_INGEST_STALE_MS', DEFAULT_INGEST_STALE_AFTER_MS),
+    extractStaleAfterMs: envMs('MERLT_EXTRACT_STALE_MS', DEFAULT_EXTRACT_STALE_AFTER_MS),
+    qaStaleAfterMs: envMs('MERLT_QA_STALE_MS', 20 * 60 * 1000),
+    qaRetentionDays: envMs('MERLT_QA_RETENTION_DAYS', 30),
   });
 }
 

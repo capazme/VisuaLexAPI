@@ -41,6 +41,12 @@ router.post(
       res.status(202).json(result);
     } catch (err) {
       if (err instanceof MerltClientError) {
+        if (err.status === 401 || err.status === 403) {
+          // MERL-T refused the admin key: MERLT_API_KEY is empty or differs
+          // from the seeded MERLT_ADMIN_API_KEY. Not an outage.
+          res.status(503).json({ detail: 'merlt_auth_misconfigured' });
+          return;
+        }
         res.status(503).json({ detail: 'merlt_unavailable' });
         return;
       }
@@ -63,6 +69,12 @@ router.get(
       res.status(200).json(await client().getConfig());
     } catch (err) {
       if (err instanceof MerltClientError) {
+        if (err.status === 401 || err.status === 403) {
+          // MERL-T refused the admin key: MERLT_API_KEY is empty or differs
+          // from the seeded MERLT_ADMIN_API_KEY. Not an outage.
+          res.status(503).json({ detail: 'merlt_auth_misconfigured' });
+          return;
+        }
         res.status(503).json({ detail: 'merlt_unavailable' });
         return;
       }
@@ -92,6 +104,12 @@ router.put(
         return;
       }
       if (err instanceof MerltClientError) {
+        if (err.status === 401 || err.status === 403) {
+          // MERL-T refused the admin key: MERLT_API_KEY is empty or differs
+          // from the seeded MERLT_ADMIN_API_KEY. Not an outage.
+          res.status(503).json({ detail: 'merlt_auth_misconfigured' });
+          return;
+        }
         res.status(503).json({ detail: 'merlt_unavailable' });
         return;
       }
@@ -112,6 +130,12 @@ router.post(
       res.status(200).json(await client().reinitEngine());
     } catch (err) {
       if (err instanceof MerltClientError) {
+        if (err.status === 401 || err.status === 403) {
+          // MERL-T refused the admin key: MERLT_API_KEY is empty or differs
+          // from the seeded MERLT_ADMIN_API_KEY. Not an outage.
+          res.status(503).json({ detail: 'merlt_auth_misconfigured' });
+          return;
+        }
         res.status(503).json({ detail: 'merlt_unavailable' });
         return;
       }
