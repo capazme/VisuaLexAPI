@@ -225,30 +225,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             .catch(error => console.debug('Norma change check unavailable:', error));
     }, [itemKey, isSavedArticle, isCurrentText]);
 
-    // Cmd+F click → scroll this article body to the requested occurrence.
-    // useArticleMarkers tags each search hit with `data-search-idx`; we
-    // wait one frame (so the re-render from the setGlobalHighlight typing
-    // AND the article switch has settled) before querying the DOM.
-    useEffect(() => {
-        return subscribeSearchNavigation((req) => {
-            if (!req) return;
-            if (req.articleId !== uniqueArticleId) return;
-            const container = contentRef.current;
-            if (!container) return;
-            // rAF twice: first frame lets React commit, second lets the
-            // browser lay out the scrollIntoView target.
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                const target = container.querySelector<HTMLElement>(
-                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
-                );
-                if (!target) return;
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.classList.add('search-match-active');
-                setTimeout(() => target.classList.remove('search-match-active'), 1600);
-            }));
-        });
-    }, [uniqueArticleId]);
-
     useEffect(() => {
         if (!toastMessage) return;
         const timeout = setTimeout(() => setToastMessage(null), 3000);
@@ -528,9 +504,44 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
 
     // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
-    const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, itemKey, {
+    const { updatesOpen, openNote, closeNote, openUpdates } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
     });
+
+    // Cmd+F click → scroll this article body to the requested occurrence.
+    // useArticleMarkers tags each search hit with `data-search-idx`; we
+    // wait one frame (so the re-render from the setGlobalHighlight typing
+    // AND the article switch has settled) before querying the DOM.
+    useEffect(() => {
+        const reveal = (target: HTMLElement) => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('search-match-active');
+            setTimeout(() => target.classList.remove('search-match-active'), 1600);
+        };
+        return subscribeSearchNavigation((req) => {
+            if (!req) return;
+            if (req.articleId !== uniqueArticleId) return;
+            const container = contentRef.current;
+            if (!container) return;
+            // rAF twice: first frame lets React commit, second lets the
+            // browser lay out the scrollIntoView target.
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                const target = container.querySelector<HTMLElement>(
+                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
+                );
+                if (!target) return;
+                // A hit in the folded AGGIORNAMENTO notes is display:none, and
+                // scrolling to it would do nothing: unfold them first. Folding
+                // is a class, so the target element survives the re-render.
+                if (target.closest('.vlx-updates-body') && !target.closest('.vlx-updates-open')) {
+                    openUpdates();
+                    requestAnimationFrame(() => requestAnimationFrame(() => reveal(target)));
+                    return;
+                }
+                reveal(target);
+            }));
+        });
+    }, [uniqueArticleId, openUpdates]);
 
     // Handle citation hover and click events
     useEffect(() => {

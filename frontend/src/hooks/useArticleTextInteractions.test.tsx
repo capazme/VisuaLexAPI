@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { useMemo, useRef } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useArticleTextInteractions } from './useArticleTextInteractions';
+import { UpdateNotePopover } from '../components/features/search/UpdateNotePopover';
 
 // Markup as utils/articleRender.ts emits it (chip outermost, a note anchor inside).
 const BODY =
@@ -12,9 +13,9 @@ const BODY =
   '<div class="vlx-updates" data-open="false"><span class="vlx-updates-toggle" role="button" tabindex="0"></span>' +
   '<div class="vlx-updates-body"><div class="vlx-b vlx-update-head">AGGIORNAMENTO (119)</div></div></div>';
 
-function Harness({ resetKey, contentKey = 'v1' }: { resetKey: string; contentKey?: string }) {
+function Harness({ resetKey, contentKey = 'v1', withPopover = false }: { resetKey: string; contentKey?: string; withPopover?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(ref, resetKey, { contentKey });
+  const { updatesOpen, openNote, closeNote, openUpdates } = useArticleTextInteractions(ref, resetKey, { contentKey });
   // Stable, like SafeHTML (memoised): a new object would make React re-set innerHTML.
   const html = useMemo(() => ({ __html: BODY }), []);
   return (
@@ -22,6 +23,10 @@ function Harness({ resetKey, contentKey = 'v1' }: { resetKey: string; contentKey
       <div ref={ref} data-testid="body" dangerouslySetInnerHTML={html} />
       <output data-testid="state">{JSON.stringify({ updatesOpen, note: openNote?.id ?? null })}</output>
       <button type="button" onClick={closeNote}>chiudi</button>
+      <button type="button" onClick={openUpdates}>apri note</button>
+      {withPopover && openNote && (
+        <UpdateNotePopover noteId={openNote.id} paragraphs={['Testo della nota.']} anchorEl={openNote.anchorEl} onClose={closeNote} />
+      )}
     </div>
   );
 }
@@ -80,6 +85,33 @@ describe('useArticleTextInteractions', () => {
     expect(state().note).toBe('119');
     act(() => rerender(<Harness resetKey="a" contentKey="v2" />));
     expect(state().note).toBeNull();
+  });
+
+  it('closes the note on a second real click of its chip, with the popover mounted', () => {
+    render(<Harness resetKey="a" withPopover />);
+    // A real click is pointerdown, mousedown, pointerup, mouseup, click: the
+    // popover's outside-press dismissal must not treat the chip as outside,
+    // or it closes on pointerdown and the click reopens it.
+    const realClick = (el: HTMLElement) => {
+      fireEvent.pointerDown(el);
+      fireEvent.mouseDown(el);
+      fireEvent.pointerUp(el);
+      fireEvent.mouseUp(el);
+      fireEvent.click(el);
+    };
+    realClick(chip('119'));
+    expect(state().note).toBe('119');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    realClick(chip('119'));
+    expect(state().note).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('unfolds the update notes on demand (a search hit inside them)', () => {
+    render(<Harness resetKey="a" />);
+    fireEvent.click(screen.getByText('apri note'));
+    expect(state().updatesOpen).toBe(true);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
   });
 
   it('ignores other keys and other elements', () => {

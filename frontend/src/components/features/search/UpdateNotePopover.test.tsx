@@ -28,6 +28,16 @@ describe('UpdateNotePopover', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it('does not treat a press on its own chip as outside, but does for the rest of the page', () => {
+    const { onClose, anchor } = setup(['Testo della nota.']);
+    fireEvent.pointerDown(anchor);
+    fireEvent.mouseDown(anchor);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.pointerDown(document.body);
+    fireEvent.mouseDown(document.body);
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it('says so when the note has no text', () => {
     setup([]);
     expect(screen.getByText('La nota non ha testo nella versione scaricata.')).toBeInTheDocument();

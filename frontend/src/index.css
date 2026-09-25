@@ -345,6 +345,17 @@
   color: inherit;
 }
 
+/* Its sepia theme would turn the slate greys below into grey stains on
+   cream: in Study Mode the quiet parts are a shade of the theme's own ink. */
+.vlx-art--study .vlx-paren,
+.vlx-art--study .vlx-notice,
+.vlx-art--study .vlx-ref-missing,
+.vlx-art--study .vlx-update-head,
+.vlx-art--study .vlx-update-para,
+.vlx-art--study .vlx-heading {
+  color: color-mix(in srgb, currentColor 62%, transparent);
+}
+
 /* Hidden, not removed: hidden text still counts in the offsets. */
 .vlx-hide-header .vlx-heading,
 .vlx-hide-header .vlx-rubrica,
@@ -547,6 +558,25 @@
     --vlx-indent: 0.4em;
     font-size: 1.0625rem;
     line-height: 1.65;
+  }
+
+  .vlx-art .vlx-updates-toggle {
+    min-height: 44px;
+  }
+}
+
+/* A "(119)" chip sits inside a line and cannot grow to 44px without
+   breaking it: on touch screens it gets a larger, invisible hit area
+   instead (generated content — no text node, no layout shift). */
+@media (pointer: coarse) {
+  .vlx-art .vlx-ref {
+    position: relative;
+  }
+
+  .vlx-art .vlx-ref::after {
+    content: '';
+    position: absolute;
+    inset: -12px -6px;
   }
 }
 
