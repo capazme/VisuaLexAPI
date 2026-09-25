@@ -20,7 +20,7 @@ import json
 import structlog
 import yaml
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 from uuid import uuid4
 
@@ -334,6 +334,33 @@ class WeightStore:
             }
 
         return result
+
+    def parse_config(self, config_data: Dict) -> WeightConfig:
+        """Public entry to the YAML/JSON → ``WeightConfig`` conversion (a row's ``config_json``)."""
+        return self._parse_yaml_to_config(config_data)
+
+    async def list_versions(self, experiment_id: str, limit: int = 50) -> List[WeightVersion]:
+        """
+        Every saved version for an experiment, newest first, active or not.
+
+        Backs ``GET /rlcf/policies/history``. Errors propagate: the caller
+        decides how loudly a broken history should fail. Without a
+        ``database_url`` there is nothing to list.
+        """
+        if not self.database_url:
+            return []
+
+        from merlt.rlcf.database import get_async_session
+
+        async with get_async_session() as session:
+            stmt = (
+                select(WeightVersion)
+                .where(WeightVersion.experiment_id == experiment_id)
+                .order_by(WeightVersion.created_at.desc(), WeightVersion.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
 
     async def _load_from_database(self, experiment_id: str) -> Optional[WeightConfig]:
         """Carica pesi da database per un esperimento specifico."""

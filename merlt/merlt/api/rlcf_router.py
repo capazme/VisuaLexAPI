@@ -141,6 +141,84 @@ def _get_scheduler():
         return None
 
 
+DEFAULT_EXPERIMENT_ID = "rlcf_training"
+
+_EXPERT_SHORT_NAMES = {
+    "LiteralExpert": "literal",
+    "SystemicExpert": "systemic",
+    "PrinciplesExpert": "principles",
+    "PrecedentExpert": "precedent",
+}
+
+# The traversal policy has no persisted summary yet: these are the values the
+# weights endpoint has always reported next to the learned gating priors.
+_TRAVERSAL_SUMMARY = {"avg_depth": 2.0, "avg_width": 2.0, "exploration_rate": 0.2}
+
+
+def _resolve_experiment_id() -> str:
+    """
+    The ``experiment_id`` the TrainingScheduler persists weights under.
+
+    Read from the live scheduler (so a non-default experiment configured at
+    runtime is honoured), with the SchedulerConfig default as fallback. Shared
+    by ``/policies/weights`` and ``/policies/history`` so the two endpoints can
+    never read different experiments.
+    """
+    scheduler = _get_scheduler()
+    if scheduler is None:
+        return DEFAULT_EXPERIMENT_ID
+    return getattr(scheduler.config, "experiment_id", DEFAULT_EXPERIMENT_ID) or DEFAULT_EXPERIMENT_ID
+
+
+def _config_to_status(config: Any, timestamp: Optional[str]) -> Optional[PolicyWeightsStatus]:
+    """
+    Project a ``WeightConfig`` onto the ``PolicyWeightsStatus`` wire shape.
+
+    Returns ``None`` when the config carries no gating priors (nothing learned
+    yet), so callers can fall back to the uniform defaults. The same projection
+    serves the current weights and every entry of the history.
+    """
+    gating_cfg = getattr(config, "gating", None)
+    priors = getattr(gating_cfg, "expert_priors", None) if gating_cfg else None
+    if not priors:
+        return None
+
+    gating: Dict[str, float] = {}
+    for name, lw in priors.items():
+        key = _EXPERT_SHORT_NAMES.get(name, name.lower().replace("expert", ""))
+        gating[key] = round(float(getattr(lw, "default", 0.25)), 4)
+    if not gating:
+        return None
+
+    # Loop β E.3: surface per-tool learned call-probabilities.
+    tool_gating: Dict[str, float] = {}
+    tool_cfg = getattr(config, "tool_gating", None)
+    if tool_cfg is not None and getattr(tool_cfg, "tool_priors", None):
+        for tname, tlw in tool_cfg.tool_priors.items():
+            tool_gating[tname] = round(float(getattr(tlw, "default", 0.0)), 4)
+
+    return PolicyWeightsStatus(
+        gating=gating,
+        traversal=dict(_TRAVERSAL_SUMMARY),
+        tool_gating=tool_gating,
+        timestamp=timestamp,
+    )
+
+
+def _default_policy_weights() -> PolicyWeightsStatus:
+    """Uniform priors, reported when no trained version exists."""
+    return PolicyWeightsStatus(
+        gating={
+            "literal": 0.25,
+            "systemic": 0.25,
+            "principles": 0.25,
+            "precedent": 0.25,
+        },
+        traversal=dict(_TRAVERSAL_SUMMARY),
+        timestamp=datetime.now().isoformat(),
+    )
+
+
 async def _get_policy_weights() -> PolicyWeightsStatus:
     """
     Ottiene i pesi policy reali dal sistema RLCF.
@@ -162,62 +240,19 @@ async def _get_policy_weights() -> PolicyWeightsStatus:
         db_url = os.environ.get("RLCF_DATABASE_URL")
         if db_url:
             store = WeightStore(database_url=db_url)
-            # experiment_id deve combaciare con quello che il TrainingScheduler usa
-            # per persistere i pesi: leggilo dallo scheduler vivo (evita un
-            # mismatch silenzioso se è stato configurato un experiment_id non
-            # di default), col fallback al default di SchedulerConfig.
-            scheduler = _get_scheduler()
-            experiment_id = (
-                getattr(scheduler.config, "experiment_id", "rlcf_training")
-                if scheduler is not None
-                else "rlcf_training"
-            )
-            config = await store.get_weights(experiment_id=experiment_id)
-            if config and config.gating and config.gating.expert_priors:
-                short = {
-                    "LiteralExpert": "literal",
-                    "SystemicExpert": "systemic",
-                    "PrinciplesExpert": "principles",
-                    "PrecedentExpert": "precedent",
-                }
-                gating = {}
-                for name, lw in config.gating.expert_priors.items():
-                    key = short.get(name, name.lower().replace("expert", ""))
-                    gating[key] = round(float(getattr(lw, "default", 0.25)), 4)
-                # Loop β E.3: surface per-tool learned call-probabilities.
-                tool_gating = {}
-                if getattr(config, "tool_gating", None) and config.tool_gating.tool_priors:
-                    for tname, tlw in config.tool_gating.tool_priors.items():
-                        tool_gating[tname] = round(float(getattr(tlw, "default", 0.0)), 4)
-                if gating:
-                    return PolicyWeightsStatus(
-                        gating=gating,
-                        traversal={
-                            "avg_depth": 2.0,
-                            "avg_width": 2.0,
-                            "exploration_rate": 0.2,
-                        },
-                        tool_gating=tool_gating,
-                        timestamp=getattr(config, "updated_at", None) or datetime.now().isoformat(),
-                    )
+            config = await store.get_weights(experiment_id=_resolve_experiment_id())
+            if config is not None:
+                status = _config_to_status(
+                    config,
+                    getattr(config, "updated_at", None) or datetime.now().isoformat(),
+                )
+                if status is not None:
+                    return status
     except Exception as e:
         log.debug("Could not load policy weights from weight store", error=str(e))
 
     # Return default weights if nothing available
-    return PolicyWeightsStatus(
-        gating={
-            "literal": 0.25,
-            "systemic": 0.25,
-            "principles": 0.25,
-            "precedent": 0.25,
-        },
-        traversal={
-            "avg_depth": 2.0,
-            "avg_width": 2.0,
-            "exploration_rate": 0.2,
-        },
-        timestamp=datetime.now().isoformat(),
-    )
+    return _default_policy_weights()
 
 
 def _get_buffer_feedback_distribution(buffer) -> dict:
@@ -588,7 +623,15 @@ async def get_policy_history(
     """
     Recupera storia dei pesi delle policy nel tempo.
 
-    Carica da checkpoint storici salvati.
+    Legge le versioni salvate nella tabella ``weight_versions`` (la stessa che
+    ``/policies/weights`` interroga per la versione attiva), attive o meno, per
+    l'``experiment_id`` del TrainingScheduler. Ogni versione diventa una entry
+    di ``PolicyWeightsStatus`` in ordine cronologico, così ``epochs`` cresce nel
+    tempo. Senza ``RLCF_DATABASE_URL`` la storia è vuota.
+
+    Prima leggeva ``RLCFPersistence.list_checkpoints`` — un metodo inesistente,
+    su un modello senza ``gating_weights`` — e l'except a livello debug
+    restituiva SEMPRE una storia vuota senza segnalarlo.
 
     Args:
         limit: Numero massimo di entry da restituire
@@ -603,29 +646,42 @@ async def get_policy_history(
           "epochs": [1, 2, 3, ...]
         }
     """
-    history = []
-    epochs = []
+    history: List[PolicyWeightsStatus] = []
 
-    try:
-        from merlt.rlcf.persistence import RLCFPersistence
+    import os
+    db_url = os.environ.get("RLCF_DATABASE_URL")
+    if db_url:
+        try:
+            from merlt.weights.store import WeightStore
 
-        persistence = RLCFPersistence()
-        checkpoints = persistence.list_checkpoints(limit=limit)
-
-        for i, checkpoint in enumerate(checkpoints):
-            history.append(PolicyWeightsStatus(
-                gating=checkpoint.gating_weights or {},
-                traversal=checkpoint.traversal_params or {},
-                timestamp=checkpoint.created_at.isoformat() if checkpoint.created_at else None,
-            ))
-            epochs.append(i + 1)
-
-    except Exception as e:
-        log.debug("Could not load policy history", error=str(e))
+            store = WeightStore(database_url=db_url)
+            rows = await store.list_versions(
+                experiment_id=_resolve_experiment_id(), limit=limit
+            )
+            # Newest-first from the store; the chart wants oldest-first.
+            for row in reversed(rows):
+                # One unreadable row (older schema, hand-edited JSON) must not
+                # empty the whole history.
+                try:
+                    if not row.config_json:
+                        continue
+                    config = store.parse_config(row.config_json)
+                    timestamp = row.created_at.isoformat() if row.created_at else None
+                    status = _config_to_status(config, timestamp)
+                    if status is not None:
+                        history.append(status)
+                except Exception as e:
+                    log.warning(
+                        "Skipping unreadable weight version",
+                        version_id=getattr(row, "id", None),
+                        error=str(e),
+                    )
+        except Exception as e:
+            log.warning("Could not load policy history", error=str(e))
 
     return PolicyWeightsHistory(
         history=history,
-        epochs=epochs,
+        epochs=list(range(1, len(history) + 1)),
     )
 
 
