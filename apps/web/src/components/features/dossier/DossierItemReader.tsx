@@ -6,12 +6,14 @@ import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
+import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, NormaVisitata } from '../../../types';
 
 interface Props {
@@ -104,13 +106,21 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
 
   const rawText = state.phase === 'ready' ? (state.article.article_text || '') : '';
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
-  const markedHtml = useArticleMarkers({ rawText, highlights: articleHighlights, annotations: itemAnnotations, structure });
-  // Update-note references and the foldable AGGIORNAMENTO tail, as on the
-  // dashboard. `enabled` waits for the body: it exists only once the fetch settles.
-  const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(contentRef, itemKey, {
+  const markedHtml = useArticleMarkers({ rawText, highlights: articleHighlights, annotations: itemAnnotations, structure, signs: true });
+  // What each block's sign counts, for the popover it opens (the renderer
+  // derives the signs from the same inputs, through the same module).
+  const blockGroups = useMemo(
+    () => groupAnnotationsByBlock(rawText, structure, articleHighlights, itemAnnotations),
+    [rawText, structure, articleHighlights, itemAnnotations],
+  );
+  // Update-note references, the foldable AGGIORNAMENTO tail and the
+  // annotation signs, as on the dashboard. `enabled` waits for the body: it
+  // exists only once the fetch settles.
+  const { updatesOpen, openNote, closeNote, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
     enabled: isReady,
     contentKey: markedHtml,
   });
+  const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
   // Delegated click on the article body: tapping a wavy `.note-anchor`
   // opens the compact InlineNotePopover for that single note, exactly as
@@ -197,13 +207,11 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
         contentRef={contentRef}
         itemKey={itemKey}
         processedContent={markedHtml}
-        panelHighlights={articleHighlights}
         onPopupHighlight={handlePopupHighlight}
         onPopupAddNote={(text, startOffset, rect) => {
           setComposer({ rect, anchorText: text, startOffset });
         }}
         onPopupCopy={handlePopupCopy}
-        onRemoveHighlight={removeHighlight}
         updatesOpen={updatesOpen}
       />
       {openNote && structure.notes[openNote.id] && (
@@ -212,6 +220,20 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast }: Props
           paragraphs={getUpdateNoteParagraphs(rawText, structure.notes[openNote.id])}
           anchorEl={openNote.anchorEl}
           onClose={closeNote}
+        />
+      )}
+      {openBlock !== null && hasAnnotations(openGroup) && (
+        <BlockAnnotationsPopover
+          key={openBlock}
+          containerRef={contentRef}
+          blockIndex={openBlock}
+          blockLabel={describeBlock(rawText, structure.blocks[openBlock])}
+          group={openGroup}
+          contentKey={markedHtml}
+          onClose={closeBlock}
+          onUpdateNote={updateAnnotation}
+          onRemoveNote={removeAnnotation}
+          onRemoveHighlight={removeHighlight}
         />
       )}
       {composer && (

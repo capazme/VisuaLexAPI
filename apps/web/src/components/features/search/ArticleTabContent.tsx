@@ -25,6 +25,7 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
+import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { PluginSlot } from '../../../plugins/PluginSlot';
@@ -36,6 +37,7 @@ import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
 import type { Annotation } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
@@ -658,14 +660,23 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         highlights: articleHighlights,
         annotations: itemAnnotations,
         structure,
+        signs: true,
     });
+    // What each block's sign counts, for the popover it opens (the renderer
+    // derives the signs from the same inputs, through the same module).
+    const blockGroups = useMemo(
+        () => groupAnnotationsByBlock(article_text || '', structure, articleHighlights, itemAnnotations),
+        [article_text, structure, articleHighlights, itemAnnotations],
+    );
 
     const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
 
-    // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
-    const { updatesOpen, openNote, closeNote, openUpdates } = useArticleTextInteractions(contentRef, itemKey, {
+    // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom
+    // fold; an annotation sign opens its block's notes and highlights.
+    const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
     });
+    const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
     // Cmd+F click → scroll this article body to the requested occurrence.
     // useArticleMarkers tags each search hit with `data-search-idx`; we
@@ -881,12 +892,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 contentRef={contentRef}
                 itemKey={itemKey}
                 processedContent={processedContent}
-                panelHighlights={allPanelHighlights}
                 onPopupHighlight={handlePopupHighlight}
                 onPopupAddNote={handlePopupAddNote}
                 onPopupCopy={handlePopupCopy}
                 onPopupReportCitation={canContribute ? handlePopupReportCitation : undefined}
-                onRemoveHighlight={removeHighlight}
                 updatesOpen={updatesOpen}
             />
 
@@ -896,6 +905,21 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                     paragraphs={getUpdateNoteParagraphs(article_text || '', structure.notes[openNote.id])}
                     anchorEl={openNote.anchorEl}
                     onClose={closeNote}
+                />
+            )}
+
+            {openBlock !== null && hasAnnotations(openGroup) && (
+                <BlockAnnotationsPopover
+                    key={openBlock}
+                    containerRef={contentRef}
+                    blockIndex={openBlock}
+                    blockLabel={describeBlock(article_text || '', structure.blocks[openBlock])}
+                    group={openGroup}
+                    contentKey={processedContent}
+                    onClose={closeBlock}
+                    onUpdateNote={updateAnnotation}
+                    onRemoveNote={removeAnnotation}
+                    onRemoveHighlight={removeHighlight}
                 />
             )}
 
