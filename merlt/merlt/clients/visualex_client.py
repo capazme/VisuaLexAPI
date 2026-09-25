@@ -177,11 +177,15 @@ class VisuaLexClient:
             log.warning("parse_query failed", error=str(e), query=query[:80])
             return None
 
-    async def extract_citations(self, text, context_act_type=None):
+    async def extract_citations(self, text, context_act_type=None, raise_on_error=False):
         """Detect normative citations embedded in free text via VisuaLex's shared
         /extract_citations endpoint. Finds refs inside a natural-language question
         and returns each with char offsets. [] on miss/outage (fail-soft). Short
-        timeout: runs on the query hot path."""
+        timeout: runs on the query hot path.
+
+        ``raise_on_error=True`` re-raises instead of returning [] — for a caller
+        that must tell "no citation" from "VisuaLex unreachable" (the NER A/B
+        report marks its baseline unavailable rather than scoring it 0)."""
         if not text or not text.strip():
             return []
         client = await self._get_client()
@@ -195,6 +199,8 @@ class VisuaLexClient:
             return data.get("citations") or []
         except Exception as e:
             log.warning("extract_citations failed", error=str(e), text=text[:80])
+            if raise_on_error:
+                raise
             return []
 
     async def fetch_norma_data(

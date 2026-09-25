@@ -36,12 +36,14 @@ NER_LABEL = "RIFERIMENTO"
 
 
 class NERFeedbackRecord(dict):
-    """A dict ({text, citations, feedback_type}) that also exposes
-    ``sample_weight`` / ``feedback_id`` as attributes — the dual access the
-    trainer needs (see module docstring)."""
+    """A dict ({text, citations, feedback_type, source_surface}) that also
+    exposes ``sample_weight`` / ``feedback_id`` / ``source_surface`` as
+    attributes — the dual access the trainer needs (see module docstring).
+    ``source_surface`` lets the A/B report stratify by capture surface."""
 
     sample_weight: float = 1.0
     feedback_id: Optional[str] = None
+    source_surface: Optional[str] = None
 
 
 def _row_to_record(row: NERFeedback) -> Optional[NERFeedbackRecord]:
@@ -65,9 +67,15 @@ def _row_to_record(row: NERFeedback) -> Optional[NERFeedbackRecord]:
             return None
         citations = [{"start": start, "end": start + len(sel), "label": NER_LABEL}]
 
-    rec = NERFeedbackRecord(text=text, citations=citations, feedback_type=row.feedback_type)
+    rec = NERFeedbackRecord(
+        text=text,
+        citations=citations,
+        feedback_type=row.feedback_type,
+        source_surface=row.source_surface,
+    )
     rec.sample_weight = float(row.sample_weight or 1.0)
     rec.feedback_id = row.feedback_id
+    rec.source_surface = row.source_surface
     return rec
 
 

@@ -7,8 +7,11 @@ them in the authority-weighted `ner_feedback` table — the labeled training set
 for the learned spaCy NER (Phase 4).
 
 Endpoints:
-    POST /api/v1/ner/feedback       - Store one NER correction/confirmation
-    GET  /api/v1/ner/feedback/stats - Counts by feedback_type / source_surface
+    POST /api/v1/ner/feedback                  - Store one NER correction/confirmation
+    GET  /api/v1/ner/feedback/stats            - Counts by feedback_type / source_surface
+    POST /api/v1/ner/training/start            - Enqueue a learned-NER training run
+    GET  /api/v1/ner/training/jobs/{job_id}    - RQ status (+ result) of a run
+    GET  /api/v1/ner/training/report/latest    - The last persisted A/B report
 
 The BFF is the only caller; auth + consent are enforced BFF-side. This endpoint
 trusts the `user_id` (varchar, never an FK) and computes the authority weight
@@ -159,6 +162,7 @@ async def ner_feedback_stats(api_key: ApiKey = Depends(verify_api_key)):
 # ---------------------------------------------------------------------------
 
 _NER_TRAIN_QUEUE_NAME = "merlt_ner_train"
+_NER_TRAIN_RESULT_TTL = 7 * 24 * 3600
 _ner_train_connection = None
 
 
@@ -192,6 +196,11 @@ async def start_ner_training(
                 req.only_untrained,
                 job_id=job_id,
                 job_timeout=3600,
+                # RQ keeps a result 500s by default: the A/B report vanished
+                # before the admin card could poll it. The report is also
+                # persisted on the models volume (training/report/latest).
+                result_ttl=_NER_TRAIN_RESULT_TTL,
+                failure_ttl=_NER_TRAIN_RESULT_TTL,
             )
         )
     except Exception as e:
@@ -222,5 +231,27 @@ async def ner_training_job_status(
     elif status == "failed":
         payload["error"] = str(job.exc_info or "")[-1000:]
     return payload
+
+
+@router.get("/training/report/latest")
+async def ner_training_latest_report(api_key: ApiKey = Depends(verify_api_key)):
+    """The A/B report of the last training run (persisted on the models volume
+    by the worker), so the admin card can show it after the RQ result expired.
+
+    Shape: the job result's ``ab_report`` (test_examples, baseline, learned,
+    combined, baseline_available, baseline_status, by_surface, counts,
+    created_at, checkpoint_path, n_iter, only_untrained, ...). 404 ``no_report``
+    until a run has completed.
+    """
+    from merlt.worker.ner_training_tasks import load_latest_ab_report
+
+    try:
+        report = await asyncio.to_thread(load_latest_ab_report)
+    except Exception as e:
+        log.error("NER A/B report unreadable", error=str(e))
+        raise HTTPException(status_code=500, detail="report_unreadable")
+    if report is None:
+        raise HTTPException(status_code=404, detail="no_report")
+    return report
 
 __all__ = ["router", "compute_sample_weight"]
