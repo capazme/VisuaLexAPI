@@ -41,14 +41,18 @@ import re
 import structlog
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Staging candidates are ephemeral (Slice 2c #3): purged after promotion or TTL.
 STAGING_TTL_HOURS = int(os.getenv("MERLT_STAGING_TTL_HOURS", "48"))
+
+# Width of the relation endpoint columns (source_node_urn / target_entity_id).
+ENDPOINT_MAX_LEN = 300
 
 from merlt.storage.enrichment.models import (
     PendingEntity,
@@ -56,7 +60,9 @@ from merlt.storage.enrichment.models import (
     PendingAmendment,
     ExtractionCandidate,
 )
-from merlt.storage.enrichment import EntityDeduplicator
+from merlt.storage.enrichment import DuplicateConfidence, EntityDeduplicator
+from merlt.storage.graph.entity_writer import entity_node_id, normalize_entity_name
+from merlt.storage.graph.relation_endpoints import canonical_norm_key, is_norm_reference
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 from merlt.pipeline.multivigenza import parse_estremi, parse_disposizione
 
@@ -510,8 +516,23 @@ class DocumentParserService:
           - "pending" → PendingRelation (legacy RLCF queue).
 
         This closes the gap noted in the design: notes could yield entities but
-        never relations. Endpoints (source/target) are stored as the concept
-        names the LLM found; promotion resolves them to graph nodes.
+        never relations.
+
+        Endpoints (B1). The LLM names each endpoint as a concept
+        ("risoluzione del contratto"); nothing downstream resolves a name, and
+        the consensus writer refuses one. In staging, each name is resolved
+        here, best-effort, to a graph identifier:
+          - a URN/URL the LLM wrote is kept (version marker stripped);
+          - a same-document entity candidate with the same normalized name
+            resolves to the id its Entity node will carry
+            (``entity_writer.entity_node_id``, a forward reference until that
+            entity is promoted and approved);
+          - otherwise an exact/high-confidence ``EntityDeduplicator`` match
+            resolves to that pending entity's id.
+        ``source_node_urn`` / ``target_entity_id`` hold the identifier, or the
+        raw name when nothing matched; ``source_text`` / ``target_text`` always
+        keep the name. The reviewer links an unresolved endpoint before
+        promotion. The legacy "pending" target is unchanged (raw names).
         """
         if not self.llm_service:
             log.warning("LLM service not available, skipping relation extraction")
@@ -525,6 +546,11 @@ class DocumentParserService:
 
         extractor = RelationExtractor(self.llm_service)
         relations_count = 0
+
+        siblings: List[Tuple[str, str]] = []
+        resolution_cache: Dict[str, Optional[str]] = {}
+        if persist_target == "staging":
+            siblings = await self._load_sibling_entities(session, document_id)
 
         for chunk_idx, chunk in enumerate(chunks):
             if not chunk.strip():
@@ -553,13 +579,23 @@ class DocumentParserService:
                 # (see relation.py::canonical_relation_type docstring).
                 rel_type = canonical_relation_type(rel.relation_type)
                 if persist_target == "staging":
+                    source_id = await self._resolve_endpoint_name(
+                        rel.source, siblings, session, resolution_cache
+                    )
+                    target_id = await self._resolve_endpoint_name(
+                        rel.target, siblings, session, resolution_cache
+                    )
                     row = ExtractionCandidate(
                         document_id=document_id,
                         contributor_id=user_id,
                         candidate_type="relation",
                         relation_type=rel_type,
-                        source_node_urn=rel.source,
-                        target_entity_id=rel.target,
+                        # varchar(300): a longer raw name is unresolved anyway,
+                        # the full name stays in *_text.
+                        source_node_urn=(source_id or rel.source or "")[:ENDPOINT_MAX_LEN],
+                        target_entity_id=(target_id or rel.target or "")[:ENDPOINT_MAX_LEN],
+                        source_text=rel.source,
+                        target_text=rel.target,
                         article_urn="user_document",
                         descrizione=rel.descrizione or "",
                         verbatim_excerpt=snippet,
@@ -595,6 +631,87 @@ class DocumentParserService:
             log.warning("⚠️  No relations extracted from document")
 
         return relations_count
+
+    async def _load_sibling_entities(
+        self, session: AsyncSession, document_id: Optional[int]
+    ) -> List[Tuple[str, str]]:
+        """(name, type) of the entity candidates staged for the same document.
+
+        Covers both the rows an earlier run persisted and those this run added
+        to the session: the enrichment session does not autoflush, so a query
+        alone would miss the entity pass that just ran. Best-effort.
+        """
+        siblings: List[Tuple[str, str]] = []
+        for obj in list(getattr(session, "new", None) or ()):
+            if (
+                isinstance(obj, ExtractionCandidate)
+                and obj.candidate_type == "entity"
+                and obj.document_id == document_id
+            ):
+                siblings.append((obj.entity_text, obj.entity_type))
+        if document_id is not None:
+            try:
+                rows = (
+                    await session.execute(
+                        select(ExtractionCandidate.entity_text, ExtractionCandidate.entity_type).where(
+                            ExtractionCandidate.document_id == document_id,
+                            ExtractionCandidate.candidate_type == "entity",
+                        )
+                    )
+                ).all()
+                siblings.extend((name, tipo) for name, tipo in rows)
+            except Exception as exc:  # resolution is best-effort
+                log.warning("sibling entity lookup failed", document_id=document_id, exc=str(exc))
+        return [(name, tipo) for name, tipo in siblings if name and tipo]
+
+    async def _resolve_endpoint_name(
+        self,
+        name: Optional[str],
+        siblings: List[Tuple[str, str]],
+        session: AsyncSession,
+        cache: Dict[str, Optional[str]],
+    ) -> Optional[str]:
+        """The graph identifier a relation endpoint named `name` refers to, or
+        None when it cannot be resolved (see _extract_relations_from_chunks)."""
+        raw = (name or "").strip()
+        if not raw:
+            return None
+        if is_norm_reference(raw):
+            return canonical_norm_key(raw)[:ENDPOINT_MAX_LEN]
+
+        slug = normalize_entity_name(raw)
+        if slug in cache:
+            return cache[slug]
+
+        resolved: Optional[str] = None
+        if slug:
+            for text, tipo in siblings:
+                if normalize_entity_name(text) == slug:
+                    resolved = entity_node_id(tipo, text)
+                    break
+
+        if resolved is None:
+            try:
+                dres = await EntityDeduplicator(session).find_duplicates(raw, "", scope="global")
+                strong = [
+                    d
+                    for d in dres.duplicates
+                    if d.confidence in (DuplicateConfidence.EXACT, DuplicateConfidence.HIGH)
+                ]
+                if strong:
+                    # Prefer an entity the community already approved.
+                    strong.sort(
+                        key=lambda d: (d.validation_status == "approved", d.similarity_score),
+                        reverse=True,
+                    )
+                    resolved = strong[0].entity_id
+            except Exception as exc:  # resolution is best-effort
+                log.warning("relation endpoint dedup failed", endpoint=raw, exc=str(exc))
+
+        if resolved is not None and len(resolved) > ENDPOINT_MAX_LEN:
+            resolved = None
+        cache[slug] = resolved
+        return resolved
 
     async def _extract_amendments_from_text(
         self,

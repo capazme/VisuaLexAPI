@@ -87,6 +87,58 @@ def is_real_article_urn(urn: object) -> bool:
     return isinstance(urn, str) and urn.strip() not in PLACEHOLDER_ARTICLE_URNS
 
 
+def normalize_entity_name(nome: str) -> str:
+    """
+    Normalize an entity name into the slug of its graph node id.
+
+    Rules:
+    - Lowercase
+    - Strip whitespace
+    - Remove a leading Italian article (il, lo, la, i, gli, le, l', un, uno, una)
+    - Replace hyphens and spaces with underscores
+    - Remove special chars
+
+    Examples:
+        "La Legittima difesa" -> "legittima_difesa"
+        "Il Contratto di compravendita" -> "contratto_di_compravendita"
+    """
+    normalized = (nome or "").lower().strip()
+
+    # Remove Italian articles
+    articles = ["il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una "]
+    for article in articles:
+        if normalized.startswith(article):
+            normalized = normalized[len(article) :]
+            break
+
+    # Replace hyphens with spaces (so "Legittima-difesa" → "Legittima difesa")
+    normalized = normalized.replace("-", " ")
+
+    # Remove special chars, keep alphanumeric and spaces
+    normalized = re.sub(r"[^a-z0-9\s]", "", normalized)
+
+    # Replace spaces with underscores
+    normalized = normalized.replace(" ", "_")
+
+    # Remove multiple underscores
+    normalized = re.sub(r"_+", "_", normalized)
+
+    # Strip underscores
+    normalized = normalized.strip("_")
+
+    return normalized
+
+
+def entity_node_id(entity_type: str, nome: str) -> str:
+    """The id of the :Entity node an approved entity is written as.
+
+    ``{tipo}:{normalized_nome}`` — the same id whether the writer creates the
+    node or enriches the mechanical duplicate it matched, so it is also the
+    forward reference a relation can hold before the entity reaches the graph.
+    """
+    return f"{entity_type}:{normalize_entity_name(nome)}"
+
+
 class EntityGraphWriter:
     """
     Writes validated entities to FalkorDB with 3-layer deduplication.
@@ -214,45 +266,8 @@ class EntityGraphWriter:
         return None
 
     def _normalize_nome(self, nome: str) -> str:
-        """
-        Normalize entity name for deduplication.
-
-        Rules:
-        - Lowercase
-        - Strip whitespace
-        - Remove articles (il, lo, la, i, gli, le)
-        - Replace spaces with underscores
-        - Remove special chars
-
-        Examples:
-            "La Legittima difesa" -> "legittima_difesa"
-            "Il Contratto di compravendita" -> "contratto_compravendita"
-        """
-        normalized = nome.lower().strip()
-
-        # Remove Italian articles
-        articles = ["il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una "]
-        for article in articles:
-            if normalized.startswith(article):
-                normalized = normalized[len(article) :]
-                break
-
-        # Replace hyphens with spaces (so "Legittima-difesa" → "Legittima difesa")
-        normalized = normalized.replace("-", " ")
-
-        # Remove special chars, keep alphanumeric and spaces
-        normalized = re.sub(r"[^a-z0-9\s]", "", normalized)
-
-        # Replace spaces with underscores
-        normalized = normalized.replace(" ", "_")
-
-        # Remove multiple underscores
-        normalized = re.sub(r"_+", "_", normalized)
-
-        # Strip underscores
-        normalized = normalized.strip("_")
-
-        return normalized
+        """Normalize entity name for deduplication (see normalize_entity_name)."""
+        return normalize_entity_name(nome)
 
     async def _create_new_entity_node(self, entity: PendingEntity) -> str:
         """
@@ -565,5 +580,7 @@ async def write_approved_entities_batch(
 __all__ = [
     "EntityGraphWriter",
     "WriteResult",
+    "entity_node_id",
+    "normalize_entity_name",
     "write_approved_entities_batch",
 ]

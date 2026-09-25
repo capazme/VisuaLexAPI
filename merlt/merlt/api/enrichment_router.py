@@ -26,7 +26,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
@@ -89,7 +89,18 @@ from merlt.storage.enrichment import (
     UserDocument,
 )
 from merlt.storage.graph.client import FalkorDBClient
-from merlt.storage.graph.entity_writer import EntityGraphWriter
+from merlt.storage.graph.entity_writer import (
+    EntityGraphWriter,
+    entity_node_id,
+    is_real_article_urn,
+)
+from merlt.storage.graph.relation_endpoints import (
+    is_nir_reference,
+    is_norm_reference,
+    looks_like_entity_id,
+    norm_key_candidates,
+)
+from merlt.utils.urn_labels import derive_article_fields_from_urn
 from merlt.rlcf.domain_authority import (
     get_user_authority_for_vote,
     recalculate_authorities_after_consensus,
@@ -1453,6 +1464,19 @@ async def _write_entity_to_graph(entity: PendingEntity, session: AsyncSession) -
                 node_id=result.node_id,
                 action=result.action,
             )
+
+            # B1: relations approved while this entity was still pending (or a
+            # forward reference to its node id) could not be written then.
+            try:
+                await _write_deferred_relations_for_entity(
+                    entity, result.node_id, session, falkordb
+                )
+            except Exception as e:  # never fail the entity write
+                log.error(
+                    "Deferred relation write failed",
+                    entity_id=entity.entity_id,
+                    error=str(e),
+                )
         else:
             log.error("Failed to write entity to graph", entity_id=entity.entity_id, error=result.error)
 
@@ -1460,13 +1484,170 @@ async def _write_entity_to_graph(entity: PendingEntity, session: AsyncSession) -
         await falkordb.close()
 
 
-async def _write_relation_to_graph(relation: PendingRelation, session: AsyncSession) -> None:
-    """
-    Helper to write approved relation to FalkorDB.
+# Relation types are interpolated into Cypher (labels cannot be parameters):
+# only the canonical UPPER_SNAKE vocabulary may get there.
+_RELATION_TYPE_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
-    Creates a semantic relation between source and target nodes.
-    If target is a pending entity, uses the entity node ID.
-    If target is another article/norma, uses the URN.
+
+@dataclass
+class _GraphEndpoint:
+    """A relation endpoint resolved to a graph node, or why it is not.
+
+    `pattern` binds the node in Cypher: "{var}" is the variable, "{param}" the
+    key parameter. `create_norma` is the URN escape hatch: a Normattiva norm
+    not yet in the graph is MERGEd as a stub, as inter-article relations always
+    were. `deferred` marks an endpoint that can still resolve later (an entity
+    not yet written to the graph).
+    """
+
+    key: Optional[str] = None
+    pattern: Optional[str] = None
+    create_norma: bool = False
+    reason: Optional[str] = None
+    deferred: bool = False
+
+    @property
+    def resolved(self) -> bool:
+        return self.key is not None
+
+
+@dataclass
+class RelationWriteOutcome:
+    """Result of an attempt to write an approved relation to the graph."""
+
+    written: bool
+    reason: Optional[str] = None
+    deferred: bool = False
+
+
+_NORMA_PATTERN = "({var}:Norma {{URN: ${param}}})"
+_ENTITY_PATTERN = "({var}:Entity {{id: ${param}}})"
+_NODE_ID_PATTERN = "({var} {{node_id: ${param}}})"
+
+
+async def _resolve_relation_endpoint(
+    value: Optional[str], session: AsyncSession, falkordb: Any
+) -> _GraphEndpoint:
+    """Resolve one endpoint of an approved relation to an existing graph node.
+
+    Order: a norm URN/URL (existing Norma, or a stub for a NIR URN); a pending
+    entity id (the :Entity its approval wrote, `entity_node_id`); an :Entity id;
+    any node's `node_id` (seed concepts/principles/rulings); a unique :Entity
+    whose name matches. Anything else is unresolved — a concept name must
+    never be MERGEd into a :Norma (B1).
+    """
+    raw = (value or "").strip()
+    if not raw or not is_real_article_urn(raw):
+        return _GraphEndpoint(reason="empty or placeholder endpoint")
+
+    if is_norm_reference(raw):
+        candidates = norm_key_candidates(raw)
+        rows = await falkordb.query(
+            "MATCH (n:Norma) WHERE n.URN IN $keys RETURN n.URN AS key LIMIT 1",
+            {"keys": candidates},
+        )
+        if rows:
+            return _GraphEndpoint(key=rows[0]["key"], pattern=_NORMA_PATTERN)
+        if is_nir_reference(raw):
+            return _GraphEndpoint(key=candidates[0], pattern=_NORMA_PATTERN, create_norma=True)
+        return _GraphEndpoint(reason=f"norm {raw!r} is not in the graph")
+
+    pending = (
+        await session.execute(select(PendingEntity).where(PendingEntity.entity_id == raw))
+    ).scalar_one_or_none()
+    if pending is not None:
+        if pending.validation_status == "rejected":
+            return _GraphEndpoint(reason=f"pending entity {raw!r} was rejected")
+        node_id = entity_node_id(pending.entity_type, pending.entity_text)
+        if pending.written_to_graph_at:
+            rows = await falkordb.query(
+                "MATCH (n:Entity {id: $key}) RETURN n.id AS key LIMIT 1", {"key": node_id}
+            )
+            if rows:
+                return _GraphEndpoint(key=node_id, pattern=_ENTITY_PATTERN)
+        return _GraphEndpoint(
+            reason=f"pending entity {raw!r} is not in the graph yet", deferred=True
+        )
+
+    rows = await falkordb.query(
+        "MATCH (n:Entity {id: $key}) RETURN n.id AS key LIMIT 1", {"key": raw}
+    )
+    if rows:
+        return _GraphEndpoint(key=raw, pattern=_ENTITY_PATTERN)
+
+    rows = await falkordb.query(
+        "MATCH (n) WHERE n.node_id = $key RETURN n.node_id AS key LIMIT 1", {"key": raw}
+    )
+    if rows:
+        return _GraphEndpoint(key=raw, pattern=_NODE_ID_PATTERN)
+
+    rows = await falkordb.query(
+        "MATCH (n:Entity) WHERE toLower(n.nome) = $name RETURN n.id AS key LIMIT 2",
+        {"name": raw.lower()},
+    )
+    if len(rows or []) == 1:
+        return _GraphEndpoint(key=rows[0]["key"], pattern=_ENTITY_PATTERN)
+
+    if looks_like_entity_id(raw):
+        # A forward reference (staging resolves a same-document concept to the
+        # id its Entity will carry): written once that entity is approved.
+        return _GraphEndpoint(reason=f"entity {raw!r} is not in the graph yet", deferred=True)
+    return _GraphEndpoint(reason=f"{raw!r} is not a norm, a graph node or a pending entity")
+
+
+def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _GraphEndpoint) -> str:
+    """MATCH the existing endpoints, MERGE any Norma stub, then the edge."""
+    ends = (("source", source), ("target", target))
+    clauses: List[str] = []
+    bound: List[str] = []
+    for var, ep in ends:
+        if not ep.create_norma:
+            clauses.append("MATCH " + ep.pattern.format(var=var, param=f"{var}_key"))
+            bound.append(var)
+    for var, ep in ends:
+        if ep.create_norma:
+            if bound:
+                clauses.append("WITH " + ", ".join(bound))
+            clauses.append(
+                "MERGE " + ep.pattern.format(var=var, param=f"{var}_key") + "\n"
+                f"ON CREATE SET {var}.created_at = $timestamp, "
+                f"{var}.numero_articolo = ${var}_numero_articolo, "
+                f"{var}.estremi = ${var}_estremi"
+            )
+            bound.append(var)
+    clauses.append("WITH source, target")
+    clauses.append(
+        f"""MERGE (source)-[r:{rel_type}]->(target)
+ON CREATE SET
+    r.certezza = $certezza,
+    r.fonte = 'community_validation',
+    r.evidence = $evidence,
+    r.community_validated = true,
+    r.approval_score = $approval_score,
+    r.votes_count = $votes_count,
+    r.contributed_by = $contributed_by,
+    r.created_at = $timestamp
+RETURN r"""
+    )
+    return "\n".join(clauses)
+
+
+async def _write_relation_to_graph(
+    relation: PendingRelation,
+    session: AsyncSession,
+    falkordb: Any = None,
+) -> RelationWriteOutcome:
+    """
+    Write an approved relation to FalkorDB — only between nodes that exist.
+
+    Each endpoint is resolved by `_resolve_relation_endpoint`. When either one
+    cannot be resolved, nothing is written: `written_to_graph_at` stays NULL
+    and `validation_status` stays what consensus set, the same state a failed
+    entity write leaves. The reason is logged and returned. An endpoint that
+    is a pending entity (or the forward id of one) is retried by
+    `_write_deferred_relations_for_entity` once that entity is written.
+    `article_urn` stands in for an empty source, never the `user_document`
+    placeholder.
     """
     log.info(
         "Writing approved relation to graph",
@@ -1474,62 +1655,44 @@ async def _write_relation_to_graph(relation: PendingRelation, session: AsyncSess
         relation_type=relation.relation_type,
     )
 
-    # Connect to FalkorDB
-    falkordb = FalkorDBClient()
-    await falkordb.connect()
+    rel_type = relation.relation_type or ""
+    if not _RELATION_TYPE_RE.match(rel_type):
+        log.error(
+            "Relation not written to graph: invalid relation type",
+            relation_id=relation.relation_id,
+            relation_type=rel_type,
+        )
+        return RelationWriteOutcome(written=False, reason=f"invalid relation type {rel_type!r}")
+
+    own_client = falkordb is None
+    if own_client:
+        falkordb = FalkorDBClient()
+        await falkordb.connect()
 
     try:
+        source = await _resolve_relation_endpoint(
+            relation.source_node_urn or relation.article_urn, session, falkordb
+        )
+        target = await _resolve_relation_endpoint(relation.target_entity_id, session, falkordb)
+
+        unresolved = [(side, ep) for side, ep in (("source", source), ("target", target)) if not ep.resolved]
+        if unresolved:
+            reason = "; ".join(f"{side}: {ep.reason}" for side, ep in unresolved)
+            deferred = all(ep.deferred for _, ep in unresolved)
+            log.warning(
+                "Relation not written to graph: unresolved endpoint",
+                relation_id=relation.relation_id,
+                source=relation.source_node_urn,
+                target=relation.target_entity_id,
+                reason=reason,
+                deferred=deferred,
+            )
+            return RelationWriteOutcome(written=False, reason=reason, deferred=deferred)
+
         timestamp = datetime.now(timezone.utc).isoformat()
-
-        # Determine target node type
-        # If target_entity_id looks like an entity ID (tipo:nome), it's an entity
-        # Otherwise, it's likely another article URN
-        is_entity_target = ":" in relation.target_entity_id and not relation.target_entity_id.startswith("urn:")
-
-        if is_entity_target:
-            # Target is an Entity node
-            query = f"""
-            MERGE (source:Norma {{URN: $source_urn}})
-            ON CREATE SET source.created_at = $timestamp
-            WITH source
-            MATCH (target:Entity {{id: $target_id}})
-            MERGE (source)-[r:{relation.relation_type}]->(target)
-            ON CREATE SET
-                r.certezza = $certezza,
-                r.fonte = 'community_validation',
-                r.evidence = $evidence,
-                r.community_validated = true,
-                r.approval_score = $approval_score,
-                r.votes_count = $votes_count,
-                r.contributed_by = $contributed_by,
-                r.created_at = $timestamp
-            RETURN r
-            """
-        else:
-            # Target is another Norma node (inter-article relation)
-            query = f"""
-            MERGE (source:Norma {{URN: $source_urn}})
-            ON CREATE SET source.created_at = $timestamp
-            WITH source
-            MERGE (target:Norma {{URN: $target_id}})
-            ON CREATE SET target.created_at = $timestamp
-            WITH source, target
-            MERGE (source)-[r:{relation.relation_type}]->(target)
-            ON CREATE SET
-                r.certezza = $certezza,
-                r.fonte = 'community_validation',
-                r.evidence = $evidence,
-                r.community_validated = true,
-                r.approval_score = $approval_score,
-                r.votes_count = $votes_count,
-                r.contributed_by = $contributed_by,
-                r.created_at = $timestamp
-            RETURN r
-            """
-
-        params = {
-            "source_urn": relation.source_node_urn or relation.article_urn,
-            "target_id": relation.target_entity_id,
+        params: Dict[str, Any] = {
+            "source_key": source.key,
+            "target_key": target.key,
             "certezza": relation.certezza or 1.0,
             "evidence": relation.relation_description or "",
             "approval_score": relation.approval_score or 0.0,
@@ -1537,27 +1700,35 @@ async def _write_relation_to_graph(relation: PendingRelation, session: AsyncSess
             "contributed_by": relation.contributed_by or "",
             "timestamp": timestamp,
         }
+        for var, ep in (("source", source), ("target", target)):
+            if ep.create_norma:
+                numero_articolo, estremi = derive_article_fields_from_urn(ep.key)
+                params[f"{var}_numero_articolo"] = numero_articolo
+                params[f"{var}_estremi"] = estremi
 
-        result = await falkordb.query(query, params)
+        result = await falkordb.query(_relation_write_cypher(rel_type, source, target), params)
 
-        if result is not None:
-            # Update timestamp (remove timezone for PostgreSQL TIMESTAMP WITHOUT TIME ZONE)
-            relation.written_to_graph_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            await session.commit()
-
-            log.info(
-                "Relation written to graph",
-                relation_id=relation.relation_id,
-                relation_type=relation.relation_type,
-                source=relation.source_node_urn,
-                target=relation.target_entity_id,
-            )
-        else:
+        if not result:
             log.error(
-                "Failed to write relation to graph",
+                "Relation not written to graph: the write matched nothing",
                 relation_id=relation.relation_id,
-                error="Query returned None",
+                source=source.key,
+                target=target.key,
             )
+            return RelationWriteOutcome(written=False, reason="graph write matched no nodes")
+
+        # Update timestamp (remove timezone for PostgreSQL TIMESTAMP WITHOUT TIME ZONE)
+        relation.written_to_graph_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        await session.commit()
+
+        log.info(
+            "Relation written to graph",
+            relation_id=relation.relation_id,
+            relation_type=rel_type,
+            source=source.key,
+            target=target.key,
+        )
+        return RelationWriteOutcome(written=True)
 
     except Exception as e:
         log.error(
@@ -1566,8 +1737,55 @@ async def _write_relation_to_graph(relation: PendingRelation, session: AsyncSess
             error=str(e),
             exc_info=True,
         )
+        return RelationWriteOutcome(written=False, reason=f"graph error: {e}")
     finally:
-        await falkordb.close()
+        if own_client:
+            await falkordb.close()
+
+
+async def _write_deferred_relations_for_entity(
+    entity: PendingEntity,
+    node_id: Optional[str],
+    session: AsyncSession,
+    falkordb: Any = None,
+) -> int:
+    """Write the approved relations that were waiting for `entity` (B1).
+
+    A relation approved while one endpoint was this pending entity — its
+    pending id, the node id it is written as, or its bare name on a legacy row
+    — could not be written at consensus. Returns how many are now written.
+    """
+    refs = {entity.entity_id, node_id or entity_node_id(entity.entity_type, entity.entity_text)}
+    name = (entity.entity_text or "").strip().lower()
+    conditions = [
+        PendingRelation.source_node_urn.in_(refs),
+        PendingRelation.target_entity_id.in_(refs),
+    ]
+    if name:
+        conditions += [
+            func.lower(PendingRelation.source_node_urn) == name,
+            func.lower(PendingRelation.target_entity_id) == name,
+        ]
+    stmt = select(PendingRelation).where(
+        PendingRelation.consensus_type == "approved",
+        PendingRelation.validation_status == "approved",
+        PendingRelation.written_to_graph_at.is_(None),
+        or_(*conditions),
+    )
+    relations = (await session.execute(stmt)).scalars().all()
+    written = 0
+    for relation in relations:
+        outcome = await _write_relation_to_graph(relation, session, falkordb)
+        written += int(outcome.written)
+    if relations:
+        log.info(
+            "Deferred relations retried after entity write",
+            entity_id=entity.entity_id,
+            node_id=node_id,
+            candidates=len(relations),
+            written=written,
+        )
+    return written
 
 
 async def _cascade_reset_relations_for_rejected_entity(
@@ -1619,6 +1837,25 @@ async def _cascade_reset_relations_for_rejected_entity(
     )
 
     return len(relations)
+
+
+def _relation_endpoint_label(value: Optional[str], pending_names: Dict[str, str]) -> str:
+    """Human label for a relation endpoint, without a graph round-trip.
+
+    A pending entity id reads as its name, a norm as "Art. N c.c.", a
+    `tipo:slug` node id as its slug, a raw name as itself.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if raw in pending_names:
+        return pending_names[raw]
+    if is_norm_reference(raw):
+        return _extract_readable_label(raw)
+    if looks_like_entity_id(raw):
+        slug = raw.split(":", 1)[1].replace("_", " ").strip()
+        return slug[:1].upper() + slug[1:] if slug else raw
+    return raw
 
 
 # =============================================================================
@@ -1797,6 +2034,20 @@ async def get_pending(
     relations_result = await session.execute(relations_stmt)
     relations = relations_result.scalars().all()
 
+    # Readable endpoint labels for the validation card (B1): a pending entity
+    # id reads as its name, one query for the whole page.
+    endpoint_values = {
+        v for rel in relations for v in (rel.source_node_urn, rel.target_entity_id) if v
+    }
+    pending_names: Dict[str, str] = {}
+    if endpoint_values:
+        name_rows = await session.execute(
+            select(PendingEntity.entity_id, PendingEntity.entity_text).where(
+                PendingEntity.entity_id.in_(endpoint_values)
+            )
+        )
+        pending_names = {eid: text for eid, text in name_rows.all() if text}
+
     # Convert to PendingRelationData
     pending_relations = []
     for rel in relations:
@@ -1813,6 +2064,8 @@ async def get_pending(
                 id=rel.relation_id,
                 source_urn=rel.source_node_urn or "",
                 target_urn=rel.target_entity_id or "",
+                source_label=_relation_endpoint_label(rel.source_node_urn, pending_names),
+                target_label=_relation_endpoint_label(rel.target_entity_id, pending_names),
                 relation_type=rel_type,
                 fonte=_relation_fonte(rel),
                 source_reference=rel.source_reference,
@@ -2616,8 +2869,10 @@ async def validate_relation(
                     merge_message = f" Edits applied: {merge_result.message}"
                     await session.refresh(relation)
 
-                # Then write to FalkorDB
-                await _write_relation_to_graph(relation, session)
+                # Then write to FalkorDB (only between existing nodes, B1)
+                outcome = await _write_relation_to_graph(relation, session)
+                if not outcome.written:
+                    merge_message += f" Not written to the graph yet: {outcome.reason}"
 
             except Exception as e:
                 log.error(f"Failed to process relation consensus: {e}", exc_info=True)

@@ -28,6 +28,21 @@ _STATEMENTS = (
     # column default. Only propose-relation writes source_type='manual'.
     "UPDATE pending_relations SET fonte = 'community' "
     "WHERE source_type = 'manual' AND (fonte IS NULL OR fonte = 'llm_extraction')",
+    # 004_relation_endpoints.sql (B1): the LLM's endpoint names stay readable
+    # once the parser resolved the endpoint to a graph identifier.
+    "ALTER TABLE extraction_candidates ADD COLUMN IF NOT EXISTS source_text TEXT",
+    "ALTER TABLE extraction_candidates ADD COLUMN IF NOT EXISTS target_text TEXT",
+    # A Normattiva URL target overflowed varchar(100); widen to the source's
+    # 300. Guarded so a re-run on an already-wide column is a no-op.
+    *(
+        "DO $$ BEGIN "
+        "IF EXISTS (SELECT 1 FROM information_schema.columns "
+        f"WHERE table_schema = current_schema() AND table_name = '{table}' "
+        "AND column_name = 'target_entity_id' AND character_maximum_length < 300) THEN "
+        f"ALTER TABLE {table} ALTER COLUMN target_entity_id TYPE VARCHAR(300); "
+        "END IF; END $$"
+        for table in ("extraction_candidates", "pending_relations")
+    ),
 )
 
 

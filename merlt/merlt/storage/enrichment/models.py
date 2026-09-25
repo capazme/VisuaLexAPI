@@ -185,10 +185,12 @@ class PendingRelation(Base):
     source_type = Column(String(50), default="article")
     source_document_id = Column(Integer, ForeignKey("user_documents.id", ondelete="SET NULL"))
 
-    # Relation data
+    # Relation data. Endpoints: a norm URN/URL, a graph node id or a pending
+    # entity id (see storage/graph/relation_endpoints.py). The target is as
+    # wide as the source: a Normattiva URL target overflowed varchar(100).
     relation_type = Column(String(100), nullable=False, index=True)
     source_node_urn = Column(String(300), nullable=False, index=True)
-    target_entity_id = Column(String(100), nullable=False, index=True)
+    target_entity_id = Column(String(300), nullable=False, index=True)
 
     # Target status tracking (for cascade logic)
     # If target is a pending entity, this is True. When target is rejected,
@@ -300,10 +302,15 @@ class ExtractionCandidate(Base):
     entity_text = Column(Text)
     entity_type = Column(String(50))
 
-    # Relation fields
+    # Relation fields. source_node_urn / target_entity_id hold the endpoint
+    # the parser resolved (norm URN, graph Entity id, pending entity id) or,
+    # when resolution failed, the raw name; source_text / target_text always
+    # keep the name the LLM wrote (B1).
     relation_type = Column(String(100))
     source_node_urn = Column(String(300))
-    target_entity_id = Column(String(100))
+    target_entity_id = Column(String(300))
+    source_text = Column(Text)
+    target_text = Column(Text)
 
     # Common
     article_urn = Column(String(300))

@@ -52,6 +52,7 @@ from merlt.storage.enrichment import (
     PendingAmendment,
 )
 from merlt.storage.enrichment.models import ExtractionCandidate
+from merlt.storage.graph.relation_endpoints import endpoint_is_resolved
 from merlt.api.models.document_models import (
     AmendmentSubmissionRequest,
     AmendmentSubmissionResponse,
@@ -577,8 +578,20 @@ class ExtractionCandidateOut(BaseModel):
     entity_text: Optional[str] = None
     entity_type: Optional[str] = None
     relation_type: Optional[str] = None
+    # Relation endpoints (B1). Each holds the identifier the parser resolved —
+    # a norm URN/URL, a graph Entity id ("concetto:risoluzione_del_contratto",
+    # possibly a forward reference to a same-document entity not promoted yet)
+    # or a pending entity id — or, when *_resolved is false, the raw name the
+    # LLM wrote. Nothing resolves them later: promotion must send resolved ids.
     source_node_urn: Optional[str] = None
     target_entity_id: Optional[str] = None
+    # The endpoint names as the LLM wrote them (display); None on rows staged
+    # before B1.
+    source_text: Optional[str] = None
+    target_text: Optional[str] = None
+    # Relation candidates only (None for entities).
+    source_resolved: Optional[bool] = None
+    target_resolved: Optional[bool] = None
     article_urn: Optional[str] = None
     descrizione: Optional[str] = None
     verbatim_excerpt: Optional[str] = None
@@ -595,6 +608,7 @@ class ListCandidatesResponse(BaseModel):
 
 
 def _candidate_to_out(c: ExtractionCandidate) -> ExtractionCandidateOut:
+    is_relation = c.candidate_type == "relation"
     return ExtractionCandidateOut(
         id=c.id,
         candidate_type=c.candidate_type,
@@ -603,6 +617,14 @@ def _candidate_to_out(c: ExtractionCandidate) -> ExtractionCandidateOut:
         relation_type=c.relation_type,
         source_node_urn=c.source_node_urn,
         target_entity_id=c.target_entity_id,
+        source_text=c.source_text,
+        target_text=c.target_text,
+        source_resolved=(
+            endpoint_is_resolved(c.source_node_urn, c.source_text) if is_relation else None
+        ),
+        target_resolved=(
+            endpoint_is_resolved(c.target_entity_id, c.target_text) if is_relation else None
+        ),
         article_urn=c.article_urn,
         descrizione=c.descrizione,
         verbatim_excerpt=c.verbatim_excerpt,

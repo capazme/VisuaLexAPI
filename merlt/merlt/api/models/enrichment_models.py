@@ -97,6 +97,10 @@ class PendingRelationData(BaseModel):
     id: str = Field(..., description="ID univoco della relazione pending")
     source_urn: str = Field(..., description="URN nodo sorgente")
     target_urn: str = Field(..., description="URN nodo target")
+    # Readable endpoints for the validation card ("source -> TYPE -> target"):
+    # source_urn / target_urn may be a pending entity id or a graph node id.
+    source_label: Optional[str] = Field(None, description="Etichetta leggibile della sorgente")
+    target_label: Optional[str] = Field(None, description="Etichetta leggibile del target")
     relation_type: RelationType = Field(..., description="Tipo relazione")
 
     # Provenance
