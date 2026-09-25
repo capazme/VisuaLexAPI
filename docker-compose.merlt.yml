@@ -54,10 +54,16 @@ services:
     # and did NOT restart on its own). Data lives on the merlt_falkor_data volume,
     # so a restart reloads the 27.7k-node graph intact.
     restart: unless-stopped
+    # Persistence is explicit: the image writes to /var/lib/falkordb/data (see
+    # docs/merlt/seed-libro-iv.md), NOT /data, so the volume used to sit next
+    # to the real data dir and every container recreate dropped the lazily
+    # ingested and co-evolved nodes (only the seed came back).
+    environment:
+      FALKORDB_ARGS: "--save 60 1 --appendonly yes --appendfsync everysec"
     ports:
       - "127.0.0.1:${MERLT_FALKOR_PORT:-6382}:6379"
     volumes:
-      - merlt_falkor_data:/data
+      - merlt_falkor_data:/var/lib/falkordb/data
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "6379", "ping"]
       interval: 10s
@@ -158,6 +164,9 @@ services:
       MERLT_EXTRACT_JOB_TIMEOUT: "${MERLT_EXTRACT_JOB_TIMEOUT:-1800}"
       # Loop β #2 Phase 4: gate the learned NER at inference. OFF until A/B proves it.
       MERLT_NER_LEARNED_ENABLED: "false"
+      # RLCF replay buffer file: on the durable, writable merlt_checkpoints
+      # volume (/app/data is read-only), so the buffer survives recreation.
+      MERLT_RLCF_BUFFER_PATH: "/app/checkpoints/rlcf/replay_buffer.json"
       # Slice 4 L3: the trained TraversalPolicy ranks/extends the systemic
       # expert's graph relations per-query (safe blend: the static curated list
       # is ALWAYS included — the policy can only ADD relations). "false" →
@@ -208,6 +217,10 @@ services:
       # worker's BFF_CALLBACK_URL, only the path differs.
       BFF_QA_CALLBACK_URL: "${MERLT_BFF_QA_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/qa-callback}"
       MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:-dev-internal-secret}"
+      # The BFF's MERLT_API_KEY, seeded into api_keys at boot (role admin) so
+      # the ops routes work on a fresh stack. start.sh exports it from
+      # backend/.env; an empty value skips the seed (manual /api-keys/bootstrap).
+      MERLT_ADMIN_API_KEY: "${MERLT_API_KEY:-}"
 
       # Slice 2a — Seed loader (Libro IV CC). MERLT_DATA_DIR points at the
       # mounted data/ directory; MERLT_SKIP_SEED=true disables boot loading.
@@ -220,6 +233,14 @@ services:
       MERLT_SKIP_SEED: "${MERLT_SKIP_SEED:-false}"
       MERLT_SKIP_EMBEDDINGS: "${MERLT_SKIP_EMBEDDINGS:-true}"
       FALKORDB_GRAPH_NAME: "${MERLT_GRAPH_NAME:-merl_t_legal}"
+      # Qdrant collection the seed, the provisional writer and the retriever
+      # share; several endpoints defaulted to the old `merl_t_dev_chunks`.
+      QDRANT_COLLECTION: "${MERLT_QDRANT_COLLECTION:-merl_t_legal_chunks}"
+      # Graph co-evolution hygiene (decay / quarantine / prune of provisional
+      # nodes): the in-process sweep runs only when > 0 and the code default is
+      # 0, so without this line it never ran and /merlt/valida's provisional
+      # section stayed empty. First sweep fires one interval after boot.
+      MERLT_HYGIENE_INTERVAL_HOURS: "${MERLT_HYGIENE_INTERVAL_HOURS:-24}"
       # LLM (OpenRouter) — required for live entity extraction from user notes.
       # Set OPENROUTER_API_KEY in the repo-root .env or your shell before `up`.
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
@@ -322,6 +343,7 @@ services:
       # Qdrant
       QDRANT_HOST: "merlt-qdrant"
       QDRANT_PORT: "6333"
+      QDRANT_COLLECTION: "${MERLT_QDRANT_COLLECTION:-merl_t_legal_chunks}"
 
       # RQ job queue (Redis DB 1, separate from the general cache DB 0).
       RQ_REDIS_URL: "redis://merlt-redis:6379/1"
