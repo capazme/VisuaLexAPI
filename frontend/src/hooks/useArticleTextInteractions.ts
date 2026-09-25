@@ -45,7 +45,13 @@ export function useArticleTextInteractions(
   containerRef: RefObject<HTMLElement | null>,
   resetKey: string,
   { enabled = true, contentKey = '' }: ArticleTextInteractionOptions = {},
-): { updatesOpen: boolean; openNote: OpenUpdateNote | null; closeNote: () => void } {
+): {
+  updatesOpen: boolean;
+  openNote: OpenUpdateNote | null;
+  closeNote: () => void;
+  /** Unfolds the AGGIORNAMENTO notes — e.g. before scrolling to a search hit inside them. */
+  openUpdates: () => void;
+} {
   const [state, setState] = useState<State>(() => fresh(resetKey));
   const current = state.key === resetKey ? state : fresh(resetKey);
   const openNote =
@@ -54,6 +60,10 @@ export function useArticleTextInteractions(
       : null;
   const closeNote = useCallback(() => {
     setState((s) => (s.key === resetKey ? { ...s, openNote: null } : fresh(resetKey)));
+  }, [resetKey]);
+
+  const openUpdates = useCallback(() => {
+    setState((s) => ({ ...(s.key === resetKey ? s : fresh(resetKey)), updatesOpen: true }));
   }, [resetKey]);
 
   useEffect(() => {
@@ -113,5 +123,5 @@ export function useArticleTextInteractions(
       ?.setAttribute('aria-expanded', current.updatesOpen ? 'true' : 'false');
   }, [current.updatesOpen, containerRef, contentKey]);
 
-  return { updatesOpen: current.updatesOpen, openNote, closeNote };
+  return { updatesOpen: current.updatesOpen, openNote, closeNote, openUpdates };
 }

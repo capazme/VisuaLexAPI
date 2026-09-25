@@ -605,7 +605,7 @@ Duplicating any of these is a defect, not a shortcut.
   breakpoint can express, use the CSS breakpoint.
 - `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
   `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
-  regex (`citationMatcher`, `citationParser`, `treeUtils`, `extractPreamble`).
+  regex (`citationMatcher`, `citationParser`, `treeUtils`, `articleStructure`).
   Mirrors `visualex_api/tools/article_suffixes.py` — change both together. Each
   pattern must close the alternation with `\b`.
 - `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
