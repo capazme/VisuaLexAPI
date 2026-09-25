@@ -21,6 +21,7 @@
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from './highlightColors';
 import type { ArticleStructure, DecorationKind, StructureBlock } from './articleStructure';
+import { resolveAnchors } from './articleAnnotations';
 
 export interface RenderArticleInput {
   raw: string;
@@ -89,29 +90,15 @@ function decorationOpen(kind: DecorationKind, noteId?: string): string {
   }
 }
 
-/**
- * Where a stored anchor ends, in plain-text offsets, or null when its text is
- * not at its offset. Exact (case-insensitive) first, as always. Then one
- * bounded rescue for anchors stored from a rendered selection, whose text
- * carries newlines the projection does not have: anchored at the same offset,
- * whitespace skipped on both sides, every other character equal.
- */
-function anchorEnd(plain: string, start: number, text: string): number | null {
-  if (!text || start < 0 || start >= plain.length) return null;
-  const exact = plain.slice(start, start + text.length);
-  if (exact.length === text.length && exact.toLowerCase() === text.toLowerCase()) return start + text.length;
-  if (/\s/.test(plain[start])) return null;
-  let i = start;
-  let matched = 0;
-  for (let j = 0; j < text.length; j++) {
-    if (/\s/.test(text[j])) continue;
-    while (i < plain.length && /\s/.test(plain[i])) i++;
-    if (i >= plain.length || plain[i].toLowerCase() !== text[j].toLowerCase()) return null;
-    i++;
-    matched++;
-  }
-  return matched > 0 ? i : null;
+function highlightOpen(h: Highlight): string {
+  const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
+  const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
+  const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
+  return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
 }
+
+const noteOpen = (a: Annotation): string =>
+  `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`;
 
 export function renderArticleHtml(input: RenderArticleInput): string {
   const raw = input.raw || '';
@@ -133,35 +120,12 @@ export function renderArticleHtml(input: RenderArticleInput): string {
     pushRaw(rawAt[start], rawAt[end - 1] + 1, kind, open, close);
   };
 
-  for (const h of input.highlights) {
-    const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
-    const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
-    const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
-    const open = `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
-    if (typeof h.startOffset === 'number' && h.startOffset >= 0) {
-      const end = anchorEnd(plain, h.startOffset, h.text);
-      if (end !== null) pushPlain(h.startOffset, end, 'highlight', open, '</mark>');
-      continue;
-    }
-    // Saved before offsets existed: every occurrence, as it always rendered.
-    const needle = h.text.toLowerCase();
-    if (!needle) continue;
-    for (let at = plainLower.indexOf(needle); at !== -1; at = plainLower.indexOf(needle, at + needle.length)) {
-      pushPlain(at, at + needle.length, 'highlight', open, '</mark>');
-    }
-  }
-
-  for (const a of input.annotations) {
-    if (typeof a.startOffset !== 'number' || a.startOffset < 0 || !a.anchorText) continue;
-    const end = anchorEnd(plain, a.startOffset, a.anchorText);
-    if (end === null) continue;
-    pushPlain(
-      a.startOffset,
-      end,
-      'note',
-      `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`,
-      '</span>',
-    );
+  // Where each highlight and note renders — decided in articleAnnotations.ts,
+  // which the annotation signs and their popover read too.
+  const anchors = resolveAnchors(plain, input.highlights, input.annotations);
+  for (const anchor of anchors) {
+    if (anchor.kind === 'highlight') pushPlain(anchor.start, anchor.end, 'highlight', highlightOpen(anchor.highlight), '</mark>');
+    else pushPlain(anchor.start, anchor.end, 'note', noteOpen(anchor.note), '</span>');
   }
 
   const query = input.searchQuery;
