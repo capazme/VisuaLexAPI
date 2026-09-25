@@ -1538,14 +1538,35 @@ folds the tail through the `vlx-updates-open` class on the text container
 (the HTML never changes when it opens). A reference whose note is not in the
 text is plain text; only `((49))` is dimmed.
 
+**The reader's own annotations are marked where they are** (round B, spec
+`docs/superpowers/specs/2026-09-25-annotazioni-sul-testo-design.md`).
+`utils/articleAnnotations.ts` is the one definition of where a highlight or a
+note renders (`resolveAnchors`) and of which block shows it
+(`groupAnnotationsByBlock`). With `signs: true` — the tab and the dossier
+reader, not Study Mode — the renderer ends each annotated block with an empty
+`span.vlx-sign`: the note icon, the count and one dot per colour are CSS, so
+the text nodes are untouched. The sign sits inline after the block's text, or
+in the right margin when the `vlx-frame` size container (a wrapper around the
+text in `ArticleBody`) has room for the 68ch column plus a sign. It opens
+`BlockAnnotationsPopover` through `useArticleTextInteractions` (one popover at
+a time with the update notes): the block's notes, edited and deleted in place
+with the Notes panel's own `NoteCard`, and its highlights, removed; *Vai al
+passo* scrolls to the passage and makes it glow (`utils/revealAnnotation.ts`).
+The popover's anchor is a virtual reference that finds the sign again on every
+measurement, because every edit redraws the text. The "Evidenziazioni" box
+that listed highlights under the article is gone.
+
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
-anchored note; `InlineNotePopover` when clicking an existing wavy underline.
-Three entry points, deliberately distinct — don't collapse them.
+anchored note; `InlineNotePopover` when clicking an existing wavy underline;
+the block popover from a sign, for everything one block holds. Deliberately
+distinct entry points — don't collapse them.
 
 **Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
+Hiding them also hides the signs' colour dots and the signs that hold only
+highlights.
 
 **Discussions**: the toolbar's speech-bubble button opens
 `ArticleDiscussionPanel`, a draggable portal anchored on
@@ -1677,8 +1698,20 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
   plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
   Every surface that creates a highlight or an anchored note goes through it.
-- `hooks/useArticleTextInteractions.ts` — the update-note chips and the
-  foldable AGGIORNAMENTO tail, for any surface that renders structured text.
+- `hooks/useArticleTextInteractions.ts` — the update-note chips, the
+  foldable AGGIORNAMENTO tail and the annotation signs (`openBlock`), for any
+  surface that renders structured text.
+- `utils/articleAnnotations.ts` — `resolveAnchors`, `groupAnnotationsByBlock`,
+  `describeBlock` (a block named by its printed enumerator or its opening
+  words, never a computed number). The renderer and the block popover both
+  read it: never re-derive where an anchor lands anywhere else.
+- `utils/revealAnnotation.ts` — `revealAnnotation(root, { kind, id }, near?)`:
+  scroll to an annotation and make it glow. The block popover and Study
+  Mode's summary.
+- `utils/floatingOrigin.ts` — `getTransformOrigin(placement)` for a popover's
+  entry animation.
+- `hooks/useNoteEditing.ts` + `features/search/NoteCard.tsx` — a note edited in
+  place; the Notes panel and the block popover.
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
   `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
@@ -1727,8 +1760,8 @@ scope the role to the header, as `SortableDossierItem` does.
 **Popovers with `@floating-ui/react`** — split positioning and animation across
 **two** elements: outer div takes `refs.setFloating` + `floatingStyles`, inner div
 owns the entry animation. On the same element the scale transform overwrites the
-positioning transform. Compute `transformOrigin` from `placement` (see
-`getTransformOrigin` in `NotesPeekPanel.tsx`). Anchor via a `useState` element,
+positioning transform. Compute `transformOrigin` from `placement` (`getTransformOrigin`,
+`utils/floatingOrigin.ts`). Anchor via a `useState` element,
 not a ref object, and pass it at render time (gotcha 13).
 
 **Toggle buttons** — drive the visual from an `isPressed` selector, not a fixed
@@ -1848,7 +1881,8 @@ Breaking one of these breaks the product. Read before editing.
 
 **Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
 `utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
-`utils/articleStructure.ts` · `utils/articleRender.ts` · `utils/dateUtils.ts` ·
+`utils/articleStructure.ts` · `utils/articleRender.ts` ·
+`utils/articleAnnotations.ts` · `utils/dateUtils.ts` ·
 `utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
 `utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
 `hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
@@ -1877,7 +1911,8 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
   `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
-  opened from its `(119)`), `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
+  highlights, opened from its sign), `NoteCard.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
   `SearchPanel.tsx` (streaming merge logic, and the mount point for both
   `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
@@ -1999,7 +2034,8 @@ meant to stay split; add new features as new files, not inside the shells:
     is frozen and why AKN is never the display text. The same holds on the
     rendering side: the structured reading surface may wrap characters in
     elements but never add, drop or change one — `articleRender.test.ts`
-    checks the rendered text nodes against `article_text` on 27 real texts.
+    checks the rendered text nodes against `article_text` on 27 real texts,
+    with the annotation signs on (a sign has no text node).
     (Inserting only `\n` would not move any offset — newlines are invisible in
     the projection — but the saved-norm watcher compares `article_text`
     verbatim, so it would still raise false "changed" notifications.)
