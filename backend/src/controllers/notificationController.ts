@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
+import { prisma } from '../lib/prisma';
 import { compareNormaSnapshots } from '../utils/normaWatcher';
-
-const prisma = new PrismaClient();
 
 // 2 MB cap on article_text: generous for any real article, but bounds the
 // payload a malicious or buggy client could push into the snapshot JSON column.

@@ -10,13 +10,11 @@
  * - ADMIN_PASSWORD: Admin password (required, no default for security)
  */
 
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { hashPassword } from './password';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const prisma = new PrismaClient();
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@visualex.it';

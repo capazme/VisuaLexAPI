@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 const anchorSchema = z.object({
   normaKey: z.string().min(1).max(500),

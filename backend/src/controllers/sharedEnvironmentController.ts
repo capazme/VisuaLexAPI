@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, EnvironmentCategory, ReportReason } from '@prisma/client';
+import { EnvironmentCategory, ReportReason } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Rate limiting: max 5 publications per day per user
 const DAILY_PUBLISH_LIMIT = 5;

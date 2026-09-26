@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Password validation regex: min 8 chars, at least 1 uppercase, 1 lowercase, 1 number
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
