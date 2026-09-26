@@ -20,10 +20,9 @@ import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
 import articleDiscussionRoutes from './routes/articleDiscussions';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './lib/prisma';
 
 const app = express();
-const healthPrisma = new PrismaClient();
 
 // Trust first proxy (load balancer) for accurate req.ip
 app.set('trust proxy', 1);
@@ -76,7 +75,7 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/health/detailed', async (_req, res) => {
   const started = Date.now();
   try {
-    await healthPrisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRaw`SELECT 1`;
     res.json({ status: 'ok', timestamp: new Date().toISOString(), services: { database: { status: 'ok', latency_ms: Date.now() - started } } });
   } catch {
     res.status(503).json({ status: 'degraded', timestamp: new Date().toISOString(), services: { database: { status: 'error', latency_ms: Date.now() - started } } });

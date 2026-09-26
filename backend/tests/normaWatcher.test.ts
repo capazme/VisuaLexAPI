@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { compareNormaSnapshots, runNormaWatcher, startNormaWatcher } from '../src/utils/normaWatcher';
 import { prisma, createTestUser, type TestUser } from './helpers';
+import { prisma as appPrisma } from '../src/lib/prisma';
 
 describe('compareNormaSnapshots', () => {
   it('is unchanged when article_text is identical', () => {
@@ -51,6 +52,27 @@ describe('startNormaWatcher', () => {
     const timer = startNormaWatcher();
     expect(timer).not.toBeNull();
     clearInterval(timer as NodeJS.Timeout);
+  });
+
+  it('logs a scheduled run that fails instead of leaving the rejection unhandled', async () => {
+    // Nothing handles rejections globally, so an unhandled one crashes the
+    // process: a database hiccup as the run starts, or the graceful shutdown
+    // disconnecting Prisma under it, would take the whole backend down.
+    delete process.env.NORMA_WATCH_ENABLED;
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const findMany = vi.spyOn(appPrisma.normaWatch, 'findMany').mockRejectedValueOnce(new Error('database unreachable'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const timer = startNormaWatcher(60_000);
+    try {
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(findMany).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[norma-watcher]'), 'database unreachable');
+    } finally {
+      clearInterval(timer as NodeJS.Timeout);
+      vi.useRealTimers();
+      findMany.mockRestore();
+      warn.mockRestore();
+    }
   });
 });
 

@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Folder } from '@prisma/client';
+import { Folder } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Validation schemas
 const createFolderSchema = z.object({

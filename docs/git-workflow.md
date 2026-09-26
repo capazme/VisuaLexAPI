@@ -177,6 +177,11 @@ would have been an hour a month.
   replaced it. Do not resurrect the file.
 - **`deploy.sh` keeps `main`'s branch guard** (step 0). Whatever the
   experiment adds to the script sits after it.
+- **`backend/src/index.ts` keeps `main`'s shutdown**, and it stops both
+  timers: `main`'s `normaWatcherInterval` and the experiment's
+  `watchdogInterval`. The experiment's own shutdown lacks the idle-socket
+  sweep, without which a request in flight at pm2's SIGINT holds the process
+  ~6 s, past pm2's 1.6 s SIGKILL, and the Prisma pool is never released.
 - **`CLAUDE.md` is `main`'s text plus the MERL-T sections**, not a choice
   between the two.
 - **Run all of it afterwards**: the three vanilla suites above, plus the

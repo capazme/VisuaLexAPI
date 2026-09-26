@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
-import { Prisma, PrismaClient, DossierItemType } from '@prisma/client';
+import { Prisma, DossierItemType } from '@prisma/client';
 import { createHash } from 'node:crypto';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
-
-const prisma = new PrismaClient();
 
 // Validation schemas
 const createDossierSchema = z.object({
