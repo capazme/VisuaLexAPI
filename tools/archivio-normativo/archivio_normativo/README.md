@@ -53,6 +53,8 @@ A long build (a fresh archive, or `--full`) outlives a terminal session, so
 run it detached and check on it separately:
 
 ```bash
+cd tools/archivio-normativo
+export PYTHONPATH=../../services/visualex
 mkdir -p archivio_out && nohup ../../services/visualex/.venv/bin/python -m archivio_normativo build > archivio_out/build.txt 2>&1 &
 python -m archivio_normativo report                # progress / last run's stats
 ```
