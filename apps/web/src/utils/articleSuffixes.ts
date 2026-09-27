@@ -13,7 +13,9 @@
  * copy of the alternation, and all nine stopped at "decies": "art.
  * 25-terdecies" was read as art. 25-ter — an article that exists, so the
  * truncation produced a plausible link to the wrong text rather than an error.
- * Mirrored by `visualex_api/tools/article_suffixes.py`; change both together.
+ * Mirrors `services/visualex/visualex_api/tools/article_suffixes.py`, as does
+ * `apps/server/src/utils/articleSuffixes.ts`; change all three together (the
+ * server's `tests/unit/articleSuffixes.test.ts` fails when a mirror drifts).
  *
  * Two spellings circulate for 15, 16, 18 and 19 ("quinquiesdecies" /
  * "quindecies", "sexiesdecies" / "sexdecies", "octiesdecies" / "duodevicies",

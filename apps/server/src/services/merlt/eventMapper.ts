@@ -17,6 +17,7 @@ import type {
   ForumSignalRequest,
 } from '../../schemas/merlt/events';
 import type { MerltTrackingEvent } from './merltClient';
+import { ARTICLE_SUFFIX_ALTERNATION } from '../../utils/articleSuffixes';
 
 /** Authority/qualification context attached to every event. */
 export interface UserContext {
@@ -25,25 +26,34 @@ export interface UserContext {
   baselineQual?: string;
 }
 
+const ORDINAL_SPELLING = new RegExp(
+  `(\\d+)[\\s_-]?(${ARTICLE_SUFFIX_ALTERNATION})\\b(?:[\\s_-]?(semel)\\b)?`,
+  'gi'
+);
+
 /**
- * Normalize URN article-id ordinal suffix to the dash-form (`-bis`,
- * `-ter`, etc.) regardless of source spelling: ` bis`, `_bis`, `bis`
- * (no separator) — and irrespective of whether the article number is
- * preceded by `~art` (Normattiva URN format) or by `;` (compact URN).
+ * Normalize an URN's article ordinal to the joined form (`~art2bis`,
+ * `~art25sexiesdecies`, `~art270bis.1`) whatever the source spelling:
+ * `-bis`, ` bis`, `_bis` — after `~art` (Normattiva URN) or `;` (compact URN).
  *
- * The MERL-T graph stores URNs in the dash-form (Normattiva canonical
- * form), so we unify upstream of the wire.
+ * The joined form is what the URN generator emits, what the lazy-ingestion
+ * job is keyed on and what the MERL-T graph stores (seed `~art30bis`,
+ * mechanical ingestion): an event keyed on another spelling never joins its
+ * node. The suffixes come from the shared ordinal table, so the numbering past
+ * "decies" is read too.
  *
  * Examples:
- *  urn:nir~art1 bis      → urn:nir~art1-bis
- *  urn:nir~art1bis       → urn:nir~art1-bis
- *  urn:nir:c.c.:1942;2043 bis → urn:nir:c.c.:1942;2043-bis
- *  urn:foo:bis~art2      → urn:foo:bis~art2  (no leading digit, no change)
+ *  urn:nir~art1 bis      → urn:nir~art1bis
+ *  urn:nir~art1-bis      → urn:nir~art1bis
+ *  urn:nir:c.c.:1942;2043 bis → urn:nir:c.c.:1942;2043bis
+ *  urn:nir~art1-com2     → unchanged (a comma reference, not an ordinal)
+ *  urn:foo:bis~art2      → unchanged (no leading digit)
  */
 export function normalizeArticleUrn(urn: string): string {
   return urn.replace(
-    /(\d+)[\s_]?(bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)\b/gi,
-    (_, head, suffix) => `${head}-${suffix.toLowerCase()}`
+    ORDINAL_SPELLING,
+    (_, head: string, suffix: string, second?: string) =>
+      `${head}${suffix.toLowerCase()}${second ? second.toLowerCase() : ''}`
   );
 }
 

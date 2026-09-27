@@ -1315,8 +1315,9 @@ the worker share.
 7. **The URN suffix regex is longest-first.** The article-suffix list in
    `utils/urn_labels.py` is complete, sorted longest-first, and ends with a
    boundary. Before, `2409-terdecies` became `2409-ter` and collided with the
-   real 2409-ter. The BFF `eventMapper.normalizeArticleUrn` still knows only
-   `bis`..`decies`.
+   real 2409-ter. The BFF `eventMapper.normalizeArticleUrn` reads the same
+   table (`apps/server/src/utils/articleSuffixes.ts`) and folds every spelling
+   into the joined form the graph keys on (`~art2bis`).
 
 ## Key API Endpoints
 
