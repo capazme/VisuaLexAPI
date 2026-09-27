@@ -68,9 +68,11 @@ const server = app.listen(config.port, () => {
   `);
 });
 
-// Graceful shutdown: stop the watchdog and the saved-norm watcher, drain
-// in-flight requests, release the Prisma connection pool, then exit.
-// Idempotent across repeated signals.
+// Graceful shutdown: stop the MERL-T watchdog and the saved-norm watcher,
+// drain in-flight requests, release the Prisma connection pool, then exit.
+// Idempotent across repeated signals. A watcher run already under way is cut
+// short, which is safe: each of its writes is atomic, and the next run starts
+// again from the least recently seen watch.
 let shuttingDown = false;
 function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
@@ -84,6 +86,16 @@ function shutdown(signal: NodeJS.Signals): void {
       .catch((err) => console.error('[shutdown] prisma disconnect failed:', err))
       .finally(() => process.exit(0));
   });
+  // close() drops the idle keep-alive sockets only once. A socket that was
+  // mid-request stays open for the whole keep-alive timeout (~6 s) after its
+  // answer: drop each one as soon as it goes idle.
+  setInterval(() => server.closeIdleConnections(), 100).unref();
+  // Handling the signal replaces Node's own exit and repeats are ignored, so a
+  // request or a disconnect that never ends must not keep the process alive.
+  setTimeout(() => {
+    console.error('[shutdown] still running after 10 s, forcing exit');
+    process.exit(1);
+  }, 10_000).unref();
 }
 
 process.on('SIGTERM', shutdown);

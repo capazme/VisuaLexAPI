@@ -209,6 +209,19 @@ run: `archivio_normativo/README.md`. Tests: `tests/archivio/`.
 
 Express + Prisma. Auth, and the persistence for every user-owned slice.
 
+- `src/lib/prisma.ts` — the one `PrismaClient`; every module under `src/`
+  imports `prisma` from it. Each client owns a connection pool (physical CPUs
+  × 2 + 1 connections by default in Prisma 5; a flat 10 from Prisma 7), and
+  until September 2026 the server loaded eighteen, one per module — eighteen
+  pools against Postgres' `max_connections`. `tests/prismaClient.test.ts`
+  fails when a module under `src/` constructs another; the test harness
+  (`tests/setup.ts`, `tests/helpers.ts`) keeps its own clients on purpose.
+- `src/index.ts` — graceful shutdown on SIGTERM/SIGINT (pm2 restarts with
+  SIGINT): clear the saved-norm watcher's interval, `server.close()`, drop each
+  keep-alive socket as soon as it goes idle, `prisma.$disconnect()`, exit; a
+  forced exit after 10 s. The idle sweep is load-bearing: a socket that was
+  mid-request otherwise holds `close()` open for the whole keep-alive timeout
+  (~6 s, measured), past the 1.6 s pm2 waits by default before its SIGKILL.
 - `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
   authenticated 300/min (by userId), writes 20/min. `RateLimiterRedis` when
   `REDIS_ENABLED=true`, else in-memory with a startup warning.
@@ -254,6 +267,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `/fetch_article_text` is appended — and notifies on a text change.
   `NORMA_WATCH_ENABLED=false` turns it off. A malformed answer (no
   `norma_data`, empty text) is a no-op, never a fallback to the stored data.
+  A run that fails outright (database unreachable as it starts) is logged by
+  the scheduler. **Nothing in the backend handles rejections globally**, so
+  any fire-and-forget promise (`void f()`) that rejects crashes the whole
+  server: catch it where it is fired.
 - **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
   on `{normaKey, articleId, version}` with comments, toggled votes and
   reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
@@ -1876,7 +1893,7 @@ meant to stay split; add new features as new files, not inside the shells:
   (see History above).
 - `features/documents/` — `DocumentReviewPage.tsx` only.
 
-**Backend** — `prisma/schema.prisma` · `controllers/` (`environmentController`,
+**Backend** — `prisma/schema.prisma` · `src/lib/prisma.ts` · `controllers/` (`environmentController`,
 `quickNormController`, `customAliasController`, `dossierController`) ·
 `routes/` (all authenticate-gated, mounted on `/api`).
 

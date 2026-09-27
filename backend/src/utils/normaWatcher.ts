@@ -131,5 +131,10 @@ export function startNormaWatcher(intervalMs = Number(process.env.NORMA_WATCH_IN
     return null;
   }
   const interval = Math.max(60_000, intervalMs);
-  return setInterval(() => { void runNormaWatcher(); }, interval);
+  // Nothing handles rejections globally, and an unhandled one crashes the
+  // process: a database error as a run starts must cost that run, not the
+  // backend.
+  return setInterval(() => {
+    runNormaWatcher().catch((error) => console.warn('[norma-watcher] run failed:', error instanceof Error ? error.message : error));
+  }, interval);
 }

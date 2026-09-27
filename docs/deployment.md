@@ -71,7 +71,7 @@ absence broke a deploy, which is why they read as a list of scars:
 | 5 | `npm run build` (frontend) | `tsc -b && vite build`. **This is the real type-check** — it walks the project references, which a bare `tsc --noEmit` does not. |
 | 6 | `npm run build` (backend) | pm2 runs `node dist/index.js`, so skipping this leaves the service on a stale `dist/`. `tsc` type-checks as it emits and fails before writing. |
 | 7 | Version bump + commit + tag + push | Only when `--major/--minor/--patch` is passed. Writes `version.txt`, commits, tags the commit `vX.Y.Z` and pushes `HEAD` plus the tag. The tag is the record of what production ran; a failed push is a warning, not a failed deploy — push by hand. |
-| 8 | Restart | `pm2 restart all`, else `systemctl restart visualex-backend`. |
+| 8 | Restart | `pm2 restart all`, else `systemctl restart visualex-backend`. The backend stops gracefully on the signal (pm2 sends SIGINT): in-flight requests finish and its one Prisma pool is closed before it exits (`backend/src/index.ts`). pm2 SIGKILLs whatever is still alive after its `kill_timeout`, 1.6 s by default — which is why the shutdown drops each keep-alive socket as soon as it goes idle instead of waiting out the keep-alive timeout. |
 
 ---
 
@@ -97,7 +97,7 @@ cd backend && npm test
 cd frontend && npm run build && npx vitest run
 ```
 
-Expected today: 984 Python (6 deselected — the `live` marker), 65 backend, 490 frontend.
+Expected today: 984 Python (6 deselected — the `live` marker), 67 backend, 490 frontend.
 
 The backend suite needs `backend/.env.test` pointing at a **separate** database
 (`visualex_test`, not `visualex_platform`) — it runs `prisma migrate reset` on
