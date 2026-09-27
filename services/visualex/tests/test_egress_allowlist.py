@@ -17,6 +17,8 @@ import pytest
 from visualex_api.tools.egress import ALLOWED_HOSTS, NON_NETWORK_HOSTS, is_allowed
 
 ROOT = Path(__file__).resolve().parents[1]
+# SECURITY.md documents the whole product and stays at the repository root.
+REPO_ROOT = ROOT.parents[1]
 URL = re.compile(r"https?://([A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9])")
 
 
@@ -46,7 +48,7 @@ def test_server_contacts_only_declared_hosts(host):
 
 @pytest.mark.parametrize("host", sorted(ALLOWED_HOSTS))
 def test_every_allowed_host_is_documented(host):
-    assert host in (ROOT / "SECURITY.md").read_text(encoding="utf-8"), (
+    assert host in (REPO_ROOT / "SECURITY.md").read_text(encoding="utf-8"), (
         f"'{host}' is allowed in code but absent from SECURITY.md"
     )
 
