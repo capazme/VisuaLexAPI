@@ -36,6 +36,10 @@ const updateDossierItemSchema = z.object({
   status: z.enum(['unread', 'reading', 'important', 'done']).optional(),
 });
 
+const moveDossierItemSchema = z.object({
+  targetDossierId: z.string().min(1),
+});
+
 /**
  * List all dossiers for current user
  */
@@ -338,6 +342,78 @@ export const deleteDossierItem = async (req: Request, res: Response) => {
   }
 
   res.status(204).send();
+};
+
+/**
+ * Move a dossier item to another dossier of the same user
+ *
+ * The row itself is moved — only `dossier_id` and `position` change — so its
+ * id, its `created_at` and its content survive. The client used to re-create
+ * the item on the target and delete it from the source: the new row came back
+ * unstarred (the star lives in the `_dossierMeta` envelope inside `content`),
+ * its fresh id made the next star or delete 404 against the target dossier,
+ * its added-at date became the move date, and a failed delete left the item in
+ * both dossiers.
+ */
+export const moveDossierItem = async (req: Request, res: Response) => {
+  const { id, itemId } = req.params;
+  const { targetDossierId } = moveDossierItemSchema.parse(req.body ?? {});
+
+  // BOTH dossiers must belong to the caller: the URL proves the source is ours
+  // (as in the other item handlers), but the target comes from the body, so it
+  // needs the same check or an authenticated user could file an item into — or
+  // pull one out of — a dossier they do not own.
+  const [source, target] = await Promise.all([
+    prisma.dossier.findFirst({ where: { id, userId: req.user!.id }, select: { id: true } }),
+    prisma.dossier.findFirst({ where: { id: targetDossierId, userId: req.user!.id }, select: { id: true } }),
+  ]);
+
+  if (!source || !target) {
+    throw new AppError(404, 'Dossier not found');
+  }
+
+  if (source.id === target.id) {
+    throw new AppError(400, 'Item is already in that dossier');
+  }
+
+  try {
+    const item = await prisma.$transaction(async (tx) => {
+      // Read the append slot in the same transaction as the write. Under
+      // Postgres' default isolation two moves arriving together can still read
+      // the same max and claim the same position — the client sends one move at
+      // a time, and two items sharing a position only swaps their order until
+      // the next reorder rewrites every position, so no lock is taken for it.
+      const maxPos = await tx.dossierItem.aggregate({
+        where: { dossierId: target.id },
+        _max: { position: true },
+      });
+
+      return tx.dossierItem.update({
+        // Scoped by dossierId: the ownership check above proves the source
+        // dossier is ours, not that the item belongs to it.
+        where: { id: itemId, dossierId: source.id },
+        data: {
+          dossierId: target.id,
+          position: (maxPos._max.position ?? -1) + 1,
+        },
+      });
+    });
+
+    res.json({
+      id: item.id,
+      item_type: item.itemType,
+      title: item.title,
+      content: item.content,
+      position: item.position,
+      status: item.status,
+      created_at: item.createdAt,
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Dossier item not found');
+    }
+    throw err;
+  }
 };
 
 /**
