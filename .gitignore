@@ -9,7 +9,10 @@ download
 
 dist/*
 .claude
+# The Python API's runtime data (search history, dossiers): private. It lived
+# in /data before the monorepo move, and an old checkout leaves it there.
 services/visualex/data/
+/data/
 
 # Node modules (nested dirs also carry their own .gitignore)
 node_modules/
