@@ -225,7 +225,7 @@ describe('POST /api/merlt/events/article-viewed (MERLT-1.5)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('normalizes -bis URN suffixes in the outgoing payload', async () => {
+  it('folds the ordinal spelling into the joined URN form in the outgoing payload', async () => {
     await grantConsent(user, 'basic');
     nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
 
@@ -233,7 +233,7 @@ describe('POST /api/merlt/events/article-viewed (MERLT-1.5)', () => {
       .post('/api/v1/tracking/events', (body: unknown) => {
         const b = body as { events: Array<Record<string, unknown>> };
         const d = b.events[0].data as Record<string, unknown>;
-        return d.article_urn === 'urn:nir:stato:codice.civile:1942;2043-bis';
+        return d.article_urn === 'urn:nir:stato:codice.civile:1942;2043bis';
       })
       .reply(200, { received: 1, timestamp: 't-bis' });
 
@@ -349,7 +349,7 @@ describe('POST /api/merlt/events/highlight-annotation (MERLT-1.7)', () => {
     expect(res.body.detail).toBe('invalid_body');
   });
 
-  it('normalizes -bis suffix on articleUrn', async () => {
+  it('folds the ordinal spelling on articleUrn into the joined form', async () => {
     await grantConsent(user, 'basic');
     nock(TEST_MERLT_BASE).get('/api/v1/profile/full').query(true).reply(503);
 
@@ -357,7 +357,7 @@ describe('POST /api/merlt/events/highlight-annotation (MERLT-1.7)', () => {
       .post('/api/v1/tracking/events', (body: unknown) => {
         const b = body as { events: Array<Record<string, unknown>> };
         const d = b.events[0].data as Record<string, unknown>;
-        return d.article_urn === 'urn:nir:stato:codice.civile:1942;2043-bis';
+        return d.article_urn === 'urn:nir:stato:codice.civile:1942;2043bis';
       })
       .reply(200, { received: 1, timestamp: 't' });
 

@@ -15,36 +15,58 @@ const userCtx = {
 };
 
 describe('normalizeArticleUrn', () => {
-  it('normalizes art with -bis suffix as-is', () => {
-    expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;1175~art1-bis')).toBe(
-      'urn:nir:stato:codice.civile:1942;1175~art1-bis'
-    );
-  });
-
-  it('normalizes `art1 bis` to `art1-bis`', () => {
-    expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;1175~art1 bis')).toBe(
-      'urn:nir:stato:codice.civile:1942;1175~art1-bis'
-    );
-  });
-
-  it('normalizes `art1bis` (no separator) to `art1-bis`', () => {
+  // The joined form (`~art2bis`) is what the URN generator emits, what the
+  // ingestion job is keyed on and what the MERL-T graph stores: every spelling
+  // of the ordinal folds into it.
+  it('leaves the joined form untouched', () => {
     expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;1175~art1bis')).toBe(
-      'urn:nir:stato:codice.civile:1942;1175~art1-bis'
+      'urn:nir:stato:codice.civile:1942;1175~art1bis'
+    );
+  });
+
+  it('joins the hyphenated form (`art1-bis` → `art1bis`)', () => {
+    expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;1175~art1-bis')).toBe(
+      'urn:nir:stato:codice.civile:1942;1175~art1bis'
+    );
+  });
+
+  it('joins `art1 bis` to `art1bis`', () => {
+    expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;1175~art1 bis')).toBe(
+      'urn:nir:stato:codice.civile:1942;1175~art1bis'
     );
   });
 
   it('handles `art2_ter` (underscore separator)', () => {
-    expect(normalizeArticleUrn('urn:nir~art2_ter')).toBe('urn:nir~art2-ter');
+    expect(normalizeArticleUrn('urn:nir~art2_ter')).toBe('urn:nir~art2ter');
   });
 
-  it('handles uppercase suffix (`art1 BIS` → `art1-bis`)', () => {
-    expect(normalizeArticleUrn('urn:nir~art1 BIS')).toBe('urn:nir~art1-bis');
+  it('handles uppercase suffix (`art1 BIS` → `art1bis`)', () => {
+    expect(normalizeArticleUrn('urn:nir~art1 BIS')).toBe('urn:nir~art1bis');
   });
 
-  it('handles compact URN form (`;2043 bis` → `;2043-bis`)', () => {
+  it('handles compact URN form (`;2043 bis` → `;2043bis`)', () => {
     expect(normalizeArticleUrn('urn:nir:stato:codice.civile:1942;2043 bis')).toBe(
-      'urn:nir:stato:codice.civile:1942;2043-bis'
+      'urn:nir:stato:codice.civile:1942;2043bis'
     );
+  });
+
+  it('reads the ordinals past decies (`art25-sexiesdecies`, `art2409 noviesdecies`)', () => {
+    expect(normalizeArticleUrn('urn:nir:stato:decreto.legislativo:2001-06-08;231~art25-sexiesdecies')).toBe(
+      'urn:nir:stato:decreto.legislativo:2001-06-08;231~art25sexiesdecies'
+    );
+    expect(normalizeArticleUrn('urn:nir~art2409 noviesdecies')).toBe('urn:nir~art2409noviesdecies');
+  });
+
+  it('spells nine as Normattiva does (`novies`)', () => {
+    expect(normalizeArticleUrn('urn:nir~art3-novies')).toBe('urn:nir~art3novies');
+  });
+
+  it('keeps the dotted sub-number (`art270-bis.1` → `art270bis.1`)', () => {
+    expect(normalizeArticleUrn('urn:nir~art270-bis.1')).toBe('urn:nir~art270bis.1');
+  });
+
+  it('keeps the version marker', () => {
+    expect(normalizeArticleUrn('urn:nir~art2-bis!vig=2024-01-01')).toBe('urn:nir~art2bis!vig=2024-01-01');
   });
 
   it('leaves plain URN without suffix untouched', () => {
@@ -53,14 +75,20 @@ describe('normalizeArticleUrn', () => {
     );
   });
 
-  it('handles multiple ordinal suffixes in one URN', () => {
-    expect(normalizeArticleUrn('urn:a~art1bis|urn:b~art2 ter')).toBe(
-      'urn:a~art1-bis|urn:b~art2-ter'
-    );
+  it('does not touch a comma reference (`art1-com2`)', () => {
+    expect(normalizeArticleUrn('urn:nir~art1-com2')).toBe('urn:nir~art1-com2');
+  });
+
+  it('handles multiple ordinal suffixes in one string', () => {
+    expect(normalizeArticleUrn('urn:a~art1-bis|urn:b~art2 ter')).toBe('urn:a~art1bis|urn:b~art2ter');
   });
 
   it('does NOT match `bis` outside a digit context', () => {
     expect(normalizeArticleUrn('urn:foo:bis-without-digit')).toBe('urn:foo:bis-without-digit');
+  });
+
+  it('does NOT match the head of a longer word (`5 bisogna`)', () => {
+    expect(normalizeArticleUrn('urn:nir~art5 bisogna')).toBe('urn:nir~art5 bisogna');
   });
 });
 
@@ -105,7 +133,7 @@ describe('toMerltArticleViewed', () => {
     expect(out.baseline_qualification).toBeUndefined();
   });
 
-  it('normalizes URN with `-bis` suffix variants', () => {
+  it('folds URN ordinal spellings into the joined form', () => {
     const out = toMerltArticleViewed(
       {
         articleUrn: 'urn:nir~art1 bis',
@@ -115,7 +143,7 @@ describe('toMerltArticleViewed', () => {
       },
       userCtx
     );
-    expect(out.article_urn).toBe('urn:nir~art1-bis');
+    expect(out.article_urn).toBe('urn:nir~art1bis');
   });
 });
 
@@ -226,8 +254,8 @@ describe('toMerltCitationClicked', () => {
       },
       { userId: 'u-1' }
     );
-    expect(out.source_urn).toBe('urn:nir~art1-bis');
-    expect(out.target_urn).toBe('urn:nir~art2-ter');
+    expect(out.source_urn).toBe('urn:nir~art1bis');
+    expect(out.target_urn).toBe('urn:nir~art2ter');
   });
 });
 
