@@ -1,7 +1,8 @@
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import type { Highlight } from '../../../types';
 import { Highlighter, X } from 'lucide-react';
 import { SafeHTML } from '../../../utils/sanitize';
+import { cn } from '../../../lib/utils';
 import { SelectionPopup } from './SelectionPopup';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../utils/highlightColors';
 
@@ -16,6 +17,8 @@ export interface ArticleBodyProps {
     /** Optional "Segnala come citazione" action; the popup hides it when absent. */
     onPopupReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onRemoveHighlight: (id: string) => void;
+    /** Unfolds the AGGIORNAMENTO notes at the bottom of the text (useArticleTextInteractions). */
+    updatesOpen?: boolean;
 }
 
 export function ArticleBody({
@@ -28,19 +31,24 @@ export function ArticleBody({
     onPopupCopy,
     onPopupReportCitation,
     onRemoveHighlight,
+    updatesOpen = false,
 }: ArticleBodyProps) {
+    // The text alone, without the selection popup: stored offsets are measured
+    // from here (see SelectionPopup's textRootRef).
+    const textRef = useRef<HTMLDivElement>(null);
     return (
         <>
-            {/* Article Content with Prose Styling */}
+            {/* Article text — typography and structure from `.vlx-art` (index.css, READING SURFACE) */}
             <div className="relative group/content" ref={contentRef}>
                 <SelectionPopup
                     containerRef={contentRef}
+                    textRootRef={textRef}
                     onHighlight={onPopupHighlight}
                     onAddNote={onPopupAddNote}
                     onCopy={onPopupCopy}
                     onReportCitation={onPopupReportCitation}
                 />
-                <div className="prose prose-lg dark:prose-invert max-w-none legal-prose prose-slate prose-headings:font-bold font-serif px-2 sm:px-4" id={`article-content-${itemKey}`}>
+                <div ref={textRef} className={cn('vlx-art px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent ? (
                         <SafeHTML html={processedContent} />
                     ) : (

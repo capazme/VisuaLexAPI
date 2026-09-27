@@ -22,11 +22,23 @@ comments and commits are English.
 AI experiment and is never deployed.**
 
 Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
-through short-lived branches (`fix/…`, `feature/…`); `merlt` absorbs them with a
-periodic `git merge main`. Nothing is cherry-picked back. If you find yourself
-fixing something vanilla while on `merlt`, stop and move to `main` — that
-one-way-valve discipline is what this model exists to enforce, after 32 vanilla
-commits (four of them security fixes) sat stranded on the experiment for weeks.
+through short-lived branches (`fix/…`, `feature/…`, merged `--no-ff`); a release
+is a deploy, and `deploy.sh` tags it `vX.Y.Z` at bump time; `merlt` absorbs
+vanilla by merging each release **tag**, never `main` itself. Nothing is
+cherry-picked back. If you find yourself fixing something vanilla while on
+`merlt`, stop and move to `main` — that one-way-valve discipline is what this
+model exists to enforce, after 32 vanilla commits (four of them security fixes)
+sat stranded on the experiment for weeks. There is deliberately no `dev`
+branch. The experiment lives in its own checkout, the permanent worktree
+`../VisuaLexAPI-merlt` — never switch this checkout to it.
+**`docs/git-workflow.md` is the standard** — the merlt merge checklist, the
+monthly sweep, why `dev` was rejected.
+
+Two more places where work strands, both checked before assuming every fix
+has reached `main`: Claude Code web sessions push `origin/claude/<name>-<id>` branches
+(merge into `main` within days or delete — one held a real fix for three days
+while a parallel fix landed), and desktop sessions leave worktrees under
+`.claude/worktrees/`, sometimes with an uncommitted file inside.
 
 When backporting from `merlt`, watch for two things: commits are often mixed
 (a vanilla fix and MERL-T work in one commit), and MERL-T code can ride along —
@@ -78,6 +90,17 @@ plus a weekly `pip-audit` / `npm audit`. That is the only automated check in the
 project: `deploy.sh` consults nothing, runs no test and has no rollback, so a red
 `main` still deploys.
 
+## Archivio normativo (`archivio_normativo/`)
+
+A CLI that builds a local archive of the acts in `archivio_normativo/manifest.yaml`
+through this API: `python -m archivio_normativo build [--dry-run] [--only …]
+[--enrich …]`. One SQLite record per article/recital plus one Markdown per act,
+in `archivio_out/` (gitignored). Update runs refetch only the articles whose AKN
+fingerprint moved. Text and structure come from VisuaLex; case law and authority
+practice from the `legal-it` MCP server (optional, `requirements-archivio.txt`).
+Spec: `docs/superpowers/specs/2026-09-19-archivio-normativo-design.md`; how to
+run: `archivio_normativo/README.md`. Tests: `tests/archivio/`.
+
 ## Architecture
 
 ### Python API (`/visualex_api`)
@@ -102,8 +125,18 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     Only the article INDEX is cached — in memory, capped at
     `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
     in-flight registry so N concurrent cold requests download the act once.
-    Article texts are never cached. `AKN_ENABLED=false` disables the whole path
-    and is read at call time.
+    Article texts are never cached. `ParsedPart.dates` carries each article's
+    FRBRWork date (component acts only), and `AktIndex.fingerprints` a sha256
+    per article — both are metadata about the text, not the text. The hash
+    is of the RENDERED AKN text (the markdown `akn_parser` produces,
+    AGGIORNAMENTO blocks included), so a renderer change moves every hash — a
+    harmless full refetch. The top-level map covers the dominant part only;
+    an annex such as the preleggi or the disposizioni di attuazione must be
+    read from `parts_fingerprints` (served as `parts` by
+    `/fetch_act_fingerprints`), which is kept apart from `parts_detail` so
+    the hashes do not ride along on every `/fetch_rubriche` answer. With
+    the fingerprints a codice's in-memory index is a few hundred KB.
+    `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
     article numbers and needs no network.
 - **`tools/`**:
@@ -112,6 +145,13 @@ project: `deploy.sh` consults nothing, runs no test and has no rollback, so a re
     the primary container across the API)
   - `urngenerator.py` — URN generation · `treextractor.py` — article trees
   - `text_op.py` — text parsing **and** date handling (see Date System)
+  - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
+    article-number regex reads, longest-first so a short entry cannot claim the
+    head of a longer one. A leaf module, imported by `nl_parser`,
+    `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
+    `frontend/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
+    `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
+    exists, which is why nothing looked broken
   - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
   - `map.py` — act-type mappings, plus the act tables the resolver reads
@@ -192,16 +232,52 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   scoped to `req.user.id`. Intended caller is `applyEnvironment(replace)` ONLY —
   do not wire into end-user UI without a dedicated confirm flow.
 - Dossier item mutations are scoped to their dossier (IDOR fix — keep it that
-  way when adding item routes).
+  way when adding item routes). `POST`/`GET /dossiers/:id/snapshots` are
+  scoped to the owner the same way. Write-only from the UI today ("Snapshot"
+  in the detail view); there is no restore yet.
+- **Saved-norm change tracking** (`routes/notifications.ts`, all behind
+  `authenticate`): `POST /notifications/normas/check` — the reader registers
+  `{normaKey, normaData: {norma_data, article_text}}` (Zod, 2 MB cap on the
+  text) — plus `GET /notifications/normas`, `GET …/unread-count`,
+  `POST …/mark-read`. One `NormaWatch` row per `(userId, normaKey)` holds
+  the last snapshot; a `NormaChangeNotification` is written when the
+  **text** differs. `compareNormaSnapshots` in `utils/normaWatcher.ts` is
+  the one definition of "changed" for both writers of those rows (this
+  endpoint and the background watcher): compare anything but `article_text`
+  and the two ping-pong false notifications forever, because each stores
+  `norma_data` in its own shape. A stored snapshot with no text
+  (metadata-only, from before this contract) is a `baseline`: the snapshot
+  is replaced and nothing is notified.
+- **`utils/normaWatcher.ts`** — started from `index.ts`. Every
+  `NORMA_WATCH_INTERVAL_MS` (6 h, floor 1 min) it refetches up to 100
+  watches through the Python API — `LEGAL_API_URL` is the **base** URL,
+  `/fetch_article_text` is appended — and notifies on a text change.
+  `NORMA_WATCH_ENABLED=false` turns it off. A malformed answer (no
+  `norma_data`, empty text) is a no-op, never a fallback to the stored data.
+- **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
+  on `{normaKey, articleId, version}` with comments, toggled votes and
+  reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
+  `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
+  `updatedAt`, vote count.
+- **Account data**: `GET /auth/export` (the user's data, minus password and
+  tokens) and `DELETE /auth/account` (password re-checked; every relation to
+  `User` cascades). Reached from the Settings modal.
+- **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
+  banner. The Python `/health/detailed` is the one that probes the sources
+  (see Key API Endpoints).
 
 ### Frontend (`/frontend/src`)
 
 - `App.tsx` — routing. Routes: `/` (search), `/dossier`, `/history`,
-  `/environments`, `/forum`, `/admin/*`, plus `/login` and `/register`.
+  `/environments`, `/forum`, `/documents`, `/admin/*`, plus `/login` and
+  `/register`.
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`, `environments`,
-  `bulletin` (the Forum), `history`, `compare`, `settings`.
+  `bulletin` (the Forum), `history`, `compare`, `settings`, `documents`
+  (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
+  user drops in — parsed in the browser, never uploaded — each opening the
+  reader through `navigate('/')` + `triggerSearch`, gotcha 15).
 - `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
@@ -1238,10 +1314,28 @@ POST unless noted, JSON bodies.
 - `/parse_query`, `/extract_citations` — NL parsing and citation detection
 - `/fetch_rubriche` — article titles and repealed articles for an act, from the
   AKN index. Structure only: it never carries the display text
+- `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
+  `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
+  Reads the OJ page the tree already uses; a consolidated text has no
+  preamble and answers an empty list. Normattiva acts get a 400
+- `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
+  AKN text plus, for the codici, the FRBRWork date of each article (the day
+  its current text came into force). `urn` is the act's full URL as
+  `norma_data.url` gives it (`https://www.normattiva.it/uri-res/N2Ls?urn:nir:…`),
+  not a bare `urn:nir:` string; an article suffix (`~art2`) is stripped. A
+  change detector, never the text: a client refetches only the articles
+  whose hash moved. `available: false` with empty maps when there is no AKN
+  index, or an index without fingerprints — the caller must then refetch
+  everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
+- `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
+  real**, on the shared client and circuit breakers. One result is cached
+  for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
+  concurrent cold callers run one probe; the body carries `cached` and the
+  status stays 503 while a source fails. Never wire it to a tight loop
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
@@ -1258,7 +1352,8 @@ error page instead of NDJSON.
   "article": "2043",             // required: single, list "1,2", or range "3-5"
   "version": "vigente",          // optional: "vigente" | "originale"
   "version_date": "2024-01-15",  // optional
-  "annex": "A"                   // optional (allegato)
+  "annex": "A",                  // optional (allegato)
+  "celex_consolidated": "02002L0058-20091219"  // optional, EU acts only: serve this consolidated version
 }
 ```
 
@@ -1296,6 +1391,13 @@ to the cached or synthetic value.
 1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
    EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
    state law, Brocardi for annotations on Normattiva sources.
+   EU acts come from the Official Journal page unless the request names a
+   `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
+   tree, rubriche and article text are read from that consolidated page,
+   whose markup is different (`title-article-norm`, `modref` markers) and
+   handled by its own branch in `eurlex_scraper.py` / `treextractor.py`.
+   Consolidated texts carry no preamble — recitals always come from the OJ
+   page of the base act.
 2. **Parallel fetching** via `asyncio.gather()`.
 3. **Streaming**: `/stream_article_text` uses a Quart `Response` generator.
 4. **Browsers**: always through the `PlaywrightManager` singleton.
@@ -1338,7 +1440,13 @@ server-backed** — see gotcha 17, which is the rule any new slice must follow.
   `bookmarkService`. There is **no bookmarks page or route**; the dedicated UI was
   removed as dead code. Don't document or build against a bookmarks page without
   first deciding to rebuild one.
-- **History** (`/history`) — server-side search history.
+- **History** (`/history`) — server-side search history. It also hosts
+  `NormaChangesSection`, the one place the "a saved norm changed"
+  notifications are listed and marked read; the Cronologia entry in the
+  sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
+  deliberately kept out of the Forum's `total`, which nothing on that page
+  could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
+  on `window` so the badge drops before the next 30s poll.
 
 All of them reopen a norm through `triggerSearch()`.
 
@@ -1377,6 +1485,41 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 uses the same two functions, and they must stay byte-identical or annotations
 made on one surface stop appearing on the other.
 
+**The text is structured, never rewritten** (round A, spec
+`docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
+`parseArticleStructure` (`utils/articleStructure.ts`) reads heading, rubric,
+commi, items with their printed enumerator and level, Normattiva's
+`((modifications))` and repeal notices, `(119)` references and the
+AGGIORNAMENTO notes, as raw ranges that partition `article_text`;
+`renderArticleHtml` (`utils/articleRender.ts`, behind `useArticleMarkers`)
+emits one `div.vlx-b.vlx-{kind}` per block, cutting the text at every block and
+mark edge and nesting marks with a stack, so the HTML is always well-formed and
+escaped. Styles are the `.vlx-*` rules in `index.css` (READING SURFACE): a 68ch
+measure, commi divided by space, hanging numbers and items. The contract is
+gotcha 23: the rendered text nodes spell `article_text` minus `\n` — any new
+label goes in CSS (`content: attr(...)`), never in a text node.
+`articleRender.test.ts` enforces it on 27 real texts
+(`utils/__fixtures__/articleTexts.ts`). Tab, dossier reader and Study Mode all
+render this way; Study Mode hides the heading and rubric blocks
+(`vlx-hide-header`) instead of cutting them, so its offsets are
+document-relative like everywhere else. The Brocardi sections render flat
+(`structure: null`).
+
+**Offsets are measured from the text alone.** `SelectionPopup` takes a
+`textRootRef` (the element holding only the article text) and stores the anchor
+from `getSelectionAnchor` (`utils/selectionOffset.ts`), which reads
+`Range.toString()`: `Selection.toString()` is rendered text and writes a newline
+per line or comma boundary, which made every cross-comma highlight unmatched.
+The renderer also accepts, at the same offset, a stored text that differs only
+in whitespace, so those older highlights show again.
+
+**Normattiva's update notes** are interactive and out of the way:
+`useArticleTextInteractions` delegates click and Enter/Space on the body — a
+`(119)` chip opens `UpdateNotePopover`, the "Note di aggiornamento (N)" toggle
+folds the tail through the `vlx-updates-open` class on the text container
+(the HTML never changes when it opens). A reference whose note is not in the
+text is plain text; only `((49))` is dimmed.
+
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
 anchored note; `InlineNotePopover` when clicking an existing wavy underline.
@@ -1385,6 +1528,22 @@ Three entry points, deliberately distinct — don't collapse them.
 **Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
 button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
 exports to `.txt` — it is not a second creator (that was tried and rolled back).
+
+**Discussions**: the toolbar's speech-bubble button opens
+`ArticleDiscussionPanel`, a draggable portal anchored on
+`{normaKey, articleId, version}` (threads, replies, votes, report; moderation
+is admin-only, `PATCH /admin/article-discussions/:id`). The panel is mounted
+for every rendered article and fetches **only while open** — a load on mount
+cost one GET per article of a range.
+
+**Saved-norm change check**: when a *bookmarked* article is shown,
+`ArticleTabContent` posts `{norma_data, article_text}` to
+`/notifications/normas/check`; the server keeps one snapshot per
+`(user, normaKey)` and answers `changed` when the **text** differs, which
+the reader toasts. The effect is keyed on `(itemKey, isSavedArticle)` and
+reads the body through a ref, so a re-render with the same text as a new
+object does not post again; it is separate from the highlights/annotations
+load effect, which stays keyed on identity alone.
 
 **The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
 `'window'` on desktop — a draggable, backdrop-less window portalled to
@@ -1443,7 +1602,8 @@ A dossier is where the articles needed for a task are aggregated and read.
 Duplicating any of these is a defect, not a shortcut.
 
 **Python**: `urngenerator.py` (URNs) · `text_op.py` (text parsing + dates) ·
-`treextractor.py` (trees) · `PlaywrightManager` (browsers).
+`treextractor.py` (trees) · `PlaywrightManager` (browsers) ·
+`article_suffixes.py` (the ordinal suffix table).
 
 **Frontend**:
 - `utils/normaKeys.ts` — `buildItemKey(norma)` (norm + article),
@@ -1460,6 +1620,11 @@ Duplicating any of these is a defect, not a shortcut.
   *structurally* different markup per breakpoint (portal vs. inline). It existed
   as two private copies before round 2a; do not make a third. For anything a CSS
   breakpoint can express, use the CSS breakpoint.
+- `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
+  `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
+  regex (`citationMatcher`, `citationParser`, `treeUtils`, `articleStructure`).
+  Mirrors `visualex_api/tools/article_suffixes.py` — change both together. Each
+  pattern must close the alternation with `\b`.
 - `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
   `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
   (**tolerant** lookup — required, see gotcha 9).
@@ -1487,10 +1652,40 @@ Duplicating any of these is a defect, not a shortcut.
   (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
   copyable citation string.
 - `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
+- `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
+  reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
+  `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
+  calls. Real test texts in `utils/__fixtures__/articleTexts.ts`.
+- `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
+  plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
+  Every surface that creates a highlight or an anchored note goes through it.
+- `hooks/useArticleTextInteractions.ts` — the update-note chips and the
+  foldable AGGIORNAMENTO tail, for any surface that renders structured text.
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
   `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
   `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
+- `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
+  `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
+  an optional article to focus, which `SearchPanel` focuses even inside a
+  range). `SearchPanel` still reads the older `?share=`.
+- `utils/searchFilters.ts` — `matchesSearchFilters(article, filters)` for the
+  palette's source / Brocardi / historical / year filters, applied
+  client-side to each streamed result. `SearchPanel` counts what a filter
+  drops and, when nothing got through, says so instead of showing an empty
+  search.
+- `utils/normaChanges.ts` — `normaFromChangeNotification` /
+  `normaChangeLabel`: reopen and label a change notification from the
+  snapshot the server stored (null, not a guess, when the snapshot has no
+  identity).
+- `hooks/useForumNotifications.ts` — the one 30s poller behind both sidebar
+  badges (Forum `total`, Cronologia `normaChanges`).
+- `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
+  `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
+  Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
+  **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
+  cached server-side for `HEALTH_DETAILED_TTL`. Do not tighten either loop —
+  the first version polled every 60s per tab.
 
 ## UI Conventions
 
@@ -1611,14 +1806,19 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
 `AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
-call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory,
-a few tens of KB each). Template in `.env.example`.
+call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
+a few tens of KB for an ordinary act, a few hundred KB for a codice because of
+the per-article fingerprints), `HEALTH_DETAILED_TTL` (`120` — seconds the
+`/health/detailed` probe is cached, read at call time). Template in
+`.env.example`.
 
 Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
 parser uses; it ships a `cp314` wheel, so `deploy.sh` needs no compiler.
 
 **Node backend** — see `backend/.env.example`. `REDIS_ENABLED` defaults to
 `"true"` there to mirror production; set `"false"` for dev without Redis.
+`NORMA_WATCH_ENABLED` / `NORMA_WATCH_INTERVAL_MS` / `LEGAL_API_URL` drive the
+saved-norm watcher (see the Node backend section); all three have defaults.
 
 ## Critical Files
 
@@ -1629,7 +1829,8 @@ Breaking one of these breaks the product. Read before editing.
 `services/*_scraper.py` (fragile HTML parsers).
 
 **Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
-`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/dateUtils.ts` ·
+`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
+`utils/articleStructure.ts` · `utils/articleRender.ts` · `utils/dateUtils.ts` ·
 `utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
 `utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
 `hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
@@ -1657,7 +1858,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
 - `features/search/` — `ArticleTabContent.tsx` (the reading surface),
   `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
-  `InlineNotePopover.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
+  opened from its `(119)`), `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
   `SearchPanel.tsx` (streaming merge logic, and the mount point for both
   `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
@@ -1665,7 +1867,14 @@ meant to stay split; add new features as new files, not inside the shells:
   edits, not for where it opens: it is reached from the command palette, not
   from Settings (gotcha 27). See the Aliases section above.
 - `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
-  `NormaBlockComponent`, `LooseArticleCard`, and `StudyMode/`.
+  `NormaBlockComponent`, `LooseArticleCard`, `LazyStudyMode` (the
+  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are
+  lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
+  "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
+  workspace is persisted).
+- `features/history/` — `HistoryView.tsx` plus `NormaChangesSection.tsx`
+  (see History above).
+- `features/documents/` — `DocumentReviewPage.tsx` only.
 
 **Backend** — `prisma/schema.prisma` · `controllers/` (`environmentController`,
 `quickNormController`, `customAliasController`, `dossierController`) ·
@@ -1689,12 +1898,16 @@ meant to stay split; add new features as new files, not inside the shells:
 8. **Selenium is gone** — Playwright only.
 9. **Article id formatting (`-bis` / `-ter`)** — the tree API and the scraper
    disagree (`"1-bis"` vs `"1 bis"`). Server-side both are now canonicalised
-   through `normalize_article_key` (`services/akn_parser.py`), which treats the
-   suffix as any alphabetic tail rather than an enumerated ordinal list —
-   Normattiva goes well past `decies` ("2409 octiesdecies" c.c.). On the
-   frontend the tolerant `findArticleByNormalizedId` is still required: a naive
-   `===` silently misses and falls back to the first article. Always use it, then
-   canonicalise with `getUniqueArticleId(match)` before storing in state.
+   through `normalize_article_key` (`services/akn_parser.py`), which reads the
+   ordinal from `tools/article_suffixes.py` and falls back to "any alphabetic
+   tail" for anything that table does not list — Normattiva goes well past
+   `decies` ("2409 octiesdecies" c.c.). On the frontend the tolerant
+   `findArticleByNormalizedId` is still required: a naive `===` silently misses
+   and falls back to the first article. Always use it, then canonicalise with
+   `getUniqueArticleId(match)` before storing in state. The accepted forms now
+   include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
+   (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
+   normaliser and the archive (`archivio_normativo/hierarchy.py`).
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.
@@ -1758,13 +1971,20 @@ meant to stay split; add new features as new files, not inside the shells:
 23. **`article_text` is a data contract, not a string.** Highlights and anchored
     notes are pinned by `(startOffset, text)` where the offset counts characters
     in a projection of `article_text` in which only `\n` is invisible.
-    `useArticleMarkers` requires exact equality between the stored text and the
-    slice at that offset and drops the marker silently on mismatch — no fuzzy
-    fallback, no log, no visual difference from "never existed". Changing the
-    scraper's output formatting by one space deletes every anchor after it, for
-    every user, with no way to detect it afterwards. Measured: AKN vs HTML is
-    0/19 identical. This is why `normattiva_scraper._estrai_testo_*` output is
-    frozen and why AKN is never the display text.
+    The renderer (`utils/articleRender.ts`) requires the stored text to equal
+    the slice at that offset (case-insensitive; whitespace-only differences
+    tolerated, nothing else) and drops the marker silently on mismatch — no
+    fuzzy fallback, no log, no visual difference from "never existed". Changing
+    the scraper's output formatting by one space deletes every anchor after it,
+    for every user, with no way to detect it afterwards. Measured: AKN vs HTML
+    is 0/19 identical. This is why `normattiva_scraper._estrai_testo_*` output
+    is frozen and why AKN is never the display text. The same holds on the
+    rendering side: the structured reading surface may wrap characters in
+    elements but never add, drop or change one — `articleRender.test.ts`
+    checks the rendered text nodes against `article_text` on 27 real texts.
+    (Inserting only `\n` would not move any offset — newlines are invisible in
+    the projection — but the saved-norm watcher compares `article_text`
+    verbatim, so it would still raise false "changed" notifications.)
 
 24. **A missing article gets you a different one.** Normattiva answers a request
     for a nonexistent article with the act's Art. 1 and HTTP 200. The existence
@@ -1820,3 +2040,11 @@ meant to stay split; add new features as new files, not inside the shells:
     back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
     40, so a miss is the normal case, not the exception. Same trap as
     `codice_urn` on the backend.
+
+<!-- second-brain:inizio -->
+## Second brain (vault Obsidian)
+- Scheda del progetto: `🛠️ Progetti/VisuaLexAPI/VisuaLexAPI.md` (stato repo generato ogni ora, non modificarlo a mano).
+- Decisioni architetturali: `🛠️ Progetti/VisuaLexAPI/ADR/` — leggi le ADR prima di cambiare l'architettura; per una nuova decisione scrivi una ADR (template `🧩 Template/ADR.md`).
+- Memorie di Claude Code copiate in `🛠️ Progetti/VisuaLexAPI/Memorie/` (sola lettura: la fonte è `~/.claude/projects`).
+- Accesso: server MCP `obsidian` (Local REST API). Non scrivere nel vault fuori da ADR e note del progetto.
+<!-- second-brain:fine -->

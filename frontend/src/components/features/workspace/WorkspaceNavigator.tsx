@@ -3,6 +3,8 @@ import {
   Layers,
   ChevronUp,
   ChevronDown,
+  AlignJustify,
+  X,
 } from 'lucide-react';
 import {
   DndContext,
@@ -24,6 +26,7 @@ import { cn } from '../../../lib/utils';
 import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { SortableWorkspaceTab } from './SortableWorkspaceTab';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 interface WorkspaceNavigatorProps {
   className?: string;
@@ -35,6 +38,7 @@ interface WorkspaceNavigatorProps {
  */
 export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [closeAllOpen, setCloseAllOpen] = useState(false);
 
   const {
     workspaceTabs,
@@ -43,6 +47,8 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     toggleTabMinimize,
     toggleTabVisibility,
     reorderWorkspaceTabs,
+    arrangeWorkspaceTabs,
+    closeAllWorkspaceTabs,
     commandPaletteOpen,
   } = useAppStore(useShallow(s => ({
     workspaceTabs: s.workspaceTabs,
@@ -51,6 +57,8 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
     toggleTabMinimize: s.toggleTabMinimize,
     toggleTabVisibility: s.toggleTabVisibility,
     reorderWorkspaceTabs: s.reorderWorkspaceTabs,
+    arrangeWorkspaceTabs: s.arrangeWorkspaceTabs,
+    closeAllWorkspaceTabs: s.closeAllWorkspaceTabs,
     commandPaletteOpen: s.commandPaletteOpen,
   })));
 
@@ -83,6 +91,7 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
   const activeTabId = [...workspaceTabs].sort((a, b) => b.zIndex - a.zIndex)[0]?.id ?? null;
 
   return (
+    <>
     <div
       id="tour-workspace-dock"
       className={cn(
@@ -119,14 +128,33 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
                 {workspaceTabs.length}
               </span>
             </div>
-            <button
-              onClick={() => setIsExpanded(false)}
-              aria-label="Comprimi il workspace"
-              aria-expanded
-              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
-            >
-              <ChevronDown size={14} aria-hidden className="text-slate-400" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={arrangeWorkspaceTabs}
+                aria-label="Allinea le finestre"
+                title="Allinea finestre"
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus-ring"
+              >
+                <AlignJustify size={14} aria-hidden className="text-slate-400" />
+              </button>
+              <button
+                onClick={() => setCloseAllOpen(true)}
+                disabled={workspaceTabs.length === 0}
+                aria-label="Chiudi tutte le tab"
+                title="Chiudi tutte"
+                className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors focus-ring"
+              >
+                <X size={14} aria-hidden className="text-slate-400 hover:text-red-500" />
+              </button>
+              <button
+                onClick={() => setIsExpanded(false)}
+                aria-label="Comprimi il workspace"
+                aria-expanded
+                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus-ring"
+              >
+                <ChevronDown size={14} aria-hidden className="text-slate-400" />
+              </button>
+            </div>
           </div>
 
           {/* Tab list */}
@@ -151,11 +179,23 @@ export function WorkspaceNavigator({ className }: WorkspaceNavigatorProps) {
           {/* Keyboard hint */}
           <div className="px-4 py-1.5 border-t border-slate-200/60 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-              Click per portare in primo piano • Trascina per riordinare
+              Click per portare in primo piano • Trascina per riordinare • Allinea con ⬌
             </span>
           </div>
         </div>
       )}
     </div>
+    {/* The workspace is persisted, so "close all" throws away every open
+        tab at once; a destructive action gets the confirm every other one has. */}
+    <ConfirmDialog
+      open={closeAllOpen}
+      variant="danger"
+      title="Chiudere tutte le tab?"
+      message={`${workspaceTabs.length === 1 ? 'La tab aperta' : `Le ${workspaceTabs.length} tab aperte`} nel workspace ${workspaceTabs.length === 1 ? 'verrà chiusa' : 'verranno chiuse'}. Dossier, segnalibri, note ed evidenziazioni non saranno toccati.`}
+      confirmLabel="Chiudi tutte"
+      onConfirm={() => { closeAllWorkspaceTabs(); setCloseAllOpen(false); }}
+      onCancel={() => setCloseAllOpen(false)}
+    />
+    </>
   );
 }

@@ -12,6 +12,11 @@ from typing import Optional
 import yaml
 
 from .act_resolver import resolve_atto
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+
+# One ordinal suffix, from the shared table: numbering goes far past "decies",
+# and the \b keeps "bis" from matching the head of an ordinary word.
+_ART_SUFFIX = r"(?:" + ARTICLE_SUFFIX_ALTERNATION + r")\b"
 
 
 def _load_presets_from_yaml() -> dict[str, dict]:
@@ -47,7 +52,7 @@ def resolve_alias(text: str) -> Optional[dict]:
     # Strip article prefix to isolate the alias part
     article = None
     art_match = re.match(
-        r"(artt?\.?|articol[oi])\s+(\d+(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?)"
+        r"(artt?\.?|articol[oi])\s+(\d+(?:\s*[-]?\s*" + _ART_SUFFIX + r")?)"
         r"\s+(.+)",
         normalized,
         re.IGNORECASE,
@@ -56,7 +61,7 @@ def resolve_alias(text: str) -> Optional[dict]:
         article_num = art_match.group(2).strip()
         # Normalize "2 bis" → "2-bis"
         article_num = re.sub(
-            r"(\d+)\s+(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)",
+            r"(\d+)\s+(" + _ART_SUFFIX + r")",
             r"\1-\2", article_num, flags=re.IGNORECASE,
         )
         alias_part = art_match.group(3).strip()

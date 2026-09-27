@@ -60,7 +60,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     // the Q&A surface and points the sidebar at it too, the hub stays /merlt.
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/environments', '/forum', '/history', '/merlt', '/grafo']);
+    expect(hrefs).toEqual(['/', '/dossier', '/environments', '/forum', '/documents', '/history', '/merlt', '/grafo']);
     // exactly one hub entry
     expect(hrefs.filter((h) => h.startsWith('/merlt'))).toHaveLength(1);
     // Cronologia (/history) sits above the MERL-T entries
@@ -71,7 +71,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     isMerltEnabledMock.mockReturnValue(false);
     renderSidebar();
     const hrefs = navHrefs();
-    expect(hrefs).toEqual(['/', '/dossier', '/environments', '/forum', '/history']);
+    expect(hrefs).toEqual(['/', '/dossier', '/environments', '/forum', '/documents', '/history']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
   });
 });

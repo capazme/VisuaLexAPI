@@ -1,4 +1,5 @@
 """Network + cache layer for the AKN export. No test hits the network."""
+import re
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -245,3 +246,64 @@ class TestSingleFlightCancellation:
             result = await asyncio.wait_for(follower, timeout=2.0)
 
         assert result is None
+
+
+class TestFingerprints:
+    """A hash per article, so a client can learn WHICH articles changed with one
+    act-level download instead of refetching every article's HTML.
+
+    The hash is of the AKN text, which is never shown (it transliterates
+    accents) — it is a change detector, not content. The index stays
+    text-free: 64 hex characters per article.
+    """
+
+    CP_XML = (FIXTURES / "codice_penale_trimmed.xml").read_text(encoding="utf-8")
+
+    @pytest.mark.asyncio
+    async def test_flat_act_index_carries_one_fingerprint_per_article(self):
+        calls = []
+        with patch("visualex_api.services.akn_fetch.http_client.request",
+                   new=AsyncMock(side_effect=_responder(calls))):
+            index = await akn_fetch.fetch_act_index(FakeNorma())
+        assert set(index.fingerprints) == set(index.keys)
+        entry = index.fingerprints["1"]
+        assert re.fullmatch(r"[0-9a-f]{64}", entry["fingerprint"])
+        assert entry["date"] is None  # flat acts have no per-article lifecycle
+
+    def test_to_index_uses_the_parsed_texts_and_dates(self):
+        from visualex_api.services.akn_parser import parse_akn
+        index = akn_fetch._to_index(parse_akn(self.CP_XML), "codice", "19301026")
+        assert index.fingerprints["3-bis"]["date"] == "2018-04-06"
+        assert index.fingerprints["1"]["date"] == "1931-07-01"
+        assert len({v["fingerprint"] for v in index.fingerprints.values()}) == len(index.fingerprints), \
+            "two different articles must not share a fingerprint"
+
+    def test_fingerprint_is_the_sha256_of_the_akn_text(self):
+        import hashlib
+        from visualex_api.services.akn_parser import parse_akn
+        act = parse_akn(self.CP_XML)
+        index = akn_fetch._to_index(act, "codice", "19301026")
+        expected = hashlib.sha256(act.articles["3-bis"].encode("utf-8")).hexdigest()
+        assert index.fingerprints["3-bis"]["fingerprint"] == expected
+
+    def test_parts_fingerprints_are_kept_apart_from_parts_detail(self):
+        # /fetch_rubriche returns parts_detail verbatim on every index open;
+        # the hashes must not ride along with it.
+        from visualex_api.services.akn_parser import parse_akn
+        index = akn_fetch._to_index(parse_akn(self.CP_XML), "codice", "19301026")
+        by_name = {p["name"]: p for p in index.parts_detail}
+        assert "Codice Penale" in by_name
+        assert set(index.parts_fingerprints["Codice Penale"]) == set(by_name["Codice Penale"]["keys"])
+        assert set(index.parts_fingerprints) == set(by_name)
+        assert all("fingerprints" not in part for part in index.parts_detail)
+
+    @pytest.mark.asyncio
+    async def test_fingerprints_survive_the_persistent_cache(self):
+        calls = []
+        with patch("visualex_api.services.akn_fetch.http_client.request",
+                   new=AsyncMock(side_effect=_responder(calls))):
+            first = await akn_fetch.fetch_act_index(FakeNorma())
+            akn_fetch._memory.clear()  # force the disk path
+            second = await akn_fetch.fetch_act_index(FakeNorma())
+        assert len(calls) == 2, "the second call must come from the persistent cache"
+        assert second.fingerprints == first.fingerprints

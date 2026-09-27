@@ -1,6 +1,6 @@
 import type { Ref } from 'react';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 
@@ -16,10 +16,12 @@ export interface ReadingToolbarProps {
     isHighlightsPeekOpen: boolean;
     highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
+    isDiscussionOpen: boolean;
     showMoreMenu: boolean;
     isPinnedQuick: boolean;
     onToggleNotes: () => void;
     onToggleHighlightsPeek: () => void;
+    onToggleDiscussion: () => void;
     onToggleMoreMenu: (next: boolean) => void;
     onToggleQuickNorm: () => void;
     onMobileCopy: () => Promise<void> | void;
@@ -43,10 +45,12 @@ export function ReadingToolbar({
     isHighlightsPeekOpen,
     highlightsButtonRef,
     highlightsCount,
+    isDiscussionOpen,
     showMoreMenu,
     isPinnedQuick,
     onToggleNotes,
     onToggleHighlightsPeek,
+    onToggleDiscussion,
     onToggleMoreMenu,
     onToggleQuickNorm,
     onMobileCopy,
@@ -103,6 +107,15 @@ export function ReadingToolbar({
                     title={isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide"}
                 >
                     <Zap size={20} className={cn(isPinnedQuick && "fill-amber-500")} />
+                </button>
+                <button
+                    onClick={onToggleDiscussion}
+                    aria-expanded={isDiscussionOpen}
+                    aria-haspopup="dialog"
+                    className={cn("p-2 lg:p-2.5 rounded-lg transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary-500")}
+                    title="Discussioni sull’articolo"
+                >
+                    <MessageCircle size={20} />
                 </button>
                 <button
                     onClick={() => { void onMobileCopy(); }}
@@ -198,6 +211,15 @@ export function ReadingToolbar({
                             {highlightsCount}
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={onToggleDiscussion}
+                    aria-expanded={isDiscussionOpen}
+                    aria-haspopup="dialog"
+                    className={cn("p-1.5 rounded-md transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500")}
+                    title="Discussioni sull’articolo"
+                >
+                    <MessageCircle size={16} />
                 </button>
                 <button
                     onClick={onOpenCopyModal}

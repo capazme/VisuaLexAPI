@@ -312,3 +312,59 @@ describe('extractCitations — an ordinal is not a numbering suffix', () => {
     expect(ms.map(m => m.parsed.article)).toEqual(['12', '13']);
   });
 });
+
+// Normattiva numbers articles well past "decies": the catalogue of reati
+// presupposto of d.lgs. 231/2001 runs 25-bis … 25-sexiesdecies and beyond, and
+// tests/test_article_existence.py records the spellings captured live from the
+// article tree ("25 undecies", "25 quinquiesdecies", "25 septiesdecies",
+// "25 undevicies"). An alternation that stopped at "decies" matched only the
+// head of the suffix, so "art. 25-terdecies" was linked as art. 25-ter — a
+// different, existing article, which is worse than no link at all.
+describe('extractCitations — article suffixes past decies', () => {
+  const inCodice = { tipo_atto: 'codice civile' };
+
+  it.each([
+    'undecies', 'duodecies', 'terdecies', 'quaterdecies',
+    'quinquiesdecies', 'sexiesdecies', 'septiesdecies',
+  ])('keeps "art. 25-%s del d.lgs. 231/2001" whole', (suffix) => {
+    const [m, ...rest] = extractCitations(`ai sensi dell'art. 25-${suffix} del d.lgs. 231/2001`, inCodice);
+    expect(rest).toHaveLength(0);
+    expect(m.parsed).toMatchObject({
+      act_type: 'decreto legislativo', act_number: '231', date: '2001', article: `25-${suffix}`,
+    });
+  });
+
+  it('reads the act-first form', () => {
+    const [m] = extractCitations('il d.lgs. 231/2001, art. 25-quinquiesdecies, prevede', inCodice);
+    expect(m.parsed).toMatchObject({
+      act_type: 'decreto legislativo', act_number: '231', date: '2001', article: '25-quinquiesdecies',
+    });
+  });
+
+  it('keeps a list of long suffixes on the act being read', () => {
+    const inDecreto = { tipo_atto: 'decreto legislativo', numero_atto: '231', data: '2001' };
+    const ms = extractCitations('artt. 25-septies e 25-terdecies', inDecreto);
+    expect(ms.map(m => m.parsed.article)).toEqual(['25-septies', '25-terdecies']);
+  });
+
+  it('reads the spaced spelling the article tree uses', () => {
+    const inDecreto = { tipo_atto: 'decreto legislativo', numero_atto: '231', data: '2001' };
+    const [m] = extractCitations('art. 25 undevicies', inDecreto);
+    expect(m.parsed.article).toBe('25-undevicies');
+  });
+
+  it('still stops at the short suffix when that is the whole word', () => {
+    const [m] = extractCitations('art. 25-ter del d.lgs. 231/2001', inCodice);
+    expect(m.parsed).toMatchObject({ act_type: 'decreto legislativo', article: '25-ter' });
+  });
+
+  // Il \b che chiude l'alternanza: senza, il suffisso aggancia la testa di una
+  // parola qualsiasi, e "art. 5 terzo comma" diventava l'art. 5-ter.
+  it.each(['art. 5 terzo comma', "l'art. 5 bisogna leggerlo"])(
+    'does not read the head of an ordinary word as a suffix (%s)',
+    (text) => {
+      const [m] = extractCitations(text, inCodice);
+      expect(m.parsed.article).toBe('5');
+    },
+  );
+});

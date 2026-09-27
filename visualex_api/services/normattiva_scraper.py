@@ -217,6 +217,30 @@ class NormattivaScraper(BaseScraper):
                 content_text, _ = self.extract_text_recursive(attachment_text, link=link, link_dict=link_dict)
                 final_text += content_text.strip()
 
+            # A repealed article's notice normally sits INSIDE the attachment
+            # span and is read with it (c.p. art. 544: "Art. 544. \n\n((ARTICOLO
+            # ABROGATO ...))"). For c.p. art. 524 — and 523-526, 530, 539,
+            # 541-543, 545-555 — Normattiva opens the span inside an <a> and
+            # closes it after it; html.parser repairs that by closing the span
+            # early, so the `div.ins-akn.art_abrogato-akn` lands in `corpo` as
+            # a sibling of the span and the article came back as its label
+            # alone ('Codice Penale-art. 524', HTTP 200). Read every ins-akn
+            # block the span does not contain, in document order, appended the
+            # way the in-span case already reads, so the text is never only
+            # the act label. Blocks inside the span are untouched (gotcha 23:
+            # that output is frozen); `art_aggiornamento-akn` has its own pass.
+            for block in corpo.find_all('div', class_='ins-akn'):
+                if 'art_aggiornamento-akn' in (block.get('class') or []):
+                    continue
+                if any(parent is attachment_text or 'ins-akn' in (parent.get('class') or [])
+                       for parent in block.parents):
+                    continue
+                block_text, _ = self.extract_text_recursive(block, link=link, link_dict=link_dict)
+                if block_text.strip():
+                    log.info("ins-akn block found outside the attachment span, appended",
+                             classes=block.get('class'))
+                    final_text += '\n\n' + block_text.strip()
+
             # Estrazione degli aggiornamenti (se presenti)
             aggiornamenti = corpo.find_all('div', class_='art_aggiornamento-akn')
             for aggiornamento in aggiornamenti:

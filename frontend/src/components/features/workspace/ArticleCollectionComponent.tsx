@@ -6,7 +6,7 @@ import { useAppStore, type ArticleCollection } from '../../../store/useAppStore'
 import { ArticleTabContent } from '../search/ArticleTabContent';
 import { ArticleNavigation } from './ArticleNavigation';
 import { ArticleMinimap } from './ArticleMinimap';
-import { StudyMode } from './StudyMode';
+import { LazyStudyMode as StudyMode } from './LazyStudyMode';
 import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 

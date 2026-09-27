@@ -1,6 +1,7 @@
 import { config } from './config';
 import app from './app';
 import { prisma } from './lib/prisma';
+import { startNormaWatcher } from './utils/normaWatcher';
 import {
   scheduleStuckJobSweeper,
   DEFAULT_EXTRACT_STALE_AFTER_MS,
@@ -39,7 +40,10 @@ if (config.nodeEnv !== 'test') {
   });
 }
 
+let normaWatcherInterval: NodeJS.Timeout | null = null;
+
 const server = app.listen(config.port, () => {
+  normaWatcherInterval = startNormaWatcher();
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -64,14 +68,16 @@ const server = app.listen(config.port, () => {
   `);
 });
 
-// Graceful shutdown: stop the watchdog, drain in-flight requests, release the
-// Prisma connection pool, then exit. Idempotent across repeated signals.
+// Graceful shutdown: stop the watchdog and the saved-norm watcher, drain
+// in-flight requests, release the Prisma connection pool, then exit.
+// Idempotent across repeated signals.
 let shuttingDown = false;
 function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[shutdown] received ${signal}, closing server...`);
   if (watchdogInterval) clearInterval(watchdogInterval);
+  if (normaWatcherInterval) clearInterval(normaWatcherInterval);
   server.close(() => {
     prisma
       .$disconnect()

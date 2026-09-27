@@ -1,3 +1,5 @@
+import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+
 /**
  * Extracts article IDs from a tree structure.
  * Handles various tree node formats from the API:
@@ -97,15 +99,17 @@ function extractArticleFromString(str: string): string | null {
   if (!trimmed) return null;
 
   // Match numeric articles with optional suffix:
-  // "1", "2", "123", "1-bis", "2 bis", "3-ter", "4 quater", etc.
-  const numericMatch = trimmed.match(/^(\d+)(?:[-\s]?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?$/i);
+  // "1", "2", "123", "1-bis", "2 bis", "3-ter", "25 terdecies", etc. — the
+  // suffix table is the shared one, so the index keeps every article the tree
+  // returns rather than dropping those numbered past "decies".
+  const numericMatch = trimmed.match(new RegExp(`^(\\d+)(?:[-\\s]?(${ARTICLE_SUFFIX_ALTERNATION}))?$`, 'i'));
   if (numericMatch) {
     return trimmed;
   }
 
   // Match roman numerals for transitional provisions: "I", "II", "III", etc.
   // Also with optional suffix: "I-bis", "II ter"
-  const romanMatch = trimmed.match(/^([IVXLCDM]+)(?:[-\s]?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies))?$/i);
+  const romanMatch = trimmed.match(new RegExp(`^([IVXLCDM]+)(?:[-\\s]?(${ARTICLE_SUFFIX_ALTERNATION}))?$`, 'i'));
   if (romanMatch) {
     return trimmed;
   }

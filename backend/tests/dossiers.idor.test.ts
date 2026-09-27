@@ -69,6 +69,43 @@ describe('dossier item IDOR', () => {
     expect(after?.position).toBe(0);
   });
 
+  it('does not let another user read or create snapshots on a dossier they do not own', async () => {
+    const owner = await createTestUser('snapshot-owner');
+    const attacker = await createTestUser('snapshot-attacker');
+    const { dossier } = await dossierWithItem(owner, 'snapshot-item');
+
+    const list = await request(app)
+      .get(`/api/dossiers/${dossier.id}/snapshots`)
+      .set(authHeader(attacker));
+    expect(list.status).toBe(404);
+
+    const create = await request(app)
+      .post(`/api/dossiers/${dossier.id}/snapshots`)
+      .set(authHeader(attacker))
+      .send({});
+    expect(create.status).toBe(404);
+
+    expect(await prisma.dossierSnapshot.count({ where: { dossierId: dossier.id } })).toBe(0);
+  });
+
+  it('answers 400, not 500, to a snapshot label of the wrong type', async () => {
+    const owner = await createTestUser('snapshot-label-owner');
+    const { dossier } = await dossierWithItem(owner, 'snapshot-label-item');
+
+    const bad = await request(app)
+      .post(`/api/dossiers/${dossier.id}/snapshots`)
+      .set(authHeader(owner))
+      .send({ label: 42 });
+    expect(bad.status).toBe(400);
+
+    const good = await request(app)
+      .post(`/api/dossiers/${dossier.id}/snapshots`)
+      .set(authHeader(owner))
+      .send({ label: '  Verifica  ' });
+    expect(good.status).toBe(201);
+    expect(good.body.label).toBe('Verifica');
+  });
+
   it('still lets the owner update, reorder and delete their own items', async () => {
     const owner = await createTestUser('owner');
     const { dossier, item } = await dossierWithItem(owner, 'mine');

@@ -14,6 +14,7 @@ from bisect import bisect_right
 from dataclasses import dataclass
 from typing import Optional
 
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from .map import NORMATTIVA_SEARCH
 from .nl_parser import build_eu_act_pattern, eu_act_from_groups
 
@@ -49,9 +50,12 @@ _NUMBERED_ACT_TYPES = frozenset({
     "decreto ministeriale", "regolamento ue", "direttiva ue",
 })
 
-# One article: a number, an optional bis/ter/... suffix or a range ("1-10").
+# One article: a number, an optional bis/ter/.../terdecies suffix or a range
+# ("1-10"). The suffix table is the shared one — numbering goes far past
+# "decies" — and the \b closing it keeps a suffix from matching the head of an
+# ordinary word.
 _ARTICLE_NUMBER_RE = re.compile(
-    r"\d+(?:\s*-\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies|\d+))?",
+    r"\d+(?:\s*-\s*(?:(?:" + ARTICLE_SUFFIX_ALTERNATION + r")\b|\d+))?",
     re.IGNORECASE,
 )
 # "articoli 8 e 9", "artt. 1, 2 e 3": every number of the list is an article

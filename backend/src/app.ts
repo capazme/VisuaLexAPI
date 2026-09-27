@@ -19,8 +19,10 @@ import environmentRoutes from './routes/environments';
 import quickNormRoutes from './routes/quickNorms';
 import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
+import articleDiscussionRoutes from './routes/articleDiscussions';
 import merltRoutes from './routes/merlt';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
+import { prisma } from './lib/prisma';
 
 const app = express();
 
@@ -47,7 +49,11 @@ app.use(cors({
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
 app.use(globalRateLimiter);
 
-app.use(express.json());
+// 2 MB, not the 100 kB default: the saved-norm check posts the article's
+// full text (art. 1 of a legge di bilancio is close to 1 MB), and dossier
+// items carry article content too. Bounded again per field by the Zod
+// schemas, and per client by the rate limiter above.
+app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Additional write rate limit on mutation endpoints (POST/PUT/PATCH/DELETE)
@@ -66,6 +72,16 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
   });
+});
+
+app.get('/api/health/detailed', async (_req, res) => {
+  const started = Date.now();
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), services: { database: { status: 'ok', latency_ms: Date.now() - started } } });
+  } catch {
+    res.status(503).json({ status: 'degraded', timestamp: new Date().toISOString(), services: { database: { status: 'error', latency_ms: Date.now() - started } } });
+  }
 });
 
 // Routes
@@ -93,6 +109,7 @@ app.use('/api', environmentRoutes);
 app.use('/api', quickNormRoutes);
 app.use('/api', customAliasRoutes);
 app.use('/api', notificationRoutes);
+app.use('/api', articleDiscussionRoutes);
 
 // 404 handler
 app.use((_req, res) => {

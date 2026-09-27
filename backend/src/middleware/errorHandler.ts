@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
 
 export class AppError extends Error {
   constructor(
@@ -62,6 +63,14 @@ export const errorHandler = (
       // to highlight fields can, without parsing the prose above.
       errors: fields,
     });
+  }
+
+  // Prisma's own outcome codes for a row that is not there (an update or
+  // delete by id that raced a deletion) and for a unique-key collision (two
+  // clicks on a vote toggle): the caller's state is stale, not the server's.
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2025') return res.status(404).json({ detail: 'Not found' });
+    if (err.code === 'P2002') return res.status(409).json({ detail: 'Already exists' });
   }
 
   console.error('Unexpected error:', err);

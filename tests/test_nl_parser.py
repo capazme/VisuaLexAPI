@@ -467,3 +467,32 @@ class TestDateSanity:
 class TestTrailingMarkerOnRegulations:
     def test_trailing_marker_on_a_regulation_says_nothing_about_the_order(self):
         assert resolve_eu_year_and_number("1049", "2001", kind="regolamento", trailing_marker=True, current_year=2026) == ("2001", "1049")
+
+
+class TestSuffixesPastDecies:
+    """"art. 25-terdecies 231/2001" must not become article 25-ter.
+
+    Normattiva numbers articles far past "decies" — d.lgs. 231/2001 runs to
+    25-sexiesdecies and beyond, c.c. to 2409-noviesdecies. The parser answers
+    the command palette, so a truncated suffix silently opened a different,
+    existing article.
+    """
+
+    @pytest.mark.parametrize("suffix", [
+        "undecies", "duodecies", "terdecies", "quaterdecies",
+        "quinquiesdecies", "sexiesdecies", "septiesdecies", "undevicies",
+    ])
+    def test_hyphenated(self, suffix):
+        r = parse_nl_query(f"art. 25-{suffix} d.lgs. 231/2001")
+        assert r.article == f"25-{suffix}"
+        assert r.act_number == "231"
+
+    def test_spaced_spelling_is_normalised(self):
+        r = parse_nl_query("art. 25 terdecies dlgs 231/2001")
+        assert r.article == "25-terdecies"
+
+    def test_list_keeps_every_suffix(self):
+        assert parse_nl_query("artt. 25 undecies e 25-terdecies cc").article == "25-undecies,25-terdecies"
+
+    def test_short_suffix_unchanged(self):
+        assert parse_nl_query("art. 25-ter cp").article == "25-ter"

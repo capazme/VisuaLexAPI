@@ -7,6 +7,7 @@ import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { EnvironmentPage } from './components/features/environments/EnvironmentPage';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
+import { DocumentReviewPage } from './components/features/documents/DocumentReviewPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
@@ -69,6 +70,7 @@ function App() {
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentPage />} />
           <Route path="forum" element={<BulletinBoardPage />} />
+          <Route path="documents" element={<DocumentReviewPage />} />
           <Route
             path="merlt"
             element={

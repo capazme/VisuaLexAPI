@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import { WorkspaceManager } from '../workspace/WorkspaceManager';
 import { CommandPalette } from './CommandPalette';
 import { QuickNormsManager } from './QuickNormsManager';
 import { AliasManager } from '../settings/AliasManager';
-import { PDFViewer } from '../../ui/PDFViewer';
+const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { WorkspaceNavigator } from '../workspace/WorkspaceNavigator';
 import { NormaCard } from './NormaCard';
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
@@ -23,6 +23,8 @@ import { getErrorMessage } from '../../../utils/errors';
 import { buildNormaKey } from '../../../utils/normaKeys';
 import { resolveAct } from '../../../utils/actUrn';
 import { ReadingBackControl } from './ReadingBackControl';
+import { matchesSearchFilters } from '../../../utils/searchFilters';
+import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -49,6 +51,7 @@ const calculateExpectedArticles = (article: string): number => {
 export function SearchPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [partialErrors, setPartialErrors] = useState<string[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total?: number } | null>(null);
   const {
@@ -95,6 +98,12 @@ export function SearchPanel() {
   // result (even when merged into an existing tab via R3). Above 1 we
   // stay out of the way per R1.
   const expectedTotalRef = useRef<number>(0);
+  const deepLinkFocusRef = useRef<string | null>(null);
+  // Search filters drop streamed articles client-side. Count what they drop
+  // and what got through, so a search the filters emptied says so instead of
+  // looking like a search that returned nothing.
+  const filteredOutRef = useRef(0);
+  const acceptedRef = useRef(0);
 
   // Abort in-flight streaming fetch when a new search starts or component unmounts
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -122,9 +131,11 @@ export function SearchPanel() {
   // over a stale label captured when the memoized callback was created — the
   // second search would end up landing in a default-label tab. See the drain
   // effect below for the flow.
-  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetTabId?: string) => {
+  const processResult = useCallback((result: ArticleData, versionDate?: string, isStreaming = false, tabLabel?: string, targetTabId?: string, filters?: SearchParams['filters']) => {
     if (result.error) {
       console.error("Backend Error for item:", result.error);
+      const article = result.norma_data?.numero_articolo || 'richiesto';
+      setPartialErrors(prev => [...prev, `Art. ${article}: ${result.error}`]);
       return;
     }
 
@@ -143,6 +154,12 @@ export function SearchPanel() {
         effectiveDate: normaData.data_versione || normaData.data
       };
     }
+
+    if (!matchesSearchFilters(result, filters)) {
+      filteredOutRef.current += 1;
+      return;
+    }
+    acceptedRef.current += 1;
 
     const norma: Norma = {
       tipo_atto: normaData.tipo_atto,
@@ -164,6 +181,10 @@ export function SearchPanel() {
 
       // Check if we're streaming to the same norma as before
       const isSameNorma = streamingTabRef.current && streamingTabRef.current.normaKey === key;
+
+      const numero = result.norma_data.numero_articolo;
+      const allegato = result.norma_data.allegato;
+      const articleUniqueId = allegato ? `all${allegato}:${numero}` : numero;
 
       // Direct-merge path: when the caller pre-created a tab (dossier "apri
       // tutto") and passed its id, we bypass all label-matching logic and
@@ -218,15 +239,18 @@ export function SearchPanel() {
           streamingTabRef.current = { normaKey: key, tabId: newTabId };
         }
 
-        // R2 (streaming-ux): single-article searches auto-focus the result
-        // even when merged into a pre-existing tab (R3). For ranges we let
-        // the user stay on whatever they're reading (R1).
-        if (expectedTotalRef.current === 1 && streamingTabRef.current) {
-          const numero = result.norma_data.numero_articolo;
-          const allegato = result.norma_data.allegato;
-          const articleUniqueId = allegato ? `all${allegato}:${numero}` : numero;
-          focusArticleInTab(streamingTabRef.current.tabId, articleUniqueId);
-        }
+      }
+
+      // R2 (streaming-ux): single-article searches auto-focus the result even
+      // when merged into a pre-existing tab (R3). For ranges we let the user
+      // stay on whatever they're reading (R1). Not on the targetTabId path:
+      // the dossier "apri tutte" queue (gotcha 15) would otherwise jump to
+      // each article as it lands. A deep link focuses the article it names
+      // on any path, range included.
+      const isDeepLinkTarget = deepLinkFocusRef.current === articleUniqueId;
+      if (streamingTabRef.current && (isDeepLinkTarget || (expectedTotalRef.current === 1 && !targetTabId))) {
+        focusArticleInTab(streamingTabRef.current.tabId, articleUniqueId);
+        if (isDeepLinkTarget) deepLinkFocusRef.current = null;
       }
     } else {
       // Buffer results for batch processing
@@ -266,6 +290,9 @@ export function SearchPanel() {
 
     setIsLoading(true);
     setError(null);
+    setPartialErrors([]);
+    filteredOutRef.current = 0;
+    acceptedRef.current = 0;
     setResultsBuffer({}); // Clear buffer before new search
     streamingTabRef.current = null; // Reset streaming tab tracker
 
@@ -310,7 +337,7 @@ export function SearchPanel() {
           if (line.trim()) {
             try {
               const result = JSON.parse(line);
-              processResult(result, params.version_date, true, params.tabLabel, params.targetTabId);
+              processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters);
             } catch (e) {
               parseFailures += 1;
               console.error("Error parsing line", line, e);
@@ -323,7 +350,7 @@ export function SearchPanel() {
       if (buffer.trim()) {
         try {
           const result = JSON.parse(buffer);
-          processResult(result, params.version_date, true, params.tabLabel, params.targetTabId);
+          processResult(result, params.version_date, true, params.tabLabel, params.targetTabId, params.filters);
         } catch (e) {
           parseFailures += 1;
           console.error("Error parsing final buffer", e);
@@ -335,6 +362,13 @@ export function SearchPanel() {
       if (parseFailures > 0) {
         setError(
           `Errore durante lo streaming: ${parseFailures} ${parseFailures === 1 ? 'articolo non è stato elaborato' : 'articoli non sono stati elaborati'}.`
+        );
+      }
+
+      if (filteredOutRef.current > 0 && acceptedRef.current === 0) {
+        const dropped = filteredOutRef.current;
+        setError(
+          `Nessun articolo corrisponde ai filtri impostati: ${dropped} ${dropped === 1 ? 'articolo escluso' : 'articoli esclusi'}. Allenta i filtri nella ricerca (⌘K) e riprova.`
         );
       }
 
@@ -453,6 +487,21 @@ export function SearchPanel() {
   }, [resultsBuffer, isLoading, addWorkspaceTab, addNormaToTab, workspaceTabs, customTabLabel]);
 
   useEffect(() => {
+    const deepLinkValue = searchParams.get(SEARCH_PARAM);
+    if (deepLinkValue) {
+      const deepLink = parseSearchDeepLink(deepLinkValue);
+      if (deepLink) {
+        deepLinkFocusRef.current = deepLink.articleId || null;
+        handleSearch(deepLink.params);
+      } else {
+        console.error('Invalid norma deep link');
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete(SEARCH_PARAM);
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
     const shareValue = searchParams.get('share');
     if (shareValue) {
       try {
@@ -779,22 +828,41 @@ export function SearchPanel() {
             {/* Icon Container - Glass Card */}
             <div className="relative w-32 h-32 sm:w-40 sm:h-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2.5rem] shadow-glass-lg flex items-center justify-center border border-white dark:border-slate-800 transition-all duration-500 group-hover:shadow-primary-500/10 group-hover:-translate-y-2">
               <Search size={64} className="text-primary-500 stroke-[1.2] w-14 h-14 sm:w-16 sm:h-16 group-hover:scale-110 transition-transform duration-500" />
+              <span className="sr-only">Apri la ricerca</span>
 
               {/* Keyboard Shortcut Badge */}
               <div className="absolute -bottom-2 -right-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg border-4 border-slate-50 dark:border-slate-950 uppercase tracking-widest">
                 ⌘ K
               </div>
             </div>
-          </div>
+            <button
+              onClick={openCommandPalette}
+              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all focus-ring"
+            >
+              <Search size={16} />
+              Inizia una ricerca
+            </button>
+            </div>
 
           {/* Title and Description */}
-          <div className="text-center mt-12 mb-10 max-w-md">
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+          <div className="text-center mt-10 mb-8 max-w-xl">
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">
               Ricerca Intelligente
             </h3>
             <p className="text-slate-500 dark:text-slate-400 text-lg leading-relaxed font-medium">
-              Esplora l'intero ecosistema normativo con query naturali. Prova <span className="text-primary-600 dark:text-primary-400 font-bold">"Art 2043 cc"</span>
+              Scrivi una citazione naturale: non serve compilare tutti i campi.
             </p>
+            <div className="flex flex-wrap justify-center gap-2 mt-5" aria-label="Esempi di ricerca">
+              {["Art. 2043 c.c.", "Art. 5 GDPR", "Art. 1 Costituzione"].map((example) => (
+                <button
+                  key={example}
+                  onClick={openCommandPalette}
+                  className="px-3 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 text-xs font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-colors focus-ring"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* QuickNorms Section */}
@@ -947,12 +1015,38 @@ export function SearchPanel() {
 
       {/* Error display */}
       <AnimatePresence>
+        {partialErrors.length > 0 && !error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={cn('fixed bottom-24 right-4 w-full max-w-md px-4', Z_INDEX.toast)}
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 p-4 rounded-2xl shadow-lg shadow-amber-500/10 flex items-start gap-3">
+              <Info size={20} className="shrink-0 text-amber-500 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Risultato parziale</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {partialErrors.length} {partialErrors.length === 1 ? 'articolo non è stato elaborato' : 'articoli non sono stati elaborati'}.
+                </p>
+                <ul className="mt-2 max-h-20 overflow-y-auto text-xs text-amber-700 dark:text-amber-300 space-y-1">
+                  {partialErrors.map((message, index) => <li key={`${message}-${index}`}>{message}</li>)}
+                </ul>
+              </div>
+              <button onClick={() => setPartialErrors([])} aria-label="Chiudi avviso risultato parziale" className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg focus-ring">
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
         {error && (
           <motion.div
-            initial={{ opacity: 0, y: -20, x: '-50%' }}
-            animate={{ opacity: 1, y: 0, x: '-50%' }}
-            exit={{ opacity: 0, y: -20, x: '-50%' }}
-            className={cn('fixed top-24 left-1/2 w-full max-w-md px-4', Z_INDEX.searchPanel)}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={cn('fixed bottom-24 right-4 w-full max-w-md px-4', Z_INDEX.toast)}
             role="alert"
             aria-live="assertive"
             aria-atomic="true"
@@ -1014,13 +1108,15 @@ export function SearchPanel() {
         annexNumber={autoSwitchDialog.annexNumber}
       />
 
-      {/* PDF Viewer Modal */}
-      <PDFViewer
-        isOpen={pdfState.isOpen}
-        onClose={() => setPdfState(s => ({ ...s, isOpen: false }))}
-        pdfUrl={pdfState.url}
-        isLoading={pdfState.isLoading}
-      />
+      {/* PDF Viewer Modal — loaded only when explicitly opened */}
+      <Suspense fallback={null}>
+        <PDFViewer
+          isOpen={pdfState.isOpen}
+          onClose={() => setPdfState(s => ({ ...s, isOpen: false }))}
+          pdfUrl={pdfState.url}
+          isLoading={pdfState.isLoading}
+        />
+      </Suspense>
     </>
   );
 }

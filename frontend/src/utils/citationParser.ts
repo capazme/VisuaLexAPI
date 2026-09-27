@@ -7,6 +7,7 @@
 import type { CustomAlias } from '../types';
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
+import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -203,10 +204,13 @@ export const FULL_ACT_NAMES: ReadonlyArray<readonly [string, string]> = Object.e
   .sort((a, b) => b[0].length - a[0].length);
 
 /**
- * Un articolo: numero, eventuale suffisso (bis, ter, ...) o intervallo ("1-10").
+ * Un articolo: numero, eventuale suffisso (bis, ter, ... terdecies) o
+ * intervallo ("1-10"). La tabella dei suffissi sta in articleSuffixes.ts, ed è
+ * la sola copia; il \b che la chiude impedisce che "bis" agganci la testa di
+ * una parola qualsiasi ("art. 5 bisogna").
  */
-// \b after the suffix: "480 terzo comma" is art. 480, not 480-ter.
-const ARTICLE_ITEM = '\\d+(?:\\s*-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\\b)?(?:\\s*-\\s*\\d+)?';
+const ARTICLE_SUFFIX_SOURCE = `(?:${ARTICLE_SUFFIX_ALTERNATION})\\b`;
+const ARTICLE_ITEM = `\\d+(?:\\s*-?\\s*${ARTICLE_SUFFIX_SOURCE})?(?:\\s*-\\s*\\d+)?`;
 
 /**
  * Un elenco di articoli separati da "," o "e": "artt. 1, 2 e 3". L'API
@@ -239,7 +243,7 @@ const FULL_DATE_PATTERNS = [
 /**
  * Pattern per numeri di articolo standalone (senza "art"); supporta range.
  */
-const STANDALONE_NUMBER_PATTERN = /^(\d+)(?:\s*-\s*(\d+))?\s*[-]?\s*(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)?$/i;
+const STANDALONE_NUMBER_PATTERN = new RegExp(`^(\\d+)(?:\\s*-\\s*(\\d+))?\\s*[-]?\\s*(${ARTICLE_SUFFIX_ALTERNATION})?$`, 'i');
 
 /**
  * Pattern per numero/anno (es. "241/1990", "679/2016"). L'anno ha due o
@@ -383,7 +387,7 @@ function extractEuCitation(normalized: string): ActTypeExtraction | null {
 export function toApiArticleNumber(raw: string): string {
   return raw
     .replace(/\s+/g, '')
-    .replace(/^(\d+)-?(bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)$/i, '$1-$2');
+    .replace(new RegExp(`^(\\d+)-?(${ARTICLE_SUFFIX_ALTERNATION})$`, 'i'), '$1-$2');
 }
 
 /**
@@ -668,7 +672,11 @@ export interface ArticleRef {
  * - "art. 2043 c.c."
  * - "art. 123-bis"
  */
-const ARTICLE_REF_PATTERN = /\b(?:art(?:icol[oi])?t?\.?\s*)(\d+(?:\s*-\s*\d+)?(?:\s*[-]?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)\s*(?:e\s+(?:ss\.?|seg(?:uenti)?\.?)|(?:c\.?\s*c\.?|c\.?\s*p\.?|c\.?\s*p\.?\s*c\.?|c\.?\s*p\.?\s*p\.?|cost\.?|costituzione))?/gi;
+const ARTICLE_REF_PATTERN = new RegExp(
+  `\\b(?:art(?:icol[oi])?t?\\.?\\s*)(\\d+(?:\\s*-\\s*\\d+)?(?:\\s*[-]?\\s*${ARTICLE_SUFFIX_SOURCE})?)` +
+  `\\s*(?:e\\s+(?:ss\\.?|seg(?:uenti)?\\.?)|(?:c\\.?\\s*c\\.?|c\\.?\\s*p\\.?|c\\.?\\s*p\\.?\\s*c\\.?|c\\.?\\s*p\\.?\\s*p\\.?|cost\\.?|costituzione))?`,
+  'gi'
+);
 
 /**
  * Pattern per rilevare il tipo di atto dopo il numero articolo

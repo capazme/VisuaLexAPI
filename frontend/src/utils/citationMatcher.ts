@@ -12,6 +12,7 @@
 import { EU_ACT_TYPES, EU_PAIR_SOURCE, buildEuHeadSource, euKindOf, hasEuMarker, isOldEuMarker, resolveEuPair } from './euCitation';
 import { expandTwoDigitYear } from './dateUtils';
 import { FULL_ACT_NAMES, toApiArticleNumber } from './citationParser';
+import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 
 // Minimal interface for norma context (subset of NormaVisitata)
 interface NormaContext {
@@ -95,10 +96,11 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
   'cdfue': 'CDFUE',
 };
 
-// Suffissi articolo (bis, ter, etc.)
-// The \b keeps an ordinal apart from a suffix: "480 terzo comma" is art. 480,
-// not 480-ter (a page that does not exist).
-const ARTICLE_SUFFIX_PATTERN = '(?:-?\\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\\b)?';
+// Suffissi articolo (bis, ter, ... terdecies, sexiesdecies): la tabella sta in
+// articleSuffixes.ts, ed è la sola copia. Il \b è obbligatorio: senza, il
+// suffisso aggancia la testa di una parola qualsiasi ("art. 5 bisogna"), e un
+// ordinale diventa un suffisso: "480 terzo comma" è l'art. 480, non 480-ter.
+const ARTICLE_SUFFIX_PATTERN = `(?:-?\\s*(?:${ARTICLE_SUFFIX_ALTERNATION})\\b)?`;
 
 // Preposizioni articolate che precedono "articolo" (dell'articolo, dall'articolo, etc.)
 const PREPOSITION_PATTERN = "(?:dell?'|dall?'|all?'|nell?'|sull?')?";
@@ -481,7 +483,7 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
       const articlesGroup = match[2];  // "8 e 9"
 
       // Trova la posizione di ogni numero all'interno del testo originale
-      const numberRegex = /(\d+(?:-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)/gi;
+      const numberRegex = new RegExp(`(\\d+${ARTICLE_SUFFIX_PATTERN})`, 'gi');
       let numMatch;
 
       // La posizione base è dopo il prefisso

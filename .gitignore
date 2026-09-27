@@ -39,3 +39,6 @@ coverage/
 
 # Brainstorming visual companion workspace
 .superpowers/
+
+# Local legal archive output (python -m archivio_normativo build)
+archivio_out/

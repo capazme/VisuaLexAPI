@@ -29,6 +29,8 @@ from dataclasses import dataclass, field
 import structlog
 from lxml import etree
 
+from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+
 log = structlog.get_logger()
 
 
@@ -188,11 +190,6 @@ def extract_rubrica(article_text: str | None, key: str | None = None) -> str | N
 # Article key normalization
 # ---------------------------------------------------------------------------
 
-_ORDINAL_SUFFIXES = (
-    "bis", "ter", "quater", "quinquies", "sexies", "septies",
-    "octies", "novies", "decies",
-)
-
 
 def normalize_article_key(numero_articolo: str) -> str:
     """Normalize an article reference to the canonical key form.
@@ -212,7 +209,11 @@ def normalize_article_key(numero_articolo: str) -> str:
 
     # Unify separators between the number and an ordinal suffix: a space, a dash
     # or nothing all collapse to a single dash. e.g. "2 bis" / "2bis" -> "2-bis".
-    suffix_alt = "|".join(_ORDINAL_SUFFIXES)
+    # The table is the shared one: numbering goes far past "decies"
+    # ("2409 octiesdecies" c.c., "25 undevicies" d.lgs. 231/2001), and the short
+    # list this used to carry left "25terdecies" to the fallback below, which
+    # cannot tell a suffix from a rubrica.
+    suffix_alt = ARTICLE_SUFFIX_ALTERNATION
     m = re.match(rf"^(\d+)\s*[-\s]?\s*({suffix_alt})$", key)
     if m:
         return f"{m.group(1)}-{m.group(2)}"
@@ -223,8 +224,15 @@ def normalize_article_key(numero_articolo: str) -> str:
         return key.replace(" ", "-")
 
     # Fallback: collapse internal whitespace to dashes, strip stray chars.
+    # This is where the shapes the table cannot spell land — "270 bis.1" ->
+    # "270-bis.1", "314/2", "135 sex decies" -> "135-sex-decies" — and they
+    # need nothing more. A bare digit after an ordinal is a dotted sub-number
+    # ("171 octies 1" in the tree of l. 633/1941 is ~art171octies.1 on
+    # Normattiva), so it joins with a dot: the tree's spelling, the archive's
+    # "171-octies-1" and the request's "171-octies.1" share one key.
     key = re.sub(r"\s+", "-", key)
     key = re.sub(r"-{2,}", "-", key).strip("-")
+    key = re.sub(r"(?<=[a-z])-(\d+)$", r".\1", key)
     return key
 
 
@@ -254,6 +262,9 @@ class ParsedPart:
     name: str
     articles: dict[str, str] = field(default_factory=dict)
     order: list[str] = field(default_factory=list)
+    # Article key -> ISO date of the text in force for that article, read from
+    # the article's own FRBRWork/FRBRdate. Component acts only.
+    dates: dict[str, str] = field(default_factory=dict)
 
     @property
     def article_count(self) -> int:
@@ -269,6 +280,9 @@ class ParsedAct:
     title: str
     articles: dict[str, str] = field(default_factory=dict)
     order: list[str] = field(default_factory=list)
+    # Mirrors the dominant part's ``dates``; empty for flat acts, whose
+    # lifecycle is recorded at act level only.
+    dates: dict[str, str] = field(default_factory=dict)
     structure: str = "flat"
     # All component parts keyed by their AKN PART name. Empty for flat acts and
     # for single-part component acts. ``articles``/``order`` mirror the dominant
@@ -515,6 +529,25 @@ def _parse_flat(root) -> tuple[dict[str, str], list[str]]:
 
 _DOC_NAME_RE = re.compile(r"^(?P<part>.+?)-art\.\s*(?P<num>.+)$", re.IGNORECASE)
 
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _doc_work_date(doc) -> str | None:
+    """The FRBRWork date of a component <doc>, or None.
+
+    Expression and Manifestation dates sit beside it and are the act's, not
+    the article's — the Work date is the one that moves when the article's
+    text is replaced.
+    """
+    dates = doc.xpath(
+        f".//{_local('meta')}//{_local('FRBRWork')}/{_local('FRBRdate')}/@date"
+    )
+    for value in dates:
+        value = (value or "").strip()
+        if _ISO_DATE.match(value):
+            return value
+    return None
+
 
 def _render_component_doc(doc, num_label: str) -> str:
     """Render a component ``<doc>`` element to markdown."""
@@ -575,6 +608,7 @@ def _parse_component(root) -> tuple[dict[str, ParsedPart], str]:
     for part_name, entries in by_part.items():
         articles: dict[str, str] = {}
         order: list[str] = []
+        dates: dict[str, str] = {}
         for num_raw, doc in entries:
             key = normalize_article_key(num_raw)
             if not key or key in articles:
@@ -583,8 +617,11 @@ def _parse_component(root) -> tuple[dict[str, ParsedPart], str]:
             if rendered:
                 articles[key] = rendered
                 order.append(key)
+                work_date = _doc_work_date(doc)
+                if work_date:
+                    dates[key] = work_date
         if articles:
-            parts[part_name] = ParsedPart(name=part_name, articles=articles, order=order)
+            parts[part_name] = ParsedPart(name=part_name, articles=articles, order=order, dates=dates)
 
     if not parts:
         return {}, ""
@@ -671,6 +708,7 @@ def parse_akn(xml: str) -> ParsedAct:
             title=title,
             articles=main.articles,
             order=main.order,
+            dates=main.dates,
             structure="component",
             parts=parts,
         )

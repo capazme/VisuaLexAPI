@@ -23,6 +23,10 @@ import { HighlightsActionsPicker } from './HighlightsActionsPicker';
 import { InlineNotePopover } from './InlineNotePopover';
 import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
+import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
+import { UpdateNotePopover } from './UpdateNotePopover';
+import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
 import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
@@ -35,6 +39,9 @@ import type { NerReference } from '../../../features/merlt/ner/NerReferenceEdito
 import type { Annotation } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
+import { buildSearchDeepLink } from '../../../utils/deepLinks';
+import { notificationService } from '../../../services/notificationService';
+import { isAuthenticated } from '../../../services/authService';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -47,14 +54,6 @@ interface ArticleTabContentProps {
      */
     readingOrigin?: { tabId: string; blockId: string };
 }
-
-const DICTIONARY_TERMS: Record<string, string> = {
-    'ratio legis': 'Motivazione giuridica alla base della norma.',
-    'ultra vires': 'Atto compiuto oltre i poteri conferiti.',
-    'erga omnes': 'Efficace nei confronti di tutti.',
-    'ex tunc': 'Con effetti retroattivi.',
-    'ex nunc': 'Con effetti solo per il futuro.',
-};
 
 export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin }: ArticleTabContentProps) {
     const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
@@ -82,6 +81,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         addQuickNorm,
         removeQuickNormByParams,
         isQuickNorm,
+        bookmarks,
     } = useAppStore(useShallow(s => ({
         annotations: s.annotations,
         addAnnotation: s.addAnnotation,
@@ -97,6 +97,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         addQuickNorm: s.addQuickNorm,
         removeQuickNormByParams: s.removeQuickNormByParams,
         isQuickNorm: s.isQuickNorm,
+        bookmarks: s.bookmarks,
     })));
 
     const [dossierPopoverOpen, setDossierPopoverOpen] = useState(false);
@@ -110,6 +111,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // react-hooks/refs lint and can miss the post-mount update.
     const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [discussionOpen, setDiscussionOpen] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
@@ -158,8 +160,18 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const { canContribute, qaAskable, consentLevel, merltEnabled } = useMerltFeatures();
 
     const itemKey = useMemo(() => buildItemKey(norma_data), [norma_data]);
+    const isSavedArticle = useMemo(
+        () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
+        [bookmarks, itemKey],
+    );
 
     const uniqueArticleId = useMemo(() => uniqueArticleIdFromNorma(norma_data), [norma_data]);
+    const discussionAnchor = useMemo(() => ({
+        normaKey: itemKey,
+        articleId: uniqueArticleId,
+        articleLabel: norma_data.numero_articolo,
+        version: norma_data.versione || norma_data.data_versione,
+    }), [itemKey, uniqueArticleId, norma_data.numero_articolo, norma_data.versione, norma_data.data_versione]);
 
     // Memo the four filters: without this, the full annotations/highlights
     // arrays being new-ref on every store mutation (even unrelated articles)
@@ -190,6 +202,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         );
     }, [highlights, itemKey, uniqueArticleId]);
 
+    const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+        setToastMessage({ text, type });
+    };
+
     // Fetch persisted highlights + annotations from the Node backend when the
     // article first mounts (or when the user switches to a different article
     // inside the same NormaCard). The store actions guard against racing
@@ -201,29 +217,39 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         loadAnnotationsForArticle(itemKey, uniqueArticleId);
     }, [itemKey, uniqueArticleId, loadHighlightsForArticle, loadAnnotationsForArticle]);
 
-    // Cmd+F click → scroll this article body to the requested occurrence.
-    // useArticleMarkers tags each search hit with `data-search-idx`; we
-    // wait one frame (so the re-render from the setGlobalHighlight typing
-    // AND the article switch has settled) before querying the DOM.
+    // Change tracking, for saved (bookmarked) articles only: register the
+    // snapshot the reader is showing and let the server say whether the text
+    // moved since the last one. Keyed on identity and on the saved flag —
+    // bookmarking starts the watch — and the body is read through a ref so a
+    // re-render that hands down the same text as a new object does not post
+    // it again. The check sends the full text on purpose: an earlier version
+    // sent only norma_data, so a changed article was never detected.
+    // The watch key (buildItemKey) carries no version segment, so only the
+    // current text may be registered: a historical or "originale" view of a
+    // bookmarked article would otherwise read as a change and overwrite the
+    // stored text with the old one — a false alert on the way in and another
+    // on the way back to vigente.
+    const isCurrentText = !versionInfo?.isHistorical
+        && (norma_data.versione ?? 'vigente') === 'vigente'
+        && !norma_data.data_versione;
+    const latestSnapshotRef = useRef({ norma_data, article_text });
     useEffect(() => {
-        return subscribeSearchNavigation((req) => {
-            if (!req) return;
-            if (req.articleId !== uniqueArticleId) return;
-            const container = contentRef.current;
-            if (!container) return;
-            // rAF twice: first frame lets React commit, second lets the
-            // browser lay out the scrollIntoView target.
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                const target = container.querySelector<HTMLElement>(
-                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
-                );
-                if (!target) return;
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.classList.add('search-match-active');
-                setTimeout(() => target.classList.remove('search-match-active'), 1600);
-            }));
-        });
-    }, [uniqueArticleId]);
+        latestSnapshotRef.current = { norma_data, article_text };
+    });
+    useEffect(() => {
+        if (!itemKey || !isSavedArticle || !isCurrentText || !isAuthenticated()) return;
+        const snapshot = latestSnapshotRef.current;
+        notificationService.checkNorma(itemKey, {
+            norma_data: snapshot.norma_data,
+            article_text: snapshot.article_text || '',
+        })
+            .then(result => {
+                if (result.changed) {
+                    setToastMessage({ text: 'Questa norma salvata è cambiata dall’ultima consultazione', type: 'info' });
+                }
+            })
+            .catch(error => console.debug('Norma change check unavailable:', error));
+    }, [itemKey, isSavedArticle, isCurrentText]);
 
     useEffect(() => {
         if (!toastMessage) return;
@@ -260,10 +286,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         container.addEventListener('click', handler);
         return () => container.removeEventListener('click', handler);
     }, [itemAnnotations]);
-
-    const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
-        setToastMessage({ text, type });
-    };
 
     const quickNormParams = useMemo(() => ({
         act_type: norma_data.tipo_atto,
@@ -426,8 +448,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 version_date: norma_data.data_versione || '',
                 show_brocardi_info: true
             };
-            const encoded = btoa(JSON.stringify(params));
-            const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+            const shareUrl = buildSearchDeepLink(params, uniqueArticleId);
             await navigator.clipboard.writeText(shareUrl);
             showToast('Link copiato negli appunti', 'success');
         } catch {
@@ -626,27 +647,60 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
-    // Highlights + note anchors are applied by the shared useArticleMarkers
-    // hook (reusable on Brocardi sections too). Dictionary + citation
-    // wrapping are article-specific and happen after.
+    // The structure (heading, rubric, commi, items, Normattiva's modifications
+    // and update notes) is read once per text; the shared useArticleMarkers
+    // hook renders it with the highlights and note anchors (the dossier reader
+    // and Study Mode use the same pair). Citation wrapping is article-specific
+    // and happens after.
+    const structure = useMemo(() => parseArticleStructure(article_text || ''), [article_text]);
     const markedHtml = useArticleMarkers({
         rawText: article_text || '',
         highlights: articleHighlights,
         annotations: itemAnnotations,
+        structure,
     });
 
-    const processedContent = useMemo(() => {
-        let html = markedHtml;
+    const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
 
-        Object.entries(DICTIONARY_TERMS).forEach(([term, definition]) => {
-            const regex = new RegExp(`(?<!<mark[^>]*>)\\b${term}\\b(?!</mark>)`, 'gi');
-            html = html.replace(regex, (match) => `<span class="dictionary-term" data-definition="${definition}">${match}</span>`);
+    // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
+    const { updatesOpen, openNote, closeNote, openUpdates } = useArticleTextInteractions(contentRef, itemKey, {
+        contentKey: processedContent,
+    });
+
+    // Cmd+F click → scroll this article body to the requested occurrence.
+    // useArticleMarkers tags each search hit with `data-search-idx`; we
+    // wait one frame (so the re-render from the setGlobalHighlight typing
+    // AND the article switch has settled) before querying the DOM.
+    useEffect(() => {
+        const reveal = (target: HTMLElement) => {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('search-match-active');
+            setTimeout(() => target.classList.remove('search-match-active'), 1600);
+        };
+        return subscribeSearchNavigation((req) => {
+            if (!req) return;
+            if (req.articleId !== uniqueArticleId) return;
+            const container = contentRef.current;
+            if (!container) return;
+            // rAF twice: first frame lets React commit, second lets the
+            // browser lay out the scrollIntoView target.
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                const target = container.querySelector<HTMLElement>(
+                    `.search-match[data-search-idx="${req.occurrenceIdx}"]`,
+                );
+                if (!target) return;
+                // A hit in the folded AGGIORNAMENTO notes is display:none, and
+                // scrolling to it would do nothing: unfold them first. Folding
+                // is a class, so the target element survives the re-render.
+                if (target.closest('.vlx-updates-body') && !target.closest('.vlx-updates-open')) {
+                    openUpdates();
+                    requestAnimationFrame(() => requestAnimationFrame(() => reveal(target)));
+                    return;
+                }
+                reveal(target);
+            }));
         });
-
-        html = wrapCitationsInHtml(html, norma_data);
-
-        return html;
-    }, [markedHtml, norma_data]);
+    }, [uniqueArticleId, openUpdates]);
 
     // Handle citation hover and click events
     useEffect(() => {
@@ -751,9 +805,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isHighlightsPeekOpen={isHighlightsPeekOpen}
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={allPanelHighlights.length}
+                isDiscussionOpen={discussionOpen}
                 showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
+                onToggleDiscussion={() => setDiscussionOpen(v => !v)}
                 onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
@@ -831,6 +887,22 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onPopupCopy={handlePopupCopy}
                 onPopupReportCitation={canContribute ? handlePopupReportCitation : undefined}
                 onRemoveHighlight={removeHighlight}
+                updatesOpen={updatesOpen}
+            />
+
+            {openNote && structure.notes[openNote.id] && (
+                <UpdateNotePopover
+                    noteId={openNote.id}
+                    paragraphs={getUpdateNoteParagraphs(article_text || '', structure.notes[openNote.id])}
+                    anchorEl={openNote.anchorEl}
+                    onClose={closeNote}
+                />
+            )}
+
+            <ArticleDiscussionPanel
+                anchor={discussionAnchor}
+                isOpen={discussionOpen}
+                onClose={() => setDiscussionOpen(false)}
             />
 
             <AskMerltEntry

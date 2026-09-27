@@ -39,8 +39,10 @@ included:
 deploying a hotfix branch.
 
 Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
-through short-lived branches; `merlt` absorbs them with a periodic
-`git merge main`. Nothing is ever cherry-picked back.
+through short-lived branches; `merlt` absorbs them by merging each release
+tag (`git merge v1.7.6`), never `main` itself. Nothing is ever cherry-picked
+back. The full model — topic branches, tags, the merlt merge checklist, where
+session branches strand — is in `docs/git-workflow.md`.
 
 ---
 
@@ -68,7 +70,7 @@ absence broke a deploy, which is why they read as a list of scars:
 | 4 | `npm ci` in `frontend/` | |
 | 5 | `npm run build` (frontend) | `tsc -b && vite build`. **This is the real type-check** — it walks the project references, which a bare `tsc --noEmit` does not. |
 | 6 | `npm run build` (backend) | pm2 runs `node dist/index.js`, so skipping this leaves the service on a stale `dist/`. `tsc` type-checks as it emits and fails before writing. |
-| 7 | Version bump + commit | Only when `--major/--minor/--patch` is passed. |
+| 7 | Version bump + commit + tag + push | Only when `--major/--minor/--patch` is passed. Writes `version.txt`, commits, tags the commit `vX.Y.Z` and pushes `HEAD` plus the tag. The tag is the record of what production ran; a failed push is a warning, not a failed deploy — push by hand. |
 | 8 | Restart | `pm2 restart all`, else `systemctl restart visualex-backend`. |
 
 ---
@@ -95,7 +97,7 @@ cd backend && npm test
 cd frontend && npm run build && npx vitest run
 ```
 
-Expected today: 400 Python (1 deselected — the `live` marker), 35 backend, 194 frontend.
+Expected today: 984 Python (6 deselected — the `live` marker), 65 backend, 490 frontend.
 
 The backend suite needs `backend/.env.test` pointing at a **separate** database
 (`visualex_test`, not `visualex_platform`) — it runs `prisma migrate reset` on
@@ -125,6 +127,9 @@ startup and the process refuses to boot without them. See
 | `ALLOWED_ORIGINS` | Comma-separated. Must list the production origin |
 | `PORT` / `NODE_ENV` | |
 | `REDIS_ENABLED` / `REDIS_URL` | With Redis off the rate limiter falls back to per-instance memory and logs a warning |
+| `NORMA_WATCH_ENABLED` | Default enabled; `"false"` or `"0"` turns the saved-norm background watcher off |
+| `NORMA_WATCH_INTERVAL_MS` | Default `21600000` (6 h), floored at `60000` (1 min) |
+| `LEGAL_API_URL` | Default `http://localhost:5000`. The Python API's **base** URL: the watcher appends `/fetch_article_text` itself |
 
 **Python API** — all optional, all with defaults:
 
@@ -138,6 +143,7 @@ startup and the process refuses to boot without them. See
 | `FETCH_QUEUE_WORKERS` / `FETCH_QUEUE_DELAY` | | |
 | `AKN_ENABLED` | `true` | Kill switch for the Akoma Ntoso path (article index + last-resort text fallback). Read at call time, so flipping it needs no code change |
 | `AKN_CACHE_MAX_ACTS` | `40` | Article indexes held in memory, a few tens of KB each. Texts are never cached |
+| `HEALTH_DETAILED_TTL` | `120` | Seconds `/health/detailed` caches its three live-source probes; concurrent cold callers share one probe via a lock. Read at call time |
 
 ---
 
@@ -243,11 +249,24 @@ Recorded rather than fixed, so nobody rediscovers them during an incident.
   directory, exists only on the server; if that machine is lost, so is the
   knowledge. `start.sh` is a *development* launcher (`npm run dev`,
   `python app.py &`) and is not what production runs.
-- **The version bump commit is never pushed.** It stays local to the server, so
-  the server's `main` sits one commit ahead of `origin/main` and `git pull -r`
-  rebases it forward on every deploy.
+- **The push at step 7 is best-effort.** If the server cannot reach GitHub,
+  the bump commit and the `vX.Y.Z` tag stay local to it; the server's `main`
+  then sits ahead of `origin/main`, the laptop never sees the tag, and the
+  merlt merge in `docs/git-workflow.md` has nothing to merge. The script warns
+  with the exact command to run; run it.
+- **Releases before 19 September 2026 have no tag.** The tags start at
+  `v1.7.5`, added retroactively; `git describe` on anything older says so.
 - **`requirements.txt` has no version pins.** Builds are not reproducible, and a
   compromised or breaking upstream release lands in production on the next
   deploy without anyone choosing it.
-- **No rollback.** Recovery means checking out the previous tag and re-running
-  the script — and `prisma migrate deploy` does not walk migrations backwards.
+- **No rollback.** Recovery means checking out the previous `vX.Y.Z` tag and
+  re-running the script — and `prisma migrate deploy` does not walk migrations backwards.
+- **A deploy that pulls a new `deploy.sh` finishes on the OLD one.** Bash
+  reads the script as it runs, so the text step 1 pulls in is not what steps
+  2-8 execute. The v1.7.6 deploy (25 September 2026) pulled the tag-and-push
+  version of step 7 and ran the previous one: the bump commit was neither
+  tagged nor pushed, and `v1.7.6` was tagged afterwards from a laptop, on the
+  server's own commit, and pushed on its own — which is why that tag sits
+  beside `main` rather than on it. Until the script re-executes itself from a
+  copy (an `exec` on a temp file at the top), after any deploy that changed
+  `deploy.sh` check `git tag -l 'v*'` on the server and finish step 7 by hand.

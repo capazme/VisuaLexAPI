@@ -101,6 +101,15 @@ brocardi_scraper = BrocardiScraper()
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
 
+# /health/detailed probes three live sources on the shared throttled client and
+# circuit breakers; the frontend banner polls it, so N open tabs multiply that
+# load. One cached result is shared by every caller for HEALTH_DETAILED_TTL
+# seconds, with a lock so concurrent cold callers trigger a single probe
+# instead of one each. Module-level (like the scrapers above): there is one
+# NormaController instance in the running process.
+_health_detailed_cache: dict = {'response': None, 'status_code': None, 'expires_at': 0.0}
+_health_detailed_lock = asyncio.Lock()
+
 
 class RateLimitedTaskQueue:
     def __init__(self, workers: int, spacing: float) -> None:
@@ -335,6 +344,8 @@ class NormaController:
         self.app.add_url_rule('/fetch_all_data', view_func=self.fetch_all_data, methods=['POST'])
         self.app.add_url_rule('/fetch_tree', view_func=self.fetch_tree, methods=['POST'])
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
+        self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
+        self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
@@ -383,6 +394,14 @@ class NormaController:
         act_number = data.get('act_number')
         norma_date = data.get('date')
 
+        # A consolidated EU version. Validated here so a Normattiva request
+        # carrying the field fails loudly instead of being silently ignored.
+        celex_consolidated = data.get('celex_consolidated') or None
+        if celex_consolidated and normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+            raise ValidationError(
+                "celex_consolidated vale solo per atti EUR-Lex (regolamento ue, direttiva ue)"
+            )
+
         # Check if this is a codice with extractable details (e.g., "codice civile" -> "regio decreto 262/1942")
         codice_details = extract_codice_details(act_type) if act_type else None
         tipo_atto_reale = None
@@ -411,7 +430,8 @@ class NormaController:
             tipo_atto=act_type,
             data=norma_date if norma_date else None,
             numero_atto=act_number,
-            tipo_atto_reale=tipo_atto_reale
+            tipo_atto_reale=tipo_atto_reale,
+            celex_consolidated=celex_consolidated
         )
         log.info("Norma instance created", norma=norma)
 
@@ -571,13 +591,14 @@ class NormaController:
 
         Article numbers are canonicalised on both sides with the AKN parser's
         `normalize_article_key`: the tree API and the scraper disagree on the
-        separator ("1-bis" vs "1 bis"). That normaliser treats the suffix as
-        "any alphabetic tail" rather than an enumerated ordinal list, which is
+        separator ("1-bis" vs "1 bis"). That normaliser reads the ordinal from
+        the shared table in `tools/article_suffixes.py` and falls back to "any
+        alphabetic tail" for anything the table does not list, which is
         load-bearing — Normattiva goes far past `decies` ("25 undecies",
         "25 quinquiesdecies", "25 duodevicies" in d.lgs. 231/2001,
-        "669 terdecies" c.p.c., "2409 octiesdecies" c.c.) and an enumerated
-        list would silently turn every article beyond its last entry into
-        "does not exist".
+        "669 terdecies" c.p.c., "2409 octiesdecies" c.c.) and a normaliser that
+        stopped at its last entry would silently turn every article beyond it
+        into "does not exist".
         """
         act_url = getattr(norma, 'url', None) or str(norma)
         try:
@@ -918,6 +939,97 @@ class NormaController:
             log.warning("Error in fetch_rubriche", error=str(e), exc_info=True)
             return jsonify({'rubriche': {}, 'abrogati': [], 'parts': [], 'count': 0, 'error': str(e)})
 
+    async def fetch_recitals(self):
+        """All the considerando of an EU act, in one call.
+
+        A separate endpoint rather than a flag on /stream_article_text: a
+        recital is not an article — no URN, no annex, no Brocardi — and the
+        archive that consumes this wants the whole preamble at once. The
+        page is the one the tree and the articles already come from, cached
+        for 24 h, so the call costs one parse and no network on a warm cache.
+        Consolidated texts have no preamble; they answer an empty list.
+        """
+        try:
+            data = await request.get_json() or {}
+            act_type = data.get('act_type')
+            if not act_type:
+                raise ValidationError("Campo obbligatorio mancante: act_type")
+            if normalize_act_type(act_type).lower() not in ('regolamento ue', 'direttiva ue'):
+                raise ValidationError(
+                    "fetch_recitals accetta solo atti EUR-Lex (regolamento ue, direttiva ue)"
+                )
+            # Validate before building the Norma: the EUR-Lex URL is built
+            # from these two fields, and a missing or malformed one used to
+            # send Playwright to ".../reg/None/None/oj/ita" (or raise a
+            # ValueError out of Norma.__post_init__ into a 500) to discover
+            # what a regex tells for free.
+            # ASCII digits: `\d` alone accepts other scripts' digits, which
+            # do not belong in a URL.
+            act_number = str(data.get('act_number') or '').strip()
+            if not re.fullmatch(r'\d+', act_number, re.ASCII):
+                raise ValidationError(
+                    "Campo act_number mancante o non valido: atteso il numero dell'atto (es. 679)"
+                )
+            date = str(data.get('date') or '').strip()
+            if not re.fullmatch(r'\d{4}(-\d{2}-\d{2})?', date, re.ASCII):
+                raise ValidationError(
+                    "Campo date mancante o non valido: atteso l'anno (es. 2016) o una data AAAA-MM-GG"
+                )
+            norma = Norma(tipo_atto=act_type, data=date, numero_atto=act_number)
+            recitals, url = await eurlex_scraper.get_recitals(norma)
+            return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_recitals')
+
+    async def fetch_act_fingerprints(self):
+        """Per-article change detectors for a Normattiva act.
+
+        One download of the act's AKN export yields a hash of every article's
+        text and, for the codici, the date each article's text came into
+        force. A client that stored the hashes last time can tell which
+        articles to refetch without touching the others — the archive's
+        update run drops from hours to minutes on this.
+
+        The AKN text itself is never served (it transliterates accents; see
+        akn_parser.py). Two answers are deliberately different: no index
+        (AKN disabled or unavailable) is `available: false` with empty maps
+        and 200, so the caller falls back to a full fetch; a crash is a 500,
+        so it is never read as "nothing changed". An index WITHOUT
+        fingerprints gets the first answer too: one written to the persistent
+        cache before this field existed rehydrates with an empty map, and a
+        real index always carries at least one fingerprint — `available:
+        true` over an empty map would read as "every article vanished".
+        """
+        try:
+            data = await request.get_json() or {}
+            urn = data.get('urn')
+            if not urn:
+                raise ValidationError("Missing 'urn' in request data")
+            if 'eur-lex' in str(urn):
+                raise ValidationError(
+                    "fetch_act_fingerprints accetta solo atti Normattiva: EUR-Lex non ha un export AKN"
+                )
+            # The AKN index keys off the ACT, so an article suffix has to go:
+            # ...;241~art2 -> ...;241 (same rule as fetch_rubriche).
+            act_url = str(urn).split('~')[0]
+            index = await fetch_act_index(SimpleNamespace(url=act_url))
+            if index is None or not index.fingerprints:
+                log.info("No AKN fingerprints available", urn=act_url[:100],
+                         reason="no index" if index is None else "index without fingerprints")
+                return jsonify({'available': False, 'fingerprints': {}, 'parts': [], 'count': 0})
+            log.info("Fingerprints served", urn=act_url[:100], count=len(index.fingerprints))
+            return jsonify({
+                'available': True,
+                'fingerprints': index.fingerprints,
+                'parts': [
+                    {'name': name, 'fingerprints': fingerprints}
+                    for name, fingerprints in index.parts_fingerprints.items()
+                ],
+                'count': len(index.fingerprints),
+            })
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_act_fingerprints')
+
     async def fetch_alias_catalog(self):
         """Everything this server already recognises when naming an act.
 
@@ -1244,66 +1356,101 @@ class NormaController:
         })
 
     async def health_detailed(self):
-        """Detailed health check - tests connectivity to external sources."""
+        """Detailed health check - tests connectivity to external sources.
+
+        Cached for HEALTH_DETAILED_TTL seconds (read at call time, like
+        AKN_ENABLED) so the frontend's polling banner does not multiply the
+        three live probes by every open tab. A failing probe is cached too,
+        so a flapping source does not get hammered by repeated callers.
+        """
         from datetime import datetime
         import time as time_module
 
-        results = {
-            'status': 'ok',
-            'timestamp': datetime.utcnow().isoformat(),
-            'services': {}
-        }
+        ttl = float(os.getenv('HEALTH_DETAILED_TTL', '120'))
+        now = time_module.time()
 
-        # Test Normattiva (fetch homepage with timeout)
-        try:
-            start = time_module.time()
-            await normattiva_scraper.request_document("https://www.normattiva.it", source="health_check")
-            latency = time_module.time() - start
-            results['services']['normattiva'] = {
+        if _health_detailed_cache['response'] is not None and now < _health_detailed_cache['expires_at']:
+            cached = dict(_health_detailed_cache['response'])
+            cached['cached'] = True
+            cached['cache_ttl_seconds'] = ttl
+            return jsonify(cached), _health_detailed_cache['status_code']
+
+        async with _health_detailed_lock:
+            # Re-check: a concurrent caller may have already run the probe
+            # while this one waited for the lock.
+            now = time_module.time()
+            if _health_detailed_cache['response'] is not None and now < _health_detailed_cache['expires_at']:
+                cached = dict(_health_detailed_cache['response'])
+                cached['cached'] = True
+                cached['cache_ttl_seconds'] = ttl
+                return jsonify(cached), _health_detailed_cache['status_code']
+
+            results = {
                 'status': 'ok',
-                'latency_ms': round(latency * 1000, 2)
+                'timestamp': datetime.utcnow().isoformat(),
+                'services': {}
             }
-        except Exception as e:
-            results['services']['normattiva'] = {
-                'status': 'error',
-                'error': str(e)
-            }
-            results['status'] = 'degraded'
 
-        # Test EUR-Lex (fetch homepage with timeout)
-        try:
-            start = time_module.time()
-            await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
-            latency = time_module.time() - start
-            results['services']['eurlex'] = {
-                'status': 'ok',
-                'latency_ms': round(latency * 1000, 2)
-            }
-        except Exception as e:
-            results['services']['eurlex'] = {
-                'status': 'error',
-                'error': str(e)
-            }
-            results['status'] = 'degraded'
+            # Test Normattiva (fetch homepage with timeout)
+            try:
+                start = time_module.time()
+                await normattiva_scraper.request_document("https://www.normattiva.it", source="health_check")
+                latency = time_module.time() - start
+                results['services']['normattiva'] = {
+                    'status': 'ok',
+                    'latency_ms': round(latency * 1000, 2)
+                }
+            except Exception as e:
+                results['services']['normattiva'] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                results['status'] = 'degraded'
 
-        # Test Brocardi (fetch homepage with timeout)
-        try:
-            start = time_module.time()
-            await brocardi_scraper.request_document("https://www.brocardi.it", source="health_check")
-            latency = time_module.time() - start
-            results['services']['brocardi'] = {
-                'status': 'ok',
-                'latency_ms': round(latency * 1000, 2)
-            }
-        except Exception as e:
-            results['services']['brocardi'] = {
-                'status': 'error',
-                'error': str(e)
-            }
-            results['status'] = 'degraded'
+            # Test EUR-Lex (fetch homepage with timeout)
+            try:
+                start = time_module.time()
+                await eurlex_scraper.request_document("https://eur-lex.europa.eu", source="health_check")
+                latency = time_module.time() - start
+                results['services']['eurlex'] = {
+                    'status': 'ok',
+                    'latency_ms': round(latency * 1000, 2)
+                }
+            except Exception as e:
+                results['services']['eurlex'] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                results['status'] = 'degraded'
 
-        status_code = 200 if results['status'] == 'ok' else 503
-        return jsonify(results), status_code
+            # Test Brocardi (fetch homepage with timeout)
+            try:
+                start = time_module.time()
+                await brocardi_scraper.request_document("https://www.brocardi.it", source="health_check")
+                latency = time_module.time() - start
+                results['services']['brocardi'] = {
+                    'status': 'ok',
+                    'latency_ms': round(latency * 1000, 2)
+                }
+            except Exception as e:
+                results['services']['brocardi'] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                results['status'] = 'degraded'
+
+            status_code = 200 if results['status'] == 'ok' else 503
+
+            _health_detailed_cache['response'] = results
+            _health_detailed_cache['status_code'] = status_code
+            # From the end of the probe: measured from its start, a slow probe
+            # (up to ~30 s across three sources) ate into the TTL.
+            _health_detailed_cache['expires_at'] = time_module.time() + max(ttl, 0)
+
+            payload = dict(results)
+            payload['cached'] = False
+            payload['cache_ttl_seconds'] = ttl
+            return jsonify(payload), status_code
 
     async def get_version(self):
         """Returns version info, latest git commit details, and changelog."""
