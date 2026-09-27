@@ -13,7 +13,13 @@ const prisma = new PrismaClient();
 // hang up") or a request goes out with a dropped header ("no-header" 401). A
 // single long-lived server reuses one port and removes that race. `.unref()` so
 // the listener never keeps the test process alive at teardown.
-const app = expressApp.listen(0);
+//
+// Bound to 127.0.0.1, the address supertest dials. On macOS a wildcard listen
+// can be given a port another local process holds on 127.0.0.1 alone, and the
+// kernel then hands that process the suite's requests: a dev tool answering
+// 403 failed `sharedEnvironments.publish` once in eight runs. A loopback bind
+// cannot share its port that way.
+const app = expressApp.listen(0, '127.0.0.1');
 app.unref();
 
 export interface TestUser {
