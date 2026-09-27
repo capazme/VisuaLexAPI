@@ -9,7 +9,7 @@ value once.
 Runs against the enrichment Postgres (in-container, or locally with
 ``ENRICHMENT_DATABASE_URL`` pointing at a database where ``create_tables()``
 ran):
-    docker exec -w /app visualex-merlt-api python -m pytest tests/api/test_propose_relation.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/api/test_propose_relation.py -q
 """
 
 from __future__ import annotations

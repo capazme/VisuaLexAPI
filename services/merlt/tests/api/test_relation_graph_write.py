@@ -9,7 +9,7 @@ node_id, unique Entity name); an unresolved one leaves the relation unwritten
 and a pending-entity endpoint is retried once that entity is written.
 
 Postgres-backed (pending_* rows) with an in-memory fake graph:
-    docker exec -w /app visualex-merlt-api python -m pytest tests/api/test_relation_graph_write.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/api/test_relation_graph_write.py -q
 """
 
 from __future__ import annotations

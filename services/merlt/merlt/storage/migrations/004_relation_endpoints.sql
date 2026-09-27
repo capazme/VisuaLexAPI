@@ -6,7 +6,7 @@
 -- merlt/storage/enrichment/schema_additions.py (applied at every boot), for
 -- databases bootstrapped by create_tables(). Idempotent: safe to re-run.
 --
---   docker exec -i <merlt-postgres> psql -U <user> -d <db> < 004_relation_endpoints.sql
+--   docker exec -i <postgres-container> psql -U <user> -d <db> < 004_relation_endpoints.sql
 --
 
 -- The endpoint names the LLM wrote. source_node_urn / target_entity_id now

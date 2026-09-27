@@ -23,18 +23,24 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = REPO_ROOT / "apps" / "server"
 BACKEND_ENV = BACKEND_DIR / ".env"
 
-# container_name values declared in infra/compose.yml
+# infra/compose.yml names every container <stack>-<service>; a throwaway stack
+# sets VISUALEX_STACK (and its own ports) the same way it does for Compose.
+STACK = os.environ.get("VISUALEX_STACK", "visualex")
+MERLT_API = f"{STACK}-merlt-api"
+MERLT_WORKER = f"{STACK}-merlt-worker"
+FALKORDB = f"{STACK}-falkordb"
 CONTAINERS = (
-    "visualex-merlt-postgres",
-    "visualex-merlt-redis",
-    "visualex-merlt-falkordb",
-    "visualex-merlt-qdrant",
-    "visualex-merlt-api",
-    "visualex-merlt-worker",
+    f"{STACK}-postgres",
+    f"{STACK}-redis",
+    FALKORDB,
+    f"{STACK}-qdrant",
+    MERLT_API,
+    MERLT_WORKER,
 )
 RQ_QUEUES = ("merlt_ingest", "merlt_extract", "merlt_ner_train")
-RQ_REDIS_URL = "redis://merlt-redis:6379/1"
-FALKOR_PORT = os.environ.get("MERLT_FALKOR_PORT", "6382")
+# Read inside the worker container, where Compose's service name resolves.
+RQ_REDIS_URL = os.environ.get("E2E_RQ_REDIS_URL", "redis://redis:6379/1")
+FALKOR_PORT = os.environ.get("VISUALEX_FALKOR_PORT", "6382")
 GRAPH_NAME = os.environ.get("MERLT_GRAPH_NAME", "merl_t_legal")
 
 ProbeFn = Callable[[], Awaitable[tuple[bool, str]]]
@@ -172,7 +178,7 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
         return True, f"{len(CONTAINERS)} containers healthy"
 
     async def c5_worker_queues() -> tuple[bool, str]:
-        rc, out = await _run_cmd("docker", "exec", "visualex-merlt-worker",
+        rc, out = await _run_cmd("docker", "exec", MERLT_WORKER,
                                  "rq", "info", "--url", RQ_REDIS_URL)
         if rc != 0:
             return False, _short(out, 140)
@@ -186,7 +192,7 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
 
     async def c6_rq_enqueue_side() -> tuple[bool, str]:
         snippet = "import os,redis;u=os.environ['RQ_REDIS_URL'];redis.from_url(u).ping();print(u)"
-        rc, out = await _run_cmd("docker", "exec", "visualex-merlt-api",
+        rc, out = await _run_cmd("docker", "exec", MERLT_API,
                                  "python", "-c", snippet)
         if rc != 0:
             return False, _short(out, 140)
@@ -205,7 +211,7 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
         bff_secret = _env_file_value(BACKEND_ENV, "MERLT_INTERNAL_SECRET")
         if not bff_secret:
             problems.append("MERLT_INTERNAL_SECRET missing in apps/server/.env")
-        rc, out = await _run_cmd("docker", "exec", "visualex-merlt-worker",
+        rc, out = await _run_cmd("docker", "exec", MERLT_WORKER,
                                  "printenv", "MERLT_INTERNAL_SECRET")
         if rc != 0:
             problems.append(f"worker env probe failed: {_short(out, 60)}")
@@ -230,7 +236,7 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
         rc, out = await _run_cmd("redis-cli", "-p", FALKOR_PORT,
                                  "GRAPH.QUERY", GRAPH_NAME, cypher)
         if rc != 0:
-            rc, out = await _run_cmd("docker", "exec", "visualex-merlt-falkordb",
+            rc, out = await _run_cmd("docker", "exec", FALKORDB,
                                      "redis-cli", "GRAPH.QUERY", GRAPH_NAME, cypher)
         if rc != 0:
             return False, _short(out, 140)

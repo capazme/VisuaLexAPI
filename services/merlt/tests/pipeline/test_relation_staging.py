@@ -4,7 +4,7 @@ Mirrors test_extraction_staging for relations: `persist_target="staging"` lands
 relation candidates in ExtractionCandidate(candidate_type="relation"), while
 "pending" creates PendingRelation rows. Uses a fake extractor + fake session.
 
-    docker exec -w /app visualex-merlt-api python -m pytest tests/pipeline/test_relation_staging.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/pipeline/test_relation_staging.py -q
 """
 
 from __future__ import annotations

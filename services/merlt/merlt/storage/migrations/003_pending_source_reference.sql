@@ -9,7 +9,7 @@
 -- MUST run before the rebuilt merlt-api serves traffic: the ORM selects the
 -- new column, so every pending_* read fails until it exists.
 --
---   docker exec -i <merlt-postgres> psql -U <user> -d <db> < 003_pending_source_reference.sql
+--   docker exec -i <postgres-container> psql -U <user> -d <db> < 003_pending_source_reference.sql
 --
 
 -- The contributor's bibliographic citation, or the URL of a confirmed live

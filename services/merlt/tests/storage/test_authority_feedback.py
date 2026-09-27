@@ -6,7 +6,7 @@ aligned with the consensus gain accuracy (→ 1.0), those who voted against lose
 it (→ 0.0). `recalculate_authorities_after_consensus` is the documented hook;
 this proves it produces the right authority from real votes.
 
-    docker exec -w /app visualex-merlt-api python -m pytest tests/storage/test_authority_feedback.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/storage/test_authority_feedback.py -q
 """
 
 from __future__ import annotations
