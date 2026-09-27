@@ -2,13 +2,11 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, visualex-merlt-main]
-  # main is included so its state is never unverified between deploys: deploy.sh
-  # runs no tests and has no rollback, so a red main is a production risk.
-  # visualex-merlt-main is the MERL-T line: never deployed, but nothing else
-  # gates it, and its backend/frontend suites carry the MERL-T integration.
+    branches: [main, develop]
+  # main is the released line, develop the integration line (MERL-T included):
+  # nothing else gates either, so both run every suite here.
   push:
-    branches: [main, visualex-merlt-main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -110,7 +108,7 @@ jobs:
     # `integration` (live FalkorDB) are excluded by pyproject's addopts; the
     # DB-backed ones run against this Postgres after create_tables() plus the
     # boot-time schema additions, the same way the api bootstraps itself.
-    if: github.ref == 'refs/heads/visualex-merlt-main' || github.base_ref == 'visualex-merlt-main'
+    if: github.ref == 'refs/heads/develop' || github.base_ref == 'develop'
     services:
       postgres:
         image: postgres:16
