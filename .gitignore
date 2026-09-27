@@ -41,3 +41,6 @@ coverage/
 
 # Local legal archive output (python -m archivio_normativo build)
 archivio_out/
+
+# Personal editor workspaces (they point outside the repository)
+*.code-workspace
