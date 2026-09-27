@@ -9,29 +9,31 @@ download
 
 dist/*
 .claude
-/data
+# The Python API's runtime data (search history, dossiers): private. It lived
+# in /data before the monorepo move, and an old checkout leaves it there.
+services/visualex/data/
+/data/
 
 # Node modules (nested dirs also carry their own .gitignore)
 node_modules/
 
 # Backend runtime artifacts (dead-letter log, etc.)
-backend/logs/
+apps/server/logs/
 
 # E2E scratch fixtures
 test-notes-e2e.txt
 
-# MERL-T runtime dirs (codice in merlt/ è versionato; runtime no)
-merlt/uploads/
-merlt/data/
-merlt/.venv/
-merlt/merlt.egg-info/
+# MERL-T runtime dirs (codice in services/merlt/ è versionato; runtime no)
+services/merlt/uploads/
+services/merlt/data/
+services/merlt/.venv/
+services/merlt/merlt.egg-info/
 
 # Environment files - NEVER commit secrets
 .env
 .env.*
 !.env.example
-!.env.merlt.example
-!backend/.env.test
+!apps/server/.env.test
 *.env.local
 
 # Test coverage output
@@ -42,3 +44,6 @@ coverage/
 
 # Local legal archive output (python -m archivio_normativo build)
 archivio_out/
+
+# Personal editor workspaces (they point outside the repository)
+*.code-workspace

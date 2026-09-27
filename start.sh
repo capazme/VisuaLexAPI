@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VisuaLex Development Startup Script
-# Starts: visualex_api (Python), backend (Node), frontend (Vite)
+# Starts: visualex_api (Python, services/visualex), apps/server (Node), apps/web (Vite)
 # Optional: MERLT FastAPI sidecar when MERLT_ENABLED=true
 
 set -e
@@ -16,7 +16,7 @@ NC='\033[0m'
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 MERLT_ENABLED="${MERLT_ENABLED:-false}"
 # The supported MERL-T path is api-in-docker (api + worker + mcp-legal-it as
-# containers, ~40 env vars wired in docker-compose.merlt.yml). It implies the
+# containers, ~40 env vars wired in infra/compose.yml). It implies the
 # compose dependencies. Local uvicorn (MERLT_API_IN_DOCKER=false) is a
 # developer mode: it needs a venv with the merlt deps and runs without the
 # mcp-legal-it tools.
@@ -25,8 +25,15 @@ if [ "$MERLT_ENABLED" = "true" ] && [ "$MERLT_API_IN_DOCKER" = "true" ]; then
     MERLT_COMPOSE_ENABLED="true"
 fi
 MERLT_COMPOSE_ENABLED="${MERLT_COMPOSE_ENABLED:-false}"
-MERLT_COMPOSE_FILE="${MERLT_COMPOSE_FILE:-$PROJECT_ROOT/docker-compose.merlt.yml}"
-MERLT_ROOT="${MERLT_ROOT:-$PROJECT_ROOT/merlt}"
+MERLT_COMPOSE_FILE="${MERLT_COMPOSE_FILE:-$PROJECT_ROOT/infra/compose.yml}"
+# Interim (monorepo move): compose now lives in infra/ and would read
+# infra/.env; until that file exists, interpolate from the repo-root .env
+# exactly as before the move.
+MERLT_COMPOSE_ENV=()
+if [ -f "$PROJECT_ROOT/.env" ] && [ ! -f "$PROJECT_ROOT/infra/.env" ]; then
+    MERLT_COMPOSE_ENV=(--env-file "$PROJECT_ROOT/.env")
+fi
+MERLT_ROOT="${MERLT_ROOT:-$PROJECT_ROOT/services/merlt}"
 MERLT_PORT="${MERLT_PORT:-8000}"
 MERLT_HEALTH_TIMEOUT="${MERLT_HEALTH_TIMEOUT:-60}"
 # Local mode interpreter: the VisuaLex .venv sourced below has no torch/fastmcp/
@@ -52,7 +59,7 @@ cleanup() {
     echo -e "\n${YELLOW}Shutting down services...${NC}"
     kill ${API_PID:-} ${BACKEND_PID:-} ${FRONTEND_PID:-} ${MERLT_PID:-} ${MERLT_WORKER_PID:-} 2>/dev/null || true
     if [ "$MERLT_COMPOSE_ENABLED" = "true" ]; then
-        docker compose -f "$MERLT_COMPOSE_FILE" --profile api-in-docker down >/dev/null 2>&1 || true
+        docker compose -f "$MERLT_COMPOSE_FILE" ${MERLT_COMPOSE_ENV[@]+"${MERLT_COMPOSE_ENV[@]}"} --profile api-in-docker down >/dev/null 2>&1 || true
     fi
     echo -e "${GREEN}All services stopped.${NC}"
 }
@@ -83,7 +90,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
         echo -e "${RED}MERLT_COMPOSE_FILE not found: $MERLT_COMPOSE_FILE${NC}"
         exit 1
     fi
-    # mcp-legal-it is a git submodule that docker-compose.merlt.yml builds from
+    # mcp-legal-it is a git submodule that infra/compose.yml builds from
     # ./vendor/mcp-legal-it: a fresh clone has an EMPTY directory there and
     # `compose up` fails on the missing Dockerfile. Initialise it here, before
     # anything is started.
@@ -96,24 +103,24 @@ if [ "$MERLT_ENABLED" = "true" ]; then
         fi
     fi
     # The MERL-T → BFF callbacks are authenticated with X-Internal-Secret. The
-    # BFF reads MERLT_INTERNAL_SECRET from backend/.env, compose interpolates
-    # the same variable from this shell: read it from backend/.env when the
+    # BFF reads MERLT_INTERNAL_SECRET from apps/server/.env, compose interpolates
+    # the same variable from this shell: read it from apps/server/.env when the
     # shell does not carry it, so the two sides cannot disagree.
-    if [ -z "${MERLT_INTERNAL_SECRET:-}" ] && [ -f "$PROJECT_ROOT/backend/.env" ]; then
-        MERLT_INTERNAL_SECRET="$(sed -n 's/^MERLT_INTERNAL_SECRET=["'"'"']\{0,1\}\([^"'"'"']*\).*/\1/p' "$PROJECT_ROOT/backend/.env" | tail -1)"
+    if [ -z "${MERLT_INTERNAL_SECRET:-}" ] && [ -f "$PROJECT_ROOT/apps/server/.env" ]; then
+        MERLT_INTERNAL_SECRET="$(sed -n 's/^MERLT_INTERNAL_SECRET=["'"'"']\{0,1\}\([^"'"'"']*\).*/\1/p' "$PROJECT_ROOT/apps/server/.env" | tail -1)"
     fi
     if [ -z "${MERLT_INTERNAL_SECRET:-}" ]; then
-        echo -e "${YELLOW}MERLT_INTERNAL_SECRET is empty: worker/api callbacks to the BFF will be refused (set it in backend/.env)${NC}"
+        echo -e "${YELLOW}MERLT_INTERNAL_SECRET is empty: worker/api callbacks to the BFF will be refused (set it in apps/server/.env)${NC}"
     else
         export MERLT_INTERNAL_SECRET
     fi
     # Same for the admin API key: the BFF sends it as X-API-Key, merlt-api seeds
     # it (MERLT_ADMIN_API_KEY) so RLCF training, hygiene and ingestion work.
-    if [ -z "${MERLT_API_KEY:-}" ] && [ -f "$PROJECT_ROOT/backend/.env" ]; then
-        MERLT_API_KEY="$(sed -n 's/^MERLT_API_KEY=["'"'"']\{0,1\}\([^"'"'"']*\).*/\1/p' "$PROJECT_ROOT/backend/.env" | tail -1)"
+    if [ -z "${MERLT_API_KEY:-}" ] && [ -f "$PROJECT_ROOT/apps/server/.env" ]; then
+        MERLT_API_KEY="$(sed -n 's/^MERLT_API_KEY=["'"'"']\{0,1\}\([^"'"'"']*\).*/\1/p' "$PROJECT_ROOT/apps/server/.env" | tail -1)"
     fi
     if [ -z "${MERLT_API_KEY:-}" ]; then
-        echo -e "${YELLOW}MERLT_API_KEY is empty: admin ops (RLCF training, graph hygiene, ingestion) will answer 401 until a key is set in backend/.env${NC}"
+        echo -e "${YELLOW}MERLT_API_KEY is empty: admin ops (RLCF training, graph hygiene, ingestion) will answer 401 until a key is set in apps/server/.env${NC}"
     else
         export MERLT_API_KEY
         export MERLT_ADMIN_API_KEY="$MERLT_API_KEY"
@@ -129,18 +136,18 @@ echo -e "${GREEN}All ports available${NC}"
 
 # Preflight: Python venv, required packages, Playwright browser
 echo -e "\n${YELLOW}Checking Python environment...${NC}"
-VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
-VENV_PLAYWRIGHT="$PROJECT_ROOT/.venv/bin/playwright"
+VENV_PYTHON="$PROJECT_ROOT/services/visualex/.venv/bin/python"
+VENV_PLAYWRIGHT="$PROJECT_ROOT/services/visualex/.venv/bin/playwright"
 
 if [ ! -x "$VENV_PYTHON" ]; then
-    echo -e "${RED}.venv not found at $PROJECT_ROOT/.venv${NC}"
-    echo -e "  Run: ${YELLOW}python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium${NC}"
+    echo -e "${RED}.venv not found at $PROJECT_ROOT/services/visualex/.venv${NC}"
+    echo -e "  Run: ${YELLOW}cd services/visualex && python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium${NC}"
     exit 1
 fi
 
 if ! "$VENV_PYTHON" -c "import redis, playwright" 2>/dev/null; then
     echo -e "${RED}Python dependencies missing (redis and/or playwright not importable)${NC}"
-    echo -e "  Run: ${YELLOW}.venv/bin/pip install -r requirements.txt${NC}"
+    echo -e "  Run: ${YELLOW}cd services/visualex && .venv/bin/pip install -r requirements.txt${NC}"
     exit 1
 fi
 
@@ -154,14 +161,14 @@ if [ -z "$PW_CACHE" ]; then
 fi
 if [ -n "$PW_CACHE" ] && ! ls "$PW_CACHE" 2>/dev/null | grep -q chromium; then
     echo -e "${RED}Playwright Chromium browser not found in $PW_CACHE${NC}"
-    echo -e "  Run: ${YELLOW}.venv/bin/playwright install chromium${NC}"
+    echo -e "  Run: ${YELLOW}cd services/visualex && .venv/bin/playwright install chromium${NC}"
     exit 1
 fi
 echo -e "${GREEN}Python environment OK${NC}"
 
 # 1. Start VisuaLex API (Python/Quart - port 5000)
 echo -e "\n${YELLOW}[1/3] Starting VisuaLex API (port 5000)...${NC}"
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT/services/visualex"
 source .venv/bin/activate
 python app.py &
 API_PID=$!
@@ -169,7 +176,7 @@ echo -e "${GREEN}VisuaLex API started (PID: $API_PID)${NC}"
 
 # 2. Start Platform Backend (Node - port 3001)
 echo -e "\n${YELLOW}[2/3] Starting Platform Backend (port 3001)...${NC}"
-cd "$PROJECT_ROOT/backend"
+cd "$PROJECT_ROOT/apps/server"
 
 # Bootstrap the platform DB before launching the server so a fresh checkout is
 # usable end-to-end: regenerate the Prisma client, apply pending migrations,
@@ -178,7 +185,7 @@ cd "$PROJECT_ROOT/backend"
 # the whole authenticated app is unreachable. Non-fatal (guarded against set -e)
 # so the dev server still comes up if something needs fixing by hand. The admin
 # seed runs only when ADMIN_PASSWORD is set (seed.ts exits 1 otherwise).
-# Uses backend/.env DATABASE_URL — the MERL-T DATABASE_URL export happens later
+# Uses apps/server/.env DATABASE_URL — the MERL-T DATABASE_URL export happens later
 # (step 4) and only targets the MERL-T sidecar.
 echo -e "${BLUE}  Bootstrapping platform DB (prisma generate + migrate deploy + seed)...${NC}"
 npx prisma generate > /dev/null 2>&1 || echo -e "${YELLOW}  ⚠ prisma generate failed${NC}"
@@ -187,7 +194,7 @@ if [ -n "$ADMIN_PASSWORD" ]; then
     npm run db:seed || echo -e "${YELLOW}  ⚠ db:seed failed${NC}"
 else
     echo -e "${YELLOW}  ⚠ ADMIN_PASSWORD not set — skipping admin seed (no admin will exist on a fresh DB).${NC}"
-    echo -e "${YELLOW}    Set ADMIN_PASSWORD then run 'npm run db:seed' in backend/ to create one.${NC}"
+    echo -e "${YELLOW}    Set ADMIN_PASSWORD then run 'npm run db:seed' in apps/server/ to create one.${NC}"
 fi
 
 npm run dev &
@@ -196,7 +203,7 @@ echo -e "${GREEN}Platform Backend started (PID: $BACKEND_PID)${NC}"
 
 # 3. Start Frontend (Vite - port 5173)
 echo -e "\n${YELLOW}[3/3] Starting Frontend (port 5173)...${NC}"
-cd "$PROJECT_ROOT/frontend"
+cd "$PROJECT_ROOT/apps/web"
 npm run dev &
 FRONTEND_PID=$!
 echo -e "${GREEN}Frontend started (PID: $FRONTEND_PID)${NC}"
@@ -206,10 +213,10 @@ if [ "$MERLT_ENABLED" = "true" ]; then
     if [ "$MERLT_COMPOSE_ENABLED" = "true" ]; then
         if [ "$MERLT_API_IN_DOCKER" = "true" ]; then
             echo -e "\n${YELLOW}[4/4] Starting MERLT stack (deps + API in Docker)...${NC}"
-            docker compose -f "$MERLT_COMPOSE_FILE" --profile api-in-docker up -d
+            docker compose -f "$MERLT_COMPOSE_FILE" ${MERLT_COMPOSE_ENV[@]+"${MERLT_COMPOSE_ENV[@]}"} --profile api-in-docker up -d
         else
             echo -e "\n${YELLOW}[4/5] Starting MERLT dependencies (deps in Docker, API local)...${NC}"
-            docker compose -f "$MERLT_COMPOSE_FILE" up -d
+            docker compose -f "$MERLT_COMPOSE_FILE" ${MERLT_COMPOSE_ENV[@]+"${MERLT_COMPOSE_ENV[@]}"} up -d
         fi
         MERLT_DB_USER="${MERLT_POSTGRES_USER:-merlt}"
         MERLT_DB_PASSWORD="${MERLT_POSTGRES_PASSWORD:-merlt}"
@@ -273,7 +280,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
         # The RQ worker only exists as a container under --profile api-in-docker;
         # in local mode nothing consumed the queues, so lazy ingestion, note
         # extraction and NER training stayed "in corso" forever. Same three
-        # queues as docker-compose.merlt.yml's merlt-worker command.
+        # queues as infra/compose.yml's merlt-worker command.
         if [ -n "${RQ_REDIS_URL:-}" ]; then
             MERLT_SKIP_SEED=true "$MERLT_PYTHON" -m rq.cli worker merlt_ingest merlt_extract merlt_ner_train --url "$RQ_REDIS_URL" &
             MERLT_WORKER_PID=$!
@@ -302,7 +309,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
     # A healthy api with no worker is a half-working stack (jobs queue forever):
     # say so instead of letting the first ingestion reveal it.
     if [ "$MERLT_COMPOSE_ENABLED" = "true" ] && [ "$MERLT_API_IN_DOCKER" = "true" ]; then
-        if ! docker compose -f "$MERLT_COMPOSE_FILE" --profile api-in-docker ps --status running --services 2>/dev/null | grep -q '^merlt-worker$'; then
+        if ! docker compose -f "$MERLT_COMPOSE_FILE" ${MERLT_COMPOSE_ENV[@]+"${MERLT_COMPOSE_ENV[@]}"} --profile api-in-docker ps --status running --services 2>/dev/null | grep -q '^merlt-worker$'; then
             echo -e "${RED}merlt-worker is not running: lazy ingestion, note extraction and NER training will never complete${NC}"
         fi
     fi
