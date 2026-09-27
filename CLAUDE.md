@@ -248,6 +248,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   way when adding item routes). `POST`/`GET /dossiers/:id/snapshots` are
   scoped to the owner the same way. Write-only from the UI today ("Snapshot"
   in the detail view); there is no restore yet.
+- **`POST /dossiers/:id/items/:itemId/move`** — a move to another dossier is
+  the row itself changing `dossier_id` and `position` (target max + 1), not an
+  `addItem` on the target plus a `deleteItem` on the source. Ownership is
+  checked on **both** dossiers — the target comes from the body, so the URL's
+  dossier proves nothing about it — and the item is scoped to the source. The
+  client's `moveToDossier` reverts a refused item into the source at its old
+  index; leaving it in the target would make every later star or delete there
+  404, since the server still has the row in the source.
 - **Saved-norm change tracking** (`routes/notifications.ts`, all behind
   `authenticate`): `POST /notifications/normas/check` — the reader registers
   `{normaKey, normaData: {norma_data, article_text}}` (Zod, 2 MB cap on the

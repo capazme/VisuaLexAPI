@@ -1668,47 +1668,69 @@ const appStore = createStore<AppState>()(
                 const source = get().dossiers.find(d => d.id === sourceDossierId);
                 const target = get().dossiers.find(d => d.id === targetDossierId);
                 if (!source || !target) return;
-                const itemsToMove = source.items.filter(i => itemIds.includes(i.id));
-                if (itemsToMove.length === 0) return;
+                const requested = source.items.filter(i => itemIds.includes(i.id));
+                if (requested.length === 0) return;
+
+                // An item whose addToDossier POST is still in flight carries a
+                // client temp id the server has never seen. Moving it would 404,
+                // and addToDossier's settle handler would then look for the temp
+                // id in a dossier the item has already left — so skip those and
+                // say so, instead of half-moving the selection.
+                const pending = get().pendingDossierItemIds;
+                const itemsToMove = requested.filter(i => !pending[i.id]);
+                if (itemsToMove.length === 0) {
+                    get().pushSyncError('Gli elementi selezionati non sono ancora salvati. Riprova tra un istante.');
+                    return;
+                }
+                if (itemsToMove.length < requested.length) {
+                    get().pushSyncError('Alcuni elementi non sono ancora salvati e non sono stati spostati. Riprova tra un istante.');
+                }
+
+                // Where each item sat in the source: a refused move has to put it
+                // back there, not at the end.
+                const sourceIndexes = new Map(source.items.map((item, index) => [item.id, index] as const));
 
                 // Optimistic update
                 set((state) => {
                     const s = state.dossiers.find(d => d.id === sourceDossierId);
                     const t = state.dossiers.find(d => d.id === targetDossierId);
                     if (s && t) {
-                        const moving = s.items.filter(i => itemIds.includes(i.id));
-                        s.items = s.items.filter(i => !itemIds.includes(i.id));
+                        const movingIds = itemsToMove.map(i => i.id);
+                        const moving = s.items.filter(i => movingIds.includes(i.id));
+                        s.items = s.items.filter(i => !movingIds.includes(i.id));
                         t.items.push(...moving);
                     }
                 });
 
-                // Server sync: a move is add-to-target + delete-from-source
-                // (in that order, so a failure can't lose the item). The
-                // re-created item gets a fresh server id — swap it into the
-                // store so later updates/deletes hit the right row.
-                void Promise.allSettled(
-                    itemsToMove.map(async (item) => {
-                        const created = await dossierService.addItem(targetDossierId, {
-                            itemType: item.type === 'norma' ? 'norm' : 'note',
-                            title: item.type === 'norma' ? (item.data?.tipo_atto || 'Norma') : 'Nota',
-                            content: item.data,
-                        });
-                        await dossierService.deleteItem(sourceDossierId, item.id);
-                        set((state) => {
-                            const t = state.dossiers.find(d => d.id === targetDossierId);
-                            const moved = t?.items.find(i => i.id === item.id);
-                            if (moved) {
-                                moved.id = created.id;
-                            }
-                        });
-                    })
-                ).then((results) => {
-                    const failedCount = results.filter(r => r.status === 'rejected').length;
-                    if (failedCount > 0) {
-                        console.error(`moveToDossier: ${failedCount}/${itemsToMove.length} items failed to sync`);
+                // Server sync: the server moves each row itself (dossier_id and
+                // position), so there is no id to reconcile and nothing to delete
+                // on the source. One call at a time, in the order the items sit in
+                // the source, so the target's stored order matches what the user
+                // just saw. A refusal is reverted item by item — leaving an item in
+                // the target while the server still has it in the source would make
+                // every later star or delete there 404.
+                void (async () => {
+                    let failed = 0;
+                    for (const item of itemsToMove) {
+                        try {
+                            await dossierService.moveItem(sourceDossierId, item.id, targetDossierId);
+                        } catch (err) {
+                            failed += 1;
+                            console.error('Failed to move dossier item:', err);
+                            set((state) => {
+                                const s = state.dossiers.find(d => d.id === sourceDossierId);
+                                const t = state.dossiers.find(d => d.id === targetDossierId);
+                                if (!s || !t) return;
+                                t.items = t.items.filter(i => i.id !== item.id);
+                                const at = Math.min(sourceIndexes.get(item.id) ?? s.items.length, s.items.length);
+                                s.items.splice(at, 0, item);
+                            });
+                        }
+                    }
+                    if (failed > 0) {
                         get().pushSyncError('Impossibile spostare alcuni elementi tra i dossier. Riprova.');
                     }
-                });
+                })();
             },
 
             importDossier: async (dossier) => {
