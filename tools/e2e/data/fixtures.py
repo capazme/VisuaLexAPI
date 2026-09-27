@@ -3,8 +3,8 @@
 Data-only module (stdlib only, no aiohttp). URN shapes verified against
 visualex_api/tools/map.py ("codice civile" -> "regio.decreto:1942-03-16;262:2"),
 urngenerator.py (base_url + "!vig=" version suffix) and
-backend/tests/integration/merlt/graph-routes.test.ts. The FalkorDB seed
-(merlt/data/seeds/libro-iv-cc-graph.json) stores the same full-URL form
+apps/server/tests/integration/merlt/graph-routes.test.ts. The FalkorDB seed
+(services/merlt/data/seeds/libro-iv-cc-graph.json) stores the same full-URL form
 WITHOUT the "!vig=" marker — the BFF's normalizeGraphUrn strips it.
 """
 from __future__ import annotations
@@ -45,7 +45,7 @@ SEARCH_BODIES: list[dict] = [
 SEEDED_GRAPH_URNS: list[str] = [cc_urn(art) for art in WARM_ARTICLES]
 
 
-# ---- tracking event payload factories (Zod: backend/src/schemas/merlt/events.ts) ----
+# ---- tracking event payload factories (Zod: apps/server/src/schemas/merlt/events.ts) ----
 
 def article_viewed_payload(urn: str, run_id: str) -> dict:
     return {

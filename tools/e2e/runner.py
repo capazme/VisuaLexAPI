@@ -30,9 +30,9 @@ FAST_SKIP_TAGS = frozenset(
 BRING_UP_HINT = """
 Stack non avviato o incompleto — lancialo in un altro terminale:
 
-  cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI
-  # prima volta / dopo modifiche a merlt/ (il codice e' baked nell'immagine):
-  docker compose -f docker-compose.merlt.yml --profile api-in-docker build
+  cd "$(git rev-parse --show-toplevel)"
+  # prima volta / dopo modifiche a services/merlt/ (il codice e' baked nell'immagine):
+  docker compose -f infra/compose.yml --profile api-in-docker build
 
   MERLT_ENABLED=true MERLT_COMPOSE_ENABLED=true MERLT_API_IN_DOCKER=true \\
   ADMIN_PASSWORD='<admin-pw>' OPENROUTER_API_KEY='<key-or-empty>' ./start.sh

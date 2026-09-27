@@ -55,10 +55,10 @@
     {
       "id": "EXPERTS_503",
       "severity": "high",
-      "description": "POST /api/v1/api/experts/query returns 503 - OpenRouter AI service not available. Needs OPENROUTER_API_KEY in merlt/.env",
+      "description": "POST /api/v1/api/experts/query returns 503 - OpenRouter AI service not available. Needs OPENROUTER_API_KEY in services/merlt/.env",
       "affected_endpoints": 2,
       "file": "experts_router.py",
-      "fix": "Ensure OPENROUTER_API_KEY is set in merlt/.env and the service is reachable"
+      "fix": "Ensure OPENROUTER_API_KEY is set in services/merlt/.env and the service is reachable"
     },
     {
       "id": "ENRICHMENT_500",

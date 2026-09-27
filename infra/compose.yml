@@ -23,6 +23,9 @@
 # Variabili: vedi .env.merlt.example (compose) e backend/.env.example (BFF);
 # runbook completo in docs/merlt/integration.md.
 
+# Interim (monorepo move): keep the project name the volumes carry today.
+name: visualexapi
+
 services:
   merlt-postgres:
     image: postgres:16-alpine
@@ -95,7 +98,7 @@ services:
   # The FastMCP server serves Streamable HTTP at the MCP_PATH (/mcp).
   mcp-legal-it:
     build:
-      context: ./vendor/mcp-legal-it
+      context: ../vendor/mcp-legal-it
       dockerfile: Dockerfile
     container_name: visualex-mcp-legal-it
     profiles: ["api-in-docker"]
@@ -120,7 +123,7 @@ services:
 
   merlt-api:
     build:
-      context: ./merlt
+      context: ../services/merlt
       dockerfile: Dockerfile
     container_name: visualex-merlt-api
     profiles: ["api-in-docker"]
@@ -251,7 +254,7 @@ services:
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
     volumes:
       # Seeds + dumps for the Slice 2a boot loader. Read-only, host filesystem.
-      - ./merlt/data:/app/data:ro
+      - ../services/merlt/data:/app/data:ro
       # Shared uploads dir: the api receives the file, the worker reads it for
       # extraction (Slice 2c) — must be the same volume across both services.
       - merlt_uploads:/app/uploads
@@ -279,7 +282,7 @@ services:
 
   merlt-worker:
     build:
-      context: ./merlt
+      context: ../services/merlt
       dockerfile: Dockerfile
     container_name: visualex-merlt-worker
     profiles: ["api-in-docker"]
@@ -367,7 +370,7 @@ services:
       MERLT_DATA_DIR: "/app/data"
     volumes:
       # Parity with merlt-api; ingest scrapes live but keep the data mount available.
-      - ./merlt/data:/app/data:ro
+      - ../services/merlt/data:/app/data:ro
       # Shared uploads dir: the api receives the file, the worker reads it for
       # extraction (Slice 2c) — must be the same volume across both services.
       - merlt_uploads:/app/uploads

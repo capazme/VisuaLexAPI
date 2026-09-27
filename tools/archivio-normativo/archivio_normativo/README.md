@@ -7,16 +7,23 @@ built on the VisuaLex API. Design and rationale:
 
 ## Prerequisites
 
-- The VisuaLex Python API running locally (`source .venv/bin/activate && python app.py`,
-  port 5000). The archive never starts it.
+- The VisuaLex Python API running locally (`cd services/visualex && source
+  .venv/bin/activate && python app.py`, port 5000). The archive never starts it.
 - For enrichment beyond Brocardi (case law, Consulta, Garante, EU↔IT): the
   `legal-it` MCP server, reachable through the command in
   `providers.legalit.command` (or `LEGALIT_MCP_COMMAND`, a JSON list), and
-  `pip install -r requirements-archivio.txt` in the project venv.
+  `pip install -r tools/archivio-normativo/requirements-archivio.txt` in the
+  API's venv (`services/visualex/.venv`).
 
 ## Commands
 
+Run from `tools/archivio-normativo` with the API's venv active. The package
+reads the ordinal-suffix table from `visualex_api`, so that folder goes on
+`PYTHONPATH` (the tests get it from `pytest.ini`):
+
 ```bash
+cd tools/archivio-normativo
+export PYTHONPATH=../../services/visualex
 python -m archivio_normativo build --dry-run                 # what would happen, no writes
 python -m archivio_normativo build                           # everything in the manifest
 python -m archivio_normativo build --only cc,gdpr            # some acts
@@ -46,7 +53,7 @@ A long build (a fresh archive, or `--full`) outlives a terminal session, so
 run it detached and check on it separately:
 
 ```bash
-mkdir -p archivio_out && nohup .venv/bin/python -m archivio_normativo build > archivio_out/build.txt 2>&1 &
+mkdir -p archivio_out && nohup ../../services/visualex/.venv/bin/python -m archivio_normativo build > archivio_out/build.txt 2>&1 &
 python -m archivio_normativo report                # progress / last run's stats
 ```
 
@@ -78,7 +85,8 @@ rendering.
 ## Editing the manifest
 
 Every act is an entry under `acts:`; unknown keys are errors. Codici need only
-`act_type` (the names VisuaLex knows, see `visualex_api/tools/map.py`);
+`act_type` (the names VisuaLex knows, see
+`services/visualex/visualex_api/tools/map.py`);
 other acts carry `date` and `act_number`; EU acts carry `celex` and may name a
 consolidated version with `celex_consolidated`. `cite` is how you would write
 the act in a citation — it composes the references sent to legal-it. Run

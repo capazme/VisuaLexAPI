@@ -1,7 +1,7 @@
 # Harness E2E + Stress — VisuaLex
 
 Suite di collaudo end-to-end e di carico per lo stack locale (API Python :5000,
-BFF Node :3001, sidecar MERL-T :8000). E' un pacchetto Python autonomo in `e2e/`:
+BFF Node :3001, sidecar MERL-T :8000). E' un pacchetto Python autonomo in `tools/e2e/`:
 **non tocca il codice dell'app**, parla solo HTTP. Non usa pytest: ogni "flow" e'
 un percorso utente reale (login → azione → verifica) con asserzioni proprie e
 report finale. Unica dipendenza extra: `aiohttp` (Python ≥ 3.11).
@@ -14,9 +14,9 @@ l'admin via `POST /api/admin/users`. Serve quindi l'admin seedato.
 1. Stack acceso, in un terminale separato (l'harness non avvia processi):
 
 ```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI
-# prima volta / dopo modifiche a merlt/ (il codice e' cotto nell'immagine):
-docker compose -f docker-compose.merlt.yml --profile api-in-docker build
+cd "$(git rev-parse --show-toplevel)"
+# prima volta / dopo modifiche a services/merlt/ (il codice e' cotto nell'immagine):
+docker compose -f infra/compose.yml --profile api-in-docker build
 
 # stack completo CON worker — tutti e tre i flag a true:
 MERLT_ENABLED=true MERLT_COMPOSE_ENABLED=true MERLT_API_IN_DOCKER=true \
@@ -47,7 +47,7 @@ ADMIN_PASSWORD='<admin-pw>' OPENROUTER_API_KEY='<key-o-vuota>' ./start.sh
 ## I 3 modi d'uso
 
 ```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI
+cd "$(git rev-parse --show-toplevel)/tools"
 
 # 1) Solo diagnosi: verifica lo stack e mappa i problemi sui gap dell'audit, poi esce
 E2E_ADMIN_PASSWORD='...' python3 -m e2e.runner --preflight-only
@@ -70,6 +70,7 @@ Exit code = numero di flussi falliti.
 ## Stress
 
 ```bash
+cd "$(git rev-parse --show-toplevel)/tools"
 E2E_ADMIN_PASSWORD='...' python3 -m e2e.stress --users 10 --duration 60
 # opzionale: warm-up di 5 articoli + re-hit SOLO su cache a <=0.5 rps globali
 E2E_ADMIN_PASSWORD='...' python3 -m e2e.stress --users 10 --duration 60 --include-search-cached
@@ -82,7 +83,7 @@ locali (eventi MERL-T, letture grafo, CRUD Prisma). Con `--include-search-cached
 gli unici hit scraper sono i 5 del warm-up iniziale; poi si rilegge la cache.
 Guardrail fissi: max 50 utenti, max 600s (`--i-know-what-im-doing` li alza, ma
 NON riattiva mai gli scraper). Soglie: err% < 1, p95 tracking < 500ms,
-grafo < 1500ms, CRUD < 800ms — sforate ⇒ exit ≠ 0. Report: `e2e/out/stress-<run>.json`.
+grafo < 1500ms, CRUD < 800ms — sforate ⇒ exit ≠ 0. Report: `tools/e2e/out/stress-<run>.json`.
 
 ## Flussi
 
@@ -103,7 +104,7 @@ grafo < 1500ms, CRUD < 800ms — sforate ⇒ exit ≠ 0. Report: `e2e/out/stress
 
 ## Interpretare il report
 
-Fine run: tabella a console (PASS/FAIL/SKIPPED per flow) + `e2e/out/report-<run>.json`.
+Fine run: tabella a console (PASS/FAIL/SKIPPED per flow) + `tools/e2e/out/report-<run>.json`.
 Nel JSON: `flows[]` con esito e durata, `steps[]` con ogni richiesta HTTP
 (metodo, URL, status, latenza, dettaglio d'errore). Uno SKIPPED e' sempre
 motivato (`detail`), mai silenzioso. `known_issue` marca i difetti noti
@@ -126,7 +127,7 @@ come regressioni nuove.
   preflight (check 5 e 6). Il worker deve ascoltare `merlt_ingest merlt_extract
   merlt_ner_train`.
 - **503 da `/ops/rlcf/training/start`** → `MERLT_API_KEY` mancante o errata in
-  `backend/.env` (gap G): impostala e riavvia il BFF. Nota: `{success:false,
+  `apps/server/.env` (gap G): impostala e riavvia il BFF. Nota: `{success:false,
   "Buffer insufficiente (N/50)"}` NON e' un errore — e' il comportamento atteso
   finche' non c'e' abbastanza feedback.
 - **Spinner ingestion infinito / side rail che non si popola** → preflight 5/6:

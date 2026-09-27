@@ -2,7 +2,7 @@
 
 Enqueued by `merlt.api.ingestion_mechanical_router` on the existing
 `merlt_ingest` queue (no new queue name — the worker already listens on it,
-see `docker-compose.merlt.yml`'s worker `command`). Both entrypoints are sync
+see `infra/compose.yml`'s worker `command`). Both entrypoints are sync
 (RQ requirement) wrapping the async pipeline.
 
 GOTCHA (CLAUDE.md #6): the RQ worker has no FastAPI lifespan, so the

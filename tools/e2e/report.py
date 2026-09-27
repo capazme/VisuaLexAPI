@@ -2,7 +2,7 @@
 
 Flows record steps through the Report object; the client auto-records
 request latency under the currently-open flow/step. At the end the runner
-prints a console summary and writes a JSON artifact under e2e/out/.
+prints a console summary and writes a JSON artifact under tools/e2e/out/.
 """
 from __future__ import annotations
 

@@ -15,6 +15,9 @@ jobs:
   python:
     name: Python tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/visualex
     strategy:
       matrix:
         python-version: ['3.12', '3.14']
@@ -26,7 +29,10 @@ jobs:
       # requirements-dev.txt pulls requirements.txt, so the runtime deps the
       # tests import are installed too.
       - run: pip install -r requirements-dev.txt
-      - run: pytest tests/ -q
+      - run: python -m pytest tests/ -q
+      - name: Archive CLI tests
+        working-directory: tools/archivio-normativo
+        run: python -m pytest tests/ -q
 
   frontend:
     name: Frontend build, test, lint
@@ -41,22 +47,22 @@ jobs:
           # with "Missing: @esbuild/... from lock file".
           node-version: '24'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
-        working-directory: frontend
+        working-directory: apps/web
       - run: npm run test -- --run
-        working-directory: frontend
+        working-directory: apps/web
       # `tsc -b` is the real type-check: a bare `tsc --noEmit` does not walk the
       # project references and reports a false green.
       - run: npm run build
-        working-directory: frontend
+        working-directory: apps/web
       - run: npm run lint
-        working-directory: frontend
+        working-directory: apps/web
 
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
-    # backend/tests/setup.ts runs `prisma migrate reset --force` in beforeAll and
+    # apps/server/tests/setup.ts runs `prisma migrate reset --force` in beforeAll and
     # TRUNCATEs every table in beforeEach, both against a live database, so this
     # job needs a real Postgres or it cannot pass at all.
     services:
@@ -79,7 +85,7 @@ jobs:
       # `npm run test` is `dotenv -e .env.test -- vitest run`, and dotenv-cli
       # calls dotenv.config({ override: false }) unless -o is passed, so a
       # variable already in the environment wins over the file. That is what
-      # lets this URL replace the developer-local one in backend/.env.test
+      # lets this URL replace the developer-local one in apps/server/.env.test
       # without touching that file. JWT_SECRET and REDIS_ENABLED still come
       # from .env.test.
       DATABASE_URL: postgresql://visualex:visualex@localhost:5432/visualex_test
@@ -93,18 +99,18 @@ jobs:
           # with "Missing: @esbuild/... from lock file".
           node-version: '24'
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: apps/server/package-lock.json
       - run: npm ci
-        working-directory: backend
+        working-directory: apps/server
       - run: npx prisma generate
-        working-directory: backend
+        working-directory: apps/server
       - run: npm run test
-        working-directory: backend
+        working-directory: apps/server
 
   merlt:
     name: MERL-T python tests
     runs-on: ubuntu-latest
-    # The vendored sidecar (merlt/) has its own suite. Tests marked
+    # The vendored sidecar (services/merlt/) has its own suite. Tests marked
     # `integration` (live FalkorDB) are excluded by pyproject's addopts; the
     # DB-backed ones run against this Postgres after create_tables() plus the
     # boot-time schema additions, the same way the api bootstraps itself.
@@ -132,15 +138,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          # The image is python:3.11-slim (merlt/Dockerfile).
+          # The image is python:3.11-slim (services/merlt/Dockerfile).
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: merlt/pyproject.toml
+          cache-dependency-path: services/merlt/pyproject.toml
       # CPU wheels first, as the Dockerfile does: the default index pulls the
       # CUDA build (several GB) for nothing.
       - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - run: pip install -e ".[dev]"
-        working-directory: merlt
+        working-directory: services/merlt
       - run: |
           python -c "
           import asyncio
@@ -152,6 +158,6 @@ jobs:
               await ensure_schema_additions()
           asyncio.run(main())
           "
-        working-directory: merlt
+        working-directory: services/merlt
       - run: python -m pytest tests/ -q -p no:cacheprovider
-        working-directory: merlt
+        working-directory: services/merlt

@@ -19,11 +19,11 @@ import aiohttp
 
 from e2e.config import CONFIG, Config
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-BACKEND_DIR = REPO_ROOT / "backend"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = REPO_ROOT / "apps" / "server"
 BACKEND_ENV = BACKEND_DIR / ".env"
 
-# container_name values declared in docker-compose.merlt.yml
+# container_name values declared in infra/compose.yml
 CONTAINERS = (
     "visualex-merlt-postgres",
     "visualex-merlt-redis",
@@ -197,14 +197,14 @@ def build_checks(cfg: Config, session: aiohttp.ClientSession,
 
     async def c7_api_key() -> tuple[bool, str]:
         if _env_file_value(BACKEND_ENV, "MERLT_API_KEY"):
-            return True, "set in backend/.env (functional probe lives in flow ops)"
-        return False, "missing in backend/.env -> flow ops will 503 (gap G)"
+            return True, "set in apps/server/.env (functional probe lives in flow ops)"
+        return False, "missing in apps/server/.env -> flow ops will 503 (gap G)"
 
     async def c8_internal_secret() -> tuple[bool, str]:
         problems: list[str] = []
         bff_secret = _env_file_value(BACKEND_ENV, "MERLT_INTERNAL_SECRET")
         if not bff_secret:
-            problems.append("MERLT_INTERNAL_SECRET missing in backend/.env")
+            problems.append("MERLT_INTERNAL_SECRET missing in apps/server/.env")
         rc, out = await _run_cmd("docker", "exec", "visualex-merlt-worker",
                                  "printenv", "MERLT_INTERNAL_SECRET")
         if rc != 0:

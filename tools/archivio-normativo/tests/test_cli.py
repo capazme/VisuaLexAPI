@@ -6,7 +6,7 @@ import yaml
 from archivio_normativo import cli
 from archivio_normativo.cli import async_main
 from archivio_normativo.store import Store
-from tests.archivio.fake_visualex import FakeVisuaLex
+from tests.fake_visualex import FakeVisuaLex
 
 CC_URL = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262"
 

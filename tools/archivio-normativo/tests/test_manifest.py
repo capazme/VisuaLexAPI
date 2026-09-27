@@ -9,7 +9,7 @@ from archivio_normativo.manifest import (
     AREAS, KINDS, ManifestError, expand_kinds, load_manifest, parse_article_selection,
 )
 
-SHIPPED = Path(__file__).resolve().parents[2] / "archivio_normativo" / "manifest.yaml"
+SHIPPED = Path(__file__).resolve().parents[1] / "archivio_normativo" / "manifest.yaml"
 
 
 def write(tmp_path, data):

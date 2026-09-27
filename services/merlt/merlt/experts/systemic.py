@@ -49,7 +49,7 @@ log = structlog.get_logger()
 # policy call, no trace recording). DEFAULT OFF, mirroring the repo's learned-
 # behaviour precedent (MERLT_NER_LEARNED_ENABLED): a trained checkpoint sitting
 # on the durable volume must not change systemic retrieval on deploy without an
-# explicit opt-in. The dev compose (docker-compose.merlt.yml) sets it "true" so
+# explicit opt-in. The dev compose (infra/compose.yml) sets it "true" so
 # the steer→traversal loop is live where it is actively verified. Read once and
 # cached; tests reset via _reset_neural_traversal_flag_for_tests().
 _NEURAL_TRAVERSAL_ENV = "MERLT_NEURAL_TRAVERSAL_ENABLED"

@@ -2,7 +2,7 @@ import aiohttp
 import pytest
 
 from archivio_normativo.throttle import Throttle
-from tests.archivio.fake_visualex import FakeVisuaLex
+from tests.fake_visualex import FakeVisuaLex
 
 
 @pytest.fixture

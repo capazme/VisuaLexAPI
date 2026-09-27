@@ -3,7 +3,7 @@
 Both `success:true` (run started) and `success:false` with the
 "Buffer insufficiente (N/50)" message are PASS - the Pydantic floor ge=50 on
 the feedback buffer is documented behavior, not a bug. A 503 with the rest of
-the MERL-T stack green is gap G (MERLT_API_KEY missing/wrong in backend/.env:
+the MERL-T stack green is gap G (MERLT_API_KEY missing/wrong in apps/server/.env:
 opsClient must send it as X-API-Key, and without it MERL-T 401s every call,
 which the BFF maps to 503 merlt_unavailable).
 """
@@ -33,7 +33,7 @@ async def run(ctx: Context, report: Report) -> None:
         if status == 503:
             raise StepFailure(
                 "503 merlt_unavailable dalla ops route: con lo stack MERL-T sano questo "
-                "e' il gap G. Rimedio: imposta MERLT_API_KEY in backend/.env (opsClient "
+                "e' il gap G. Rimedio: imposta MERLT_API_KEY in apps/server/.env (opsClient "
                 "la manda come header X-API-Key) e riavvia il BFF.",
                 {"response": body},
             )

@@ -38,12 +38,12 @@ Connection setup mirrors ``load_seed_libro_iv.py``:
 
 Run (post-rebuild, inside the merlt-api container):
 
-    docker compose -f docker-compose.merlt.yml exec merlt-api \\
+    docker compose -f infra/compose.yml exec merlt-api \\
         python -m merlt.scripts.backfill_data_quality
 
 Dry-run first to see the counts without mutating anything:
 
-    docker compose -f docker-compose.merlt.yml exec merlt-api \\
+    docker compose -f infra/compose.yml exec merlt-api \\
         python -m merlt.scripts.backfill_data_quality --dry-run
 """
 

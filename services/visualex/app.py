@@ -1458,7 +1458,10 @@ class NormaController:
         from pathlib import Path
 
         # Get the project root directory (where app.py is located)
-        project_root = Path(__file__).parent
+        project_root = Path(__file__).resolve().parent
+        # version.txt is the product's version and lives at the repository root,
+        # two levels above services/visualex/.
+        repo_root = project_root.parents[1]
 
         def run_git_command(args: list[str]) -> str:
             try:
@@ -1475,7 +1478,7 @@ class NormaController:
 
         # Read version from version.txt
         version = '1.0.0'
-        version_file = project_root / 'version.txt'
+        version_file = repo_root / 'version.txt'
         if version_file.exists():
             try:
                 version = version_file.read_text().strip()
@@ -1495,7 +1498,7 @@ class NormaController:
         # development step; visualex_api/tools/changelog.py drops the rest.
         version_file_log = await asyncio.to_thread(
             run_git_command,
-            ['log', '-n', '2', '--format=%h', '--', 'version.txt']
+            ['log', '-n', '2', '--format=%h', '--', ':/version.txt']
         )
         changelog_raw = await asyncio.to_thread(
             run_git_command,

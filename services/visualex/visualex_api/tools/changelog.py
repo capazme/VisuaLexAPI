@@ -112,9 +112,9 @@ def _select(parsed: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
 def changelog_boundary(version_file_log: str) -> Optional[str]:
     """Where the current version's news starts.
 
-    Takes `git log -n 2 --format=%h -- version.txt`. The deploy script stamps
-    `version.txt` after building, so everything above the previous stamp is what
-    this version brought. Returns None before a second release exists, which
+    Takes `git log -n 2 --format=%h -- :/version.txt`. Each release stamps
+    `version.txt`, so everything above the previous stamp is what this version
+    brought. Returns None before a second release exists, which
     leaves the changelog unwindowed.
     """
     bumps = [line.strip() for line in version_file_log.splitlines() if line.strip()]
