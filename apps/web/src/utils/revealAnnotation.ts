@@ -1,5 +1,5 @@
 export interface AnnotationTarget {
-  kind: 'note' | 'highlight';
+  kind: 'note' | 'highlight' | 'thread';
   id: string;
 }
 
@@ -17,7 +17,12 @@ const quoted = (value: string): string => `"${value.replace(/["\\]/g, '\\$&')}"`
  * from) when there is one. False when the annotation is not in the text.
  */
 export function revealAnnotation(root: ParentNode, target: AnnotationTarget, near?: Element | null): boolean {
-  const attribute = target.kind === 'note' ? 'data-note-id' : 'data-highlight';
+  const attribute =
+    target.kind === 'note'
+      ? 'data-note-id'
+      : target.kind === 'thread'
+        ? 'data-thread-focus'
+        : 'data-highlight';
   const pieces = [...root.querySelectorAll<HTMLElement>(`[${attribute}=${quoted(target.id)}]`)];
   if (pieces.length === 0) return false;
   const first = (near && pieces.find((piece) => near.contains(piece))) || pieces[0];

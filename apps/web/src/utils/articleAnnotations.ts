@@ -9,17 +9,26 @@
  * shows. Offsets are plain-text offsets — `article_text` without its
  * newlines (CLAUDE.md gotcha 23).
  */
-import type { Annotation, Highlight } from '../types';
+import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../types';
 import type { ArticleStructure, StructureBlock } from './articleStructure';
 import { HIGHLIGHT_COLORS, type HighlightColor } from './highlightColors';
 
+/** A passage discussion located in the text on screen (never a detached one). */
+export interface LocatedThread {
+  thread: ArticleDiscussionPassageSummary;
+  start: number; // plain-text offsets, from locatePassage
+  end: number;
+}
+
 export type ResolvedAnchor =
   | { kind: 'highlight'; highlight: Highlight; start: number; end: number }
-  | { kind: 'note'; note: Annotation; start: number; end: number };
+  | { kind: 'note'; note: Annotation; start: number; end: number }
+  | { kind: 'thread'; thread: ArticleDiscussionPassageSummary; start: number; end: number };
 
 export interface BlockAnnotations {
   notes: Annotation[];
   highlights: Highlight[];
+  threads: ArticleDiscussionPassageSummary[];
 }
 
 /**
@@ -93,8 +102,16 @@ export function groupAnnotationsByBlock(
   structure: ArticleStructure,
   highlights: readonly Highlight[],
   annotations: readonly Annotation[],
+  threads: readonly LocatedThread[] = [],
 ): BlockAnnotations[] {
-  return groupAnchorsByBlock(raw, structure, resolveAnchors(raw.replace(/\n/g, ''), highlights, annotations));
+  const anchors = resolveAnchors(raw.replace(/\n/g, ''), highlights, annotations);
+  const threadAnchors: ResolvedAnchor[] = threads.map((lt) => ({
+    kind: 'thread',
+    thread: lt.thread,
+    start: lt.start,
+    end: lt.end,
+  }));
+  return groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]);
 }
 
 /** `groupAnnotationsByBlock` over anchors already resolved (the renderer has them). */
@@ -110,7 +127,7 @@ export function groupAnchorsByBlock(
   const plainAt = (rawIndex: number) => plainBefore[Math.min(Math.max(rawIndex, 0), raw.length)];
 
   return structure.blocks.map((block) => {
-    const group: BlockAnnotations = { notes: [], highlights: [] };
+    const group: BlockAnnotations = { notes: [], highlights: [], threads: [] };
     if (block.kind === 'update-sep') return group;
     const start = plainAt(block.start);
     const end = plainAt(block.end);
@@ -121,8 +138,14 @@ export function groupAnchorsByBlock(
     for (const { anchor } of hits) {
       if (anchor.kind === 'note') {
         if (!group.notes.includes(anchor.note)) group.notes.push(anchor.note);
-      } else if (!group.highlights.includes(anchor.highlight)) {
-        group.highlights.push(anchor.highlight);
+      } else if (anchor.kind === 'highlight') {
+        if (!group.highlights.includes(anchor.highlight)) {
+          group.highlights.push(anchor.highlight);
+        }
+      } else if (anchor.kind === 'thread') {
+        if (!group.threads.includes(anchor.thread)) {
+          group.threads.push(anchor.thread);
+        }
       }
     }
     return group;
@@ -130,7 +153,7 @@ export function groupAnchorsByBlock(
 }
 
 export const hasAnnotations = (group: BlockAnnotations | undefined): group is BlockAnnotations =>
-  !!group && group.notes.length + group.highlights.length > 0;
+  !!group && group.notes.length + group.highlights.length + group.threads.length > 0;
 
 /**
  * The highlights no block's sign shows: those of another section of the
@@ -155,11 +178,15 @@ export function signColors(highlights: readonly Highlight[]): HighlightColor[] {
 }
 
 /** What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". */
-export function signAriaLabel(notes: number, highlights: number): string {
+export function signAriaLabel(notes: number, highlights: number, threads = 0): string {
   const parts: string[] = [];
   if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'nota' : 'note'}`);
   if (highlights > 0) parts.push(`${highlights} ${highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}`);
-  return `${parts.join(' e ')} in questo passo`;
+  if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'discussione' : 'discussioni'}`);
+  if (parts.length === 0) return 'in questo passo';
+  if (parts.length === 1) return `${parts[0]} in questo passo`;
+  if (parts.length === 2) return `${parts[0]} e ${parts[1]} in questo passo`;
+  return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]} in questo passo`;
 }
 
 const OPENING_CHARS = 48;

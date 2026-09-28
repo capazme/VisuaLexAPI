@@ -27,6 +27,8 @@ import {
   signAriaLabel,
   signColors,
   type BlockAnnotations,
+  type LocatedThread,
+  type ResolvedAnchor,
 } from './articleAnnotations';
 
 export interface RenderArticleInput {
@@ -42,9 +44,13 @@ export interface RenderArticleInput {
    * no blocks and ignores it.
    */
   signs?: boolean;
+  /** Passage discussions located in this text: counted on the signs. */
+  threads?: readonly LocatedThread[];
+  /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
+  focusedThreadId?: string | null;
 }
 
-type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'search';
+type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread' | 'search';
 
 /**
  * Nesting order, outermost first. The printed enumerator is outermost and so
@@ -61,10 +67,11 @@ const RANK: Record<MarkKind, number> = {
   notice: 3,
   note: 4,
   highlight: 5,
-  search: 6,
-  'mod-paren': 7,
-  'rubric-paren': 7,
-  hidden: 8,
+  thread: 6,
+  search: 7,
+  'mod-paren': 8,
+  'rubric-paren': 8,
+  hidden: 9,
 };
 
 interface Mark {
@@ -140,6 +147,26 @@ export function renderArticleHtml(input: RenderArticleInput): string {
     else pushPlain(anchor.start, anchor.end, 'note', noteOpen(anchor.note), '</span>');
   }
 
+  const threadAnchors: ResolvedAnchor[] = (input.threads ?? []).map((lt) => ({
+    kind: 'thread',
+    thread: lt.thread,
+    start: lt.start,
+    end: lt.end,
+  }));
+
+  if (input.focusedThreadId) {
+    const focused = input.threads?.find((t) => t.thread.id === input.focusedThreadId);
+    if (focused) {
+      pushPlain(
+        focused.start,
+        focused.end,
+        'thread',
+        `<span class="vlx-thread-focus" data-thread-focus="${escapeAttr(focused.thread.id)}">`,
+        '</span>',
+      );
+    }
+  }
+
   const query = input.searchQuery;
   if (query && query.length >= 2) {
     const needle = query.toLowerCase();
@@ -163,7 +190,7 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   }
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
-  const groups = input.signs ? groupAnchorsByBlock(raw, structure, anchors) : null;
+  const groups = input.signs ? groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]) : null;
   return renderBlocks(raw, structure, marks, groups);
 }
 
@@ -215,12 +242,14 @@ function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[], g
 function signHtml(index: number, group: BlockAnnotations | undefined): string {
   const notes = group?.notes.length ?? 0;
   const highlights = group?.highlights.length ?? 0;
-  if (!group || notes + highlights === 0) return '';
+  const threads = group?.threads.length ?? 0;
+  if (!group || notes + highlights + threads === 0) return '';
   let html =
     `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
-    ` data-notes="${notes}" data-highlights="${highlights}" aria-label="${signAriaLabel(notes, highlights)}">`;
+    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}" aria-label="${signAriaLabel(notes, highlights, threads)}">`;
   if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
   for (const color of signColors(group.highlights)) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
+  if (threads > 0) html += `<span class="vlx-sign-threads" data-count="${threads}"></span>`;
   return `${html}</span>`;
 }
 

@@ -25,5 +25,21 @@ describe('revealAnnotation', () => {
     root.innerHTML = '<span data-note-id="n1">x</span>';
     expect(revealAnnotation(root, { kind: 'note', id: 'n"]x' })).toBe(false);
     expect(revealAnnotation(root, { kind: 'highlight', id: 'n1' })).toBe(false);
+    expect(revealAnnotation(root, { kind: 'thread', id: 't1' })).toBe(false);
+  });
+
+  it('scrolls to and flashes a thread focus mark', () => {
+    vi.useFakeTimers();
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<div class="vlx-b" id="b1"><span class="vlx-thread-focus" data-thread-focus="t1">testo discusso</span></div>';
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+    expect(revealAnnotation(root, { kind: 'thread', id: 't1' })).toBe(true);
+    const piece = root.querySelector('.vlx-thread-focus')!;
+    expect(scroll).toHaveBeenCalled();
+    expect(piece.classList.contains('vlx-flash')).toBe(true);
+    vi.advanceTimersByTime(1600);
+    expect(piece.classList.contains('vlx-flash')).toBe(false);
+    scroll.mockRestore();
   });
 });

@@ -10,13 +10,28 @@ import {
 } from './articleAnnotations';
 import { parseArticleStructure } from './articleStructure';
 import { fixtureText } from './__fixtures__/articleTexts';
-import type { Annotation, Highlight } from '../types';
+import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../types';
+import type { LocatedThread } from './articleAnnotations';
 
 const hl = (id: string, text: string, startOffset: number | undefined, color: Highlight['color'] = 'yellow'): Highlight => ({
   id, normaKey: 'k', articleId: '1', rangeSerialized: '', text, color, startOffset,
 });
 const note = (id: string, anchorText: string, startOffset: number): Annotation => ({
   id, normaKey: 'k', articleId: '1', text: `nota ${id}`, createdAt: '2026-09-25', anchorText, startOffset,
+});
+const thread = (id: string, start: number, end: number): LocatedThread => ({
+  thread: {
+    id,
+    title: `thread ${id}`,
+    passage: { quote: 'q', start, prefix: '', suffix: '' },
+    articleUrn: null,
+    textHash: null,
+    commentCount: 0,
+    createdAt: '2026-09-28',
+    user: { id: 'u1', username: 'marta' },
+  },
+  start,
+  end,
 });
 
 // c.c. 1453: 0 heading, 1 rubric, 2-4 the three commi.
@@ -65,6 +80,18 @@ describe('groupAnnotationsByBlock', () => {
     expect(groups.every((g) => !hasAnnotations(g))).toBe(true);
   });
 
+  it('puts a located thread in the group of the block that shows its words, and under both when crossing two commi', () => {
+    const single = thread('t1', at('prestazioni'), at('prestazioni') + 10);
+    const acrossStart = at('danno.');
+    const acrossEnd = at('La risoluzione') + 5;
+    const across = thread('t2', acrossStart, acrossEnd);
+
+    const groups = groupAnnotationsByBlock(RAW, STRUCTURE, [], [], [single, across]);
+    expect(groups[2].threads.map((t) => t.id)).toEqual(['single' === 'single' ? 't1' : '', 't2'].filter(Boolean));
+    expect(groups[3].threads.map((t) => t.id)).toEqual(['t2']);
+    expect(hasAnnotations(groups[2])).toBe(true);
+  });
+
   it('puts each annotation under the block that shows it, in the order it appears', () => {
     const groups = groupAnnotationsByBlock(
       RAW,
@@ -75,7 +102,7 @@ describe('groupAnnotationsByBlock', () => {
     expect(ids(groups[2].highlights)).toEqual(['h1', 'h2']);
     expect(ids(groups[2].notes)).toEqual(['n0']);
     expect(ids(groups[3].notes)).toEqual(['n1']);
-    expect(groups[4]).toEqual({ notes: [], highlights: [] });
+    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [] });
   });
 
   it('lists a highlight dragged across two commi under both', () => {
@@ -124,6 +151,8 @@ describe('signColors and signAriaLabel', () => {
     expect(signAriaLabel(1, 0)).toBe('1 nota in questo passo');
     expect(signAriaLabel(2, 1)).toBe('2 note e 1 evidenziazione in questo passo');
     expect(signAriaLabel(0, 3)).toBe('3 evidenziazioni in questo passo');
+    expect(signAriaLabel(0, 0, 1)).toBe('1 discussione in questo passo');
+    expect(signAriaLabel(2, 1, 3)).toBe('2 note, 1 evidenziazione e 3 discussioni in questo passo');
   });
 });
 
