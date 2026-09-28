@@ -10,6 +10,8 @@ export interface ArticleBodyProps {
     onPopupHighlight: (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => void;
     onPopupAddNote: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     onPopupCopy: (text: string) => Promise<void> | void;
+    /** Optional "Discuti" action on selected passage. */
+    onPopupDiscuss?: (text: string, startOffset: number) => void;
     /** Optional "Segnala come citazione" action; the popup hides it when absent. */
     onPopupReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     /** Unfolds the AGGIORNAMENTO notes at the bottom of the text (useArticleTextInteractions). */
@@ -23,6 +25,7 @@ export function ArticleBody({
     onPopupHighlight,
     onPopupAddNote,
     onPopupCopy,
+    onPopupDiscuss,
     onPopupReportCitation,
     updatesOpen = false,
 }: ArticleBodyProps) {
@@ -38,6 +41,7 @@ export function ArticleBody({
                 onHighlight={onPopupHighlight}
                 onAddNote={onPopupAddNote}
                 onCopy={onPopupCopy}
+                onDiscuss={onPopupDiscuss}
                 onReportCitation={onPopupReportCitation}
             />
             {/* A size container: with room beside the 68ch column, each
