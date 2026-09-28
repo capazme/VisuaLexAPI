@@ -4,7 +4,7 @@ import { BlockAnnotationsPopover, type BlockAnnotationsPopoverProps } from './Bl
 import { renderArticleHtml } from '../../../utils/articleRender';
 import { parseArticleStructure } from '../../../utils/articleStructure';
 import { describeBlock, groupAnnotationsByBlock } from '../../../utils/articleAnnotations';
-import { sanitizeHTML } from '../../../utils/sanitize';
+import { sanitizeHTML } from '../../../utils/sanitizeHtml';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
 import type { Annotation, Highlight } from '../../../types';
 
