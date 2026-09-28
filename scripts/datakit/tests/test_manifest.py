@@ -73,3 +73,10 @@ def test_a_stack_names_its_containers_volumes_and_qdrant_port(monkeypatch):
     assert (t.pg_container, t.falkor_container, t.volume_prefix) == ("x-postgres", "x-falkordb", "x_")
     assert t.qdrant_url == "http://127.0.0.1:56343"
     assert Target.for_stack("x", pg_container="legacy").pg_container == "legacy"
+
+
+def test_a_backup_folder_is_private_to_its_owner(tmp_path):
+    from datakit import cli
+
+    out = cli.new_backup_folder(tmp_path / "nested" / "backup")
+    assert out.stat().st_mode & 0o777 == 0o700

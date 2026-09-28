@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import subprocess
 import sys
 from dataclasses import replace
@@ -59,11 +60,19 @@ def _compare(t: Target, m: dict, names) -> list[str]:
     return problems
 
 
+def new_backup_folder(out: Path) -> Path:
+    """The backup folder, readable by its owner only: it holds password hashes,
+    notes and uploads. The mode is set explicitly, whatever the umask."""
+    out.mkdir(parents=True, exist_ok=False, mode=0o700)
+    out.chmod(0o700)
+    return out
+
+
 def cmd_backup(args) -> int:
     t = _target(args)
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = Path(args.out or Path.home() / "visualex-backups" / f"{t.stack}-{stamp}").expanduser()
-    out.mkdir(parents=True, exist_ok=False)
+    os.umask(0o077)  # every file this process writes: owner only
+    out = new_backup_folder(Path(args.out or Path.home() / "visualex-backups" / f"{t.stack}-{stamp}").expanduser())
     stores = {}
     for name in args.stores.split(","):
         print(f"== backup {name}", file=sys.stderr)
