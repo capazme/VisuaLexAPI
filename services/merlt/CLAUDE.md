@@ -1,27 +1,31 @@
 # CLAUDE.md: MERL-T (vendored in VisuaLexAPI)
 
-Guidance for agents working under `merlt/`. Keep it true of the code: if the code
+Guidance for agents working under `services/merlt/`. Keep it true of the code: if the code
 contradicts a line here, fix the line in the same change.
 
 ## What this directory is
 
-`merlt/` is the **vendored MERL-T sidecar** of VisuaLexAPI, branch
-`visualex-merlt-main`. It started as a selective copy of the upstream research
+`services/merlt/` is the **vendored MERL-T sidecar** of VisuaLexAPI (on
+`develop` since the unification; the old `visualex-merlt-main` line is the tag
+`archive/visualex-merlt-main`). It started as a selective copy of the upstream research
 monorepo `ALIS_CORE/merlt` and has since diverged. **This copy is the source of
 truth** for the code VisuaLex runs. `docs/merlt/upstream-sync.md` records what
 was copied, how to sync, and the local divergences.
 
 It is not a PyPI package and it has no standalone workflow here. It runs as the
-`merlt-api` and `merlt-worker` containers of `docker-compose.merlt.yml`, at the
-repo root, started by the root `start.sh`. `merlt/docker-compose.dev.yml` and
-`merlt/start_dev.sh` are upstream leftovers that VisuaLex does not use.
+`merlt-api` and `merlt-worker` containers of `infra/compose.yml` (profile
+`merlt`), started by the root `start.sh`. `services/merlt/docker-compose.dev.yml`
+and `services/merlt/start_dev.sh` are upstream leftovers that VisuaLex does not use.
 
 Read first:
 
-- `../CLAUDE.md`, the MERL-T sections: topology, BFF contract, gates, gotchas.
-- `../docs/merlt/blueprint.md`: the architecture, verified against the code.
-- `../docs/merlt/integration.md`: the runbook and the env vars.
-- `../docs/merlt/contract-matrix.md`: which MERL-T routes the BFF proxies.
+- MERL-T integration across server and web (routes, gates, guards, surfaces, slice history): `docs/merlt/claude-notes.md`.
+- `docs/merlt/blueprint.md`: the architecture, verified against the code.
+- `docs/merlt/integration.md`: the runbook and the env vars.
+- `docs/merlt/contract-matrix.md`: which MERL-T routes the BFF proxies.
+
+Paths in this file: `merlt/…` is the Python package inside this folder;
+everything else is relative to the repository root.
 
 The browser never calls MERL-T. Every call comes from the Node BFF
 (`/api/merlt/*`), which injects `user_id` into the body and sends `X-API-Key`
@@ -53,19 +57,19 @@ The graph co-evolves on its own:
 ## Real layout
 
 ```
-merlt/
+services/merlt/
 ├── merlt/                 the Python package (below)
 ├── tests/                 pytest suite (api, pipeline, rlcf, scripts, storage, unit, worker)
 ├── alembic/ + alembic.ini Alembic revisions 001–008 + baafa63897a6 (not run by the live stack)
 ├── config/                RLCF training YAML (`rlcf_training.yaml`)
 ├── scripts/               utility scripts
 ├── data/                  seeds + dumps, mounted read-only at /app/data in the containers
-├── docs/                  upstream MERL-T docs (historical; VisuaLex docs live in ../docs/merlt/)
+├── docs/                  upstream MERL-T docs (historical; VisuaLex docs live in docs/merlt/)
 ├── Dockerfile             multi-stage, python:3.11-slim, torch CPU + spaCy it_core_news_lg
 └── pyproject.toml         deps; extras [dev]; pytest addopts excludes the `integration` marker
 ```
 
-`merlt/merlt/` (the package):
+`services/merlt/merlt/` (the package):
 
 | Package | What lives there |
 |---|---|
@@ -169,31 +173,31 @@ The RQ worker has no lifespan: every task that touches the enrichment DB calls
 | `storage/graph/entity_writer.py`, `relation_endpoints.py` | what consensus writes into FalkorDB; the `user_document` placeholder must never become a node |
 | `pipeline/provisional_writer.py`, `promotion.py`, `hygiene.py` | the graph co-evolution; match nodes by `URN OR node_id OR source_url` |
 | `utils/urn_labels.py` | URN → label, the article-suffix regex (longest-first) |
-| `api/experts_router.py`, `api/enrichment_router.py`, `api/graph_router.py` | the BFF-facing contract; see `../docs/merlt/contract-matrix.md` |
+| `api/experts_router.py`, `api/enrichment_router.py`, `api/graph_router.py` | the BFF-facing contract; see `docs/merlt/contract-matrix.md` |
 
 ## Running
 
-**In Docker (the supported path), from the repo root.** Only `merlt/data` is
-mounted, so after any code change rebuild and recreate:
+**In Docker (the supported path), from the repo root.** Only `services/merlt/data`
+is mounted, so after any code change rebuild and recreate:
 
 ```bash
 MERLT_ENABLED=true ./start.sh
-docker compose -f docker-compose.merlt.yml --profile api-in-docker build merlt-api merlt-worker
-docker compose -f docker-compose.merlt.yml --profile api-in-docker up -d --force-recreate merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
 ```
 
 **Locally** (developer mode, deps still in Docker):
 
 ```bash
-python3.11 -m venv merlt/.venv
-merlt/.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
-merlt/.venv/bin/pip install -e 'merlt[dev]'
-MERLT_ENABLED=true MERLT_API_IN_DOCKER=false MERLT_COMPOSE_ENABLED=true ./start.sh
+python3.11 -m venv services/merlt/.venv
+services/merlt/.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+services/merlt/.venv/bin/pip install -e 'services/merlt[dev]'
+MERLT_ENABLED=true MERLT_API_IN_DOCKER=false ./start.sh
 ```
 
 In this mode `start.sh` runs `uvicorn merlt.app:app --reload` and a local
 `rq worker merlt_ingest merlt_extract merlt_ner_train`, from `MERLT_PYTHON`
-(default `merlt/.venv/bin/python`).
+(default `services/merlt/.venv/bin/python`).
 
 The host ports, all bound to 127.0.0.1: postgres 5436, redis 6381, FalkorDB
 6382, Qdrant 6343, api 8000, mcp-legal-it 8011. Inside the compose network the
@@ -201,8 +205,8 @@ services use their container ports (FalkorDB and Redis on 6379, Qdrant on 6333).
 
 ## Tests
 
-CI (`.github/workflows/ci.yml`, job `merlt`, branch `visualex-merlt-main`) is
-the reference run. On Python 3.11 it:
+CI (`.github/workflows/ci.yml`, job `merlt`, on `develop` and on pull requests
+into it) is the reference run. On Python 3.11 it:
 
 1. installs CPU torch, then `pip install -e ".[dev]"`;
 2. bootstraps a Postgres service with `init_db()`, `create_tables()` and
@@ -216,7 +220,7 @@ Locally, from the venv. The DB-backed tests write rows, so point them at a
 disposable database, never at the dev stack's data:
 
 ```bash
-cd merlt
+cd services/merlt
 export ENRICHMENT_DATABASE_URL=postgresql+asyncpg://merlt:merlt@localhost:5436/merlt_test
 export RLCF_DATABASE_URL=postgresql://merlt:merlt@localhost:5436/merlt_test
 export RLCF_ASYNC_DATABASE_URL=postgresql+asyncpg://merlt:merlt@localhost:5436/merlt_test
@@ -230,12 +234,15 @@ asyncio.run(main())"
 .venv/bin/python -m pytest tests/ -q
 ```
 
-(`merlt_test` must exist: `createdb -h localhost -p 5436 -U merlt merlt_test`.)
+(`merlt_test` must exist: `createdb -h localhost -p 5436 -U postgres -O merlt merlt_test` — the `merlt`
+role cannot create databases; the superuser's password is `POSTGRES_PASSWORD` in `infra/.env`.)
 
-**In the container:** `docker exec -w /app visualex-merlt-api python -m pytest tests/ -q`.
-The Dockerfile copies `tests/` and installs pytest, and this works only if
-`merlt/.dockerignore` does not exclude `tests/`. The command runs against the
-stack's own database.
+**In a container:** `docker exec -w /app <stack>-merlt-api python -m pytest tests/ -q`,
+where `<stack>` is a throwaway stack (`VISUALEX_STACK=… ` with its own ports,
+see `infra/.env.example`), never the development one: the command runs against
+that stack's own database, and the tests write rows. The Dockerfile copies
+`tests/` and installs pytest; this works only while
+`services/merlt/.dockerignore` does not exclude `tests/`.
 
 **Two test gotchas:**
 
