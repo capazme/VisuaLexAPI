@@ -511,6 +511,15 @@ export interface UpdateEnvironmentWithVersionPayload {
     versionMode?: 'replace' | 'coexist';
 }
 
+/** A passage of an article a discussion is attached to: the quotation, its
+ *  plain-text offset when the discussion was opened, 32 chars of context each side. */
+export interface ThreadPassage {
+    quote: string;
+    start: number;
+    prefix: string;
+    suffix: string;
+}
+
 export interface ArticleDiscussionComment {
     id: string;
     threadId: string;
@@ -533,6 +542,9 @@ export interface ArticleDiscussionThread {
     version?: string | null;
     title: string;
     body: string;
+    passage: ThreadPassage | null;
+    articleUrn: string | null;
+    textHash: string | null;
     user: { id: string; username: string };
     createdAt: string;
     updatedAt: string;
@@ -540,6 +552,17 @@ export interface ArticleDiscussionThread {
     userVoted: boolean;
     isOwner: boolean;
     comments: ArticleDiscussionComment[];
+}
+
+export interface ArticleDiscussionPassageSummary {
+    id: string;
+    title: string;
+    passage: ThreadPassage;
+    articleUrn: string | null;
+    textHash: string | null;
+    commentCount: number;
+    createdAt: string;
+    user: { id: string; username: string };
 }
 
 export interface ArticleDiscussionResponse {
