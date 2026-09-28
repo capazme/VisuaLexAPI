@@ -42,13 +42,18 @@ kill_tree() {
 }
 
 CLEANED_UP=""
+STORES_STARTED=""
 cleanup() {
     [ -n "$CLEANED_UP" ] && return
     CLEANED_UP=1
     echo -e "\n${YELLOW}Shutting down...${NC}"
     for pid in ${API_PID:-} ${SERVER_PID:-} ${WEB_PID:-} ${MERLT_PID:-} ${MERLT_WORKER_PID:-}; do kill_tree "$pid"; done
-    # stop, not down: containers and volumes stay for the next start.
-    "${COMPOSE[@]}" --profile merlt stop >/dev/null 2>&1 || true
+    # Only once this run started the stores: a second start.sh that stops at a
+    # check must not take the running stack's stores away. stop, not down:
+    # containers and volumes stay for the next start.
+    if [ -n "$STORES_STARTED" ]; then
+        "${COMPOSE[@]}" --profile merlt stop >/dev/null 2>&1 || true
+    fi
     echo -e "${GREEN}Stopped.${NC}"
 }
 trap 'cleanup; exit 0' SIGINT SIGTERM
@@ -97,6 +102,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
 fi
 
 echo -e "\n${YELLOW}[1/4] Data stores...${NC}"
+STORES_STARTED=1
 "${COMPOSE[@]}" up -d --wait postgres redis falkordb qdrant
 
 echo -e "\n${YELLOW}[2/4] Python API (:5000)...${NC}"
