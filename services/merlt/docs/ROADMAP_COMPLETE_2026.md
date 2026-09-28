@@ -152,7 +152,7 @@ EXECUTE FUNCTION update_updated_at_column();
 **Step 1: Database Migration (1h)**
 ```bash
 # File: merlt/rlcf/migrations/add_pending_validation_tables.sql
-cd /Users/gpuzio/Desktop/CODE/MERL-T_alpha
+cd ../MERL-T_alpha
 # Run migration script
 psql -U postgres -d merl_t_rlcf -f merlt/rlcf/migrations/add_pending_validation_tables.sql
 ```
@@ -519,7 +519,7 @@ curl http://localhost:3001/api/merlt/profile/full \
 Entities approvate non vengono scritte al knowledge graph.
 
 #### Decisioni Prese
-- **Schema Source**: `/Users/gpuzio/Desktop/CODE/MERL-T_alpha/merlt/pipeline/enrichment/models.py`
+- **Schema Source**: `../MERL-T_alpha/merlt/pipeline/enrichment/models.py`
 - **Principi**: Rigore, omogeneità, schema univoco
 - **Obiettivo**: Guidare 4 expert nelle loro task
 - **User nodes**: NO (grafo solo entità giuridiche)
@@ -2769,12 +2769,12 @@ Discussion Thread: "Interpretazione Art 52 c.p. - Legittima difesa"
 ### Development Environment
 ```bash
 # MERL-T
-cd /Users/gpuzio/Desktop/CODE/MERL-T_alpha
+cd ../MERL-T_alpha
 docker-compose -f docker-compose.dev.yml up -d
 python -m merlt.api.visualex_bridge
 
 # VisuaLex
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI
+cd .
 npm run dev:backend  # Port 3001
 npm run dev:frontend # Port 5173
 ```

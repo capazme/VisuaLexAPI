@@ -92,7 +92,7 @@
 
 ```bash
 # Avviare ambiente
-cd /Users/gpuzio/Desktop/CODE/MERL-T_alpha
+cd ../MERL-T_alpha
 source .venv/bin/activate
 
 # Database

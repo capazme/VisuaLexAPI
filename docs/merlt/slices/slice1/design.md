@@ -5,9 +5,9 @@
 **Branch**: `visualex-merlt-main`
 **Predecessor**: commit `81be277` (abandoned scaffolding, to be partially refactored)
 **Reference docs**:
-- `/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt/docs/PIANO_DEFINITIVO_INTEGRAZIONE.md`
-- `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/docs/visualex_merlt_main_execution_plan.md`
-- `/Users/gpuzio/Desktop/CODE/ALIS_CORE/visualex-merlt/docs/PLUGIN_ARCHITECTURE.md`
+- `../ALIS_CORE/merlt/docs/PIANO_DEFINITIVO_INTEGRAZIONE.md`
+- `./docs/visualex_merlt_main_execution_plan.md`
+- `../ALIS_CORE/visualex-merlt/docs/PLUGIN_ARCHITECTURE.md`
 
 ---
 
