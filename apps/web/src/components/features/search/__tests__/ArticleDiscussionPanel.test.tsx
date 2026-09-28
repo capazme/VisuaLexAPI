@@ -1,0 +1,317 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { ArticleDiscussionPanel } from '../ArticleDiscussionPanel';
+import { articleDiscussionService } from '../../../../services/articleDiscussionService';
+import type { ArticleDiscussionThread, ThreadPassage } from '../../../../types';
+
+vi.mock('../../../../services/articleDiscussionService', () => ({
+  articleDiscussionService: {
+    list: vi.fn(),
+    create: vi.fn(),
+    comment: vi.fn(),
+    report: vi.fn(),
+    voteThread: vi.fn(),
+    voteComment: vi.fn(),
+  },
+}));
+
+describe('ArticleDiscussionPanel', () => {
+  const dummyAnchor = { normaKey: 'k1', articleId: '1453', articleLabel: '1453' };
+
+  const dummyThread: ArticleDiscussionThread = {
+    id: 'thread-1',
+    normaKey: 'k1',
+    articleId: '1453',
+    version: 'v1',
+    title: 'Titolo discussione',
+    body: 'Testo della discussione generale',
+    passage: null,
+    articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
+    textHash: 'hash-1',
+    voteCount: 3,
+    userVoted: false,
+    createdAt: '2026-09-28T10:00:00Z',
+    updatedAt: '2026-09-28T10:00:00Z',
+    user: { id: 'u1', username: 'marta' },
+    comments: [],
+  };
+
+  const passageSample: ThreadPassage = {
+    quote: 'risarcimento del danno',
+    start: 50,
+    prefix: 'in ogni caso il ',
+    suffix: '.',
+  };
+
+  const dummyPassageThread: ArticleDiscussionThread = {
+    id: 'thread-p',
+    normaKey: 'k1',
+    articleId: '1453',
+    version: 'v1',
+    title: 'Discussione sul risarcimento',
+    body: 'Commento sul passo',
+    passage: passageSample,
+    articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
+    textHash: 'hash-orig',
+    voteCount: 1,
+    userVoted: false,
+    createdAt: '2026-09-28T11:00:00Z',
+    updatedAt: '2026-09-28T11:00:00Z',
+    user: { id: 'u2', username: 'luca' },
+    comments: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [dummyThread],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('without a draft, a missing title blocks submit, and a valid submit sends { articleUrn, textHash }', async () => {
+    const onThreadCreated = vi.fn();
+    render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        articleUrn="urn:nir:stato:legge:1942;262~art1453"
+        textHash="hash-current"
+        onThreadCreated={onThreadCreated}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Titolo discussione')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /nuova discussione/i }));
+    const titleInput = screen.getByPlaceholderText('Titolo della discussione');
+    const bodyInput = screen.getByPlaceholderText(/condividi una domanda/i);
+
+    expect(titleInput).toBeRequired();
+
+    // Fill valid title and body
+    fireEvent.change(titleInput, { target: { value: 'Nuovo titolo' } });
+    fireEvent.change(bodyInput, { target: { value: 'Nuovo corpo del messaggio' } });
+
+    const newCreatedThread: ArticleDiscussionThread = {
+      ...dummyThread,
+      id: 'thread-new',
+      title: 'Nuovo titolo',
+      body: 'Nuovo corpo del messaggio',
+    };
+    vi.mocked(articleDiscussionService.create).mockResolvedValue(newCreatedThread);
+
+    fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
+
+    await waitFor(() => {
+      expect(articleDiscussionService.create).toHaveBeenCalledWith(
+        dummyAnchor,
+        'Nuovo titolo',
+        'Nuovo corpo del messaggio',
+        {
+          passage: undefined,
+          articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
+          textHash: 'hash-current',
+        }
+      );
+    });
+
+    expect(onThreadCreated).toHaveBeenCalledWith(newCreatedThread);
+  });
+
+  it('with a draft, the composer shows "Discussione sul passo" and the quotation, title is optional, and submitting calls create with { passage, articleUrn, textHash }', async () => {
+    const onDraftConsumed = vi.fn();
+    const onThreadCreated = vi.fn();
+    const onFocusThread = vi.fn();
+
+    const createdPassageThread: ArticleDiscussionThread = {
+      ...dummyPassageThread,
+      id: 'thread-created-draft',
+      title: '',
+      body: 'Osservazione su questo specifico passo',
+    };
+    vi.mocked(articleDiscussionService.create).mockResolvedValue(createdPassageThread);
+
+    render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        articleUrn="urn:nir:stato:legge:1942;262~art1453"
+        textHash="hash-current"
+        draft={{ passage: passageSample }}
+        onDraftConsumed={onDraftConsumed}
+        onThreadCreated={onThreadCreated}
+        onFocusThread={onFocusThread}
+      />
+    );
+
+    // Composer opens automatically when draft is present
+    expect(screen.getByText('Discussione sul passo')).toBeInTheDocument();
+    expect(screen.getByText(/«risarcimento del danno»/)).toBeInTheDocument();
+
+    const titleInput = screen.getByPlaceholderText('Titolo (facoltativo)');
+    expect(titleInput).not.toBeRequired();
+
+    const bodyInput = screen.getByPlaceholderText(/condividi una domanda/i);
+    fireEvent.change(bodyInput, { target: { value: 'Osservazione su questo specifico passo' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /pubblica/i }));
+
+    await waitFor(() => {
+      expect(articleDiscussionService.create).toHaveBeenCalledWith(
+        dummyAnchor,
+        '',
+        'Osservazione su questo specifico passo',
+        {
+          passage: passageSample,
+          articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
+          textHash: 'hash-current',
+        }
+      );
+    });
+
+    expect(onDraftConsumed).toHaveBeenCalled();
+    expect(onThreadCreated).toHaveBeenCalledWith(createdPassageThread);
+    expect(onFocusThread).toHaveBeenCalledWith('thread-created-draft');
+  });
+
+  it('a "detached" state shows "Il passo discusso non si trova nel testo che stai leggendo." and the quotation, and the discussion stays listed', async () => {
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [dummyPassageThread],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+
+    render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        passageStates={{ 'thread-p': 'detached' }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Discussione sul risarcimento')).toBeInTheDocument();
+    });
+
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent('Il passo discusso non si trova nel testo che stai leggendo.');
+    expect(note).toHaveTextContent('risarcimento del danno');
+  });
+
+  it('differing hashes show the changed-text note', async () => {
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [dummyPassageThread], // has textHash: 'hash-orig'
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+
+    render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        textHash="hash-different"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Discussione sul risarcimento')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText('Il testo dell’articolo è cambiato da quando è stata aperta questa discussione.')
+    ).toBeInTheDocument();
+  });
+
+  it('focusThreadId expands that discussion; expanding a passage discussion by click calls onFocusThread(id), collapsing calls onFocusThread(null)', async () => {
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [dummyPassageThread],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+    const onFocusThread = vi.fn();
+
+    const { rerender } = render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        onFocusThread={onFocusThread}
+        focusThreadId="thread-p"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Commento sul passo')).toBeInTheDocument();
+    });
+
+    const articleEl = screen.getByRole('article');
+    expect(articleEl).toHaveAttribute('id', 'article-thread-thread-p');
+
+    // Click to collapse
+    const collapseBtn = within(articleEl).getByRole('button', { name: /Discussione sul risarcimento/i });
+    fireEvent.click(collapseBtn);
+    expect(onFocusThread).toHaveBeenCalledWith(null);
+
+    // Click to expand again
+    fireEvent.click(collapseBtn);
+    expect(onFocusThread).toHaveBeenCalledWith('thread-p');
+  });
+
+  it('"Vai al passo" appears for a located passage and calls onGoToPassage(id), and does not appear for a detached one', async () => {
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [dummyPassageThread],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+    const onGoToPassage = vi.fn();
+
+    const { rerender } = render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        passageStates={{ 'thread-p': 'exact' }}
+        focusThreadId="thread-p"
+        onGoToPassage={onGoToPassage}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /vai al passo/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /vai al passo/i }));
+    expect(onGoToPassage).toHaveBeenCalledWith('thread-p');
+
+    // If detached, "Vai al passo" is not shown
+    rerender(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        passageStates={{ 'thread-p': 'detached' }}
+        focusThreadId="thread-p"
+        onGoToPassage={onGoToPassage}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /vai al passo/i })).not.toBeInTheDocument();
+  });
+});
