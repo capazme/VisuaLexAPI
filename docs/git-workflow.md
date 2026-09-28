@@ -46,6 +46,11 @@ extraction (its output is the offset space of every stored highlight and
 note). A pull request touching them needs the other developer's approval, on
 `develop` and on `main`, so a release carrying such a change is approved too.
 
+The rules apply to everyone, the repository owner included. In an emergency —
+a fix that cannot wait for the other developer — the owner suspends the
+branch's ruleset in the repository settings, merges, restores the ruleset the
+same day, and says so in the pull request.
+
 ## Release
 
 1. On `chore/release-X.Y.Z` from `develop`, set `version.txt` to `X.Y.Z`; pull
