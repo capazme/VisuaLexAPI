@@ -8,7 +8,14 @@ download
 .DS_Store
 
 dist/*
-.claude
+
+# Claude Code: personal files stay local; the shared rules are versioned.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+CLAUDE.local.md
+*.code-workspace
+
 # The Python API's runtime data (search history, dossiers): private. It lived
 # in /data before the monorepo move, and an old checkout leaves it there.
 services/visualex/data/
@@ -44,6 +51,3 @@ coverage/
 
 # Local legal archive output (python -m archivio_normativo build)
 archivio_out/
-
-# Personal editor workspaces (they point outside the repository)
-*.code-workspace
