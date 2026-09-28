@@ -113,7 +113,7 @@ services/merlt/
 
 4. Se ci sono modifiche locali in VisuaLex che vanno PRESERVATE (es. fix specifici al BFF integration), risolvere manualmente.
 
-5. Commit + PR verso `visualex-merlt-main` (NON main):
+5. Commit su un ramo `chore/…` preso da `develop`, poi pull request verso `develop` (vedi `docs/git-workflow.md`):
    ```bash
    git commit -m "chore(merlt): sync from upstream ALIS_CORE YYYY-MM-DD"
    ```
@@ -137,7 +137,7 @@ services/merlt/
 
 ## Note
 
-- Il `docker-compose.dev.yml` interno a `services/merlt/` è MERL-T standalone (per dev MERL-T isolato). Il nostro flusso VisuaLex usa **`infra/compose.yml` nella root del repo**: 4 dipendenze sempre attive (postgres, redis, falkordb, qdrant) più 3 servizi sotto il profilo `api-in-docker`, che è il default di `start.sh` (`mcp-legal-it`, `merlt-api`, `merlt-worker`).
+- Il `docker-compose.dev.yml` interno a `services/merlt/` è MERL-T standalone (per dev MERL-T isolato). Il nostro flusso VisuaLex usa **`infra/compose.yml`**: 4 archivi sempre attivi (postgres, redis, falkordb, qdrant) più 3 servizi sotto il profilo `merlt`, che `start.sh` avvia con `MERLT_ENABLED=true` (`mcp-legal-it`, `merlt-api`, `merlt-worker`).
 - `start_dev.sh` interno a `services/merlt/` analogamente NON viene usato. Il nostro `start.sh` root usa i container. Nella modalità sviluppatore (`MERLT_API_IN_DOCKER=false`) avvia invece `uvicorn merlt.app:app` più un `rq worker` locale sulle tre code, dall'interprete `MERLT_PYTHON`.
 - Se `ALIS_CORE/merlt` viene cancellato/spostato, NULLA cambia in VisuaLex: `services/merlt/` è autocontenuto. Per ricostruire `data/` serve documentazione separata (riferirsi a `services/merlt/docs/`).
 

@@ -2,7 +2,7 @@
 
 **Scope:** verifica manuale end-to-end di ogni superficie MERL-T (Slice 1 → Slice 4, Loop β, NER, ops, ingestion).
 **Quando:** dopo ogni modifica che tocca una superficie, e prima di dichiarare «fatto» un lavoro MERL-T.
-**Ambiente:** dev locale (VisuaLex più il sidecar MERL-T in Docker, modalità `api-in-docker`).
+**Ambiente:** dev locale (VisuaLex più il sidecar MERL-T in Docker, profilo Compose `merlt`).
 
 Questa è la copia canonica. `docs/merlt-smoke-checklist.md` è solo un puntatore. Il runbook di avvio è [integration.md](./integration.md); le route con guard e flag sono in [contract-matrix.md](./contract-matrix.md).
 
@@ -12,28 +12,31 @@ Salva log e screenshot di ogni esecuzione in `docs/smoke-evidence/YYYY-MM-DD-mer
 
 ## Setup (una volta per sessione)
 
-1. **Reset di MERL-T (clean slate, opzionale).** Distrugge anche grafo, vettori e checkpoint.
-   ```bash
-   docker compose -f infra/compose.yml --profile api-in-docker down -v
-   ```
+1. **Da zero (opzionale): mai `down -v` sullo stack di sviluppo.** Lo stack è uno
+   solo e il suo Postgres contiene anche utenti, dossier, note ed evidenziazioni:
+   `down -v` li cancellerebbe. Per una prova da zero usa un secondo checkout con
+   il suo `infra/.env` (un altro `VISUALEX_STACK` e altre porte, vedi
+   `docs/setup.md`, «Two stacks on one machine»). Per riportare lo stack di
+   sviluppo a un punto noto si ripristina un backup (`scripts/restore.sh`, vedi
+   `scripts/datakit/README.md`).
 
-2. **Avvia lo stack.** `api-in-docker` è il default. Al primo avvio alza il gate: build delle immagini e seed richiedono minuti.
+2. **Avvia lo stack.** MERL-T in Docker è il default (`MERLT_API_IN_DOCKER=true`). Al primo avvio alza il gate: build delle immagini e seed richiedono minuti.
    ```bash
    MERLT_ENABLED=true ./start.sh
    # primo avvio: MERLT_ENABLED=true MERLT_HEALTH_TIMEOUT=600 ./start.sh
    ```
    Righe attese nel log:
-   - `[1/3] Starting VisuaLex API (port 5000)…`
-   - `[2/3] Starting Platform Backend (port 3001)…`
-   - `[3/3] Starting Frontend (port 5173)…`
-   - `[4/4] Starting MERLT stack (deps + API in Docker)…`
-   - `MERLT /health OK after Ns`
+   - `[1/4] Data stores...`
+   - `[2/4] Python API (:5000)...`
+   - `[3/4] Server (:3001)...`
+   - `[4/4] Web (:5173)...`
+   - `MERL-T in Docker...`, poi `Waiting for MERL-T /health (up to 60s)...` senza `MERL-T not healthy`
 
    Non deve comparire `merlt-worker is not running`.
 
 3. **Container su.**
    ```bash
-   docker compose -f infra/compose.yml --profile api-in-docker ps
+   docker compose -f infra/compose.yml --profile merlt ps
    docker inspect visualex-merlt-worker --format '{{join .Config.Cmd " "}}'
    ```
    I 7 servizi devono essere `running`, e healthy dove c'è un healthcheck. Il comando del worker contiene `merlt_ingest merlt_extract merlt_ner_train`.

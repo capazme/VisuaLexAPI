@@ -4,7 +4,7 @@ Termini ricorrenti nel codice e nei doc di **VisuaLexAPI**, con il punto in cui 
 
 ## Runtime & integrazione (VisuaLexAPI)
 - **BFF**: il layer Node/Express (`apps/server/`). **Unico** canale verso MERL-T: tutto passa per `/api/merlt/*`; il frontend non chiama mai `:8000`.
-- **Sidecar MERL-T**: lo stack `infra/compose.yml`, 7 servizi. Sempre attivi: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`. Sotto il profilo `api-in-docker`, default di `start.sh`: `mcp-legal-it` (:8011), `merlt-api` (:8000), `merlt-worker`. Gate: `MERLT_ENABLED`.
+- **Sidecar MERL-T**: lo stack `infra/compose.yml`, 7 servizi. Sempre attivi: `postgres` (anche i database della piattaforma), `redis`, `falkordb`, `qdrant`. Sotto il profilo `merlt`, avviato da `start.sh` con `MERLT_ENABLED=true`: `mcp-legal-it` (:8011), `merlt-api` (:8000), `merlt-worker`. Gate: `MERLT_ENABLED`.
 - **`services/merlt/` (vendored)**: copia selettiva del Python upstream `ALIS_CORE/merlt`; **baked nell'immagine** al build (i cambi richiedono rebuild). Vedi `upstream-sync.md`.
 - **Plugin host**: il registro di slot FE (`apps/web/src/plugins/`) che monta le superfici MERL-T senza accoppiarle al core (`article_content_after`, `article_sidebar`, `global`).
 - **Feature flag**: `MERLT_ENABLED` accende lo stack in `start.sh` ed è anche il kill switch del BFF su tutto `/api/merlt`. Nel BFF ci sono poi i sotto-flag `MERLT_GRAPH_ENABLED`, `MERLT_CONTRIBUTION_ENABLED`, `MERLT_VALIDATION_ENABLED` e `MERLT_OPS_ENABLED` (default `true`, filtrano per prefisso di path). Nel FE: `VITE_FEATURE_MERLT` / `VITE_FEATURE_MERLT_GRAPH` (default ON).

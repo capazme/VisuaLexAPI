@@ -1,6 +1,6 @@
 # MERL-T: runbook di integrazione
 
-MERL-T è il sidecar FastAPI (grafo giuridico + RLCF) che esiste solo sul branch `visualex-merlt-main`. Il browser non lo chiama mai: tutto passa dal BFF Node su `/api/merlt/*`.
+MERL-T è il sidecar FastAPI (grafo giuridico + RLCF). Dal 27 settembre 2026 fa parte di `develop` come il resto di VisuaLex; la vecchia linea separata è il tag `archive/visualex-merlt-main`. Il browser non lo chiama mai: tutto passa dal BFF Node su `/api/merlt/*`.
 
 Questo documento porta da un clone vuoto a uno stack funzionante e spiega come verificare ogni superficie. Per il resto:
 
@@ -10,17 +10,18 @@ Questo documento porta da un clone vuoto a uno stack funzionante e spiega come v
 
 ## 1. Cosa gira
 
-`infra/compose.yml` definisce 7 servizi. Tutte le porte host sono legate a `127.0.0.1`.
+`infra/compose.yml` definisce 7 servizi. Tutte le porte host sono legate a `127.0.0.1`
+e si cambiano in `infra/.env`.
 
 | Servizio | Porta host | Quando parte |
 |---|---|---|
-| `merlt-postgres` | 5436 | sempre |
-| `merlt-redis` | 6381 | sempre |
-| `merlt-falkordb` | 6382 | sempre |
-| `merlt-qdrant` | 6343 (gRPC 6344) | sempre |
-| `mcp-legal-it` | 8011 | profilo `api-in-docker` |
-| `merlt-api` | 8000 | profilo `api-in-docker` |
-| `merlt-worker` | nessuna (RQ su `merlt_ingest merlt_extract merlt_ner_train`) | profilo `api-in-docker` |
+| `postgres` | 5436 | sempre (database `visualex_platform`, `visualex_test`, `merlt`) |
+| `redis` | 6381 | sempre |
+| `falkordb` | 6382 | sempre |
+| `qdrant` | 6343 (gRPC 6344) | sempre |
+| `mcp-legal-it` | 8011 | profilo `merlt` |
+| `merlt-api` | 8000 | profilo `merlt` |
+| `merlt-worker` | nessuna (RQ su `merlt_ingest merlt_extract merlt_ner_train`) | profilo `merlt` |
 
 - **Il BFF** (Node, :3001) gira sull'host e raggiunge MERL-T su `MERLT_API_URL` (`http://localhost:8000`).
 - **api e worker** chiamano il BFF e l'API Python (:5000) tramite `host.docker.internal`, grazie a `extra_hosts: host-gateway`, necessario su Linux.
@@ -28,12 +29,12 @@ Questo documento porta da un clone vuoto a uno stack funzionante e spiega come v
 
 ## 2. Da zero
 
-Prerequisiti del prodotto base: Docker con Compose v2, Node con npm 11 (la CI usa Node 24), Python per `services/visualex/.venv`, un Postgres per il BFF. Per le funzioni LLM serve anche una chiave OpenRouter.
+Prerequisiti del prodotto base: Docker con Compose v2, Node con npm 11 (la CI usa Node 24), Python per `services/visualex/.venv`. Il Postgres del BFF è quello dello stack Docker. Per le funzioni LLM serve anche una chiave OpenRouter.
 
-1. **Clona e prendi il branch.**
+1. **Clona e prendi il ramo di lavoro.** La guida generale è [`docs/setup.md`](../setup.md).
    ```bash
-   git clone <url> VisuaLexAPI && cd VisuaLexAPI
-   git checkout visualex-merlt-main
+   git clone --recurse-submodules <url> VisuaLexAPI && cd VisuaLexAPI
+   git switch develop
    ```
 
 2. **Inizializza il submodule.** `start.sh` lo fa da solo quando trova la cartella vuota; per farlo a mano:
@@ -53,18 +54,18 @@ Prerequisiti del prodotto base: Docker con Compose v2, Node con npm 11 (la CI us
    cp apps/server/.env.example apps/server/.env
    ```
    Poi imposta questi valori:
-   - `DATABASE_URL` e `JWT_SECRET`, per il BFF.
+   - `DATABASE_URL` (il Postgres dello stack: `postgresql://visualex:visualex@localhost:5436/visualex_platform`) e `JWT_SECRET`, per il BFF.
    - `MERLT_INTERNAL_SECRET`. L'esempio usa già `dev-internal-secret`, lo stesso default di compose. Se lo cambi, `start.sh` rilegge il valore da `apps/server/.env` e lo esporta anche a compose, così i due lati restano allineati.
    - `MERLT_API_KEY`: una stringa lunga e casuale. `start.sh` la esporta anche come `MERLT_ADMIN_API_KEY`, e merlt-api la registra al boot come chiave `admin` (per hash, in modo idempotente). Senza chiave, training RLCF e ingestion meccanica rispondono 401 upstream, cioè 503 lato BFF.
    - `MERLT_ENABLED` può restare `"false"`. `MERLT_ENABLED=true ./start.sh` vince comunque, perché dotenv non sovrascrive una variabile già presente nell'ambiente.
 
-5. **Dai la chiave LLM a compose.** Compose legge `OPENROUTER_API_KEY` dalla shell o dal `.env` nella root del repo, che carica da solo. Il modello completo con tutte le variabili di compose è [`infra/.env.example`](../../infra/.env.example). Senza chiave il Q&A e l'estrazione dagli appunti non funzionano.
+5. **Dai la chiave LLM a compose.** Compose legge `OPENROUTER_API_KEY` dalla shell o da `infra/.env`, che crei copiando [`infra/.env.example`](../../infra/.env.example). Senza chiave il Q&A e l'estrazione dagli appunti non funzionano.
 
-6. **Avvia.** La modalità `api-in-docker` è il default. `ADMIN_PASSWORD` serve solo al primo avvio, per creare l'utente admin.
+6. **Avvia.** MERL-T in Docker è il default (`MERLT_API_IN_DOCKER=true`). `ADMIN_PASSWORD` serve solo al primo avvio, per creare l'utente admin.
    ```bash
    ADMIN_PASSWORD='<una password>' MERLT_ENABLED=true ./start.sh
    ```
-   Il primo `docker compose --profile api-in-docker up -d` costruisce le immagini (merlt-api e merlt-worker condividono lo stesso build context). L'esempio stima circa 5 minuti: pesano le wheel torch CPU e il modello spaCy `it_core_news_lg`.
+   Il primo `docker compose -f infra/compose.yml --profile merlt up -d` costruisce le immagini (merlt-api e merlt-worker condividono lo stesso build context). L'esempio stima circa 5 minuti: pesano le wheel torch CPU e il modello spaCy `it_core_news_lg`.
 
    Al primo boot merlt-api carica anche il seed Libro IV (circa 27.7k nodi), e ci mette qualche minuto. Il gate di `start.sh` aspetta 60 s per default e, allo scadere, stampa l'errore e prosegue. Per il primo avvio conviene alzarlo:
    ```bash
@@ -78,7 +79,7 @@ Prerequisiti del prodotto base: Docker con Compose v2, Node con npm 11 (la CI us
 Stack e dipendenze:
 
 ```bash
-docker compose -f infra/compose.yml --profile api-in-docker ps
+docker compose -f infra/compose.yml --profile merlt ps
 curl -s http://localhost:8000/health
 curl -s http://localhost:3001/api/merlt/health
 docker inspect visualex-merlt-worker --format '{{join .Config.Cmd " "}}'
@@ -157,19 +158,21 @@ Alcuni valori sono fissi nel file compose e non vengono letti dall'ambiente:
 - `MERLT_NER_LEARNED_ENABLED=false`;
 - `MERLT_RLCF_BUFFER_PATH=/app/checkpoints/rlcf/replay_buffer.json`;
 - `MCP_LEGAL_IT_URL=http://mcp-legal-it:8011/mcp`;
-- `VISUALEX_API_URL=http://host.docker.internal:5000`;
-- `RQ_REDIS_URL=redis://merlt-redis:6379/1`;
-- FalkorDB con `FALKORDB_ARGS` di persistenza e volume su `/var/lib/falkordb/data`.
+- `RQ_REDIS_URL=redis://redis:6379/1`;
+- il volume di FalkorDB su `/var/lib/falkordb/data`.
+
+`VISUALEX_API_URL` (default `http://host.docker.internal:5000`) e `FALKORDB_ARGS`
+(la persistenza di FalkorDB; `scripts/restore.sh` la cambia per un avvio) si
+possono sovrascrivere.
 
 ### `start.sh`
 
 | Variabile | Default | Effetto |
 |---|---|---|
 | `MERLT_ENABLED` | `false` | Accende il sidecar |
-| `MERLT_API_IN_DOCKER` | `true` | api, worker e mcp-legal-it in container. Implica `MERLT_COMPOSE_ENABLED=true` |
-| `MERLT_COMPOSE_ENABLED` | `false` (forzato a `true` dalla modalità docker) | Avvia le dipendenze con compose |
+| `MERLT_API_IN_DOCKER` | `true` | api, worker e mcp-legal-it in container (profilo `merlt`); con `false`, api e worker sull'host |
 | `MERLT_HEALTH_TIMEOUT` | 60 | Secondi di attesa di `:8000/health` |
-| `MERLT_PORT` / `MERLT_ROOT` / `MERLT_COMPOSE_FILE` | 8000 / `./merlt` / `./infra/compose.yml` | |
+| `MERLT_API_PORT` | 8000 | Porta dell'api (anche in `infra/.env`) |
 | `MERLT_PYTHON` | `services/merlt/.venv/bin/python` se esiste, altrimenti `python` | Interprete della modalità locale |
 | `ADMIN_PASSWORD` | vuota | Se impostata, esegue `npm run db:seed` (crea l'admin) |
 
@@ -185,7 +188,7 @@ Le dipendenze restano in Docker. api e worker girano sull'host da `MERLT_PYTHON`
 python3.11 -m venv services/merlt/.venv
 services/merlt/.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
 services/merlt/.venv/bin/pip install -e 'services/merlt[dev]'
-MERLT_ENABLED=true MERLT_API_IN_DOCKER=false MERLT_COMPOSE_ENABLED=true ./start.sh
+MERLT_ENABLED=true MERLT_API_IN_DOCKER=false ./start.sh
 ```
 
 `start.sh` esporta il cablaggio che compose dà ai container, con indirizzi host: DB su 5436, redis su 6381 (`RQ_REDIS_URL` sul DB 1), FalkorDB 6382, Qdrant 6343, nome del grafo, collection, URL delle callback verso `localhost:3001`, `VISUALEX_API_URL`. Poi avvia `uvicorn merlt.app:app --reload` e un `rq worker` sulle tre code.
@@ -193,7 +196,7 @@ MERLT_ENABLED=true MERLT_API_IN_DOCKER=false MERLT_COMPOSE_ENABLED=true ./start.
 Limiti:
 
 - **Niente mcp-legal-it.** Gira solo sotto il profilo docker, quindi `MERLT_MCP_LEGAL_TOOLS_ENABLED=false` e gli esperti usano i tool interni. Per averlo: `docker compose -f infra/compose.yml up -d mcp-legal-it` e `MCP_LEGAL_IT_URL=http://localhost:8011/mcp`.
-- **Il worker parte solo con `RQ_REDIS_URL`**, cioè con `MERLT_COMPOSE_ENABLED=true` o con la variabile esportata a mano.
+- **Gli archivi restano in Docker**: `start.sh` li avvia sempre, e api e worker sull'host li raggiungono sulle porte di `infra/.env`.
 - **Il preflight** esce subito se `MERLT_PYTHON` non importa `merlt.app`.
 
 ## 6. Il codice MERL-T è dentro l'immagine
@@ -201,8 +204,8 @@ Limiti:
 Nei container è montato solo `services/merlt/data`, in sola lettura: il resto di `services/merlt/` è copiato nell'immagine al build. Dopo qualunque modifica sotto `services/merlt/` un restart non basta. Bisogna ricostruire e ricreare:
 
 ```bash
-docker compose -f infra/compose.yml --profile api-in-docker build merlt-api merlt-worker
-docker compose -f infra/compose.yml --profile api-in-docker up -d --force-recreate merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
 ```
 
 Cosa sopravvive a un recreate:
@@ -215,8 +218,8 @@ Redis invece non è durabile: coda RQ e cache si perdono a ogni recreate.
 
 ## 7. Test MERL-T
 
-- **In CI:** il job `merlt` di `.github/workflows/ci.yml`, sul branch `visualex-merlt-main`, esegue `python -m pytest tests/ -q` su Python 3.11 contro un Postgres di servizio, dopo `create_tables()` e `ensure_schema_additions()`.
-- **In locale:** dalla venv di `services/merlt/`, puntando `ENRICHMENT_DATABASE_URL` a un Postgres usa e getta. I test su DB scrivono righe, quindi non vanno lanciati sui dati dello stack di sviluppo. Il comando esatto è in [`services/merlt/CLAUDE.md`](../../merlt/CLAUDE.md).
+- **In CI:** il job `MERL-T tests` di `.github/workflows/ci.yml`, su `develop`, su `main` e sulle pull request verso di loro, esegue `python -m pytest tests/ -q` su Python 3.11 contro un Postgres di servizio, dopo `create_tables()` e `ensure_schema_additions()`.
+- **In locale:** dalla venv di `services/merlt/`, puntando `ENRICHMENT_DATABASE_URL` a un Postgres usa e getta. I test su DB scrivono righe, quindi non vanno lanciati sui dati dello stack di sviluppo. Il comando esatto è in [`services/merlt/CLAUDE.md`](../../services/merlt/CLAUDE.md).
 
 ## 8. Guasti comuni
 

@@ -82,7 +82,7 @@ the seed came back at the next boot.
 
 1. `merlt-api` builds the image (no code volume mount): after editing the loader
    run `docker compose build merlt-api && up -d --force-recreate`.
-2. The Dockerfile copies `services/merlt/`, not `data/`: mount `./merlt/data:/app/data:ro`
+2. The Dockerfile copies the `merlt/` package, not `data/`: `infra/compose.yml` mounts `../services/merlt/data:/app/data:ro`
    and set `MERLT_DATA_DIR=/app/data` (the `Path(__file__).parents[2]/data`
    default breaks in the container — `parents[2]` is `/`).
 3. `postgresql-client` (psql) had to be added to the runtime image deps.

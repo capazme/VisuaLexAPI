@@ -86,7 +86,8 @@ node --test '.claude/hooks/*.test.mjs'
 
 | Symptom | Cause and fix |
 |---|---|
-| `Port 5000/3001/5173 in use` | Another process holds it: `kill $(lsof -t -i:5000)`. |
+| `Port 5000 in use` on a Mac | Usually macOS's AirPlay Receiver (`ControlCenter`), which comes back if killed: System Settings → General → AirDrop & Handoff → AirPlay Receiver off. |
+| `Port 5000/3001/5173 in use` | Another process holds it: find it with `lsof -i :5000`, stop it, start again. |
 | `prisma migrate deploy failed` | `DATABASE_URL` in `apps/server/.env` must point at `localhost:5436`, or the stack is down: `docker compose -f infra/compose.yml ps`. |
 | `Playwright Chromium missing` | `services/visualex/.venv/bin/playwright install chromium` |
 | `vendor/mcp-legal-it` is empty | `git submodule update --init --recursive` |

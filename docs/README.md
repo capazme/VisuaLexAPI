@@ -1,6 +1,6 @@
 # Documentazione: VisuaLexAPI
 
-Indice della documentazione del progetto **VisuaLexAPI**: applicazione per avvocati italiani (Python Quart API · Node BFF · React SPA) con il sottosistema **MERL-T** (grafo giuridico collaborativo + RLCF) integrato come sidecar sul branch `visualex-merlt-main`.
+Indice della documentazione del progetto **VisuaLexAPI**: applicazione per avvocati italiani (Python Quart API · Node BFF · React SPA) con il sottosistema **MERL-T** (grafo giuridico collaborativo + RLCF) integrato come sidecar (dal 27 settembre 2026 nel ramo `develop`, insieme al resto).
 
 > **Nota.** Tutta questa documentazione descrive **VisuaLexAPI** (questo repo). `ALIS_CORE` è solo il riferimento **upstream** da cui provengono la visione e la libreria `merlt/`: lo leggiamo, non ci sviluppiamo.
 

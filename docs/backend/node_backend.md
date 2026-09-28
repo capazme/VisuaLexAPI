@@ -57,8 +57,8 @@ ALLOWED_ORIGINS="http://localhost:5173,http://localhost:3001"
 # Generate Prisma client
 npm run prisma:generate
 
-# Run migrations
-npm run prisma:migrate
+# Apply the migrations (start.sh does it too)
+npx prisma migrate deploy
 
 # (Optional) Open Prisma Studio GUI
 npm run prisma:studio
@@ -85,9 +85,9 @@ npm start
 | `build` | Compile TypeScript to dist/ |
 | `start` | Run compiled server |
 | `prisma:generate` | Generate Prisma client |
-| `prisma:migrate` | Create and run migrations |
+| `prisma:migrate` | `prisma migrate dev` — **do not use on the development database**: on drift it offers to reset it. Write the migration by hand and apply it with `npx prisma migrate deploy` (`apps/server/CLAUDE.md`) |
 | `prisma:studio` | Open Prisma Studio (port 5555) |
-| `prisma:reset` | Reset database (destructive!) |
+| `prisma:reset` | `prisma migrate reset` — wipes the database it points at; the test setup uses it on `visualex_test` only |
 | `db:seed` | Seed database with sample data |
 
 ---
