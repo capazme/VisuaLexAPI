@@ -271,11 +271,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   the scheduler. **Nothing in the backend handles rejections globally**, so
   any fire-and-forget promise (`void f()`) that rejects crashes the whole
   server: catch it where it is fired.
-- **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
+- **Article discussions** (`apps/server/src/routes/articleDiscussions.ts`): threads anchored
   on `{normaKey, articleId, version}` with comments, toggled votes and
   reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
   `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
-  `updatedAt`, vote count.
+  `updatedAt`, vote count. A thread may carry a `passage` (quotation, plain-text
+  offset, 32-char prefix and suffix), `articleUrn` and `textHash` (SHA-256 of the plain
+  projection when the thread was opened); the title is optional only for passage
+  threads; `GET /article-discussions/passages` lists an article's passage threads
+  without bodies. The stored passage is never rewritten; the reader's browser locates it.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades). Reached from the Settings modal.
@@ -1677,6 +1681,9 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
   plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
   Every surface that creates a highlight or an anchored note goes through it.
+- `utils/threadPassages.ts` — `buildPassage`, `textFingerprint`, `locatePassage`
+  (exact → whitespace-tolerant search → the occurrence whose context agrees;
+  never guesses: ambiguous or missing = `detached`).
 - `hooks/useArticleTextInteractions.ts` — the update-note chips and the
   foldable AGGIORNAMENTO tail, for any surface that renders structured text.
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
