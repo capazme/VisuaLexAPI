@@ -11,8 +11,8 @@ import {
     useInteractions,
     useRole,
 } from '@floating-ui/react';
-import { LocateFixed, Trash2, X } from 'lucide-react';
-import type { Highlight } from '../../../types';
+import { LocateFixed, MessageCircle, Trash2, X } from 'lucide-react';
+import type { ArticleDiscussionPassageSummary, Highlight } from '../../../types';
 import type { BlockAnnotations } from '../../../utils/articleAnnotations';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { getTransformOrigin } from '../../../utils/floatingOrigin';
@@ -41,6 +41,10 @@ export interface BlockAnnotationsPopoverProps {
     onUpdateNote: (id: string, text: string) => void;
     onRemoveNote: (id: string) => void;
     onRemoveHighlight: (id: string) => void;
+    /** Open this discussion in the panel (the popover closes first). */
+    onOpenThread?: (threadId: string) => void;
+    /** Fingerprint of the text on screen, to tell a discussion opened on another text. */
+    textHash?: string | null;
 }
 
 /**
@@ -60,6 +64,8 @@ export function BlockAnnotationsPopover({
     onUpdateNote,
     onRemoveNote,
     onRemoveHighlight,
+    onOpenThread,
+    textHash,
 }: BlockAnnotationsPopoverProps) {
     const titleId = useId();
     // Where focus goes on close: the sign after Esc, the close button or "Vai
@@ -117,7 +123,7 @@ export function BlockAnnotationsPopover({
     const role = useRole(context, { role: 'dialog' });
     const { getFloatingProps } = useInteractions([dismiss, role]);
 
-    const total = group.notes.length + group.highlights.length;
+    const total = group.notes.length + group.highlights.length + group.threads.length;
     const remove = (run: () => void) => {
         run();
         // The block's last annotation takes the sign with it.
@@ -211,6 +217,24 @@ export function BlockAnnotationsPopover({
                                     ))}
                                 </section>
                             )}
+                            {group.threads.length > 0 && (
+                                <section className="space-y-2">
+                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Discussioni</h4>
+                                    {group.threads.map((thread) => (
+                                        <ThreadCard
+                                            key={thread.id}
+                                            thread={thread}
+                                            currentTextHash={textHash}
+                                            onOpen={() => {
+                                                // Close popover without returning focus to sign; the panel takes it
+                                                returnFocusRef.current = null;
+                                                onClose();
+                                                onOpenThread?.(thread.id);
+                                            }}
+                                        />
+                                    ))}
+                                </section>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -244,6 +268,55 @@ function HighlightCard({ highlight, onGoTo, onRemove }: { highlight: Highlight; 
                     className="ml-auto inline-flex min-h-[44px] items-center gap-1 rounded px-1.5 text-xs font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 md:min-h-0 md:py-0.5 dark:text-slate-400 dark:hover:bg-red-900/20"
                 >
                     <Trash2 size={12} aria-hidden /> Rimuovi
+                </button>
+            </div>
+        </div>
+    );
+}
+
+/** A passage discussion of the block. */
+function ThreadCard({
+    thread,
+    currentTextHash,
+    onOpen,
+}: {
+    thread: ArticleDiscussionPassageSummary;
+    currentTextHash?: string | null;
+    onOpen: () => void;
+}) {
+    const isTextDifferent =
+        Boolean(thread.textHash) &&
+        Boolean(currentTextHash) &&
+        thread.textHash !== currentTextHash;
+
+    const repliesLabel =
+        thread.commentCount === 1 ? '1 risposta' : `${thread.commentCount} risposte`;
+
+    return (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+            <p className="line-clamp-2 text-[11px] italic text-primary-700 dark:text-primary-300">
+                &ldquo;{thread.passage.quote}&rdquo;
+            </p>
+            {thread.title ? (
+                <p className="mt-1 font-medium text-slate-800 dark:text-slate-200">
+                    {thread.title}
+                </p>
+            ) : null}
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                @{thread.user.username} &middot; {repliesLabel}
+            </p>
+            {isTextDifferent && (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                    Il testo è cambiato da quando è stata aperta
+                </p>
+            )}
+            <div className="mt-2 flex items-center">
+                <button
+                    type="button"
+                    onClick={onOpen}
+                    className="inline-flex min-h-[44px] items-center gap-1 rounded px-1 text-xs font-medium text-slate-500 transition-colors hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-0.5 dark:text-slate-400 dark:hover:text-primary-400"
+                >
+                    <MessageCircle size={12} aria-hidden /> Apri discussione
                 </button>
             </div>
         </div>

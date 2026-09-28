@@ -3,10 +3,11 @@ import { render, screen, fireEvent, within, waitFor } from '@testing-library/rea
 import { BlockAnnotationsPopover, type BlockAnnotationsPopoverProps } from './BlockAnnotationsPopover';
 import { renderArticleHtml } from '../../../utils/articleRender';
 import { parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, type LocatedThread } from '../../../utils/articleAnnotations';
 import { sanitizeHTML } from '../../../utils/sanitizeHtml';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
-import type { Annotation, Highlight } from '../../../types';
+import { buildPassage } from '../../../utils/threadPassages';
+import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../../../types';
 
 const RAW = fixtureText('nrm-cc-1453');
 const PLAIN = RAW.replace(/\n/g, '');
@@ -21,10 +22,45 @@ const h1: Highlight = {
 };
 const TITLE = 'Annotazioni · Nei contratti con prestazioni corrispettive…';
 
-function setup(highlights: Highlight[] = [h1], annotations: Annotation[] = [n1], over: Partial<BlockAnnotationsPopoverProps> = {}) {
+function createDummyThread(over: Partial<ArticleDiscussionPassageSummary> = {}): ArticleDiscussionPassageSummary {
+  const quote = 'prestazioni corrispettive';
+  const start = PLAIN.indexOf(quote);
+  return {
+    id: 't1',
+    title: 'Disputa sulla risoluzione',
+    passage: buildPassage(PLAIN, start, quote)!,
+    articleUrn: 'urn:nir:stato:legge:1942;262~art1453',
+    textHash: 'hash-orig',
+    commentCount: 1,
+    createdAt: '2026-09-28',
+    user: { id: 'u1', username: 'marta' },
+    ...over,
+  };
+}
+
+function setup(
+  highlights: Highlight[] = [h1],
+  annotations: Annotation[] = [n1],
+  over: Partial<BlockAnnotationsPopoverProps> = {},
+  threads: ArticleDiscussionPassageSummary[] = [],
+) {
   const container = document.createElement('div');
+  const locatedThreads: LocatedThread[] = threads.map((t) => ({
+    thread: t,
+    start: t.passage.start,
+    end: t.passage.start + t.passage.quote.length,
+  }));
   const draw = () => {
-    container.innerHTML = sanitizeHTML(renderArticleHtml({ raw: RAW, structure: STRUCTURE, highlights, annotations, signs: true }));
+    container.innerHTML = sanitizeHTML(
+      renderArticleHtml({
+        raw: RAW,
+        structure: STRUCTURE,
+        highlights,
+        annotations,
+        threads: locatedThreads,
+        signs: true,
+      }),
+    );
   };
   draw();
   document.body.appendChild(container);
@@ -32,7 +68,7 @@ function setup(highlights: Highlight[] = [h1], annotations: Annotation[] = [n1],
     containerRef: { current: container },
     blockIndex: 2,
     blockLabel: describeBlock(RAW, STRUCTURE.blocks[2]),
-    group: groupAnnotationsByBlock(RAW, STRUCTURE, highlights, annotations)[2],
+    group: groupAnnotationsByBlock(RAW, STRUCTURE, highlights, annotations, locatedThreads)[2],
     contentKey: 'v1',
     onClose: vi.fn(), onUpdateNote: vi.fn(), onRemoveNote: vi.fn(), onRemoveHighlight: vi.fn(),
     ...over,
@@ -145,5 +181,48 @@ describe('BlockAnnotationsPopover', () => {
     setup([{ ...h1, sourceSuggestionId: 's1', originalAuthor: { id: 'u', username: 'marta' } }], []);
     const dialog = await screen.findByRole('dialog', { name: TITLE });
     expect(within(dialog).getByTitle('Suggerita da @marta')).toBeInTheDocument();
+  });
+
+  it('shows the Discussioni section with quote, author, comment count and Apri discussione button', async () => {
+    const thread = createDummyThread({ commentCount: 1 });
+    const onOpenThread = vi.fn();
+    const { props } = setup([], [], { onOpenThread }, [thread]);
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+
+    expect(within(dialog).getByRole('heading', { level: 4, name: 'Discussioni' })).toBeInTheDocument();
+    expect(within(dialog).getByText('“prestazioni corrispettive”')).toBeInTheDocument();
+    expect(within(dialog).getByText('Disputa sulla risoluzione')).toBeInTheDocument();
+    expect(within(dialog).getByText(/@marta · 1 risposta/)).toBeInTheDocument();
+
+    const openBtn = within(dialog).getByRole('button', { name: /Apri discussione/ });
+    fireEvent.click(openBtn);
+    expect(props.onClose).toHaveBeenCalled();
+    expect(onOpenThread).toHaveBeenCalledWith('t1');
+  });
+
+  it('shows changed-text notice only when thread textHash and textHash prop differ', async () => {
+    const thread = createDummyThread({ textHash: 'hash-orig' });
+
+    // Same hash -> no notice
+    const same = setup([], [], { textHash: 'hash-orig' }, [thread]);
+    let dialog = await screen.findByRole('dialog', { name: TITLE });
+    expect(within(dialog).queryByText(/Il testo è cambiato/)).not.toBeInTheDocument();
+    same.unmount();
+    document.body.innerHTML = '';
+
+    // Different hash -> notice shown
+    setup([], [], { textHash: 'hash-different' }, [thread]);
+    dialog = await screen.findByRole('dialog', { name: TITLE });
+    expect(within(dialog).getByText('Il testo è cambiato da quando è stata aperta')).toBeInTheDocument();
+  });
+
+  it('removing the last highlight of a block that still has a thread does not close the popover', async () => {
+    const thread = createDummyThread();
+    const { props } = setup([h1], [], {}, [thread]);
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /Rimuovi/ }));
+    expect(props.onRemoveHighlight).toHaveBeenCalledWith('h1');
+    expect(props.onClose).not.toHaveBeenCalled();
   });
 });
