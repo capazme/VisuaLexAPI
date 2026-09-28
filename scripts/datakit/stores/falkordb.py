@@ -69,9 +69,13 @@ def _wait_for_aof(container: str, timeout: float = 900) -> None:
     raise RuntimeError("FalkorDB did not finish writing its AOF")
 
 
-def restore(t: Target, src: Path, entry: dict, force: bool) -> None:
-    if any(g["nodes"] for g in count(t).values()) and not force:
+def check(t: Target, entry: dict, force: bool) -> None:
+    if not force and any(g["nodes"] for g in count(t).values()):
         raise RuntimeError("falkordb is not empty: pass --force to replace it")
+
+
+def restore(t: Target, src: Path, entry: dict, force: bool) -> None:
+    check(t, entry, force)
     _compose(t, "stop", "falkordb")
     run(["docker", "run", "--rm", "-v", f"{t.volume_prefix}falkordb_data:/data",
          "-v", f"{(src / 'falkordb').resolve()}:/in:ro", "alpine:3.20",

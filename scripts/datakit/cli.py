@@ -97,6 +97,9 @@ def cmd_restore(args) -> int:
         return 2
     t = _target(args)
     names = [n for n in (args.stores.split(",") if args.stores else m["stores"]) if n in m["stores"]]
+    # Every store is checked before any is written: a refusal leaves the stack as it was.
+    for name in names:
+        STORES[name].check(t, m["stores"][name], args.force)
     for name in names:
         print(f"== restore {name}", file=sys.stderr)
         STORES[name].restore(t, src, m["stores"][name], args.force)

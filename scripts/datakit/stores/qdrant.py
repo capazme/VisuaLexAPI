@@ -36,11 +36,20 @@ def backup(t: Target, out: Path) -> dict:
     return {"version": _call("GET", f"{t.qdrant_url}/").get("version", "unknown"), "counts": counts}
 
 
-def restore(t: Target, src: Path, entry: dict, force: bool) -> None:
+def check(t: Target, entry: dict, force: bool) -> None:
+    if force:
+        return
     existing = set(collections(t))
     for c in entry["counts"]:
-        if c in existing and not force:
-            raise RuntimeError(f"qdrant/{c} exists: pass --force to replace it")
+        points = _call("POST", f"{t.qdrant_url}/collections/{c}/points/count", {"exact": True})["result"]["count"] \
+            if c in existing else 0
+        if points:
+            raise RuntimeError(f"qdrant/{c} is not empty: pass --force to replace it")
+
+
+def restore(t: Target, src: Path, entry: dict, force: bool) -> None:
+    check(t, entry, force)
+    for c in entry["counts"]:
         run(["curl", "-sS", "--fail-with-body", "-X", "POST",
              f"{t.qdrant_url}/collections/{c}/snapshots/upload?priority=snapshot&wait=true",
              "-F", f"snapshot=@{src / 'qdrant' / (c + '.snapshot')}"])

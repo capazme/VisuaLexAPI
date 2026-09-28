@@ -36,7 +36,15 @@ def backup(t: Target, out: Path) -> dict:
     return {"counts": counts}
 
 
+def check(t: Target, entry: dict, force: bool) -> None:
+    for v in entry["counts"]:
+        volume = t.volume_prefix + v
+        if not force and _exists(volume) and _files(volume):
+            raise RuntimeError(f"volume {volume} is not empty: pass --force to replace it")
+
+
 def restore(t: Target, src: Path, entry: dict, force: bool) -> None:
+    check(t, entry, force)
     folder = (src / "volumes").resolve()
     for v in entry["counts"]:
         volume = t.volume_prefix + v
@@ -44,7 +52,5 @@ def restore(t: Target, src: Path, entry: dict, force: bool) -> None:
             # Labelled like Compose's own, so Compose adopts it without warnings.
             run(["docker", "volume", "create", "--label", f"com.docker.compose.project={t.stack}",
                  "--label", f"com.docker.compose.volume={v}", volume])
-        elif _files(volume) and not force:
-            raise RuntimeError(f"volume {volume} is not empty: pass --force to replace it")
         run(["docker", "run", "--rm", "-v", f"{volume}:/dst", "-v", f"{folder}:/in:ro", HELPER,
              "sh", "-c", f"find /dst -mindepth 1 -delete && tar xzf /in/{v}.tgz -C /dst"])

@@ -55,10 +55,16 @@ def stack():
         os.environ.update(saved)
 
 
+MIGRATIONS = ("CREATE TABLE _prisma_migrations (migration_name text, finished_at timestamptz);"
+              " INSERT INTO _prisma_migrations VALUES ('20260101000000_init', now());")
+
+
 def seed():
     for db in ("visualex_platform", "merlt"):
         sh("docker", "exec", f"{STACK}-postgres", "psql", "-U", "postgres", "-d", db, "-v", "ON_ERROR_STOP=1",
            "-c", "CREATE TABLE notes (id int primary key, body text); INSERT INTO notes VALUES (1,'a'),(2,'b'),(3,'c');")
+    sh("docker", "exec", f"{STACK}-postgres", "psql", "-U", "postgres", "-d", "visualex_platform",
+       "-v", "ON_ERROR_STOP=1", "-c", MIGRATIONS)
     sh("docker", "exec", f"{STACK}-falkordb", "redis-cli", "GRAPH.QUERY", "g", "CREATE (:A {x:1})-[:R]->(:B {x:2})")
     qdrant("PUT", "/collections/c", {"vectors": {"size": 4, "distance": "Cosine"}})
     qdrant("PUT", "/collections/c/points?wait=true",
@@ -73,6 +79,11 @@ def wipe():
     sh(*COMPOSE, "down", "-v")
     subprocess.run(["docker", "volume", "rm", "-f", f"{STACK}_merlt_uploads"], check=False, capture_output=True)
     sh(*COMPOSE, "up", "-d", "--wait", *STORES)
+    # What start.sh leaves before a restore: the platform schema migrated, no
+    # user rows yet (tables owned by the platform role), and an empty collection.
+    sh("docker", "exec", f"{STACK}-postgres", "psql", "-U", "visualex", "-d", "visualex_platform",
+       "-v", "ON_ERROR_STOP=1", "-c", "CREATE TABLE notes (id int primary key, body text); " + MIGRATIONS)
+    qdrant("PUT", "/collections/c", {"vectors": {"size": 4, "distance": "Cosine"}})
 
 
 def test_backup_restore_roundtrip(stack, tmp_path):
@@ -80,7 +91,9 @@ def test_backup_restore_roundtrip(stack, tmp_path):
     out = tmp_path / "backup"
     assert cli.main(["backup", *TARGET, "--out", str(out)]) == 0
     stores = json.loads((out / "manifest.json").read_text())["stores"]
-    assert stores["postgres"]["counts"] == {"visualex_platform": {"notes": 3}, "merlt": {"notes": 3}}
+    assert stores["postgres"]["counts"] == {
+        "visualex_platform": {"notes": 3, "_prisma_migrations": 1}, "merlt": {"notes": 3}}
+    assert stores["postgres"]["schema"] == {"visualex_platform": "20260101000000_init", "merlt": None}
     assert stores["falkordb"]["counts"] == {"g": {"nodes": 2, "edges": 1}}
     assert stores["qdrant"]["counts"] == {"c": 3}
     assert stores["volumes"]["counts"] == {"merlt_uploads": 2}
@@ -96,3 +109,10 @@ def test_backup_restore_roundtrip(stack, tmp_path):
     # Restoring over stores that now hold data must refuse.
     with pytest.raises(RuntimeError, match="not empty|exists"):
         cli.main(["restore", str(out), *TARGET])
+
+    # ...and refuse before writing anything: FalkorDB, emptied and first in the
+    # manifest's order, stays empty while Postgres refuses.
+    sh("docker", "exec", f"{STACK}-falkordb", "redis-cli", "GRAPH.DELETE", "g")
+    with pytest.raises(RuntimeError, match="not empty"):
+        cli.main(["restore", str(out), *TARGET])
+    assert "g" not in sh("docker", "exec", f"{STACK}-falkordb", "redis-cli", "GRAPH.LIST").split()
