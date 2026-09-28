@@ -532,5 +532,3 @@ meant to stay split; add new features as new files, not inside the shells:
     back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
     40, so a miss is the normal case, not the exception. Same trap as
     `codice_urn` on the backend.
-
-<!-- second-brain:inizio -->

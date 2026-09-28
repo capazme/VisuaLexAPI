@@ -11,7 +11,7 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `http_client.py` (the shared throttled aiohttp client — TLS verification on).
   - `brocardi_scraper.py` also emits `Glossario` (links to Brocardi's legal
     dictionary, `{termine, url, dizionario_id}`). Any new `brocardi_info` key
-    must be whitelisted in **all three** wire literals in root `app.py`
+    must be whitelisted in **all three** wire literals in `app.py` (this folder)
     (`stream_article_text`, `fetch_brocardi_info`, `fetch_all_data`) — a key
     missing from any one of them never reaches the frontend.
   - `akn_parser.py` / `akn_fetch.py` — Normattiva's Akoma Ntoso export.
