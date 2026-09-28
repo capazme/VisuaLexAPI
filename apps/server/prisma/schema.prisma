@@ -467,6 +467,12 @@ model ArticleThread {
   articleId   String   @map("article_id")
   articleLabel String? @map("article_label")
   version     String?
+  passageQuote  String? @map("passage_quote")
+  passageStart  Int?    @map("passage_start")
+  passagePrefix String? @map("passage_prefix")
+  passageSuffix String? @map("passage_suffix")
+  articleUrn    String? @map("article_urn")
+  textHash      String? @map("text_hash")
   title       String
   body        String
   userId      String   @map("user_id")

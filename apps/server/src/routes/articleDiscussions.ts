@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/article-discussions', controller.listThreads);
+router.get('/article-discussions/passages', controller.listPassages);
 router.post('/article-discussions', controller.createThread);
 router.post('/article-discussions/:threadId/comments', controller.createComment);
 router.post('/article-discussions/:threadId/vote', controller.toggleThreadVote);
