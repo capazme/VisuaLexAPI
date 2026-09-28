@@ -17,7 +17,7 @@ FalkorDB and the RQ queue are fakes. The pending branch writes through the real
 propose-entity code path, so those tests need the enrichment Postgres (locally
 with ``ENRICHMENT_DATABASE_URL`` pointing at a database where
 ``create_tables()`` and migration 007 ran, or in-container):
-    docker exec -w /app visualex-merlt-api python -m pytest tests/api/test_confirm_source.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/api/test_confirm_source.py -q
 """
 
 from __future__ import annotations

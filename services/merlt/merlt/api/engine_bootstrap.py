@@ -50,7 +50,7 @@ async def _build_tools() -> list:
     # that flag. BridgeTableConfig defaults to localhost:5433/rlcf_dev, which is
     # unreachable inside the container network (the bridge silently failed to
     # connect → zero graph enrichment). Point it at the enrichment DB
-    # (merlt-postgres:5432/merlt) where the chunk→node bridge_table lives.
+    # (postgres:5432/merlt) where the chunk→node bridge_table lives.
     bridge = None
     try:
         from merlt.storage.bridge import BridgeTable, BridgeTableConfig

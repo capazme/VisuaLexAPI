@@ -4,7 +4,7 @@ Slice 1 events used to live only in an in-memory ring buffer (lost on restart).
 These tests pin the new durable path: events map to `tracking_events` rows and
 survive a fresh session.
 
-    docker exec -w /app visualex-merlt-api python -m pytest tests/api/test_tracking_persistence.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/api/test_tracking_persistence.py -q
 """
 
 from __future__ import annotations

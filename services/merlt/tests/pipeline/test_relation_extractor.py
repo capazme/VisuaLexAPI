@@ -4,7 +4,7 @@ Covers the deterministic response-parsing (filtering self-loops / empty
 endpoints, normalizing unknown relation types, clamping confidence) and the
 LLM-call wrapper's error handling. No live LLM.
 
-    docker exec -w /app visualex-merlt-api python -m pytest tests/pipeline/test_relation_extractor.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/pipeline/test_relation_extractor.py -q
 """
 
 from __future__ import annotations

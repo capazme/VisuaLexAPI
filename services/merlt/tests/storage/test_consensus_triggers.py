@@ -7,8 +7,8 @@ and flip `consensus_reached` / `consensus_type` on the parent
 creates the tables but never installs the triggers (so votes never reach
 consensus and graph promotion never fires).
 
-Runs inside the merlt-api container (reaches merlt-postgres):
-    docker exec -w /app visualex-merlt-api python -m pytest tests/storage/test_consensus_triggers.py -q
+Runs inside the merlt-api container (reaches the stack's postgres):
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/storage/test_consensus_triggers.py -q
 
 A loop-local NullPool engine is created per test so pytest-asyncio's per-test
 event loop never inherits a pool bound to a closed loop.

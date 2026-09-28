@@ -3,7 +3,7 @@ endpoint resolved, through the real extraction_candidates table (columns
 source_text / target_text, migration 008 / schema_additions) and the
 GET /documents/{id}/candidates read model.
 
-    docker exec -w /app visualex-merlt-api python -m pytest tests/api/test_candidate_relation_endpoints.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/api/test_candidate_relation_endpoints.py -q
 """
 
 from __future__ import annotations

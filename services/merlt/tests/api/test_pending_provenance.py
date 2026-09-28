@@ -13,7 +13,7 @@ Regressions covered:
 Runs against the enrichment Postgres (in-container, or locally with
 ``ENRICHMENT_DATABASE_URL`` pointing at a database where ``create_tables()``
 and migration 007 ran):
-    docker exec -w /app visualex-merlt-api python -m pytest tests/api/test_pending_provenance.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/api/test_pending_provenance.py -q
 """
 
 from __future__ import annotations

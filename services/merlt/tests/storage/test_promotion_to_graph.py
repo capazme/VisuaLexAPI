@@ -8,7 +8,7 @@ validate-entity endpoint calls on approved consensus (enrichment_router.py:1269)
 Writes to an ISOLATED test graph (`merlt_test_a3`) so the production Libro IV
 graph is never touched; the graph is wiped at teardown.
 
-    docker exec -w /app visualex-merlt-api python -m pytest tests/storage/test_promotion_to_graph.py -q
+    docker exec -w /app <throwaway-stack>-merlt-api python -m pytest tests/storage/test_promotion_to_graph.py -q
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import uuid
 import pytest
 import pytest_asyncio
 
-# Needs a live FalkorDB (compose merlt-falkordb): excluded by default through
+# Needs a live FalkorDB (the compose falkordb service): excluded by default through
 # pyproject's `-m 'not integration'`; run with `-m integration` in-container.
 pytestmark = pytest.mark.integration
 
