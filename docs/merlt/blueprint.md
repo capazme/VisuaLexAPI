@@ -14,7 +14,7 @@
 > glossario.
 >
 > Riferimenti al codice nella forma `file:line` (es. `orchestrator.py:656`) sono ancore reali,
-> relative a `merlt/merlt/` salvo diversa indicazione.
+> relative a `services/merlt/merlt/` salvo diversa indicazione.
 
 > **Stato al 2026-09-25.** Il blueprint descrive il working tree del 17 luglio 2026. Da allora, e in
 > particolare nella sessione del 25 settembre, sono stati chiusi questi punti. Le sezioni toccate
@@ -24,7 +24,7 @@
 >
 > - **Stack da un clone vuoto.** `start.sh` usa `api-in-docker` di default e inizializza il
 >   submodule `vendor/mcp-legal-it`. Legge `MERLT_INTERNAL_SECRET` e `MERLT_API_KEY` da
->   `backend/.env`. In modalità locale avvia anche un worker RQ sulle tre code. FalkorDB persiste in
+>   `apps/server/.env`. In modalità locale avvia anche un worker RQ sulle tre code. FalkorDB persiste in
 >   `/var/lib/falkordb/data`. Il sweep di igiene gira ogni 24 h (`MERLT_HYGIENE_INTERVAL_HOURS`).
 >   (`2a68ab3`)
 > - **Boot.** Il boot semina la chiave admin da `MERLT_ADMIN_API_KEY` e applica
@@ -147,7 +147,7 @@ flowchart LR
 ### 0.3 Topologia fisica (7 servizi Docker)
 
 MERL-T è un **sidecar** del prodotto VisuaLex, isolato in un proprio stack Docker
-(`docker-compose.merlt.yml`). Tutti i servizi sono bindati su `127.0.0.1` (solo loopback host).
+(`infra/compose.yml`). Tutti i servizi sono bindati su `127.0.0.1` (solo loopback host).
 
 ```mermaid
 flowchart TB
@@ -181,7 +181,7 @@ passa dal BFF sotto `/api/merlt/*`, che autentica l'utente (JWT), applica i guar
 consenso/ruolo, inietta `user_id` e proxya a MERL-T iniettando la `X-API-Key` (che il FE non vede mai).
 Vedi Parte 6 per porte, volumi ed env.
 
-### 0.4 Mappa dei sottosistemi Python (`merlt/merlt/`)
+### 0.4 Mappa dei sottosistemi Python (`services/merlt/merlt/`)
 
 | Sottosistema | In una frase | Parte |
 |---|---|---|
@@ -412,7 +412,7 @@ feedback diventa un'*esperienza* in un replay buffer; quando il buffer supera un
 admin) si esegue un *training epoch* che ripesa le policy e salva checkpoint durabili, ricaricati al
 boot senza riavvio.
 
-> Nota di lettura: `merlt/CLAUDE.md` descrive file aspirazionali (`rlcf/feedback.py`, `training.py`,
+> Nota di lettura: `services/merlt/CLAUDE.md` descrive file aspirazionali (`rlcf/feedback.py`, `training.py`,
 > `governance.py`) che **non esistono**. I file reali sono quelli qui sotto.
 
 ### 2.2 Le tre "manopole" (policy head)
@@ -796,7 +796,7 @@ PUB), `auth_api` (sync authority, PUB), `api_keys_router`.
 
 Ogni passo è isolato: se fallisce, logga e il boot prosegue.
 
-### 6.3 Topologia Docker (`docker-compose.merlt.yml`)
+### 6.3 Topologia Docker (`infra/compose.yml`)
 
 | Servizio | Porta host↔container | Volume durabile | Profilo |
 |---|---|---|---|
@@ -859,7 +859,7 @@ e, soprattutto, **il BFF Node**, che autentica via JWT e inietta `user_id`. Rego
 nuovo endpoint sensibile assumendo che `verify_api_key` **non** filtri, e non esporre `:8000`
 direttamente.
 
-**Immagine baked-at-build:** il codice `merlt/` è dentro l'immagine (solo `data/` è volume-montato).
+**Immagine baked-at-build:** il codice `services/merlt/` è dentro l'immagine (solo `data/` è volume-montato).
 Modifiche al codice Python richiedono `docker compose --profile api-in-docker build` + recreate — non
 basta un restart.
 
@@ -887,7 +887,7 @@ divergenze qui sotto sono recepite e restano come registro.*
    durabile. La nota "future: PostgreSQL" è obsoleta.
 6. **`GET /api/merlt/features` non esiste** (mai implementato): le capability sono derivate client-side
    in `useMerltFeatures.ts`.
-7. **File RLCF aspirazionali** citati in `merlt/CLAUDE.md` (`rlcf/feedback.py`, `training.py`,
+7. **File RLCF aspirazionali** citati in `services/merlt/CLAUDE.md` (`rlcf/feedback.py`, `training.py`,
    `governance.py`) **non esistono**; i file reali sono in Parte 4.2.
 
 > **Raccomandazione:** dopo la validazione di questo blueprint, allineare il CLAUDE.md (o rimandare ad

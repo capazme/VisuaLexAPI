@@ -147,7 +147,7 @@ Retrieves and processes legal texts from external sources.
 
 ## MERL-T Sidecar (Optional Subsystem)
 
-When `MERLT_ENABLED=true`, VisuaLex runs an additional **MERL-T** stack (`docker-compose.merlt.yml`) — a legal knowledge-graph + RLCF subsystem whose Python is source-vendored in `merlt/` (a selective copy of upstream `ALIS_CORE/merlt`).
+When `MERLT_ENABLED=true`, VisuaLex runs an additional **MERL-T** stack (`infra/compose.yml`) — a legal knowledge-graph + RLCF subsystem whose Python is source-vendored in `merlt/` (a selective copy of upstream `ALIS_CORE/merlt`).
 
 ```mermaid
 graph LR
@@ -418,13 +418,13 @@ Or manually:
 
 ```bash
 # Terminal 1: Python API
-source .venv/bin/activate && python app.py
+cd services/visualex && source .venv/bin/activate && python app.py
 
 # Terminal 2: Node.js Backend
-cd backend && npm run dev
+cd apps/server && npm run dev
 
 # Terminal 3: Frontend
-cd frontend && npm run dev
+cd apps/web && npm run dev
 ```
 
 ### Development Proxies
@@ -446,10 +446,10 @@ Vite proxies API requests during development:
 
 ```bash
 # Frontend
-cd frontend && npm run build  # Creates dist/
+cd apps/web && npm run build  # Creates dist/
 
 # Node.js Backend
-cd backend && npm run build   # Compiles to dist/
+cd apps/server && npm run build   # Compiles to dist/
 
 # Python API
 # Run with gunicorn or hypercorn for production

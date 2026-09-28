@@ -9,7 +9,7 @@
 
 Da questo momento, **`VisuaLexAPI/merlt/`** è la single source of truth per il codice MERL-T usato in produzione VisuaLex.
 
-`/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt/` resta come **reference read-only**: storico di sviluppo, snapshot completo (incluso `data/` 317 MB, `models/`, `examples/`, ecc.).
+`../ALIS_CORE/merlt/` (un checkout accanto a questo) resta come **reference read-only**: storico di sviluppo, snapshot completo (incluso `data/` 317 MB, `models/`, `examples/`, ecc.).
 
 **Baseline import**: tag git `merlt-baseline-from-alis-core` segna il commit di prima copia. Riferimento per audit/regression.
 
@@ -20,8 +20,8 @@ Da questo momento, **`VisuaLexAPI/merlt/`** è la single source of truth per il 
 `VisuaLexAPI/merlt/` (~5.5 MB, 328 file) contiene tutto il codice Python necessario al runtime:
 
 ```
-merlt/
-├── merlt/              codice Python (api/, app.py, experts/, rlcf/, storage/, ner/, pipeline/, ...)
+services/merlt/
+├── services/merlt/              codice Python (api/, app.py, experts/, rlcf/, storage/, ner/, pipeline/, ...)
 ├── alembic/            DB migrations
 ├── alembic.ini         Alembic config
 ├── scripts/            utility scripts
@@ -45,7 +45,7 @@ merlt/
 | `data/` | 317 MB | Knowledge graph + embeddings — ricostruibili, non source code |
 | `.venv/` | ~100 MB | Virtual environment — ricreabile via `pip install` |
 | `models/` | 32 KB | Contiene `legal_ner_checkpoints/` (NER weights) — ricreabile via training |
-| `tests/` | 20 MB | Test pesanti MERL-T standalone, non copiati. L'attuale `merlt/tests/` è un'altra cosa: una suite mirata alle funzioni integrate in VisuaLex, che gira nel job CI `merlt`. |
+| `tests/` | 20 MB | Test pesanti MERL-T standalone, non copiati. L'attuale `services/merlt/tests/` è un'altra cosa: una suite mirata alle funzioni integrate in VisuaLex, che gira nel job CI `merlt`. |
 | `examples/` | 964 KB | Script di sviluppo/test one-off |
 | `exports/` | 992 KB | Artifact di export precedenti |
 | `docs/experiments/` | 29 MB | Notebooks + risultati esperimenti — reference solo in ALIS_CORE |
@@ -72,7 +72,7 @@ merlt/
    git checkout -b merlt-upstream-sync-YYYY-MM-DD
    ```
 
-2. Rsync selettivo. **IMPORTANTE**: usa pattern con `/` davanti per ancorare al root, altrimenti rsync matcha ovunque (es. `data/` matcherebbe anche `merlt/disagreement/data/` che contiene codice Python!). Fix scoperto in commit `ef2bd25` (Story MERLT-1.0):
+2. Rsync selettivo. **IMPORTANTE**: usa pattern con `/` davanti per ancorare al root, altrimenti rsync matcha ovunque (es. `data/` matcherebbe anche `services/merlt/merlt/disagreement/data/` che contiene codice Python!). Fix scoperto in commit `ef2bd25` (Story MERLT-1.0):
    ```bash
    rsync -a --dry-run \
      --exclude='/data/' \
@@ -96,8 +96,8 @@ merlt/
      --exclude='trace_output.json' \
      --exclude='frontend-audit.json' \
      --exclude='.claude-doc-trigger.json' \
-     /Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt/ \
-     ./merlt/
+     ../ALIS_CORE/merlt/ \
+     ./services/merlt/
    ```
    (rimuovi `--dry-run` per applicare)
 
@@ -107,8 +107,8 @@ merlt/
 
 3. Review del diff:
    ```bash
-   git diff --stat merlt/
-   git diff merlt/ | less
+   git diff --stat services/merlt/
+   git diff services/merlt/ | less
    ```
 
 4. Se ci sono modifiche locali in VisuaLex che vanno PRESERVATE (es. fix specifici al BFF integration), risolvere manualmente.
@@ -129,38 +129,38 @@ merlt/
 
 ## Anti-drift safeguards
 
-1. **`docs/merlt/upstream-sync.md`** (questo doc): leggere prima di qualsiasi modifica strutturale a `merlt/`.
-2. **Tag baseline** `merlt-baseline-from-alis-core` — riferimento per audit (`git diff merlt-baseline-from-alis-core -- merlt/`).
-3. **CODEOWNERS** (futuro, opzionale): assegnare review obbligatorio per modifiche a `merlt/`.
+1. **`docs/merlt/upstream-sync.md`** (questo doc): leggere prima di qualsiasi modifica strutturale a `services/merlt/`.
+2. **Tag baseline** `merlt-baseline-from-alis-core` — riferimento per audit (`git diff merlt-baseline-from-alis-core -- services/merlt/`).
+3. **CODEOWNERS** (futuro, opzionale): assegnare review obbligatorio per modifiche a `services/merlt/`.
 
 ---
 
 ## Note
 
-- Il `docker-compose.dev.yml` interno a `merlt/` è MERL-T standalone (per dev MERL-T isolato). Il nostro flusso VisuaLex usa **`docker-compose.merlt.yml` nella root del repo**: 4 dipendenze sempre attive (postgres, redis, falkordb, qdrant) più 3 servizi sotto il profilo `api-in-docker`, che è il default di `start.sh` (`mcp-legal-it`, `merlt-api`, `merlt-worker`).
-- `start_dev.sh` interno a `merlt/` analogamente NON viene usato. Il nostro `start.sh` root usa i container. Nella modalità sviluppatore (`MERLT_API_IN_DOCKER=false`) avvia invece `uvicorn merlt.app:app` più un `rq worker` locale sulle tre code, dall'interprete `MERLT_PYTHON`.
-- Se `ALIS_CORE/merlt` viene cancellato/spostato, NULLA cambia in VisuaLex: `merlt/` è autocontenuto. Per ricostruire `data/` serve documentazione separata (riferirsi a `merlt/docs/`).
+- Il `docker-compose.dev.yml` interno a `services/merlt/` è MERL-T standalone (per dev MERL-T isolato). Il nostro flusso VisuaLex usa **`infra/compose.yml` nella root del repo**: 4 dipendenze sempre attive (postgres, redis, falkordb, qdrant) più 3 servizi sotto il profilo `api-in-docker`, che è il default di `start.sh` (`mcp-legal-it`, `merlt-api`, `merlt-worker`).
+- `start_dev.sh` interno a `services/merlt/` analogamente NON viene usato. Il nostro `start.sh` root usa i container. Nella modalità sviluppatore (`MERLT_API_IN_DOCKER=false`) avvia invece `uvicorn merlt.app:app` più un `rq worker` locale sulle tre code, dall'interprete `MERLT_PYTHON`.
+- Se `ALIS_CORE/merlt` viene cancellato/spostato, NULLA cambia in VisuaLex: `services/merlt/` è autocontenuto. Per ricostruire `data/` serve documentazione separata (riferirsi a `services/merlt/docs/`).
 
 ## Divergenze locali da ri-applicare in upstream (Slice 2c — staging "Apprendi dai miei appunti")
 
-Queste modifiche al `merlt/` vendorizzato **sono già deployate sullo stack live locale** (rebuild `visualex-merlt-api`+`worker`; tabella creata al boot via lifespan `create_tables()`, niente Alembic manuale necessario sul live ma la migrazione 005 resta per parità/prod) e vanno portate in upstream `ALIS_CORE/merlt`:
-- `merlt/storage/enrichment/models.py` — nuovo modello `ExtractionCandidate` (tabella `extraction_candidates`).
+Queste modifiche al `services/merlt/` vendorizzato **sono già deployate sullo stack live locale** (rebuild `visualex-merlt-api`+`worker`; tabella creata al boot via lifespan `create_tables()`, niente Alembic manuale necessario sul live ma la migrazione 005 resta per parità/prod) e vanno portate in upstream `ALIS_CORE/merlt`:
+- `services/merlt/merlt/storage/enrichment/models.py` — nuovo modello `ExtractionCandidate` (tabella `extraction_candidates`).
 - `alembic/versions/005_add_extraction_candidates.py` — migrazione (down_revision `004_add_weight_versions_table`).
-- `merlt/pipeline/document_parser.py` — param `persist_target` ("pending" | "staging") + `document_id`; branch che scrive `ExtractionCandidate` invece di `PendingEntity`.
-- `merlt/worker/extraction_tasks.py` — task RQ `extract_to_staging` (coda `merlt_extract`, callback BFF `/api/merlt/internal/extraction-callback`, env `BFF_EXTRACTION_CALLBACK_URL`).
-- `merlt/api/document_router.py` — endpoint `POST /documents/{id}/extract-async`, `GET /documents/{id}/candidates`, + nuovo `candidates_router` (`GET /candidates/{id}`, `POST /candidates/{id}/mark-promoted`). Wired in `merlt/api/__init__.py` + `merlt/app.py`.
-- `docker-compose.merlt.yml` — 3 fix scoperti durante lo smoke live: (a) `merlt-api` env `RQ_REDIS_URL: redis://merlt-redis:6379/1` (l'api accoda, non solo il worker); (b) worker `command` → `rq worker merlt_ingest merlt_extract` (oggi `merlt_ingest merlt_extract merlt_ner_train`, dopo il Loop β #2); (c) worker env `BFF_EXTRACTION_CALLBACK_URL`. Inoltre: RQ job_id non può contenere `:` (usato `extract-`+sha256), e il worker chiama `init_db()` (niente lifespan).
-- Deploy fatto: `docker compose -f docker-compose.merlt.yml --profile api-in-docker build merlt-api merlt-worker && up -d`. Verifica: 4 endpoint in OpenAPI, `extract-async` 202 + worker processa `merlt_extract`, pytest `tests/pipeline/test_extraction_staging.py` 2 passed (in-container). E2E positivo completo (PDF reale→LLM→promote) richiede BFF Node up + chiave LLM.
+- `services/merlt/merlt/pipeline/document_parser.py` — param `persist_target` ("pending" | "staging") + `document_id`; branch che scrive `ExtractionCandidate` invece di `PendingEntity`.
+- `services/merlt/merlt/worker/extraction_tasks.py` — task RQ `extract_to_staging` (coda `merlt_extract`, callback BFF `/api/merlt/internal/extraction-callback`, env `BFF_EXTRACTION_CALLBACK_URL`).
+- `services/merlt/merlt/api/document_router.py` — endpoint `POST /documents/{id}/extract-async`, `GET /documents/{id}/candidates`, + nuovo `candidates_router` (`GET /candidates/{id}`, `POST /candidates/{id}/mark-promoted`). Wired in `services/merlt/merlt/api/__init__.py` + `services/merlt/merlt/app.py`.
+- `infra/compose.yml` — 3 fix scoperti durante lo smoke live: (a) `merlt-api` env `RQ_REDIS_URL: redis://merlt-redis:6379/1` (l'api accoda, non solo il worker); (b) worker `command` → `rq worker merlt_ingest merlt_extract` (oggi `merlt_ingest merlt_extract merlt_ner_train`, dopo il Loop β #2); (c) worker env `BFF_EXTRACTION_CALLBACK_URL`. Inoltre: RQ job_id non può contenere `:` (usato `extract-`+sha256), e il worker chiama `init_db()` (niente lifespan).
+- Deploy fatto: `docker compose -f infra/compose.yml --profile api-in-docker build merlt-api merlt-worker && up -d`. Verifica: 4 endpoint in OpenAPI, `extract-async` 202 + worker processa `merlt_extract`, pytest `tests/pipeline/test_extraction_staging.py` 2 passed (in-container). E2E positivo completo (PDF reale→LLM→promote) richiede BFF Node up + chiave LLM.
 - Gap-closure (deployata): `document_parser.py` ora setta `expires_at` (env `MERLT_STAGING_TTL_HOURS`) e chiama `EntityDeduplicator.find_duplicates` (best-effort) per `potential_duplicate_of`; `worker/extraction_tasks.py` cancella il file caricato a estrazione completata; `document_router.list_document_candidates` fa lazy-purge di promoted+expired. Nessun nuovo file MERL-T (modifiche ai 3 già elencati).
 - #5 (estrazione relazioni da testo libero): *nota storica superata.* Al momento della Slice 2c non era implementata. Dal loop-closure B1 lo è: il worker chiama `parse_document(extract_relations=True)`, che scrive `ExtractionCandidate(candidate_type="relation")` passando da `canonical_relation_type`.
 
 ## Divergenze locali della sessione 2026-09-25 (da valutare per upstream)
 
-Tutte in `merlt/`, già nell'immagine dopo il rebuild. `ALIS_CORE/merlt` non le ha.
+Tutte in `services/merlt/`, già nell'immagine dopo il rebuild. `ALIS_CORE/merlt` non le ha.
 
 **Enrichment e provenienza**
 
-- **`confirm-source`.** Nuova route `POST /api/v1/enrichment/confirm-source` in `merlt/api/enrichment_router.py`, con i modelli in `api/models/enrichment_models.py`. Valida il nodo `live:`; ingerisce un articolo Normattiva con l'helper di enqueue condiviso (estratto da `graph_router.ingest_article`, stesso job id `ingest-`); trasforma le altre fonti in pending entity passando dai gate di `propose_entity`. Test: `tests/api/test_confirm_source.py`. (`553a968`)
+- **`confirm-source`.** Nuova route `POST /api/v1/enrichment/confirm-source` in `services/merlt/merlt/api/enrichment_router.py`, con i modelli in `api/models/enrichment_models.py`. Valida il nodo `live:`; ingerisce un articolo Normattiva con l'helper di enqueue condiviso (estratto da `graph_router.ingest_article`, stesso job id `ingest-`); trasforma le altre fonti in pending entity passando dai gate di `propose_entity`. Test: `tests/api/test_confirm_source.py`. (`553a968`)
 - **Colonna `source_reference`.** Nuova colonna su `pending_entities` e `pending_relations`, per la provenienza della promozione: Alembic `007_add_pending_source_reference.py` e SQL `storage/migrations/003_pending_source_reference.sql`. `get_pending` restituisce `created_at` UTC reale e la reference. `validate_relation` ricalcola l'authority dopo il consenso. (`553a968`)
 - **Estremi delle relazioni.** Sono risolti in staging (`pipeline/document_parser.py`) e scritti per MATCH al consenso (`_write_relation_to_graph`, `_write_deferred_relations_for_entity`). Gli helper stanno in `storage/graph/relation_endpoints.py`. `target_entity_id` passa a `varchar(300)` (Alembic `008_relation_endpoints.py`, `storage/migrations/004_relation_endpoints.sql`). (`c7d0844`)
 - **Proposte di relazione.** Il valore wire risolto sostituisce l'Enum. `entity_writer.PLACEHOLDER_ARTICLE_URNS` impedisce che `user_document` diventi una `:Norma`. Le estrazioni fallite mandano una callback `failed`. (`9365353`)

@@ -16,7 +16,7 @@ The Node.js backend is an Express.js server providing platform services: user au
 ### Installation
 
 ```bash
-cd backend
+cd apps/server
 npm install
 ```
 
@@ -532,7 +532,7 @@ Folder move operations prevent a folder from being moved into its own descendant
 ## Project Structure
 
 ```
-backend/
+apps/server/
 ├── prisma/
 │   └── schema.prisma      # Database schema
 ├── src/

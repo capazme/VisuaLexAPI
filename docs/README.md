@@ -10,13 +10,16 @@ Indice della documentazione del progetto **VisuaLexAPI**: applicazione per avvoc
 
 ## Inizia da qui
 
+- **[git-workflow.md](./git-workflow.md)**: il modello dei rami — `develop` per lavorare, `main` per le release, pull request, code owner, hotfix.
+- **[setup.md](./setup.md)**: da un clone vuoto a uno stack funzionante con le suite verdi.
+
 1. ✅ **[merlt/blueprint.md](./merlt/blueprint.md)**: l'architettura MERL-T verificata sul codice (topologia, come pensa, come impara, dati, infra). **Leggi prima questo.**
 2. ✅ **[merlt/integration.md](./merlt/integration.md)**: runbook da un clone vuoto a uno stack funzionante, con le variabili d'ambiente.
 3. ✅ **[merlt/contract-matrix.md](./merlt/contract-matrix.md)**: ogni route montata sul BFF, con guard, flag, endpoint MERL-T e consumer FE.
 4. ✅ **[merlt/smoke-checklist.md](./merlt/smoke-checklist.md)**: smoke E2E di tutte le superfici (Slice 1→4, Loop β, NER, ops).
 5. 🧭 **[merlt/system-map.md](./merlt/system-map.md)**: la mappa esistente vs. target, i due loop RLCF, le incongruenze aperte.
 
-Prodotto base (non-MERL-T): [architecture.md](./architecture.md) · [backend/](./backend/) · [frontend/](./frontend/) · [deployment.md](./deployment.md).
+Prodotto base (non-MERL-T): [architecture.md](./architecture.md) · [backend/](./backend/) · [frontend/](./frontend/).
 
 ---
 
@@ -76,7 +79,8 @@ Design MERL-T scritti fuori da `docs/merlt/` (in `docs/superpowers/specs/`): [Q&
 
 Tracker storici:
 
-- [sprint-status.yaml](./sprint-status.yaml) segue solo gli sprint MERL-T 1a/1b.
+- [archive/sprint-status.yaml](./archive/sprint-status.yaml) segue solo gli sprint MERL-T 1a/1b.
+- [archive/deployment-lightsail.md](./archive/deployment-lightsail.md): il deploy su un server dismesso il 26 settembre 2026 (`deploy.sh`), conservato come storia.
 - [bmm-workflow-status.yaml](./bmm-workflow-status.yaml) è un artefatto di marzo 2026.
 
 ---
@@ -85,3 +89,4 @@ Tracker storici:
 - **Doc MERL-T** → `docs/merlt/` (panoramiche), `docs/merlt/slices/<slice>/` (design + sprint-plan accoppiati), `docs/merlt/decisions/` (ADR).
 - **Design spec nuovi** → `docs/superpowers/specs/AAAA-MM-GG-<tema>-design.md`.
 - Lingua: prosa **italiana**, identificatori/endpoint/percorsi in **inglese** (come nel codice).
+- Documents under `merlt/slices/`, `archive/` and `superpowers/` describe the repository of their time: their paths predate the v2.0.0 layout.
