@@ -67,10 +67,14 @@ Q3 (is the connection behind carrier-grade NAT?) is answered.
   right; a header shorter than N, or malformed, falls back to `remote_addr`. Then use it
   in `rate_limit_middleware`, reading `TRUSTED_PROXIES` (default 0). Run the existing
   rate-limit tests: they must still pass.
-- [ ] **1.3 Optional log file.** `VISUALEX_LOG_FILE` names the file (default
-  `visualex_api.log`, so development is unchanged); an empty value drops the file
-  handler. Test: with it empty, importing the logger creates no file.
-- [ ] **1.4 Hypercorn.** Add it to `requirements.txt`; run `hypercorn asgi:app --bind
+- [ ] **1.3 Optional log file.** Three modules (`treextractor`, `text_op`,
+  `urngenerator`) open `norma.log` in the working directory **at import time**, and the
+  alternative server opens `visualex_api.log`: on a read-only filesystem the application
+  never starts. One shared helper, `log_handlers(default_file)`, replaces the four
+  `FileHandler` calls; `VISUALEX_LOG_FILE` names another file, and an **empty** value drops
+  the file handler. With it unset each call site keeps its own default, so development is
+  unchanged. Test: with it empty, no file is created.
+- [ ] **1.4 Hypercorn.** Quart already pulls it in; name it in `requirements.txt` anyway; run `hypercorn asgi:app --bind
   127.0.0.1:5000 --workers 1` from `services/visualex` and `curl /health`. One worker is
   not a default: the rate limiter, the circuit breaker and the fetch queue are in-memory.
 - [ ] **1.5 Dockerfile.** Build context is the repository root (`version.txt` is read from
@@ -83,11 +87,12 @@ Q3 (is the connection behind carrier-grade NAT?) is answered.
   environment; a `HEALTHCHECK` that requests `/health` (never `/health/detailed`, which
   probes the real sources); `CMD hypercorn asgi:app --bind 0.0.0.0:5000 --workers 1`.
 - [ ] **1.6 Prove it.** `docker build -f services/visualex/Dockerfile -t
-  visualex-scrapers .` from the root; run it with `--shm-size=1g`, then: `/health`,
+  visualex-scrapers .` from the root; run it, then: `/health`,
   `/version` (shows `version.txt`), `POST /fetch_norma_data` and `/fetch_article_text` for
   art. 2043 c.c., `POST /export_pdf` (Chromium renders), and `/stream_article_text` streams
-  line by line. Try once **without** `--shm-size` to see the crash the flag prevents.
-  Note `docker stats` during a PDF export: the memory limit of Task 4 comes from it.
+  line by line. Note `docker stats` during four concurrent PDF exports: the memory limit of
+  Task 4 comes from it. *(Measured on 29 September, arm64: idle about 280 MiB, peak about
+  1.06 GiB and 195 processes; Docker's default 64 MB `/dev/shm` is enough, so no `--shm-size`.)*
 - [ ] **1.7 Docs.** `services/visualex/CLAUDE.md`: how the image is built and why one
   worker, the layout mirror, the trusted-proxy setting.
 
@@ -126,23 +131,29 @@ the three checks of 2.3 in the pull request.
   Python-bound entries in `apps/web/vite.config.ts` and the `@legal` matcher of the
   Caddyfile; they must be the same set, prefix for prefix. Red until 3.2.
 - [ ] **3.2 Caddyfile.** Phase 1 is plain HTTP: `auto_https off`, `admin off`, one site on
-  `:80`. `@legal` (the Vite list, each with a trailing `*`) goes to
+  `:8080` (above 1024, so the module runs as a normal user with every capability
+  dropped). `@legal` (the Vite list, each with a trailing `*`) goes to
   `{$SCRAPERS_UPSTREAM:scrapers:5000}` with `flush_interval -1` so the NDJSON stream is
   not buffered; `/api/*` to `{$SERVER_UPSTREAM:server:3001}`; everything else from `/srv`
   with `try_files {path} /index.html`. Compression; `Cache-Control` immutable on
   `/assets/*` and `no-cache` on `index.html`; `X-Content-Type-Options`, `Referrer-Policy`,
   `Permissions-Policy`, `X-Frame-Options`, and the content security policy in
-  **report-only** first (the reader emits inline styles). Body limit 60 MB on
-  `/api/merlt/contrib/*` (the note upload is 50 MB), 10 MB elsewhere. Nothing else of the
+  **report-only** first (the reader emits inline styles). Body limits: 60 MB on
+  `/api/merlt/contrib/*` (the note upload is 50 MB), 10 MB on the rest of `/api/`, 1 MB on
+  the scraping paths and the static app (their real payloads are a few hundred bytes). Nothing else of the
   Python API is routed: its own `/history`, `/dossiers…` and circuit-breaker status stay
   unreachable.
 - [ ] **3.3 Dockerfile.** Stage one builds `apps/web` with `VITE_API_URL=/api` (the
   `VITE_FEATURE_MERLT*` flags are build arguments, default on); stage two is `caddy:2`
   with the build in `/srv` and the Caddyfile copied in, and a `RUN caddy validate` so a
-  broken file fails the build, not the start.
+  broken file fails the build, not the start; a non-root user, Caddy's state under `/tmp`
+  (so the root filesystem can be read-only), and a `HEALTHCHECK` on `/`, which is what
+  makes `up --wait` mean something.
 - [ ] **3.4 Prove it.** The path test is green; run the image next to a stub upstream and
   check each route lands where the Caddyfile says; a deep link (`/dossier`) returns the
-  app, not a 404; the stream path is not buffered (chunks arrive one by one).
+  app, not a 404; the stream path is not buffered (chunks arrive one by one) **also when
+  the client sends `Accept-Encoding: gzip`**, as every browser does — compression is the
+  other classic place where a stream gets held back.
 
 **Verification:** `node --test infra/ingress/paths.test.mjs`, `npm --prefix apps/web run
 build`, the checks of 3.4.
@@ -166,14 +177,17 @@ build`, the checks of 3.4.
   no drift. `apps/server/.env` (`env_file`) keeps the server-only secrets such as the JWT
   secret. `LEGAL_API_URL=http://scrapers:5000`, `MERLT_API_URL=http://merlt-api:8000`,
   `ALLOWED_ORIGINS` set to the ingress origin, `NODE_ENV=production`.
-- [ ] **4.3 `compose.scrapers.yml`.** One service, `shm_size: 1gb`, a memory limit from
-  `SCRAPERS_MEM_LIMIT` (default from the measurement in 1.6), the `data` and `download`
-  folders as named volumes, `TRUSTED_PROXIES=0`, no Redis (the filesystem cache).
+- [ ] **4.3 `compose.scrapers.yml`.** One service, a memory limit from
+  `SCRAPERS_MEM_LIMIT` (default `2g`, from the measurement in 1.6) and a process limit, the `data` and `download`
+  folders as named volumes, `TRUSTED_PROXIES=1` (one proxy, the ingress, is in front: with 0 every client on the
+  network would share the ingress's address and one rate-limit bucket), no Redis (the
+  filesystem cache).
 - [ ] **4.4 `compose.prod.yml`.** The three networks with `app` on a fixed subnet
   (`APP_SUBNET`, a default unlikely to collide with the home network, documented);
   every service assigned to its networks; `restart: unless-stopped`; `init: true`; log
-  rotation (`json-file`, 10 MB × 5); `cap_drop: [ALL]` and `no-new-privileges` on the
-  application modules; MERL-T's callback and scraper addresses pointed at container names
+  rotation (`json-file`, 10 MB × 5); `cap_drop: [ALL]`, `no-new-privileges` and, where the module allows it, `read_only` with
+  a tmpfs on `/tmp` on the application modules (the ingress qualifies: port 8080, state in
+  `/tmp`); MERL-T's callback and scraper addresses pointed at container names
   (`MERLT_BFF_*_CALLBACK_URL` → `http://server:3001/…`, `VISUALEX_API_URL` →
   `http://scrapers:5000`). Loopback publishing of the stores stays: the backup tool
   reaches them there.
@@ -231,8 +245,8 @@ runs of 5.4.
   deploy; an update; a rollback; the phone (Termux from F-Droid, `openssh` and `restic`,
   a key restricted to the host, a wake lock, the battery exemption, `sshd` started at
   boot, an `restic init` and a **restore test**); H1; the reboot test; what to look at
-  when a module is unhealthy (the Chromium shared-memory crash, Prisma's engine on a
-  missing library, the memory limit).
+  when a module is unhealthy (Prisma's engine on a missing library, the memory limit,
+  Chromium being killed for it).
 - [ ] **6.4 Walk it.** On the host, someone who did not write it follows the runbook from
   a clean machine; every place they stumble is a fix to the text.
 

@@ -213,9 +213,10 @@ chose the refactor instead.
 
 - **`scrapers`.** A Debian-based Python image (Playwright does not support Alpine),
   Chromium installed with its system libraries, a non-root user, Hypercorn with one
-  worker. Chromium needs more shared memory than Docker's 64 MB default (`shm_size`), or
-  pages crash mid-render; a memory limit is set after measuring, so Chromium cannot
-  starve the databases. The application needs a module-level ASGI object (`asgi.py`)
+  worker. Docker's default 64 MB of shared memory is enough (measured: Playwright's
+  Chromium avoids `/dev/shm`); the memory limit comes from measurement too — about
+  280 MiB idle and about 1.06 GiB with four PDF exports at once — so it is set at 2 GiB
+  and Chromium cannot starve the databases. The application needs a module-level ASGI object (`asgi.py`)
   because `app.py` builds it inside `main()`. Three details the code forces: the image
   mirrors the repository layout (`/repo/services/visualex`, `/repo/version.txt`) because
   `/version` and the state paths are computed relative to the source tree; the log file
@@ -223,7 +224,9 @@ chose the refactor instead.
   `data/` and `download/` folders are volumes, or the history and the cache die with
   every rebuild. The client address for the rate limiter is read from `X-Forwarded-For`
   only when told how many proxies to trust — today it trusts any caller-supplied value,
-  which makes the per-IP limit meaningless once the service is reachable.
+  which makes the per-IP limit meaningless once the service is reachable. Behind the
+  ingress the count is 1; left at 0, every client would share the ingress's address and
+  one rate-limit bucket.
 - **`server`.** A multi-stage build: `npm ci`, `prisma generate` and `tsc`, then a runtime
   with only what `node dist/index.js` needs, on a Debian slim base (not Alpine) for
   Prisma's engine. `prisma` and `tsx` are development dependencies, so the `migrate` step
