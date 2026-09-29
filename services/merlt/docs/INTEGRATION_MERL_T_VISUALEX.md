@@ -2104,7 +2104,7 @@ volumes:
 
 **Start services:**
 ```bash
-cd /Users/gpuzio/Desktop/CODE/MERL-T_alpha
+cd ../MERL-T_alpha
 docker-compose -f docker-compose.dev.yml up -d
 ```
 

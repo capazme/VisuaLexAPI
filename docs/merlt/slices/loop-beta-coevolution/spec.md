@@ -73,7 +73,7 @@ the same continuous loop, joined by the bridge in §4.3.
 | Consensus triggers + `pending_entities`/`pending_relations` + validation | `merlt/merlt/storage/enrichment/consensus_triggers.py`, `api/enrichment_router.py` | promotion to permanent (Loop α machinery) |
 | RLCF: REINFORCE, training, multilevel feedback, traces | `merlt/merlt/rlcf/{policy_gradient,training_scheduler,multilevel_feedback}.py`; tables `qa_traces`/`qa_feedback` | weight learning |
 | Embeddings backfill | `merlt/merlt/scripts/backfill_embeddings.py` | also embeds live-created nodes so semantic search finds them |
-| **mcp-legal-it** legal tools | `/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it` (clean `src/lib/*/client.py` libs + `src/tools/*` thin `@mcp.tool` wrappers; built on the same `visualex`) | the live authoritative arm |
+| **mcp-legal-it** legal tools | `../server-infra2.0/mcp-legal-it` (clean `src/lib/*/client.py` libs + `src/tools/*` thin `@mcp.tool` wrappers; built on the same `visualex`) | the live authoritative arm |
 
 ### 2.2 New — BUILD
 
