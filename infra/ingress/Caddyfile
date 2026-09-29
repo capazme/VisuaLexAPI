@@ -1,0 +1,81 @@
+# The ingress: the one module that faces the network.
+#
+# Phase 1 (private) is plain HTTP on the home network. Phase 2 replaces the global
+# block and the site address with the domain, and Caddy obtains its certificate.
+#
+# It listens on 8080, not 80: a port above 1024 needs no privilege, so the module
+# runs as a normal user with every capability dropped. Publish it wherever you like
+# (Compose: "80:8080" or a LAN address).
+#
+# The upstreams come from the environment, so a module can move to another machine:
+#   SERVER_UPSTREAM     default server:3001
+#   SCRAPERS_UPSTREAM   default scrapers:5000
+#
+# Only the paths below reach the Python API. Its own /history, /dossiers… and
+# circuit-breaker pages stay unrouted: it keeps a global, unauthenticated history
+# and dossier file that were never meant for the outside.
+
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Report-only first: the reader emits inline styles and the graph a worker.
+		# Tighten to an enforcing policy once the browser console shows no violation.
+		Content-Security-Policy-Report-Only "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# The server: accounts, dossiers, the MERL-T gateway. The note upload is 50 MB.
+	handle /api/merlt/contrib/* {
+		request_body {
+			max_size 60MB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	handle /api/* {
+		request_body {
+			max_size 10MB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+
+	# The scrapers. This is the same list Vite proxies to port 5000 in development,
+	# prefix for prefix; infra/ingress/paths.test.mjs keeps the two in step.
+	@legal path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /parse_query* /extract_citations* /export_pdf* /version* /health*
+	handle @legal {
+		request_body {
+			max_size 1MB
+		}
+		# /stream_article_text answers NDJSON, one line per article: no buffering.
+		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
+			flush_interval -1
+		}
+	}
+
+	# Hashed assets never change under the same name.
+	handle /assets/* {
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# The app, with the single-page fallback. It takes no body worth reading.
+	handle {
+		request_body {
+			max_size 1MB
+		}
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
