@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { AlertTriangle, ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, ThumbsUp, X } from 'lucide-react';
@@ -313,7 +313,8 @@ export function ArticleDiscussionPanel({
         <div className="space-y-3">
           {threads.map(thread => {
             const isExpanded = expanded.has(thread.id);
-            const isPassage = thread.passage !== null;
+            const passage = thread.passage;
+            const isPassage = passage !== null;
             const passageState = isPassage ? passageStates?.[thread.id] : undefined;
             const isDetached = passageState === 'detached';
             const isLocated = passageState === 'exact' || passageState === 'moved';
@@ -323,8 +324,8 @@ export function ArticleDiscussionPanel({
               thread.textHash !== textHash;
 
             const headingText =
-              isPassage && !thread.title.trim()
-                ? `«${truncateQuote(thread.passage.quote)}»`
+              passage && !thread.title.trim()
+                ? `«${truncateQuote(passage.quote)}»`
                 : thread.title;
 
             return (
@@ -343,9 +344,9 @@ export function ArticleDiscussionPanel({
                       <h4 className="font-semibold text-slate-900 dark:text-white">
                         {headingText}
                       </h4>
-                      {isPassage && thread.title.trim() && (
+                      {passage && thread.title.trim() && (
                         <span className="mt-0.5 block text-xs italic text-slate-600 dark:text-slate-300">
-                          Sul passo «{truncateQuote(thread.passage.quote)}»
+                          Sul passo «{truncateQuote(passage.quote)}»
                         </span>
                       )}
                       <span className="mt-1 block text-xs text-slate-400">

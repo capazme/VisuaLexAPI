@@ -33,6 +33,7 @@ describe('ArticleDiscussionPanel', () => {
     createdAt: '2026-09-28T10:00:00Z',
     updatedAt: '2026-09-28T10:00:00Z',
     user: { id: 'u1', username: 'marta' },
+    isOwner: false,
     comments: [],
   };
 
@@ -58,6 +59,7 @@ describe('ArticleDiscussionPanel', () => {
     createdAt: '2026-09-28T11:00:00Z',
     updatedAt: '2026-09-28T11:00:00Z',
     user: { id: 'u2', username: 'luca' },
+    isOwner: false,
     comments: [],
   };
 
@@ -65,9 +67,7 @@ describe('ArticleDiscussionPanel', () => {
     vi.clearAllMocks();
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
       data: [dummyThread],
-      total: 1,
-      page: 1,
-      limit: 20,
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
     });
   });
 
@@ -188,9 +188,7 @@ describe('ArticleDiscussionPanel', () => {
   it('a "detached" state shows "Il passo discusso non si trova nel testo che stai leggendo." and the quotation, and the discussion stays listed', async () => {
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
       data: [dummyPassageThread],
-      total: 1,
-      page: 1,
-      limit: 20,
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
     });
 
     render(
@@ -214,9 +212,7 @@ describe('ArticleDiscussionPanel', () => {
   it('differing hashes show the changed-text note', async () => {
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
       data: [dummyPassageThread], // has textHash: 'hash-orig'
-      total: 1,
-      page: 1,
-      limit: 20,
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
     });
 
     render(
@@ -240,13 +236,11 @@ describe('ArticleDiscussionPanel', () => {
   it('focusThreadId expands that discussion; expanding a passage discussion by click calls onFocusThread(id), collapsing calls onFocusThread(null)', async () => {
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
       data: [dummyPassageThread],
-      total: 1,
-      page: 1,
-      limit: 20,
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
     });
     const onFocusThread = vi.fn();
 
-    const { rerender } = render(
+    render(
       <ArticleDiscussionPanel
         anchor={dummyAnchor}
         isOpen={true}
@@ -276,9 +270,7 @@ describe('ArticleDiscussionPanel', () => {
   it('"Vai al passo" appears for a located passage and calls onGoToPassage(id), and does not appear for a detached one', async () => {
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
       data: [dummyPassageThread],
-      total: 1,
-      page: 1,
-      limit: 20,
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
     });
     const onGoToPassage = vi.fn();
 

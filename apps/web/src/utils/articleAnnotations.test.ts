@@ -10,7 +10,7 @@ import {
 } from './articleAnnotations';
 import { parseArticleStructure } from './articleStructure';
 import { fixtureText } from './__fixtures__/articleTexts';
-import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../types';
+import type { Annotation, Highlight } from '../types';
 import type { LocatedThread } from './articleAnnotations';
 
 const hl = (id: string, text: string, startOffset: number | undefined, color: Highlight['color'] = 'yellow'): Highlight => ({
@@ -87,7 +87,7 @@ describe('groupAnnotationsByBlock', () => {
     const across = thread('t2', acrossStart, acrossEnd);
 
     const groups = groupAnnotationsByBlock(RAW, STRUCTURE, [], [], [single, across]);
-    expect(groups[2].threads.map((t) => t.id)).toEqual(['single' === 'single' ? 't1' : '', 't2'].filter(Boolean));
+    expect(groups[2].threads.map((t) => t.id)).toEqual(['t1', 't2']);
     expect(groups[3].threads.map((t) => t.id)).toEqual(['t2']);
     expect(hasAnnotations(groups[2])).toBe(true);
   });

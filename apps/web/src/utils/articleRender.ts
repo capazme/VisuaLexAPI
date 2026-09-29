@@ -144,7 +144,7 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   const anchors = resolveAnchors(plain, input.highlights, input.annotations);
   for (const anchor of anchors) {
     if (anchor.kind === 'highlight') pushPlain(anchor.start, anchor.end, 'highlight', highlightOpen(anchor.highlight), '</mark>');
-    else pushPlain(anchor.start, anchor.end, 'note', noteOpen(anchor.note), '</span>');
+    else if (anchor.kind === 'note') pushPlain(anchor.start, anchor.end, 'note', noteOpen(anchor.note), '</span>');
   }
 
   const threadAnchors: ResolvedAnchor[] = (input.threads ?? []).map((lt) => ({
