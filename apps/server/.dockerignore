@@ -1,0 +1,16 @@
+# Never in an image: secrets, dependencies built for another machine, local state.
+.env
+.env.*
+node_modules
+dist
+coverage
+logs
+*.log
+.DS_Store
+tests
+e2e-setup.cjs
+kill-port.sh
+vitest.config.ts
+README.md
+Dockerfile
+.dockerignore

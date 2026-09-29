@@ -12,6 +12,9 @@ DOSSIER_LIMIT = 100  # Max number of dossiers
 # Used by the root app.py's rate_limit_middleware (per-IP request counter).
 RATE_LIMIT = int(os.getenv("RATE_LIMIT", 1000))  # Max requests allowed per IP within RATE_LIMIT_WINDOW seconds
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", 600))  # Window size in seconds
+# How many reverse proxies sit in front of this service. 0 (the default) means the
+# X-Forwarded-For header is not believed at all — see tools/client_ip.py.
+TRUSTED_PROXIES = int(os.getenv("TRUSTED_PROXIES") or 0)  # unset or empty = 0
 
 PERSISTENT_CACHE_DIR = BASE_PATH / "download" / "cache"
 PERSISTENT_CACHE_TTL = int(os.getenv("PERSISTENT_CACHE_TTL", 86400))

@@ -11,9 +11,11 @@ from quart import Quart, request, jsonify, send_file, Response, g
 from quart_cors import cors
 import structlog
 
+from visualex_api.tools.client_ip import client_address
 from visualex_api.tools.config import (
     RATE_LIMIT,
     RATE_LIMIT_WINDOW,
+    TRUSTED_PROXIES,
     FETCH_QUEUE_WORKERS,
     FETCH_QUEUE_DELAY,
 )
@@ -289,7 +291,9 @@ class NormaController:
         g.start_time = time()
 
     async def rate_limit_middleware(self):
-        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        client_ip = client_address(
+            request.headers.get('X-Forwarded-For'), request.remote_addr, TRUSTED_PROXIES
+        )
         current_time = time()
         log.debug("Rate limit check", client_ip=client_ip, current_time=current_time)
 

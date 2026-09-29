@@ -6,8 +6,25 @@ across the application.
 """
 
 import logging
+import os
 import structlog
 from typing import Any, Optional
+
+
+def log_handlers(default_file: str) -> list[logging.Handler]:
+    """The root logger's handlers: the console, plus a file unless told otherwise.
+
+    Development keeps writing ``default_file`` in the working directory. Setting
+    ``VISUALEX_LOG_FILE`` names another file, and setting it EMPTY drops the file
+    handler: a container with a read-only root filesystem cannot open one, and
+    several modules used to try at import time, so the application never started.
+    """
+    path = os.getenv("VISUALEX_LOG_FILE", default_file)
+    handlers: list[logging.Handler] = []
+    if path:
+        handlers.append(logging.FileHandler(path))
+    handlers.append(logging.StreamHandler())
+    return handlers
 
 
 def configure_logging(level: str = "INFO") -> structlog.BoundLogger:
@@ -24,10 +41,7 @@ def configure_logging(level: str = "INFO") -> structlog.BoundLogger:
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[
-            logging.FileHandler("visualex_api.log"),
-            logging.StreamHandler()
-        ]
+        handlers=log_handlers("visualex_api.log"),
     )
     
     # Configure structlog
