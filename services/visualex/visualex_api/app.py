@@ -26,7 +26,7 @@ from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.tools.sys_op import WebDriverManager
-from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
+from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input
 from visualex_api.tools.cache_warmup import warmup_cache_background
@@ -934,7 +934,7 @@ class NormaController:
             urn = urn.strip()
 
             logger.info("Received data for export_pdf", extra={"urn": urn})
-            pdf_path = urn_to_filename(urn)
+            pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
 
             # Check if the PDF already exists
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)

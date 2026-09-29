@@ -258,6 +258,10 @@ filesystem cache when off, warned at startup), `REDIS_URL`,
 `HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
 `ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
 `RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
+`TRUSTED_PROXIES` (`0` — how many reverse proxies sit in front; `X-Forwarded-For` is
+believed only that far, and not at all at 0), `VISUALEX_LOG_FILE` (unset keeps
+`norma.log` / `visualex_api.log` in the working directory; **empty** means console
+only, which a read-only container needs),
 `AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
 call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
 a few tens of KB for an ordinary act, a few hundred KB for a codice because of
@@ -267,6 +271,27 @@ the per-article fingerprints), `HEALTH_DETAILED_TTL` (`120` — seconds the
 
 Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
 parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
+
+## Container image
+
+`services/visualex/Dockerfile`, built from the **repository root** (it reads
+`version.txt`): `docker build -f services/visualex/Dockerfile -t visualex-scrapers .`.
+`infra/compose.scrapers.yml` is the module that runs it.
+
+- **Hypercorn, one worker** (`asgi:app`). The rate limiter, the circuit breaker and the
+  fetch queue keep their state in memory, per process: more workers would each have
+  their own. `python app.py` is still the development server.
+- **It mirrors the repository layout** (`/repo/services/visualex`, `/repo/version.txt`)
+  because `/version` and the `data/` and `download/` paths are computed relative to the
+  source tree. `data/` (the search history and dossier file this service keeps) and
+  `download/` (the cache and the exported PDFs) are volumes.
+- **Chromium runs as a normal user** with every capability dropped and no `--shm-size`.
+  Measured: about 280 MiB idle, about 1.06 GiB and 195 processes with four PDF exports at
+  once; Docker's default 64 MB `/dev/shm` is enough (Playwright's Chromium avoids it).
+- **No Redis.** MERL-T's job queues live in Redis as pickled objects, so a scraper able
+  to write there could get code run by the worker. The cache is the filesystem.
+- **Behind the ingress set `TRUSTED_PROXIES=1`.** At 0 every client shares the ingress's
+  address, and one rate-limit bucket.
 
 ## Critical Files
 
@@ -310,3 +335,11 @@ Breaking one of these breaks the product. Read before editing.
     ("Articolo N non presente in …", through `_error_response`); it fails open,
     so a Normattiva outage is never reported as "does not exist". A range where
     *some* articles exist keeps those and drops the rest.
+
+30. **A path built from the URN is untrusted.** The guard on `/export_pdf` checks the
+    host (`normattiva.it`), so everything after it is the caller's: `;../../x` used to
+    become a directory part of the cached PDF's path, read from and copied to.
+    `urn_to_filename` now returns a bare file name (`[A-Za-z0-9._-]`, never hidden), and
+    `pdf_cache_path(urn, directory)` is the only way a cache path is built: a file
+    directly inside `download/`. Any new path derived from a request goes through the
+    same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.

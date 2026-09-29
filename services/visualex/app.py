@@ -30,7 +30,7 @@ from visualex_api.services.akn_parser import normalize_article_key
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
-from visualex_api.tools.urngenerator import complete_date_or_parse_async, urn_to_filename
+from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
 from visualex_api.tools.map import codice_urn, extract_codice_details
@@ -1541,7 +1541,8 @@ class NormaController:
             urn = urn.strip()
 
             log.info("Received data for export_pdf", data=data)
-            pdf_path = urn_to_filename(urn)
+            # The same folder extract_pdf downloads into: the cached copy is a file in it.
+            pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
 
             # Check if PDF already exists in cache
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)
