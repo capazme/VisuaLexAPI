@@ -1,0 +1,534 @@
+# Web app — apps/web
+
+Loaded when Claude works in this folder; the root `CLAUDE.md` holds the repository-wide rules.
+
+MERL-T integration across server and web (routes, gates, guards, surfaces, slice history): `docs/merlt/claude-notes.md`.
+
+### Frontend (`apps/web/src`)
+
+- `App.tsx` — routing. Routes: `/` (search), `/dossier`, `/history`,
+  `/environments`, `/forum`, `/documents`, `/admin/*`, plus `/login` and
+  `/register`.
+- `store/useAppStore.ts` — Zustand + Immer, the single global store.
+- `types/index.ts` — shared types. `services/` — one file per backend entity.
+- `components/features/` — `search`, `workspace`, `dossier`, `environments`,
+  `bulletin` (the Forum), `history`, `compare`, `settings`, `documents`
+  (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
+  user drops in — parsed in the browser, never uploaded — each opening the
+  reader through `navigate('/')` + `triggerSearch`, gotcha 15).
+- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
+- `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
+  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
+  Interaction tokens live in `constants/interactions.ts`, stacking bands in
+  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
+
+## Frontend State
+
+One Zustand store (`store/useAppStore.ts`) with Immer. Always mutate through
+actions.
+
+**Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
+synced): bookmarks, dossiers + items, environments, quickNorms, customAliases,
+annotations and highlights (these two hydrate per-article via
+`loadAnnotationsForArticle` / `loadHighlightsForArticle`), history.
+
+**UI-only** (persisted to `localStorage` through the `persist` partialize):
+workspace tabs and z-index, settings, `searchPanelState`.
+
+The partialize deliberately holds UI state only. **Every user-owned slice is
+server-backed** — see gotcha 17, which is the rule any new slice must follow.
+
+### How the collections differ
+
+- **Dossiers** (`/dossier`) — the working file for a task: many articles, read in
+  place, reorderable, exportable, shareable. This is where real work happens.
+- **Bookmarks** — a save action in the reading toolbar backed by
+  `bookmarkService`. There is **no bookmarks page or route**; the dedicated UI was
+  removed as dead code. Don't document or build against a bookmarks page without
+  first deciding to rebuild one.
+- **History** (`/history`) — server-side search history. It also hosts
+  `NormaChangesSection`, the one place the "a saved norm changed"
+  notifications are listed and marked read; the Cronologia entry in the
+  sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
+  deliberately kept out of the Forum's `total`, which nothing on that page
+  could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
+  on `window` so the badge drops before the next 30s poll.
+
+All of them reopen a norm through `triggerSearch()`.
+
+### Aliases
+
+Three different things. Conflating them is the recurring mistake.
+
+- **Presets** (80) — shipped in `preset_aliases.yaml`, served by
+  `GET /fetch_alias_catalog`. 21 of them only rename an act type: "codice
+  appalti" IS the "Codice Contratti Pubblici" tile already in the palette's
+  grid, so listing them duplicates that grid. The palette shows only the 59
+  that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
+  the grid cannot save.
+- **Known acts** (392) — names `act_resolver.py` understands unaided ("statuto
+  dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
+- **CustomAlias** — the user's own, server-backed. A custom trigger beats a
+  preset of the same name, because the client resolves its own aliases before
+  asking the server. So the palette hides the shadowed preset rather than
+  advertising a shortcut that no longer runs, and the manager badges it
+  "sovrascritto".
+
+`AliasManager` is reached **only** from the command palette (gotcha 27), and in
+the palette the presets cost one line of header text at rest — they render as
+rows only once the user types, and cmdk does the matching. `useAliasCatalog`
+keeps its `loaded` flag in component state, so the palette and the manager each
+fetch the catalog once for as long as they stay mounted — two calls per session,
+never repeated, nothing persisted.
+
+### Reading surface
+
+The dashboard article view (`ArticleTabContent`) composes: `ArticleBody` (renders
+sanitised HTML + hosts `SelectionPopup`), `useArticleMarkers` (turns raw text into
+HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
+(`ReadingToolbar`). Keys are `buildItemKey(norma)` and
+`uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
+uses the same two functions, and they must stay byte-identical or annotations
+made on one surface stop appearing on the other.
+
+**The text is structured, never rewritten** (round A, spec
+`docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
+`parseArticleStructure` (`utils/articleStructure.ts`) reads heading, rubric,
+commi, items with their printed enumerator and level, Normattiva's
+`((modifications))` and repeal notices, `(119)` references and the
+AGGIORNAMENTO notes, as raw ranges that partition `article_text`;
+`renderArticleHtml` (`utils/articleRender.ts`, behind `useArticleMarkers`)
+emits one `div.vlx-b.vlx-{kind}` per block, cutting the text at every block and
+mark edge and nesting marks with a stack, so the HTML is always well-formed and
+escaped. Styles are the `.vlx-*` rules in `index.css` (READING SURFACE): a 68ch
+measure, commi divided by space, hanging numbers and items. The contract is
+gotcha 23: the rendered text nodes spell `article_text` minus `\n` — any new
+label goes in CSS (`content: attr(...)`), never in a text node.
+`articleRender.test.ts` enforces it on 27 real texts
+(`utils/__fixtures__/articleTexts.ts`). Tab, dossier reader and Study Mode all
+render this way; Study Mode hides the heading and rubric blocks
+(`vlx-hide-header`) instead of cutting them, so its offsets are
+document-relative like everywhere else. The Brocardi sections render flat
+(`structure: null`).
+
+**Offsets are measured from the text alone.** `SelectionPopup` takes a
+`textRootRef` (the element holding only the article text) and stores the anchor
+from `getSelectionAnchor` (`utils/selectionOffset.ts`), which reads
+`Range.toString()`: `Selection.toString()` is rendered text and writes a newline
+per line or comma boundary, which made every cross-comma highlight unmatched.
+The renderer also accepts, at the same offset, a stored text that differs only
+in whitespace, so those older highlights show again.
+
+**Normattiva's update notes** are interactive and out of the way:
+`useArticleTextInteractions` delegates click and Enter/Space on the body — a
+`(119)` chip opens `UpdateNotePopover`, the "Note di aggiornamento (N)" toggle
+folds the tail through the `vlx-updates-open` class on the text container
+(the HTML never changes when it opens). A reference whose note is not in the
+text is plain text; only `((49))` is dimmed.
+
+**Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
+free notes; `InlineNoteComposer` anchored on the selection when creating an
+anchored note; `InlineNotePopover` when clicking an existing wavy underline.
+Three entry points, deliberately distinct — don't collapse them.
+
+**Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
+button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
+exports to `.txt` — it is not a second creator (that was tried and rolled back).
+
+**Discussions**: the toolbar's speech-bubble button opens
+`ArticleDiscussionPanel`, a draggable portal anchored on
+`{normaKey, articleId, version}` (threads, replies, votes, report; moderation
+is admin-only, `PATCH /admin/article-discussions/:id`). The panel is mounted
+for every rendered article and fetches **only while open** — a load on mount
+cost one GET per article of a range.
+
+**Saved-norm change check**: when a *bookmarked* article is shown,
+`ArticleTabContent` posts `{norma_data, article_text}` to
+`/notifications/normas/check`; the server keeps one snapshot per
+`(user, normaKey)` and answers `changed` when the **text** differs, which
+the reader toasts. The effect is keyed on `(itemKey, isSavedArticle)` and
+reads the body through a ref, so a re-render with the same text as a new
+object does not post again; it is separate from the highlights/annotations
+load effect, which stays keyed on identity alone.
+
+**The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
+`'window'` on desktop — a draggable, backdrop-less window portalled to
+`document.body`, parked where the user left it — and `'drawer'` on mobile, the
+old right-side sheet. Neither closes when an article is picked: taking three
+articles out of an index without reopening it is the whole point. Ownership of
+the desktop window lives in the store as a single `structureWindow.blockId`, so
+opening one block's index hands the window over rather than stacking a second.
+The floating mechanism belongs to the *tool*, not the content — the owner's own
+framing, and the correction that shaped round 2a.
+
+**Opening an act without an article.** `fetchActUrn` (`utils/actUrn.ts`) resolves
+an act's URN structurally, with no text fetched; `addNormaIndexToTab` then drops
+an article-less block on a tab and points the window at it atomically. The
+palette's "Apri l'indice e sfoglia" is the entry point. A block with zero
+articles is a legitimate state — guard anything that dereferences the active
+article (`StudyMode` is mounted conditionally for exactly this reason).
+
+**Going back.** `readingBackStack` records **citation jumps only**. Picking from
+the index does not lose your place, and a previous/next arrow is undone by the
+opposite arrow; recording those would fill the stack with stops nobody wants.
+`ReadingBackControl` renders once for the whole app — the stack is global, so a
+per-tab copy would sit inside the very tab an entry points at. It names its
+destination, and it has no keyboard shortcut on purpose: every natural
+combination for "back" already belongs to the browser.
+
+### Dossier
+
+A dossier is where the articles needed for a task are aggregated and read.
+
+- **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
+  inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
+  composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
+  expanded footer. `ArticleViewerModal` no longer exists.
+- **Fetching**: `utils/articleFetchCache.ts` — session-only cache, in-flight
+  de-dup, max 3 concurrent fetches, errors not cached so "Riprova" really
+  refetches.
+- **Important star**: reading statuses (unread/reading/done) were removed. The
+  star persists through a `_dossierMeta` envelope packed into the item's `content`
+  JSON — no backend schema change — via `packItemContent`/`unpackItemContent` in
+  `dossierUtils.ts`. `updateDossierItemStatus` writes only `'unread' | 'important'`
+  and defers the PUT while an item is still in `pendingDossierItemIds` (its
+  `addItem` POST hasn't returned a server id yet), replaying it once settled.
+  Legacy status values still hydrate and simply render as unstarred.
+- **Collection**: `AddToDossierPopover.tsx` is the only add-from-reading entry
+  point (from `ReadingToolbar` and `LooseArticleCard`). It lists recent dossiers,
+  guards duplicates, and its inline "Nuovo dossier" waits for the server id
+  before adding — `createDossier()` returns `Promise<string | null>`.
+  `DossierModal` is create-only.
+- **Rows** (`SortableDossierItem`): the expand toggle lives on a header-scoped
+  sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
+  star keeps a 44px touch target.
+
+## Shared utilities — check before writing a new one
+
+Duplicating any of these is a defect, not a shortcut.
+
+**Frontend**:
+- `utils/normaKeys.ts` — `buildItemKey(norma)` (norm + article),
+  `buildNormaKey(norma)` (act only, used to group streaming results),
+  `uniqueArticleIdFromNorma(norma)`. Both keys share their act-level segments so
+  they cannot drift. `buildItemKey` is the annotation/highlight key contract and
+  must stay byte-identical across dashboard and dossier.
+- `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
+  fetched. It sends `article: '1'` because the endpoint refuses to build a
+  `NormaVisitata` without one — a probe, not a request for article 1.
+- `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
+  `findLiveBackIndex` for citation-jump undo.
+- `hooks/useIsDesktop.ts` — viewport check for components that must render
+  *structurally* different markup per breakpoint (portal vs. inline). It existed
+  as two private copies before round 2a; do not make a third. For anything a CSS
+  breakpoint can express, use the CSS breakpoint.
+- `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
+  `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
+  regex (`citationMatcher`, `citationParser`, `treeUtils`, `articleStructure`).
+  Mirrors `services/visualex/visualex_api/tools/article_suffixes.py`, as does
+  `apps/server/src/utils/articleSuffixes.ts` — change all three together. Each
+  pattern must close the alternation with `\b`.
+- `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
+  `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
+  (**tolerant** lookup — required, see gotcha 9).
+- `utils/dateUtils.ts` — `parseItalianDate`, `formatDateItalianLong`,
+  `expandTwoDigitYear` (the one two-digit-year pivot, same as the backend's
+  `_expand_year`: "90" → 1990, "23" → 2023).
+- `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
+  then number, "679/2016" the reverse, "2006/2004" number first), shared by
+  the palette parser and the in-text matcher and mirrored by
+  `resolve_eu_year_and_number` in `nl_parser.py`, which `citation_linker.py`
+  reuses through `build_eu_act_pattern` / `eu_act_from_groups`. Change all
+  four together. The two in-text detectors (`citationMatcher.ts`,
+  `citation_linker.py`) read the same prose forms: "regolamento (UE)
+  2016/679, art. 5", "art. 5 del regolamento (UE) 2016/679", "art. 5, comma
+  1, del …", and a list ("articoli 8 e 9 del …") becomes one link per number,
+  all towards the EU act. The client matcher reads the article-first form
+  for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
+  without the preposition), as the server's `_EXPLICIT_CITE_RE` and
+  `_ART_DEL_ACT_RE` do, and the codici and the Costituzione named in full
+  ("art. 5 del codice civile") through `FULL_ACT_NAMES`, the palette's own
+  vocabulary. An article the prose gives to an act no pattern can read
+  ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on the
+  client rather than one to the act being read.
+- `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
+  (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
+  copyable citation string.
+- `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
+- `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
+  reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
+  `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
+  calls. Real test texts in `utils/__fixtures__/articleTexts.ts`.
+- `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
+  plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
+  Every surface that creates a highlight or an anchored note goes through it.
+- `hooks/useArticleTextInteractions.ts` — the update-note chips and the
+  foldable AGGIORNAMENTO tail, for any surface that renders structured text.
+- `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
+  `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
+  `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
+- `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
+- `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
+  `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
+  an optional article to focus, which `SearchPanel` focuses even inside a
+  range). `SearchPanel` still reads the older `?share=`.
+- `utils/searchFilters.ts` — `matchesSearchFilters(article, filters)` for the
+  palette's source / Brocardi / historical / year filters, applied
+  client-side to each streamed result. `SearchPanel` counts what a filter
+  drops and, when nothing got through, says so instead of showing an empty
+  search.
+- `utils/normaChanges.ts` — `normaFromChangeNotification` /
+  `normaChangeLabel`: reopen and label a change notification from the
+  snapshot the server stored (null, not a guess, when the snapshot has no
+  identity).
+- `hooks/useForumNotifications.ts` — the one 30s poller behind both sidebar
+  badges (Forum `total`, Cronologia `normaChanges`).
+- `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
+  `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
+  Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
+  **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
+  cached server-side for `HEALTH_DETAILED_TTL`. Do not tighten either loop —
+  the first version polled every 60s per tab.
+
+## UI Conventions
+
+Non-obvious rules baked into the codebase. Follow them so new surfaces stay
+coherent.
+
+**Destructive confirmations** — never `window.confirm`. Use
+`components/ui/ConfirmDialog` with `variant="danger"`, and word the message so it
+names the scope *and* what is not touched ("Segnalibri e dossier non saranno
+toccati").
+
+**Keyboard-accessible collapsibles** — a `div` that toggles on click needs
+`role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`
+(espandi/comprimi), and `onKeyDown` for Enter/Space with `preventDefault()`. The
+handler must start with `if (e.target !== e.currentTarget) return;` or interactive
+children re-trigger the toggle. Always add
+`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`.
+Never nest interactive content inside the element carrying `role="button"` —
+scope the role to the header, as `SortableDossierItem` does.
+
+**Popovers with `@floating-ui/react`** — split positioning and animation across
+**two** elements: outer div takes `refs.setFloating` + `floatingStyles`, inner div
+owns the entry animation. On the same element the scale transform overwrites the
+positioning transform. Compute `transformOrigin` from `placement` (see
+`getTransformOrigin` in `NotesPeekPanel.tsx`). Anchor via a `useState` element,
+not a ref object, and pass it at render time (gotcha 13).
+
+**Toggle buttons** — drive the visual from an `isPressed` selector, not a fixed
+colour: idle `text-slate-400` + hover accent, active `bg-{accent}-50
+text-{accent}` (plus `fill-` when the icon has a body). Toast wording must match
+the action actually taken. Always set `aria-pressed`.
+
+**Two flavours of pop-up** — *Peek* (header, scrollable body, composer; ~360px,
+page-themed) when the surface lists or edits content; *action bar* (thin dark
+slate, 2-4 icon buttons with 1px dividers, no chrome) when it only performs
+actions. Both use the outer/inner split above.
+
+**Sticky filter rows** — `sticky top-0` alone lets content scroll through. Give
+the row an opaque background matching the panel, bleed it edge-to-edge with
+negative margins matching the parent padding, add `border-b border-current/10`,
+and raise it to `z-20`.
+
+**Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
+overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
+z-index will be honoured.
+
+**Beating inline `style="..."` without `!important`** — when markup you don't
+control ships inline styles (e.g. `useArticleMarkers` emits
+`<mark style="background-color:hsl(var(--hl-yellow-bg))">`), first try
+**redefining the CSS variable in a narrower scope** so the inline `hsl(var(--…))`
+resolves differently. Only if the inline style references no variable, fall back
+to a single narrowly-scoped `!important` with a comment justifying why every
+other route fails.
+
+**Colour markers** — for a list mirroring something already coloured in the
+article body, use a 4px stripe down the card's leading edge rather than
+re-applying a saturated background behind the text.
+
+**Mobile-first** — interactive controls keep a 44px touch target on mobile.
+`TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
+(`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
+`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
+row's star and remove buttons do.
+
+## Common Patterns
+
+**New frontend component** — compose the `ui/` primitives and the interaction
+constants; import types from `types/index.ts`; reach state through
+`useAppStore()`; Tailwind v4 for styling.
+
+## Critical Files
+
+Breaking one of these breaks the product. Read before editing.
+
+**Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
+`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
+`utils/articleStructure.ts` · `utils/articleRender.ts` · `utils/dateUtils.ts` ·
+`utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
+`utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
+`hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
+
+**Frontend features** — each of these folders was split out of a monolith and is
+meant to stay split; add new features as new files, not inside the shells:
+
+- `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
+  `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
+  `i`), `DossierDetailView.tsx`, `SortableDossierItem.tsx` (row + star + expand),
+  `DossierItemReader.tsx` (in-place article), `AddToDossierPopover.tsx`,
+  `ToolbarButton.tsx` (colour-token toolbar button with `pressed`/`pressedColor`),
+  one file per modal, shared helpers in `dossierUtils.ts`.
+- `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
+  one file per modal; `EnvironmentContentViewer.tsx` renders the shared
+  dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category
+  stripe and a stale/fresh chip; primary action is "Unisci", replace lives in the
+  3-dot menu behind a danger `ConfirmDialog`.
+- `features/bulletin/` — the Forum. Folder and component names stay `bulletin`
+  because they match the backend `SharedEnvironment` model; the route is `/forum`
+  and the UI label is "Forum". `BulletinBoardPage.tsx` is a shell over three dumb
+  views (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`).
+  The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
+  `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,
+  `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
+- `features/search/` — `ArticleTabContent.tsx` (the reading surface),
+  `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
+  `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
+  opened from its `(119)`), `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
+  `SearchPanel.tsx` (streaming merge logic, and the mount point for both
+  `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
+  `TreeViewPanel.tsx` (the article index window).
+- `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
+  edits, not for where it opens: it is reached from the command palette, not
+  from Settings (gotcha 27). See the Aliases section above.
+- `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
+  `NormaBlockComponent`, `LooseArticleCard`, `LazyStudyMode` (the
+  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are
+  lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
+  "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
+  workspace is persisted).
+- `features/history/` — `HistoryView.tsx` plus `NormaChangesSection.tsx`
+  (see History above).
+- `features/documents/` — `DocumentReviewPage.tsx` only.
+
+## Gotchas
+
+9. **Article id formatting (`-bis` / `-ter`)** — the tree API and the scraper
+   disagree (`"1-bis"` vs `"1 bis"`). Server-side both are now canonicalised
+   through `normalize_article_key` (`services/akn_parser.py`), which reads the
+   ordinal from `tools/article_suffixes.py` and falls back to "any alphabetic
+   tail" for anything that table does not list — Normattiva goes well past
+   `decies` ("2409 octiesdecies" c.c.). On the frontend the tolerant
+   `findArticleByNormalizedId` is still required: a naive `===` silently misses
+   and falls back to the first article. Always use it, then canonicalise with
+   `getUniqueArticleId(match)` before storing in state. The accepted forms now
+   include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
+   (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
+   normaliser and the archive (`tools/archivio-normativo/archivio_normativo/hierarchy.py`).
+10. **Popover positioning vs entry animation** — floating-ui positions with an
+    inline `transform`; an `animate-in zoom-in-95` on the *same* element
+    overwrites it and the popover flies from (0,0). Split across two elements.
+11. **`set-state-in-effect`** — prefer deriving the value during render over
+    silencing the rule. Silence only for effects synchronising with an external
+    signal *and* mutating external state in the same transaction, and always
+    leave the justification on the disable line.
+12. **Workspace tab pin was removed** — the flag only suppressed bring-to-front,
+    which contradicted the word "pin". Don't reintroduce without a product
+    reason. `Dossier.isPinned` is unrelated and stays.
+13. **Popover first paint at (0,0)** — floating-ui computes position
+    asynchronously. Registering the reference in a layout effect leaves the first
+    paint uncoordinated. For DOM anchors pass
+    `useFloating({ elements: { reference: anchorEl } })` at render time. For
+    **virtual** elements that path throws, so use `refs.setPositionReference()`
+    plus `visibility: isPositioned ? 'visible' : 'hidden'`.
+14. **StrictMode double-invoke + multi-step store actions** — an effect issuing
+    two separate mutations runs both twice against the same closure value.
+    Collapse them into one atomic store action (`drainNextSearch` is the
+    canonical example) so the second invocation finds the precondition already
+    satisfied and no-ops.
+15. **Dossier "apri tutte le norme"** — `triggerSearch` overwrites the trigger, so
+    a loop keeps only the last. The flow queues params and drains them one at a
+    time; each carries `tabLabel` (cosmetic) and `targetTabId` (load-bearing —
+    tells `processResult` to skip merge heuristics). The destination tab is
+    pre-created synchronously before `navigate('/')`. Without `targetTabId` a
+    stale orphan tab in persisted state can swallow the results.
+16. **Capture the selection rect eagerly** — before `hidePopup()` /
+    `removeAllRanges()`, because the selection is gone immediately after. The rect
+    travels through `onAddNote(text, startOffset, rect)`.
+17. **Every user-owned slice is server-backed** — every create/update/delete must
+    round-trip the backend. The canonical regressions were `importDossier` and
+    `applyEnvironment`, which pushed a local `uuidv4()` into the store; the UI
+    looked fine until the first `addItem` 404'd on a ghost entity. Creation goes
+    through `service.create()` first so the store holds server ids; mutations are
+    optimistic + sync + revert. `applyEnvironment(replace)` also wipes
+    server-side first, gated behind a danger `ConfirmDialog`.
+18. **Never silently swallow errors in load paths** — `.catch(() => [])` in
+    `fetchUserData` once hid a backend restart behind an empty UI for a whole
+    session. Log with context before any fallback.
+19. **Atomic usage counters** — `usageCount` bumps go through `POST /:id/use`
+    (`increment: 1`), never a read-modify-write PUT. Client pattern: bump locally
+    for instant feedback, then fire-and-forget `service.use(id)`; the next
+    `fetchUserData` is the source of truth.
+20. **SuggestionItem payloads are server-trusted** — the `take` handler trusts the
+    stored shape, so any rename must happen before storage. That is why the alias
+    Rename path is deferred; Replace and Skip cover the flows.
+21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract** —
+    never mutate or filter them out. If a row has an author, the UI shows the
+    `AttributionChip`; a deleted author renders "@utente-rimosso" by design.
+22. **A z-index is inert on a `static` element, and `backdrop-filter` traps its
+    descendants.** The sidebar was `lg:static` with `z-50` (never applied) *and*
+    `backdrop-blur-xl`, which creates a stacking context — so its hover tooltips
+    could not escape it no matter how high their own z-index went, and page
+    content painted over them. Before reaching for a bigger number, check that the
+    element is positioned and that no ancestor sets `backdrop-filter`, `filter`,
+    `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
+    raising the child's value does nothing.
+
+
+25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
+    The live workspace-tab actions are inlined in the store (`addNormaToTab` and
+    friends); nothing imports the factory in that file. Its only live export is
+    the `NormaBlock` / `LooseArticle` *types*, imported by `useGlobalSearch.ts`.
+    Editing an action there changes nothing at runtime. The file carries a header
+    saying so; relocating the types and deleting the rest is queued for round 2b.
+26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**
+    `display: none` hides descendants, but a portal re-parents to `document.body`
+    and leaves the hidden subtree behind — the desktop renderer would surface its
+    window on a phone, next to the mobile one. Anything portalled that exists in
+    only one breakpoint needs a real viewport check (`useIsDesktop`), not a
+    wrapper class. Conversely, a non-portalled `fixed` element inside a
+    transformed ancestor is positioned against *that ancestor*, not the viewport
+    (see gotcha 22) — which is why the structure window portals at all.
+
+27. **A store flag only opens a modal that is actually mounted.** `AliasManager`
+    (and its siblings) render inside `SearchPanel`, so `aliasManagerOpen` is
+    inert on `/dossier`, `/history` or any route that is not the search page —
+    the flag flipped and nothing appeared, silently. That is why the alias
+    manager is reached from the command palette, which lives in the same subtree,
+    and why the Settings entry that used to open it was removed rather than kept
+    as a second door. Before adding a global-looking "open X" button, check where
+    X is mounted.
+
+29. **A Tailwind class whose token is undeclared fails in total silence.**
+    `apps/web/tailwind.config.js` is a v3-style config and Tailwind v4 never
+    loads it — there is no `@config` in `src/index.css`. Every
+    `primary-<number>` class the app wrote therefore generated no CSS at all:
+    568 of them across 60 files, including 38 buttons carrying `text-white` on
+    a `bg-primary-600` that painted nothing, and the
+    `focus-visible:ring-primary-500` this file prescribes for accessibility.
+    No build error, no lint warning, no visual difference from a typo. The
+    scale now lives in the `@theme` block of `index.css`, which is the only
+    place v4 reads; `src/theme.test.ts` compiles the real stylesheet and fails
+    if a step stops resolving. **`--color-primary` and `--color-primary-500`
+    are different tokens** — `bg-primary` (213 uses) comes from the first and
+    must keep working. Everything else the config declares — `font-sans`,
+    `shadow-glow`, `animate-shimmer` — is still inert.
+
+28. **Two vocabularies name the same act, and they disagree on case.**
+    `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver
+    answers `regolamento ue`. A `===` between the two silently produced an act
+    with no name in the palette ("· n. 1689 del 2024") and skipped the step
+    that collects an act's number and date. Compare case-insensitively and fall
+    back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
+    40, so a miss is the normal case, not the exception. Same trap as
+    `codice_urn` on the backend.
