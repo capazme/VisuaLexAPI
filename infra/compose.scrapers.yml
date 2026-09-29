@@ -19,6 +19,9 @@
 #    filesystem (REDIS_ENABLED false).
 #  - TRUSTED_PROXIES=1: exactly one proxy, the ingress, is in front of it. At 0 every
 #    client would share the ingress's address, and one rate-limit bucket.
+#  - the root filesystem is read-only. What it writes goes to the two volumes below and
+#    to a tmpfs (Chromium's scratch space and its profile). That works since the PDF
+#    export caches inside download/ and no longer in the working directory.
 #  - the ceilings come from a measurement, not a guess: about 280 MiB idle, about
 #    1.06 GiB and 195 processes with four PDF exports at once.
 #
@@ -44,6 +47,10 @@ services:
       - scrapers_data:/repo/services/visualex/data
       - scrapers_download:/repo/services/visualex/download
     networks: [app]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/app
     mem_limit: ${SCRAPERS_MEM_LIMIT:-2g}
     pids_limit: 512
     cap_drop: [ALL]

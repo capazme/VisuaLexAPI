@@ -144,6 +144,14 @@ def prod(cfg, lan_bind):
     check(bool(scrapers.get("mem_limit")), "the scrapers have a memory ceiling")
     check(bool(scrapers.get("pids_limit")), "and a process ceiling")
     check(not scrapers.get("ports"), "and publish nothing")
+    check(
+        all(services[s].get("read_only") is True for s in ("ingress", "server", "scrapers")),
+        "the ingress, the server and the scrapers have a read-only root filesystem",
+    )
+    check(
+        all("/tmp" in (services[s].get("tmpfs") or []) for s in ("ingress", "server", "scrapers")),
+        "each with a tmpfs for its scratch space",
+    )
 
     args = (services["ingress"].get("build") or {}).get("args") or {}
     check(
