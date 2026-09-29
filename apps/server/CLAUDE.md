@@ -111,6 +111,22 @@ alias) because nock 14 corrupted supertest's sockets, and the suite shares one
 persistent server bound to `127.0.0.1` (a wildcard bind on macOS could share its
 port with another local process).
 
+## Container image
+
+`apps/server/Dockerfile` (context: this folder) has two targets. `runtime` carries only
+what `node dist/index.js` needs, on Debian slim with openssl for Prisma's query engine,
+as user `node`, with an exec-form `CMD` so SIGTERM reaches the graceful shutdown.
+`migrate` is a one-shot (`prisma migrate deploy`) and exists because `prisma` and `tsx`
+are development dependencies. `.dockerignore` excludes every `.env*`: a secret never
+enters an image. The admin seed runs compiled: `node dist/utils/seed.js`.
+
+Under `infra/compose.app.yml` the server's `DATABASE_URL` and the secrets it shares with
+MERL-T (`MERLT_INTERNAL_SECRET`, `MERLT_API_KEY`) come from `infra/.env`, not from
+`apps/server/.env`, whose `DATABASE_URL` points at localhost for the development flow;
+`apps/server/.env` keeps the server's own (the JWT secret, the admin seed). The MERL-T
+dead-letter log (`MERLT_DEAD_LETTER_DIR`, default `./logs`) is a volume and the root
+filesystem is read-only.
+
 ## Environment Variables
 
 **Node backend** — see `apps/server/.env.example`. `REDIS_ENABLED` defaults to

@@ -1,0 +1,59 @@
+# The scrapers: the Python API and the Chromium it drives.
+#
+# A module of its own, so it can run on another machine: on this host it is one more
+# `-f` of the production stack; elsewhere it runs by itself,
+#
+#   docker compose -f infra/compose.scrapers.yml up -d --build
+#
+# and SCRAPERS_ADDR (infra/.env) on the host points at it. What the module needs is
+# in this file, not in compose.prod.yml, so leaving it out leaves nothing dangling.
+#
+# It publishes NO port, here or anywhere: on a machine of its own the operator adds a
+# `ports:` for the address that only the host may reach, and the firewall rule and the
+# shared secret that go with it (spec section 4.4: not built yet). Do not expose it as is.
+#
+# Three things are deliberate:
+#  - it is on the `app` network and on nothing else: no database is reachable from it,
+#    and it has no Redis. MERL-T's job queues live in Redis as pickled objects, so a
+#    scraper able to write there could get code run by the worker. The cache is the
+#    filesystem (REDIS_ENABLED false).
+#  - TRUSTED_PROXIES=1: exactly one proxy, the ingress, is in front of it. At 0 every
+#    client would share the ingress's address, and one rate-limit bucket.
+#  - the ceilings come from a measurement, not a guess: about 280 MiB idle, about
+#    1.06 GiB and 195 processes with four PDF exports at once.
+#
+# Design: docs/superpowers/specs/2026-09-29-modular-deployment-design.md
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+
+services:
+  scrapers:
+    build:
+      context: ..
+      dockerfile: services/visualex/Dockerfile
+    container_name: ${VISUALEX_STACK:-visualex}-scrapers
+    restart: unless-stopped
+    init: true
+    environment:
+      TRUSTED_PROXIES: "1"
+      REDIS_ENABLED: "false"
+    volumes:
+      # The Python API's own search history and dossier file, and its cache.
+      - scrapers_data:/repo/services/visualex/data
+      - scrapers_download:/repo/services/visualex/download
+    networks: [app]
+    mem_limit: ${SCRAPERS_MEM_LIMIT:-2g}
+    pids_limit: 512
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+networks:
+  # compose.prod.yml gives it a fixed subnet on the host; on its own it is a plain bridge.
+  app: {}
+
+volumes:
+  scrapers_data: {name: "${VISUALEX_STACK:-visualex}_scrapers_data"}
+  scrapers_download: {name: "${VISUALEX_STACK:-visualex}_scrapers_download"}

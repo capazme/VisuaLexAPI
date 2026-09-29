@@ -1,0 +1,114 @@
+# How the modules are wired together on the production host: networks, restart policy,
+# log rotation, and the addresses MERL-T uses to reach the server and the scrapers.
+#
+# Always the LAST file. It mentions only services that are always present on the host
+# (the stores, MERL-T, the server, the ingress), never the scrapers, whose file carries
+# its own settings: leaving compose.scrapers.yml out must still render.
+#
+#   edge  the ingress, the only door
+#   app   the request path: ingress, server, scrapers, MERL-T
+#   data  the stores, reachable only by the server and MERL-T
+#
+# Hardening (spec section 8, H2): the application modules and MERL-T run with every
+# capability dropped and no way to gain privileges (measured: MERL-T is healthy that
+# way). The stores keep the defaults: their entrypoints chown and then drop privileges
+# themselves. `mcp-legal-it` still runs as root inside its container (its Dockerfile
+# is in the submodule), capabilities dropped; a normal user is for that repository.
+# `data` is not `internal`: the stores publish on the loopback for the backup tool, and
+# Docker does not publish ports of a container that is on internal networks only.
+#
+# A compromised scraper (it renders third-party pages) can reach `app` but not the
+# databases. What it could still reach — the home network, and MERL-T's own API, whose
+# /admin and /ner routes have no gate of their own — is spelled out in the spec,
+# sections 4.2 (R1, R2) and 8 (H1).
+#
+# The stores keep publishing on the loopback, as in compose.yml: the backup tool
+# (scripts/backup.sh) reaches them there.
+# Design: docs/superpowers/specs/2026-09-29-modular-deployment-design.md
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "5"}
+
+x-hardening: &hardening
+  init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+networks:
+  edge: {}
+  app:
+    ipam:
+      config:
+        # Fixed, because the host firewall rule that keeps the scrapers away from the
+        # home network is keyed on it. Change it (infra/.env) if it collides with yours.
+        - subnet: "${APP_SUBNET:-172.29.240.0/24}"
+  data: {}
+
+services:
+  postgres:
+    init: true
+    restart: unless-stopped
+    networks: [data]
+    environment:
+      # No development default in production: the three passwords come from infra/.env,
+      # which ./start.sh --prod generates on the first run.
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set in infra/.env (./start.sh --prod creates it)}"
+      PLATFORM_DB_PASSWORD: "${PLATFORM_DB_PASSWORD:?PLATFORM_DB_PASSWORD is not set in infra/.env (./start.sh --prod creates it)}"
+      MERLT_DB_PASSWORD: "${MERLT_DB_PASSWORD:?MERLT_DB_PASSWORD is not set in infra/.env (./start.sh --prod creates it)}"
+    logging: *logging
+  redis:
+    init: true
+    restart: unless-stopped
+    networks: [data]
+    logging: *logging
+  falkordb:
+    init: true
+    restart: unless-stopped
+    networks: [data]
+    logging: *logging
+  qdrant:
+    init: true
+    restart: unless-stopped
+    networks: [data]
+    logging: *logging
+
+  mcp-legal-it:
+    <<: *hardening
+    restart: unless-stopped
+    networks: [app]
+    logging: *logging
+  merlt-api:
+    <<: *hardening
+    restart: unless-stopped
+    networks: [app, data]
+    environment:
+      # No development default here: the same value, from the same place, as the server.
+      MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:?MERLT_INTERNAL_SECRET is not set in infra/.env (./start.sh --prod creates it)}"
+      # Container names, not host.docker.internal: the server and the scrapers are
+      # containers now.
+      VISUALEX_API_URL: "http://${SCRAPERS_ADDR:-scrapers:5000}"
+      BFF_QA_CALLBACK_URL: "http://server:3001/api/merlt/internal/qa-callback"
+    logging: *logging
+  merlt-worker:
+    <<: *hardening
+    restart: unless-stopped
+    networks: [app, data]
+    environment:
+      MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:?MERLT_INTERNAL_SECRET is not set in infra/.env (./start.sh --prod creates it)}"
+      VISUALEX_API_URL: "http://${SCRAPERS_ADDR:-scrapers:5000}"
+      BFF_CALLBACK_URL: "http://server:3001/api/merlt/internal/job-callback"
+      BFF_EXTRACTION_CALLBACK_URL: "http://server:3001/api/merlt/internal/extraction-callback"
+    logging: *logging
+
+  migrate:
+    networks: [data]
+    logging: *logging
+  server:
+    restart: unless-stopped
+    networks: [app, data]
+    logging: *logging
+  ingress:
+    restart: unless-stopped
+    networks: [edge, app]
+    logging: *logging
