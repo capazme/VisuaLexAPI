@@ -14,6 +14,12 @@ interface Props {
   /** Recorded on every new discussion: the article's URN and the SHA-256 of the text on screen. */
   articleUrn?: string;
   textHash?: string | null;
+  /** Passage summaries are unavailable because their request failed. */
+  passageLoadError?: boolean;
+  /** Passage summaries are currently being refreshed. */
+  passageThreadsLoading?: boolean;
+  /** Retry loading passage summaries. */
+  onRetryPassageLoad?: () => void;
   /** Where each passage discussion is in the text on screen (from locatePassage). */
   passageStates?: Record<string, 'exact' | 'moved' | 'detached'>;
   /** A discussion to show expanded and scroll to (from a sign's popover). */
@@ -36,6 +42,9 @@ export function ArticleDiscussionPanel({
   onClose,
   articleUrn,
   textHash,
+  passageLoadError = false,
+  passageThreadsLoading = false,
+  onRetryPassageLoad,
   passageStates,
   focusThreadId,
   onFocusThread,
@@ -308,8 +317,28 @@ export function ArticleDiscussionPanel({
       )}
 
       {error && <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">{error}</div>}
+      {passageThreadsLoading && (
+        <p role="status" className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          Aggiornamento discussioni sui passaggi…
+        </p>
+      )}
+      {passageLoadError && (
+        <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+          <span>Impossibile caricare le discussioni sui passaggi. I segni potrebbero non mostrarle.</span>
+          {onRetryPassageLoad && (
+            <button type="button" onClick={onRetryPassageLoad} className="font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              Riprova
+            </button>
+          )}
+        </div>
+      )}
+      {passageLoadError && threads.length === 0 && !isLoading && (
+        <p className="mb-3 rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-700">
+          Le discussioni non sono disponibili al momento, quindi l’elenco potrebbe essere incompleto.
+        </p>
+      )}
       {notice && <div role="status" className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">{notice}</div>}
-      {isLoading ? <p className="text-sm text-slate-400">Caricamento discussioni…</p> : threads.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500">Nessuna discussione ancora. Puoi essere il primo a porre una domanda.</p> : (
+      {isLoading ? <p className="text-sm text-slate-400">Caricamento discussioni…</p> : threads.length === 0 && (passageLoadError || passageThreadsLoading) ? null : threads.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-6 text-center text-sm text-slate-500">Nessuna discussione ancora. Puoi essere il primo a porre una domanda.</p> : (
         <div className="space-y-3">
           {threads.map(thread => {
             const isExpanded = expanded.has(thread.id);

@@ -14,36 +14,42 @@ export function useArticlePassageThreads(
   enabled = true,
 ): {
   threads: ArticleDiscussionPassageSummary[];
+  isLoading: boolean;
+  error: boolean;
   reload: () => void;
 } {
   const [reloadCount, setReloadCount] = useState(0);
   const [loadedData, setLoadedData] = useState<{
-    key: string;
+    requestId: string;
     threads: ArticleDiscussionPassageSummary[];
+    error: boolean;
   }>({
-    key: '',
+    requestId: '',
     threads: [],
+    error: false,
   });
 
   const reload = useCallback(() => {
     setReloadCount((c) => c + 1);
   }, []);
 
-  const currentKey = normaKey && articleId ? `${normaKey}:${articleId}` : '';
+  const currentKey = normaKey && articleId ? JSON.stringify([normaKey, articleId]) : '';
+  const currentRequestId = currentKey ? JSON.stringify([currentKey, reloadCount]) : '';
+  const shouldLoad = enabled && Boolean(currentKey) && isAuthenticated();
 
   useEffect(() => {
     if (!enabled || !normaKey || !articleId || !isAuthenticated()) {
       return;
     }
 
-    const requestKey = `${normaKey}:${articleId}`;
+    const requestId = JSON.stringify([currentKey, reloadCount]);
     let cancelled = false;
 
     articleDiscussionService
       .listPassages({ normaKey, articleId })
       .then((threads) => {
         if (!cancelled) {
-          setLoadedData({ key: requestKey, threads });
+          setLoadedData({ requestId, threads, error: false });
         }
       })
       .catch((error) => {
@@ -53,16 +59,19 @@ export function useArticlePassageThreads(
             articleId,
             error,
           });
-          setLoadedData({ key: requestKey, threads: [] });
+          setLoadedData({ requestId, threads: [], error: true });
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [normaKey, articleId, enabled, reloadCount]);
+  }, [normaKey, articleId, currentKey, enabled, reloadCount]);
 
-  const threads = loadedData.key === currentKey ? loadedData.threads : [];
+  const hasCurrentData = loadedData.requestId === currentRequestId;
+  const threads = hasCurrentData ? loadedData.threads : [];
+  const isLoading = shouldLoad && !hasCurrentData;
+  const error = hasCurrentData && loadedData.error;
 
-  return { threads, reload };
+  return { threads, isLoading, error, reload };
 }
