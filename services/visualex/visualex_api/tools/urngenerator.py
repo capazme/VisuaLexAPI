@@ -1,3 +1,4 @@
+import os
 import re
 import logging
 import asyncio
@@ -250,6 +251,24 @@ def append_version_info(urn, version, version_date):
         logging.info(f"Appended version info to URN: {urn}")
     return urn
 
+_UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
+_MAX_FILENAME = 150
+
+
+def _safe_filename(name):
+    """
+    Makes `name` a file name and nothing else: no directory part, no separator, not hidden.
+
+    The URN a name is built from is written by the caller. The guard on /export_pdf
+    only checks the host, so `;../../x` used to become a directory part of the path the
+    PDF is read from and copied to.
+    """
+    safe = _UNSAFE_IN_FILENAME.sub("_", name).lstrip(".")
+    if len(safe) > _MAX_FILENAME:
+        safe = safe[:_MAX_FILENAME - len(".pdf")] + ".pdf"
+    return safe or "document.pdf"
+
+
 def urn_to_filename(urn):
     """
     Converts a URN to a filename.
@@ -258,7 +277,7 @@ def urn_to_filename(urn):
     urn -- The URN string
 
     Returns:
-    str -- The generated filename
+    str -- The generated filename: always a bare file name, safe to join to a directory
     """
     logging.info(f"Converting URN to filename: {urn}")
     try:
@@ -270,11 +289,18 @@ def urn_to_filename(urn):
     if ':' in act_type_section and ';' in act_type_section:
         type_and_date, number = act_type_section.split(';')
         year = type_and_date.split(':')[1].split('-')[0]
-        filename = f"{number}_{year}.pdf"
+        filename = _safe_filename(f"{number}_{year}.pdf")
         logging.info(f"Generated filename: {filename}")
         return filename
 
     act_type = act_type_section.split('/')[-1]
-    filename = f"{act_type.capitalize()}.pdf"
+    filename = _safe_filename(f"{act_type.capitalize()}.pdf")
     logging.info(f"Generated filename: {filename}")
     return filename
+
+
+def pdf_cache_path(urn, directory):
+    """
+    Where the exported PDF of `urn` is cached: a file directly inside `directory`.
+    """
+    return os.path.join(directory, urn_to_filename(urn))
