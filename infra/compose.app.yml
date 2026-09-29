@@ -1,0 +1,108 @@
+# The application modules: the server (with its one-shot migrate step) and the ingress.
+#
+# One of the files of the production stack; compose.prod.yml wires them together
+# (networks, restart, logs). ./start.sh --prod runs:
+#
+#   docker compose -f infra/compose.yml -f infra/compose.app.yml \
+#     -f infra/compose.scrapers.yml -f infra/compose.prod.yml --profile merlt up -d --build
+#
+# Leave compose.scrapers.yml out to run the scrapers on another machine and point
+# SCRAPERS_ADDR (infra/.env) at it: nothing here depends on that service existing.
+#
+# compose.prod.yml must be the LAST file: it is what puts each module on its network.
+# Without it the modules share the default network with the stores. Needs Docker
+# Compose 2.24 or newer (the long form of env_file below, `required:`).
+#
+# Secrets shared with MERL-T (MERLT_INTERNAL_SECRET, MERLT_API_KEY) live in
+# infra/.env and nowhere else, so the two sides cannot drift. apps/server/.env keeps
+# the server's own (the JWT secret, the admin seed, ...).
+# Design: docs/superpowers/specs/2026-09-29-modular-deployment-design.md
+
+x-database: &database
+  # Derived here from the stack's own password, not read from apps/server/.env,
+  # whose DATABASE_URL points at localhost for the development flow.
+  # No default: a production stack must never come up with a password everyone knows.
+  DATABASE_URL: "postgresql://visualex:${PLATFORM_DB_PASSWORD:?PLATFORM_DB_PASSWORD is not set in infra/.env (./start.sh --prod creates it)}@postgres:5432/visualex_platform"
+
+x-hardening: &hardening
+  init: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  # Applies the Prisma migrations, then exits. `prisma` is a development dependency,
+  # which is why this is its own image target and not part of the server's.
+  migrate:
+    <<: *hardening
+    build:
+      context: ../apps/server
+      target: migrate
+    container_name: ${VISUALEX_STACK:-visualex}-migrate
+    restart: "no"
+    environment:
+      <<: *database
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  server:
+    <<: *hardening
+    build:
+      context: ../apps/server
+      target: runtime
+    container_name: ${VISUALEX_STACK:-visualex}-server
+    # Optional at render time so the files can be checked without secrets; a server
+    # started without JWT_SECRET refuses to boot, by name.
+    env_file:
+      - path: ../apps/server/.env
+        required: false
+    environment:
+      <<: *database
+      NODE_ENV: production
+      PORT: "3001"
+      REDIS_URL: "redis://redis:6379/0"
+      REDIS_ENABLED: "true"
+      # The browser's address of the app: the CORS allow-list. Comma-separated.
+      ALLOWED_ORIGINS: "${PUBLIC_ORIGIN:-http://localhost:8080}"
+      LEGAL_API_URL: "http://${SCRAPERS_ADDR:-scrapers:5000}"
+      MERLT_ENABLED: "${MERLT_ENABLED:-true}"
+      MERLT_API_URL: "http://merlt-api:8000"
+      MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:?MERLT_INTERNAL_SECRET is not set in infra/.env (./start.sh --prod creates it)}"
+      MERLT_API_KEY: "${MERLT_API_KEY:-}"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    volumes:
+      # The MERL-T dead-letter log (NDJSON, capped at 50 MB): tracking events.
+      - server_logs:/app/logs
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  # The one module that faces the network. The only published port of the stack.
+  ingress:
+    <<: *hardening
+    build:
+      context: ..
+      dockerfile: infra/ingress/Dockerfile
+      # Key only: taken from the environment when set, and NOT passed when unset.
+      # An empty string would switch MERL-T off (the app reads "" as false).
+      args:
+        - VITE_FEATURE_MERLT
+        - VITE_FEATURE_MERLT_GRAPH
+    container_name: ${VISUALEX_STACK:-visualex}-ingress
+    environment:
+      SERVER_UPSTREAM: "server:3001"
+      SCRAPERS_UPSTREAM: "${SCRAPERS_ADDR:-scrapers:5000}"
+    # Loopback by default; INGRESS_BIND is the home-network address to reach it from
+    # other devices. The container listens on 8080 as a normal user.
+    ports:
+      - "${INGRESS_BIND:-127.0.0.1}:${INGRESS_PORT:-8080}:8080"
+    depends_on:
+      server: {condition: service_healthy}
+    read_only: true
+    tmpfs:
+      - /tmp
+
+volumes:
+  server_logs: {name: "${VISUALEX_STACK:-visualex}_server_logs"}

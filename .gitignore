@@ -32,7 +32,7 @@ test-notes-e2e.txt
 
 # MERL-T runtime dirs (codice in services/merlt/ è versionato; runtime no)
 services/merlt/uploads/
-services/merlt/data/
+services/merlt/data
 services/merlt/.venv/
 services/merlt/merlt.egg-info/
 
