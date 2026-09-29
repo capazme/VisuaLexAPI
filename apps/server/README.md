@@ -55,7 +55,7 @@ PORT=3001
 
 ```bash
 npm run prisma:generate
-npm run prisma:migrate
+npx prisma migrate deploy
 ```
 
 This will:
@@ -79,9 +79,9 @@ Server will start at `http://localhost:3001`
 | `npm run build` | Build TypeScript to JavaScript |
 | `npm start` | Run production server (requires build first) |
 | `npm run prisma:generate` | Generate Prisma Client |
-| `npm run prisma:migrate` | Run database migrations |
+| `npm run prisma:migrate` | `prisma migrate dev` — never on the development database: on drift it offers to reset it (see "Create New Migration") |
 | `npm run prisma:studio` | Open Prisma Studio (visual DB editor) |
-| `npm run prisma:reset` | Reset database (⚠️ deletes all data) |
+| `npm run prisma:reset` | Reset the database it points at (⚠️ deletes all data; the test setup runs it on `visualex_test`) |
 | `npm run db:seed` | Seed database with test data |
 
 ## API Endpoints
@@ -230,26 +230,32 @@ Opens visual database editor at `http://localhost:5555`
 
 ### Reset Database
 
-⚠️ **Warning:** This deletes all data!
-
-```bash
-npm run prisma:reset
-```
+Do not reset the development database: it holds real accounts, dossiers and
+notes. To go back to a known state, restore a backup (`scripts/restore.sh`,
+`scripts/datakit/README.md`); to start from nothing, use a throwaway stack
+(`docs/setup.md`, "Two stacks on one machine").
 
 ### Create New Migration
 
-After modifying `prisma/schema.prisma`:
+After modifying `prisma/schema.prisma`, write the migration by hand in
+`prisma/migrations/<timestamp>_<name>/migration.sql` (Prisma's naming), then:
 
 ```bash
-npx prisma migrate dev --name description_of_changes
+npx prisma migrate deploy
+npx prisma generate
+npx prisma migrate status
 ```
+
+Never `npx prisma migrate dev` against the development database: on any drift
+it offers to reset it, and an agent can accept. The shared Claude Code hook
+refuses it (`apps/server/CLAUDE.md`).
 
 ## Frontend Integration
 
-The React frontend is configured to call this backend via axios client at `frontend/src/services/api.ts`.
+The React frontend is configured to call this backend via axios client at `apps/web/src/services/api.ts`.
 
 **Frontend setup:**
-1. Ensure `frontend/.env` has `VITE_API_URL=http://localhost:3001/api`
+1. Ensure `apps/web/.env` has `VITE_API_URL=http://localhost:3001/api`
 2. Frontend automatically adds `Authorization: Bearer <token>` header
 3. Auto-refresh on 401 errors using refresh token
 

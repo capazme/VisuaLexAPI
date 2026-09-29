@@ -45,9 +45,9 @@ now map to 400/404 only through `_error_response` in the root controller.
 
 ## Global Constraints
 
-- **Interpreter is always `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python`.** With the ambient `python3` the suite is 10 failed / 159 passed because `quart` is not importable. Every command below names it explicitly. Referred to as `$PY`.
+- **Interpreter is always `./.venv/bin/python`.** With the ambient `python3` the suite is 10 failed / 159 passed because `quart` is not importable. Every command below names it explicitly. Referred to as `$PY`.
 - **Baseline to preserve: 169 passed.** No task may reduce it; each task adds tests.
-- Source repo, referred to as `$M`: `/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it`. Its library root is `$M/plugin/server/src`.
+- Source repo, referred to as `$M`: `../server-infra2.0/mcp-legal-it`. Its library root is `$M/plugin/server/src`.
 - **`article_text` must not change shape.** Highlights and anchored notes are pinned by `(startOffset, text)` with an exact case-insensitive equality gate and no fuzzy fallback (`useArticleMarkers.ts:59-88`). A single added space before an anchor silently deletes it from the body. No task may alter `normattiva_scraper._estrai_testo_*` output formatting.
 - UI copy Italian; code, comments, commits English. Conventional Commits.
 - **Owner rule — no auto-commit.** Each task ends with a *proposed* commit message; the commit is made only when the owner has authorised per-task commits.
@@ -79,9 +79,9 @@ now map to 400/404 only through `_error_response` in the root controller.
 Run this once and commit the output. It writes real HTML, so the tests never need the network again.
 
 ```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/.claude/worktrees/wonderful-tereshkova-56ca06
+cd ./.claude/worktrees/wonderful-tereshkova-56ca06
 mkdir -p tests/fixtures/normattiva
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import asyncio, sys
 sys.path.insert(0, ".")
 from visualex_api.tools.norma import Norma, NormaVisitata
@@ -198,7 +198,7 @@ async def test_parse_failure_reports_the_real_cause(scraper):
 - [ ] **Step 3: Run it and watch it fail**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_normattiva_extraction.py -q
+./.venv/bin/python -m pytest tests/test_normattiva_extraction.py -q
 ```
 
 Expected: the async tests ERROR with "async def functions are not natively supported"
@@ -226,7 +226,7 @@ markers =
 line 16 but four except blocks call `logger.error(...)`. Replace all four occurrences:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 from pathlib import Path
 p = Path("visualex_api/services/normattiva_scraper.py")
 src = p.read_text(encoding="utf-8")
@@ -254,7 +254,7 @@ Constructing a `Norma` triggers `generate_urn`, so importing the models module d
 - [ ] **Step 7: Run the tests and the full suite**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 Expected: 169 pre-existing + the new ones, all passing, and no stray dict printed
@@ -369,7 +369,7 @@ def test_is_allowed(url, expected):
 - [ ] **Step 2: Run it to see the shape of the failure**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_egress_allowlist.py -q
+./.venv/bin/python -m pytest tests/test_egress_allowlist.py -q
 ```
 
 Expected: collection error, `ModuleNotFoundError: visualex_api.tools.egress`.
@@ -554,7 +554,7 @@ genuinely broken chain must be recorded per-host, never fixed by disabling verif
 globally.
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import asyncio, aiohttp
 
 URLS = [
@@ -583,7 +583,7 @@ exact certificate problem before proceeding — do not re-disable verification.
 - [ ] **Step 8: Run the tests**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 Expected: all green. If `test_server_contacts_only_declared_hosts` red-lights on a host
@@ -800,7 +800,7 @@ jobs:
 - [ ] **Step 4: Check the workflows parse**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -c "
+./.venv/bin/python -c "
 import yaml, pathlib
 for p in sorted(pathlib.Path('.github/workflows').glob('*.yml')):
     d = yaml.safe_load(p.read_text())
@@ -814,8 +814,8 @@ Expected: `ci.yml -> ['python', 'frontend', 'backend']` and
 - [ ] **Step 5: Verify the audits pass locally before CI ever runs them**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pip install --quiet pip-audit
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pip_audit -r requirements.txt || true
+./.venv/bin/python -m pip install --quiet pip-audit
+./.venv/bin/python -m pip_audit -r requirements.txt || true
 cd frontend && npm audit --audit-level=high || true
 ```
 
@@ -943,7 +943,7 @@ class TestCaseInsensitiveCodici:
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_act_tables.py -q
+./.venv/bin/python -m pytest tests/test_act_tables.py -q
 ```
 
 Expected: `ImportError: cannot import name 'ATTI_DENOMINATI'`.
@@ -953,7 +953,7 @@ Expected: `ImportError: cannot import name 'ATTI_DENOMINATI'`.
 Do not take this on trust — run it and read the output:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import importlib.util, sys, pathlib
 
 def load(path, name):
@@ -963,7 +963,7 @@ def load(path, name):
     spec.loader.exec_module(mod)
     return mod
 
-A = load("/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it/plugin/server/src/lib/visualex/map.py", "map_a")
+A = load("../server-infra2.0/mcp-legal-it/plugin/server/src/lib/visualex/map.py", "map_a")
 B = load("visualex_api/tools/map.py", "map_b")
 
 for t in ["NORMATTIVA_URN_CODICI", "NORMATTIVA_SEARCH", "BROCARDI_CODICI", "BROCARDI_SEARCH", "EURLEX"]:
@@ -1008,12 +1008,12 @@ the three capitalised spellings already present**. Compute the additions rather 
 retyping them:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import importlib.util, sys
 def load(p, n):
     s = importlib.util.spec_from_file_location(n, p); m = importlib.util.module_from_spec(s)
     sys.modules[n] = m; s.loader.exec_module(m); return m
-A = load("/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it/plugin/server/src/lib/visualex/map.py", "a")
+A = load("../server-infra2.0/mcp-legal-it/plugin/server/src/lib/visualex/map.py", "a")
 B = load("visualex_api/tools/map.py", "b")
 for k in sorted(set(A.NORMATTIVA_SEARCH) - set(B.NORMATTIVA_SEARCH)):
     print(f'    {k!r}: {A.NORMATTIVA_SEARCH[k]!r},')
@@ -1066,8 +1066,8 @@ alongside the existing `NORMATTIVA_URN_CODICI` import in each file.
 - [ ] **Step 7: Run the new tests, then the full suite**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_act_tables.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_act_tables.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 8: Check what the widened table did to citation detection**
@@ -1076,7 +1076,7 @@ alongside the existing `NORMATTIVA_URN_CODICI` import in each file.
 import, so 22 new keys widen the alternation by ~20%.
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_citation_linker.py tests/test_nl_parser.py tests/test_alias_resolver.py -q
+./.venv/bin/python -m pytest tests/test_citation_linker.py tests/test_nl_parser.py tests/test_alias_resolver.py -q
 ```
 
 Expected: green. A failure here is a real behaviour change — report which citation
@@ -1211,7 +1211,7 @@ class TestKnownNames:
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_act_resolver.py -q
+./.venv/bin/python -m pytest tests/test_act_resolver.py -q
 ```
 
 Expected: `ModuleNotFoundError: visualex_api.tools.act_resolver`.
@@ -1381,8 +1381,8 @@ def suggest_acts(name: str, limit: int = 3) -> list[str]:
 - [ ] **Step 4: Run the tests**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_act_resolver.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_act_resolver.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 5: Cross-check the tables against live Normattiva (opt-in)**
@@ -1435,7 +1435,7 @@ Run it once now and record the result — this is where the source repo's own
 1941-12-18) will surface:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_act_resolver.py -m live -q
+./.venv/bin/python -m pytest tests/test_act_resolver.py -m live -q
 ```
 
 Any act reported here is corrected in `_ATTI_DENOMINATI_SPEC` before the task closes,
@@ -1522,7 +1522,7 @@ class TestResolverInNlParser:
 - [ ] **Step 2: Run them and watch them fail**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_alias_resolver.py tests/test_nl_parser.py -q
+./.venv/bin/python -m pytest tests/test_alias_resolver.py tests/test_nl_parser.py -q
 ```
 
 Expected: the new cases fail (`resolve_alias("statuto dei lavoratori")` is `None`); every
@@ -1626,7 +1626,7 @@ are what `test_nl_parser.py`'s 30+ existing cases exercise.
 - [ ] **Step 6: Run everything that touches act-type resolution**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 Expected: green, with the new cases passing and no pre-existing case changed. If an
@@ -1710,7 +1710,7 @@ class TestUrnGenerationIsUnaffected:
 - [ ] **Step 2: Run it to see how many keys are dead**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_normalize_act_type.py -q
+./.venv/bin/python -m pytest tests/test_normalize_act_type.py -q
 ```
 
 Expected: `test_no_key_is_unreachable` fails reporting ~62 of 111 keys.
@@ -1739,8 +1739,8 @@ keep the stripped form as a fallback, so the abbreviations that work today keep 
 - [ ] **Step 4: Run the tests, then everything**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_normalize_act_type.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_normalize_act_type.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 `test_no_double_dots_in_the_urn` is the one that matters here: `generate_urn` compensates
@@ -1750,7 +1750,7 @@ return more canonical multi-word names than before.
 - [ ] **Step 5: Confirm real URNs did not move**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import sys
 sys.path.insert(0, ".")
 from visualex_api.tools.urngenerator import generate_urn
@@ -1911,7 +1911,7 @@ class TestRequestValidation:
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_article_existence.py -q
+./.venv/bin/python -m pytest tests/test_article_existence.py -q
 ```
 
 Expected: `AttributeError: '_article_exists_in_tree'`, plus the three validation tests
@@ -2030,14 +2030,14 @@ articles must still return the 32.
 - [ ] **Step 6: Run the tests**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_article_existence.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_article_existence.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 7: Verify against live Normattiva — the whole point of the task**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import asyncio, sys
 sys.path.insert(0, ".")
 from app import NormaController
@@ -2121,9 +2121,9 @@ codice penale. Only the small flat fixtures are copied whole; the component stru
 gets a trimmed fixture instead.
 
 ```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/.claude/worktrees/wonderful-tereshkova-56ca06
+cd ./.claude/worktrees/wonderful-tereshkova-56ca06
 mkdir -p tests/fixtures/akn
-M=/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it/tests/fixtures/akn
+M=../server-infra2.0/mcp-legal-it/tests/fixtures/akn
 cp "$M/legge_241_1990.xml" "$M/costituzione.xml" "$M/dlgs_231_2001.xml" \
    "$M/landing_legge_241_1990.html" tests/fixtures/akn/
 du -sh tests/fixtures/akn
@@ -2134,10 +2134,10 @@ codice penale, which is enough to exercise the component branch, the `PART-art. 
 parsing and the dominant-part selection:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 from lxml import etree
 
-SRC = "/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it/tests/fixtures/akn/codice_penale.xml"
+SRC = "../server-infra2.0/mcp-legal-it/tests/fixtures/akn/codice_penale.xml"
 OUT = "tests/fixtures/akn/codice_penale_trimmed.xml"
 KEEP = 40
 
@@ -2282,7 +2282,7 @@ class TestRobustness:
 - [ ] **Step 3: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_akn_parser.py -q
+./.venv/bin/python -m pytest tests/test_akn_parser.py -q
 ```
 
 Expected: `ModuleNotFoundError: visualex_api.services.akn_parser`.
@@ -2325,13 +2325,13 @@ Dropping it is a security improvement only if the real acts still parse. The cod
 civile is the largest export at 10.6 MB:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import sys, time
 sys.path.insert(0, ".")
 from visualex_api.services.akn_parser import parse_akn
 
 for f in ["codice_civile.xml", "codice_penale.xml", "dlgs_152_2006.xml"]:
-    path = f"/Users/gpuzio/Desktop/CODE/server-infra2.0/mcp-legal-it/tests/fixtures/akn/{f}"
+    path = f"../server-infra2.0/mcp-legal-it/tests/fixtures/akn/{f}"
     try:
         raw = open(path, encoding="utf-8", errors="replace").read()
     except FileNotFoundError:
@@ -2349,8 +2349,8 @@ module docstring, since that reopens the hardening question.
 - [ ] **Step 6: Run the tests and the full suite**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_akn_parser.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_akn_parser.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 7: Propose the commit**
@@ -2546,7 +2546,7 @@ class TestKillSwitch:
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_akn_fetch.py -q
+./.venv/bin/python -m pytest tests/test_akn_fetch.py -q
 ```
 
 Expected: `ModuleNotFoundError: visualex_api.services.akn_fetch`.
@@ -2810,8 +2810,8 @@ async def fetch_act_article(norma, article: str, data_vigenza: str | None = None
 - [ ] **Step 5: Run the tests**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_akn_fetch.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_akn_fetch.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 6: Verify the two-request flow against live Normattiva**
@@ -2820,7 +2820,7 @@ The `_MIN_XML_CHARS` threshold and the error-page shape are empirical and dated
 2026-06-11 in the source repo; confirm they still hold today.
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import asyncio, sys, time
 sys.path.insert(0, ".")
 from visualex_api.tools.norma import Norma
@@ -2981,7 +2981,7 @@ class TestTextFallback:
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_akn_integration.py -q
+./.venv/bin/python -m pytest tests/test_akn_integration.py -q
 ```
 
 - [ ] **Step 3: Replace the local normaliser with the real one**
@@ -3049,7 +3049,7 @@ Import `fetch_act_article` at module level from `.akn_fetch`.
 - [ ] **Step 6: Run the tests**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 7: Prove the primary text did not move — the gate for the whole phase**
@@ -3060,7 +3060,7 @@ article text this branch produces against the same text on `main`.
 ```bash
 git stash push --keep-index -m "akn-wip" 2>/dev/null || true
 git switch main --detach 2>/dev/null
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - > /tmp/text_before.txt <<'EOF'
+./.venv/bin/python - > /tmp/text_before.txt <<'EOF'
 import asyncio, sys, json
 sys.path.insert(0, ".")
 from visualex_api.tools.norma import Norma, NormaVisitata
@@ -3092,8 +3092,8 @@ git stash pop 2>/dev/null || true
 Then run the identical script on this branch into `/tmp/text_after.txt` and diff:
 
 ```bash
-diff <(/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -c "import json;print(open('/tmp/text_before.txt').read())") \
-     <(/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -c "import json;print(open('/tmp/text_after.txt').read())") \
+diff <(./.venv/bin/python -c "import json;print(open('/tmp/text_before.txt').read())") \
+     <(./.venv/bin/python -c "import json;print(open('/tmp/text_after.txt').read())") \
   && echo "IDENTICO — nessun offset si è mosso"
 ```
 
@@ -3143,9 +3143,9 @@ Also drops the temporary article-key normaliser in favour of the AKN parser's.
 - [ ] **Step 1: Capture the fixtures**
 
 ```bash
-cd /Users/gpuzio/Desktop/CODE/VisuaLexAPI/.claude/worktrees/wonderful-tereshkova-56ca06
+cd ./.claude/worktrees/wonderful-tereshkova-56ca06
 mkdir -p tests/fixtures/brocardi
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import asyncio, sys
 sys.path.insert(0, ".")
 from visualex_api.services.brocardi_scraper import BrocardiScraper
@@ -3173,7 +3173,7 @@ Then make the second fixture — the same page with one extra class on the conte
 container. This is the shape that silently empties every section today:
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 src = open("tests/fixtures/brocardi/article.html", encoding="utf-8").read()
 old = "panes-condensed panes-w-ads content-ext-guide content-mark"
 assert old in src, "the exact class string is not in the fixture; inspect it before proceeding"
@@ -3295,7 +3295,7 @@ class TestArticleUrlResolution:
 - [ ] **Step 3: Run it and record which assertions fail**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_brocardi_extraction.py -q
+./.venv/bin/python -m pytest tests/test_brocardi_extraction.py -q
 ```
 
 Expected failures: the extra-class test (sections vanish), the short-prefix test (`[17:]`
@@ -3403,14 +3403,14 @@ line. Leave `NormattivaSelectors` alone — that one is used.
 - [ ] **Step 10: Run the tests**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_brocardi_extraction.py -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/test_brocardi_extraction.py -q
+./.venv/bin/python -m pytest tests/ -q
 ```
 
 - [ ] **Step 11: Verify against live Brocardi**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python - <<'EOF'
 import asyncio, sys
 sys.path.insert(0, ".")
 from visualex_api.services.brocardi_scraper import BrocardiScraper
@@ -3503,7 +3503,7 @@ class TestGlossario:
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/test_brocardi_extraction.py -k Glossario -q
+./.venv/bin/python -m pytest tests/test_brocardi_extraction.py -k Glossario -q
 ```
 
 - [ ] **Step 3: Write the extractor**
@@ -3576,8 +3576,8 @@ Expected: exactly three lines.
 - [ ] **Step 5: Run the tests and check the wire end to end**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python - <<'EOF'
+./.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python - <<'EOF'
 import asyncio, sys, json
 sys.path.insert(0, ".")
 from visualex_api.services.brocardi_scraper import BrocardiScraper
@@ -4094,7 +4094,7 @@ Every name must appear in all of its places.
 - [ ] **Step 5: Run the full gate one last time**
 
 ```bash
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q
+./.venv/bin/python -m pytest tests/ -q
 cd frontend && npm run test -- --run && npm run build && npm run lint
 ```
 

@@ -14,7 +14,7 @@
 > glossario.
 >
 > Riferimenti al codice nella forma `file:line` (es. `orchestrator.py:656`) sono ancore reali,
-> relative a `merlt/merlt/` salvo diversa indicazione.
+> relative a `services/merlt/merlt/` salvo diversa indicazione.
 
 > **Stato al 2026-09-25.** Il blueprint descrive il working tree del 17 luglio 2026. Da allora, e in
 > particolare nella sessione del 25 settembre, sono stati chiusi questi punti. Le sezioni toccate
@@ -22,9 +22,9 @@
 >
 > **Runtime e infrastruttura**
 >
-> - **Stack da un clone vuoto.** `start.sh` usa `api-in-docker` di default e inizializza il
+> - **Stack da un clone vuoto.** `start.sh` avvia MERL-T in Docker di default (profilo `merlt`) e inizializza il
 >   submodule `vendor/mcp-legal-it`. Legge `MERLT_INTERNAL_SECRET` e `MERLT_API_KEY` da
->   `backend/.env`. In modalità locale avvia anche un worker RQ sulle tre code. FalkorDB persiste in
+>   `apps/server/.env`. In modalità locale avvia anche un worker RQ sulle tre code. FalkorDB persiste in
 >   `/var/lib/falkordb/data`. Il sweep di igiene gira ogni 24 h (`MERLT_HYGIENE_INTERVAL_HOURS`).
 >   (`2a68ab3`)
 > - **Boot.** Il boot semina la chiave admin da `MERLT_ADMIN_API_KEY` e applica
@@ -147,7 +147,7 @@ flowchart LR
 ### 0.3 Topologia fisica (7 servizi Docker)
 
 MERL-T è un **sidecar** del prodotto VisuaLex, isolato in un proprio stack Docker
-(`docker-compose.merlt.yml`). Tutti i servizi sono bindati su `127.0.0.1` (solo loopback host).
+(`infra/compose.yml`). Tutti i servizi sono bindati su `127.0.0.1` (solo loopback host).
 
 ```mermaid
 flowchart TB
@@ -156,14 +156,14 @@ flowchart TB
         BFF["BFF Node/Express<br/>:3001 — /api/merlt/*"]
         PY["Python API VisuaLex<br/>:5000 (scraping)"]
     end
-    subgraph MERLT["Stack Docker MERL-T (profilo api-in-docker)"]
+    subgraph MERLT["Stack Docker (infra/compose.yml; MERL-T nel profilo merlt)"]
         API["merlt-api<br/>FastAPI :8000"]
         WK["merlt-worker<br/>RQ (3 code)"]
         MCP["mcp-legal-it<br/>:8011 (tool giuridici)"]
-        PG[("merlt-postgres<br/>:5436→5432")]
-        RD[("merlt-redis<br/>:6381→6379")]
-        FK[("merlt-falkordb<br/>:6382→6379<br/>GRAFO")]
-        QD[("merlt-qdrant<br/>:6343→6333<br/>VETTORI")]
+        PG[("postgres<br/>:5436→5432<br/>visualex_platform, merlt")]
+        RD[("redis<br/>:6381→6379")]
+        FK[("falkordb<br/>:6382→6379<br/>GRAFO")]
+        QD[("qdrant<br/>:6343→6333<br/>VETTORI")]
     end
     FE --> BFF
     BFF -->|"X-API-Key"| API
@@ -181,7 +181,7 @@ passa dal BFF sotto `/api/merlt/*`, che autentica l'utente (JWT), applica i guar
 consenso/ruolo, inietta `user_id` e proxya a MERL-T iniettando la `X-API-Key` (che il FE non vede mai).
 Vedi Parte 6 per porte, volumi ed env.
 
-### 0.4 Mappa dei sottosistemi Python (`merlt/merlt/`)
+### 0.4 Mappa dei sottosistemi Python (`services/merlt/merlt/`)
 
 | Sottosistema | In una frase | Parte |
 |---|---|---|
@@ -412,7 +412,7 @@ feedback diventa un'*esperienza* in un replay buffer; quando il buffer supera un
 admin) si esegue un *training epoch* che ripesa le policy e salva checkpoint durabili, ricaricati al
 boot senza riavvio.
 
-> Nota di lettura: `merlt/CLAUDE.md` descrive file aspirazionali (`rlcf/feedback.py`, `training.py`,
+> Nota di lettura: `services/merlt/CLAUDE.md` descrive file aspirazionali (`rlcf/feedback.py`, `training.py`,
 > `governance.py`) che **non esistono**. I file reali sono quelli qui sotto.
 
 ### 2.2 Le tre "manopole" (policy head)
@@ -796,20 +796,21 @@ PUB), `auth_api` (sync authority, PUB), `api_keys_router`.
 
 Ogni passo è isolato: se fallisce, logga e il boot prosegue.
 
-### 6.3 Topologia Docker (`docker-compose.merlt.yml`)
+### 6.3 Topologia Docker (`infra/compose.yml`)
 
 | Servizio | Porta host↔container | Volume durabile | Profilo |
 |---|---|---|---|
-| `merlt-postgres` | 5436→5432 | `merlt_postgres_data` | sempre |
-| `merlt-redis` | 6381→6379 | — (effimero: cache + coda RQ) | sempre |
-| `merlt-falkordb` | 6382→6379 | `merlt_falkor_data` montato su `/var/lib/falkordb/data`, con `FALKORDB_ARGS="--save 60 1 --appendonly yes --appendfsync everysec"` (`restart: unless-stopped`) | sempre |
-| `merlt-qdrant` | 6343→6333 | `merlt_qdrant_data` | sempre |
-| `mcp-legal-it` | 8011→8011 | — | `api-in-docker` |
-| `merlt-api` | 8000→8000 | (condivisi) | `api-in-docker` |
-| `merlt-worker` | — (no HTTP) | (condivisi) | `api-in-docker` |
+| `postgres` | 5436→5432 | `visualex_postgres_data` (anche `visualex_platform` e `visualex_test`) | sempre |
+| `redis` | 6381→6379 | — (effimero: cache + coda RQ) | sempre |
+| `falkordb` | 6382→6379 | `visualex_falkordb_data` montato su `/var/lib/falkordb/data`, con `FALKORDB_ARGS="--save 60 1 --appendonly yes --appendfsync everysec"` (`restart: unless-stopped`) | sempre |
+| `qdrant` | 6343→6333 | `visualex_qdrant_data` | sempre |
+| `mcp-legal-it` | 8011→8011 | — | `merlt` |
+| `merlt-api` | 8000→8000 | (condivisi) | `merlt` |
+| `merlt-worker` | — (no HTTP) | (condivisi) | `merlt` |
 
-**Volumi durabili** (sopravvivono a recreate): `merlt_postgres_data`, `merlt_falkor_data`,
-`merlt_qdrant_data`, `merlt_uploads` (api↔worker), `merlt_hf_cache` (e5-large ~1.2GB),
+**Volumi durabili** (sopravvivono a recreate; il prefisso è `VISUALEX_STACK`, default `visualex`):
+`visualex_postgres_data`, `visualex_falkordb_data`, `visualex_qdrant_data`, `merlt_uploads`
+(api↔worker), `merlt_hf_cache` (e5-large ~1.2GB),
 **`merlt_checkpoints`** (pesi .pt RLCF), `merlt_ner_models`. **Redis NON è durabile** — coda RQ e cache
 si perdono al recreate. Verso l'host, api/worker usano `host.docker.internal` (via `extra_hosts`,
 obbligatorio su Linux/prod).
@@ -818,9 +819,9 @@ obbligatorio su Linux/prod).
 
 | Nome | Default (⚠️ = rompe in container) | Serve a |
 |---|---|---|
-| `ENRICHMENT_DB_*` / `RLCF_DATABASE_URL` | ⚠️ localhost:5433/rlcf_dev | DB enrichment + RLCF |
-| `RQ_REDIS_URL` | ⚠️ localhost:6379 → compose `redis://merlt-redis:6379/1` | Coda RQ — **serve anche all'api** (enqueue) |
-| `FALKORDB_HOST/PORT` | localhost/6380 → container `merlt-falkordb:6379` | Grafo |
+| `ENRICHMENT_DB_*` / `RLCF_DATABASE_URL` | ⚠️ localhost:5433/rlcf_dev → compose `postgres:5432/merlt` | DB enrichment + RLCF |
+| `RQ_REDIS_URL` | ⚠️ localhost:6379 → compose `redis://redis:6379/1` | Coda RQ — **serve anche all'api** (enqueue) |
+| `FALKORDB_HOST/PORT` | localhost/6380 → container `falkordb:6379` | Grafo |
 | `QDRANT_HOST/PORT` | localhost/6333 | Vettori |
 | `MERLT_INTERNAL_SECRET` | `dev-internal-secret` | Callback worker/api↔BFF |
 | `MERLT_API_KEY` (BFF) / `MERLT_ADMIN_API_KEY` (api) | — | Ogni client BFF la invia come `X-API-Key` quando è impostata. Serve davvero solo alle route `require_role("admin")` (`/rlcf/training/{start,stop}`, `/ingestion/mechanical/*`). L'api la semina al boot come chiave `admin` |
@@ -837,9 +838,9 @@ obbligatorio su Linux/prod).
 
 ### 6.5 Avvio & migrazioni
 
-`start.sh` (root) gate: `MERLT_ENABLED` (default false) accende il sidecar. `MERLT_API_IN_DOCKER`
-(default `true`) sceglie l'api in container (`--profile api-in-docker`) e implica
-`MERLT_COMPOSE_ENABLED=true`. Con `false` parte la modalità sviluppatore: uvicorn locale con
+`start.sh` (root) gate: `MERLT_ENABLED` (default false) accende il sidecar. Gli archivi
+(postgres, redis, falkordb, qdrant) partono sempre. `MERLT_API_IN_DOCKER` (default `true`)
+sceglie api e worker in container (`--profile merlt`). Con `false` parte la modalità sviluppatore: uvicorn locale con
 hot-reload più un worker RQ locale sulle tre code, senza mcp-legal-it. Il runbook è in
 `integration.md`. Ordine deps: api/worker attendono
 postgres+redis+falkordb+qdrant *healthy*.
@@ -859,8 +860,8 @@ e, soprattutto, **il BFF Node**, che autentica via JWT e inietta `user_id`. Rego
 nuovo endpoint sensibile assumendo che `verify_api_key` **non** filtri, e non esporre `:8000`
 direttamente.
 
-**Immagine baked-at-build:** il codice `merlt/` è dentro l'immagine (solo `data/` è volume-montato).
-Modifiche al codice Python richiedono `docker compose --profile api-in-docker build` + recreate — non
+**Immagine baked-at-build:** il codice `services/merlt/` è dentro l'immagine (solo `data/` è volume-montato).
+Modifiche al codice Python richiedono `docker compose -f infra/compose.yml --profile merlt build` + recreate — non
 basta un restart.
 
 ---
@@ -887,7 +888,7 @@ divergenze qui sotto sono recepite e restano come registro.*
    durabile. La nota "future: PostgreSQL" è obsoleta.
 6. **`GET /api/merlt/features` non esiste** (mai implementato): le capability sono derivate client-side
    in `useMerltFeatures.ts`.
-7. **File RLCF aspirazionali** citati in `merlt/CLAUDE.md` (`rlcf/feedback.py`, `training.py`,
+7. **File RLCF aspirazionali** citati in `services/merlt/CLAUDE.md` (`rlcf/feedback.py`, `training.py`,
    `governance.py`) **non esistono**; i file reali sono in Parte 4.2.
 
 > **Raccomandazione:** dopo la validazione di questo blueprint, allineare il CLAUDE.md (o rimandare ad

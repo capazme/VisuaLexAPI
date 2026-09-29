@@ -12,6 +12,8 @@ export const PROTECTED = ['main', 'develop'];
 // migrate dev offers to reset a drifted database, and an agent can accept.
 const MIGRATE = /\bprisma\s+migrate\s+(dev|reset)\b/;
 const FORCE_RESET = /\bprisma\s+db\s+push\b[^;&|]*--force-reset/;
+// The same two through apps/server/package.json's scripts.
+const MIGRATE_SCRIPT = /\b(npm|pnpm|yarn|bun)\b[^;&|]*\bprisma:(migrate|reset)\b/;
 
 function segments(command) {
   return command.split(/&&|\|\||;|\||\n/).map((s) => s.trim()).filter(Boolean);
@@ -46,7 +48,7 @@ function pushTargets(args, branch) {
 
 export function decide(command, branchOf) {
   for (const segment of segments(command)) {
-    if (MIGRATE.test(segment) || FORCE_RESET.test(segment)) {
+    if (MIGRATE.test(segment) || FORCE_RESET.test(segment) || MIGRATE_SCRIPT.test(segment)) {
       return 'prisma migrate dev/reset and db push --force-reset can wipe the development database. '
         + 'Write the migration by hand and apply it with `npx prisma migrate deploy` (apps/server/CLAUDE.md).';
     }

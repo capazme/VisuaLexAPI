@@ -3,8 +3,8 @@
 > **Intelligent Legal Visualization and Research**
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -23,61 +23,21 @@ VisuaLex is an advanced web application designed to research, visualize, and stu
 | **[Frontend Setup](docs/frontend/setup.md)** | Installation & development |
 | **[Component Library](docs/frontend/component_library.md)** | Reusable UI components |
 | **[User Guide](docs/user_guide.md)** | End-user documentation |
-| **[Deployment](docs/deployment.md)** | How `deploy.sh` works, pre-deploy checklist, env vars |
-| **[Git workflow](docs/git-workflow.md)** | Branches, release tags, how the experiment branch absorbs `main`, the monthly sweep |
+| **[Setup](docs/setup.md)** | From clone to a running stack and green suites |
+| **[Git workflow](docs/git-workflow.md)** | `develop` and `main`, pull requests, code owners, releases, hotfixes |
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-- **Python 3.10+**
-- **Node.js 18+**
-- **PostgreSQL** (for user data)
-
-### Installation
-
 ```bash
-# 1. Clone and setup Python API
-cd VisuaLexAPI
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-playwright install chromium  # Required for PDF export
-
-# 2. Setup Node.js Backend
-cd backend
-npm install
-cp .env.example .env        # Configure DATABASE_URL and JWT_SECRET
-npm run prisma:generate
-npm run prisma:migrate
-
-# 3. Setup Frontend
-cd ../frontend
-npm install
-```
-
-### Running
-
-```bash
-# Option 1: Use start script (recommended)
+git clone --recurse-submodules https://github.com/capazme/VisuaLexAPI.git
+cd VisuaLexAPI && git switch develop
 ./start.sh
-
-# Option 2: Manual (3 terminals)
-# Terminal 1: Python API
-source .venv/bin/activate && python app.py      # :5000
-
-# Terminal 2: Node.js Backend
-cd backend && npm run dev                        # :3001
-
-# Terminal 3: Frontend
-cd frontend && npm run dev                       # :5173
 ```
 
-**Access the application at:** http://localhost:5173
-
----
+The one-time setup (Docker, Node, Python, the `.env` files) is in
+[docs/setup.md](docs/setup.md).
 
 ## Core Features
 
@@ -92,45 +52,25 @@ cd frontend && npm run dev                       # :5173
 
 ## Project Structure
 
-```
-VisuaLexAPI/
-├── app.py                    # Python API entry point (Quart)
-├── visualex_api/             # Python API source
-│   ├── services/             # Scrapers (Normattiva, EUR-Lex, Brocardi)
-│   └── tools/                # Utilities (URN, parsing, config)
-├── backend/                  # Node.js platform backend
-│   ├── prisma/               # Database schema
-│   └── src/                  # Express routes, controllers
-├── frontend/                 # React SPA (Vite + TypeScript)
-│   └── src/
-│       ├── components/       # UI & feature components
-│       ├── store/            # Zustand state management
-│       └── services/         # API clients
-├── docs/                     # Documentation
-└── data/                     # Local data storage
-```
+| Path | What |
+|---|---|
+| `apps/web/` | React + Vite web app |
+| `apps/server/` | Express + Prisma: accounts, dossiers, community |
+| `services/visualex/` | Python API (Quart): Normattiva, EUR-Lex, Brocardi |
+| `services/merlt/` | MERL-T knowledge graph and RLCF (Apache-2.0) |
+| `tools/` | archive CLI, end-to-end harness |
+| `infra/` | Docker Compose stack |
+| `scripts/` | data backup and restore |
+| `docs/` | documentation — start from [docs/README.md](docs/README.md) |
 
----
+## Releases
 
-## Deployment
-
-Production ships through one script, run **on the server**:
-
-```bash
-./deploy.sh --patch
-```
-
-It pulls, installs, syncs the Playwright browser, regenerates the Prisma client,
-applies pending migrations, builds both apps and restarts the services. It does
-**not** run any test — see **[Deployment](docs/deployment.md)** for the
-pre-deploy checklist, the environment variables, and the rule that the server
-must be checked out on `main` (never on the `visualex-merlt-main` experiment).
-
----
+There is no public deployment at the moment. Releases are tags on `main`;
+day-to-day work goes to `develop` — see [docs/git-workflow.md](docs/git-workflow.md).
 
 ## Troubleshooting
 
-- **"Playwright: no such driver"**: Run `playwright install chromium`
+- **"Playwright: no such driver"**: Run `services/visualex/.venv/bin/playwright install chromium`
 - **PDF Export Fails**: Ensure Chromium is installed via Playwright
 - **CORS Errors**: Check that all services are running on correct ports
 

@@ -21,7 +21,7 @@ Lo Slice 1 attua l'integrazione VisuaLex ↔ MERL-T ↔ RLCF chiudendo il loop d
 **Reference docs**:
 - Design: `./design.md`
 - Execution plan: `~/.claude/plans/cozy-stargazing-parnas.md`
-- Reference ALIS_CORE: `/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt/docs/PIANO_DEFINITIVO_INTEGRAZIONE.md`
+- Reference ALIS_CORE: `../ALIS_CORE/merlt/docs/PIANO_DEFINITIVO_INTEGRAZIONE.md`
 
 **Key Metrics:**
 - Total Stories: 12
@@ -107,7 +107,7 @@ voglio un comando unico che avvii VisuaLex+MERL-T con tutte le dipendenze
 così che posso iterare sull'integrazione senza setup manuale ricorrente.
 
 **Acceptance Criteria:**
-- [ ] `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/merlt/` esiste come copia integrale di `/Users/gpuzio/Desktop/CODE/ALIS_CORE/merlt/`
+- [ ] `./merlt/` esiste come copia integrale di `../ALIS_CORE/merlt/`
 - [ ] Tag git `merlt-baseline-from-alis-core` creato sul commit di import
 - [ ] `docker-compose.merlt.yml` esteso con: `merlt-api`, `falkordb`, `qdrant`, `redis-merlt`, `postgres-merlt` (5 servizi)
 - [ ] Healthcheck definito per ogni servizio
