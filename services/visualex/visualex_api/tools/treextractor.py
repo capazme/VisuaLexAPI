@@ -8,13 +8,13 @@ from aiocache.serializers import JsonSerializer
 from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
+from .logging_config import log_handlers
 from ..services.akn_parser import normalize_article_key
 
 # Configurazione del logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
-                    handlers=[logging.FileHandler("norma.log"),
-                              logging.StreamHandler()])
+                    handlers=log_handlers("norma.log"))
 
 # Persistent cache for tree structures (survives restarts)
 _tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours

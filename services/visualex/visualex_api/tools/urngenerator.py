@@ -2,6 +2,7 @@ import re
 import logging
 import asyncio
 from .config import MAX_CACHE_SIZE
+from .logging_config import log_handlers
 from .text_op import normalize_act_type, parse_date, estrai_data_da_denominazione
 from .map import EURLEX, codice_urn
 from .sys_op import get_playwright_manager
@@ -10,8 +11,7 @@ from ..services.eurlex_scraper import EurlexScraper
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
-                    handlers=[logging.FileHandler("norma.log"),
-                              logging.StreamHandler()])
+                    handlers=log_handlers("norma.log"))
 
 # Cache for completed dates (since we can't use lru_cache with async)
 _date_cache: dict[tuple, str] = {}

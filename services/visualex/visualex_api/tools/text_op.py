@@ -2,6 +2,7 @@ import re
 import datetime
 import asyncio
 from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
+from .logging_config import log_handlers
 from .treextractor import get_tree
 import logging
 
@@ -19,8 +20,7 @@ _BROCARDI_SEARCH_LOWER = {_k.lower(): _v for _k, _v in BROCARDI_SEARCH.items()}
 # Configure logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
-                    handlers=[logging.FileHandler("norma.log"),
-                              logging.StreamHandler()])
+                    handlers=log_handlers("norma.log"))
 
 # The single-article grammar, matched AFTER the range test so "473-bis.1" is
 # one article and "3-5" a range. Normattiva's own index lists every one of

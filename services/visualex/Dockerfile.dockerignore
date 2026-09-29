@@ -1,0 +1,15 @@
+# The build context is the repository root and almost none of it is needed:
+# keep only what the image copies. BuildKit reads this file, not a root one.
+*
+!version.txt
+!services/visualex
+
+# Inside services/visualex, none of this belongs in an image.
+services/visualex/.venv
+services/visualex/tests
+services/visualex/data
+services/visualex/download
+**/__pycache__
+**/*.pyc
+**/*.log
+**/.env*
