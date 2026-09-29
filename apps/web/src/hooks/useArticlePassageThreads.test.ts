@@ -75,25 +75,82 @@ describe('useArticlePassageThreads', () => {
     expect(articleDiscussionService.listPassages).not.toHaveBeenCalled();
   });
 
-  it('on a rejected request, returns [] and logs with console.warn', async () => {
+  it('distinguishes a failed passage request from an empty result and retries successfully', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const error = new Error('Network error');
-    vi.mocked(articleDiscussionService.listPassages).mockRejectedValue(error);
+    vi.mocked(articleDiscussionService.listPassages)
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(dummyThreads);
 
     const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
 
     await waitFor(() => {
-      expect(warnSpy).toHaveBeenCalledWith(
-        '[useArticlePassageThreads] could not load the passage discussions',
-        { normaKey: 'k1', articleId: 'art1', error },
-      );
+      expect(result.current.error).toBe(true);
+    });
+    expect(result.current.threads).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[useArticlePassageThreads] could not load the passage discussions',
+      { normaKey: 'k1', articleId: 'art1', error },
+    );
+
+    act(() => result.current.reload());
+    await waitFor(() => {
+      expect(result.current.error).toBe(false);
+      expect(result.current.threads).toEqual([]);
     });
 
-    expect(result.current.threads).toEqual([]);
+    act(() => result.current.reload());
+    await waitFor(() => {
+      expect(result.current.error).toBe(false);
+      expect(result.current.threads).toEqual(dummyThreads);
+    });
+    expect(articleDiscussionService.listPassages).toHaveBeenCalledTimes(3);
     warnSpy.mockRestore();
   });
 
-  it('after the key changes, the old key\'s threads are not returned', async () => {
+  it('returns an empty list without an error when the request succeeds with no discussions', async () => {
+    vi.mocked(articleDiscussionService.listPassages).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.threads).toEqual([]);
+    expect(result.current.error).toBe(false);
+  });
+
+  it('clears a previous error while retrying', async () => {
+    vi.mocked(articleDiscussionService.listPassages)
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(dummyThreads);
+
+    const { result } = renderHook(() => useArticlePassageThreads('k1', 'art1'));
+
+    await waitFor(() => expect(result.current.error).toBe(true));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.isLoading).toBe(true));
+    expect(result.current.error).toBe(false);
+    await waitFor(() => expect(result.current.threads).toEqual(dummyThreads));
+  });
+
+  it('does not expose a previous key\'s error on a new article key', async () => {
+    vi.mocked(articleDiscussionService.listPassages)
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce(dummyThreads);
+
+    const { result, rerender } = renderHook(
+      ({ key }: { key: string }) => useArticlePassageThreads(key, 'art1'),
+      { initialProps: { key: 'k1' } },
+    );
+    await waitFor(() => expect(result.current.error).toBe(true));
+
+    rerender({ key: 'k2' });
+    expect(result.current.error).toBe(false);
+    expect(result.current.isLoading).toBe(true);
+    await waitFor(() => expect(result.current.threads).toEqual(dummyThreads));
+  });
+
+  it('after the key changes, the old key\'s threads and error are not returned', async () => {
     let resolveFirst: (v: ArticleDiscussionPassageSummary[]) => void;
     const firstPromise = new Promise<ArticleDiscussionPassageSummary[]>((res) => {
       resolveFirst = res;
@@ -115,7 +172,7 @@ describe('useArticlePassageThreads', () => {
       { initialProps: { k: 'k1', a: 'art1' } },
     );
 
-    // Initial state is []
+    // Initial state is [] and the request starts in the effect.
     expect(result.current.threads).toEqual([]);
 
     // Key changes immediately before k1 resolves
@@ -123,6 +180,8 @@ describe('useArticlePassageThreads', () => {
 
     // Must be [] while k2 is loading, even if k1 resolved later
     expect(result.current.threads).toEqual([]);
+    expect(result.current.error).toBe(false);
+    expect(result.current.isLoading).toBe(true);
 
     await waitFor(() => {
       expect(result.current.threads).toHaveLength(1);

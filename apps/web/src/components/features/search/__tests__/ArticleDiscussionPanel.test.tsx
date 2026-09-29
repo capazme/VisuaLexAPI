@@ -30,10 +30,10 @@ describe('ArticleDiscussionPanel', () => {
     textHash: 'hash-1',
     voteCount: 3,
     userVoted: false,
+    isOwner: false,
     createdAt: '2026-09-28T10:00:00Z',
     updatedAt: '2026-09-28T10:00:00Z',
     user: { id: 'u1', username: 'marta' },
-    isOwner: false,
     comments: [],
   };
 
@@ -56,10 +56,10 @@ describe('ArticleDiscussionPanel', () => {
     textHash: 'hash-orig',
     voteCount: 1,
     userVoted: false,
+    isOwner: false,
     createdAt: '2026-09-28T11:00:00Z',
     updatedAt: '2026-09-28T11:00:00Z',
     user: { id: 'u2', username: 'luca' },
-    isOwner: false,
     comments: [],
   };
 
@@ -183,6 +183,45 @@ describe('ArticleDiscussionPanel', () => {
     expect(onDraftConsumed).toHaveBeenCalled();
     expect(onThreadCreated).toHaveBeenCalledWith(createdPassageThread);
     expect(onFocusThread).toHaveBeenCalledWith('thread-created-draft');
+  });
+
+  it('shows passage-load failure separately from an empty discussion result and allows retry', async () => {
+    const onRetryPassageLoad = vi.fn();
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, pages: 0 },
+    });
+
+    const { rerender } = render(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        passageLoadError={true}
+        onRetryPassageLoad={onRetryPassageLoad}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Impossibile caricare le discussioni sui passaggi.'));
+    expect(screen.queryByText(/Nessuna discussione ancora\./)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /riprova/i }));
+    expect(onRetryPassageLoad).toHaveBeenCalledOnce();
+
+    vi.mocked(articleDiscussionService.list).mockResolvedValue({
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, pages: 0 },
+    });
+    rerender(
+      <ArticleDiscussionPanel
+        anchor={dummyAnchor}
+        isOpen={true}
+        onClose={vi.fn()}
+        passageLoadError={false}
+      />
+    );
+    await waitFor(() => expect(screen.getByText(/Nessuna discussione ancora\./)).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Le discussioni non sono disponibili/)).not.toBeInTheDocument();
   });
 
   it('a "detached" state shows "Il passo discusso non si trova nel testo che stai leggendo." and the quotation, and the discussion stays listed', async () => {

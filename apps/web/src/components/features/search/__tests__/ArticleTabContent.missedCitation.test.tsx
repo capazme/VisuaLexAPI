@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData } from '../../../../types';
 
 const features = vi.fn();
 vi.mock('../../../../features/merlt/useMerltFeatures', () => ({ useMerltFeatures: () => features() }));
+
+const passageThreadState = vi.fn();
+vi.mock('../../../../hooks/useArticlePassageThreads', () => ({
+  useArticlePassageThreads: () => passageThreadState(),
+}));
 
 const sendNerFeedback = vi.fn();
 vi.mock('../../../../services/merltService', async (importOriginal) => ({
@@ -70,6 +75,7 @@ async function selectNeedle() {
 }
 
 beforeEach(() => {
+  passageThreadState.mockReturnValue({ threads: [], error: null, reload: vi.fn() });
   sendNerFeedback.mockReset().mockResolvedValue({ received: true, feedback_id: 'f1', sample_weight: 1 });
   // The per-article loaders hit the backend; the flow under test does not need them.
   appStore.setState({ loadAnnotationsForArticle: vi.fn(), loadHighlightsForArticle: vi.fn() });
@@ -79,6 +85,21 @@ beforeEach(() => {
 afterEach(() => {
   Range.prototype.getBoundingClientRect = originalRect;
   window.getSelection()?.removeAllRanges();
+});
+
+describe('ArticleTabContent: passage discussion loading', () => {
+  it('shows a recoverable error for a failed passage load and invokes retry', async () => {
+    const reload = vi.fn();
+    passageThreadState.mockReturnValue({ threads: [], error: true, reload });
+    features.mockReturnValue({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true });
+
+    renderArticle();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Impossibile caricare le discussioni sui passaggi.');
+    fireEvent.click(within(alert).getByRole('button', { name: /riprova/i }));
+    expect(reload).toHaveBeenCalledOnce();
+  });
 });
 
 describe('ArticleTabContent: "Segnala come citazione" (NER missed, Loop β #2)', () => {

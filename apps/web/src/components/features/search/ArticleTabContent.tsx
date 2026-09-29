@@ -183,8 +183,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         version: norma_data.versione || norma_data.data_versione,
     }), [itemKey, uniqueArticleId, norma_data.numero_articolo, norma_data.versione, norma_data.data_versione]);
 
-    const { threads: passageThreads, reload: reloadPassageThreads } =
-        useArticlePassageThreads(discussionAnchor.normaKey, discussionAnchor.articleId, Boolean(article_text));
+    const {
+        threads: passageThreads,
+        isLoading: passageThreadsLoading,
+        error: passageThreadsError,
+        reload: reloadPassageThreads,
+    } = useArticlePassageThreads(discussionAnchor.normaKey, discussionAnchor.articleId, Boolean(article_text));
     const plainArticle = useMemo(() => plainText(article_text || ''), [article_text]);
     const passageLocations = useMemo(
         () => new Map(passageThreads.map((t) => [t.id, locatePassage(plainArticle, t.passage)])),
@@ -955,6 +959,24 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 updatesOpen={updatesOpen}
             />
 
+            {!discussionOpen && passageThreadsError && (
+                <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+                    <span>Impossibile caricare le discussioni sui passaggi. I segni potrebbero non mostrarle.</span>
+                    <button
+                        type="button"
+                        onClick={reloadPassageThreads}
+                        className="font-semibold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                        Riprova
+                    </button>
+                </div>
+            )}
+            {!discussionOpen && passageThreadsLoading && (
+                <p role="status" className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                    Aggiornamento discussioni sui passaggi…
+                </p>
+            )}
+
             <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
 
             {openNote && structure.notes[openNote.id] && (
@@ -992,6 +1014,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isOpen={discussionOpen}
                 articleUrn={norma_data.urn}
                 textHash={textHash}
+                passageLoadError={passageThreadsError}
+                passageThreadsLoading={passageThreadsLoading}
+                onRetryPassageLoad={reloadPassageThreads}
                 passageStates={Object.fromEntries(
                     Array.from(passageLocations.entries()).map(([id, loc]) => [id, loc.state])
                 )}
