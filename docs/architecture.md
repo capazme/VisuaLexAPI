@@ -147,13 +147,13 @@ Retrieves and processes legal texts from external sources.
 
 ## MERL-T Sidecar (Optional Subsystem)
 
-When `MERLT_ENABLED=true`, VisuaLex runs an additional **MERL-T** stack (`docker-compose.merlt.yml`) — a legal knowledge-graph + RLCF subsystem whose Python is source-vendored in `merlt/` (a selective copy of upstream `ALIS_CORE/merlt`).
+When `MERLT_ENABLED=true`, VisuaLex runs an additional **MERL-T** stack (`infra/compose.yml`) — a legal knowledge-graph + RLCF subsystem whose Python is source-vendored in `services/merlt/` (a selective copy of upstream `ALIS_CORE/merlt`).
 
 ```mermaid
 graph LR
     FE[Frontend] -->|/api/merlt/*| BFF[Node BFF :3001]
     BFF -->|proxy, X-API-Key, user_id| API[merlt-api :8000]
-    API --> PG[(merlt-postgres)]
+    API --> PG[(postgres: merlt DB)]
     API --> FK[(FalkorDB)]
     API --> QD[(Qdrant)]
     API --> RD[(Redis: cache + RQ)]
@@ -168,8 +168,8 @@ graph LR
 
 - **Boundary rule:** the browser never calls `:8000` directly. The Node BFF proxies all MERL-T traffic under `/api/merlt/*` and is the trust boundary: MERL-T makes its API key optional, so only `require_role("admin")` routes check it.
 - **Services (7):**
-  - Always on: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`.
-  - Under the `api-in-docker` profile, which is the `start.sh` default: `mcp-legal-it` (a git submodule at `vendor/mcp-legal-it`), `merlt-api` (FastAPI :8000) and `merlt-worker` (RQ on `merlt_ingest`, `merlt_extract`, `merlt_ner_train`).
+  - Always on: `postgres` (the `visualex_platform`, `visualex_test` and `merlt` databases), `redis`, `falkordb`, `qdrant`.
+  - Under the `merlt` profile, started by `start.sh` when `MERLT_ENABLED=true`: `mcp-legal-it` (a git submodule at `vendor/mcp-legal-it`), `merlt-api` (FastAPI :8000) and `merlt-worker` (RQ on `merlt_ingest`, `merlt_extract`, `merlt_ner_train`).
   - The containers reach the host BFF and Python API through `host.docker.internal`.
 - **Status:**
   - The community **graph-enrichment loop** (contribute → vote → consensus → graph) is closed end to end.
@@ -418,13 +418,13 @@ Or manually:
 
 ```bash
 # Terminal 1: Python API
-source .venv/bin/activate && python app.py
+cd services/visualex && source .venv/bin/activate && python app.py
 
 # Terminal 2: Node.js Backend
-cd backend && npm run dev
+cd apps/server && npm run dev
 
 # Terminal 3: Frontend
-cd frontend && npm run dev
+cd apps/web && npm run dev
 ```
 
 ### Development Proxies
@@ -446,10 +446,10 @@ Vite proxies API requests during development:
 
 ```bash
 # Frontend
-cd frontend && npm run build  # Creates dist/
+cd apps/web && npm run build  # Creates dist/
 
 # Node.js Backend
-cd backend && npm run build   # Compiles to dist/
+cd apps/server && npm run build   # Compiles to dist/
 
 # Python API
 # Run with gunicorn or hypercorn for production

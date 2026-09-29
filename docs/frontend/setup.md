@@ -16,7 +16,7 @@ The frontend is a modern React 19 Single Page Application built with TypeScript 
 ## Installation
 
 ```bash
-cd frontend
+cd apps/web
 npm install
 ```
 
@@ -94,7 +94,7 @@ See `vite.config.ts` for the complete proxy configuration.
 ## Project Structure
 
 ```
-frontend/src/
+apps/web/src/
 ├── App.tsx                    # Main app with routing
 ├── main.tsx                   # Entry point
 │

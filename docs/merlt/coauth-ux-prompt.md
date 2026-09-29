@@ -44,20 +44,20 @@ Non sono **organiche** col tono del progetto. Vanno scartate e ripensate.
 Leggi (read-only, niente modifiche) il tono attuale di VisuaLex per capire
 come parla all'avvocato. Sono i tuoi riferimenti, NON le pagine MERL-T:
 
-- `frontend/src/components/features/search/` — come si presenta una norma
+- `apps/web/src/components/features/search/` — come si presenta una norma
   (NormaCard, NormaBlockComponent, ArticleTabContent)
-- `frontend/src/components/features/dossier/` — collezione personale
+- `apps/web/src/components/features/dossier/` — collezione personale
   (DossierDetailView, SortableDossierItem, lo "status stripe" di 4px sul
   lato sinistro come signal discreto di stato)
-- `frontend/src/components/features/environments/` — preset personali con
+- `apps/web/src/components/features/environments/` — preset personali con
   stripe di categoria e chip "stale/fresh"
-- `frontend/src/components/features/bulletin/` (Forum) — l'unica superficie
+- `apps/web/src/components/features/bulletin/` (Forum) — l'unica superficie
   community esistente: studia come comunica "condiviso", "autore",
   "versione", "preso da @x"
-- `frontend/src/components/ui/` — componenti base (Button, ConfirmDialog,
+- `apps/web/src/components/ui/` — componenti base (Button, ConfirmDialog,
   Toast, EmptyState, AttributionChip — quest'ultima molto rilevante)
-- Le pagine MERL-T attuali: `frontend/src/features/merlt/{graph,contrib,validate}/`
-  e `frontend/src/pages/MerltHubPage.tsx`
+- Le pagine MERL-T attuali: `apps/web/src/features/merlt/{graph,contrib,validate}/`
+  e `apps/web/src/pages/MerltHubPage.tsx`
 - `CLAUDE.md` del repo (sezioni "Forum suggestions rework" e "Dossier" per
   capire i pattern già stabilizzati)
 

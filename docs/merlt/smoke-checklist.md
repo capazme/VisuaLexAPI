@@ -2,7 +2,7 @@
 
 **Scope:** verifica manuale end-to-end di ogni superficie MERL-T (Slice 1 → Slice 4, Loop β, NER, ops, ingestion).
 **Quando:** dopo ogni modifica che tocca una superficie, e prima di dichiarare «fatto» un lavoro MERL-T.
-**Ambiente:** dev locale (VisuaLex più il sidecar MERL-T in Docker, modalità `api-in-docker`).
+**Ambiente:** dev locale (VisuaLex più il sidecar MERL-T in Docker, profilo Compose `merlt`).
 
 Questa è la copia canonica. `docs/merlt-smoke-checklist.md` è solo un puntatore. Il runbook di avvio è [integration.md](./integration.md); le route con guard e flag sono in [contract-matrix.md](./contract-matrix.md).
 
@@ -12,28 +12,31 @@ Salva log e screenshot di ogni esecuzione in `docs/smoke-evidence/YYYY-MM-DD-mer
 
 ## Setup (una volta per sessione)
 
-1. **Reset di MERL-T (clean slate, opzionale).** Distrugge anche grafo, vettori e checkpoint.
-   ```bash
-   docker compose -f docker-compose.merlt.yml --profile api-in-docker down -v
-   ```
+1. **Da zero (opzionale): mai `down -v` sullo stack di sviluppo.** Lo stack è uno
+   solo e il suo Postgres contiene anche utenti, dossier, note ed evidenziazioni:
+   `down -v` li cancellerebbe. Per una prova da zero usa un secondo checkout con
+   il suo `infra/.env` (un altro `VISUALEX_STACK` e altre porte, vedi
+   `docs/setup.md`, «Two stacks on one machine»). Per riportare lo stack di
+   sviluppo a un punto noto si ripristina un backup (`scripts/restore.sh`, vedi
+   `scripts/datakit/README.md`).
 
-2. **Avvia lo stack.** `api-in-docker` è il default. Al primo avvio alza il gate: build delle immagini e seed richiedono minuti.
+2. **Avvia lo stack.** MERL-T in Docker è il default (`MERLT_API_IN_DOCKER=true`). Al primo avvio alza il gate: build delle immagini e seed richiedono minuti.
    ```bash
    MERLT_ENABLED=true ./start.sh
    # primo avvio: MERLT_ENABLED=true MERLT_HEALTH_TIMEOUT=600 ./start.sh
    ```
    Righe attese nel log:
-   - `[1/3] Starting VisuaLex API (port 5000)…`
-   - `[2/3] Starting Platform Backend (port 3001)…`
-   - `[3/3] Starting Frontend (port 5173)…`
-   - `[4/4] Starting MERLT stack (deps + API in Docker)…`
-   - `MERLT /health OK after Ns`
+   - `[1/4] Data stores...`
+   - `[2/4] Python API (:5000)...`
+   - `[3/4] Server (:3001)...`
+   - `[4/4] Web (:5173)...`
+   - `MERL-T in Docker...`, poi `Waiting for MERL-T /health (up to 60s)...` senza `MERL-T not healthy`
 
    Non deve comparire `merlt-worker is not running`.
 
 3. **Container su.**
    ```bash
-   docker compose -f docker-compose.merlt.yml --profile api-in-docker ps
+   docker compose -f infra/compose.yml --profile merlt ps
    docker inspect visualex-merlt-worker --format '{{join .Config.Cmd " "}}'
    ```
    I 7 servizi devono essere `running`, e healthy dove c'è un healthcheck. Il comando del worker contiene `merlt_ingest merlt_extract merlt_ner_train`.
@@ -77,7 +80,7 @@ Salva log e screenshot di ogni esecuzione in `docs/smoke-evidence/YYYY-MM-DD-mer
 
 ### 3. Verifica la riga in MERL-T
 ```bash
-docker exec -it visualex-merlt-postgres \
+docker exec -it visualex-postgres \
   psql -U merlt -d merlt \
   -c "SELECT event_type, user_id, payload->>'article_urn' AS article_urn,
              payload->>'dwell_ms' AS dwell_ms, payload->>'scroll_max_pct' AS scroll_pct, created_at
@@ -101,7 +104,7 @@ docker stop visualex-merlt-api
 ```
 Con il consenso attivo, riapri l'articolo: la UI non si blocca. Poi controlla il log dead-letter:
 ```bash
-tail backend/logs/merlt-dead-letter.jsonl
+tail apps/server/logs/merlt-dead-letter.jsonl
 ```
 Atteso: una riga con `event: "article-viewed"` e un `error` di rete o di timeout.
 ```bash
@@ -109,7 +112,7 @@ docker start visualex-merlt-api
 ```
 
 ### 6. Feature flag FE
-In `frontend/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app funziona normalmente e il browser non fa nessuna chiamata a `/api/merlt/*`. Poi ripristina.
+In `apps/web/.env` metti `VITE_FEATURE_MERLT=false` e riavvia il frontend. L'app funziona normalmente e il browser non fa nessuna chiamata a `/api/merlt/*`. Poi ripristina.
 
 ---
 
@@ -336,7 +339,7 @@ La Q&A vive su `/grafo`; `/merlt/chiedi` e `/merlt/qa` reindirizzano lì. **Per 
 # Ops e ingestion (admin)
 
 ## Training RLCF
-- [ ] **Prerequisito:** `MERLT_API_KEY` impostata in `backend/.env` e ricreazione di merlt-api, così la chiave viene seminata come `admin`. Nel log compare `Admin API key seeded from environment`, oppure la chiave era già presente.
+- [ ] **Prerequisito:** `MERLT_API_KEY` impostata in `apps/server/.env` e ricreazione di merlt-api, così la chiave viene seminata come `admin`. Nel log compare `Admin API key seeded from environment`, oppure la chiave era già presente.
 - [ ] Card «Ops (admin)» → avvio del training → `POST /api/merlt/ops/rlcf/training/start` → 202 `{success, training_id?, message, config?}`. Con il buffer insufficiente risponde `{success:false, message:"Buffer insufficiente (N/…)"}`, ed è atteso: la soglia minima è 50 esperienze.
 - [ ] Il buffer sopravvive a un recreate di merlt-api: sta in `/app/checkpoints/rlcf/replay_buffer.json` e, se manca, viene reidratato al boot da `qa_feedback`.
 - [ ] Chiave assente o sbagliata → 503 `merlt_auth_misconfigured`, non «non raggiungibile».
@@ -370,8 +373,8 @@ La Q&A vive su `/grafo`; `/merlt/chiedi` e `/merlt/qa` reindirizzano lì. **Per 
 | MERL-T 503 all'avvio del container | mancano `ENRICHMENT_DB_*` / `RLCF_DATABASE_URL` | Commit `1fdb3d5`; oggi sono tutti nel file compose |
 | Timeout del gate di `start.sh` | primo boot lento (build, seed, caricamento modelli) | `MERLT_HEALTH_TIMEOUT=600` |
 | Job «in corso» fino al timeout | callback rifiutata (500 `internal_auth_not_configured` o 401), worker fermo, sotto-flag spento | Allinea `MERLT_INTERNAL_SECRET` fra BFF e compose; controlla `docker compose ... ps`; nel log del worker cerca `BFF callback refused` |
-| Ops → 503 `merlt_auth_misconfigured` | `MERLT_API_KEY` vuota o diversa dalla chiave seminata | Imposta la chiave in `backend/.env`, poi ricrea merlt-api (la seed usa `MERLT_ADMIN_API_KEY`) |
+| Ops → 503 `merlt_auth_misconfigured` | `MERLT_API_KEY` vuota o diversa dalla chiave seminata | Imposta la chiave in `apps/server/.env`, poi ricrea merlt-api (la seed usa `MERLT_ADMIN_API_KEY`) |
 | Il training NER resta `queued` | il worker non ascolta `merlt_ner_train` | Controlla il `command` del worker, poi `docker compose ... up -d --no-deps --force-recreate merlt-worker` |
-| Nodi ingeriti o co-evoluti spariti dopo un recreate | volume FalkorDB montato fuori da `/var/lib/falkordb/data` | Il compose attuale monta lì e salva con `--appendonly yes`. Verifica con `docker inspect visualex-merlt-falkordb` |
+| Nodi ingeriti o co-evoluti spariti dopo un recreate | volume FalkorDB montato fuori da `/var/lib/falkordb/data` | Il compose attuale monta lì e salva con `--appendonly yes`. Verifica con `docker inspect visualex-falkordb` |
 | Il training RLCF risponde sempre `Buffer insufficiente` | buffer sotto soglia (minimo 50) | Atteso finché non si raccolgono abbastanza feedback |
 | Il frontend chiama `/api/merlt/features` | dipendenza legacy | Risolto in Slice 2b: il gating è derivato lato client in `useMerltFeatures`, l'endpoint non esiste |
