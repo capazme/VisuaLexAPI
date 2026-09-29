@@ -61,7 +61,13 @@ trap cleanup EXIT
 
 check_port() {
     if lsof -Pi :"$1" -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${RED}Port $1 in use${NC} - run: ${YELLOW}kill \$(lsof -t -i:$1)${NC}"
+        holder="$(lsof -Pi :"$1" -sTCP:LISTEN -Fc 2>/dev/null | sed -n 's/^c//p' | head -1)"
+        if [ "$holder" = "ControlCenter" ]; then
+            # Killing it is useless: macOS starts it again at once.
+            echo -e "${RED}Port $1 is held by macOS's AirPlay Receiver${NC} - turn it off: System Settings → General → AirDrop & Handoff → AirPlay Receiver"
+        else
+            echo -e "${RED}Port $1 in use${NC} (${holder:-unknown}) - run: ${YELLOW}kill \$(lsof -t -i:$1)${NC}"
+        fi
         return 1
     fi
 }
@@ -113,7 +119,8 @@ echo -e "\n${YELLOW}[3/4] Server (:3001)...${NC}"
 cd "$PROJECT_ROOT/apps/server"
 npx prisma generate > /dev/null 2>&1 || echo -e "${YELLOW}prisma generate failed${NC}"
 npx prisma migrate deploy || echo -e "${YELLOW}prisma migrate deploy failed - does DATABASE_URL in apps/server/.env point at port ${VISUALEX_PG_PORT:-5436}?${NC}"
-if [ -n "${ADMIN_PASSWORD:-}" ]; then npm run db:seed || echo -e "${YELLOW}db:seed failed${NC}"; fi
+# The seed reads ADMIN_PASSWORD from apps/server/.env itself; the shell may override it.
+if [ -n "${ADMIN_PASSWORD:-$(server_env ADMIN_PASSWORD)}" ]; then npm run db:seed || echo -e "${YELLOW}db:seed failed${NC}"; fi
 npm run dev &
 SERVER_PID=$!
 

@@ -25,6 +25,11 @@ const denied = [
   ['npx prisma migrate dev --name add_x', on('feat/x')],
   ['cd apps/server && npx prisma migrate reset --force', on('feat/x')],
   ['npx prisma db push --force-reset', on('feat/x')],
+  // apps/server/package.json names them prisma:migrate (migrate dev) and prisma:reset.
+  ['npm run prisma:migrate', on('feat/x')],
+  ['npm --prefix apps/server run prisma:reset', on('feat/x')],
+  ['cd apps/server && pnpm run prisma:migrate', on('feat/x')],
+  ['yarn prisma:reset', on('feat/x')],
 ];
 
 const allowed = [
@@ -39,6 +44,8 @@ const allowed = [
   ['npx prisma migrate deploy', on('develop')],
   ['npx prisma migrate status', on('develop')],
   ['npm test', on('develop')],
+  ['npm run prisma:generate', on('develop')],
+  ['npm --prefix apps/server run prisma:studio', on('develop')],
   ['echo "git commit is refused on main"', on('main')],
 ];
 
