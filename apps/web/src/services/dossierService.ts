@@ -111,6 +111,14 @@ export const dossierService = {
     await apiClient.delete(`/dossiers/${dossierId}/items/${itemId}`);
   },
 
+  // Move an item to another dossier. The server moves the row itself, so the id
+  // the store holds stays valid, and the item keeps its added-at date and its
+  // content (the _dossierMeta envelope that carries the star).
+  async moveItem(dossierId: string, itemId: string, targetDossierId: string): Promise<DossierItemApi> {
+    const response = await apiClient.post(`/dossiers/${dossierId}/items/${itemId}/move`, { targetDossierId });
+    return response.data;
+  },
+
   // Reorder dossier items
   async reorderItems(dossierId: string, itemIds: string[]): Promise<void> {
     await apiClient.post(`/dossiers/${dossierId}/reorder`, { itemIds });

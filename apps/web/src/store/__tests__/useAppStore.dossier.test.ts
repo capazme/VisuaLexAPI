@@ -10,6 +10,7 @@ vi.mock('../../services/dossierService', () => ({
         addItem: vi.fn(),
         updateItem: vi.fn(),
         deleteItem: vi.fn(),
+        moveItem: vi.fn(),
         reorderItems: vi.fn(),
     },
 }));
@@ -81,6 +82,11 @@ describe('useAppStore dossier sync', () => {
     });
 
     describe('moveToDossier', () => {
+        // The server moves the row itself: one call per item, no re-creation.
+        // The old addItem+deleteItem pair re-created the row, which handed the
+        // item a fresh server id (so a star or a delete on the moved row 404'd
+        // against the target dossier until a reload) and reset its added-at
+        // date, and left the item in both dossiers whenever the delete failed.
         beforeEach(() => {
             appStore.setState({
                 dossiers: [
@@ -90,6 +96,8 @@ describe('useAppStore dossier sync', () => {
                         createdAt: '2026-06-01T00:00:00.000Z',
                         items: [
                             { id: 'item-1', type: 'note', data: 'appunto', addedAt: '2026-06-01T00:00:00.000Z' },
+                            { id: 'item-2', type: 'note', data: 'secondo', addedAt: '2026-06-01T00:00:00.000Z' },
+                            { id: 'item-3', type: 'note', data: 'terzo', addedAt: '2026-06-01T00:00:00.000Z' },
                         ],
                     },
                     {
@@ -99,42 +107,104 @@ describe('useAppStore dossier sync', () => {
                         items: [],
                     },
                 ],
+                pendingDossierItemIds: {},
             });
         });
 
-        it('moves optimistically and syncs as addItem on target + deleteItem on source', async () => {
-            vi.mocked(dossierService.addItem).mockResolvedValue(serverItem);
-            vi.mocked(dossierService.deleteItem).mockResolvedValue(undefined);
+        it('moves optimistically and syncs with one in-place move, keeping the server id', async () => {
+            vi.mocked(dossierService.moveItem).mockResolvedValue(serverItem);
 
             appStore.getState().moveToDossier('d-src', 'd-dst', ['item-1']);
 
             // Optimistic move is synchronous
             const afterMove = appStore.getState().dossiers;
-            expect(afterMove.find(d => d.id === 'd-src')?.items).toHaveLength(0);
-            expect(afterMove.find(d => d.id === 'd-dst')?.items).toHaveLength(1);
+            expect(afterMove.find(d => d.id === 'd-src')?.items.map(i => i.id)).toEqual(['item-2', 'item-3']);
+            expect(afterMove.find(d => d.id === 'd-dst')?.items.map(i => i.id)).toEqual(['item-1']);
 
             await vi.waitFor(() => {
-                expect(dossierService.addItem).toHaveBeenCalledWith('d-dst', {
-                    itemType: 'note',
-                    title: 'Nota',
-                    content: 'appunto',
-                });
-                expect(dossierService.deleteItem).toHaveBeenCalledWith('d-src', 'item-1');
-                // The moved item carries the fresh server id
-                expect(appStore.getState().dossiers.find(d => d.id === 'd-dst')?.items[0].id).toBe('srv-item-1');
+                expect(dossierService.moveItem).toHaveBeenCalledWith('d-src', 'item-1', 'd-dst');
             });
+            // Same row on the server, so the id the store holds is still valid:
+            // starring or deleting it in the target no longer 404s.
+            expect(appStore.getState().dossiers.find(d => d.id === 'd-dst')?.items[0].id).toBe('item-1');
+            expect(dossierService.addItem).not.toHaveBeenCalled();
+            expect(dossierService.deleteItem).not.toHaveBeenCalled();
             expect(appStore.getState().lastSyncError).toBeNull();
         });
 
-        it('keeps the optimistic move but surfaces a sync error when the server rejects', async () => {
-            vi.mocked(dossierService.addItem).mockRejectedValue(new Error('boom'));
+        it('puts the item back in the source, at its old index, when the server refuses the move', async () => {
+            vi.mocked(dossierService.moveItem).mockRejectedValue(new Error('boom'));
 
-            appStore.getState().moveToDossier('d-src', 'd-dst', ['item-1']);
+            appStore.getState().moveToDossier('d-src', 'd-dst', ['item-2']);
 
             await vi.waitFor(() => {
-                expect(appStore.getState().lastSyncError?.message).toContain('dossier');
+                expect(appStore.getState().lastSyncError?.message).toContain('spostare');
             });
-            expect(dossierService.deleteItem).not.toHaveBeenCalled();
+            // Reverted: the item is really still in the source, so leaving it in
+            // the target would make every later star or delete there 404.
+            const dossiers = appStore.getState().dossiers;
+            expect(dossiers.find(d => d.id === 'd-src')?.items.map(i => i.id)).toEqual(['item-1', 'item-2', 'item-3']);
+            expect(dossiers.find(d => d.id === 'd-dst')?.items).toHaveLength(0);
+        });
+
+        it('reverts only the items the server refused', async () => {
+            vi.mocked(dossierService.moveItem).mockImplementation(async (_source, itemId) => {
+                if (itemId === 'item-3') throw new Error('boom');
+                return serverItem;
+            });
+
+            appStore.getState().moveToDossier('d-src', 'd-dst', ['item-2', 'item-3']);
+
+            await vi.waitFor(() => {
+                expect(appStore.getState().lastSyncError?.message).toContain('spostare');
+            });
+            const dossiers = appStore.getState().dossiers;
+            expect(dossiers.find(d => d.id === 'd-src')?.items.map(i => i.id)).toEqual(['item-1', 'item-3']);
+            expect(dossiers.find(d => d.id === 'd-dst')?.items.map(i => i.id)).toEqual(['item-2']);
+        });
+
+        it('refuses to move an item whose addToDossier POST is still in flight', async () => {
+            appStore.setState((state) => {
+                state.dossiers[0].items = [
+                    ...state.dossiers[0].items,
+                    { id: 'temp-1', type: 'note', data: 'in corso', addedAt: '2026-06-01T00:00:00.000Z' },
+                ];
+                state.pendingDossierItemIds['temp-1'] = true;
+            });
+
+            appStore.getState().moveToDossier('d-src', 'd-dst', ['temp-1']);
+
+            // The server has never seen temp-1: a move call would 404, and
+            // addToDossier's settle handler would then look for the temp id in a
+            // dossier it has already left, leaving the item in both after reload.
+            await Promise.resolve();
+            expect(dossierService.moveItem).not.toHaveBeenCalled();
+            const dossiers = appStore.getState().dossiers;
+            expect(dossiers.find(d => d.id === 'd-src')?.items.map(i => i.id)).toContain('temp-1');
+            expect(dossiers.find(d => d.id === 'd-dst')?.items).toHaveLength(0);
+            expect(appStore.getState().lastSyncError?.message).toContain('ancora salvati');
+        });
+
+        it('moves the settled items and reports the ones still in flight', async () => {
+            vi.mocked(dossierService.moveItem).mockResolvedValue(serverItem);
+            appStore.setState((state) => {
+                state.dossiers[0].items = [
+                    ...state.dossiers[0].items,
+                    { id: 'temp-1', type: 'note', data: 'in corso', addedAt: '2026-06-01T00:00:00.000Z' },
+                ];
+                state.pendingDossierItemIds['temp-1'] = true;
+            });
+
+            appStore.getState().moveToDossier('d-src', 'd-dst', ['item-1', 'temp-1']);
+
+            await vi.waitFor(() => {
+                expect(dossierService.moveItem).toHaveBeenCalledWith('d-src', 'item-1', 'd-dst');
+            });
+            expect(dossierService.moveItem).toHaveBeenCalledTimes(1);
+            const dossiers = appStore.getState().dossiers;
+            expect(dossiers.find(d => d.id === 'd-src')?.items.map(i => i.id)).toEqual(['item-2', 'item-3', 'temp-1']);
+            expect(dossiers.find(d => d.id === 'd-dst')?.items.map(i => i.id)).toEqual(['item-1']);
+            expect(appStore.getState().lastSyncError?.message).toContain('ancora salvati');
         });
     });
 });
