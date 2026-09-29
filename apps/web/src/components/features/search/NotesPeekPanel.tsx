@@ -12,12 +12,14 @@ import {
     shift,
     size,
 } from '@floating-ui/react';
-import { StickyNote, X, BookOpen, Trash2, Download } from 'lucide-react';
+import { StickyNote, X, BookOpen, Download } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { AttributionChip } from '../bulletin/AttributionChip';
+import { NoteCard } from './NoteCard';
+import { useNoteEditing } from '../../../hooks/useNoteEditing';
+import { getTransformOrigin } from '../../../utils/floatingOrigin';
 
 export interface NotesPeekPanelProps {
     isOpen: boolean;
@@ -160,8 +162,7 @@ function PeekBody({
     onOpenStudyMode,
     onExportTxt,
 }: BodyProps) {
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editingText, setEditingText] = useState('');
+    const { editingId, editingText, setEditingText, startEdit, commitEdit, cancelEdit } = useNoteEditing(annotations, onUpdateNote);
     const [composerText, setComposerText] = useState('');
     const composerRef = useRef<HTMLTextAreaElement>(null);
     const [ownerFilter, setOwnerFilter] = useState<'all' | 'own' | 'imported'>('all');
@@ -178,27 +179,6 @@ function PeekBody({
     useEffect(() => {
         if (noteAnchor) composerRef.current?.focus();
     }, [noteAnchor]);
-
-    const startEdit = (note: Annotation) => {
-        setEditingId(note.id);
-        setEditingText(note.text);
-    };
-
-    const commitEdit = () => {
-        if (!editingId) return;
-        const trimmed = editingText.trim();
-        const original = annotations.find(a => a.id === editingId);
-        if (original && trimmed && trimmed !== original.text) {
-            onUpdateNote(editingId, trimmed);
-        }
-        setEditingId(null);
-        setEditingText('');
-    };
-
-    const cancelEdit = () => {
-        setEditingId(null);
-        setEditingText('');
-    };
 
     const submitComposer = () => {
         const trimmed = composerText.trim();
@@ -398,68 +378,6 @@ function NoteGroup({ label, notes, editingId, editingText, onStartEdit, onChange
     );
 }
 
-interface NoteCardProps {
-    note: Annotation;
-    isEditing: boolean;
-    editingText: string;
-    onStartEdit: () => void;
-    onChangeEdit: (text: string) => void;
-    onCommitEdit: () => void;
-    onCancelEdit: () => void;
-    onRemove: () => void;
-}
-
-function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEdit, onCommitEdit, onCancelEdit, onRemove }: NoteCardProps) {
-    return (
-        <div className="group relative rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2.5 text-sm">
-            {note.anchorText && (
-                <div className="text-[11px] italic text-amber-700 dark:text-amber-400 mb-1 line-clamp-1 pr-6">
-                    &ldquo;{note.anchorText}&rdquo;
-                </div>
-            )}
-
-            {isEditing ? (
-                <textarea
-                    autoFocus
-                    value={editingText}
-                    onChange={(e) => onChangeEdit(e.target.value)}
-                    onBlur={onCommitEdit}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') { e.preventDefault(); onCancelEdit(); }
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onCommitEdit(); }
-                    }}
-                    rows={Math.max(2, editingText.split('\n').length)}
-                    className="w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-                />
-            ) : (
-                <>
-                    <button
-                        onClick={onStartEdit}
-                        className="w-full text-left whitespace-pre-wrap text-slate-800 dark:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 rounded"
-                        title="Clicca per modificare"
-                    >
-                        {note.text}
-                    </button>
-                    {note.sourceSuggestionId && (
-                        <div className="mt-1">
-                            <AttributionChip author={note.originalAuthor} />
-                        </div>
-                    )}
-                </>
-            )}
-
-            <button
-                onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                className="absolute top-1.5 right-1.5 p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                title="Elimina nota"
-                aria-label="Elimina nota"
-            >
-                <Trash2 size={12} />
-            </button>
-        </div>
-    );
-}
-
 // ───────────────────────── HELPERS ─────────────────────────
 
 function groupByAnchor(annotations: Annotation[]): { anchoredNotes: Annotation[]; freeNotes: Annotation[] } {
@@ -472,22 +390,3 @@ function groupByAnchor(annotations: Annotation[]): { anchoredNotes: Annotation[]
     return { anchoredNotes, freeNotes };
 }
 
-/**
- * Translate a floating-ui placement into the CSS transform-origin that
- * corresponds to the edge of the popover touching the reference — so
- * the scale-in animation grows FROM the anchor instead of from the
- * popover's geometric center (which otherwise reads as "dropping from
- * above" because the popover's centre is far from the toolbar button).
- */
-function getTransformOrigin(placement: string): string {
-    const [side, align] = placement.split('-') as [string, string | undefined];
-    const opposite: Record<string, string> = { top: 'bottom', right: 'left', bottom: 'top', left: 'right' };
-    const main = opposite[side] ?? 'center';
-    const crossAxisIsHorizontal = side === 'top' || side === 'bottom';
-    const cross = !align
-        ? 'center'
-        : crossAxisIsHorizontal
-            ? (align === 'start' ? 'left' : 'right')
-            : (align === 'start' ? 'top' : 'bottom');
-    return crossAxisIsHorizontal ? `${cross} ${main}` : `${main} ${cross}`;
-}

@@ -562,7 +562,7 @@ Get application version and git information.
 
 **Notes:** The changelog is what landed in the current version, read from the
 first-parent log so each entry is a branch that landed rather than a development
-step. `visualex_api/tools/changelog.py` drops reverted work (a revert cancels
+step. `services/visualex/visualex_api/tools/changelog.py` drops reverted work (a revert cancels
 the merge it undid, and with it everything that merge brought in), housekeeping
 types (`build/chore/ci/docs/refactor/style/test`) and toolchain scopes, then
 caps the list at 20 entries. `message` is the raw commit subject; `summary`,
@@ -666,4 +666,4 @@ Common act types and their internal mappings:
 | `tfue` | Trattato sul Funzionamento dell'UE |
 | `cdfue` | Carta dei Diritti Fondamentali |
 
-See `visualex_api/tools/map.py` for complete mappings.
+See `services/visualex/visualex_api/tools/map.py` for complete mappings.

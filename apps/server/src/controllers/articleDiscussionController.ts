@@ -10,9 +10,30 @@ const anchorSchema = z.object({
   version: z.string().max(120).optional(),
 });
 
+const passageSchema = z.object({
+  quote: z.string().min(1).max(2000)
+    .refine((s) => s.trim().length > 0, 'La citazione non può essere vuota'),
+  start: z.number().int().min(0).max(2_000_000),
+  prefix: z.string().max(32),
+  suffix: z.string().max(32),
+});
+
 const createThreadSchema = anchorSchema.extend({
-  title: z.string().trim().min(3).max(200),
+  title: z.string().trim().max(200).optional(),
   body: z.string().trim().min(3).max(10000),
+  passage: passageSchema.optional(),
+  articleUrn: z.string().trim().min(1).max(1000).optional(),
+  textHash: z.string().regex(/^[0-9a-f]{64}$/, 'Impronta del testo non valida').optional(),
+}).superRefine((data, ctx) => {
+  const title = data.title ?? '';
+  if (!data.passage && title.length < 3) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['title'],
+      message: 'Il titolo è obbligatorio (almeno 3 caratteri) per una discussione sull’intero articolo' });
+  }
+  if (data.passage && title.length > 0 && title.length < 3) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['title'],
+      message: 'Il titolo, se indicato, deve avere almeno 3 caratteri' });
+  }
 });
 
 const createCommentSchema = z.object({
@@ -49,6 +70,55 @@ function commentView(comment: {
   };
 }
 
+function threadView(thread: {
+  id: string;
+  normaKey: string;
+  articleId: string;
+  articleLabel: string | null;
+  version: string | null;
+  passageQuote: string | null;
+  passageStart: number | null;
+  passagePrefix: string | null;
+  passageSuffix: string | null;
+  articleUrn: string | null;
+  textHash: string | null;
+  title: string;
+  body: string;
+  user: { id: string; username: string };
+  createdAt: Date;
+  updatedAt: Date;
+  votes: { userId: string }[];
+  comments: Parameters<typeof commentView>[0][];
+  userId?: string;
+}, userId: string) {
+  return {
+    id: thread.id,
+    normaKey: thread.normaKey,
+    articleId: thread.articleId,
+    articleLabel: thread.articleLabel,
+    version: thread.version,
+    title: thread.title,
+    body: thread.body,
+    passage: thread.passageQuote === null || thread.passageStart === null
+      ? null
+      : {
+          quote: thread.passageQuote,
+          start: thread.passageStart,
+          prefix: thread.passagePrefix ?? '',
+          suffix: thread.passageSuffix ?? '',
+        },
+    articleUrn: thread.articleUrn,
+    textHash: thread.textHash,
+    user: userView(thread.user),
+    createdAt: thread.createdAt,
+    updatedAt: thread.updatedAt,
+    voteCount: thread.votes.length,
+    userVoted: thread.votes.some(vote => vote.userId === userId),
+    isOwner: (thread.userId ?? thread.user.id) === userId,
+    comments: thread.comments.map(comment => commentView(comment, userId)),
+  };
+}
+
 export const listThreads = async (req: Request, res: Response) => {
   const { normaKey, articleId } = anchorSchema.pick({ normaKey: true, articleId: true }).parse(req.query);
   const sort = req.query.sort === 'popular' ? 'popular' : req.query.sort === 'active' ? 'active' : 'recent';
@@ -80,48 +150,86 @@ export const listThreads = async (req: Request, res: Response) => {
   ]);
 
   res.json({
+    data: threads.map(thread => threadView(thread, req.user!.id)),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  });
+};
+
+export const listPassages = async (req: Request, res: Response) => {
+  const { normaKey, articleId } = anchorSchema.pick({ normaKey: true, articleId: true }).parse(req.query);
+
+  const threads = await prisma.articleThread.findMany({
+    where: {
+      normaKey,
+      articleId,
+      isHidden: false,
+      passageQuote: { not: null },
+    },
+    select: {
+      id: true,
+      title: true,
+      passageQuote: true,
+      passageStart: true,
+      passagePrefix: true,
+      passageSuffix: true,
+      articleUrn: true,
+      textHash: true,
+      createdAt: true,
+      user: { select: { id: true, username: true } },
+      _count: { select: { comments: { where: { isHidden: false } } } },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 200,
+  });
+
+  res.json({
     data: threads.map(thread => ({
       id: thread.id,
-      normaKey: thread.normaKey,
-      articleId: thread.articleId,
-      articleLabel: thread.articleLabel,
-      version: thread.version,
       title: thread.title,
-      body: thread.body,
-      user: userView(thread.user),
+      passage: {
+        quote: thread.passageQuote!,
+        start: thread.passageStart!,
+        prefix: thread.passagePrefix ?? '',
+        suffix: thread.passageSuffix ?? '',
+      },
+      articleUrn: thread.articleUrn,
+      textHash: thread.textHash,
+      commentCount: thread._count.comments,
       createdAt: thread.createdAt,
-      updatedAt: thread.updatedAt,
-      voteCount: thread.votes.length,
-      userVoted: thread.votes.some(vote => vote.userId === req.user!.id),
-      isOwner: thread.userId === req.user!.id,
-      comments: thread.comments.map(comment => commentView(comment, req.user!.id)),
+      user: userView(thread.user),
     })),
-    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   });
 };
 
 export const createThread = async (req: Request, res: Response) => {
   const data = createThreadSchema.parse(req.body);
   const thread = await prisma.articleThread.create({
-    data: { ...data, userId: req.user!.id },
-    include: { user: { select: { id: true, username: true } } },
+    data: {
+      normaKey: data.normaKey,
+      articleId: data.articleId,
+      articleLabel: data.articleLabel,
+      version: data.version,
+      title: data.title ?? '',
+      body: data.body,
+      passageQuote: data.passage?.quote ?? null,
+      passageStart: data.passage?.start ?? null,
+      passagePrefix: data.passage?.prefix ?? null,
+      passageSuffix: data.passage?.suffix ?? null,
+      articleUrn: data.articleUrn ?? null,
+      textHash: data.textHash ?? null,
+      userId: req.user!.id,
+    },
+    include: {
+      user: { select: { id: true, username: true } },
+      comments: {
+        where: { isHidden: false },
+        orderBy: { createdAt: 'asc' },
+        include: { user: { select: { id: true, username: true } }, votes: true },
+      },
+      votes: true,
+    },
   });
-  res.status(201).json({
-    id: thread.id,
-    normaKey: thread.normaKey,
-    articleId: thread.articleId,
-    articleLabel: thread.articleLabel,
-    version: thread.version,
-    title: thread.title,
-    body: thread.body,
-    user: userView(thread.user),
-    createdAt: thread.createdAt,
-    updatedAt: thread.updatedAt,
-    voteCount: 0,
-    userVoted: false,
-    isOwner: true,
-    comments: [],
-  });
+  res.status(201).json(threadView(thread, req.user!.id));
 };
 
 export const createComment = async (req: Request, res: Response) => {

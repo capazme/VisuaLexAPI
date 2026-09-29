@@ -2,8 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderArticleHtml, type RenderArticleInput } from './articleRender';
 import { parseArticleStructure } from './articleStructure';
 import { sanitizeHTML } from './sanitizeHtml';
-import { plainOffsetAt } from './selectionOffset';
+import { getSelectionAnchor, plainOffsetAt } from './selectionOffset';
+import { groupAnnotationsByBlock, type LocatedThread } from './articleAnnotations';
 import { ARTICLE_FIXTURES, fixtureText } from './__fixtures__/articleTexts';
+import { buildPassage } from './threadPassages';
 import type { Annotation, Highlight } from '../types';
 
 const hl = (id: string, text: string, startOffset: number, color: Highlight['color'] = 'yellow'): Highlight => ({
@@ -43,7 +45,28 @@ describe('the projection invariant — every real text', () => {
         const len = 1 + Math.floor(next() * Math.min(40, plain.length - a - 1));
         annotations.push(note(`n${i}`, plain.slice(a, a + len), a));
       }
-      const html = render(raw, { highlights, annotations, searchQuery: 'del' });
+      const threads: LocatedThread[] = [];
+      for (let i = 0; i < 3; i++) {
+        const a = Math.floor(next() * (plain.length - 1));
+        const len = 1 + Math.floor(next() * Math.min(40, plain.length - a - 1));
+        const quote = plain.slice(a, a + len);
+        threads.push({
+          thread: {
+            id: `t${i}`,
+            title: '',
+            passage: buildPassage(plain, a, quote)!,
+            articleUrn: null,
+            textHash: null,
+            commentCount: 0,
+            createdAt: '2026-09-28',
+            user: { id: 'u', username: 'marta' },
+          },
+          start: a,
+          end: a + len,
+        });
+      }
+      const focusedThreadId = threads[0]?.thread.id ?? null;
+      const html = render(raw, { highlights, annotations, threads, focusedThreadId, searchQuery: 'del', signs: true });
       // Well-formed before the sanitizer gets a chance to repair it.
       const xml = new DOMParser().parseFromString(`<root>${html}</root>`, 'application/xml');
       expect(xml.getElementsByTagName('parsererror')).toHaveLength(0);
@@ -62,6 +85,34 @@ describe('the projection invariant — every real text', () => {
         const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
         expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
       }
+      // Focused thread pieces join to thread words, no extra elements for unfocused threads
+      if (focusedThreadId) {
+        const focusedPieces = pieces(div, `[data-thread-focus="${focusedThreadId}"]`);
+        expect(focusedPieces.length).toBeGreaterThan(0);
+        expect(focusedPieces.map((e) => e.textContent).join('')).toBe(threads[0].thread.passage.quote);
+      }
+      for (const t of threads.slice(1)) {
+        expect(pieces(div, `[data-thread-focus="${t.thread.id}"]`)).toHaveLength(0);
+      }
+      // Each block's sign counts exactly what the block shows.
+      const structure = parseArticleStructure(raw);
+      const groups = groupAnnotationsByBlock(raw, structure, highlights, annotations, threads);
+      const blocks = pieces(div, '.vlx-b');
+      expect(blocks).toHaveLength(structure.blocks.length);
+      blocks.forEach((block, i) => {
+        if (structure.blocks[i].kind === 'update-sep') return;
+        const shown = (attr: string) => new Set(pieces(block as HTMLElement, `[${attr}]`).map((e) => e.getAttribute(attr)));
+        expect(shown('data-note-id'), `block ${i}: notes`).toEqual(new Set(groups[i].notes.map((n) => n.id)));
+        expect(shown('data-highlight'), `block ${i}: highlights`).toEqual(new Set(groups[i].highlights.map((h) => h.id)));
+        const sign = [...block.children].find((c) => c.classList.contains('vlx-sign'));
+        if (groups[i].notes.length + groups[i].highlights.length + groups[i].threads.length === 0) {
+          expect(sign, `block ${i}: sign`).toBeUndefined();
+        } else {
+          expect(sign?.getAttribute('data-notes'), `block ${i}: sign notes`).toBe(String(groups[i].notes.length));
+          expect(sign?.getAttribute('data-highlights'), `block ${i}: sign highlights`).toBe(String(groups[i].highlights.length));
+          expect(sign?.getAttribute('data-threads'), `block ${i}: sign threads`).toBe(String(groups[i].threads.length));
+        }
+      });
     },
   );
 
@@ -261,5 +312,178 @@ describe('Normattiva markers', () => {
     const div = mount(render(raw));
     expect(div.querySelector('.vlx-hidden')?.textContent).toBe('### ');
     expect(div.textContent).toBe(raw.replace(/\n/g, ''));
+  });
+});
+
+describe('annotation signs', () => {
+  const raw = fixtureText('nrm-cc-1453');
+  const plain = raw.replace(/\n/g, '');
+  const at = (s: string) => plain.indexOf(s);
+  const signOf = (div: HTMLElement, block: number) => div.querySelector<HTMLElement>(`.vlx-sign[data-block="${block}"]`);
+
+  it('marks a block with its notes and one dot per colour, in the order they appear', () => {
+    const div = mount(render(raw, {
+      signs: true,
+      annotations: [note('n1', 'prestazioni corrispettive', at('prestazioni corrispettive')), note('n2', 'a sua scelta', at('a sua scelta'))],
+      highlights: [
+        hl('h1', 'contraenti', at('contraenti'), 'green'),
+        hl('h2', 'obbligazioni', at('obbligazioni')),
+        hl('h3', 'risarcimento', at('risarcimento'), 'green'),
+      ],
+    }));
+    const sign = signOf(div, 2)!;
+    expect(sign.getAttribute('role')).toBe('button');
+    expect(sign.getAttribute('tabindex')).toBe('0');
+    expect(sign.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(sign.getAttribute('aria-label')).toBe('2 note e 3 evidenziazioni in questo passo');
+    expect(sign.querySelector('.vlx-sign-notes')?.getAttribute('data-count')).toBe('2');
+    expect(pieces(sign, '.vlx-sign-dot').map((d) => d.getAttribute('data-color'))).toEqual(['green', 'yellow']);
+    expect(div.querySelectorAll('.vlx-sign')).toHaveLength(1);
+  });
+
+  it('adds no text: the sign is empty and sits after the block\'s text, outside every mark', () => {
+    const end = 'risarcimento del danno.';
+    const div = mount(render(raw, { signs: true, highlights: [hl('h', end, at(end))] }));
+    const sign = signOf(div, 2)!;
+    expect(sign.textContent).toBe('');
+    expect(sign.parentElement?.classList.contains('vlx-b')).toBe(true);
+    expect(sign.parentElement?.lastElementChild).toBe(sign);
+    expect(sign.closest('mark')).toBeNull();
+    expect(div.textContent).toBe(plain);
+  });
+
+  it('gives a highlight across two commi a sign on each', () => {
+    const start = at('danno.');
+    const end = at('La risoluzione') + 'La risoluzione'.length;
+    const div = mount(render(raw, { signs: true, highlights: [hl('x', plain.slice(start, end), start)] }));
+    expect(pieces(div, '.vlx-sign').map((s) => s.getAttribute('data-block'))).toEqual(['2', '3']);
+  });
+
+  it('gives no sign to an orphan, and none at all without the option or the structure', () => {
+    expect(mount(render(raw, { signs: true, annotations: [note('o', 'inesistente', 100)] })).querySelector('.vlx-sign')).toBeNull();
+    const n = [note('n', 'giudizio', at('giudizio'))];
+    expect(mount(render(raw, { annotations: n })).querySelector('.vlx-sign')).toBeNull();
+    expect(mount(renderArticleHtml({ raw, structure: null, highlights: [], annotations: n, signs: true })).querySelector('.vlx-sign')).toBeNull();
+  });
+
+  it('puts the sign of an update paragraph inside the folding tail', () => {
+    const tail = fixtureText('nrm-cp-640');
+    const text = 'amnistia per il delitto previsto';
+    const div = mount(render(tail, { signs: true, annotations: [note('t', text, tail.replace(/\n/g, '').indexOf(text))] }));
+    expect(div.querySelector('.vlx-sign')?.closest('.vlx-updates-body')).not.toBeNull();
+  });
+
+  it('leaves the anchor of a selection dragged across a sign exactly as the renderer checks it', () => {
+    const div = mount(render(raw, { signs: true, annotations: [note('n', 'contraenti', at('contraenti'))] }));
+    document.body.appendChild(div);
+    const textIn = (block: number, word: string) => {
+      const walker = document.createTreeWalker(div.querySelectorAll('.vlx-b')[block], NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const i = n.textContent!.indexOf(word);
+        if (i >= 0) return { node: n, offset: i };
+      }
+      throw new Error(word);
+    };
+    const from = textIn(2, 'danno');
+    const to = textIn(3, 'giudizio');
+    const range = document.createRange();
+    range.setStart(from.node, from.offset);
+    range.setEnd(to.node, to.offset + 'giudizio'.length);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const anchor = getSelectionAnchor(div, selection)!;
+    expect(anchor.startOffset).toBe(at('danno.'));
+    expect(anchor.text).toBe(plain.slice(anchor.startOffset, at('giudizio') + 'giudizio'.length));
+    div.remove();
+  });
+
+  it('keeps the sign keyboard-reachable and labelled through the sanitizer', () => {
+    const div = mount(render(raw, { signs: true, highlights: [hl('h', 'giudizio', at('giudizio'), 'blue')] }));
+    const sign = signOf(div, 3)!;
+    expect(sign.getAttribute('tabindex')).toBe('0');
+    expect(sign.getAttribute('aria-label')).toBe('1 evidenziazione in questo passo');
+    expect(sign.getAttribute('data-notes')).toBe('0');
+    expect(sign.querySelector('.vlx-sign-dot')?.getAttribute('data-color')).toBe('blue');
+  });
+
+  it('a block holding only a discussion gets a sign with threads count and label', () => {
+    const word = 'giudizio';
+    const start = at(word);
+    const quote = word;
+    const thread: LocatedThread = {
+      thread: {
+        id: 't-only',
+        title: '',
+        passage: buildPassage(plain, start, quote)!,
+        articleUrn: null,
+        textHash: null,
+        commentCount: 0,
+        createdAt: '2026-09-28',
+        user: { id: 'u', username: 'marta' },
+      },
+      start,
+      end: start + quote.length,
+    };
+    const div = mount(render(raw, { signs: true, threads: [thread] }));
+    const sign = signOf(div, 3)!;
+    expect(sign).not.toBeNull();
+    expect(sign.getAttribute('data-notes')).toBe('0');
+    expect(sign.getAttribute('data-highlights')).toBe('0');
+    expect(sign.getAttribute('data-threads')).toBe('1');
+    expect(sign.getAttribute('aria-label')).toBe('1 discussione in questo passo');
+    const threadsSpan = sign.querySelector('.vlx-sign-threads');
+    expect(threadsSpan).not.toBeNull();
+    expect(threadsSpan?.getAttribute('data-count')).toBe('1');
+    expect(threadsSpan?.textContent).toBe('');
+  });
+
+  it('without focusedThreadId there is no .vlx-thread-focus in the output', () => {
+    const word = 'giudizio';
+    const start = at(word);
+    const quote = word;
+    const thread: LocatedThread = {
+      thread: {
+        id: 't-unfocused',
+        title: '',
+        passage: buildPassage(plain, start, quote)!,
+        articleUrn: null,
+        textHash: null,
+        commentCount: 0,
+        createdAt: '2026-09-28',
+        user: { id: 'u', username: 'marta' },
+      },
+      start,
+      end: start + quote.length,
+    };
+    const div = mount(render(raw, { threads: [thread], focusedThreadId: null }));
+    expect(div.querySelector('.vlx-thread-focus')).toBeNull();
+  });
+
+  it('the focus mark nests inside a highlight covering the same words', () => {
+    const word = 'inadempimento';
+    const start = at(word);
+    const quote = word;
+    const thread: LocatedThread = {
+      thread: {
+        id: 't-nested',
+        title: '',
+        passage: buildPassage(plain, start, quote)!,
+        articleUrn: null,
+        textHash: null,
+        commentCount: 0,
+        createdAt: '2026-09-28',
+        user: { id: 'u', username: 'marta' },
+      },
+      start,
+      end: start + quote.length,
+    };
+    const h = hl('h-outer', quote, start, 'yellow');
+    const div = mount(render(raw, { highlights: [h], threads: [thread], focusedThreadId: 't-nested' }));
+    const nested = div.querySelector('mark .vlx-thread-focus');
+    expect(nested).not.toBeNull();
+    expect(nested?.textContent).toBe(quote);
+    expect(nested?.getAttribute('data-thread-focus')).toBe('t-nested');
+    expect(nested?.parentElement?.getAttribute('data-highlight')).toBe('h-outer');
   });
 });

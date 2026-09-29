@@ -5,6 +5,7 @@ import { cn } from '../../../../lib/utils';
 import type { Annotation, Highlight } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../../utils/highlightColors';
+import { revealAnnotation } from '../../../../utils/revealAnnotation';
 import { StudyModeSummary } from './StudyModeSummary';
 
 interface StudyModeToolsPanelProps {
@@ -106,26 +107,14 @@ export function StudyModeToolsPanel({
   const noteInputRef = useRef<HTMLTextAreaElement>(null);
   const styles = THEME_PANEL_STYLES[theme];
 
-  // Summary → article-body navigation: find the marker in the DOM
-  // (`[data-highlight=id]` for highlights, `[data-note-id=id]` for note
-  // anchors — both emitted by useArticleMarkers) and scroll it into
-  // view with a brief flash to orient the user. Scoped to the Study
-  // Mode body element — the main article view mounts a DOM twin of
-  // the same markers behind the backdrop, and an un-scoped query
-  // would scroll that hidden copy instead.
+  // Summary → article-body navigation, scoped to the Study Mode body: the
+  // main article view mounts a DOM twin of the same markers behind the
+  // backdrop, and an unscoped query would scroll that hidden copy instead.
+  // Scrolling and the brief glow are the reading surface's own
+  // (utils/revealAnnotation.ts), as from a block's annotation popover.
   const handleSummaryNavigate = (kind: 'highlight' | 'note', id: string) => {
     const root = document.getElementById('study-mode-article-body');
-    if (!root) return;
-    const selector = kind === 'highlight'
-      ? `[data-highlight="${CSS.escape(id)}"]`
-      : `[data-note-id="${CSS.escape(id)}"]`;
-    const el = root.querySelector(selector) as HTMLElement | null;
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.add('ring-2', 'ring-primary-500/70', 'ring-offset-2', 'transition');
-    setTimeout(() => {
-      el.classList.remove('ring-2', 'ring-primary-500/70', 'ring-offset-2', 'transition');
-    }, 1200);
+    if (root) revealAnnotation(root, { kind, id });
   };
 
   // Focus note input when requested

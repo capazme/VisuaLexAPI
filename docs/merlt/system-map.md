@@ -10,11 +10,11 @@
 >
 > Lo stato verificato sul codice è in [blueprint.md](./blueprint.md) e nelle sezioni MERL-T di `CLAUDE.md`. Questa mappa resta la vista d'insieme «esistente vs. target».
 
-**Scopo.** Documentare **il progetto `VisuaLexAPI`** (`/Users/gpuzio/Desktop/CODE/VisuaLexAPI`): (a) **cosa è implementato** qui oggi e (b) **come dovrebbe diventare** integrando, slice per slice, le capacità del sottosistema MERL-T. È una mappa di lettura, non un piano di lavoro.
+**Scopo.** Documentare **il progetto `VisuaLexAPI`** (questo repository): (a) **cosa è implementato** qui oggi e (b) **come dovrebbe diventare** integrando, slice per slice, le capacità del sottosistema MERL-T. È una mappa di lettura, non un piano di lavoro.
 
 **I due repo (per non confonderli).**
-- **`VisuaLexAPI`** (questo repo — **il soggetto di questo documento**) = il **prodotto** rivolto all'avvocato (Quart API + Node BFF + React) + il **sidecar MERL-T** con il codice Python vendorizzato in `merlt/` + il **BFF** che lo integra. È dove i loop vengono *cablati e chiusi*.
-- **`ALIS_CORE`** (`/Users/gpuzio/Desktop/CODE/ALIS_CORE`) = monorepo di ricerca **upstream**, *solo riferimento*: da lì provengono la visione, la teoria RLCF (tesi), il PRD/UX BMAD e la libreria `merlt/` che copiamo selettivamente (vedi `upstream-sync.md`). Non ci sviluppiamo: lo leggiamo per sapere dove andare.
+- **`VisuaLexAPI`** (questo repo — **il soggetto di questo documento**) = il **prodotto** rivolto all'avvocato (Quart API + Node BFF + React) + il **sidecar MERL-T** con il codice Python vendorizzato in `services/merlt/` + il **BFF** che lo integra. È dove i loop vengono *cablati e chiusi*.
+- **`ALIS_CORE`** (un checkout accanto a questo, `../ALIS_CORE`) = monorepo di ricerca **upstream**, *solo riferimento*: da lì provengono la visione, la teoria RLCF (tesi), il PRD/UX BMAD e la libreria `services/merlt/` che copiamo selettivamente (vedi `upstream-sync.md`). Non ci sviluppiamo: lo leggiamo per sapere dove andare.
 
 > ⚠️ Questa mappa è **doc-grounded**: sintetizza la documentazione (che ha diverse derive di versione, vedi §8). Le righe marcate ✅ sono verificate nel nostro repo (CLAUDE.md + chiusura loop 2026-05-28); le righe 📦/🧪/📐/🐞 sono asserzioni dei doc di `ALIS_CORE` da verificare contro il codice prima di costruirci sopra.
 
@@ -46,10 +46,10 @@ La co-autorialità (la nostra UX) vive nel **Loop α**. Il **Loop β** è integr
 ## 1. Il progetto VisuaLexAPI (e cosa integra da MERL-T)
 
 ### 1.1 Cosa eseguiamo (runtime di VisuaLexAPI)
-- **Python API — Quart, :5000** (`app.py`, `visualex_api/`): ricerca norme, scraping Normattiva/EUR-Lex/Brocardi, export PDF. È il cuore storico del prodotto.
-- **Node BFF — Express + Prisma, :3001** (`backend/`): auth, dati utente, e **tutto il traffico MERL-T via `/api/merlt/*`** — il frontend non chiama mai il sidecar `:8000` direttamente.
-- **Frontend — React + Vite, :5173** (`frontend/`): SPA. Le superfici MERL-T sono `/grafo` (grafo + Q&A), `/merlt` (hub «Assistente»), `/merlt/valida`, `/merlt/contribuisci` e la tab «Ingestione» in `/admin`. Il tracking e il side rail passano dal *plugin host*; `ArticleTabContent` importa comunque alcune parti MERL-T in modo diretto. Tutto è dietro i flag `VITE_FEATURE_MERLT` / `VITE_FEATURE_MERLT_GRAPH`.
-- **Sidecar MERL-T** (`docker-compose.merlt.yml`, gate `MERLT_ENABLED`): 7 servizi. Sempre attivi: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`. Sotto il profilo `api-in-docker`, che è il default di `start.sh`: `mcp-legal-it` (tool giuridici live, :8011), `merlt-api` (:8000) e `merlt-worker` (RQ su `merlt_ingest`, `merlt_extract`, `merlt_ner_train`). Codice Python **vendorizzato in `merlt/`** (copia selettiva di `ALIS_CORE/merlt`, poi divergente: vedi `upstream-sync.md`).
+- **Python API — Quart, :5000** (`app.py`, `services/visualex/visualex_api/`): ricerca norme, scraping Normattiva/EUR-Lex/Brocardi, export PDF. È il cuore storico del prodotto.
+- **Node BFF — Express + Prisma, :3001** (`apps/server/`): auth, dati utente, e **tutto il traffico MERL-T via `/api/merlt/*`** — il frontend non chiama mai il sidecar `:8000` direttamente.
+- **Frontend — React + Vite, :5173** (`apps/web/`): SPA. Le superfici MERL-T sono `/grafo` (grafo + Q&A), `/merlt` (hub «Assistente»), `/merlt/valida`, `/merlt/contribuisci` e la tab «Ingestione» in `/admin`. Il tracking e il side rail passano dal *plugin host*; `ArticleTabContent` importa comunque alcune parti MERL-T in modo diretto. Tutto è dietro i flag `VITE_FEATURE_MERLT` / `VITE_FEATURE_MERLT_GRAPH`.
+- **Sidecar MERL-T** (`infra/compose.yml`, gate `MERLT_ENABLED`): 7 servizi. Sempre attivi: `postgres` (anche i database della piattaforma), `redis`, `falkordb`, `qdrant`. Sotto il profilo `merlt`, avviato da `start.sh` con `MERLT_ENABLED=true`: `mcp-legal-it` (tool giuridici live, :8011), `merlt-api` (:8000) e `merlt-worker` (RQ su `merlt_ingest`, `merlt_extract`, `merlt_ner_train`). Codice Python **vendorizzato in `services/merlt/`** (copia selettiva di `ALIS_CORE/merlt`, poi divergente: vedi `upstream-sync.md`).
 
 ### 1.2 La direzione che integriamo da MERL-T (visione upstream)
 - **Paradigma:** *«IDE per Giuristi»* — l'avvocato pone una domanda, quattro esperti ermeneutici (art. 12 Preleggi: Positivismo/Finalismo/Costituzionalismo/Empirismo) percorrono il grafo, una sintesi risponde *tracciabile alla fonte/URN*. Momento «aha!»: *«I can use this reasoning trace in a legal brief.»*
@@ -250,13 +250,13 @@ Il **Loop β** è ora sul grafo stesso (Slice 4). La sua co-autorialità passa d
 ## 10. Fonti autorevoli
 
 **Visione & teoria (ALIS_CORE):**
-- `merlt/docs/thesis/RLCF_TECHNICAL_DOCUMENT.md` — le 8 fasi del Loop β, REINFORCE, math.
-- `merlt/docs/rlcf/RLCF.md` + `.../reference/rlcf-formulas-explained.md` — 4 pilastri, authority, consenso.
-- `merlt/docs/architecture/{overview,reasoning,storage-layer,learning-layer}.md` — layer, esperti, schema KG.
-- `merlt/docs/architecture/DISAGREEMENT_DETECTION_SPEC.md` — tassonomia disaccordo.
+- `services/merlt/docs/thesis/RLCF_TECHNICAL_DOCUMENT.md` — le 8 fasi del Loop β, REINFORCE, math.
+- `services/merlt/docs/rlcf/RLCF.md` + `.../reference/rlcf-formulas-explained.md` — 4 pilastri, authority, consenso.
+- `services/merlt/docs/architecture/{overview,reasoning,storage-layer,learning-layer}.md` — layer, esperti, schema KG.
+- `services/merlt/docs/architecture/DISAGREEMENT_DETECTION_SPEC.md` — tassonomia disaccordo.
 - `_bmad-output/planning-artifacts/{prd,ux-design-specification,epics}.md` — prodotto/UX/epiche.
-- `merlt/docs/experiments/EXP-021…`, `EXP-023…` — validazione empirica del loop.
-- `merlt/docs/MERL_T_IMPLEMENTATION_STATUS.md`, `PIANO_DEFINITIVO_INTEGRAZIONE.md`, `architecture/PIPELINE_ANALYSIS.md` — stato e bug.
+- `services/merlt/docs/experiments/EXP-021…`, `EXP-023…` — validazione empirica del loop.
+- `services/merlt/docs/MERL_T_IMPLEMENTATION_STATUS.md`, `PIANO_DEFINITIVO_INTEGRAZIONE.md`, `architecture/PIPELINE_ANALYSIS.md` — stato e bug.
 
 **Implementazione (VisuaLexAPI):**
 - `blueprint.md`: architettura verificata sul codice.

@@ -18,6 +18,8 @@ router.delete('/dossiers/:id', dossierController.deleteDossier);
 router.post('/dossiers/:id/items', dossierController.addDossierItem);
 router.put('/dossiers/:id/items/:itemId', dossierController.updateDossierItem);
 router.delete('/dossiers/:id/items/:itemId', dossierController.deleteDossierItem);
+// Moves the row itself to another dossier of the same user (see moveDossierItem).
+router.post('/dossiers/:id/items/:itemId/move', dossierController.moveDossierItem);
 router.post('/dossiers/:id/reorder', dossierController.reorderDossierItems);
 router.post('/dossiers/:id/snapshots', dossierController.createDossierSnapshot);
 router.get('/dossiers/:id/snapshots', dossierController.listDossierSnapshots);

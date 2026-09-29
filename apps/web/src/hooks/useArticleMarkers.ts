@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Annotation, Highlight } from '../types';
 import type { ArticleStructure } from '../utils/articleStructure';
+import type { LocatedThread } from '../utils/articleAnnotations';
 import { renderArticleHtml } from '../utils/articleRender';
 import { getGlobalHighlight, subscribeToHighlight } from './useGlobalSearch';
 
@@ -14,6 +15,12 @@ interface UseArticleMarkersInput {
    * have no commi to divide.
    */
   structure?: ArticleStructure | null;
+  /** The annotation signs of the tab and the dossier reader; see RenderArticleInput. */
+  signs?: boolean;
+  /** Passage discussions located in this text: counted on the signs. */
+  threads?: readonly LocatedThread[];
+  /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
+  focusedThreadId?: string | null;
 }
 
 /**
@@ -32,12 +39,25 @@ export function useArticleMarkers({
   highlights,
   annotations,
   structure = null,
+  signs = false,
+  threads,
+  focusedThreadId,
 }: UseArticleMarkersInput): string {
   const [searchQuery, setSearchQuery] = useState<string | null>(() => getGlobalHighlight());
   useEffect(() => subscribeToHighlight(setSearchQuery), []);
 
   return useMemo(
-    () => renderArticleHtml({ raw: rawText || '', structure, highlights, annotations, searchQuery }),
-    [rawText, structure, highlights, annotations, searchQuery],
+    () =>
+      renderArticleHtml({
+        raw: rawText || '',
+        structure,
+        highlights,
+        annotations,
+        searchQuery,
+        signs,
+        threads,
+        focusedThreadId,
+      }),
+    [rawText, structure, highlights, annotations, searchQuery, signs, threads, focusedThreadId],
   );
 }

@@ -25,6 +25,8 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
+import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
+import { LooseHighlightsList } from './LooseHighlightsList';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { PluginSlot } from '../../../plugins/PluginSlot';
@@ -36,12 +38,16 @@ import { buildArticleXrefNerPayload } from './articleXrefNer';
 import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitationReporter';
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
-import type { Annotation } from '../../../types';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
+import type { Annotation, ThreadPassage } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
 import { buildSearchDeepLink } from '../../../utils/deepLinks';
 import { notificationService } from '../../../services/notificationService';
 import { isAuthenticated } from '../../../services/authService';
+import { useArticlePassageThreads } from '../../../hooks/useArticlePassageThreads';
+import { plainText, locatePassage, buildPassage, textFingerprint } from '../../../utils/threadPassages';
+import { revealAnnotation } from '../../../utils/revealAnnotation';
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -112,6 +118,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
     const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [discussionOpen, setDiscussionOpen] = useState(false);
+    const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+    const [discussionFocus, setDiscussionFocus] = useState<string | null>(null);
+    const [discussionDraft, setDiscussionDraft] = useState<{ passage: ThreadPassage } | null>(null);
+    const [textHash, setTextHash] = useState<string | null>(null);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
@@ -172,6 +182,35 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         articleLabel: norma_data.numero_articolo,
         version: norma_data.versione || norma_data.data_versione,
     }), [itemKey, uniqueArticleId, norma_data.numero_articolo, norma_data.versione, norma_data.data_versione]);
+
+    const { threads: passageThreads, reload: reloadPassageThreads } =
+        useArticlePassageThreads(discussionAnchor.normaKey, discussionAnchor.articleId, Boolean(article_text));
+    const plainArticle = useMemo(() => plainText(article_text || ''), [article_text]);
+    const passageLocations = useMemo(
+        () => new Map(passageThreads.map((t) => [t.id, locatePassage(plainArticle, t.passage)])),
+        [passageThreads, plainArticle],
+    );
+    const locatedThreads = useMemo<LocatedThread[]>(
+        () => passageThreads.flatMap((t) => {
+            const at = passageLocations.get(t.id);
+            return at && at.state !== 'detached' ? [{ thread: t, start: at.start, end: at.end }] : [];
+        }),
+        [passageThreads, passageLocations],
+    );
+
+    useEffect(() => {
+        let cancelled = false;
+        textFingerprint(article_text || '')
+            .then((hash) => {
+                if (!cancelled) setTextHash(hash);
+            })
+            .catch((error) => {
+                console.warn('[ArticleTabContent] text fingerprint failed', error);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [article_text]);
 
     // Memo the four filters: without this, the full annotations/highlights
     // arrays being new-ref on every store mutation (even unrelated articles)
@@ -525,6 +564,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
+    const handlePopupDiscuss = (text: string, startOffset: number) => {
+        const passage = buildPassage(plainArticle, startOffset, text);
+        if (!passage) {
+            showToast('Non è possibile aprire una discussione su questa selezione', 'error');
+            return;
+        }
+        setDiscussionDraft({ passage });
+        setDiscussionOpen(true);
+    };
+
     // Handler for opening citation in new tab
     const handleOpenCitationInTab = useCallback((citation: ParsedCitationData) => {
         // MERLT-1.9: emit citation_click for the bus tracker. The target URN
@@ -658,14 +707,31 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         highlights: articleHighlights,
         annotations: itemAnnotations,
         structure,
+        signs: true,
+        threads: locatedThreads,
+        focusedThreadId,
     });
+    // What each block's sign counts, for the popover it opens (the renderer
+    // derives the signs from the same inputs, through the same module).
+    const blockGroups = useMemo(
+        () => groupAnnotationsByBlock(article_text || '', structure, articleHighlights, itemAnnotations, locatedThreads),
+        [article_text, structure, articleHighlights, itemAnnotations, locatedThreads],
+    );
+    // Highlights no sign can reach — the Brocardi sections', and those whose
+    // text changed — keep a list of their own, so they can still be removed.
+    const looseHighlights = useMemo(
+        () => highlightsWithoutSign(allPanelHighlights, blockGroups),
+        [allPanelHighlights, blockGroups],
+    );
 
     const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
 
-    // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom fold.
-    const { updatesOpen, openNote, closeNote, openUpdates } = useArticleTextInteractions(contentRef, itemKey, {
+    // "(119)" references open their AGGIORNAMENTO note; the notes at the bottom
+    // fold; an annotation sign opens its block's notes and highlights.
+    const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
     });
+    const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
     // Cmd+F click → scroll this article body to the requested occurrence.
     // useArticleMarkers tags each search hit with `data-search-idx`; we
@@ -881,14 +947,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 contentRef={contentRef}
                 itemKey={itemKey}
                 processedContent={processedContent}
-                panelHighlights={allPanelHighlights}
                 onPopupHighlight={handlePopupHighlight}
                 onPopupAddNote={handlePopupAddNote}
                 onPopupCopy={handlePopupCopy}
+                onPopupDiscuss={handlePopupDiscuss}
                 onPopupReportCitation={canContribute ? handlePopupReportCitation : undefined}
-                onRemoveHighlight={removeHighlight}
                 updatesOpen={updatesOpen}
             />
+
+            <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
 
             {openNote && structure.notes[openNote.id] && (
                 <UpdateNotePopover
@@ -899,10 +966,55 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
+            {openBlock !== null && hasAnnotations(openGroup) && (
+                <BlockAnnotationsPopover
+                    key={openBlock}
+                    containerRef={contentRef}
+                    blockIndex={openBlock}
+                    blockLabel={describeBlock(article_text || '', structure.blocks[openBlock])}
+                    group={openGroup}
+                    contentKey={processedContent}
+                    textHash={textHash}
+                    onOpenThread={(id) => {
+                        setDiscussionFocus(id);
+                        setFocusedThreadId(id);
+                        setDiscussionOpen(true);
+                    }}
+                    onClose={closeBlock}
+                    onUpdateNote={updateAnnotation}
+                    onRemoveNote={removeAnnotation}
+                    onRemoveHighlight={removeHighlight}
+                />
+            )}
+
             <ArticleDiscussionPanel
                 anchor={discussionAnchor}
                 isOpen={discussionOpen}
-                onClose={() => setDiscussionOpen(false)}
+                articleUrn={norma_data.urn}
+                textHash={textHash}
+                passageStates={Object.fromEntries(
+                    Array.from(passageLocations.entries()).map(([id, loc]) => [id, loc.state])
+                )}
+                focusThreadId={discussionFocus}
+                onFocusThread={setFocusedThreadId}
+                draft={discussionDraft}
+                onDraftConsumed={() => setDiscussionDraft(null)}
+                onThreadCreated={reloadPassageThreads}
+                onGoToPassage={(id) => {
+                    setFocusedThreadId(id);
+                    requestAnimationFrame(() =>
+                        requestAnimationFrame(() => {
+                            const root = contentRef.current;
+                            if (root) revealAnnotation(root, { kind: 'thread', id });
+                        })
+                    );
+                }}
+                onClose={() => {
+                    setDiscussionOpen(false);
+                    setFocusedThreadId(null);
+                    setDiscussionFocus(null);
+                    setDiscussionDraft(null);
+                }}
             />
 
             <AskMerltEntry

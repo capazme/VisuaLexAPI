@@ -27,7 +27,7 @@ this machine on 2026-08-26, not inferred.
 
 | Gate | Command | Result |
 |---|---|---|
-| Python suite | `/Users/gpuzio/Desktop/CODE/VisuaLexAPI/.venv/bin/python -m pytest tests/ -q` | **169 passed** in 0.57s |
+| Python suite | `./.venv/bin/python -m pytest tests/ -q` | **169 passed** in 0.57s |
 | Interpreter | that venv | Python 3.14.2 |
 | Frontend deps | `frontend/node_modules` | installed in the worktree |
 

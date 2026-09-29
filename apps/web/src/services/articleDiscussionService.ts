@@ -1,5 +1,11 @@
 import { apiClient } from './api';
-import type { ArticleDiscussionResponse, ArticleDiscussionThread, ArticleDiscussionComment } from '../types';
+import type {
+  ArticleDiscussionResponse,
+  ArticleDiscussionThread,
+  ArticleDiscussionComment,
+  ArticleDiscussionPassageSummary,
+  ThreadPassage,
+} from '../types';
 
 export interface DiscussionAnchor {
   normaKey: string;
@@ -13,8 +19,17 @@ export const articleDiscussionService = {
     const response = await apiClient.get('/article-discussions', { params: { ...anchor, sort } });
     return response.data;
   },
-  async create(anchor: DiscussionAnchor, title: string, body: string): Promise<ArticleDiscussionThread> {
-    const response = await apiClient.post('/article-discussions', { ...anchor, title, body });
+  async listPassages(anchor: Pick<DiscussionAnchor, 'normaKey' | 'articleId'>): Promise<ArticleDiscussionPassageSummary[]> {
+    const response = await apiClient.get('/article-discussions/passages', { params: anchor });
+    return response.data.data;
+  },
+  async create(
+    anchor: DiscussionAnchor,
+    title: string,
+    body: string,
+    extras: { passage?: ThreadPassage; articleUrn?: string; textHash?: string } = {}
+  ): Promise<ArticleDiscussionThread> {
+    const response = await apiClient.post('/article-discussions', { ...anchor, title, body, ...extras });
     return response.data;
   },
   async comment(threadId: string, body: string, parentId?: string | null): Promise<ArticleDiscussionComment> {

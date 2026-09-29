@@ -802,14 +802,14 @@ async def test_full_enrichment_workflow():
 
 #### Backend MERL-T (6 files)
 ```
-/Users/gpuzio/Desktop/CODE/MERL-T_alpha/merlt/api/
+../MERL-T_alpha/merlt/api/
 ├── graph_router.py                  # P1.6 - Graph API
 └── profile_router.py                # P2.1 - Profile/Authority API
 
-/Users/gpuzio/Desktop/CODE/MERL-T_alpha/merlt/pipeline/
+../MERL-T_alpha/merlt/pipeline/
 └── text_extractors.py               # P2.2 - PDF/DOCX extraction
 
-/Users/gpuzio/Desktop/CODE/MERL-T_alpha/merlt/rlcf/
+../MERL-T_alpha/merlt/rlcf/
 ├── citation_ner.py                  # P3.1 - Citation NER
 ├── legal_entity_ner.py              # P3.2 - Entity NER
 └── coreference_resolver.py          # P3.3 - Coreference resolution
@@ -817,29 +817,29 @@ async def test_full_enrichment_workflow():
 
 #### Frontend VisuaLex (14 files)
 ```
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/features/merlt/
+./frontend/src/components/features/merlt/
 ├── ProposeEntityDrawer.tsx          # P1.1
 ├── ProposeRelationDrawer.tsx        # P1.1
 └── IssueVoteCard.tsx                # Optional
 
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/features/contribution/
+./frontend/src/components/features/contribution/
 ├── DocumentUploadTab.tsx            # P2.2
 └── GraphDetailPanel.tsx             # P1.6
 
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/ui/
+./frontend/src/components/ui/
 ├── EmptyState.tsx                   # UI Polish
 └── StatsCard.tsx                    # UI Polish
 
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/pages/
+./frontend/src/pages/
 └── ProfilePage.tsx                  # P2.1
 
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/components/features/profile/
+./frontend/src/components/features/profile/
 ├── AuthorityBar.tsx                 # P2.1
 ├── DomainAuthorityChart.tsx         # P2.1
 ├── ContributionStatsGrid.tsx        # P2.1
 └── ProfileSettingsForm.tsx          # P2.1
 
-/Users/gpuzio/Desktop/CODE/VisuaLexAPI/frontend/src/hooks/
+./frontend/src/hooks/
 ├── useGraphSync.ts                  # P1.6
 ├── useDocumentUpload.ts             # P2.2
 └── useUserProfile.ts                # P2.1

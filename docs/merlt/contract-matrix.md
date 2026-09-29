@@ -2,9 +2,9 @@
 
 Il browser parla solo con il BFF Node (`/api/merlt/*`). Il BFF autentica l'utente VisuaLex, applica i guard e inietta `user_id` nel corpo o nella query verso MERL-T. Non inoltra né il JWT né alcun header `X-User-ID`.
 
-Ogni client BFF invia `MERLT_API_KEY` come `X-API-Key` quando la variabile è impostata. MERL-T rende `verify_api_key` opzionale: `merlt/merlt/app.py` fa `app.dependency_overrides[verify_api_key] = optional_api_key`. La chiave serve quindi solo alle route `require_role("admin")`, marcate **ADMIN** qui sotto. **OPT** vuol dire che MERL-T accetta la richiesta anche senza chiave: su quelle route il solo cancello è il BFF, e per questo `:8000` non va mai esposto.
+Ogni client BFF invia `MERLT_API_KEY` come `X-API-Key` quando la variabile è impostata. MERL-T rende `verify_api_key` opzionale: `services/merlt/merlt/app.py` fa `app.dependency_overrides[verify_api_key] = optional_api_key`. La chiave serve quindi solo alle route `require_role("admin")`, marcate **ADMIN** qui sotto. **OPT** vuol dire che MERL-T accetta la richiesta anche senza chiave: su quelle route il solo cancello è il BFF, e per questo `:8000` non va mai esposto.
 
-Fonte di verità: `backend/src/routes/merlt/index.ts` (montaggio e feature flag) e i router in `backend/src/routes/merlt/*.ts`. Le tabelle elencano le route effettivamente montate al 2026-09-25.
+Fonte di verità: `apps/server/src/routes/merlt/index.ts` (montaggio e feature flag) e i router in `apps/server/src/routes/merlt/*.ts`. Le tabelle elencano le route effettivamente montate al 2026-09-25.
 
 **Legenda guard:**
 
@@ -145,7 +145,7 @@ Questi endpoint esistono in MERL-T ma nessuna route BFF li inoltra:
 
 `GET /api/v1/features` non è mai esistito: il frontend deriva le capability in `useMerltFeatures.ts`.
 
-`frontend/src/services/merltService.ts` contiene ancora funzioni legacy che chiamano route BFF mai montate e che nessun modulo importa fuori dai test:
+`apps/web/src/services/merltService.ts` contiene ancora funzioni legacy che chiamano route BFF mai montate e che nessun modulo importa fuori dai test:
 
 - enrichment: `checkMerltArticle`, `runMerltLiveEnrichment`, `getMerltPendingQueue`, `validateMerltEntity`, `validateMerltRelation`, `proposeMerltEntity`, `proposeMerltRelation`;
 - grafo: `graphSearchMerlt`, `getMerltArticleRelations`, `getMerltArticleEntities`, `getMerltSubgraph`;

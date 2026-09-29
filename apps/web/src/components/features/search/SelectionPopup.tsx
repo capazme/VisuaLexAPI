@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Highlighter, StickyNote, Copy, Search, Flag, X } from 'lucide-react';
+import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
@@ -26,6 +26,9 @@ interface SelectionPopupProps {
   // passes it (same rect contract as onAddNote). The popup knows nothing about
   // who consumes it; hosts that do not pass it keep the three core actions.
   onReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
+  // Optional "Discuti" action: rendered only when the host passes it.
+  // Starts a discussion on the selected passage.
+  onDiscuss?: (text: string, startOffset: number) => void;
 }
 
 interface PopupState {
@@ -47,7 +50,8 @@ export function SelectionPopup({
   onAddNote,
   onCopy,
   onSearch,
-  onReportCitation
+  onReportCitation,
+  onDiscuss,
 }: SelectionPopupProps) {
   const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -184,7 +188,7 @@ export function SelectionPopup({
     return { x: r.x, y: r.y, width: r.width, height: r.height };
   };
 
-  const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report') => {
+  const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report' | 'discuss') => {
     switch (action) {
       case 'highlight':
         setShowColorPicker(true);
@@ -193,6 +197,12 @@ export function SelectionPopup({
         // Capture the live selection rect BEFORE hiding / clearing — the
         // composer will anchor on this rect (viewport coords).
         onAddNote(popup.text, popup.startOffset, captureSelectionRect());
+        hidePopup();
+        window.getSelection()?.removeAllRanges();
+        break;
+      }
+      case 'discuss': {
+        onDiscuss?.(popup.text, popup.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
         break;
@@ -280,6 +290,19 @@ export function SelectionPopup({
             >
               <StickyNote size={16} className="text-blue-400" />
             </button>
+            {onDiscuss && (
+              <>
+                <div className="w-px h-5 bg-slate-700" />
+                <button
+                  onClick={() => handleAction('discuss')}
+                  className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
+                  title="Discuti con i colleghi"
+                  aria-label="Discuti con i colleghi"
+                >
+                  <MessageCircle size={16} className="text-sky-400" />
+                </button>
+              </>
+            )}
             <div className="w-px h-5 bg-slate-700" />
             <button
               onClick={() => handleAction('copy')}

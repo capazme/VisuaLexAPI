@@ -21,6 +21,15 @@
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from './highlightColors';
 import type { ArticleStructure, DecorationKind, StructureBlock } from './articleStructure';
+import {
+  groupAnchorsByBlock,
+  resolveAnchors,
+  signAriaLabel,
+  signColors,
+  type BlockAnnotations,
+  type LocatedThread,
+  type ResolvedAnchor,
+} from './articleAnnotations';
 
 export interface RenderArticleInput {
   raw: string;
@@ -29,9 +38,19 @@ export interface RenderArticleInput {
   highlights: Highlight[];
   annotations: Annotation[];
   searchQuery?: string | null;
+  /**
+   * Draw each annotated block's sign (round B): the tab and the dossier
+   * reader. Study Mode has its own summary and leaves it off; flat mode has
+   * no blocks and ignores it.
+   */
+  signs?: boolean;
+  /** Passage discussions located in this text: counted on the signs. */
+  threads?: readonly LocatedThread[];
+  /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
+  focusedThreadId?: string | null;
 }
 
-type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'search';
+type MarkKind = 'marker' | DecorationKind | 'note' | 'highlight' | 'thread' | 'search';
 
 /**
  * Nesting order, outermost first. The printed enumerator is outermost and so
@@ -48,10 +67,11 @@ const RANK: Record<MarkKind, number> = {
   notice: 3,
   note: 4,
   highlight: 5,
-  search: 6,
-  'mod-paren': 7,
-  'rubric-paren': 7,
-  hidden: 8,
+  thread: 6,
+  search: 7,
+  'mod-paren': 8,
+  'rubric-paren': 8,
+  hidden: 9,
 };
 
 interface Mark {
@@ -89,29 +109,15 @@ function decorationOpen(kind: DecorationKind, noteId?: string): string {
   }
 }
 
-/**
- * Where a stored anchor ends, in plain-text offsets, or null when its text is
- * not at its offset. Exact (case-insensitive) first, as always. Then one
- * bounded rescue for anchors stored from a rendered selection, whose text
- * carries newlines the projection does not have: anchored at the same offset,
- * whitespace skipped on both sides, every other character equal.
- */
-function anchorEnd(plain: string, start: number, text: string): number | null {
-  if (!text || start < 0 || start >= plain.length) return null;
-  const exact = plain.slice(start, start + text.length);
-  if (exact.length === text.length && exact.toLowerCase() === text.toLowerCase()) return start + text.length;
-  if (/\s/.test(plain[start])) return null;
-  let i = start;
-  let matched = 0;
-  for (let j = 0; j < text.length; j++) {
-    if (/\s/.test(text[j])) continue;
-    while (i < plain.length && /\s/.test(plain[i])) i++;
-    if (i >= plain.length || plain[i].toLowerCase() !== text[j].toLowerCase()) return null;
-    i++;
-    matched++;
-  }
-  return matched > 0 ? i : null;
+function highlightOpen(h: Highlight): string {
+  const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
+  const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
+  const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
+  return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
 }
+
+const noteOpen = (a: Annotation): string =>
+  `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`;
 
 export function renderArticleHtml(input: RenderArticleInput): string {
   const raw = input.raw || '';
@@ -133,35 +139,32 @@ export function renderArticleHtml(input: RenderArticleInput): string {
     pushRaw(rawAt[start], rawAt[end - 1] + 1, kind, open, close);
   };
 
-  for (const h of input.highlights) {
-    const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
-    const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
-    const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
-    const open = `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
-    if (typeof h.startOffset === 'number' && h.startOffset >= 0) {
-      const end = anchorEnd(plain, h.startOffset, h.text);
-      if (end !== null) pushPlain(h.startOffset, end, 'highlight', open, '</mark>');
-      continue;
-    }
-    // Saved before offsets existed: every occurrence, as it always rendered.
-    const needle = h.text.toLowerCase();
-    if (!needle) continue;
-    for (let at = plainLower.indexOf(needle); at !== -1; at = plainLower.indexOf(needle, at + needle.length)) {
-      pushPlain(at, at + needle.length, 'highlight', open, '</mark>');
-    }
+  // Where each highlight and note renders — decided in articleAnnotations.ts,
+  // which the annotation signs and their popover read too.
+  const anchors = resolveAnchors(plain, input.highlights, input.annotations);
+  for (const anchor of anchors) {
+    if (anchor.kind === 'highlight') pushPlain(anchor.start, anchor.end, 'highlight', highlightOpen(anchor.highlight), '</mark>');
+    else if (anchor.kind === 'note') pushPlain(anchor.start, anchor.end, 'note', noteOpen(anchor.note), '</span>');
   }
 
-  for (const a of input.annotations) {
-    if (typeof a.startOffset !== 'number' || a.startOffset < 0 || !a.anchorText) continue;
-    const end = anchorEnd(plain, a.startOffset, a.anchorText);
-    if (end === null) continue;
-    pushPlain(
-      a.startOffset,
-      end,
-      'note',
-      `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`,
-      '</span>',
-    );
+  const threadAnchors: ResolvedAnchor[] = (input.threads ?? []).map((lt) => ({
+    kind: 'thread',
+    thread: lt.thread,
+    start: lt.start,
+    end: lt.end,
+  }));
+
+  if (input.focusedThreadId) {
+    const focused = input.threads?.find((t) => t.thread.id === input.focusedThreadId);
+    if (focused) {
+      pushPlain(
+        focused.start,
+        focused.end,
+        'thread',
+        `<span class="vlx-thread-focus" data-thread-focus="${escapeAttr(focused.thread.id)}">`,
+        '</span>',
+      );
+    }
   }
 
   const query = input.searchQuery;
@@ -187,14 +190,15 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   }
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
-  return renderBlocks(raw, structure, marks);
+  const groups = input.signs ? groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]) : null;
+  return renderBlocks(raw, structure, marks, groups);
 }
 
-function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[]): string {
+function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[], groups: BlockAnnotations[] | null): string {
   const parts: string[] = [];
   const tail = structure.updates;
   let inTail = false;
-  for (const block of structure.blocks) {
+  for (const [index, block] of structure.blocks.entries()) {
     if (tail && !inTail && block.start >= tail.start) {
       inTail = true;
       // Folded by CSS through a class on the container (useArticleTextInteractions),
@@ -220,10 +224,33 @@ function renderBlocks(raw: string, structure: ArticleStructure, marks: Mark[]): 
     }
     parts.push(`<div class="${blockClass(block)}"${blockAttributes(block)}>`);
     parts.push(renderSpan(raw, block.start, block.end, blockMarks, false));
+    // After renderSpan has closed every mark, so a sign is never inside one.
+    if (groups) parts.push(signHtml(index, groups[index]));
     parts.push('</div>');
   }
   if (inTail) parts.push('</div></div>');
   return parts.join('');
+}
+
+/**
+ * An annotated block's sign: a button without a single text node. The note
+ * icon, the count and the colour dots are drawn by CSS from the data
+ * attributes (index.css, READING SURFACE), so the projection holds
+ * (gotcha 23). useArticleTextInteractions opens it; the popover finds it
+ * again by `data-block`.
+ */
+function signHtml(index: number, group: BlockAnnotations | undefined): string {
+  const notes = group?.notes.length ?? 0;
+  const highlights = group?.highlights.length ?? 0;
+  const threads = group?.threads.length ?? 0;
+  if (!group || notes + highlights + threads === 0) return '';
+  let html =
+    `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
+    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}" aria-label="${signAriaLabel(notes, highlights, threads)}">`;
+  if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
+  for (const color of signColors(group.highlights)) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
+  if (threads > 0) html += `<span class="vlx-sign-threads" data-count="${threads}"></span>`;
+  return `${html}</span>`;
 }
 
 function coversText(structure: ArticleStructure, length: number): boolean {

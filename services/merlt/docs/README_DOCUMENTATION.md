@@ -270,8 +270,8 @@ VisuaLexAPI/docs/
 - Aggiungi date e changelog
 
 **Repository**:
-- MERL-T: `/Users/gpuzio/Desktop/CODE/MERL-T_alpha`
-- VisuaLex: `/Users/gpuzio/Desktop/CODE/VisuaLexAPI`
+- MERL-T: `../MERL-T_alpha`
+- VisuaLex: `.`
 
 ---
 

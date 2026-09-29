@@ -25,22 +25,22 @@ Brocardi). Real numbers (verified against a temp container):
 
 ## Files in this repo
 
-- `merlt/data/seeds/libro-iv-cc-graph.json` (~39 MB) — portable node/edge export.
+- `services/merlt/data/seeds/libro-iv-cc-graph.json` (~39 MB) — portable node/edge export.
   **Merge key:** `properties.URN` for `Norma`, `properties.node_id` for everything
   else. NEVER merge on FalkorDB internal id (it changes between instances).
-- `merlt/data/seeds/postgres-dumps/bridge-table-data.sql` (~49 MB, COPY format) +
+- `services/merlt/data/seeds/postgres-dumps/bridge-table-data.sql` (~49 MB, COPY format) +
   `bridge-table-schema.sql` (`CREATE TABLE IF NOT EXISTS`, idempotent).
-- `merlt/data/seeds/postgres-dumps/rlcf-schema.sql` (36 tables — reused by the
+- `services/merlt/data/seeds/postgres-dumps/rlcf-schema.sql` (36 tables — reused by the
   future Slice 2b "Laboratorio RLCF").
-- `merlt/data/legacy-libro-iv/{falkordb,qdrant,postgres}/` — original raw volumes
+- `services/merlt/data/legacy-libro-iv/{falkordb,qdrant,postgres}/` — original raw volumes
   (gitignored, ~316 MB), kept for re-export.
-- `merlt/scripts/export_legacy_libro_iv.py` — reproducible exporter (verbose
+- `services/merlt/scripts/export_legacy_libro_iv.py` — reproducible exporter (verbose
   `GRAPH.QUERY`, NOT `--compact` — compact adds wrapping that broke v1).
 
 ## Loader (runs automatically on boot)
 
-`merlt/merlt/scripts/load_seed_libro_iv.py`, hooked into the FastAPI lifespan in
-`merlt/merlt/app.py` (after the expert system and the buffer rehydration, before `yield`; `MERLT_SKIP_SEED=true` disables it). Verified E2E in the
+`services/merlt/merlt/scripts/load_seed_libro_iv.py`, hooked into the FastAPI lifespan in
+`services/merlt/merlt/app.py` (after the expert system and the buffer rehydration, before `yield`; `MERLT_SKIP_SEED=true` disables it). Verified E2E in the
 `visualex-merlt-api` container: 27.741 nodes + 43.935 edges + 27.117 bridge rows
 in ~43s (embeddings skipped). Idempotent: skips entirely when the graph already
 has >100 nodes.
@@ -71,7 +71,7 @@ The container default `dir` is `/var/lib/falkordb/data` (NOT `/data`) and
 `appendonly no` — both must be overridden or the dump never loads and
 `GRAPH.LIST` returns empty.
 
-The same fact decides persistence in the live stack. `docker-compose.merlt.yml`
+The same fact decides persistence in the live stack. `infra/compose.yml`
 mounts the `merlt_falkor_data` volume at `/var/lib/falkordb/data` and sets
 `FALKORDB_ARGS="--save 60 1 --appendonly yes --appendfsync everysec"`. Until
 2026-09-25 the volume sat at `/data`, next to the real data dir, so every
@@ -82,7 +82,7 @@ the seed came back at the next boot.
 
 1. `merlt-api` builds the image (no code volume mount): after editing the loader
    run `docker compose build merlt-api && up -d --force-recreate`.
-2. The Dockerfile copies `merlt/`, not `data/`: mount `./merlt/data:/app/data:ro`
+2. The Dockerfile copies the `merlt/` package, not `data/`: `infra/compose.yml` mounts `../services/merlt/data:/app/data:ro`
    and set `MERLT_DATA_DIR=/app/data` (the `Path(__file__).parents[2]/data`
    default breaks in the container — `parents[2]` is `/`).
 3. `postgresql-client` (psql) had to be added to the runtime image deps.
@@ -104,5 +104,5 @@ the seed came back at the next boot.
 
 Run a fresh `EXP-xxx` ingestion over the target article range, export with
 `export_legacy_libro_iv.py` (adjust the graph name), drop the new
-`*-graph.json` into `merlt/data/seeds/`, and extend the loader to MERGE it. The
+`*-graph.json` into `services/merlt/data/seeds/`, and extend the loader to MERGE it. The
 URN merge contract guarantees no collisions with the existing Libro IV nodes.

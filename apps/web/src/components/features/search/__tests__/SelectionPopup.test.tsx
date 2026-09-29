@@ -7,8 +7,9 @@ const TEXT = "Si applica l'art. 2043 c.c. ai danni ingiusti.";
 const RECT = { x: 40, y: 120, width: 90, height: 18 };
 
 type ReportFn = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
+type DiscussFn = (text: string, startOffset: number) => void;
 
-function Harness({ onReportCitation }: { onReportCitation?: ReportFn }) {
+function Harness({ onReportCitation, onDiscuss }: { onReportCitation?: ReportFn; onDiscuss?: DiscussFn }) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div ref={ref} data-testid="container">
@@ -18,6 +19,7 @@ function Harness({ onReportCitation }: { onReportCitation?: ReportFn }) {
         onAddNote={vi.fn()}
         onCopy={vi.fn()}
         onReportCitation={onReportCitation}
+        onDiscuss={onDiscuss}
       />
       <p>{TEXT}</p>
     </div>
@@ -68,6 +70,29 @@ describe('SelectionPopup: "Segnala come citazione"', () => {
     expect(onReportCitation).toHaveBeenCalledWith('art. 2043 c.c.', TEXT.indexOf('art. 2043'), RECT);
     // The popup closes and the selection is gone once the action fired.
     expect(screen.queryByRole('button', { name: /segnala come citazione/i })).not.toBeInTheDocument();
+    expect(window.getSelection()?.toString()).toBe('');
+  });
+});
+
+describe('SelectionPopup: "Discuti con i colleghi"', () => {
+  it('does not offer the action when onDiscuss is not passed', async () => {
+    render(<Harness />);
+    await selectText('art. 2043 c.c.');
+    expect(screen.queryByRole('button', { name: /discuti con i colleghi/i })).not.toBeInTheDocument();
+  });
+
+  it('offers the action and calls onDiscuss with text and plain offset when clicked', async () => {
+    const onDiscuss = vi.fn<DiscussFn>();
+    render(<Harness onDiscuss={onDiscuss} />);
+    await selectText('art. 2043 c.c.');
+
+    const action = screen.getByRole('button', { name: /discuti con i colleghi/i });
+    expect(action).toHaveAttribute('title', 'Discuti con i colleghi');
+    fireEvent.click(action);
+
+    expect(onDiscuss).toHaveBeenCalledWith('art. 2043 c.c.', TEXT.indexOf('art. 2043'));
+    // The popup closes and the selection is cleared
+    expect(screen.queryByRole('button', { name: /discuti con i colleghi/i })).not.toBeInTheDocument();
     expect(window.getSelection()?.toString()).toBe('');
   });
 });
