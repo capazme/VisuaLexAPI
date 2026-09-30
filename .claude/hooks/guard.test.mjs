@@ -77,9 +77,13 @@ test('guards the branches of this repository only', () => {
   const here = fileURLToPath(new URL('.', import.meta.url));
   const own = commonDir(here);
   assert.ok(own, 'the hook sits inside a repository');
-  assert.equal(branchResolver(other, own)(), '');
-  assert.equal(branchResolver(here, own)(other), '');
-  assert.notEqual(branchResolver(here, own)(), '');
+  assert.equal(branchResolver(other, own)(), null);
+  assert.equal(branchResolver(here, own)(other), null);
+  assert.ok(branchResolver(here, own)(), 'a branch name inside this repository');
   assert.equal(decide('git commit -m x', branchResolver(other, own)), null);
   assert.equal(decide(`git -C ${other} commit -m x`, branchResolver(here, own)), null);
+  // Naming main explicitly does not make another repository's main ours.
+  assert.equal(decide('git push origin main', branchResolver(other, own)), null);
+  assert.equal(decide(`git -C ${other} push origin main`, branchResolver(here, own)), null);
+  assert.ok(decide('git push origin main', branchResolver(here, own)), 'this repository stays guarded');
 });
