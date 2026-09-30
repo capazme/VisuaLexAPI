@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pin, PinOff, Lightbulb, ChevronDown } from 'lucide-react';
+import { Pin, PinOff, ExternalLink, Lightbulb, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
 import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
-import { LATIN_MAXIMS_LABEL } from '../../../../utils/doctrineLabel';
+import { DOCTRINE_SOURCE_NAME, LATIN_MAXIMS_LABEL } from '../../../../utils/doctrineLabel';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPanelProps {
@@ -281,6 +281,18 @@ export function StudyModeBrocardiPanel({
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
                 {brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0 && (
                   <FootnotesSection footnotes={brocardiInfo.Footnotes} theme={theme} />
+                )}
+
+                {brocardiInfo.link && (
+                  <a
+                    href={brocardiInfo.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 text-sm text-primary-600 hover:text-primary-700 hover:underline py-3 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
+                  >
+                    <ExternalLink size={14} />
+                    {`Vedi fonte su ${DOCTRINE_SOURCE_NAME}`}
+                  </a>
                 )}
               </>
             ) : (

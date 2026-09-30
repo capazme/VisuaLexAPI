@@ -14,7 +14,7 @@ describe('getHealthSnapshot', () => {
     vi.mocked(legalFetch).mockReset();
   });
 
-  it('names unavailable sources by their label, the doctrine one as Dottrina', async () => {
+  it('names unavailable sources by their label, the doctrine one credited to its source', async () => {
     vi.mocked(legalFetch).mockImplementation(async (url) =>
       String(url).startsWith('/api/')
         ? answer({ status: 'ok' })
@@ -32,6 +32,6 @@ describe('getHealthSnapshot', () => {
     const snapshot = await getHealthSnapshot(new AbortController().signal);
     const api = snapshot.services.find((s) => s.name === 'API normativa e fonti');
     expect(api?.state).toBe('degraded');
-    expect(api?.detail).toBe('Non disponibili: EUR-Lex, Dottrina');
+    expect(api?.detail).toBe('Non disponibili: EUR-Lex, Dottrina (Brocardi.it)');
   });
 });

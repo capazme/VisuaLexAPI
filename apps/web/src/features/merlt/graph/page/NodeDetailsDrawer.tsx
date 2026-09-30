@@ -2,7 +2,6 @@ import { X, Check, Crosshair, Plus, Share2 } from 'lucide-react';
 import { NODE_TYPE_STYLE } from '../shared/graphStyles';
 import type { GraphNode, GraphEdge, NodeProvenance } from '../shared/types';
 import { deriveProvenance, readNodeDegree } from '../shared/types';
-import { displaySourceName, isDoctrineProviderUrl } from '../../../../utils/doctrineLabel';
 
 export interface NodeDetailsDrawerProps {
   node: GraphNode | null;
@@ -86,7 +85,7 @@ export function NodeDetailsDrawer({
   const extraProps = Object.entries(props)
     .filter(([k]) => !PRIMARY_KEYS.has(k))
     .map(([k, v]) => [k, asText(v)] as const)
-    .filter((entry): entry is [string, string] => entry[1] !== null && !isDoctrineProviderUrl(entry[1]));
+    .filter((entry): entry is [string, string] => entry[1] !== null);
 
   return (
     <div className="flex h-full flex-col">
@@ -134,17 +133,15 @@ export function NodeDetailsDrawer({
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-3 text-sm">
-        {node.urn && !isDoctrineProviderUrl(node.urn) && (
+        {node.urn && (
           <Field label="URN">
             <p className="break-all font-mono text-xs text-slate-600 dark:text-slate-300">{node.urn}</p>
           </Field>
         )}
 
         {PRIMARY_PROPS.map(({ key, label, long }) => {
-          const raw = asText(props[key]);
-          // A link to the doctrine provider would name it on screen: skip it.
-          if (!raw || isDoctrineProviderUrl(raw)) return null;
-          const text = key === 'fonte' ? displaySourceName(raw) : raw;
+          const text = asText(props[key]);
+          if (!text) return null;
           return (
             <Field key={key} label={label}>
               <p

@@ -1,6 +1,6 @@
 import type { SearchParams } from '../../../types';
 import { parseNormattivaUrl } from '../../../utils/normattivaParser';
-import { DOCTRINE_LABEL, displaySourceName } from '../../../utils/doctrineLabel';
+import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
 
 /**
  * Non-component helpers for the validation queue (Slice 3 §3.6 / D4): provenance
@@ -15,7 +15,7 @@ import { DOCTRINE_LABEL, displaySourceName } from '../../../utils/doctrineLabel'
  */
 const FONTE_LABELS: Record<string, string> = {
   llm_extraction: 'Estrazione automatica (LLM)',
-  brocardi: DOCTRINE_LABEL,
+  brocardi: `${DOCTRINE_LABEL} (${DOCTRINE_SOURCE_NAME})`,
   mechanistic: 'Estrazione strutturata',
   visualex: 'Contributo da VisuaLex',
   manual: 'Inserimento manuale',
@@ -24,7 +24,7 @@ const FONTE_LABELS: Record<string, string> = {
 
 export function formatFonte(fonte?: string): string {
   if (!fonte) return FONTE_LABELS.unknown;
-  return FONTE_LABELS[fonte.toLowerCase()] ?? displaySourceName(fonte);
+  return FONTE_LABELS[fonte.toLowerCase()] ?? fonte;
 }
 
 /**

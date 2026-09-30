@@ -17,7 +17,6 @@ import {
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { normRefToSearchParams } from '../validate/provenance';
-import { DOCTRINE_LABEL, displaySourceName, isDoctrineProviderUrl } from '../../../utils/doctrineLabel';
 import { sourceLabel, CANON_LABEL, provenanceMeta, urnKind } from './format';
 import type { ConfirmState, QaRetrievedSource, QaSource } from './types';
 
@@ -36,11 +35,6 @@ export interface QaSourceChipProps {
   onRate?: (sourceId: string, relevant: boolean) => void;
   /** Matching LLM-cited source (excerpt/citation/canon) to enrich the tooltip. */
   cited?: QaSource;
-}
-
-/** A reference as the reader may see it: a link to the doctrine provider shows as "Dottrina". */
-function shownRef(ref: string): string {
-  return isDoctrineProviderUrl(ref) ? DOCTRINE_LABEL : ref;
 }
 
 /**
@@ -94,7 +88,7 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
               <div>
                 <dt className="text-slate-400">Provenienza</dt>
                 <dd className="text-slate-700 dark:text-slate-200">
-                  {displaySourceName(source.provenance) || 'sconosciuta'}
+                  {source.provenance ?? 'sconosciuta'}
                   {typeof source.trust === 'number' ? ` · affidabilità ${source.trust.toFixed(2)}` : ''}
                 </dd>
               </div>
@@ -106,7 +100,7 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
               )}
               <div>
                 <dt className="text-slate-400">URN</dt>
-                <dd className="break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">{shownRef(source.urn)}</dd>
+                <dd className="break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">{source.urn}</dd>
               </div>
               {source.node_id && (
                 <div>
@@ -114,7 +108,7 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
                   <dd className="break-all font-mono text-[11px] text-slate-500">{source.node_id}</dd>
                 </div>
               )}
-              {source.source_url && !isDoctrineProviderUrl(source.source_url) && (
+              {source.source_url && (
                 <div>
                   <dt className="text-slate-400">Fonte</dt>
                   <dd>
@@ -173,12 +167,12 @@ export function QaSourceChip({ source, confirmState, onConfirm, onRate, cited }:
           <Link
             to={`/grafo?urn=${encodeURIComponent(displayUrn)}`}
             className="truncate font-medium text-slate-800 hover:text-primary-600 dark:text-slate-200 dark:hover:text-primary-400"
-            title={shownRef(displayUrn)}
+            title={displayUrn}
           >
             {label}
           </Link>
         ) : (
-          <span className="truncate font-medium text-slate-800 dark:text-slate-200" title={shownRef(source.urn)}>
+          <span className="truncate font-medium text-slate-800 dark:text-slate-200" title={source.urn}>
             {label}
           </span>
         )}

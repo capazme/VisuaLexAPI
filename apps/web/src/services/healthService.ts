@@ -1,5 +1,5 @@
 import { legalFetch } from './legalFetch';
-import { DOCTRINE_LABEL } from '../utils/doctrineLabel';
+import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../utils/doctrineLabel';
 
 export type ServiceHealthState = 'online' | 'degraded' | 'offline' | 'checking';
 
@@ -20,7 +20,7 @@ export interface HealthSnapshot {
 const SOURCE_LABELS: Record<string, string> = {
   normattiva: 'Normattiva',
   eurlex: 'EUR-Lex',
-  brocardi: DOCTRINE_LABEL,
+  brocardi: `${DOCTRINE_LABEL} (${DOCTRINE_SOURCE_NAME})`,
 };
 
 function sourceLabel(key: string): string {
