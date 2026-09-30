@@ -75,6 +75,11 @@ fi
 if [ -f "$PROJECT_ROOT/infra/.env" ]; then set -a; . "$PROJECT_ROOT/infra/.env"; set +a; fi
 COMPOSE=(docker compose -f "$PROJECT_ROOT/infra/compose.yml")
 MERLT_ENABLED="${MERLT_ENABLED:-false}"
+# One switch for all three: the server (whose apps/server/.env this overrides), the web
+# app, and the MERL-T services started below. A web app showing MERL-T while the
+# server has it off calls routes that answer 404.
+export MERLT_ENABLED
+export VITE_FEATURE_MERLT="${VITE_FEATURE_MERLT:-$MERLT_ENABLED}"
 MERLT_API_IN_DOCKER="${MERLT_API_IN_DOCKER:-true}"
 MERLT_ROOT="$PROJECT_ROOT/services/merlt"
 MERLT_PORT="${MERLT_API_PORT:-8000}"

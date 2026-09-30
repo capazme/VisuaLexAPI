@@ -14,6 +14,7 @@ import { cn } from '../../../lib/utils';
 import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { formatNormaMeta } from '../../../utils/normaMeta';
 import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
@@ -47,6 +48,9 @@ export function NormaBlockComponent({
   // one block's index hands the window over instead of stacking a second one.
   const isStructureOpen = useAppStore(s => s.structureWindow.blockId === normaBlock.id);
   const [studyModeOpen, setStudyModeOpen] = useState(false);
+  // One layout mounted, not two hidden by CSS: each ArticleTabContent loads its
+  // discussions, rubrics and saved-norm check, so a CSS-hidden twin doubled them.
+  const isDesktop = useIsDesktop();
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const [activeArticleId, setActiveArticleId] = useState<string | null>(
@@ -411,6 +415,7 @@ export function NormaBlockComponent({
             </div>
           )}
 
+          {!isDesktop && (
           <div className="md:hidden bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">
             {normaBlock.articles.map((article, idx) => {
               const uniqueId = getUniqueArticleId(article);
@@ -444,7 +449,9 @@ export function NormaBlockComponent({
               );
             })}
           </div>
+          )}
 
+          {isDesktop && (
           <div className="norma-article-tabs hidden md:flex relative z-30 px-3 pt-3 gap-2 overflow-x-auto overflow-y-hidden custom-scrollbar items-end">
             {normaBlock.articles.map((article, idx) => {
               const uniqueId = getUniqueArticleId(article);
@@ -510,7 +517,9 @@ export function NormaBlockComponent({
               );
             })}
           </div>
+          )}
 
+          {isDesktop && (
           <div className="hidden md:block bg-white dark:bg-slate-800 min-h-[250px] overflow-hidden relative">
             <AnimatePresence mode="wait" initial={false}>
               {activeArticle && (
@@ -549,6 +558,7 @@ export function NormaBlockComponent({
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 

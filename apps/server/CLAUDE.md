@@ -27,6 +27,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `REDIS_ENABLED=true`, else in-memory with a startup warning.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
   connection errors fail open.
+- `src/middleware/auth.ts` — `authenticate` answers **401** only when the
+  session is over: no token, a token that does not verify, the wrong type, a
+  missing or disabled user. When it cannot read the user (the database is
+  unreachable) it answers **503**: the web client treats a 401 as "log out",
+  so a 401 there logged every open tab out at each database hiccup.
+  `tests/authUnavailable.test.ts` holds both sides.
 - `src/middleware/scrapeGate.ts` — the handlers behind `GET /api/auth/verify`, the question
   the production ingress (Caddy `forward_auth`) puts to the server before it lets a scraping
   request through to the Python API. In order: a cap per address (`SCRAPE_IP_POINTS`, 1200 a
