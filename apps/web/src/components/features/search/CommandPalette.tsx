@@ -13,6 +13,7 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { motion, AnimatePresence } from 'framer-motion';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
+import { legalFetch } from '../../../services/legalFetch';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -151,7 +152,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure }:
 
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch('/parse_query', {
+      legalFetch('/parse_query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: remoteQuery }),

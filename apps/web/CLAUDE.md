@@ -260,6 +260,12 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
   fetched. It sends `article: '1'` because the endpoint refuses to build a
   `NormaVisitata` without one — a probe, not a request for article 1.
+- `services/legalFetch.ts` — `legalFetch(path, init)`: `fetch` for the Python routes
+  (`/fetch_*`, `/stream_article_text`, `/export_pdf`, `/parse_query`, `/health/detailed`…).
+  It sends the login token (refreshing it first when expired, once more on a 401, through
+  `api.ts`'s single in-flight refresh) because the production ingress refuses those calls
+  without one, and it returns fetch's own `Response`, so the NDJSON stream and the PDF
+  work as before. `/version` and `/health` are the two that stay open.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
   `findLiveBackIndex` for citation-jump undo.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
@@ -427,7 +433,7 @@ constants; import types from `types/index.ts`; reach state through
 Breaking one of these breaks the product. Read before editing.
 
 **Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
-`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
+`services/legalFetch.ts` · `utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
 `utils/articleStructure.ts` · `utils/articleRender.ts` ·
 `utils/articleAnnotations.ts` · `utils/dateUtils.ts` ·
 `utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
@@ -588,6 +594,12 @@ meant to stay split; add new features as new files, not inside the shells:
     are different tokens** — `bg-primary` (213 uses) comes from the first and
     must keep working. Everything else the config declares — `font-sans`,
     `shadow-glow`, `animate-shimmer` — is still inert.
+
+30. **A bare `fetch` to a scraping route works in development and answers 401 in
+    production.** Vite proxies those routes to the Python API with no login; the ingress
+    does not. Call them through `legalFetch`. `services/__tests__/legalFetch.guard.test.ts`
+    reads the route list from `vite.config.ts` and fails on a bare `fetch('/fetch_…'`,
+    the way `infra/ingress/paths.test.mjs` keeps the ingress in step with the same list.
 
 28. **Two vocabularies name the same act, and they disagree on case.**
     `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver

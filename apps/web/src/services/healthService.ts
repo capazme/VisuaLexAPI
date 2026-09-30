@@ -1,3 +1,5 @@
+import { legalFetch } from './legalFetch';
+
 export type ServiceHealthState = 'online' | 'degraded' | 'offline' | 'checking';
 
 export interface ServiceHealth {
@@ -16,7 +18,7 @@ export interface HealthSnapshot {
 async function probe(url: string, name: string, signal: AbortSignal): Promise<ServiceHealth> {
   const started = performance.now();
   try {
-    const response = await fetch(url, { signal });
+    const response = await legalFetch(url, { signal });
     const payload = await response.json().catch(() => ({})) as { status?: string; services?: Record<string, { status?: string; latency_ms?: number }> };
     const latencyMs = Math.round(performance.now() - started);
     // A 503 that still carries the services map is the API saying "I am up,

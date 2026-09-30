@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ANNEX_AUTO_SWITCH_CONFIG } from '../config/annexConfig';
 import type { SearchParams, TreeMetadata, AnnexMetadata } from '../types';
+import { legalFetch } from '../services/legalFetch';
 
 interface AutoSwitchState {
   /** Show confirmation dialog */
@@ -161,7 +162,7 @@ export function useAutoSwitch({
           const normUrl = buildNormURN(params);
           console.log('🔍 Auto-switch: Fetching tree for URL:', normUrl);
 
-          const response = await fetch('/fetch_tree', {
+          const response = await legalFetch('/fetch_tree', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ urn: normUrl, return_metadata: true })

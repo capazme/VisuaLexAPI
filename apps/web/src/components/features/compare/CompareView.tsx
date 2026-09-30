@@ -10,6 +10,7 @@ import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { SafeHTML } from '../../../utils/sanitize';
 import type { ArticleData } from '../../../types';
+import { legalFetch } from '../../../services/legalFetch';
 
 function stripHtml(html: string): string {
   return html
@@ -158,7 +159,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
       }
 
       // Direct fetch - same as useCitationPreview
-      const response = await fetch('/fetch_article_text', {
+      const response = await legalFetch('/fetch_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),

@@ -3,6 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { extractArticleIdsFromTree, normalizeArticleId, type TreeNode } from '../utils/treeUtils';
 import { getUniqueArticleId } from '../utils/articleIds';
 import type { Norma, ArticleData, TreeMetadata } from '../types';
+import { legalFetch } from '../services/legalFetch';
 
 interface UseAnnexNavigationProps {
   /** The norma being displayed */
@@ -151,7 +152,7 @@ export function useAnnexNavigation({
       setRubriche({});
       setAbrogati([]);
       setRubricheParts([]);
-      const res = await fetch('/fetch_tree', {
+      const res = await legalFetch('/fetch_tree', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,7 +176,7 @@ export function useAnnexNavigation({
       // codice civile, 20ms warm) because they come from the Akoma Ntoso export
       // rather than the HTML tree. Deliberately NOT awaited: the index paints
       // immediately with bare numbers and the titles merge in when they land.
-      fetch('/fetch_rubriche', {
+      legalFetch('/fetch_rubriche', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ urn })
@@ -236,7 +237,7 @@ export function useAnnexNavigation({
       setLoadingArticle(annexNumber ? `annex-${annexNumber}` : 'main');
 
       try {
-        const response = await fetch('/fetch_all_data', {
+        const response = await legalFetch('/fetch_all_data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -316,7 +317,7 @@ export function useAnnexNavigation({
       setLoadingArticle(articleNumber);
 
       try {
-        const response = await fetch('/fetch_all_data', {
+        const response = await legalFetch('/fetch_all_data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

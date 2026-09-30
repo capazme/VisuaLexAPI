@@ -1,4 +1,5 @@
 import type { Norma } from '../types';
+import { legalFetch } from '../services/legalFetch';
 
 /**
  * Resolve an act from its identifying parameters, without fetching any article
@@ -42,7 +43,7 @@ export interface ResolvedAct {
 }
 
 export async function resolveAct(params: ActUrnParams): Promise<ResolvedAct> {
-  const response = await fetch('/fetch_norma_data', {
+  const response = await legalFetch('/fetch_norma_data', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
