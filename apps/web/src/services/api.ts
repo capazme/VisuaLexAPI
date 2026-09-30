@@ -30,13 +30,13 @@ const apiClient: AxiosInstance = axios.create({
  */
 let refreshInFlight: Promise<string> | null = null;
 
-function handleUnauthenticated(): void {
+export function handleUnauthenticated(): void {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   window.location.href = '/login';
 }
 
-async function refreshAccessToken(): Promise<string> {
+export async function refreshAccessToken(): Promise<string> {
   if (refreshInFlight) return refreshInFlight;
 
   const refreshToken = localStorage.getItem('refresh_token');
@@ -63,22 +63,33 @@ async function refreshAccessToken(): Promise<string> {
 }
 
 /**
+ * The access token to send now, for a request that does not go through axios (the
+ * scraping calls use fetch: see legalFetch.ts). A token past its expiry is refreshed
+ * first, through the same single in-flight promise as every other refresh; when the
+ * refresh fails the stale token is returned, and the 401 that follows decides.
+ */
+export async function getFreshAccessToken(): Promise<string | null> {
+  const token = localStorage.getItem('access_token');
+  if (token && isAccessTokenExpired() && localStorage.getItem('refresh_token')) {
+    try {
+      return await refreshAccessToken();
+    } catch {
+      // Fall through with the stale token.
+    }
+  }
+  return token;
+}
+
+/**
  * Request interceptor: attach access token. If the token is expired and
  * a refresh_token is present, refresh *before* sending so the request
  * doesn't hit the server just to bounce back with 401.
  */
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    let token = localStorage.getItem('access_token');
-
-    if (token && isAccessTokenExpired() && localStorage.getItem('refresh_token')) {
-      try {
-        token = await refreshAccessToken();
-      } catch {
-        // Fall through with the stale token: the response interceptor
-        // will catch the resulting 401 and perform the final redirect.
-      }
-    }
+    // A stale token still goes out when the refresh fails: the response
+    // interceptor catches the resulting 401 and performs the final redirect.
+    const token = await getFreshAccessToken();
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;

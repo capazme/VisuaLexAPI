@@ -25,6 +25,7 @@ import { resolveAct } from '../../../utils/actUrn';
 import { ReadingBackControl } from './ReadingBackControl';
 import { matchesSearchFilters } from '../../../utils/searchFilters';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
+import { legalFetch } from '../../../services/legalFetch';
 
 // Estimate the number of articles a search will return based on the `article`
 // field. Used both for the streaming progress bar and the loading skeleton.
@@ -310,7 +311,7 @@ export function SearchPanel() {
 
     try {
       // Always use streaming endpoint (now supports Brocardi too!)
-      const response = await fetch('/stream_article_text', {
+      const response = await legalFetch('/stream_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -640,7 +641,7 @@ export function SearchPanel() {
   const handleViewPdf = async (urn: string) => {
     setPdfState({ isOpen: true, url: null, isLoading: true });
     try {
-      const response = await fetch('/export_pdf', {
+      const response = await legalFetch('/export_pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ urn })

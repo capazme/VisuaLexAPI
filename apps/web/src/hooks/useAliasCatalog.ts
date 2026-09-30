@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { legalFetch } from '../services/legalFetch';
 
 /**
  * What the server already recognises when naming an act.
@@ -39,7 +40,7 @@ export function useAliasCatalog(enabled: boolean): { catalog: AliasCatalog; load
     if (!enabled || loaded) return;
 
     const controller = new AbortController();
-    fetch('/fetch_alias_catalog', { signal: controller.signal })
+    legalFetch('/fetch_alias_catalog', { signal: controller.signal })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

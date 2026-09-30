@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ArticleData } from '../types';
 import type { ParsedCitationData } from '../utils/citationMatcher';
+import { legalFetch } from '../services/legalFetch';
 
 interface CachedArticle {
   data: ArticleData;
@@ -161,7 +162,7 @@ export function useCitationPreview(options: UseCitationPreviewOptions = {}) {
     }
 
     try {
-      const response = await fetch('/fetch_article_text', {
+      const response = await legalFetch('/fetch_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),

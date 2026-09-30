@@ -1,5 +1,6 @@
 import type { ArticleData, NormaVisitata } from '../types';
 import { buildItemKey } from './normaKeys';
+import { legalFetch } from '../services/legalFetch';
 
 // Session-only cache: deliberately NOT persisted and NOT in the Zustand store
 // (must never enter the persist partialize).
@@ -29,7 +30,7 @@ export function fetchArticleForNorma(norma: NormaVisitata): Promise<ArticleData>
   const promise = (async () => {
     await acquire();
     try {
-      const response = await fetch('/fetch_article_text', {
+      const response = await legalFetch('/fetch_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -4,6 +4,7 @@ import { parseItalianDate } from '../../../utils/dateUtils';
 import { resolveAct } from '../../../utils/actUrn';
 import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { legalFetch } from '../../../services/legalFetch';
 
 // Above this threshold we ask for explicit confirmation before importing —
 // selecting "all" on a large code (e.g. CC ~2900 articles) is almost always a
@@ -41,7 +42,7 @@ export function TreeNavigatorModal({ onClose, onImport }: Props) {
         date: actDate ? parseItalianDate(actDate) : undefined,
       });
 
-      const treeRes = await fetch('/fetch_tree', {
+      const treeRes = await legalFetch('/fetch_tree', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ urn: urnToUse, link: false, details: false }),

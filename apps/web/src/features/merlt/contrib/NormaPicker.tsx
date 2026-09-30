@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Check, Loader2, X } from 'lucide-react';
+import { legalFetch } from '../../../services/legalFetch';
 
 /**
  * Natural-language picker for "Norma di riferimento".
@@ -59,7 +60,7 @@ export function NormaPicker({ value, onChange, placeholder, ariaLabel }: NormaPi
     debounceRef.current = window.setTimeout(() => {
       void (async () => {
         try {
-          const res = await fetch('/parse_query', {
+          const res = await legalFetch('/parse_query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query: trimmed }),
