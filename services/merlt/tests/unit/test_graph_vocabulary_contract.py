@@ -3,7 +3,7 @@ provenance that merlt/storage/graph/schema.py does not define.
 
 It reads string literals in Python files (AST, docstrings skipped, an f-string's
 pieces joined with `{}` for its placeholders), and also Cypher in YAML templates
-(comment lines blanked out, every template as one unit). Python slice syntax
+(comment lines blanked out, every file as one unit). Python slice syntax
 never matches. Names built at runtime are invisible here: the writers and readers
 that build them test their values against the schema themselves.
 
@@ -114,7 +114,7 @@ def _found() -> dict[str, dict[str, list[str]]]:
 
 def _check(kind: str, allowed: set[str], known: set[str]) -> None:
     names = _found()[kind]
-    assert allowed, f"the scan found no canonical {kind} at all: is ROOT right?"
+    assert names.keys() & allowed, f"the scan found no canonical {kind} at all: is ROOT right?"
     offenders = {name: where for name, where in names.items() if name not in allowed}
     new = {name: where for name, where in offenders.items() if name not in known}
     assert not new, f"{kind} outside the schema: {new}"
