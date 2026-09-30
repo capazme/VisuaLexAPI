@@ -35,6 +35,11 @@ def _parsed(numero_articolo, commi, lettere, numeri):
         ("art. 1, comma 2, lettera a), numero 3)", _parsed("1", ["2"], ["a"], ["3"])),
         ("art. 1, comma 2, lettere a) e b) numero 3)", _parsed("1", ["2"], ["a", "b"], ["3"])),
         ("art. 6, comma 1, lettera a), primo periodo", _parsed("6", ["1"], ["a"], [])),
+        # the closing parenthesis ends the lettera: the words after it are not part of it
+        ("art. 3, comma 1, lettera b) della tabella A", _parsed("3", ["1"], ["b"], [])),
+        ("art. 3, comma 1, lettera c-bis) dell'allegato B", _parsed("3", ["1"], ["c-bis"], [])),
+        ("art. 3, comma 1, lettere a) e b) dello stesso articolo", _parsed("3", ["1"], ["a", "b"], [])),
+        ("art. 3, comma 1, lettera a).", _parsed("3", ["1"], ["a"], [])),
         # the function lowercases and trims what it is given
         ("  Art. 3, Comma 1, Lettera B)  ", _parsed("3", ["1"], ["b"], [])),
     ],
@@ -45,8 +50,9 @@ def test_parse_disposizione(disposizione, expected):
 
 @pytest.mark.parametrize("next_part", ["numero 3", "comma 2", "periodo", "parole da x a y", "art. 5"])
 def test_each_keyword_that_starts_another_part_ends_the_lettere_even_without_a_comma(next_part):
-    # Without the cut, the last token would be "b) <next part>" and the lettera b would be lost.
-    assert parse_disposizione(f"art. 9, comma 1, lettere a) e b) {next_part}")["lettere"] == ["a", "b"]
+    # No parenthesis to end the last lettera here: without the cut, the last token would be
+    # "c <next part>" and the lettera c would be lost.
+    assert parse_disposizione(f"art. 9, comma 1, lettere a, b e c {next_part}")["lettere"] == ["a", "b", "c"]
 
 
 @pytest.mark.parametrize("empty", ["", "   ", None])
