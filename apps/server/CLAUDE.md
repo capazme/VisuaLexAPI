@@ -36,7 +36,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   detailed health page 5, anything else 1), then `204`. A `401` or `429` (with `Retry-After`)
   goes back to the browser as it is. Mounted **before** the general limiter in `app.ts` on
   purpose: it has limits of its own, and reading many articles must not spend the quota of
-  every other call. Limiter errors fail open, authentication never does.
+  every other call. Both caps count over `SCRAPE_QUOTA_WINDOW_SECONDS`. Limiter errors fail
+  open, authentication never does.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore

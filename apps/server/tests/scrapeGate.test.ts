@@ -27,6 +27,22 @@ describe('scrapeCost', () => {
     expect(scrapeCost('/fetch_article_text')).toBe(1);
   });
 
+  it('prices a route the way the scrapers read it: escapes decoded, path normalised', () => {
+    expect(scrapeCost('/export%5Fpdf')).toBe(20);
+    expect(scrapeCost('/%65xport_pdf')).toBe(20);
+    expect(scrapeCost('//export_pdf')).toBe(20);
+    expect(scrapeCost('/x/../export_pdf')).toBe(20);
+    expect(scrapeCost('/./export_pdf')).toBe(20);
+    expect(scrapeCost('/export%5Fpdf?x=1')).toBe(20);
+    expect(scrapeCost('/stream%5Farticle_text')).toBe(3);
+    expect(scrapeCost('/fetch_article_text')).toBe(1);
+  });
+
+  it('does not throw on a malformed escape, and prices it as it stands', () => {
+    expect(() => scrapeCost('/export%ZZpdf')).not.toThrow();
+    expect(scrapeCost('/export%ZZpdf')).toBe(1);
+  });
+
   it('costs 1 when the ingress did not say what was asked', () => {
     expect(scrapeCost(undefined)).toBe(1);
     expect(scrapeCost('')).toBe(1);

@@ -1,3 +1,4 @@
+import { posix } from 'node:path';
 import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { RateLimiterRes } from 'rate-limiter-flexible';
 import { authenticate } from './auth';
@@ -15,13 +16,25 @@ export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/health/detailed': 5,
 };
 
-/** The cost of the request the ingress is asking about, from the URI it forwards. */
+/**
+ * The cost of the request the ingress is asking about, from the URI it forwards. Caddy matches
+ * the decoded, cleaned path but forwards the URI as the client wrote it, and the scrapers'
+ * router decodes the path and accepts a doubled slash, so the price is looked up under a
+ * normalised reading of the path: `/export%5Fpdf`, `//export_pdf` and `/x/../export_pdf` cost
+ * what `/export_pdf` costs.
+ */
 export function scrapeCost(
   uri: string | undefined,
   costs: Record<string, number> = DEFAULT_SCRAPE_COSTS,
 ): number {
-  const path = (uri ?? '').split('?')[0];
-  return costs[path] ?? 1;
+  let path = (uri ?? '').split('?')[0];
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // A malformed escape: the scrapers will not route it either. Price it as it stands.
+  }
+  // posix.normalize merges runs of slashes and resolves `.` and `..`; '' becomes '.', in no table.
+  return costs[posix.normalize(path)] ?? 1;
 }
 
 export interface ScrapeGateOptions {
