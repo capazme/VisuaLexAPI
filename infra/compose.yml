@@ -195,6 +195,11 @@ services:
       BFF_EXTRACTION_CALLBACK_URL: "${MERLT_BFF_EXTRACTION_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/extraction-callback}"
       # Only the api seeds the graph at boot.
       MERLT_SKIP_SEED: "true"
+      # Bulk ingestion waits on the sources far longer than the api's hot path
+      # (30 s, the client default): a code's chunk measured ~6 s idle and past
+      # 30 s under load, and a request the client abandons keeps the scrapers
+      # busy, so every later chunk timed out too.
+      VISUALEX_API_TIMEOUT: "${MERLT_WORKER_VISUALEX_TIMEOUT:-120}"
     volumes: *merlt-volumes
     command: ["rq", "worker", "merlt_ingest", "merlt_extract", "merlt_ner_train", "--url", "redis://redis:6379/1"]
     healthcheck:
