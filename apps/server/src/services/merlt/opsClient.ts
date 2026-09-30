@@ -140,7 +140,7 @@ export class OpsClient {
   }
 }
 
-/** Factory reading from process.env. Honors backend/.env conventions. */
+/** Factory reading from process.env. Honors apps/server/.env conventions. */
 export function createOpsClient(env: NodeJS.ProcessEnv = process.env): OpsClient {
   const baseUrl = env.MERLT_API_URL || 'http://localhost:8000';
   const apiKey = env.MERLT_API_KEY || undefined;

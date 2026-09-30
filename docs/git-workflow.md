@@ -28,8 +28,9 @@ unavoidable, and it never holds a security fix.
    "Commands"). A branch rebases on `develop` when `develop` moves; it does not
    merge `develop` in.
 4. `git push -u origin feat/thing`, then a pull request into `develop`.
-5. CI must be green. If the pull request touches a path in
-   `.github/CODEOWNERS`, the other developer approves it.
+5. CI must be green: GitHub refuses the merge until every CI job has
+   passed. If the pull request touches a code-owned path (below), the other
+   developer approves it — once that approval is enforced.
 6. Merge it yourself with a merge commit titled `merge: feat/thing — what it
    changes`. The branch is deleted automatically.
 
@@ -45,6 +46,10 @@ and the data scripts, the shared Claude Code rules, and the Normattiva text
 extraction (its output is the offset space of every stored highlight and
 note). A pull request touching them needs the other developer's approval, on
 `develop` and on `main`, so a release carrying such a change is approved too.
+
+Not enforced yet: `.github/CODEOWNERS` needs the other developer's GitHub
+account, and the ruleset does not ask for an approval until it exists. Until
+then the owner merges these changes alone.
 
 The rules apply to everyone, the repository owner included. In an emergency —
 a fix that cannot wait for the other developer — the owner suspends the

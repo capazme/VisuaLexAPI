@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
  *
  * Slice 1 design: fire-and-forget on the frontend, so a 503 from the
  * BFF means the event is dropped — but we keep a paper trail in
- * `backend/logs/merlt-dead-letter.jsonl` for post-mortem.
+ * `logs/merlt-dead-letter.jsonl` under the server's working directory for post-mortem.
  *
  * NDJSON format (one event per line) so it's grep-able and tail-able.
  * No PII beyond what's in the payload itself; rotating/retention is

@@ -67,14 +67,36 @@ export function decide(command, branchOf) {
   return null;
 }
 
-function branchResolver(cwd) {
+function git(dir, args) {
+  try {
+    return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+}
+
+// The repository a directory belongs to, as its common git dir: the same for
+// the main checkout and every worktree. '' outside a repository.
+export function commonDir(dir) {
+  const out = git(dir, ['rev-parse', '--git-common-dir']);
+  if (!out) return '';
+  try {
+    return realpathSync(path.resolve(dir, out));
+  } catch {
+    return '';
+  }
+}
+
+const OWN_REPO = commonDir(path.dirname(fileURLToPath(import.meta.url)));
+
+// The branch a git command acts on, but only inside this repository: a
+// session may also commit to another repository on the same disk, whose main
+// is not ours to guard. Anything else resolves to '', which nothing protects.
+export function branchResolver(cwd, ownRepo = OWN_REPO) {
   return (dir) => {
-    try {
-      return execFileSync('git', ['-C', dir ? path.resolve(cwd, dir) : cwd, 'rev-parse', '--abbrev-ref', 'HEAD'],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    } catch {
-      return '';
-    }
+    const target = dir ? path.resolve(cwd, dir) : cwd;
+    if (!ownRepo || commonDir(target) !== ownRepo) return '';
+    return git(target, ['rev-parse', '--abbrev-ref', 'HEAD']);
   };
 }
 

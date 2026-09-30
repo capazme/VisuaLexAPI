@@ -5,7 +5,7 @@ import { mkdtempSync, symlinkSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decide } from './guard.mjs';
+import { branchResolver, commonDir, decide } from './guard.mjs';
 
 // branchOf stub: the current branch, or the branch of a `git -C <dir>` target.
 const on = (branch, dirs = {}) => (dir) => (dir ? dirs[dir] ?? branch : branch);
@@ -67,4 +67,19 @@ test('runs as a hook when reached through a symlinked path', () => {
     encoding: 'utf8',
   });
   assert.match(out, /"permissionDecision":"deny"/);
+});
+
+// The git rules guard this repository only: a commit on another repository's
+// main (a notes vault, another project) is none of this hook's business.
+test('guards the branches of this repository only', () => {
+  const other = mkdtempSync(path.join(os.tmpdir(), 'guard-other-'));
+  execFileSync('git', ['init', '-q', '-b', 'main', other]);
+  const here = fileURLToPath(new URL('.', import.meta.url));
+  const own = commonDir(here);
+  assert.ok(own, 'the hook sits inside a repository');
+  assert.equal(branchResolver(other, own)(), '');
+  assert.equal(branchResolver(here, own)(other), '');
+  assert.notEqual(branchResolver(here, own)(), '');
+  assert.equal(decide('git commit -m x', branchResolver(other, own)), null);
+  assert.equal(decide(`git -C ${other} commit -m x`, branchResolver(here, own)), null);
 });

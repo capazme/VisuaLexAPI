@@ -71,15 +71,19 @@ never run `--dev` on the deployment host. Design:
 - Branch from `develop` (`feat/`, `fix/`, `refactor/`, `chore/`, `docs/`),
   open a pull request into `develop`, merge it yourself with a merge commit
   titled `merge: <branch> — <what changes>` once CI is green.
-- The other developer approves changes to authentication, the Prisma schema
-  and migrations, licences, `.github/`, `infra/` and the data scripts,
-  `.claude/settings.json`, and `normattiva_scraper.py` (`.github/CODEOWNERS`).
+- Changes to authentication, the Prisma schema and migrations, licences,
+  `.github/`, `infra/` and the data scripts, `.claude/settings.json`, and
+  `normattiva_scraper.py` are for the other developer to approve. Not enforced
+  yet: `.github/CODEOWNERS` waits for their GitHub account, and until then the
+  owner merges them alone.
 - A release is a pull request `develop → main`, then a tag `vX.Y.Z`. A
   hotfix starts from `main`, returns to `main`, and `main` is merged into
   `develop` at once.
 - No other long-lived branch: experiments sit behind flags.
 - The shared hook (`.claude/settings.json`) refuses commits on `main` and
-  `develop`, pushes to them, and `prisma migrate dev/reset`.
+  `develop` of this repository, pushes to them, and `prisma migrate
+  dev/reset`. GitHub's ruleset refuses the same pushes and any merge whose CI
+  is not green.
 
 ## Before calling work done
 
