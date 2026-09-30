@@ -14,20 +14,20 @@ const AUTHENTICATED_POINTS = 300;
 const WRITE_POINTS = 200;
 const WINDOW_SECONDS = 60; // 1 minute
 
-function createLimiter(keyPrefix: string, points: number): RateLimiterAbstract {
+export function createLimiter(keyPrefix: string, points: number, windowSeconds = WINDOW_SECONDS): RateLimiterAbstract {
   const redis = getRedisClient();
   if (redis) {
     return new RateLimiterRedis({
       storeClient: redis,
       keyPrefix,
       points,
-      duration: WINDOW_SECONDS,
+      duration: windowSeconds,
     });
   }
   return new RateLimiterMemory({
     keyPrefix,
     points,
-    duration: WINDOW_SECONDS,
+    duration: windowSeconds,
   });
 }
 
@@ -58,7 +58,7 @@ function identifyUser(req: Request): string | null {
   return payload.userId;
 }
 
-function getClientIp(req: Request): string {
+export function getClientIp(req: Request): string {
   // Relies on Express trust proxy setting for safe IP extraction.
   // Never read X-Forwarded-For directly — it's spoofable.
   return req.ip ?? req.socket.remoteAddress ?? 'unknown';
@@ -71,7 +71,7 @@ function setRateLimitHeaders(res: Response, limiterRes: RateLimiterRes, maxPoint
   res.set('RateLimit-Reset', String(resetTimestamp));
 }
 
-function sendTooManyRequests(res: Response, limiterRes: RateLimiterRes): void {
+export function sendTooManyRequests(res: Response, limiterRes: RateLimiterRes): void {
   const retryAfter = Math.ceil(limiterRes.msBeforeNext / 1000);
   res.set('Retry-After', String(retryAfter));
   res.status(429).json({ detail: 'Too many requests, please try again later' });

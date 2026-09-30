@@ -41,6 +41,13 @@ export const config = {
     enabled: (process.env.REDIS_ENABLED || 'false').toLowerCase() === 'true',
   },
 
+  // The ingress asks GET /api/auth/verify before a scraping request (middleware/scrapeGate.ts).
+  scrape: {
+    userPoints: parseInt(process.env.SCRAPE_QUOTA_POINTS || '300', 10),
+    windowSeconds: parseInt(process.env.SCRAPE_QUOTA_WINDOW_SECONDS || '60', 10),
+    ipPoints: parseInt(process.env.SCRAPE_IP_POINTS || '1200', 10),
+  },
+
   merlt: {
     // `enabled` and `flags.*` are getters, not frozen booleans: they are
     // read live from process.env on every access rather than once at module

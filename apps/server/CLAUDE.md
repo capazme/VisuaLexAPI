@@ -27,6 +27,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `REDIS_ENABLED=true`, else in-memory with a startup warning.
 - `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
   connection errors fail open.
+- `src/middleware/scrapeGate.ts` — the handlers behind `GET /api/auth/verify`, the question
+  the production ingress (Caddy `forward_auth`) puts to the server before it lets a scraping
+  request through to the Python API. In order: a cap per address (`SCRAPE_IP_POINTS`, 1200 a
+  minute: a flood with no token stops here), `authenticate`, the user's quota
+  (`SCRAPE_QUOTA_POINTS`, 300 points per `SCRAPE_QUOTA_WINDOW_SECONDS`, charged by the route
+  the ingress names in `X-Forwarded-Uri`: an export 20, a stream 3, a whole act 5, the
+  detailed health page 5, anything else 1), then `204`. A `401` or `429` (with `Retry-After`)
+  goes back to the browser as it is. Mounted **before** the general limiter in `app.ts` on
+  purpose: it has limits of its own, and reading many articles must not spend the quota of
+  every other call. Limiter errors fail open, authentication never does.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
   naming the offending fields; everything else is a 500. Controllers therefore
@@ -133,6 +143,8 @@ filesystem is read-only.
 `"true"` there to mirror production; set `"false"` for dev without Redis.
 `NORMA_WATCH_ENABLED` / `NORMA_WATCH_INTERVAL_MS` / `LEGAL_API_URL` drive the
 saved-norm watcher (see the Node backend section); all three have defaults.
+`SCRAPE_QUOTA_POINTS` / `SCRAPE_QUOTA_WINDOW_SECONDS` / `SCRAPE_IP_POINTS` (defaults
+300, 60, 1200) size the quota behind `GET /api/auth/verify`.
 
 ## Critical Files
 
