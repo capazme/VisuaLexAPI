@@ -4,13 +4,13 @@
 
 **Goal:** In production only a signed-in user can reach the scraping API (the Python routes), inside a per-user quota. In development nothing changes.
 
-**Architecture:** The web app gets one authenticated `fetch`, `legalFetch`, for all 16 places that call the Python routes. The server gets `GET /api/auth/verify`: the same `authenticate` as every other route, plus a per-user quota. The ingress asks that endpoint through Caddy's `forward_auth` before it passes a scraping request to the scrapers, keeps `/version` and `/health` open, and never hands the scrapers the login token. Three pull requests, in this order; the third turns the gate on.
+**Architecture:** The web app gets one authenticated `fetch`, `legalFetch`, for all 15 places that call the Python routes (and the health probe). The server gets `GET /api/auth/verify`: the same `authenticate` as every other route, plus a per-user quota. The ingress asks that endpoint through Caddy's `forward_auth` before it passes a scraping request to the scrapers, keeps `/version` and `/health` open, and never hands the scrapers the login token. Three pull requests, in this order; the third turns the gate on.
 
 **Tech Stack:** React 19 + Vitest (jsdom); Express + `rate-limiter-flexible` + Vitest/supertest; Caddy 2 (`forward_auth`); a Node test for the Caddyfile; Docker for the live proof.
 
 **Spec:** `docs/superpowers/specs/2026-09-29-modular-deployment-design.md`, section 5 (phase 2, steps 2 and 3), decision D7 and question Q7, settled here in favour of `forward_auth`. The analysis of the exposure that led to it: `docs/superpowers/plans/2026-09-29-auth-self-service-v2.md`, section 5, P2.
 
-**Measured on develop `69eca58` (30 September 2026):** the browser calls the Python routes with a bare `fetch` from 16 places in 11 files (`useAnnexNavigation` 4, `SearchPanel` 2, and one each in `CompareView`, `TreeNavigatorModal`, `CommandPalette`, `NormaPicker`, `useAliasCatalog`, `useAutoSwitch`, `useCitationPreview`, `actUrn`, `articleFetchCache`), plus the health probe in `healthService.ts`, which takes its URL as a variable. `services/legalApi.ts`, which promised to consolidate them, has no importer. Nothing else reaches those routes: no `href`, no `window.open`, no `EventSource`. Web suite: 1475 tests in 128 files; the server type-checks clean (`tsc --noEmit`).
+**Measured on develop `69eca58` (30 September 2026):** the browser calls the gated Python routes with a bare `fetch` from 15 places in 11 files (`useAnnexNavigation` 4, `SearchPanel` 2, and one each in `CompareView`, `TreeNavigatorModal`, `CommandPalette`, `NormaPicker`, `useAliasCatalog`, `useAutoSwitch`, `useCitationPreview`, `actUrn`, `articleFetchCache`), plus the health probe in `healthService.ts`, which takes its URL as a variable. `services/legalApi.ts`, which promised to consolidate them, has no importer. Nothing else reaches those routes: no `href`, no `window.open`, no `EventSource`. Web suite: 1475 tests in 128 files; the server type-checks clean (`tsc --noEmit`).
 
 ## Global Constraints
 
@@ -708,7 +708,7 @@ In `apps/web/CLAUDE.md`:
 git add -A apps/web
 git commit -m "refactor(web): every call to a scraping route goes through legalFetch
 
-Sixteen call sites in eleven files and the health probe now send the login token, so
+Fifteen call sites in eleven files and the health probe now send the login token, so
 the production ingress can refuse a caller who is not signed in. A test reads the route
 list from vite.config.ts and fails on a bare fetch to any gated route. services/legalApi.ts,
 an unauthenticated client nobody imported, is deleted."
@@ -716,7 +716,7 @@ git push -u origin feat/legal-fetch
 gh pr create --base develop --title "refactor(web): every call to a scraping route goes through legalFetch" --body "$(cat <<'EOF'
 ## Summary
 - `legalFetch` (new): `fetch` for the Python routes. It sends the login token, refreshes an expired one first, and on a 401 refreshes once and sends the request again.
-- 16 call sites in 11 files, and the health probe, use it. `services/legalApi.ts`, an unauthenticated client nobody imported, is deleted.
+- 15 call sites in 11 files, and the health probe, use it. `services/legalApi.ts`, an unauthenticated client nobody imported, is deleted.
 - A test reads the route list from `vite.config.ts` and fails on a bare `fetch` to any gated route.
 - `api.ts`: one `getFreshAccessToken` for axios and fetch.
 
@@ -1546,7 +1546,7 @@ gh pr merge --merge --subject "merge: feat/ingress-login-gate — the scraping r
 
 | Spec | Where |
 |---|---|
-| Step 2: one authenticated client for the 17 call sites; token attached, refreshed on a 401 as `api.ts` does; NDJSON stream and PDF keep working | Tasks 1–3 (16 sites measured today, plus the health probe); Task 2 tests; Task 7 steps 3.1–3.3 |
+| Step 2: one authenticated client for the 17 call sites; token attached, refreshed on a 401 as `api.ts` does; NDJSON stream and PDF keep working | Tasks 1–3 (15 gated sites measured today, plus the health probe; the earlier analysis said "about seventeen"); Task 2 tests; Task 7 steps 3.1–3.3 |
 | Step 3: `forward_auth` to a new `GET /api/auth/verify` that reuses `authenticate` | Tasks 4, 5 |
 | Step 3: the same hop applies a per-user quota to the scraping paths, replacing the per-IP ceiling of the auth plan | Task 4 (per user, by route, plus a per-address cap for calls with no token) |
 | Q7: `forward_auth` rather than the server proxying the calls | Task 5 |
