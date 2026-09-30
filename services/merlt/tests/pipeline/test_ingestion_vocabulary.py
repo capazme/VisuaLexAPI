@@ -254,7 +254,7 @@ async def test_multivigenza_writes_the_modifying_act_in_the_schemas_names():
         atto_modificante_estremi="D.Lgs. 1 gennaio 2001, n. 1",
         data_efficacia="2001-02-01",
         data_pubblicazione_gu="2001-01-15",
-        disposizione="art. 12, comma 1, numero 3, lettera b",  # the lettera pattern is greedy: the numero goes first
+        disposizione="art. 12, comma 1, lettera b, numero 3",  # the example of parse_disposizione's own docstring
     )
     scraper = MagicMock(
         get_amendment_history=AsyncMock(return_value=[modifica]),
@@ -272,6 +272,7 @@ async def test_multivigenza_writes_the_modifying_act_in_the_schemas_names():
     queries = [cypher for cypher, _ in client.calls]
     merges = [q for q in queries if re.search(r"MERGE \(\w+:[A-Z]", q)]
     assert {re.search(r"MERGE \((\w+):", q).group(1) for q in merges} == {"atto", "art", "comma", "let", "num", "ver"}
+    assert sum("MERGE (let:Lettera" in q for q in merges) == 1  # one lettera, not one per letter of "b, numero"
     for query in merges:
         variable = re.search(r"MERGE \((\w+):", query).group(1)
         assert f"{variable}.provenance = coalesce({variable}.provenance, 'ingestion')" in query

@@ -232,8 +232,12 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
         Dict con numero_articolo, commi, lettere, numeri (tutte liste)
 
     Examples:
-        "art. 4, comma 2" -> {art: "4", commi: ["2"], lettere: [], numeri: []}
-        "art. 22, comma 1, lettera b" -> {art: "22", commi: ["1"], lettere: ["b"], numeri: []}
+        "art. 4, comma 2" -> {numero_articolo: "4", commi: ["2"], lettere: [], numeri: []}
+        "art. 22, comma 1, lettera b" -> {numero_articolo: "22", commi: ["1"], lettere: ["b"], numeri: []}
+        "art. 12, comma 1, lettera b, numero 3" -> {numero_articolo: "12", commi: ["1"], lettere: ["b"], numeri: ["3"]}
+        "art. 5, comma 2, lettere a, b e c" -> lettere: ["a", "b", "c"]
+        "art. 7, comma 4, lettera b-bis)" -> lettere: ["b-bis"]
+        "art. 2, comma 1, lettere aa) e bb)" -> lettere: ["aa", "bb"]
     """
     result = {
         "numero_articolo": None,
@@ -259,12 +263,19 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
         commi = re.findall(r"\d+", comma_str)
         result["commi"] = commi
 
-    # Estrai lettere: "lettera b" o "lettere a, b e c"
-    lettera_match = re.search(r"letter[ae]\s+([a-z,\s]+(?:e\s+[a-z])?)", disp_lower)
+    # Lettere: "lettera b", "lettere a, b e c", "lettera b-bis)", "lettere aa) e bb)".
+    # The clause runs to the next keyword (numero, comma, periodo, parole, art.) or to the end: in
+    # "lettera b, numero 3" the numero is not part of it. Its tokens are split on commas and on the
+    # conjunction "e", lose their closing parenthesis, and only a lettera is kept: `b`, `aa` (after
+    # z come aa, bb…) or `b-bis`.
+    lettera_match = re.search(
+        r"letter[ae]\s+(.*?)(?=\b(?:numer[oi]|comm[ai]|period[oi]|parol[ae]|art\w*)\b|$)", disp_lower
+    )
     if lettera_match:
-        lettera_str = lettera_match.group(1)
-        lettere = re.findall(r"[a-z]", lettera_str)
-        result["lettere"] = lettere
+        for token in re.split(r"\s*,\s*|\s+e\s+", lettera_match.group(1)):
+            token = token.strip().rstrip(")").strip()
+            if re.fullmatch(r"[a-z]{1,2}(?:-[a-z]+)?", token):
+                result["lettere"].append(token)
 
     # Estrai numeri: "numero 1" o "numeri 1, 2 e 3"
     numero_match = re.search(r"numer[oi]\s+([\d,\s]+(?:e\s+\d+)?)", disp_lower)
@@ -274,6 +285,12 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
         result["numeri"] = numeri
 
     return result
+
+
+def _lettera_place(lettera: str) -> int:
+    """Where a lettera sits in its comma: a=1 … z=26, then aa=27, bb=28 …; `b-bis` shares b's place."""
+    place = ord(lettera[0]) - ord("a") + 1
+    return place + 26 if len(lettera) == 2 and lettera[0] == lettera[1] else place
 
 
 def _format_destinazione(parsed: Dict[str, Optional[str]]) -> str:
@@ -1040,7 +1057,7 @@ class MultivigenzaPipeline:
                             MERGE (comma)-[r:CONTIENE]->(let)
                             ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                             """,
-                            {"comma_urn": first_comma_urn, "let_urn": lettera_urn, "ord": ord(lettera) - ord('a') + 1}
+                            {"comma_urn": first_comma_urn, "let_urn": lettera_urn, "ord": _lettera_place(lettera)}
                         )
 
                     # Usa la prima lettera come source
