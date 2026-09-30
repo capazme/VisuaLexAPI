@@ -166,11 +166,21 @@ and the update path are proven before anyone else is admitted.
 2. **The web-app refactor.** One authenticated client for the seventeen call sites: it
    attaches the token, refreshes it on a 401 as `services/api.ts` does, and keeps the
    NDJSON stream and the PDF download working. Its own task, with its own review, on
-   files the reading surface depends on.
+   files the reading surface depends on. *Done, 30 September 2026: `legalFetch`
+   (`apps/web/src/services/legalFetch.ts`) carries the token on the fifteen calls to the scraping
+   routes (measured: fifteen in eleven files, not seventeen) and on the health probe, and a test fails
+   on a bare `fetch` to any gated route. Plan: `docs/superpowers/plans/2026-09-30-scraping-behind-the-login.md`.*
 3. **The login check at the ingress.** Caddy asks the server before passing a scraping
    request on (`forward_auth` to a new `GET /api/auth/verify`, which reuses
    `authenticate`). The same hop applies a per-user quota to the scraping paths — this
-   replaces the per-IP ceiling of the auth plan's WS6.
+   replaces the per-IP ceiling of the auth plan's WS6. *Done and proved, 30 September 2026:
+   `GET /api/auth/verify` (`apps/server/src/middleware/scrapeGate.ts`), the Caddyfile's `forward_auth`
+   (a login check that hangs is timed out after ten seconds), `infra/ingress/checks/gate.sh` (25 checks
+   against stand-in upstreams) and a throwaway production stack driven by curl and by a real browser:
+   401 without a login for every spelling of a scraping path, the 429 with its `Retry-After` priced by
+   route, a token that expires and is refreshed once, the PDF and the stream intact, one return to the
+   login page, the gate closed when the server is down or hangs. Still open: the real client address
+   (step 5) and the ingress checks in CI.*
 4. **Address and certificate.** The router forwards 80 and 443 to the ingress; a small
    updater keeps a Route 53 record current with an IAM user allowed to change that one
    record set and nothing else; Caddy gets its certificate from Let's Encrypt over the

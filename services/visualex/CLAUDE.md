@@ -292,6 +292,12 @@ parser uses; it ships a `cp314` wheel, so installing it needs no compiler.
   to write there could get code run by the worker. The cache is the filesystem.
 - **Behind the ingress set `TRUSTED_PROXIES=1`.** At 0 every client shares the ingress's
   address, and one rate-limit bucket.
+- **Behind the ingress the scraping routes need a login.** The Caddyfile asks the server
+  (`GET /api/auth/verify`) before it passes a request on, except `/version` and `/health`.
+  The Python API itself stays unauthenticated inside the network (the ingress is its only
+  door) and never sees the login token (`header_up -Authorization`). The login check is
+  timed out after ten seconds (a `504`), so a server that hangs fails the request instead
+  of holding it.
 
 ## Critical Files
 
