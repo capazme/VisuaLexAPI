@@ -5,6 +5,7 @@ import 'express-async-errors';
 import { config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import { globalRateLimiter, writeRateLimiter } from './middleware/rateLimiter';
+import { createScrapeGate } from './middleware/scrapeGate';
 import authRoutes from './routes/auth';
 import adminRoutes from './routes/admin';
 import folderRoutes from './routes/folders';
@@ -44,6 +45,11 @@ app.use(cors({
   origin: config.cors.origins,
   credentials: true,
 }));
+
+// The ingress asks here before it lets a scraping request through. The gate has its own limits
+// (per user and per address), so it comes before the general limiter: reading many articles must
+// not use up the quota of every other call.
+app.get('/api/auth/verify', ...createScrapeGate(config.scrape));
 
 // Rate limiting: anonymous 100/min, authenticated 300/min, writes 20/min
 // Uses Redis if REDIS_ENABLED=true, otherwise in-memory
