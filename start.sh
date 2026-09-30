@@ -246,7 +246,7 @@ if [ "$MERLT_ENABLED" = "true" ]; then
             MERLT_MCP_LEGAL_TOOLS_ENABLED="${MERLT_MCP_LEGAL_TOOLS_ENABLED:-false}"
         ( cd "$MERLT_ROOT" && exec "$MERLT_PYTHON" -m uvicorn merlt.app:app --reload --port "$MERLT_PORT" ) &
         MERLT_PID=$!
-        MERLT_SKIP_SEED=true "$MERLT_PYTHON" -m rq.cli worker merlt_ingest merlt_extract merlt_ner_train --url "$RQ_REDIS_URL" &
+        MERLT_SKIP_SEED=true "$MERLT_PYTHON" -m rq.cli worker merlt_ingest merlt_extract merlt_ner_train merlt_bulk --url "$RQ_REDIS_URL" &
         MERLT_WORKER_PID=$!
     fi
     echo -e "${YELLOW}Waiting for MERL-T /health (up to ${MERLT_HEALTH_TIMEOUT}s)...${NC}"

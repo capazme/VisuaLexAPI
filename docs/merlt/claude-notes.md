@@ -26,20 +26,23 @@ earlier one, the text says what is true today.
 
 **Runtime topology.** `infra/compose.yml` defines 7 services:
 
-- Always on: `merlt-postgres`, `merlt-redis`, `merlt-falkordb`, `merlt-qdrant`.
-- Under the `api-in-docker` profile:
+- Always on, shared with the rest of the stack: `postgres` (the server's
+  `visualex_platform` database and MERL-T's `merlt`), `redis`, `falkordb`,
+  `qdrant`.
+- Under the `merlt` profile:
   - `mcp-legal-it`: a git submodule at `vendor/mcp-legal-it`, serving HTTP MCP
     on :8011.
   - `merlt-api`: FastAPI `merlt.app:app`, on :8000.
-  - `merlt-worker`: an RQ worker on the queues `merlt_ingest`, `merlt_extract`
-    and `merlt_ner_train`.
+  - `merlt-worker`: an RQ worker on the queues `merlt_ingest`, `merlt_extract`,
+    `merlt_ner_train` and `merlt_bulk`, in that order of priority: RQ takes
+    jobs queue by queue in the order the worker names them.
 
 Every host port is bound to 127.0.0.1: postgres 5436, redis 6381, falkordb
 6382, qdrant 6343/6344, mcp 8011, api 8000.
 
 The BFF runs on the host. It reaches MERL-T through `MERLT_API_URL`
-(`http://localhost:8000`) and keeps its own Prisma database, so it never
-connects to `merlt-postgres`. The api and the worker call the BFF (:3001) and
+(`http://localhost:8000`) and keeps its own Prisma database
+(`visualex_platform`), so it never connects to MERL-T's `merlt` database. The api and the worker call the BFF (:3001) and
 the Python API (:5000) through `host.docker.internal`. That name needs
 `extra_hosts: host-gateway`, which Linux requires.
 
@@ -49,8 +52,8 @@ defaults point at `localhost:5433/rlcf_dev`, which does not exist inside the
 container network.
 
 **`start.sh`.** `MERLT_ENABLED=true` turns the sidecar on. `MERLT_API_IN_DOCKER`
-defaults to `true`, the supported path, and implies `MERLT_COMPOSE_ENABLED=true`,
-so the script runs `docker compose --profile api-in-docker up -d`. Before it
+defaults to `true`, the supported path: the script runs
+`docker compose --profile merlt up -d`. Before it
 starts anything, the script:
 
 - initialises the `vendor/mcp-legal-it` submodule when the directory is empty.
@@ -83,8 +86,8 @@ is read-only. After any change under `services/merlt/`, a restart is not enough:
 and recreate.
 
 ```bash
-docker compose -f infra/compose.yml --profile api-in-docker build merlt-api merlt-worker
-docker compose -f infra/compose.yml --profile api-in-docker up -d --force-recreate merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
 ```
 
 **Boot, in order (`services/merlt/merlt/app.py` lifespan).** Each step is failure-isolated:
@@ -833,7 +836,17 @@ though that doc's header still says DRAFT.
 - `routes/merlt/opsIngestion.ts` and `opsIngestionClient.ts` →
   `/api/v1/ingestion/mechanical/*` (`require_role("admin")`):
   - `POST /ops/ingestion/run`, with `{source: visualex_tree|italia_corpus,
-    source_ref, …}`. It enqueues on `merlt_ingest` with `job_timeout=1800`.
+    source_ref, …}`. It enqueues on `merlt_bulk`, the worker's last queue,
+    with `job_timeout=1800`: a reader's lazy ingestion (`merlt_ingest`) goes
+    before the next batch instead of queuing behind hours of codes.
+    `source_ref` for `visualex_tree` is JSON: `{"act_type": "codice civile",
+    "articles": "1-455"}` (`articles` optional; a range includes its bis/ter).
+    Articles are fetched 10 at a time and the worker waits up to 120 s a
+    request (`VISUALEX_API_TIMEOUT` on the worker only); measured under load,
+    ~1.8 s an article, so a batch must stay under ~900 articles to fit its
+    30 minutes — split a code by books. A worker stopped mid-parse leaves its
+    batch `parsing` for good (nothing sweeps them): set it `failed` in the
+    MERL-T database, then reject it.
   - `GET /ops/ingestion/batches[/:batchId]`.
   - `POST …/promote`, which answers 409 while conflicts are unresolved.
   - `POST …/reject`.
@@ -956,8 +969,10 @@ The model and its checkpoints live on `merlt_ner_models`, which the api and
 the worker share.
 
 **Loop β #2 gotchas:**
-1. **The worker queue list is load-bearing.** If `merlt_ner_train` drops out
-   of the worker `command`, every training POST stays `queued`. Fix the
+1. **The worker queue list is load-bearing.** If `merlt_ner_train` (or
+   `merlt_bulk`) drops out of the worker `command`, every training POST (or
+   mechanical batch) stays `queued`; if `merlt_bulk` moves before
+   `merlt_ingest`, lazy ingestion waits behind the bulk batches again. Fix the
    compose file, then run
    `docker compose … up -d --no-deps --force-recreate merlt-worker`.
 2. **The privacy budget lives in the BFF.** `ner.ts` caps `context_window` at

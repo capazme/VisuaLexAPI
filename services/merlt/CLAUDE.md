@@ -196,7 +196,7 @@ MERLT_ENABLED=true MERLT_API_IN_DOCKER=false ./start.sh
 ```
 
 In this mode `start.sh` runs `uvicorn merlt.app:app --reload` and a local
-`rq worker merlt_ingest merlt_extract merlt_ner_train`, from `MERLT_PYTHON`
+`rq worker merlt_ingest merlt_extract merlt_ner_train merlt_bulk`, from `MERLT_PYTHON`
 (default `services/merlt/.venv/bin/python`).
 
 The host ports, all bound to 127.0.0.1: postgres 5436, redis 6381, FalkorDB

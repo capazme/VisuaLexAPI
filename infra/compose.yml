@@ -201,7 +201,7 @@ services:
       # busy, so every later chunk timed out too.
       VISUALEX_API_TIMEOUT: "${MERLT_WORKER_VISUALEX_TIMEOUT:-120}"
     volumes: *merlt-volumes
-    command: ["rq", "worker", "merlt_ingest", "merlt_extract", "merlt_ner_train", "--url", "redis://redis:6379/1"]
+    command: ["rq", "worker", "merlt_ingest", "merlt_extract", "merlt_ner_train", "merlt_bulk", "--url", "redis://redis:6379/1"]
     healthcheck:
       # Not an HTTP server: alive = it reaches its queue.
       test: ["CMD-SHELL", "python -c \"import os,redis; redis.from_url(os.environ['RQ_REDIS_URL']).ping()\""]
