@@ -112,7 +112,7 @@ export const SEARCH_STEPS: DriveStep[] = [
     {
         element: '#tour-brocardi-toggle',
         popover: {
-            title: 'Informazioni Brocardi',
+            title: 'Dottrina',
             description: 'Attiva per ottenere spiegazioni, ratio legis e massime giurisprudenziali insieme al testo.',
             side: 'bottom',
             align: 'center',
@@ -447,7 +447,7 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '#command-palette-brocardi-toggle',
         popover: {
-            title: 'Opzione Brocardi',
+            title: 'Opzione dottrina',
             description: 'Attiva per ottenere spiegazioni, ratio legis e massime giurisprudenziali insieme al testo.',
             side: 'top',
             align: 'center',
@@ -719,8 +719,8 @@ export const NORMA_BLOCK_STEPS: DriveStep[] = [
     {
         element: '.brocardi-display',
         popover: {
-            title: 'Brocardi e Spiegazioni',
-            description: 'Ratio legis, massime giurisprudenziali e riferimenti. Attiva "Brocardi" nella ricerca.',
+            title: 'Dottrina e spiegazioni',
+            description: 'Ratio legis, massime giurisprudenziali e riferimenti. Attiva "Includi dottrina" nella ricerca.',
             side: 'top',
             align: 'center',
         }

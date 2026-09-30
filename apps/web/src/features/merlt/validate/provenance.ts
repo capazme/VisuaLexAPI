@@ -1,5 +1,6 @@
 import type { SearchParams } from '../../../types';
 import { parseNormattivaUrl } from '../../../utils/normattivaParser';
+import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
 
 /**
  * Non-component helpers for the validation queue (Slice 3 §3.6 / D4): provenance
@@ -14,7 +15,7 @@ import { parseNormattivaUrl } from '../../../utils/normattivaParser';
  */
 const FONTE_LABELS: Record<string, string> = {
   llm_extraction: 'Estrazione automatica (LLM)',
-  brocardi: 'Brocardi (dottrina)',
+  brocardi: `${DOCTRINE_LABEL} (${DOCTRINE_SOURCE_NAME})`,
   mechanistic: 'Estrazione strutturata',
   visualex: 'Contributo da VisuaLex',
   manual: 'Inserimento manuale',

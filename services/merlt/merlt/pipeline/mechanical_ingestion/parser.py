@@ -267,7 +267,10 @@ def _extract_rubrica(text: str) -> str:
 # per-request server load rather than client-side concurrency — chunks are
 # issued sequentially by this adapter (design doc §8: mechanical, bulk, not
 # meant to hammer the scraper faster than a single reasonable batch).
-_FETCH_CHUNK_SIZE = 40
+# Measured on the codice civile (30/09/2026): 10 articles ~6 s with the
+# scrapers idle, 40 past the client's 30 s once they were busy — and every
+# abandoned request kept them busy, so all the later chunks failed as well.
+_FETCH_CHUNK_SIZE = 10
 
 
 def _chunked(items: list[str], size: int) -> list[list[str]]:

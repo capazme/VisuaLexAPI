@@ -506,7 +506,7 @@ export function StudyMode({
           </div>
           <div className="hidden sm:flex items-center gap-4">
             <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>T</kbd> Note</span>
-            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>B</kbd> Brocardi</span>
+            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>B</kbd> Dottrina</span>
             <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>S</kbd> Settings</span>
           </div>
         </div>
