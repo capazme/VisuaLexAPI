@@ -1,16 +1,76 @@
 #!/bin/bash
-# VisuaLex development stack — one command.
-#   Docker (infra/compose.yml): postgres, redis, falkordb, qdrant — always;
-#     mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
-#   Host, with hot reload: Python API (services/visualex, :5000), server
-#     (apps/server, :3001), web (apps/web, :5173).
-#   MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
-#     (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
+# VisuaLex — the one entry point, in two modes.
+#
+#   ./start.sh [--dev]    the development stack, on this machine, with hot reload:
+#                           Docker (infra/compose.yml): postgres, redis, falkordb, qdrant — always;
+#                             mcp-legal-it, merlt-api, merlt-worker too with MERLT_ENABLED=true.
+#                           Host: Python API (services/visualex, :5000), server (apps/server, :3001),
+#                             web (apps/web, :5173).
+#                           MERLT_API_IN_DOCKER=false runs the MERL-T api and worker on the host
+#                             (developer mode: a venv with the merlt deps, no mcp-legal-it tools).
+#                           A fresh checkout is prepared here: env files, venv, dependencies, Chromium.
+#   ./start.sh --prod     on the deployment host: build the images and run the whole stack as
+#                           containers, behind the ingress (scripts/prod/deploy.sh). It deploys what
+#                           is checked out: main or a vX.Y.Z tag with a clean tree, unless
+#                           --allow-branch; after a backup, unless --no-backup.
+#   ./start.sh --prod --stop
+#                         stop the production stack (containers and volumes stay).
 set -e
+
+usage() {
+    cat <<'EOF'
+Usage: ./start.sh [--dev]                                  the development stack (the default)
+       ./start.sh --prod [--allow-branch] [--no-backup]    deploy what is checked out, on the production host
+       ./start.sh --prod --stop                            stop the production stack (containers and volumes stay)
+EOF
+}
+
+# The flags come first: nothing is started, created or checked before they are understood.
+MODE=""
+PROD_ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --dev|--prod)
+            if [ -n "$MODE" ] && [ "$MODE" != "${arg#--}" ]; then
+                echo "Choose --dev or --prod, not both." >&2; usage >&2; exit 2
+            fi
+            MODE="${arg#--}" ;;
+        --stop|--allow-branch|--no-backup) PROD_ARGS+=("$arg") ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $arg" >&2; usage >&2; exit 2 ;;
+    esac
+done
+DEFAULTED_TO_DEV=""
+if [ -z "$MODE" ]; then MODE=dev; DEFAULTED_TO_DEV=1; fi
+if [ "$MODE" = dev ] && [ "${#PROD_ARGS[@]}" -gt 0 ]; then
+    echo "${PROD_ARGS[*]} only goes with --prod." >&2; usage >&2; exit 2
+fi
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "$MODE" = prod ]; then
+    exec sh "$PROJECT_ROOT/scripts/prod/deploy.sh" "${PROD_ARGS[@]}"
+fi
+
+# First run on a fresh checkout: the two env files the stack and the server read, from their
+# examples. Never overwritten. The JWT secret is generated here, not left as the example's.
+. "$PROJECT_ROOT/scripts/prod/lib.sh"
+if [ ! -f "$PROJECT_ROOT/infra/.env" ]; then
+    cp "$PROJECT_ROOT/infra/.env.example" "$PROJECT_ROOT/infra/.env"
+    echo -e "${YELLOW}Created infra/.env from the example (development passwords)${NC}"
+fi
+if [ ! -f "$PROJECT_ROOT/apps/server/.env" ]; then
+    # umask 077: the file is the owner's alone from the moment it exists, and so is the temporary
+    # copy env_set writes beside it while the secret goes in.
+    (
+        umask 077
+        cp "$PROJECT_ROOT/apps/server/.env.example" "$PROJECT_ROOT/apps/server/.env"
+        env_set "$PROJECT_ROOT/apps/server/.env" JWT_SECRET "$(random_secret 64)" '"'
+    )
+    echo -e "${YELLOW}Created apps/server/.env from the example, with a fresh JWT secret${NC}"
+fi
 # Same values as Compose reads: ports, stack name, passwords.
 if [ -f "$PROJECT_ROOT/infra/.env" ]; then set -a; . "$PROJECT_ROOT/infra/.env"; set +a; fi
 COMPOSE=(docker compose -f "$PROJECT_ROOT/infra/compose.yml")
@@ -31,6 +91,7 @@ server_env() {
 }
 
 echo -e "${BLUE}VisuaLex development stack${NC}"
+[ -z "$DEFAULTED_TO_DEV" ] || echo "(--dev is the default; ./start.sh --prod deploys on the server)"
 
 # A process and its descendants: Quart's reloader serves from a child process
 # that outlives its parent's SIGTERM and keeps :5000 bound.
@@ -73,12 +134,35 @@ check_port() {
 }
 for p in 5000 3001 5173; do check_port "$p" || exit 1; done
 
+if ! docker info >/dev/null 2>&1; then
+    echo -e "${RED}Docker is not running${NC} - start Docker Desktop and run ./start.sh again"; exit 1
+fi
+
+# Dependencies: each step runs only when its result is missing, so a second start skips them all.
 if [ ! -x "$VENV/bin/python" ]; then
-    echo -e "${RED}No venv at services/visualex/.venv${NC} - see docs/setup.md"; exit 1
+    PY=""
+    for candidate in python3.14 python3.13 python3.12 python3; do
+        if command -v "$candidate" >/dev/null 2>&1 \
+            && "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' 2>/dev/null; then
+            PY="$candidate"; break
+        fi
+    done
+    if [ -z "$PY" ]; then
+        echo -e "${RED}Python 3.12 or newer not found${NC} - install one (docs/setup.md)"; exit 1
+    fi
+    echo -e "${YELLOW}Creating services/visualex/.venv with $PY...${NC}"
+    "$PY" -m venv "$VENV"
 fi
 if ! "$VENV/bin/python" -c "import redis, playwright" 2>/dev/null; then
-    echo -e "${RED}Python dependencies missing${NC} - run: ${YELLOW}services/visualex/.venv/bin/pip install -r services/visualex/requirements-dev.txt${NC}"; exit 1
+    echo -e "${YELLOW}Installing the Python dependencies...${NC}"
+    "$VENV/bin/pip" install -q -r "$PROJECT_ROOT/services/visualex/requirements-dev.txt"
 fi
+for app in apps/server apps/web; do
+    if [ ! -d "$PROJECT_ROOT/$app/node_modules" ]; then
+        echo -e "${YELLOW}Installing the $app dependencies...${NC}"
+        npm ci --prefix "$PROJECT_ROOT/$app"
+    fi
+done
 PW_CACHE="${PLAYWRIGHT_BROWSERS_PATH:-}"
 if [ -z "$PW_CACHE" ]; then
     case "$OSTYPE" in
@@ -87,7 +171,8 @@ if [ -z "$PW_CACHE" ]; then
     esac
 fi
 if [ -n "$PW_CACHE" ] && ! ls "$PW_CACHE" 2>/dev/null | grep -q chromium; then
-    echo -e "${RED}Playwright Chromium missing${NC} - run: ${YELLOW}services/visualex/.venv/bin/playwright install chromium${NC}"; exit 1
+    echo -e "${YELLOW}Installing Playwright's Chromium...${NC}"
+    "$VENV/bin/playwright" install chromium
 fi
 
 if [ "$MERLT_ENABLED" = "true" ]; then

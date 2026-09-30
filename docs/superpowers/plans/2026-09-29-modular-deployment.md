@@ -290,7 +290,7 @@ runs of 5.4.
   minutes; `--prod` says so instead of looking hung.
 - **The stream through the ingress** (`stream_article_text`) is the likeliest thing to
   misbehave behind a proxy; 3.4 checks it directly.
-- **`start.sh` conflicts.** Three changes meet in that file (PR #15, the bootstrap, this
-  task); Task 5 waits for PR #15.
+- **`start.sh` conflicts.** Three changes met in that file (PR #15, the bootstrap, this
+  task); PR #15 has merged and the bootstrap is folded into Task 5 (5.2).
 - **Phone reliability.** Android may stop Termux despite the settings; the backup is only
   as good as its last verified restore, which is why 6.3 and 7.3 both restore.

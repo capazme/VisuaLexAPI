@@ -191,7 +191,8 @@ chose the refactor instead.
   host processes and the stores. The bootstrap of a fresh checkout (env files, venv,
   dependencies, Chromium) lives here.
 - **`--prod`**, on the deployment host:
-  1. **Preflight.** Linux with Docker and the Compose plugin; `infra/.env` and
+  1. **Preflight.** Linux with Docker and the Compose plugin, 2.24 or newer (on another
+     system a warning only, so that a trial on the development machine runs); `infra/.env` and
      `apps/server/.env` exist and none of the development passwords is left in them;
      the working tree is clean and `HEAD` is `main` or a `vX.Y.Z` tag, unless
      `--allow-branch` says otherwise. The commit or tag being deployed is printed.
@@ -199,7 +200,10 @@ chose the refactor instead.
      never the development defaults, and their location is printed — the values are not.
      `MERLT_ENABLED` starts as `true`.
   3. **Backup.** `scripts/backup.sh` runs first (skippable with `--no-backup`, and skipped
-     by itself on a first deploy, when the stores are empty).
+     by itself on a first deploy: Docker has no `<stack>_postgres_data` volume). When Docker
+     cannot say whether that volume exists, the deploy stops: an error is never read as
+     "no stack". The stores that are down are started without recreating any, so the backup
+     sees the stack as it ran, not as this release's configuration would change it.
   4. **Build and start.** `docker compose -f … up -d --build --wait`, the MERL-T profile
      included, migrations included, then a health check of every module.
   5. **Report.** The address it answers on and how to follow the logs.
