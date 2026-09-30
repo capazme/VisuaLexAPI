@@ -4,7 +4,7 @@ import { formatFonte, normRefToSearchParams } from '../provenance';
 describe('formatFonte', () => {
   it('maps known pipeline codes to human labels', () => {
     expect(formatFonte('llm_extraction')).toMatch(/automatica/i);
-    expect(formatFonte('brocardi')).toMatch(/brocardi/i);
+    expect(formatFonte('brocardi')).toBe('Dottrina');
   });
 
   it('falls back to the raw value for an unknown pipeline', () => {

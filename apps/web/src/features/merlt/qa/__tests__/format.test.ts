@@ -159,3 +159,18 @@ describe('urnKind (feature 3 — "Apri" quick-open classification)', () => {
     expect(urnKind('')).toEqual({ kind: 'unknown' });
   });
 });
+
+describe('doctrine provider never named (sourceLabel, formatRetrievedUrn)', () => {
+  it('labels a provider URL as Dottrina, for a provisional node and directly', () => {
+    const url = 'https://www.brocardi.it/codice-civile/libro-quarto/art2043.html';
+    expect(formatRetrievedUrn(url)).toBe('Dottrina');
+    expect(sourceLabel({ urn: 'live:abc', provenance: 'live_unconfirmed', source_url: url })).toBe('Dottrina');
+  });
+
+  it('relabels a title that is just the provider name, leaves other titles alone', () => {
+    expect(sourceLabel({ urn: 'x', title: 'Brocardi.it' })).toBe('Dottrina');
+    expect(sourceLabel({ urn: 'x', title: 'Art. 2043. Risarcimento per fatto illecito' })).toBe(
+      'Art. 2043. Risarcimento per fatto illecito',
+    );
+  });
+});

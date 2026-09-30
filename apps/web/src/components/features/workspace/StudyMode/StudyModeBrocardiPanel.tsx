@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pin, PinOff, ExternalLink, Lightbulb, ChevronDown } from 'lucide-react';
+import { Pin, PinOff, Lightbulb, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
 import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
+import { LATIN_MAXIMS_LABEL } from '../../../../utils/doctrineLabel';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPanelProps {
@@ -274,24 +275,12 @@ export function StudyModeBrocardiPanel({
           <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             {hasContent ? (
               <>
-                <BrocardiSection title="Brocardi" content={brocardiInfo.Brocardi} theme={theme} />
+                <BrocardiSection title={LATIN_MAXIMS_LABEL} content={brocardiInfo.Brocardi} theme={theme} />
                 <BrocardiSection title="Ratio" content={brocardiInfo.Ratio} theme={theme} />
                 <BrocardiSection title="Spiegazione" content={brocardiInfo.Spiegazione} theme={theme} />
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
                 {brocardiInfo.Footnotes && brocardiInfo.Footnotes.length > 0 && (
                   <FootnotesSection footnotes={brocardiInfo.Footnotes} theme={theme} />
-                )}
-
-                {brocardiInfo.link && (
-                  <a
-                    href={brocardiInfo.link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-2 text-sm text-primary-600 hover:text-primary-700 hover:underline py-3 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
-                  >
-                    <ExternalLink size={14} />
-                    Vedi fonte su Brocardi.it
-                  </a>
                 )}
               </>
             ) : (

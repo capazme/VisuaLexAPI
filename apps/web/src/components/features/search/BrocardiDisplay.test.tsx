@@ -50,15 +50,15 @@ describe('BrocardiDisplay — Glossario', () => {
     expect(screen.queryByText(/nessun approfondimento/i)).not.toBeInTheDocument();
   });
 
-  it('opens dictionary links in a new tab, safely', () => {
-    render(<BrocardiDisplay info={{
+  it('shows the terms without linking to the provider', () => {
+    const { container } = render(<BrocardiDisplay info={{
       ...empty,
       Glossario: [{ termine: 'colpa', url: 'https://brocardi.it/dizionario/1.html', dizionario_id: '1' }],
     }} />);
     expandGlossario();
-    const link = screen.getByRole('link', { name: 'colpa' });
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    expect(screen.getByText('colpa')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'colpa' })).not.toBeInTheDocument();
+    expect(container.innerHTML).not.toMatch(/brocardi\.it/i);
   });
 });
 
@@ -73,6 +73,24 @@ describe('BrocardiDisplay — RelatedArticles', () => {
     }} />);
     expect(screen.getByText(/2042/)).toBeInTheDocument();
     expect(screen.getByText(/2044/)).toBeInTheDocument();
+  });
+
+  it('opens the neighbours in the reader, never on the provider site', () => {
+    const opened: Array<[string, string]> = [];
+    const { container } = render(<BrocardiDisplay
+      currentNorma={{ tipo_atto: 'codice civile' }}
+      onArticleClick={(numero, tipoAtto) => opened.push([numero, tipoAtto])}
+      info={{
+        ...empty,
+        RelatedArticles: {
+          previous: { numero: '2042', url: 'https://brocardi.it/a.html', titolo: 'Art. 2042' },
+          next: { numero: '2044', url: 'https://brocardi.it/b.html', titolo: 'Art. 2044' },
+        },
+      }}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: /2044/ }));
+    expect(opened).toEqual([['2044', 'codice civile']]);
+    expect(container.innerHTML).not.toMatch(/brocardi\.it/i);
   });
 });
 

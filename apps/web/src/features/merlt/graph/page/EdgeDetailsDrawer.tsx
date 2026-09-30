@@ -1,6 +1,7 @@
 import { ArrowRight, Crosshair, X } from 'lucide-react';
 import { EDGE_TYPE_STYLE, humanizeEdgeType } from '../shared/graphStyles';
 import type { GraphEdge, GraphNode } from '../shared/types';
+import { displaySourceName, isDoctrineProviderUrl } from '../../../../utils/doctrineLabel';
 
 export interface EdgeDetailsDrawerProps {
   edge: GraphEdge | null;
@@ -55,7 +56,7 @@ export function EdgeDetailsDrawer({
   const extraProps = Object.entries(props)
     .filter(([k]) => !PRIMARY_KEYS.has(k))
     .map(([k, v]) => [k, asText(v)] as const)
-    .filter((entry): entry is [string, string] => entry[1] !== null);
+    .filter((entry): entry is [string, string] => entry[1] !== null && !isDoctrineProviderUrl(entry[1]));
 
   return (
     <div className="flex h-full flex-col">
@@ -93,8 +94,10 @@ export function EdgeDetailsDrawer({
         </Field>
 
         {PRIMARY_PROPS.map(({ key, label, long }) => {
-          const text = asText(props[key]);
-          if (!text) return null;
+          const raw = asText(props[key]);
+          // A link to the doctrine provider would name it on screen: skip it.
+          if (!raw || isDoctrineProviderUrl(raw)) return null;
+          const text = key === 'fonte' ? displaySourceName(raw) : raw;
           return (
             <Field key={key} label={label}>
               <p

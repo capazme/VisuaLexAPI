@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ExternalLink, ChevronDown, FileText, MessageCircle, Gavel } from 'lucide-react';
+import { Lightbulb, ChevronDown, FileText, MessageCircle, Gavel } from 'lucide-react';
 import type { BrocardiInfo as BrocardiInfoType, MassimaStructured } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { SafeHTML } from '../../../utils/sanitize';
+import { LATIN_MAXIMS_LABEL } from '../../../utils/doctrineLabel';
 
 interface BrocardiSectionProps {
   title: string;
@@ -201,7 +202,7 @@ export function BrocardiContent({ info, articleTitle }: BrocardiContentProps) {
       {/* Sections Container */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <BrocardiSection
-          title="Brocardi"
+          title={LATIN_MAXIMS_LABEL}
           content={info.Brocardi}
           icon={<FileText size={18} />}
           variant="purple"
@@ -228,25 +229,6 @@ export function BrocardiContent({ info, articleTitle }: BrocardiContentProps) {
           variant="primary"
         />
       </div>
-
-      {/* Enhanced Footer Link */}
-      {info.link && (
-        <div className="px-6 py-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
-          <a
-            href={info.link}
-            target="_blank"
-            rel="noreferrer"
-            className="group flex items-center justify-center gap-3 py-3 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
-          >
-            <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 group-hover:scale-110 transition-transform">
-              <ExternalLink size={16} />
-            </div>
-            <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-primary-600 dark:group-hover:text-primary-400">
-              Vedi fonte completa su Brocardi.it
-            </span>
-          </a>
-        </div>
-      )}
     </div>
   );
 }

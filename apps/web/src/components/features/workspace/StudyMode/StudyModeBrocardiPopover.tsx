@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ExternalLink, Lightbulb, ChevronDown } from 'lucide-react';
+import { X, Lightbulb, ChevronDown } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
 import type { BrocardiInfo, MassimaStructured } from '../../../../types';
+import { LATIN_MAXIMS_LABEL } from '../../../../utils/doctrineLabel';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPopoverProps {
@@ -205,22 +206,10 @@ export function StudyModeBrocardiPopover({
           <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
             {hasContent ? (
               <>
-                <BrocardiSection title="Brocardi" content={brocardiInfo.Brocardi} theme={theme} defaultOpen />
+                <BrocardiSection title={LATIN_MAXIMS_LABEL} content={brocardiInfo.Brocardi} theme={theme} defaultOpen />
                 <BrocardiSection title="Ratio" content={brocardiInfo.Ratio} theme={theme} />
                 <BrocardiSection title="Spiegazione" content={brocardiInfo.Spiegazione} theme={theme} />
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
-
-                {brocardiInfo.link && (
-                  <a
-                    href={brocardiInfo.link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-700 hover:underline py-3 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
-                  >
-                    <ExternalLink size={12} />
-                    Fonte Brocardi.it
-                  </a>
-                )}
               </>
             ) : (
               <div className={cn("text-center py-8 flex flex-col items-center gap-2", styles.muted)}>

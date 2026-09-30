@@ -1,5 +1,6 @@
 /** Shared non-component helpers for the Q&A feature (react-refresh boundary). */
 
+import { DOCTRINE_LABEL, displaySourceName, isDoctrineProviderUrl } from '../../../utils/doctrineLabel';
 import type { QaRetrievedSource } from './types';
 
 export const CANON_LABEL: Record<string, string> = {
@@ -49,6 +50,8 @@ function humanizeConceptId(id: string, prefix: string): string {
 
 /** Best-effort readable label for a graph URN / node id (no server-resolved title). */
 export function formatRetrievedUrn(urn: string): string {
+  // A link to the doctrine provider would name it on screen.
+  if (isDoctrineProviderUrl(urn)) return DOCTRINE_LABEL;
   if (urn.startsWith('live:')) return 'Fonte provvisoria';
   // Generic massima_* shape: optional "cassazione_" segment, optional branch
   // word (civile/penale/…, abbreviated to 3 letters; defaults to "civ" when
@@ -77,7 +80,8 @@ export function formatRetrievedUrn(urn: string): string {
  */
 export function sourceLabel(source: QaRetrievedSource): string {
   const title = source.title?.trim();
-  if (title) return title;
+  // Only a title that IS the provider's name is relabelled; a longer title is shown as it came.
+  if (title) return /^(?:https?:\/\/)?(?:www\.)?brocardi(?:\.it)?\/?$/i.test(title) ? displaySourceName(title) : title;
   const readableUrn = source.urn.startsWith('live:') && source.source_url ? source.source_url : source.urn;
   return formatRetrievedUrn(readableUrn);
 }
@@ -121,7 +125,7 @@ const PROVENANCE_META: Record<string, ProvenanceMeta> = {
 export function provenanceMeta(provenance: string | null | undefined): ProvenanceMeta {
   return (
     (provenance && PROVENANCE_META[provenance]) || {
-      label: provenance ?? 'sconosciuta',
+      label: displaySourceName(provenance) || 'sconosciuta',
       stripe: 'bg-slate-300',
       chip: 'text-slate-400',
     }

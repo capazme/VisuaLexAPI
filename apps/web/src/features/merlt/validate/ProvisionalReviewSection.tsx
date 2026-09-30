@@ -1,5 +1,6 @@
 import { Check, Loader2, ShieldQuestion, ThumbsUp, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { DOCTRINE_LABEL, isDoctrineProviderUrl } from '../../../utils/doctrineLabel';
 import type { ProvisionalReviewItem } from './validateApi';
 
 export interface ProvisionalReviewSectionProps {
@@ -63,6 +64,8 @@ function ProvisionalReviewCard({
   onAdjudicate: (nodeId: string, decision: 'approve' | 'reject') => void;
 }) {
   const label = item.labels.find((l) => l !== 'LiveSource') ?? 'Norma';
+  // A link to the doctrine provider would name it on screen.
+  const shownUrl = isDoctrineProviderUrl(item.source_url) ? DOCTRINE_LABEL : (item.source_url ?? undefined);
   return (
     <li className="relative overflow-hidden rounded-lg border border-slate-200 bg-white pl-4 dark:border-slate-700 dark:bg-slate-800">
       <span className="absolute inset-y-0 left-0 w-1 bg-amber-400" aria-hidden />
@@ -71,8 +74,8 @@ function ProvisionalReviewCard({
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{label}</p>
             {item.source_url && (
-              <p className="mt-0.5 truncate text-xs text-slate-400" title={item.source_url}>
-                {item.source_url}
+              <p className="mt-0.5 truncate text-xs text-slate-400" title={shownUrl}>
+                {shownUrl}
               </p>
             )}
           </div>

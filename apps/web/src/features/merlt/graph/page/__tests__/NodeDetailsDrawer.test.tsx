@@ -194,4 +194,20 @@ describe('NodeDetailsDrawer', () => {
       expect(screen.queryByRole('button', { name: /usa come contesto/i })).toBeNull();
     });
   });
+  it('shows the provider as Dottrina and hides provider URLs among the properties', () => {
+    const node: GraphNode = {
+      ...NODE,
+      properties: {
+        fonte: 'Brocardi.it',
+        link: 'https://www.brocardi.it/codice-civile/art2043.html',
+        altro: 'valore visibile',
+      },
+    };
+    const { container } = render(
+      <NodeDetailsDrawer node={node} edges={[]} nodesById={NODES_BY_ID} onRecenter={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.getByText('Dottrina')).toBeInTheDocument();
+    expect(screen.getByText('valore visibile')).toBeInTheDocument();
+    expect(container.textContent?.toLowerCase()).not.toContain('brocardi');
+  });
 });

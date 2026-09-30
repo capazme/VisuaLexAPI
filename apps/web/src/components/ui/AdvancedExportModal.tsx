@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import type { ArticleData, MassimaStructured } from '../../types';
+import { LATIN_MAXIMS_LABEL } from '../../utils/doctrineLabel';
 
 interface ExportSection {
   id: string;
@@ -40,7 +41,7 @@ export function AdvancedExportModal({
   const [sections, setSections] = useState<ExportSection[]>([
     { id: 'text', label: 'Testo Articolo', icon: <FileText size={16} />, enabled: true },
     { id: 'citation', label: 'Citazione', icon: <Scale size={16} />, enabled: true },
-    { id: 'brocardi', label: 'Brocardi', icon: <BookOpen size={16} />, enabled: false },
+    { id: 'brocardi', label: LATIN_MAXIMS_LABEL, icon: <BookOpen size={16} />, enabled: false },
     { id: 'ratio', label: 'Ratio Legis', icon: <BookOpen size={16} />, enabled: false },
     { id: 'spiegazione', label: 'Spiegazione', icon: <BookOpen size={16} />, enabled: false },
     { id: 'massime', label: 'Massime', icon: <Scale size={16} />, enabled: false },
@@ -119,7 +120,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      parts.push('\n=== BROCARDI ===');
+      parts.push(`\n=== ${LATIN_MAXIMS_LABEL.toUpperCase()} ===`);
       if (Array.isArray(brocardi_info.Brocardi)) {
         brocardi_info.Brocardi.forEach(b => parts.push(`- ${plainText(b)}`));
       } else {
@@ -186,7 +187,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      rtf += `\\f0\\fs20\\b Brocardi:\\b0\\par`;
+      rtf += `\\f0\\fs20\\b ${LATIN_MAXIMS_LABEL}:\\b0\\par`;
       if (Array.isArray(brocardi_info.Brocardi)) {
         brocardi_info.Brocardi.forEach(b => {
           rtf += `\\f1\\fs18 - ${plainText(b)}\\par`;
@@ -267,7 +268,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      lines.push('## Brocardi');
+      lines.push(`## ${LATIN_MAXIMS_LABEL}`);
       lines.push('');
       if (Array.isArray(brocardi_info.Brocardi)) {
         brocardi_info.Brocardi.forEach((b) => lines.push(`- ${plainText(b)}`));
@@ -397,7 +398,7 @@ export function AdvancedExportModal({
     }
 
     if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      writeHeading('Brocardi');
+      writeHeading(LATIN_MAXIMS_LABEL);
       if (Array.isArray(brocardi_info.Brocardi)) {
         brocardi_info.Brocardi.forEach((b) => writeParagraph(`• ${plainText(b)}`, { size: 11, gapAfter: 4 }));
         y += 4;
@@ -580,7 +581,7 @@ export function AdvancedExportModal({
 
         {hasBrocardiContent && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Approfondimenti Brocardi</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Approfondimenti e dottrina</h3>
             <div className="grid grid-cols-2 gap-2">
               {sections.filter(s => ['brocardi', 'ratio', 'spiegazione'].includes(s.id)).map(section => {
                 const hasContent =

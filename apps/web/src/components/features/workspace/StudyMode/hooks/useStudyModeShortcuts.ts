@@ -152,7 +152,7 @@ export const STUDY_MODE_SHORTCUTS = [
   { key: 'ESC', label: 'Chiudi' },
   { key: '← →', label: 'Naviga' },
   { key: '+ -', label: 'Zoom' },
-  { key: 'B', label: 'Brocardi' },
+  { key: 'B', label: 'Dottrina' },
   { key: 'T', label: 'Tools' },
   { key: 'S', label: 'Settings' },
   { key: 'N', label: 'Nota' },
