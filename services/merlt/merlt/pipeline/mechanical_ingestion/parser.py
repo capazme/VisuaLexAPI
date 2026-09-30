@@ -27,6 +27,7 @@ from merlt.clients import get_visualex_client
 # The abbreviation table lives in the graph's schema; these names stay for the
 # parser's callers and tests.
 from merlt.storage.graph.schema import CODE_ABBREVIATIONS as _CODE_ABBREVIATIONS  # noqa: F401
+from merlt.storage.graph.schema import Fonte, Provenance, text_fingerprint
 from merlt.storage.graph.schema import act_abbreviation as _code_abbreviation
 
 log = structlog.get_logger()
@@ -120,6 +121,11 @@ def _normalize_base_urn(raw: str) -> str:
 
 def _article_urn(base_urn: str, numero: str) -> str:
     return f"{base_urn}~art{_urn_article_suffix(numero)}"
+
+
+def _article_props_extra(text: str) -> dict[str, Any]:
+    """What every mechanically parsed article adds to its own properties."""
+    return {"testo": text, "testo_sha256": text_fingerprint(text), "provenance": Provenance.INGESTION.value}
 
 
 # ---------------------------------------------------------------------------
@@ -378,12 +384,13 @@ class VisualexTreeAdapter:
                     "rubrica": rubrica,
                     "testo_vigente": text,
                     "titolo": estremi,
-                    "fonte": "VisualexAPI",
+                    "fonte": Fonte.NORMATTIVA.value,
                     "vigenza": "vigente",
                     "stato": "vigente",
                     "efficacia": "permanente",
                     "ambito_territoriale": "nazionale",
                 }
+                props.update(_article_props_extra(text))
                 if autorita_emanante:
                     props["autorita_emanante"] = autorita_emanante
 
@@ -548,6 +555,7 @@ def parse_italia_corpus_markdown(md_text: str) -> dict[str, list]:
         if current_urn is None or current_props is None:
             return
         current_props["testo_vigente"] = "\n".join(current_body_lines).strip()
+        current_props.update(_article_props_extra(current_props["testo_vigente"]))
         nodes.append(
             {
                 "id": current_urn,

@@ -84,6 +84,7 @@ from merlt.clients import (
     NormTree,
     get_hierarchical_tree,
 )
+from merlt.storage.graph.schema import Fonte, SourceType, canonical_urn, point_id
 from merlt.utils.urngenerator import generate_urn
 
 # Embeddings (optional, loaded lazily)
@@ -612,6 +613,7 @@ class LegalKnowledgeGraph:
             return 0
 
         points_to_upsert = []
+        article_urn = canonical_urn(article_urn)
         base_payload = {
             "article_urn": article_urn,
             "tipo_atto": metadata.tipo_atto,
@@ -621,13 +623,14 @@ class LegalKnowledgeGraph:
         # 1. Embedding del testo normativo (sempre)
         if article_text and len(article_text.strip()) > 20:
             embedding = await self._embedding_service.encode_document_async(article_text)
-            point_id = hash(f"{article_urn}:norma") % (2**63)
+            pid = point_id(article_urn, SourceType.NORMA.value)
             points_to_upsert.append(PointStruct(
-                id=point_id,
+                id=pid,
                 vector=embedding,
                 payload={
                     **base_payload,
                     "source_type": "norma",
+                    "fonte": Fonte.NORMATTIVA.value,
                     "text": article_text[:2000],
                 },
             ))
@@ -639,13 +642,14 @@ class LegalKnowledgeGraph:
             spiegazione = brocardi_info.get("Spiegazione", "")
             if spiegazione and len(spiegazione.strip()) > 50:
                 embedding = await self._embedding_service.encode_document_async(spiegazione)
-                point_id = hash(f"{article_urn}:spiegazione") % (2**63)
+                pid = point_id(article_urn, SourceType.SPIEGAZIONE.value)
                 points_to_upsert.append(PointStruct(
-                    id=point_id,
+                    id=pid,
                     vector=embedding,
                     payload={
                         **base_payload,
                         "source_type": "spiegazione",
+                        "fonte": Fonte.BROCARDI.value,
                         "text": spiegazione[:2000],
                     },
                 ))
@@ -655,13 +659,14 @@ class LegalKnowledgeGraph:
             ratio = brocardi_info.get("Ratio", "")
             if ratio and len(ratio.strip()) > 50:
                 embedding = await self._embedding_service.encode_document_async(ratio)
-                point_id = hash(f"{article_urn}:ratio") % (2**63)
+                pid = point_id(article_urn, SourceType.RATIO.value)
                 points_to_upsert.append(PointStruct(
-                    id=point_id,
+                    id=pid,
                     vector=embedding,
                     payload={
                         **base_payload,
                         "source_type": "ratio",
+                        "fonte": Fonte.BROCARDI.value,
                         "text": ratio[:2000],
                     },
                 ))
@@ -683,13 +688,14 @@ class LegalKnowledgeGraph:
 
                     if testo and len(testo.strip()) > 50:
                         embedding = await self._embedding_service.encode_document_async(testo)
-                        point_id = hash(f"{article_urn}:massima:{i}") % (2**63)
+                        pid = point_id(article_urn, SourceType.MASSIMA.value, i)
                         points_to_upsert.append(PointStruct(
-                            id=point_id,
+                            id=pid,
                             vector=embedding,
                             payload={
                                 **base_payload,
                                 "source_type": "massima",
+                                "fonte": Fonte.BROCARDI.value,
                                 "massima_index": i,
                                 "text": testo[:2000],
                             },

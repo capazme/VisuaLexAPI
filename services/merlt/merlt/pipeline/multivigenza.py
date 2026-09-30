@@ -6,7 +6,7 @@ Extended pipeline for temporal versioning (multivigenza) of Italian legal norms.
 
 This module:
 1. Tracks all amendments to articles over time
-2. Creates graph relations for modifications (:abroga, :sostituisce, :modifica, :inserisce)
+2. Creates graph relations for modifications (:ABROGA, :SOSTITUISCE, :MODIFICA, :INSERISCE)
 3. Creates COMPLETE Norma nodes for modifying acts (conformi a knowledge-graph.md)
 4. Stores version history with temporal properties
 
@@ -43,6 +43,7 @@ from merlt.clients import (
     StoriaArticolo,
     NormattivaScraper,
 )
+from merlt.storage.graph.schema import Rel
 from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
@@ -50,10 +51,10 @@ log = structlog.get_logger()
 
 # Graph relation types for modifications
 RELATION_TYPES = {
-    TipoModifica.ABROGA: "abroga",
-    TipoModifica.SOSTITUISCE: "sostituisce",
-    TipoModifica.MODIFICA: "modifica",
-    TipoModifica.INSERISCE: "inserisce",
+    TipoModifica.ABROGA: Rel.ABROGA.value,
+    TipoModifica.SOSTITUISCE: Rel.SOSTITUISCE.value,
+    TipoModifica.MODIFICA: Rel.MODIFICA.value,
+    TipoModifica.INSERISCE: Rel.INSERISCE.value,
 }
 
 # Mapping tipo atto da estremi a tipo_documento standardizzato
@@ -631,7 +632,7 @@ class MultivigenzaPipeline:
     This pipeline:
     1. Fetches amendment history from Normattiva
     2. Creates Norma nodes for modifying acts
-    3. Creates modification relations (:abroga, :modifica, etc.)
+    3. Creates modification relations (:ABROGA, :MODIFICA, etc.)
     4. Optionally fetches and stores historical versions
 
     Graph Schema Extensions:
@@ -643,10 +644,10 @@ class MultivigenzaPipeline:
             - abrogato: Boolean, True if article was abrogated
 
         New relations:
-            - :abroga {disposizione, data_efficacia, data_gu, certezza}
-            - :sostituisce {disposizione, data_efficacia, data_gu, certezza}
-            - :modifica {disposizione, data_efficacia, data_gu, certezza}
-            - :inserisce {disposizione, data_efficacia, data_gu, certezza}
+            - :ABROGA {disposizione, data_efficacia, data_gu, certezza}
+            - :SOSTITUISCE {disposizione, data_efficacia, data_gu, certezza}
+            - :MODIFICA {disposizione, data_efficacia, data_gu, certezza}
+            - :INSERISCE {disposizione, data_efficacia, data_gu, certezza}
 
     Usage:
         pipeline = MultivigenzaPipeline(falkordb_client)
@@ -822,7 +823,7 @@ class MultivigenzaPipeline:
         Struttura creata (conforme a knowledge-graph.md):
             (Atto Modificante) -[:contiene]-> (Articolo) -[:contiene]-> (Comma)
                                                                             |
-                                                                       [:modifica]
+                                                                       [:MODIFICA]
                                                                             v
                                                                     (Articolo Modificato)
 
@@ -1243,7 +1244,7 @@ class MultivigenzaPipeline:
             """
             MATCH (ver:Norma {URN: $ver_urn})
             MATCH (art:Norma {URN: $art_urn})
-            MERGE (ver)-[r:versione_di]->(art)
+            MERGE (ver)-[r:VERSIONE_DI]->(art)
             ON CREATE SET r.certezza = 1.0
             """,
             {"ver_urn": versioned_urn, "art_urn": base_urn}
