@@ -186,7 +186,18 @@ def _get_default_weights() -> Dict[str, Dict[str, float]]:
 
 
 # Expert-specific traversal weights loaded from config
-EXPERT_TRAVERSAL_WEIGHTS = _load_expert_weights()
+# Suppress structlog output during initialization to avoid polluting subprocess calls
+import io
+import sys
+_old_stdout = sys.stdout
+_old_stderr = sys.stderr
+try:
+    sys.stdout = io.StringIO()
+    sys.stderr = io.StringIO()
+    EXPERT_TRAVERSAL_WEIGHTS = _load_expert_weights()
+finally:
+    sys.stdout = _old_stdout
+    sys.stderr = _old_stderr
 
 
 # Expert-specific source type filters (Art. 12 Preleggi alignment)
