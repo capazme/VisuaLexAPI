@@ -1,11 +1,15 @@
 """The ingestion writers speak the schema's vocabulary (spec 2026-09-30, §4)."""
+import importlib
+import inspect
 import json
+import re
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from merlt.clients import Modifica, Norma, NormaVisitata, TipoModifica
 from merlt.pipeline.ingestion import IngestionPipelineV2, _canonical_urn
-from merlt.pipeline.multivigenza import RELATION_TYPES
+from merlt.pipeline.multivigenza import RELATION_TYPES, MultivigenzaPipeline
 from merlt.pipeline.visualex import NormaMetadata, VisualexArticle
 from merlt.scripts import load_seed_libro_iv as seed
 from merlt.storage.graph.schema import Rel, canonical_rel, point_id, text_fingerprint
@@ -159,24 +163,110 @@ async def test_seed_vector_ids_are_stable_across_runs():
     assert first[1].payload["source_type"] == "massima"
 
 
-async def test_an_article_with_doctrine_is_ingested_in_the_schemas_names():
+# An article that makes the pipeline write every kind of node it knows: the codice and its four
+# partitions, the article, two commi with lettere, the four shapes of doctrine, a massima.
+RICH_ARTICLE_TEXT = (
+    "Art. 117\n\n(Competenze legislative).\n\n"
+    "Lo Stato ha legislazione esclusiva nelle seguenti materie:\n"
+    "a) politica estera e rapporti internazionali dello Stato;\n"
+    "b) immigrazione e condizione giuridica degli stranieri.\n\n"
+    "Le Regioni hanno potesta legislativa in ogni materia non riservata."
+)
+RICH_BROCARDI_INFO = {
+    "Position": (
+        "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale, "
+        "Capo I - Del contratto, Sezione I - Disposizioni generali"
+    ),
+    "Ratio": "La ratio della norma.",
+    "Spiegazione": "La spiegazione della norma.",
+    "RelazioneCostituzione": {"titolo": "Relazione al Progetto", "testo": "Il testo della relazione.", "autore": "Ruini", "anno": 1947},
+    "Relazioni": [{"titolo": "Relazione del Guardasigilli", "testo": "Il testo della relazione.", "autore": "Grandi", "anno": 1942}],
+    "Massime": [{"autorita": "Cass. civ.", "numero": "1", "anno": "2021", "massima": "Testo della massima."}],
+}
+
+
+async def _queries_of_a_rich_ingestion() -> list[str]:
     client = MagicMock()
     client.query = AsyncMock(return_value=[])
     article = VisualexArticle(
-        metadata=_meta(numero="1321"),
-        article_text="Art. 1321\nTesto dell'articolo.",
-        url=CC.replace("2043", "1321"),
-        brocardi_info={
-            "Position": "Libro IV - Delle obbligazioni, Titolo II - Dei contratti in generale, Capo I - Del contratto",
-            "Ratio": "La ratio della norma.",
-            "Spiegazione": "La spiegazione della norma.",
-            "Massime": [{"autorita": "Cass. civ.", "numero": "1", "anno": "2021", "massima": "Testo della massima."}],
-        },
+        metadata=_meta(numero="117"),
+        article_text=RICH_ARTICLE_TEXT,
+        url=CC.replace("2043", "117"),
+        brocardi_info=RICH_BROCARDI_INFO,
     )
     await IngestionPipelineV2(falkordb_client=client).ingest_article(article)
-    written = "\n".join(c.args[0] for c in client.query.await_args_list)
+    return [call.args[0] for call in client.query.await_args_list]
+
+
+async def test_an_article_with_doctrine_is_ingested_in_the_schemas_names():
+    written = "\n".join(await _queries_of_a_rich_ingestion())
     for relation in ("CONTIENE", "COMMENTA", "INTERPRETA"):
         assert f"[r:{relation}]" in written
     for legacy in ("[r:contiene]", "[r:commenta]", "[r:interpreta]", "'VisualexAPI'", "'Brocardi'"):
         assert legacy not in written
     assert "libro.fonte = 'Brocardi.it'" in written and "codice.fonte = 'Normattiva'" in written
+
+
+async def test_every_node_the_ingestion_merges_carries_provenance():
+    # A node written without a provenance is the one the next backfill stamps as `seed`.
+    merges = [q for q in await _queries_of_a_rich_ingestion() if re.search(r"MERGE \(\w+:[A-Z]", q)]
+    variables = {re.search(r"MERGE \((\w+):", q).group(1) for q in merges}
+    # the test reaches every kind of node the pipeline writes, so it cannot pass by looking at too little
+    assert {"codice", "libro", "titolo", "capo", "sezione", "art", "c", "l", "d", "a"} <= variables
+    assert sum("MERGE (d:Dottrina" in q for q in merges) == 4  # ratio, spiegazione and both relazioni
+    for query in merges:
+        assert "provenance" in query, query
+        variable = re.search(r"MERGE \((\w+):", query).group(1)
+        if variable != "art":  # the article's own form (a parameter, filled on create and on match) is pinned above
+            assert f"{variable}.provenance = coalesce({variable}.provenance, 'ingestion')" in query
+
+
+def test_multivigenza_writes_no_lowercase_contiene():
+    multivigenza = importlib.import_module("merlt.pipeline.multivigenza")
+    assert ":contiene]" not in inspect.getsource(multivigenza)
+
+
+def test_every_node_multivigenza_merges_carries_provenance():
+    multivigenza = importlib.import_module("merlt.pipeline.multivigenza")
+    # one Cypher string per match: the regex runs to the closing quotes of the statement
+    statements = re.findall(r'MERGE \(\w+:[A-Z][^"]*', inspect.getsource(multivigenza))
+    variables = {re.match(r"MERGE \((\w+):", s).group(1) for s in statements}
+    assert {"atto", "art", "comma", "let", "num", "ver"} <= variables
+    for statement in statements:
+        variable = re.match(r"MERGE \((\w+):", statement).group(1)
+        assert f"{variable}.provenance = coalesce({variable}.provenance, 'ingestion')" in statement
+
+
+async def test_multivigenza_writes_the_modifying_act_in_the_schemas_names():
+    client = _Recorder()
+    modifica = Modifica(
+        tipo_modifica=TipoModifica.MODIFICA,
+        atto_modificante_urn="urn:nir:stato:decreto.legislativo:2001-01-01;1",
+        atto_modificante_estremi="D.Lgs. 1 gennaio 2001, n. 1",
+        data_efficacia="2001-02-01",
+        data_pubblicazione_gu="2001-01-15",
+        disposizione="art. 12, comma 1, numero 3, lettera b",  # the lettera pattern is greedy: the numero goes first
+    )
+    scraper = MagicMock(
+        get_amendment_history=AsyncMock(return_value=[modifica]),
+        get_original_version=AsyncMock(return_value=("Testo originale.", "urn")),
+        get_version_at_date=AsyncMock(return_value=("Testo storico.", "urn")),
+    )
+    norma = Norma(tipo_atto="codice civile", data="1942-03-16", numero_atto="262")
+    visited = NormaVisitata(norma=norma, numero_articolo="1321", urn=CC.replace("2043", "1321"))
+
+    result = await MultivigenzaPipeline(falkordb_client=client, scraper=scraper).ingest_with_history(
+        visited, fetch_all_versions=True
+    )
+
+    assert result.errors == []  # the pipeline swallows exceptions into this list: an empty one means it ran through
+    queries = [cypher for cypher, _ in client.calls]
+    merges = [q for q in queries if re.search(r"MERGE \(\w+:[A-Z]", q)]
+    assert {re.search(r"MERGE \((\w+):", q).group(1) for q in merges} == {"atto", "art", "comma", "let", "num", "ver"}
+    for query in merges:
+        variable = re.search(r"MERGE \((\w+):", query).group(1)
+        assert f"{variable}.provenance = coalesce({variable}.provenance, 'ingestion')" in query
+    written = "\n".join(queries)
+    assert written.count("[r:CONTIENE]") == 4  # act -> article -> comma -> lettera -> numero
+    assert "[r:contiene]" not in written
+    assert "[r:MODIFICA]" in written and "[r:VERSIONE_DI]" in written

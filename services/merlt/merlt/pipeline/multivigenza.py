@@ -821,7 +821,7 @@ class MultivigenzaPipeline:
         Create COMPLETE hierarchical structure for modifying act and modification relation.
 
         Struttura creata (conforme a knowledge-graph.md):
-            (Atto Modificante) -[:contiene]-> (Articolo) -[:contiene]-> (Comma)
+            (Atto Modificante) -[:CONTIENE]-> (Articolo) -[:CONTIENE]-> (Comma)
                                                                             |
                                                                        [:MODIFICA]
                                                                             v
@@ -834,7 +834,7 @@ class MultivigenzaPipeline:
         1. Nodo Norma per l'atto modificante (legge, decreto, etc.)
         2. Nodo Norma per l'articolo specifico della disposizione
         3. Nodo Comma se presente nella disposizione
-        4. Relazioni :contiene per la gerarchia
+        4. Relazioni :CONTIENE per la gerarchia
         5. Relazione di modifica dal nodo più specifico
         """
         if not self.falkordb:
@@ -877,6 +877,7 @@ class MultivigenzaPipeline:
                 atto.autorita_emanante = $autorita,
                 atto.ambito_territoriale = 'nazionale',
                 atto.fonte = 'Normattiva',
+                atto.provenance = coalesce(atto.provenance, 'ingestion'),
                 atto.created_at = $timestamp,
                 atto.updated_at = $timestamp
             """,
@@ -926,6 +927,7 @@ class MultivigenzaPipeline:
                     art.data_pubblicazione = $data_gu,
                     art.data_entrata_vigore = $data_gu,
                     art.fonte = 'Normattiva',
+                    art.provenance = coalesce(art.provenance, 'ingestion'),
                     art.created_at = $timestamp,
                     art.updated_at = $timestamp
                 """,
@@ -940,12 +942,12 @@ class MultivigenzaPipeline:
                 }
             )
 
-            # Relazione :contiene dall'atto all'articolo
+            # Relazione :CONTIENE dall'atto all'articolo
             await self.falkordb.query(
                 """
                 MATCH (atto:Norma {URN: $atto_urn})
                 MATCH (art:Norma {URN: $art_urn})
-                MERGE (atto)-[r:contiene]->(art)
+                MERGE (atto)-[r:CONTIENE]->(art)
                 ON CREATE SET r.certezza = 1.0
                 """,
                 {"atto_urn": atto_urn, "art_urn": articolo_urn}
@@ -973,6 +975,7 @@ class MultivigenzaPipeline:
                             comma.estremi = $estremi,
                             comma.testo = $testo,
                             comma.fonte = 'Normattiva',
+                            comma.provenance = coalesce(comma.provenance, 'ingestion'),
                             comma.created_at = $timestamp
                         """,
                         {
@@ -984,12 +987,12 @@ class MultivigenzaPipeline:
                         }
                     )
 
-                    # Relazione :contiene dall'articolo al comma
+                    # Relazione :CONTIENE dall'articolo al comma
                     await self.falkordb.query(
                         """
                         MATCH (art:Norma {URN: $art_urn})
                         MATCH (comma:Comma {URN: $comma_urn})
-                        MERGE (art)-[r:contiene]->(comma)
+                        MERGE (art)-[r:CONTIENE]->(comma)
                         ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                         """,
                         {"art_urn": articolo_urn, "comma_urn": comma_urn, "ord": int(comma_num)}
@@ -1018,6 +1021,7 @@ class MultivigenzaPipeline:
                                 let.posizione = $posizione,
                                 let.estremi = $estremi,
                                 let.fonte = 'Normattiva',
+                                let.provenance = coalesce(let.provenance, 'ingestion'),
                                 let.created_at = $timestamp
                             """,
                             {
@@ -1028,12 +1032,12 @@ class MultivigenzaPipeline:
                             }
                         )
 
-                        # Relazione :contiene dal comma alla lettera
+                        # Relazione :CONTIENE dal comma alla lettera
                         await self.falkordb.query(
                             """
                             MATCH (comma:Comma {URN: $comma_urn})
                             MATCH (let:Lettera {URN: $let_urn})
-                            MERGE (comma)-[r:contiene]->(let)
+                            MERGE (comma)-[r:CONTIENE]->(let)
                             ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                             """,
                             {"comma_urn": first_comma_urn, "let_urn": lettera_urn, "ord": ord(lettera) - ord('a') + 1}
@@ -1062,6 +1066,7 @@ class MultivigenzaPipeline:
                                     num.posizione = $posizione,
                                     num.estremi = $estremi,
                                     num.fonte = 'Normattiva',
+                                    num.provenance = coalesce(num.provenance, 'ingestion'),
                                     num.created_at = $timestamp
                                 """,
                                 {
@@ -1072,12 +1077,12 @@ class MultivigenzaPipeline:
                                 }
                             )
 
-                            # Relazione :contiene dalla lettera al numero
+                            # Relazione :CONTIENE dalla lettera al numero
                             await self.falkordb.query(
                                 """
                                 MATCH (let:Lettera {URN: $let_urn})
                                 MATCH (num:Numero {URN: $num_urn})
-                                MERGE (let)-[r:contiene]->(num)
+                                MERGE (let)-[r:CONTIENE]->(num)
                                 ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                                 """,
                                 {"let_urn": first_lettera_urn, "num_urn": numero_urn, "ord": int(numero)}
@@ -1226,6 +1231,7 @@ class MultivigenzaPipeline:
                 ver.estremi = $estremi,
                 ver.is_versione_vigente = false,
                 ver.fonte = 'Normattiva',
+                ver.provenance = coalesce(ver.provenance, 'ingestion'),
                 ver.created_at = $timestamp
             """,
             {

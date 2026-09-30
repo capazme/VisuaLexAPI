@@ -25,7 +25,9 @@ EXEMPT = {
 REL_RE = re.compile(r"-\[\w*:([A-Za-z_]+(?:\|:?[A-Za-z_]+)*)")
 LABEL_RE = re.compile(r"\(\w*:([A-Z][A-Za-z]+)")
 FONTE_RE = re.compile(r"\bfonte\s*[=:]\s*'([^']+)'")
-PROVENANCE_RE = re.compile(r"\bprovenance\s*[=:]\s*'([^']+)'")
+# `x.provenance = 'seed'`, `{provenance: 'seed'}` and the non-destructive
+# `x.provenance = coalesce(x.provenance, 'ingestion')` that the ingestion writers use.
+PROVENANCE_RE = re.compile(r"\bprovenance\s*[=:]\s*(?:coalesce\(\s*\w+\.provenance\s*,\s*)?'([^']+)'")
 CYPHER_RE = re.compile(r"\b(MATCH|MERGE)\b")
 
 KNOWN_LEGACY_RELS: set[str] = {

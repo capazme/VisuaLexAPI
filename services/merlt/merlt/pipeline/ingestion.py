@@ -463,6 +463,7 @@ class IngestionPipelineV2:
                 codice.efficacia = 'permanente',
                 codice.ambito_territoriale = 'nazionale',
                 codice.fonte = 'Normattiva',
+                codice.provenance = coalesce(codice.provenance, 'ingestion'),
                 codice.created_at = $timestamp
             """,
             {
@@ -522,6 +523,7 @@ class IngestionPipelineV2:
                     libro.rubrica = $titolo,
                     libro.vigenza = 'vigente',
                     libro.fonte = 'Brocardi.it',
+                    libro.provenance = coalesce(libro.provenance, 'ingestion'),
                     libro.created_at = $timestamp,
                     libro.updated_at = $timestamp
                 """,
@@ -555,6 +557,7 @@ class IngestionPipelineV2:
                     titolo.rubrica = $titolo,
                     titolo.vigenza = 'vigente',
                     titolo.fonte = 'Brocardi.it',
+                    titolo.provenance = coalesce(titolo.provenance, 'ingestion'),
                     titolo.created_at = $timestamp,
                     titolo.updated_at = $timestamp
                 """,
@@ -588,6 +591,7 @@ class IngestionPipelineV2:
                     capo.rubrica = $titolo,
                     capo.vigenza = 'vigente',
                     capo.fonte = 'Brocardi.it',
+                    capo.provenance = coalesce(capo.provenance, 'ingestion'),
                     capo.created_at = $timestamp,
                     capo.updated_at = $timestamp
                 """,
@@ -621,6 +625,7 @@ class IngestionPipelineV2:
                     sezione.rubrica = $titolo,
                     sezione.vigenza = 'vigente',
                     sezione.fonte = 'Brocardi.it',
+                    sezione.provenance = coalesce(sezione.provenance, 'ingestion'),
                     sezione.created_at = $timestamp,
                     sezione.updated_at = $timestamp
                 """,
@@ -804,6 +809,7 @@ class IngestionPipelineV2:
                     c.numero = $numero,
                     c.testo = $testo,
                     c.token_count = $tokens,
+                    c.provenance = coalesce(c.provenance, 'ingestion'),
                     c.created_at = $timestamp
                 """,
                 {
@@ -840,6 +846,7 @@ class IngestionPipelineV2:
                         l.lettera = $lettera,
                         l.testo = $testo,
                         l.token_count = $tokens,
+                        l.provenance = coalesce(l.provenance, 'ingestion'),
                         l.created_at = $timestamp
                     """,
                     {
@@ -890,6 +897,7 @@ class IngestionPipelineV2:
                     d.descrizione = $descrizione,
                     d.tipo_dottrina = 'ratio',
                     d.fonte = 'Brocardi.it',
+                    d.provenance = coalesce(d.provenance, 'ingestion'),
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
                     d.created_at = $timestamp
@@ -926,6 +934,7 @@ class IngestionPipelineV2:
                     d.descrizione = $descrizione,
                     d.tipo_dottrina = 'spiegazione',
                     d.fonte = 'Brocardi.it',
+                    d.provenance = coalesce(d.provenance, 'ingestion'),
                     d.autore = 'Brocardi.it',
                     d.confidence = 0.9,
                     d.created_at = $timestamp
@@ -1002,6 +1011,7 @@ class IngestionPipelineV2:
                     d.tipo_dottrina = 'relazione_accompagnamento',
                     d.sottotipo = 'relazione_costituzione',
                     d.fonte = 'Brocardi.it',
+                    d.provenance = coalesce(d.provenance, 'ingestion'),
                     d.autore = $autore,
                     d.anno = $anno,
                     d.confidence = 0.95,
@@ -1056,6 +1066,7 @@ class IngestionPipelineV2:
                         d.tipo_dottrina = 'relazione_accompagnamento',
                         d.sottotipo = $sottotipo,
                         d.fonte = 'Brocardi.it',
+                        d.provenance = coalesce(d.provenance, 'ingestion'),
                         d.autore = $autore,
                         d.anno = $anno,
                         d.confidence = 0.9,
@@ -1191,6 +1202,7 @@ class IngestionPipelineV2:
                 a.massima = $massima,
                 a.tipo_atto = 'sentenza',
                 a.fonte = 'Brocardi.it',
+                a.provenance = coalesce(a.provenance, 'ingestion'),
                 a.confidence = 0.9,
                 a.created_at = $timestamp
             """,
