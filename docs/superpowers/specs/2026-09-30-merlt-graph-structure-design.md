@@ -1,8 +1,9 @@
-# MERL-T knowledge graph: one structure, complete ingestion — Design (DRAFT 1)
+# MERL-T knowledge graph: one structure, complete ingestion — Design
 
 **Date:** 2026-09-30
-**Status:** DRAFT 1 for the owner's review. The interview answers of 30 September are in
-section 2; section 11 keeps what is still open.
+**Status:** accepted by the owner on 30 September (the interview answers are in section 2).
+Phase 1 is planned in `docs/superpowers/plans/2026-09-30-merlt-graph-vocabulary.md`; section 11
+keeps what is still open.
 **Round:** the MERL-T graph. It comes **before** the MCP spike, by the owner's choice (the
 Gate 0 date is at risk, and the owner accepted that).
 **Supersedes:** filling the graph with the mechanical ingestion as it stands
@@ -107,7 +108,7 @@ Non-goals:
 
 ### 4.1 One schema module
 
-`merlt/graph/schema.py` (new) is the single definition of:
+`merlt/storage/graph/schema.py` (new) is the single definition of:
 
 - **Labels**: `Norma` (with `tipo_documento`: `articolo`, `codice`, `legge`, …, and the
   partitions `parte`, `libro`, `titolo`, `capo`, `sezione`, as the seed already does), `Comma`,
@@ -129,8 +130,8 @@ Non-goals:
 - **Provenance** values (`seed`, `ingestion`, `community_validated`, `live_unconfirmed`,
   `confirmed`) and **fonte** values (`Normattiva`, `Brocardi.it`, `manuale:Torrente-libroiv`,
   `community`, `mcp-legal-it`).
-- **The stub shape** (`is_stub: true`, URN, estremi, nothing else) and the **completeness
-  flags** of an article (section 4.3).
+- **The stub shape** (`URN`, `node_id`, `numero_articolo`, `estremi`, `is_stub: true`,
+  `provenance`, nothing else) and the **completeness flags** of an article (section 4.3).
 
 Every writer imports its names from here; every reader builds its Cypher and its Qdrant
 filters from here. A contract test fails when a writer emits, or a reader asks for, a name the
@@ -156,6 +157,13 @@ vectors. `Norma.completeness` records each part with the date it was written. Th
 (`api/graph_router.py:83-89`, `apps/server/src/routes/merlt/events.ts:129-131`) asks
 "complete?" instead of "exists?", so a stub or a partial article is completed the first time
 someone reads it.
+
+Phase 1 checks four parts, derived from the graph itself: text, commi, a parent through
+`CONTIENE`, and the text's fingerprint. Rubrica is left out (many articles have none). The
+doctrine layer, the vectors and the dated record join in phase 2: checking them sooner would
+re-ingest every seed article on its first view and duplicate its vectors, because seed and lazy
+vectors are keyed differently until phase 2 re-ingests. An article that stays incomplete after
+an ingestion is not asked for again within a day.
 
 ### 4.4 Migrating the graph that exists
 
@@ -265,8 +273,10 @@ Traversal paths are saved in the Q&A trace, so a later training round can use th
 
 The side rail, the Sidebar entry and `/grafo` render only for validators (`isAdmin` today;
 the validators' role when the nucleus exists). The BFF graph read routes get the same guard,
-so hiding the UI is not the only protection. Expert answers show their sources as a list of
-articles that open in the reader.
+so hiding the UI is not the only protection; the entity search stays open to contributors,
+whose picker needs it. Expert answers show their sources as a list of articles that open in the
+reader. The Q&A lives on `/grafo` today, so in phase 1 it follows the graph: a page for it
+without the graph is a UI round of its own, when the owner chooses.
 
 ### 6.6 Sector codes
 
