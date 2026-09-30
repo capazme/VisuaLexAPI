@@ -8,6 +8,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // Above the 5 s of the waits in src/test/setup.ts, so a slow wait reports itself
+    // ("Unable to find ...") instead of being cut off by the test's own timeout.
+    testTimeout: 15000,
     css: true,
     coverage: {
       provider: 'v8',

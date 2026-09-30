@@ -1,6 +1,12 @@
 import { afterEach } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import '@testing-library/jest-dom'
+
+// A busy machine (a CI runner, a build running beside the tests) can take longer than
+// Testing Library's default one second to render a popover or settle a list, and a wait
+// that outlasts it turns a passing test red. The timeout only matters on a wait that is
+// going to fail anyway, so a generous one costs nothing on a green run.
+configure({ asyncUtilTimeout: 5000 })
 
 // Cleanup after each test
 afterEach(() => {
