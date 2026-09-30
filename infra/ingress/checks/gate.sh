@@ -18,23 +18,25 @@ cleanup() {
   docker rm -f "$name" >/dev/null 2>&1
   for p in $pids; do kill "$p" 2>/dev/null; done
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 python3 "$here/stub_upstream.py" server 13001 & server_pid=$!; pids="$server_pid"
 python3 "$here/stub_upstream.py" scrapers 15000 & scrapers_pid=$!; pids="$pids $scrapers_pid"
-docker run -d --rm --name "$name" -p 127.0.0.1:18081:8080 \
+docker run -d --name "$name" -p 127.0.0.1:18081:8080 \
   --add-host=host.docker.internal:host-gateway \
   -e SERVER_UPSTREAM=host.docker.internal:13001 -e SCRAPERS_UPSTREAM=host.docker.internal:15000 \
   -v "$root/infra/ingress/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null || { echo "cannot start caddy"; exit 1; }
 
 # wait until the ingress answers (any status)
-i=0; until curl -s -o /dev/null -m 2 "$B/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress did not start"; exit 1; }; sleep 1; done
+i=0; until curl -s -o /dev/null -m 2 "$B/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress did not start"; docker logs "$name" 2>&1 | tail -20; exit 1; }; sleep 1; done
 
 code()   { curl -s -o /dev/null -m 10 -w '%{http_code}' "$@"; }
 seen()   { curl -s -m 5 "http://127.0.0.1:$1/__seen" | python3 -c "import json,sys; d=json.load(sys.stdin); print($2)"; }
 scraper_calls() { seen 15000 'd["calls"]'; }
 verify_calls()  { seen 13001 'd["calls"]'; }
-expect() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (wanted '$2', got '$3')"; fi; }
+expect() { if [ -n "$2" ] && [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (wanted '$2', got '$3')"; fi; }
 
 # 1. no token: refused at the door, and the scrapers never hear of it
 before="$(scraper_calls)"
@@ -72,7 +74,16 @@ else
   bad "the stream flushes line by line (first byte at ${first}s, done at ${total}s)"
 fi
 
-# 7. the server does not answer: the gate stays shut
+# 7. odd spellings of a gated path are gated too: Caddy matches the decoded, cleaned path,
+#    so none of these may reach the scrapers without a login; only the exact /version and
+#    /health are open
+before="$(scraper_calls)"
+for spelling in /fetch_article%5Ftext //fetch_article_text /x/../fetch_article_text /FETCH_ARTICLE_TEXT /health%2Fdetailed /health/ /version/x; do
+  expect "$spelling without a token is refused" 401 "$(code --path-as-is -X POST -d '{}' "$B$spelling")"
+done
+expect "and none of them reached the scrapers" "$before" "$(scraper_calls)"
+
+# 8. the server does not answer: the gate stays shut (last: once it is killed everything fails closed)
 kill "$server_pid" 2>/dev/null; wait "$server_pid" 2>/dev/null; sleep 1
 status="$(code -H 'Authorization: Bearer good-token' -X POST -d '{}' "$B/fetch_article_text")"
 case "$status" in 502|503|504) ok "with no server behind it the gate is closed ($status)" ;; *) bad "with no server behind it the gate is closed (got $status)" ;; esac
