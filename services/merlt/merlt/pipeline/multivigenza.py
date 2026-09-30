@@ -249,7 +249,9 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
     if not disposizione:
         return result
 
-    disp_lower = disposizione.lower().strip()
+    # Every run of whitespace, a line break included, becomes one space: the `.` of the patterns below
+    # does not cross a line break, and the split on commas is quadratic in the length of a run.
+    disp_lower = " ".join(disposizione.lower().split())
 
     # Estrai numero articolo: "art. 12" o "art.12" o "art. 12-bis"
     art_match = re.search(r"art\.?\s*(\d+(?:-\w+)?)", disp_lower)
@@ -266,14 +268,15 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
     # Lettere: "lettera b", "lettere a, b e c", "lettera b-bis)", "lettere aa) e bb)".
     # The clause runs to the next keyword (numero, comma, periodo, parole, art.) or to the end: in
     # "lettera b, numero 3" the numero is not part of it. Its tokens are split on commas and on the
-    # conjunction "e", end at their closing parenthesis ("b) della tabella" is the lettera b), and
-    # only a lettera is kept: `b`, `aa` (after z come aa, bb…) or `b-bis`.
+    # conjunction "e", end at their closing parenthesis ("b) della tabella" is the lettera b), lose
+    # the punctuation that closes them ("b.", "b;", "b:"), and only a lettera is kept: `b`, `aa`
+    # (after z come aa, bb…) or `b-bis`.
     lettera_match = re.search(
         r"letter[ae]\s+(.*?)(?=\b(?:numer[oi]|comm[ai]|period[oi]|parol[ae]|art\w*)\b|$)", disp_lower
     )
     if lettera_match:
         for token in re.split(r"\s*,\s*|\s+e\s+", lettera_match.group(1)):
-            token = token.split(")")[0].strip()
+            token = token.split(")")[0].strip(" .;:")
             if re.fullmatch(r"[a-z]{1,2}(?:-[a-z]+)?", token):
                 result["lettere"].append(token)
 

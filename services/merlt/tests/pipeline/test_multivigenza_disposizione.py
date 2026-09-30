@@ -1,5 +1,6 @@
 """`parse_disposizione` says which part of the modifying act operates the change, and the
 writer turns every lettera it returns into a Lettera node: a wrong lettera is a wrong node."""
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,6 +41,16 @@ def _parsed(numero_articolo, commi, lettere, numeri):
         ("art. 3, comma 1, lettera c-bis) dell'allegato B", _parsed("3", ["1"], ["c-bis"], [])),
         ("art. 3, comma 1, lettere a) e b) dello stesso articolo", _parsed("3", ["1"], ["a", "b"], [])),
         ("art. 3, comma 1, lettera a).", _parsed("3", ["1"], ["a"], [])),
+        # a line break is whitespace like any other, wherever it falls
+        ("art. 12, comma 1,\nlettera b),\nnumero 3)", _parsed("12", ["1"], ["b"], ["3"])),
+        ("art. 12, comma 1, lettera b)\r\nnumero 3", _parsed("12", ["1"], ["b"], ["3"])),
+        ("art. 2, comma 1, lettere a)\ne b)", _parsed("2", ["1"], ["a", "b"], [])),
+        ("art. 5,   comma\t2,\tlettere  a,   b  e   c", _parsed("5", ["2"], ["a", "b", "c"], [])),
+        # a bare lettera followed by the punctuation that closes the clause or the sentence
+        ("art. 1, comma 1, lettera b.", _parsed("1", ["1"], ["b"], [])),
+        ("art. 1, comma 1, lettera b;", _parsed("1", ["1"], ["b"], [])),
+        ("art. 1, comma 1, lettera b:", _parsed("1", ["1"], ["b"], [])),
+        ("art. 1, comma 1, lettere a, b e c.", _parsed("1", ["1"], ["a", "b", "c"], [])),
         # the function lowercases and trims what it is given
         ("  Art. 3, Comma 1, Lettera B)  ", _parsed("3", ["1"], ["b"], [])),
     ],
@@ -53,6 +64,18 @@ def test_each_keyword_that_starts_another_part_ends_the_lettere_even_without_a_c
     # No parenthesis to end the last lettera here: without the cut, the last token would be
     # "c <next part>" and the lettera c would be lost.
     assert parse_disposizione(f"art. 9, comma 1, lettere a, b e c {next_part}")["lettere"] == ["a", "b", "c"]
+
+
+@pytest.mark.parametrize("space", [" ", "\t", "\n"])
+def test_a_long_run_of_whitespace_in_the_lettera_clause_does_not_stall_the_parser(space):
+    # parse_disposizione runs synchronously inside an async handler: a split that is quadratic in the
+    # length of a whitespace run (50,000 spaces took 4.5 s) stalls the whole event loop.
+    disposizione = "art. 12, comma 1, lettera b" + space * 50_000 + "numero 3"
+    started = time.perf_counter()
+    parsed = parse_disposizione(disposizione)
+    elapsed = time.perf_counter() - started
+    assert parsed == _parsed("12", ["1"], ["b"], ["3"])
+    assert elapsed < 1.0, f"took {elapsed:.2f} s"
 
 
 @pytest.mark.parametrize("empty", ["", "   ", None])
@@ -117,3 +140,12 @@ async def test_a_lettera_with_a_suffix_or_beyond_z_is_a_node_and_does_not_stop_t
     # the place of each in its comma: after z come aa, bb…; a suffixed lettera shares its base letter's
     places = [params["ord"] for cypher, params in calls if "(comma)-[r:CONTIENE]->(let)" in cypher]
     assert places == [27, 2]
+
+
+async def test_a_line_break_does_not_cost_the_article_its_lettera_and_its_numero():
+    # the writer creates the numeri only under a lettera: no lettera, no numero either
+    result, calls = await _write_modification("art. 12, comma 1,\nlettera b),\nnumero 3)")
+    assert result.errors == []
+    assert _lettera_urns(calls) == [f"{ACT}~art12-com1-letb"]
+    numeri = [params["urn"] for cypher, params in calls if "MERGE (num:Numero" in cypher]
+    assert numeri == [f"{ACT}~art12-com1-letb-num3"]
