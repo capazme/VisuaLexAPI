@@ -35,7 +35,7 @@ The failure modes the spec implies and no obvious test would name, most likely f
 2. **The stream and the PDF.** `stream_article_text` must keep arriving line by line through the login check, and `export_pdf` must still hand back a file: `legalFetch` returns fetch's own `Response`, untouched. Task 2 (returns what fetch gives), Task 6 (first byte before the last line), Task 7 (a PDF export in the browser).
 3. **A signed-out or revoked user.** They are sent to the login page once, with no request loop: a second 401 ends the session and is not retried a third time. Task 2.
 4. **A heavy but legitimate day.** Opening a 40-article dossier and hovering citations must stay well inside 300 points a minute; past it the user gets a `429` with `Retry-After` that the existing error paths show as an error, not a blank reader. Task 4 (quota, cost by route), Task 7 (a small quota, a real 429).
-5. **The server not answering.** The scraping paths fail (502/503), never open. Task 6.
+5. **The server not answering, or hanging.** The scraping paths fail (502 when it is down, 504 after ten seconds when it hangs), never open, and the open paths keep answering. Tasks 5 and 6, and Task 7 on the real stack.
 
 ---
 
@@ -58,9 +58,16 @@ git worktree add ../VisuaLexAPI-legal-fetch -b feat/legal-fetch develop
 ln -s "$PWD/apps/web/node_modules" ../VisuaLexAPI-legal-fetch/apps/web/node_modules
 ```
 
-A worktree has no `node_modules`: link the main checkout's, and `unlink` the links before `git worktree remove`. The server worktree also needs `apps/server/node_modules` the same way, and the gitignored `apps/server/.env.test` (link it; it is never read or printed).
+A worktree has no `node_modules`: link the main checkout's, and `unlink` the links before `git worktree remove`. The server worktree also needs `apps/server/node_modules` the same way. `apps/server/.gitignore` says `node_modules/`, which does not match a symlink, so the link shows up as untracked: stage explicit paths, never `git add apps/server`. `apps/server/.env.test` is tracked: there is nothing to link, and nothing to read.
 
-Commit with `git -C <worktree> …` if the shared hook, which reads the branch of the session's own directory, refuses. The server suite needs the development stores running, started **from the main checkout**, whose `infra/.env` they were created with (`./start.sh` there starts them, or `docker compose -f infra/compose.yml up -d --wait postgres redis`); it resets only a database whose name contains `test`.
+Commit with `git -C <worktree> …` if the shared hook, which reads the branch of the session's own directory, refuses. The server suite needs a real Postgres and resets it (`npm test` runs `prisma migrate reset` and refuses a database whose name lacks `test`). Do not point it at the development stores, whose volumes belong to the main checkout's `infra/.env`: start a throwaway one, as CI does, and let `DATABASE_URL` win over `.env.test` (dotenv-cli does not override):
+
+```bash
+docker run -d --name vxpg-test -e POSTGRES_USER=visualex -e POSTGRES_PASSWORD=visualex -e POSTGRES_DB=visualex_test \
+  -p 127.0.0.1:55432:5432 --health-cmd 'pg_isready -U visualex -d visualex_test' --health-interval 2s postgres:16
+export DATABASE_URL=postgresql://visualex:visualex@localhost:55432/visualex_test   # for every server command below
+docker rm -f vxpg-test                                                            # when the PR is done
+```
 
 ## File map
 
@@ -280,7 +287,7 @@ Expected: PASS, 6 tests.
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-npm --prefix apps/web exec -- eslint src/services
+(cd apps/web && npx eslint src/services)
 git add apps/web/src/services/api.ts apps/web/src/services/__tests__/api.session.test.ts
 git commit -m "refactor(web): one refresh policy for axios and fetch (getFreshAccessToken)"
 ```
@@ -549,7 +556,7 @@ Expected: PASS, 14 tests.
 - [ ] **Step 5: Lint and commit**
 
 ```bash
-npm --prefix apps/web exec -- eslint src/services
+(cd apps/web && npx eslint src/services)
 git add apps/web/src/services/legalFetch.ts apps/web/src/services/__tests__/legalFetch.test.ts
 git commit -m "feat(web): legalFetch — fetch for the scraping routes, with the login token"
 ```
@@ -780,6 +787,22 @@ describe('scrapeCost', () => {
     expect(scrapeCost('/fetch_article_text')).toBe(1);
   });
 
+  it('prices a route the way the scrapers read it: escapes decoded, path normalised', () => {
+    expect(scrapeCost('/export%5Fpdf')).toBe(20);
+    expect(scrapeCost('/%65xport_pdf')).toBe(20);
+    expect(scrapeCost('//export_pdf')).toBe(20);
+    expect(scrapeCost('/x/../export_pdf')).toBe(20);
+    expect(scrapeCost('/./export_pdf')).toBe(20);
+    expect(scrapeCost('/export%5Fpdf?x=1')).toBe(20);
+    expect(scrapeCost('/stream%5Farticle_text')).toBe(3);
+    expect(scrapeCost('/fetch_article_text')).toBe(1);
+  });
+
+  it('does not throw on a malformed escape, and prices it as it stands', () => {
+    expect(() => scrapeCost('/export%ZZpdf')).not.toThrow();
+    expect(scrapeCost('/export%ZZpdf')).toBe(1);
+  });
+
   it('costs 1 when the ingress did not say what was asked', () => {
     expect(scrapeCost(undefined)).toBe(1);
     expect(scrapeCost('')).toBe(1);
@@ -871,7 +894,7 @@ describe('GET /api/auth/verify on the real app', () => {
 
 - [ ] **Step 2: Run them and see them fail**
 
-With the development stores running (see *Before you start*):
+With the throwaway Postgres running and `DATABASE_URL` set (see *Before you start*):
 
 ```bash
 npm --prefix apps/server test -- tests/scrapeGate.test.ts
@@ -957,6 +980,7 @@ Apply these edits (share the limiter factory, add `config.scrape`, mount the rou
 Create `apps/server/src/middleware/scrapeGate.ts`:
 
 ```ts
+import { posix } from 'node:path';
 import { NextFunction, Request, RequestHandler, Response } from 'express';
 import { RateLimiterRes } from 'rate-limiter-flexible';
 import { authenticate } from './auth';
@@ -974,13 +998,25 @@ export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/health/detailed': 5,
 };
 
-/** The cost of the request the ingress is asking about, from the URI it forwards. */
+/**
+ * The cost of the request the ingress is asking about, from the URI it forwards. Caddy matches
+ * the decoded, cleaned path but forwards the URI as the client wrote it, and the scrapers'
+ * router decodes the path and accepts a doubled slash, so the price is looked up under a
+ * normalised reading of the path: `/export%5Fpdf`, `//export_pdf` and `/x/../export_pdf` cost
+ * what `/export_pdf` costs.
+ */
 export function scrapeCost(
   uri: string | undefined,
   costs: Record<string, number> = DEFAULT_SCRAPE_COSTS,
 ): number {
-  const path = (uri ?? '').split('?')[0];
-  return costs[path] ?? 1;
+  let path = (uri ?? '').split('?')[0];
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // A malformed escape: the scrapers will not route it either. Price it as it stands.
+  }
+  // posix.normalize merges runs of slashes and resolves `.` and `..`; '' becomes '.', in no table.
+  return costs[posix.normalize(path)] ?? 1;
 }
 
 export interface ScrapeGateOptions {
@@ -1049,7 +1085,7 @@ export function createScrapeGate(options: ScrapeGateOptions): RequestHandler[] {
 - [ ] **Step 4: Run the tests and see them pass**
 
 Run: `npm --prefix apps/server test -- tests/scrapeGate.test.ts`
-Expected: PASS, 10 tests (2 for `scrapeCost`, 6 for the gate, 2 on the real app).
+Expected: PASS, 12 tests (4 for `scrapeCost`, 6 for the gate, 2 on the real app).
 
 - [ ] **Step 5: Run the gates**
 
@@ -1066,7 +1102,8 @@ Expected: both green.
 ```
 # The production ingress asks GET /api/auth/verify before it lets a scraping request through.
 # A user's quota is in points per window (a plain request costs 1, a PDF export 20); the
-# address cap counts every call to the endpoint, with or without a token.
+# address cap counts every call to the endpoint, with or without a token. Both caps count
+# over SCRAPE_QUOTA_WINDOW_SECONDS.
 # SCRAPE_QUOTA_POINTS=300
 # SCRAPE_QUOTA_WINDOW_SECONDS=60
 # SCRAPE_IP_POINTS=1200
@@ -1084,7 +1121,8 @@ Expected: both green.
   detailed health page 5, anything else 1), then `204`. A `401` or `429` (with `Retry-After`)
   goes back to the browser as it is. Mounted **before** the general limiter in `app.ts` on
   purpose: it has limits of its own, and reading many articles must not spend the quota of
-  every other call. Limiter errors fail open, authentication never does.
+  every other call. Both caps count over `SCRAPE_QUOTA_WINDOW_SECONDS`. Limiter errors fail
+  open, authentication never does.
 ```
 
 and add `SCRAPE_QUOTA_POINTS`, `SCRAPE_QUOTA_WINDOW_SECONDS` and `SCRAPE_IP_POINTS` (defaults 300, 60, 1200) to the **Environment Variables** paragraph.
@@ -1092,7 +1130,7 @@ and add `SCRAPE_QUOTA_POINTS`, `SCRAPE_QUOTA_WINDOW_SECONDS` and `SCRAPE_IP_POIN
 - [ ] **Step 7: Commit, open PR 2, merge when CI is green**
 
 ```bash
-git add apps/server
+git add apps/server/src apps/server/tests/scrapeGate.test.ts apps/server/.env.example apps/server/CLAUDE.md
 git commit -m "feat(server): GET /api/auth/verify — the login check and scraping quota the ingress asks for"
 git push -u origin feat/scrape-gate-verify
 gh pr create --base develop --title "feat(server): GET /api/auth/verify — the login check and scraping quota the ingress asks for" --body "$(cat <<'EOF'
@@ -1103,7 +1141,7 @@ gh pr create --base develop --title "feat(server): GET /api/auth/verify — the 
 Touches authentication: a new route in `apps/server` that reuses `authenticate`.
 
 ## Checked
-10 new tests; the server suite and `npm run build` green. Nothing calls the endpoint until PR 3.
+12 new tests; the server suite and `npm run build` green. Nothing calls the endpoint until PR 3.
 EOF
 )"
 gh pr merge --merge --subject "merge: feat/scrape-gate-verify — the endpoint the ingress asks before a scraping call" --body ""
@@ -1124,16 +1162,17 @@ gh pr merge --merge --subject "merge: feat/scrape-gate-verify — the endpoint t
 
 - [ ] **Step 1: Write the failing tests**
 
-Apply to `infra/ingress/paths.test.mjs` (the matcher becomes a block, so the parsing changes; three tests are added):
+Apply to `infra/ingress/paths.test.mjs` (the matcher becomes a block, so the parsing changes; four tests are added and the assertions on `header_up -Authorization` and `flush_interval -1` are anchored on their own line, so that a commented-out line does not satisfy them):
 
 ```diff
 --- a/infra/ingress/paths.test.mjs
 +++ b/infra/ingress/paths.test.mjs
-@@ -20,7 +20,25 @@
+@@ -19,9 +19,27 @@ function vitePythonPaths() {
+     .sort();
  }
  
 +function legalBlock() {
-+  const block = caddyfile.match(/@legal\s*\{([^}]*)\}/);
++  const block = caddyfile.match(/^\s*@legal\s*\{([^}]*)\}/m);
 +  assert.ok(block, 'the Caddyfile has no "@legal { … }" matcher block');
 +  return block[1];
 +}
@@ -1157,7 +1196,9 @@ Apply to `infra/ingress/paths.test.mjs` (the matcher becomes a block, so the par
 +  assert.ok(line, 'the @legal block does not exclude the open paths');
    return line[1].trim().split(/\s+/);
  }
-@@ -55,2 +73,22 @@
+ 
+@@ -54,3 +72,31 @@ test('nothing else of the Python API is routed to it', () => {
+     );
    }
  });
 +
@@ -1176,9 +1217,17 @@ Apply to `infra/ingress/paths.test.mjs` (the matcher becomes a block, so the par
 +test('the scraping handle asks the server before it proxies, and keeps the login token from the scrapers', () => {
 +  const handle = caddyfile.match(/handle @legal \{([\s\S]*?)\n\t\}/);
 +  assert.ok(handle, 'the Caddyfile has no "handle @legal" block');
-+  assert.match(handle[1], /forward_auth\s+\{\$SERVER_UPSTREAM:server:3001\}\s*\{\s*uri \/api\/auth\/verify\s*\}/);
-+  assert.match(handle[1], /header_up -Authorization/);
-+  assert.match(handle[1], /flush_interval -1/);
++  assert.match(handle[1], /forward_auth\s+\{\$SERVER_UPSTREAM:server:3001\}\s*\{\s*uri \/api\/auth\/verify\b/);
++  assert.match(handle[1], /^\s*response_header_timeout \d+s$/m, 'the login check needs a timeout: a server that hangs must fail the request, not hold it');
++  assert.match(handle[1], /^\s*header_up -Authorization$/m);
++  assert.match(handle[1], /^\s*flush_interval -1$/m);
++});
++
++test('the open paths never carry the login token to the scrapers, and take no body', () => {
++  const handle = caddyfile.match(/handle @open \{([\s\S]*?)\n\t\}/);
++  assert.ok(handle, 'the Caddyfile has no "handle @open" block');
++  assert.match(handle[1], /^\s*header_up -Authorization$/m);
++  assert.match(handle[1], /^\s*max_size 1KB$/m);
 +});
 ```
 
@@ -1189,7 +1238,7 @@ Expected: FAIL, `the Caddyfile has no "@legal { … }" matcher block` (the Caddy
 
 - [ ] **Step 3: Change the Caddyfile**
 
-In `infra/ingress/Caddyfile`, replace everything from the comment `# The scrapers. This is the same list Vite proxies…` down to and including the closing `}` of `handle @legal`, and keep the blank line and the `# Hashed assets never change…` block that follows, with:
+In `infra/ingress/Caddyfile`, replace everything from the comment `# The scrapers. This is the same list Vite proxies…` down to and including the closing `}` of `handle @legal`, and keep the blank line and the `# Hashed assets never change…` block that follows, with the text below; then add to the header comment of the file, after "…were never meant for the outside.", the sentence "The paths that do reach it are behind the login, except /version and /health (see the scrapers block).":
 
 ```
 	# The scrapers. The list below is the one Vite proxies to port 5000 in development,
@@ -1201,6 +1250,9 @@ In `infra/ingress/Caddyfile`, replace everything from the comment `# The scraper
 	# as it is). If the server does not answer, the request fails: the gate is closed by default.
 	@open path /version /health
 	handle @open {
+		request_body {
+			max_size 1KB
+		}
 		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
 			header_up -Authorization
 		}
@@ -1215,6 +1267,11 @@ In `infra/ingress/Caddyfile`, replace everything from the comment `# The scraper
 		}
 		forward_auth {$SERVER_UPSTREAM:server:3001} {
 			uri /api/auth/verify
+			# The login check takes milliseconds. A server that has not answered in ten seconds
+			# fails the request (504) instead of holding it: the gate stays shut, and in time.
+			transport http {
+				response_header_timeout 10s
+			}
 		}
 		# /stream_article_text answers NDJSON, one line per article: no buffering.
 		# The scrapers never see the login token.
@@ -1232,7 +1289,7 @@ node --test infra/ingress/paths.test.mjs
 docker run --rm -v "$PWD/infra/ingress/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine \
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -1
 ```
-Expected: 7 tests pass; `Valid configuration`. (The image build also runs `caddy validate`.)
+Expected: 8 tests pass; `Valid configuration`. (The image build also runs `caddy validate`.)
 
 - [ ] **Step 5: Write the rule where it will be read**
 
@@ -1242,7 +1299,9 @@ In `services/visualex/CLAUDE.md`, after the `TRUSTED_PROXIES` bullet, add:
 - **Behind the ingress the scraping routes need a login.** The Caddyfile asks the server
   (`GET /api/auth/verify`) before it passes a request on, except `/version` and `/health`.
   The Python API itself stays unauthenticated inside the network (the ingress is its only
-  door) and never sees the login token (`header_up -Authorization`).
+  door) and never sees the login token (`header_up -Authorization`). The login check is
+  timed out after ten seconds (a `504`), so a server that hangs fails the request instead
+  of holding it.
 ```
 
 - [ ] **Step 6: Commit**
@@ -1259,7 +1318,7 @@ git commit -m "feat(ingress): the scraping routes ask the server before they pas
 
 **Interfaces:**
 - Consumes: the real `infra/ingress/Caddyfile`, run by the `caddy:2-alpine` image; Docker; `python3`.
-- Produces: `sh infra/ingress/checks/gate.sh` — 15 checks, exit 0 when the gate behaves. It is written to be lifted into the CI job of the deployment plan (Task 7 there) unchanged.
+- Produces: `sh infra/ingress/checks/gate.sh` — 25 checks, exit 0 when the gate behaves. It is written to be lifted into the CI job of the deployment plan (Task 7 there) unchanged.
 
 - [ ] **Step 1: Write the stand-in upstreams**
 
@@ -1271,12 +1330,14 @@ git commit -m "feat(ingress): the scraping routes ask the server before they pas
 
     stub_upstream.py server   PORT   the server: GET /api/auth/verify
     stub_upstream.py scrapers PORT   the scrapers: anything else
+    stub_upstream.py hang     PORT   a server that hangs: reads the request, never answers
 
 server:   answers 204 to "Bearer good-token", 429 with Retry-After: 7 to "Bearer slow-down",
           401 to everything else, and remembers the X-Forwarded-Uri and X-Forwarded-Method
           the ingress sent with the question.
-scrapers: answers 200 "scrapers <METHOD> <path>", remembers the Authorization header it
-          received, and streams three NDJSON lines a second apart on /stream_article_text.
+scrapers: answers 200 "scrapers <METHOD> <path>", remembers the Authorization header and the
+          body it received, and streams three NDJSON lines a second apart on /stream_article_text.
+hang:     sleeps for a minute in the handler, so a caller with a timeout gives up first.
 Both answer GET /__seen with what they have recorded, as JSON. Standard library only.
 """
 import json
@@ -1307,8 +1368,10 @@ class Handler(BaseHTTPRequestHandler):
         # Read the body even though nothing uses it: the connection is reused, and unread
         # bytes would be taken for the next request line.
         length = int(self.headers.get("Content-Length") or 0)
-        if length:
-            self.rfile.read(length)
+        body = self.rfile.read(length) if length else b""
+        if role == "hang":
+            time.sleep(60)
+            return
         if self.path == "/__seen":
             return self.reply(200, json.dumps(seen).encode(), {"Content-Type": "application/json"})
         seen["calls"] += 1
@@ -1324,7 +1387,11 @@ class Handler(BaseHTTPRequestHandler):
             if token == "Bearer slow-down":
                 return self.reply(429, b'{"detail":"Too many requests"}', {"Retry-After": "7", "Content-Type": "application/json"})
             return self.reply(401, b'{"detail":"Missing or invalid authorization header"}', {"Content-Type": "application/json"})
-        seen["last"] = {"authorization": self.headers.get("Authorization"), "path": self.path}
+        seen["last"] = {
+            "authorization": self.headers.get("Authorization"),
+            "path": self.path,
+            "body": body.decode(errors="replace"),
+        }
         if self.path.startswith("/stream_article_text"):
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
@@ -1370,23 +1437,28 @@ cleanup() {
   docker rm -f "$name" >/dev/null 2>&1
   for p in $pids; do kill "$p" 2>/dev/null; done
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 python3 "$here/stub_upstream.py" server 13001 & server_pid=$!; pids="$server_pid"
 python3 "$here/stub_upstream.py" scrapers 15000 & scrapers_pid=$!; pids="$pids $scrapers_pid"
-docker run -d --rm --name "$name" -p 127.0.0.1:18081:8080 \
+docker run -d --name "$name" -p 127.0.0.1:18081:8080 \
   --add-host=host.docker.internal:host-gateway \
   -e SERVER_UPSTREAM=host.docker.internal:13001 -e SCRAPERS_UPSTREAM=host.docker.internal:15000 \
   -v "$root/infra/ingress/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null || { echo "cannot start caddy"; exit 1; }
 
-# wait until the ingress answers (any status)
-i=0; until curl -s -o /dev/null -m 2 "$B/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress did not start"; exit 1; }; sleep 1; done
+# wait until both stand-ins answer, then the ingress (any status)
+for port in 13001 15000; do
+  i=0; until curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/__seen"; do i=$((i + 1)); [ "$i" -gt 20 ] && { echo "the stand-in on port $port did not start"; exit 1; }; sleep 1; done
+done
+i=0; until curl -s -o /dev/null -m 2 "$B/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress did not start"; docker logs "$name" 2>&1 | tail -20; exit 1; }; sleep 1; done
 
 code()   { curl -s -o /dev/null -m 10 -w '%{http_code}' "$@"; }
 seen()   { curl -s -m 5 "http://127.0.0.1:$1/__seen" | python3 -c "import json,sys; d=json.load(sys.stdin); print($2)"; }
 scraper_calls() { seen 15000 'd["calls"]'; }
 verify_calls()  { seen 13001 'd["calls"]'; }
-expect() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (wanted '$2', got '$3')"; fi; }
+expect() { if [ -n "$2" ] && [ "$2" = "$3" ]; then ok "$1"; else bad "$1 (wanted '$2', got '$3')"; fi; }
 
 # 1. no token: refused at the door, and the scrapers never hear of it
 before="$(scraper_calls)"
@@ -1394,10 +1466,11 @@ expect "a scraping call without a token is refused" 401 "$(code -X POST -d '{}' 
 expect "and the scrapers were not called" "$before" "$(scraper_calls)"
 
 # 2. a good token: let through, with the question the server needs, and no token for the scrapers
-body="$(curl -s -m 10 -X POST -H 'Authorization: Bearer good-token' -d '{}' "$B/fetch_article_text?x=1")"
+body="$(curl -s -m 10 -X POST -H 'Authorization: Bearer good-token' -d '{"probe":1}' "$B/fetch_article_text?x=1")"
 expect "a signed-in call reaches the scrapers" "scrapers POST /fetch_article_text?x=1" "$body"
 expect "the server was asked what the call was" "/fetch_article_text?x=1 POST" "$(seen 13001 'd["last"]["uri"] + " " + d["last"]["method"]')"
 expect "and the scrapers never saw the login token" "None" "$(seen 15000 'd["last"]["authorization"]')"
+expect "and the request body reached the scrapers untouched" '{"probe":1}' "$(seen 15000 'd["last"]["body"]')"
 
 # 3. over the quota: the server's 429 reaches the caller with its Retry-After, the scrapers are spared
 before="$(scraper_calls)"
@@ -1424,10 +1497,31 @@ else
   bad "the stream flushes line by line (first byte at ${first}s, done at ${total}s)"
 fi
 
-# 7. the server does not answer: the gate stays shut
+# 7. odd spellings of a gated path are gated too: Caddy matches the decoded, cleaned path,
+#    so none of these may reach the scrapers without a login; only the exact /version and
+#    /health are open
+before="$(scraper_calls)"
+for spelling in /fetch_article%5Ftext //fetch_article_text /x/../fetch_article_text /FETCH_ARTICLE_TEXT /health%2Fdetailed /health/ /version/x; do
+  expect "$spelling without a token is refused" 401 "$(code --path-as-is -X POST -d '{}' "$B$spelling")"
+done
+expect "and none of them reached the scrapers" "$before" "$(scraper_calls)"
+
+# 8. the server does not answer: the gate stays shut (last: once it is killed everything fails closed)
 kill "$server_pid" 2>/dev/null; wait "$server_pid" 2>/dev/null; sleep 1
 status="$(code -H 'Authorization: Bearer good-token' -X POST -d '{}' "$B/fetch_article_text")"
 case "$status" in 502|503|504) ok "with no server behind it the gate is closed ($status)" ;; *) bad "with no server behind it the gate is closed (got $status)" ;; esac
+
+# 9. the server hangs instead of dying: the login check is timed out, the gate stays shut, in time
+python3 "$here/stub_upstream.py" hang 13001 & hang_pid=$!; pids="$pids $hang_pid"
+sleep 1
+started="$(date +%s)"
+status="$(curl -s -o /dev/null -m 25 -w '%{http_code}' -H 'Authorization: Bearer good-token' -X POST -d '{}' "$B/fetch_article_text")"
+took=$(( $(date +%s) - started ))
+if [ "$status" = 504 ] && [ "$took" -ge 9 ] && [ "$took" -le 15 ]; then
+  ok "with a server that hangs the login check times out and the gate stays shut (504 after ${took}s)"
+else
+  bad "with a server that hangs the login check times out and the gate stays shut (got $status after ${took}s)"
+fi
 
 exit "$fail"
 ```
@@ -1435,11 +1529,11 @@ exit "$fail"
 - [ ] **Step 3: Run it and see every check pass**
 
 Run: `sh infra/ingress/checks/gate.sh`
-Expected: 15 `ok` lines, no `FAIL`, exit 0, no container or listener left behind (`docker ps -a | grep vlx-gate` and `lsof -iTCP:18081 -iTCP:13001 -iTCP:15000` print nothing).
+Expected: 25 `ok` lines, no `FAIL`, exit 0, no container or listener left behind (`docker ps -a | grep vlx-gate` and `lsof -iTCP:18081 -iTCP:13001 -iTCP:15000` print nothing).
 
 - [ ] **Step 4: Prove the script bites**
 
-Remove the `forward_auth …` block from the Caddyfile (a temporary edit), run the script again, and see `FAIL a scraping call without a token is refused (wanted '401', got '200')` and the two checks that depend on it; restore the file with `git checkout infra/ingress/Caddyfile` and see it pass again. Do the same with the line `header_up -Authorization` in the `@legal` block: `FAIL and the scrapers never saw the login token`.
+Remove the `forward_auth …` block from the Caddyfile (a temporary edit), run the script again, and see `FAIL a scraping call without a token is refused (wanted '401', got '200')` and the checks that depend on it (the whole odd-spelling section fails too); restore the file with `git checkout infra/ingress/Caddyfile` and see it pass again. Do the same with the line `header_up -Authorization` in the `@legal` block: `FAIL and the scrapers never saw the login token`.
 
 - [ ] **Step 5: Commit**
 
@@ -1502,6 +1596,9 @@ docker compose -f infra/compose.yml -f infra/compose.app.yml -f infra/compose.sc
 | `GET /health/detailed`, no token | `401` |
 | `GET /api/auth/verify`, with the token | `204` |
 | 60 calls to `/fetch_alias_catalog` in a row, with the token | `200` up to the quota, then `429` with a `Retry-After` header |
+| `POST /export%5Fpdf` three times in a row, with the token, in a fresh quota window (wait a minute after the row above; an export costs 20 of the 40 points) | the first two are let through (not `401`, not `429`: whatever the scrapers answer to an empty body), the third is `429`. The quota prices the decoded route, not the spelling the client chose (Task 4's normalisation, seen through the real ingress). `infra/ingress/checks/gate.sh` already proves that no odd spelling of a path gets past the login. |
+| Stop the server container, then call a scraping route with a token and one without; then start it again | both get a `5xx` (502), `/version` and `/health` stay `200`: the gate is closed when the server is down |
+| Freeze the server container (`docker compose … pause server`), call a scraping route with a token; then `unpause` | `504` after about ten seconds (the timeout on the login check), `/version` still `200` meanwhile |
 
 - [ ] **Step 3: A browser pass through the ingress**
 
@@ -1532,8 +1629,8 @@ The Caddyfile now asks the server (`forward_auth` to `/api/auth/verify`) before 
 Touches `infra/`.
 
 ## Checked
-- `node --test infra/ingress/paths.test.mjs`: 7 tests (3 new); `caddy validate`.
-- `sh infra/ingress/checks/gate.sh`: 15 checks against stand-in upstreams (401 without a token and the scrapers not called, the 429 and its Retry-After passing through, the token kept from the scrapers, the open paths, the stream flushing, closed when the server is down).
+- `node --test infra/ingress/paths.test.mjs`: 8 tests (4 new); `caddy validate`.
+- `sh infra/ingress/checks/gate.sh`: 25 checks against stand-in upstreams (401 without a token and the scrapers not called, the 429 and its Retry-After passing through, the token kept from the scrapers and the request body kept for them, the open paths, odd spellings of a path gated too, the stream flushing, closed when the server is down, a 504 after ten seconds when it hangs).
 - A throwaway production stack with a 20-second token and a 40-point quota, driven by curl and by a browser: sign-in, an article, the refresh, the 429, the return to the login page.
 EOF
 )"
@@ -1550,7 +1647,7 @@ gh pr merge --merge --subject "merge: feat/ingress-login-gate — the scraping r
 | Step 3: `forward_auth` to a new `GET /api/auth/verify` that reuses `authenticate` | Tasks 4, 5 |
 | Step 3: the same hop applies a per-user quota to the scraping paths, replacing the per-IP ceiling of the auth plan | Task 4 (per user, by route, plus a per-address cap for calls with no token) |
 | Q7: `forward_auth` rather than the server proxying the calls | Task 5 |
-| Fail-closed if the server does not answer | Task 6 check 7 |
+| Fail-closed if the server does not answer | Task 6 check 8 |
 
 ## Not in this plan
 
@@ -1558,4 +1655,5 @@ gh pr merge --merge --subject "merge: feat/ingress-login-gate — the scraping r
 - **The per-IP ceiling in the Python API** (Task 10 of the auth plan): superseded by the quota here; the Python limiter stays as a second layer.
 - **Invites, password reset, the mailer, `tokenVersion`** and **the MERL-T visibility switch**: separate plans, written when their turn comes (`docs/superpowers/plans/2026-09-29-auth-self-service-v2.md` is the starting point of the first).
 - **CSP enforcing, the host firewall rule (R1), the MERL-T admin routes (R2), DNS, certificates, the router, the phone backup.**
+- **CI for the ingress checks.** `node --test infra/ingress/paths.test.mjs` does not run in CI today (the `tooling` job runs only `.claude/hooks/*.test.mjs`), and `infra/ingress/checks/gate.sh` needs a job with Docker, python3 and curl; a follow-up pull request adds both, and the gate job is worth one run on a real runner before it can block a merge.
 - **Tuning the quota.** The defaults (300 points a minute, an export 20) are generous on purpose, and a user over quota is logged (`[scrapeGate] user … is over the scraping quota`); tune them from real use.
