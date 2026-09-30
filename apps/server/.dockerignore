@@ -10,7 +10,7 @@ logs
 tests
 e2e-setup.cjs
 kill-port.sh
-vitest.config.ts
+vitest.config.mts
 README.md
 Dockerfile
 .dockerignore

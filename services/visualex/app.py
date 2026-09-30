@@ -1353,10 +1353,10 @@ class NormaController:
 
     async def health(self):
         """Basic health check - returns 200 if app is running."""
-        from datetime import datetime
+        from datetime import datetime, timezone
         return jsonify({
             'status': 'ok',
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         })
 
     async def health_detailed(self):
@@ -1367,7 +1367,7 @@ class NormaController:
         three live probes by every open tab. A failing probe is cached too,
         so a flapping source does not get hammered by repeated callers.
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
         import time as time_module
 
         ttl = float(os.getenv('HEALTH_DETAILED_TTL', '120'))
@@ -1391,7 +1391,7 @@ class NormaController:
 
             results = {
                 'status': 'ok',
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 'services': {}
             }
 
