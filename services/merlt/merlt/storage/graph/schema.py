@@ -95,6 +95,7 @@ class Rel(_Vocab):
     COMMENTA = "COMMENTA"  # dottrina → article
     ESPRIME = "ESPRIME"  # article → Latin maxim
     MENZIONA = "MENZIONA"  # article → glossary concept
+    SPIEGA = "SPIEGA"  # dottrina → concetto (enrichment writer templates)
     # Concepts (seed and community)
     DISCIPLINA = "DISCIPLINA"
     APPLICA = "APPLICA"

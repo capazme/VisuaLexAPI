@@ -1,10 +1,11 @@
 """No Cypher string under merlt/ may name a relation, a label, a fonte or a
 provenance that merlt/storage/graph/schema.py does not define.
 
-It reads string literals (AST, docstrings skipped, an f-string's pieces joined
-with `{}` for its placeholders), so Python slice syntax never matches. Names
-built at runtime are invisible here: the writers and readers that build them
-test their values against the schema themselves.
+It reads string literals in Python files (AST, docstrings skipped, an f-string's
+pieces joined with `{}` for its placeholders), and also Cypher in YAML templates
+(comment lines blanked out, every template as one unit). Python slice syntax
+never matches. Names built at runtime are invisible here: the writers and readers
+that build them test their values against the schema themselves.
 
 The KNOWN_* sets are a ratchet: they list what is still old, and a name must
 leave them as soon as the code stops using it.
@@ -21,7 +22,7 @@ EXEMPT = {
     # decisions that no writer produces; it is not wired to the live graph.
     ROOT / "disagreement" / "data" / "collector.py",
 }
-REL_RE = re.compile(r"-\[\w*:([A-Za-z_]+(?:\|[A-Za-z_]+)*)")
+REL_RE = re.compile(r"-\[\w*:([A-Za-z_]+(?:\|:?[A-Za-z_]+)*)")
 LABEL_RE = re.compile(r"\(\w*:([A-Z][A-Za-z]+)")
 FONTE_RE = re.compile(r"\bfonte\s*[=:]\s*'([^']+)'")
 PROVENANCE_RE = re.compile(r"\bprovenance\s*[=:]\s*'([^']+)'")
@@ -32,6 +33,7 @@ KNOWN_LEGACY_RELS: set[str] = {
     "CITA",  # Task 4
     "contiene", "abroga", "modifica", "sostituisce", "inserisce", "CONTENUTO_IN",  # Task 5
     "cita", "conferma", "supera", "DERIVA",  # Task 5 (unwired tools)
+    "SPECIALIZZA", "GENERALIZZA",  # Task 5 (definition tool → SPECIES)
 }
 KNOWN_UNKNOWN_LABELS: set[str] = {"PendingValidation", "ValidationVote"}  # Task 5
 KNOWN_LEGACY_FONTI: set[str] = {"Brocardi", "VisualexAPI", "community_validation"}  # Tasks 3 and 4
@@ -63,18 +65,16 @@ def _units(tree: ast.AST) -> list[tuple[int, str]]:
 
 def _found() -> dict[str, dict[str, list[str]]]:
     found: dict[str, dict[str, list[str]]] = {"rel": {}, "label": {}, "fonte": {}, "provenance": {}}
+    # Scan Python files
     for path in sorted(ROOT.rglob("*.py")):
         if path in EXEMPT:
             continue
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except SyntaxError:
-            # Skip files that cannot be parsed (e.g., contain invalid f-strings)
-            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         for line, text in _units(tree):
             where = f"{path.relative_to(ROOT)}:{line}"
             for match in REL_RE.finditer(text):
                 for name in match.group(1).split("|"):
+                    name = name.lstrip(":")  # strip leading colon from alternation
                     found["rel"].setdefault(name, []).append(where)
             for match in LABEL_RE.finditer(text):
                 found["label"].setdefault(match.group(1), []).append(where)
@@ -83,11 +83,38 @@ def _found() -> dict[str, dict[str, list[str]]]:
                     found["fonte"].setdefault(match.group(1), []).append(where)
                 for match in PROVENANCE_RE.finditer(text):
                     found["provenance"].setdefault(match.group(1), []).append(where)
+    # Scan YAML templates
+    yaml_paths = sorted(set(ROOT.rglob("*.yaml")) | set(ROOT.rglob("*.yml")))
+    for path in yaml_paths:
+        if path in EXEMPT:
+            continue
+        text = path.read_text(encoding="utf-8")
+        # Blank out comment lines
+        lines = []
+        for line in text.split("\n"):
+            if line.lstrip().startswith("#"):
+                lines.append("")
+            else:
+                lines.append(line)
+        text = "\n".join(lines)
+        where = f"{path.relative_to(ROOT)}:1"
+        for match in REL_RE.finditer(text):
+            for name in match.group(1).split("|"):
+                name = name.lstrip(":")  # strip leading colon from alternation
+                found["rel"].setdefault(name, []).append(where)
+        for match in LABEL_RE.finditer(text):
+            found["label"].setdefault(match.group(1), []).append(where)
+        if CYPHER_RE.search(text):
+            for match in FONTE_RE.finditer(text):
+                found["fonte"].setdefault(match.group(1), []).append(where)
+            for match in PROVENANCE_RE.finditer(text):
+                found["provenance"].setdefault(match.group(1), []).append(where)
     return found
 
 
 def _check(kind: str, allowed: set[str], known: set[str]) -> None:
     names = _found()[kind]
+    assert allowed, f"the scan found no canonical {kind} at all: is ROOT right?"
     offenders = {name: where for name, where in names.items() if name not in allowed}
     new = {name: where for name, where in offenders.items() if name not in known}
     assert not new, f"{kind} outside the schema: {new}"
