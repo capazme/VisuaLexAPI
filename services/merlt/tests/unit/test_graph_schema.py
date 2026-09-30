@@ -116,7 +116,8 @@ def test_the_one_stub_shape():
 def test_point_ids_are_the_same_in_every_process():
     here = s.point_id(CC, "massima", 3)
     code = f"from merlt.storage.graph.schema import point_id; print(point_id({CC!r}, 'massima', 3))"
-    there = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.strip()
+    # Importing merlt prints the retriever's "config file not found" warning on every interpreter start; the uuid is always printed last.
+    there = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.strip().splitlines()[-1]
     assert here == there
     assert here != s.point_id(CC, "massima", 4)
     assert s.point_id(CC + "!vig=", "norma") == s.point_id(CC, "norma")
@@ -140,3 +141,11 @@ def test_node_text_reads_every_writers_property():
 def test_seed_twins_by_entity_type():
     assert s.SEED_TWIN["concetto"] == (s.Label.CONCETTO_GIURIDICO, "concetto")
     assert s.SEED_TWIN["soggetto_giuridico"] == (s.Label.SOGGETTO_GIURIDICO, "soggetto")
+
+
+def test_vocabulary_members_render_as_their_values():
+    assert f"{s.Rel.CONTIENE}" == "CONTIENE"
+    assert str(s.SourceType.MASSIMA) == "massima"
+    assert s.point_id(CC, s.SourceType.MASSIMA, 3) == s.point_id(CC, "massima", 3)
+    # The namespace keys every point in Qdrant: pin it.
+    assert s.point_id(CC, "massima", 3) == "bde5fe78-9f32-5791-a4fa-42dfcc470edf"

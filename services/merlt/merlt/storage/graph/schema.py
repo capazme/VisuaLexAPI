@@ -19,8 +19,17 @@ import structlog
 from merlt.utils.map import NORMATTIVA_URN_CODICI
 from merlt.utils.urn_labels import article_number_from_urn
 
+log = structlog.get_logger()
 
-class Label(str, Enum):
+
+class _Vocab(str, Enum):
+    """A vocabulary member renders as its value in f-strings, str() and format()."""
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class Label(_Vocab):
     """Node labels: the seed's, plus the ones later writers add."""
 
     NORMA = "Norma"  # an article, an act or a partition (tipo_documento says which)
@@ -51,7 +60,7 @@ class Label(str, Enum):
     LIVE_SOURCE = "LiveSource"  # a source the co-evolution retrieved live
 
 
-class Rel(str, Enum):
+class Rel(_Vocab):
     """Relation types, all upper case: the graph's own plus every community
     RelationType the graph can receive (CITA arrives as RINVIA; PARTE_DI, the
     inverse of CONTIENE, is never written)."""
@@ -201,7 +210,7 @@ def community_rel_to_graph(value: str) -> Rel:
     return canonical_rel(value)
 
 
-class SourceType(str, Enum):
+class SourceType(_Vocab):
     """Qdrant `source_type` values."""
 
     NORMA = "norma"
@@ -239,7 +248,7 @@ EXPERT_SOURCE_TYPES: dict[str, list[str]] = {
 }
 
 
-class Provenance(str, Enum):
+class Provenance(_Vocab):
     SEED = "seed"
     INGESTION = "ingestion"
     COMMUNITY_VALIDATED = "community_validated"
@@ -247,7 +256,7 @@ class Provenance(str, Enum):
     CONFIRMED = "confirmed"
 
 
-class Fonte(str, Enum):
+class Fonte(_Vocab):
     NORMATTIVA = "Normattiva"
     BROCARDI = "Brocardi.it"
     TORRENTE = "manuale:Torrente-libroiv"
@@ -339,7 +348,6 @@ def act_abbreviation(act_type: str) -> str:
         return act_type.strip()
     hit = CODE_ABBREVIATIONS.get(key)
     if hit is None:
-        log = structlog.get_logger()
         log.info("graph_schema.abbrev_fallback", act_type=act_type)
         return act_type.strip()
     return hit
