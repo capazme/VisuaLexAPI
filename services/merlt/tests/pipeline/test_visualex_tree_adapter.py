@@ -17,6 +17,7 @@ import pytest
 
 from merlt.pipeline.mechanical_ingestion import parser as parser_module
 from merlt.pipeline.mechanical_ingestion.parser import VisualexTreeAdapter
+from merlt.storage.graph.schema import text_fingerprint
 
 _BASE_URL = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262"
 _BASE_URN_WITH_ANNEX = f"{_BASE_URL}:2"
@@ -154,6 +155,15 @@ async def test_norma_node_shape_matches_seed_schema():
     assert art1["properties"]["vigenza"] == "vigente"
     assert art1["properties"]["autorita_emanante"] == "Regio Decreto"
     assert "Testo dell'articolo 1" in art1["properties"]["testo_vigente"]
+
+    # Every emitted article carries the text under its graph name, the fingerprint of that
+    # exact text, its provenance, and the source the text comes from: Normattiva.
+    for node in nodes:
+        props = node["properties"]
+        assert props["testo"] == props["testo_vigente"]
+        assert props["testo_sha256"] == text_fingerprint(props["testo"])
+        assert props["provenance"] == "ingestion"
+        assert props["fonte"] == "Normattiva"
 
 
 @pytest.mark.asyncio

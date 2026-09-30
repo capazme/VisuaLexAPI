@@ -50,7 +50,16 @@ async def test_an_article_without_doctrine_is_ingested():
     await IngestionPipelineV2(falkordb_client=client).ingest_article(article)
     writes = [c for c in client.query.await_args_list if "MERGE (art:Norma {URN: $urn})" in c.args[0]]
     cypher, params = writes[0].args
-    assert "art.testo = $testo" in cypher and "art.testo_sha256 = $testo_sha256" in cypher
+    # Each half of the MERGE must write the text, its fingerprint and the provenance:
+    # a substring check on the whole query is satisfied by the ON CREATE half alone.
+    assert cypher.count("ON MATCH SET") == 1
+    on_create, on_match = cypher.split("ON MATCH SET")
+    for line in ("art.provenance = $provenance", "art.testo = $testo", "art.testo_sha256 = $testo_sha256"):
+        assert line in on_create
+    for line in ("art.testo = $testo", "art.testo_sha256 = $testo_sha256", "coalesce(art.provenance, $provenance)"):
+        assert line in on_match
+    # a re-ingestion fills a missing provenance, it never overwrites a seed's or a confirmed one
+    assert "art.provenance = $provenance" not in on_match
     assert params["testo"] == article_text  # the text goes in as it came
     assert params["testo_sha256"] == text_fingerprint(article_text)
     assert params["fonte"] == "Normattiva" and params["provenance"] == "ingestion"

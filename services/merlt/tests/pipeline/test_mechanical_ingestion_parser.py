@@ -14,6 +14,7 @@ from merlt.pipeline.mechanical_ingestion.parser import (
     get_adapter,
     parse_italia_corpus_markdown,
 )
+from merlt.storage.graph.schema import text_fingerprint
 
 _BASE_URN = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1970-05-20;300"
 
@@ -72,6 +73,15 @@ def test_parses_frontmatter_into_article_level_properties():
     assert "diritto, nei luoghi" in art1["properties"]["testo_vigente"]
     assert art1["labels"] == ["Norma"]
     assert art1["id"] == f"{_BASE_URN}~art1"
+
+    # Every emitted article carries the text under its graph name, the fingerprint of that
+    # exact text, and its provenance: what the promotion writes as it comes.
+    for node in nodes:
+        props = node["properties"]
+        assert props["testo"] == props["testo_vigente"]
+        assert props["testo_sha256"] == text_fingerprint(props["testo"])
+        assert props["provenance"] == "ingestion"
+        assert props["fonte"] == "italia_corpus"
 
 
 def test_article_number_suffix_concatenated_in_urn_but_hyphenated_in_property():
