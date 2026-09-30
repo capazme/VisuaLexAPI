@@ -279,3 +279,51 @@ async def test_multivigenza_writes_the_modifying_act_in_the_schemas_names():
     assert written.count("[r:CONTIENE]") == 4  # act -> article -> comma -> lettera -> numero
     assert "[r:contiene]" not in written
     assert "[r:MODIFICA]" in written and "[r:VERSIONE_DI]" in written
+
+
+def _fake_kg_for_vectors():
+    kg = MagicMock()
+    kg._qdrant = MagicMock()
+    kg._embedding_service = MagicMock(
+        encode_batch_async=AsyncMock(side_effect=lambda texts, **_: [[0.1, 0.2] for _ in texts]),
+        encode_document_async=AsyncMock(return_value=[0.1, 0.2]),
+    )
+    kg.config = MagicMock(qdrant_collection="chunks")
+    return kg
+
+
+async def test_batch_vectors_are_keyed_like_the_lazy_ones():
+    from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
+    from merlt.pipeline.batch_ingestion import ArticleFetchResult, BatchIngestionPipeline
+    from merlt.pipeline.ingestion import IngestionResult
+
+    text = "Testo dell'articolo abbastanza lungo."
+    brocardi_info = {"Spiegazione": "s" * 60, "Ratio": "r" * 60, "Massime": ["x" * 60, "y" * 60]}
+    kg = _fake_kg_for_vectors()
+    fetch = ArticleFetchResult(
+        article_num="2043",
+        norma_visitata=NormaVisitata(norma=Norma(tipo_atto="codice civile", data=None, numero_atto=None), numero_articolo="2043"),
+        article_text=text,
+        brocardi_info=brocardi_info,
+    )
+    ingestion = IngestionResult(
+        article_urn=CC + "!vig=", article_url=CC, chunks=[], bridge_mappings=[], nodes_created=[], relations_created=[],
+    )
+
+    assert await BatchIngestionPipeline(kg)._generate_embeddings_batch([fetch], {"2043": ingestion}) == 5
+
+    points = kg._qdrant.upsert.call_args.kwargs["points"]
+    assert [p.id for p in points] == [
+        point_id(CC, "norma"), point_id(CC, "spiegazione"), point_id(CC, "ratio"),
+        point_id(CC, "massima", 0), point_id(CC, "massima", 1),
+    ]
+    assert {p.payload["article_urn"] for p in points} == {CC}
+    assert [p.payload["fonte"] for p in points] == ["Normattiva"] + ["Brocardi.it"] * 4
+
+    # one article, one set of points, whichever writer ran
+    lazy = LegalKnowledgeGraph.__new__(LegalKnowledgeGraph)
+    lazy._qdrant = MagicMock()
+    lazy._embedding_service = kg._embedding_service
+    lazy.config = kg.config
+    await lazy._upsert_embeddings_multi_source(article_text=text, article_urn=CC, metadata=_meta(), brocardi_info=brocardi_info)
+    assert [p.id for p in lazy._qdrant.upsert.call_args.kwargs["points"]] == [p.id for p in points]
