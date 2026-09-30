@@ -149,7 +149,7 @@ export class NerClient {
 
 let cached: NerClient | null = null;
 
-/** Factory reading from process.env. Honors backend/.env conventions. */
+/** Factory reading from process.env. Honors apps/server/.env conventions. */
 export function createNerClient(env: NodeJS.ProcessEnv = process.env): NerClient {
   const baseUrl = env.MERLT_API_URL || 'http://localhost:8000';
   const apiKey = env.MERLT_API_KEY || undefined;

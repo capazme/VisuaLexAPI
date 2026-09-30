@@ -124,7 +124,7 @@ function clampNumber(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-/** Factory reading from process.env. Honors backend/.env conventions. */
+/** Factory reading from process.env. Honors apps/server/.env conventions. */
 export function createSubgraphCache(env: NodeJS.ProcessEnv = process.env): SubgraphCache {
   const rawTtl = Number(env.MERLT_SUBGRAPH_CACHE_TTL_MS);
   const ttlMs =
