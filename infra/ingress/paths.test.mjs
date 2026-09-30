@@ -20,7 +20,7 @@ function vitePythonPaths() {
 }
 
 function legalBlock() {
-  const block = caddyfile.match(/@legal\s*\{([^}]*)\}/);
+  const block = caddyfile.match(/^\s*@legal\s*\{([^}]*)\}/m);
   assert.ok(block, 'the Caddyfile has no "@legal { … }" matcher block');
   return block[1];
 }
@@ -88,7 +88,15 @@ test('the @legal block leaves out exactly the open paths', () => {
 test('the scraping handle asks the server before it proxies, and keeps the login token from the scrapers', () => {
   const handle = caddyfile.match(/handle @legal \{([\s\S]*?)\n\t\}/);
   assert.ok(handle, 'the Caddyfile has no "handle @legal" block');
-  assert.match(handle[1], /forward_auth\s+\{\$SERVER_UPSTREAM:server:3001\}\s*\{\s*uri \/api\/auth\/verify\s*\}/);
-  assert.match(handle[1], /header_up -Authorization/);
-  assert.match(handle[1], /flush_interval -1/);
+  assert.match(handle[1], /forward_auth\s+\{\$SERVER_UPSTREAM:server:3001\}\s*\{\s*uri \/api\/auth\/verify\b/);
+  assert.match(handle[1], /^\s*response_header_timeout \d+s$/m, 'the login check needs a timeout: a server that hangs must fail the request, not hold it');
+  assert.match(handle[1], /^\s*header_up -Authorization$/m);
+  assert.match(handle[1], /^\s*flush_interval -1$/m);
+});
+
+test('the open paths never carry the login token to the scrapers, and take no body', () => {
+  const handle = caddyfile.match(/handle @open \{([\s\S]*?)\n\t\}/);
+  assert.ok(handle, 'the Caddyfile has no "handle @open" block');
+  assert.match(handle[1], /^\s*header_up -Authorization$/m);
+  assert.match(handle[1], /^\s*max_size 1KB$/m);
 });

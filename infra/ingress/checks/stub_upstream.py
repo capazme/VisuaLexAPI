@@ -3,12 +3,14 @@
 
     stub_upstream.py server   PORT   the server: GET /api/auth/verify
     stub_upstream.py scrapers PORT   the scrapers: anything else
+    stub_upstream.py hang     PORT   a server that hangs: reads the request, never answers
 
 server:   answers 204 to "Bearer good-token", 429 with Retry-After: 7 to "Bearer slow-down",
           401 to everything else, and remembers the X-Forwarded-Uri and X-Forwarded-Method
           the ingress sent with the question.
-scrapers: answers 200 "scrapers <METHOD> <path>", remembers the Authorization header it
-          received, and streams three NDJSON lines a second apart on /stream_article_text.
+scrapers: answers 200 "scrapers <METHOD> <path>", remembers the Authorization header and the
+          body it received, and streams three NDJSON lines a second apart on /stream_article_text.
+hang:     sleeps for a minute in the handler, so a caller with a timeout gives up first.
 Both answer GET /__seen with what they have recorded, as JSON. Standard library only.
 """
 import json
@@ -39,8 +41,10 @@ class Handler(BaseHTTPRequestHandler):
         # Read the body even though nothing uses it: the connection is reused, and unread
         # bytes would be taken for the next request line.
         length = int(self.headers.get("Content-Length") or 0)
-        if length:
-            self.rfile.read(length)
+        body = self.rfile.read(length) if length else b""
+        if role == "hang":
+            time.sleep(60)
+            return
         if self.path == "/__seen":
             return self.reply(200, json.dumps(seen).encode(), {"Content-Type": "application/json"})
         seen["calls"] += 1
@@ -56,7 +60,11 @@ class Handler(BaseHTTPRequestHandler):
             if token == "Bearer slow-down":
                 return self.reply(429, b'{"detail":"Too many requests"}', {"Retry-After": "7", "Content-Type": "application/json"})
             return self.reply(401, b'{"detail":"Missing or invalid authorization header"}', {"Content-Type": "application/json"})
-        seen["last"] = {"authorization": self.headers.get("Authorization"), "path": self.path}
+        seen["last"] = {
+            "authorization": self.headers.get("Authorization"),
+            "path": self.path,
+            "body": body.decode(errors="replace"),
+        }
         if self.path.startswith("/stream_article_text"):
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")

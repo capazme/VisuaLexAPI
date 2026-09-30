@@ -29,7 +29,10 @@ docker run -d --name "$name" -p 127.0.0.1:18081:8080 \
   -e SERVER_UPSTREAM=host.docker.internal:13001 -e SCRAPERS_UPSTREAM=host.docker.internal:15000 \
   -v "$root/infra/ingress/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine >/dev/null || { echo "cannot start caddy"; exit 1; }
 
-# wait until the ingress answers (any status)
+# wait until both stand-ins answer, then the ingress (any status)
+for port in 13001 15000; do
+  i=0; until curl -s -m 1 -o /dev/null "http://127.0.0.1:$port/__seen"; do i=$((i + 1)); [ "$i" -gt 20 ] && { echo "the stand-in on port $port did not start"; exit 1; }; sleep 1; done
+done
 i=0; until curl -s -o /dev/null -m 2 "$B/version"; do i=$((i + 1)); [ "$i" -gt 30 ] && { echo "the ingress did not start"; docker logs "$name" 2>&1 | tail -20; exit 1; }; sleep 1; done
 
 code()   { curl -s -o /dev/null -m 10 -w '%{http_code}' "$@"; }
@@ -44,10 +47,11 @@ expect "a scraping call without a token is refused" 401 "$(code -X POST -d '{}' 
 expect "and the scrapers were not called" "$before" "$(scraper_calls)"
 
 # 2. a good token: let through, with the question the server needs, and no token for the scrapers
-body="$(curl -s -m 10 -X POST -H 'Authorization: Bearer good-token' -d '{}' "$B/fetch_article_text?x=1")"
+body="$(curl -s -m 10 -X POST -H 'Authorization: Bearer good-token' -d '{"probe":1}' "$B/fetch_article_text?x=1")"
 expect "a signed-in call reaches the scrapers" "scrapers POST /fetch_article_text?x=1" "$body"
 expect "the server was asked what the call was" "/fetch_article_text?x=1 POST" "$(seen 13001 'd["last"]["uri"] + " " + d["last"]["method"]')"
 expect "and the scrapers never saw the login token" "None" "$(seen 15000 'd["last"]["authorization"]')"
+expect "and the request body reached the scrapers untouched" '{"probe":1}' "$(seen 15000 'd["last"]["body"]')"
 
 # 3. over the quota: the server's 429 reaches the caller with its Retry-After, the scrapers are spared
 before="$(scraper_calls)"
@@ -87,5 +91,17 @@ expect "and none of them reached the scrapers" "$before" "$(scraper_calls)"
 kill "$server_pid" 2>/dev/null; wait "$server_pid" 2>/dev/null; sleep 1
 status="$(code -H 'Authorization: Bearer good-token' -X POST -d '{}' "$B/fetch_article_text")"
 case "$status" in 502|503|504) ok "with no server behind it the gate is closed ($status)" ;; *) bad "with no server behind it the gate is closed (got $status)" ;; esac
+
+# 9. the server hangs instead of dying: the login check is timed out, the gate stays shut, in time
+python3 "$here/stub_upstream.py" hang 13001 & hang_pid=$!; pids="$pids $hang_pid"
+sleep 1
+started="$(date +%s)"
+status="$(curl -s -o /dev/null -m 25 -w '%{http_code}' -H 'Authorization: Bearer good-token' -X POST -d '{}' "$B/fetch_article_text")"
+took=$(( $(date +%s) - started ))
+if [ "$status" = 504 ] && [ "$took" -ge 9 ] && [ "$took" -le 15 ]; then
+  ok "with a server that hangs the login check times out and the gate stays shut (504 after ${took}s)"
+else
+  bad "with a server that hangs the login check times out and the gate stays shut (got $status after ${took}s)"
+fi
 
 exit "$fail"

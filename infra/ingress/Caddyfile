@@ -13,7 +13,8 @@
 #
 # Only the paths below reach the Python API. Its own /history, /dossiers… and
 # circuit-breaker pages stay unrouted: it keeps a global, unauthenticated history
-# and dossier file that were never meant for the outside.
+# and dossier file that were never meant for the outside. The paths that do reach it are
+# behind the login, except /version and /health (see the scrapers block).
 
 {
 	admin off
@@ -57,6 +58,9 @@
 	# as it is). If the server does not answer, the request fails: the gate is closed by default.
 	@open path /version /health
 	handle @open {
+		request_body {
+			max_size 1KB
+		}
 		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
 			header_up -Authorization
 		}
@@ -71,6 +75,11 @@
 		}
 		forward_auth {$SERVER_UPSTREAM:server:3001} {
 			uri /api/auth/verify
+			# The login check takes milliseconds. A server that has not answered in ten seconds
+			# fails the request (504) instead of holding it: the gate stays shut, and in time.
+			transport http {
+				response_header_timeout 10s
+			}
 		}
 		# /stream_article_text answers NDJSON, one line per article: no buffering.
 		# The scrapers never see the login token.
