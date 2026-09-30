@@ -155,8 +155,12 @@ def prod(cfg, lan_bind):
 
     args = (services["ingress"].get("build") or {}).get("args") or {}
     check(
-        "VITE_FEATURE_MERLT" not in args and "VITE_FEATURE_MERLT_GRAPH" not in args,
-        "unset MERL-T front-end flags are not passed at all (an empty string would switch them off)",
+        args.get("VITE_FEATURE_MERLT") == "true",
+        "with MERL-T on the server and no front-end flag set, the app shows MERL-T",
+    )
+    check(
+        "VITE_FEATURE_MERLT_GRAPH" not in args,
+        "the unset graph flag is not passed at all (an empty string would switch it off)",
     )
 
 
@@ -172,6 +176,15 @@ def prod_flags(cfg):
     args = (cfg["services"]["ingress"].get("build") or {}).get("args") or {}
     check(args.get("VITE_FEATURE_MERLT") == "false", "a MERL-T front-end flag that IS set reaches the build as given")
     check("VITE_FEATURE_MERLT_GRAPH" not in args, "and the one that is not set still is not passed")
+
+
+def prod_merlt_off(cfg):
+    args = (cfg["services"]["ingress"].get("build") or {}).get("args") or {}
+    check(
+        args.get("VITE_FEATURE_MERLT") == "false",
+        "MERLT_ENABLED=false on the server hides MERL-T in the app too (no front end calling a 404)",
+    )
+    check(environment(cfg["services"], "server")["MERLT_ENABLED"] == "false", "and the server has it off")
 
 
 def no_scrapers(cfg):
@@ -196,6 +209,7 @@ SCENARIOS = {
     "prod-lan": prod_lan,
     "prod-default": prod_default,
     "prod-flags": prod_flags,
+    "prod-merlt-off": prod_merlt_off,
     "no-scrapers": no_scrapers,
     "scrapers-alone": scrapers_alone,
 }

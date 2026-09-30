@@ -59,6 +59,20 @@ describe('getSlotComponents', () => {
     expect(getSlotComponents('article_content_after')).toHaveLength(0);
   });
 
+  it('hides the graph side rail with MERL-T off, even with its own flag on', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'true');
+    expect(getSlotComponents('article_sidebar')).toHaveLength(1);
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    expect(getSlotComponents('article_sidebar')).toHaveLength(0);
+  });
+
+  it('isMerltGraphEnabled follows the master switch', async () => {
+    const { isMerltGraphEnabled } = await import('../../features/merlt/graph/featureFlag');
+    expect(isMerltGraphEnabled()).toBe(true);
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    expect(isMerltGraphEnabled()).toBe(false);
+  });
+
   it('registers the graph side rail on article_sidebar gated by VITE_FEATURE_MERLT_GRAPH', () => {
     const components = getSlotComponents('article_sidebar');
     expect(components).toHaveLength(1);

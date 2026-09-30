@@ -147,8 +147,13 @@ router after it. Turning `graph` or `contribution` off also 404s the worker
 callback that group owns.
 
 The FE sees only `VITE_FEATURE_MERLT` and `VITE_FEATURE_MERLT_GRAPH`. Both are
-on by default; `false`, `0` or `""` disables them. So a group that is switched
-off server-side still shows its hub card, and its calls get 404s.
+on by default; `false`, `0` or `""` disables them. The master switch follows the
+server's unless set: `./start.sh` exports `VITE_FEATURE_MERLT` from its own
+`MERLT_ENABLED`, and `infra/compose.app.yml` builds the app with
+`${VITE_FEATURE_MERLT:-${MERLT_ENABLED:-true}}`, so MERL-T off on the server is off
+in the app (`scripts/prod/tests/test_compose.sh`, scenario `prod-merlt-off`). A
+single group switched off server-side still shows its hub card, and its calls
+get 404s.
 
 **Guards.**
 
