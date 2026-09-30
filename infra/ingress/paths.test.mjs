@@ -19,9 +19,27 @@ function vitePythonPaths() {
     .sort();
 }
 
+function legalBlock() {
+  const block = caddyfile.match(/@legal\s*\{([^}]*)\}/);
+  assert.ok(block, 'the Caddyfile has no "@legal { … }" matcher block');
+  return block[1];
+}
+
 function caddyLegalTokens() {
-  const line = caddyfile.match(/^\s*@legal\s+path\s+(.+)$/m);
-  assert.ok(line, 'the Caddyfile has no "@legal path …" matcher');
+  const line = legalBlock().match(/^\s*path\s+(.+)$/m);
+  assert.ok(line, 'the @legal block has no "path …" line');
+  return line[1].trim().split(/\s+/);
+}
+
+function caddyOpenPaths() {
+  const line = caddyfile.match(/^\s*@open\s+path\s+(.+)$/m);
+  assert.ok(line, 'the Caddyfile has no "@open path …" matcher');
+  return line[1].trim().split(/\s+/);
+}
+
+function caddyExcludedPaths() {
+  const line = legalBlock().match(/^\s*not\s+path\s+(.+)$/m);
+  assert.ok(line, 'the @legal block does not exclude the open paths');
   return line[1].trim().split(/\s+/);
 }
 
@@ -53,4 +71,24 @@ test('nothing else of the Python API is routed to it', () => {
       `${forbidden} must not be routed to the scrapers`,
     );
   }
+});
+
+test('only /version and /health stay open, and each exactly', () => {
+  assert.deepEqual([...caddyOpenPaths()].sort(), ['/health', '/version']);
+  for (const token of caddyOpenPaths()) {
+    // /health/detailed reaches Normattiva, EUR-Lex and Brocardi for real: it is not open.
+    assert.ok(!token.includes('*'), `${token} must match exactly, not by prefix`);
+  }
+});
+
+test('the @legal block leaves out exactly the open paths', () => {
+  assert.deepEqual([...caddyExcludedPaths()].sort(), [...caddyOpenPaths()].sort());
+});
+
+test('the scraping handle asks the server before it proxies, and keeps the login token from the scrapers', () => {
+  const handle = caddyfile.match(/handle @legal \{([\s\S]*?)\n\t\}/);
+  assert.ok(handle, 'the Caddyfile has no "handle @legal" block');
+  assert.match(handle[1], /forward_auth\s+\{\$SERVER_UPSTREAM:server:3001\}\s*\{\s*uri \/api\/auth\/verify\s*\}/);
+  assert.match(handle[1], /header_up -Authorization/);
+  assert.match(handle[1], /flush_interval -1/);
 });

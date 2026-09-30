@@ -48,16 +48,35 @@
 		reverse_proxy {$SERVER_UPSTREAM:server:3001}
 	}
 
-	# The scrapers. This is the same list Vite proxies to port 5000 in development,
+	# The scrapers. The list below is the one Vite proxies to port 5000 in development,
 	# prefix for prefix; infra/ingress/paths.test.mjs keeps the two in step.
-	@legal path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /parse_query* /extract_citations* /export_pdf* /version* /health*
+	#
+	# Two of them stay open: /version and /health, exactly. Everything else asks the server
+	# first (forward_auth to GET /api/auth/verify, which answers 2xx for a signed-in user
+	# inside their quota and 401 or 429 otherwise; a non-2xx answer goes back to the caller
+	# as it is). If the server does not answer, the request fails: the gate is closed by default.
+	@open path /version /health
+	handle @open {
+		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
+			header_up -Authorization
+		}
+	}
+	@legal {
+		path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /parse_query* /extract_citations* /export_pdf* /version* /health*
+		not path /version /health
+	}
 	handle @legal {
 		request_body {
 			max_size 1MB
 		}
+		forward_auth {$SERVER_UPSTREAM:server:3001} {
+			uri /api/auth/verify
+		}
 		# /stream_article_text answers NDJSON, one line per article: no buffering.
+		# The scrapers never see the login token.
 		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
 			flush_interval -1
+			header_up -Authorization
 		}
 	}
 
