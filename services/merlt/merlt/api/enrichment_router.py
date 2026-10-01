@@ -1648,7 +1648,8 @@ async def _write_relation_to_graph(
     `article_urn` stands in for an empty source, never the `user_document`
     placeholder. The community's relation type is written under the graph's
     name (`community_rel_to_graph`): CITA arrives as RINVIA, and PARTE_DI, the
-    inverse of CONTIENE, is never written.
+    inverse of CONTIENE, as the reversed CONTIENE (the endpoints swap): the
+    graph holds the one direction.
     """
     log.info(
         "Writing approved relation to graph",
@@ -1664,6 +1665,12 @@ async def _write_relation_to_graph(
             relation_type=rel_type,
         )
         return RelationWriteOutcome(written=False, reason=f"invalid relation type {rel_type!r}")
+
+    # PARTE_DI is the inverse of CONTIENE and the graph holds the one direction:
+    # "A is part of B" is written as B CONTIENE A, so the endpoints swap below.
+    reverse = rel_type == "PARTE_DI"
+    if reverse:
+        rel_type = "CONTIENE"
 
     try:
         rel_type = community_rel_to_graph(rel_type).value
@@ -1699,6 +1706,9 @@ async def _write_relation_to_graph(
                 deferred=deferred,
             )
             return RelationWriteOutcome(written=False, reason=reason, deferred=deferred)
+
+        if reverse:
+            source, target = target, source
 
         timestamp = datetime.now(timezone.utc).isoformat()
         params: Dict[str, Any] = {

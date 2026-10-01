@@ -285,20 +285,62 @@ async def test_a_cita_relation_is_written_as_rinvia(db):
         assert row.relation_type == "CITA"  # the staging row keeps the community's own word
 
 
-async def test_parte_di_is_never_written(db):
-    """PARTE_DI is the inverse of CONTIENE: the graph holds the one direction."""
+async def test_a_name_the_graph_does_not_have_is_refused_before_any_graph_access(db):
     factory, created = db
-    rid = await _relation(factory, created, "concetto:a", "concetto:b", relation_type="PARTE_DI")
+    rid = await _relation(factory, created, "concetto:a", "concetto:b", relation_type="TOTALMENTE_INVENTATA")
     graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
 
     async with factory() as session:
         outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
 
     assert outcome.written is False and outcome.deferred is False
-    assert "invalid relation type 'PARTE_DI'" in outcome.reason
+    assert "invalid relation type 'TOTALMENTE_INVENTATA'" in outcome.reason
     assert graph.queries == [], "a refused type must not even look the endpoints up"
     async with factory() as session:
         assert (await _load(session, rid)).written_to_graph_at is None
+
+
+async def test_parte_di_is_written_as_the_reversed_contiene(db):
+    """PARTE_DI is the inverse of CONTIENE. "The article is part of the act" is
+    written as the act CONTAINS the article: the endpoints swap, the type is CONTIENE."""
+    factory, created = db
+    marker = uuid.uuid4().hex[:8]
+    act = NORMATTIVA_URL_PREFIX + f"urn:nir:stato:legge:2020-01-01;{marker}"
+    article = f"urn:nir:stato:legge:2020-01-01;{marker}~art3"
+    rid = await _relation(factory, created, article, act, relation_type="PARTE_DI")
+    graph = _FakeGraph(normas={act})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is True
+    [(cypher, params)] = graph.writes
+    assert "MERGE (source)-[r:CONTIENE]->(target)" in cypher and "PARTE_DI" not in cypher
+    # The act, which exists, is the container and is only matched; the article, which
+    # does not, is the part and is MERGEd as a stub keyed by its URL.
+    assert "MATCH (source:Norma {URN: $source_key})" in cypher
+    assert "MERGE (target:Norma {URN: $target_key})" in cypher
+    assert params["source_key"] == act
+    assert params["target_key"] == NORMATTIVA_URL_PREFIX + article
+    assert params["target_stub"]["numero_articolo"] == "3"
+    assert "source_stub" not in params
+    async with factory() as session:
+        row = await _load(session, rid)
+        assert row.written_to_graph_at is not None
+        assert row.relation_type == "PARTE_DI"  # the staging row keeps the community's own word
+
+
+async def test_an_unresolved_parte_di_endpoint_is_reported_in_the_direction_it_was_stated(db):
+    factory, created = db
+    rid = await _relation(factory, created, "concetto:esistente", "Una cosa qualunque", relation_type="PARTE_DI")
+    graph = _FakeGraph(entities={"concetto:esistente"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is False
+    assert outcome.reason.startswith("target:"), outcome.reason
+    assert graph.writes == []
 
 
 async def test_a_wrapped_urn_endpoint_is_not_wrapped_twice(db):
