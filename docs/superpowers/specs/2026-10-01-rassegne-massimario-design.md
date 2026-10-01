@@ -1,15 +1,18 @@
 # The Massimario's annual reviews: in MERL-T's stores, on the article page — Design
 
 **Date:** 2026-10-01
-**Status:** DRAFT 1 for the owner's review. The design was approved section by section in
-conversation on 30 September and 1 October; section 13 keeps what is still open.
+**Status:** approved by the owner on 1 October, after section-by-section review on 30 September
+and 1 October; corrected the same day with his decisions on the decision node, the dating line
+and the August revert. Section 13 keeps what is still open.
 **Depends on:** the schema module of the MERL-T graph round
 (`services/merlt/merlt/storage/graph/schema.py`, spec
 `docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md` §4.1). It is written and
 reviewed on `refactor/merlt-graph-vocabulary` and reaches `develop` with that round's first pull
 request (its Tasks 1–5); this round builds on `develop` after that merge.
 **Coordinated with:** the sentenze round for LibreLex (decision identity and the decision page),
-the article-page redesign (placement), the graph round (the `AttoGiudiziario` key).
+the text-as-at-a-date round (placement and dating line,
+`docs/superpowers/specs/2026-10-01-testo-alla-data-design.md` §9, in review), the graph round
+(the `AttoGiudiziario` key).
 
 ## 1. Context
 
@@ -47,9 +50,16 @@ repository, with the portal's legal notes and listing saved and dated):
   Costituzione 4 %.
 - **68,083 mentions of `Rv.`**; 27,075 paragraphs cite both a norm and a decision.
 - Corte costituzionale cited ~3,500 times. On the sample: CGUE ~470, Corte EDU ~340.
-- On the sample, a simple pattern recognises 69 % of the `Rv.` citations; what it misses is almost all the
-  criminal form (`n. N del gg/mm/aaaa, dep. AAAA`) and civil variants (`n. 28928 del 2019`, no
-  rapporteur, `Rv. 66701301` without the dash, `Sez. L, 09136/2024` without `n.`).
+- A simple pattern recognises 69 % of the `Rv.` citations (sample). A prototype grammar written
+  while planning recognises **98.8 % on the whole corpus, the worst volume 96.4 %**: it adds the
+  criminal form (`n. N del gg/mm/aaaa, dep. AAAA`), the older one with the date before the number
+  (`Sez. VI, 12 novembre 2008, n. 44877`), civil variants (`n. 28928 del 2019`, no rapporteur,
+  `Rv. 66701301` without the dash, `Sez. L, 09136/2024` without `n.`) and several `Rv.` in a row
+  for one decision. What remains is mostly a massima cited by its `Rv.` alone.
+- 5,773 citations carry no year: the older civil volumes leave out the review's own year
+  (`Sez. 3, n. 8118 (Rv. 625721)`). For 96 % of them the `Rv.` number falls inside the range of
+  numbers that the explicit citations show for that year and archive; the other 241 are earlier
+  decisions cited without their year.
 - On 9,452 decision keys (sample), 51 appear with two section labels — `T` and `5`, `6-3` and
   `6`: the same decision written two ways. The section is not part of a decision's identity.
 - The portal sits behind a web application firewall. One request in ~1,400 came back as an
@@ -57,8 +67,8 @@ repository, with the portal's legal notes and listing saved and dated):
 
 **What VisuaLex has today.** The article page shows case law only as Brocardi's massime
 (`MassimeSection`, inside "Approfondimenti & Dottrina"). No code parses CED citations. A
-case-law panel built on 29 August was reverted the same day; the owner's reason, given on
-30 September: **the results were not relevant enough**. MERL-T keeps text chunks in Qdrant, the
+case-law panel built on 29 August was reverted the same day because the owner had other
+priorities (confirmed on 1 October). MERL-T keeps text chunks in Qdrant, the
 graph in FalkorDB, and a `bridge_table` in Postgres that links a chunk to graph nodes with a
 relation type, a confidence and a per-expert affinity that RLCF learns
 (`services/merlt/merlt/storage/bridge/`).
@@ -77,12 +87,17 @@ relation type, a confidence and a per-expert affinity that RLCF learns
 4. **Approach A: MERL-T's stores and the bridge.** Paragraphs go to Qdrant, decisions and norms
    to the graph, the links to the bridge; the reader's panel asks the bridge by URN. VisuaLex's
    own database keeps no legal content. The panel exists only when MERL-T is on.
-5. **Strong and weak links are kept apart** (the lesson of 29 August). A paragraph's link to a
-   norm or a decision was written by its author: strong. A decision's link to a norm inferred
-   because both appear in one paragraph is weak, and is labelled so.
+5. **Strong and weak links are kept apart.** A paragraph's link to a norm or a decision was
+   written by its author: strong. A decision's link to a norm inferred because both appear in one
+   paragraph is weak, and is labelled so. They are different evidence, and a lawyer needs to know
+   which one a row rests on.
 6. **One identity for decisions**, shared with the sentenze round (section 5.2).
 7. **Scope of v1:** Cassazione and Corte costituzionale. CGUE and Corte EDU are counted, not
    parsed.
+8. **`AttoGiudiziario` is the decision** (1 October), with its massime as attributes; each massima
+   text stays its own Qdrant point (section 5.2).
+9. **The dating line** (1 October): each year reads *Rassegna dell'anno AAAA* with the link
+   *Vedi il testo in vigore al 31 dicembre AAAA*, and no caution sentence (section 7).
 
 ## 3. Goals and non-goals
 
@@ -151,6 +166,11 @@ relation names — in `Rel` if they ever appear as graph edges). Its contract te
   (`n. 1399 del 15/12/1999, dep. 2000` → 2000); without `dep.`, the year of the date. `archivio`
   comes from the volume; in the mixed volume from the chapter, and if the chapter does not say,
   the citation stays a reference without identity (reported, not guessed).
+- **A citation without a year** takes the review's year only when its `Rv.` number falls inside
+  that year's range for its archive; otherwise it stays a reference without identity. The ranges
+  (2nd–98th percentile of the `Rv.` numbers of explicit citations, per archive and year) are a
+  small table of numbers built once from the archive and kept in the repository; the decision node
+  records `anno_implicito: true`.
 - Attributes: `sezioni` (as written: `U`, `L`, `T`, `6-3`…), `relatore`, `data_udienza`,
   `tipo`, `rv` (the massime numbers), `fonte`.
 - Brocardi's massime take the same identity in the graph round's phase 2, when the doctrine
@@ -158,10 +178,9 @@ relation names — in `Rel` if they ever appear as graph edges). Its contract te
   one node. Until then they are separate nodes: the seed's key (`massima_{corte}_{numero}`) has
   no year and no archive, and cannot be re-keyed in place because decisions with the same number
   in different years already collapsed into one node.
-- `AttoGiudiziario` as **the decision**, with its massime as attributes (the `Rv.` list, the
-  massima texts, each text still its own Qdrant point), is what this round and the graph round
-  both recommend; the alternative is a child `Massima` node. It changes the data model, so the
-  owner decides (section 13).
+- `AttoGiudiziario` is **the decision** (owner's decision, 1 October), with its massime as
+  attributes: the `Rv.` list here, the massima texts when Brocardi's are re-ingested, each text
+  still its own Qdrant point. There is no child `Massima` node.
 
 ### 5.3 Norm → `Norma`
 
@@ -185,10 +204,14 @@ relation names — in `Rel` if they ever appear as graph edges). Its contract te
 
 ### 5.5 Citation grammar
 
-One tolerant parser, one test per form: civil `n. N/AAAA` and `n. N del AAAA`, with or without
-`n.`, rapporteur and dash in the `Rv.`; criminal `n. N del gg/mm/aaaa[, dep. AAAA]`; lists of
-citations separated by `;`; Sezioni Unite spelt `U`, `U.`, `Un.`; Corte costituzionale
-`Corte cost. n. N del AAAA` and `sent./ord. n. N/AAAA`. **Target: at least 95 % of the `Rv.`
+One tolerant parser, anchored on each `Rv.` and reading the citation that ends before it, one
+test per form: civil `n. N/AAAA`, `n. N/AA` and `n. N del AAAA`, with or without `n.`, rapporteur
+and dash in the `Rv.`; criminal `n. N del gg/mm/aaaa[, dep. AAAA]` and `n. N, del gg.mm.aaaa`;
+the older order `Sez. VI, 12 novembre 2008[ - dep. …], n. N`; no year (section 5.2); several
+`Rv.` in a row for one decision; lists separated by `;`; Sezioni Unite spelt `U`, `U.`, `Un.`,
+`un.`; Roman section numbers (`Sez. VI`, `Sez. VI - 1`); Corte costituzionale
+`Corte cost. n. N del AAAA` and `sent./ord. n. N/AAAA`. Decisions cited without `Rv.`
+(`Sez. U, n. 123/2020`) are parsed by the same grammar. **Target: at least 95 % of the `Rv.`
 mentions of each volume**, measured in the batch report; what is not recognised is counted and
 sampled, never guessed.
 
@@ -221,15 +244,26 @@ run at night.
 
 ## 7. The reader
 
-- **Where**: a new component in the `article_content_after` plugin slot
-  (`apps/web/src/plugins/registry.tsx`), after the article body and before Brocardi's section,
-  present only with MERL-T on. The article text is untouched (root `CLAUDE.md`, rule 23).
-  Placement is subject to the article-page redesign (section 13).
-- **Closed by default.** Header: **Nelle rassegne della Cassazione** · *N passi, AAAA–AAAA*, and
-  below it *Orientamenti datati: riferiti al testo vigente nell'anno della rassegna.* Nothing is
-  rendered when no paragraph cites the article.
-- **Open**: grouped by year, newest first; ten paragraphs at a time within a year; a
-  civile/penale filter only when both appear. Each paragraph shows:
+- **Where** (text-as-at-a-date spec §9, P1): a closed row in the `article_content_after` plugin
+  slot (`apps/web/src/plugins/registry.tsx`), directly under the article text and its apparatus,
+  above Brocardi's block; not part of "Approfondimenti & Dottrina", not a drawer, a popover or a
+  margin item; it opens nothing over the text. Present only with MERL-T on, with no placeholder
+  otherwise. The article text is untouched (root `CLAUDE.md`, rule 23).
+- **Self-contained** (P2): the component takes `articleUrn` and an optional `validity` and returns
+  one collapsible; it assumes nothing about its neighbours and injects nothing into the text root,
+  so the article-page redesign can mount it wherever it puts its layers.
+- **On a historical text it stays visible** (P3). The host adds `validity` and `isHistorical` to
+  the slot's props (additive); this version ignores them and never claims a link between a
+  year's review and the version shown.
+- **Closed by default.** The row reads **Nelle rassegne della Cassazione** · *N passi,
+  AAAA–AAAA*. Nothing is rendered when no paragraph cites the article.
+- **Open**: grouped by year, newest first. Each year's heading reads *Rassegna dell'anno AAAA*
+  with the link *Vedi il testo in vigore al 31 dicembre AAAA* (P4), which opens the historical
+  text through the existing `triggerSearch` with `version_date`; until the text-as-at-a-date
+  round ships `version_date`, the heading carries no link. No caution sentence: a review of year
+  Y reports decisions of year Y, and the Court may have applied an earlier version of the norm.
+  Ten paragraphs at a time within a year; a civile/penale filter only when both appear. Each
+  paragraph shows:
   - where it comes from: `Rassegna civile 2024 · vol. 1 › Cap. I › § 2 <section title>`, and the
     authors;
   - the paragraph, cut at four lines with "mostra tutto", the citation of this article
@@ -246,7 +280,8 @@ run at night.
   lists "decisions about this article" from co-citation.
 - **Data path**: the web calls `GET /api/merlt/rassegne?urn=<canonical>&anno=&cursor=` on the
   BFF (authenticated); the BFF calls MERL-T, which reads the bridge by URN, fetches the points by
-  id (no semantic search) and groups them. The call records no reading event. A MERL-T error
+  id (no semantic search) and groups them. One request per article view, after the text has
+  rendered, cached per session by URN (P5). The call records no reading event. A MERL-T error
   shows one discreet line, *Rassegne non disponibili ora*; errors are not swallowed.
 
 ## 8. Dependencies and coordination
@@ -256,7 +291,8 @@ run at night.
   is written before it is in `develop`.
 - **Graph round, phase 2**: Brocardi's massime are re-ingested with the identity of section 5.2.
 - **Sentenze round**: the decision page and its routes; the chips link to it once it exists.
-- **Article-page redesign**: the panel's placement.
+- **Text-as-at-a-date round**: the placement (its §9, in review), the `validity`/`isHistorical`
+  slot props, and `version_date` for the link in each year's heading.
 - The mechanical ingestion is stopped for the codes (graph round, decision 7); this is a new
   adapter with its own batches, reviewed and promoted one volume at a time.
 
@@ -282,15 +318,16 @@ run at night.
 
 ## 11. Verification
 
-- Parser: a test per citation form, including the December-hearing/January-deposit case and the
-  mixed volume; the URN conversion for every code in the table; synthetic fixtures only.
+- Parser: a test per citation form, including the December-hearing/January-deposit case, a
+  citation without a year inside and outside its `Rv.` range, and the mixed volume; the URN
+  conversion for every code in the table; synthetic fixtures only.
 - A contract test: the adapter emits no name the schema module does not define.
 - Pilot: one civil and one criminal volume, their reports read by the owner, coverage ≥ 95 %;
   a sample of paragraphs checked by hand against the portal (text, links, decisions).
 - Idempotence: a second run of a promoted volume changes nothing.
 - Reversibility: deleting by `fonte` on a copy removes exactly the prose and the bridge rows.
 - Reader: a browser pass on `http://localhost:5173` with MERL-T on (an article cited in many
-  years, one never cited, MERL-T stopped).
+  years, one never cited, a historical version of an article, MERL-T stopped).
 - The suites of every area touched, green.
 
 ## 12. Risks
@@ -303,7 +340,7 @@ run at night.
 
 ## 13. Open
 
-1. `AttoGiudiziario`: the decision with its massime as attributes (recommended by this round
-   and the graph round), or a child `Massima` node — the owner decides.
-2. The panel's placement in the article-page redesign.
-3. Where the vectors are computed (graph round, open point 3).
+1. Where the vectors are computed (graph round, open point 3).
+
+Closed on 1 October: `AttoGiudiziario` is the decision (section 2, decision 8); the placement
+and the dating line follow the text-as-at-a-date spec §9 (section 7), which is still in review.
