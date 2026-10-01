@@ -512,20 +512,42 @@ def _without_coalesced_pair(cypher, first, second):
 
 async def test_concept_definitions_read_a_concept_as_the_seed_stores_it():
     # A seed concept has no `definizione` and no `URN`: its text is `descrizione`, its key `node_id`.
-    row = {
-        "term": "Buona fede", "source_urn": "concetto:buona_fede", "source_estremi": "Buona fede",
-        "definition_text": "La buona fede e correttezza.", "context": "correlato a x",
-    }
+    # Each of the four strategies is answered with rows of its own, so an entry can only come from
+    # the strategy that asked for it: one fake row for every query would let any of them pass.
     from merlt.tools.definition import DefinitionLookupTool
 
-    graph = _GraphRecorder(rows=[row])
+    graph = _GraphRecorder(answers=[
+        ("MATCH (c:ConcettoGiuridico)", [{
+            "term": "Buona fede", "source_urn": "concetto:buona_fede", "source_type": "ConcettoGiuridico",
+            "source_estremi": "Buona fede", "definition_text": "La buona fede e correttezza.",
+        }]),
+        ("CORRELATO|SPECIES", [{
+            "term": "Correttezza", "source_urn": "concetto:correttezza", "source_estremi": "Correttezza",
+            "definition_text": "Lealta nei rapporti.", "context": "correlato a Buona fede",
+        }]),
+        ("[r:DEFINISCE]", [{
+            "term": "buona fede", "source_urn": "massima_cass_1", "source_type": "AttoGiudiziario",
+            "source_estremi": "Cass. civ. 1/2020", "definition_text": "Il dovere di lealta.", "context": "La massima.",
+        }]),
+        ("'si intende'", [{
+            "source_urn": CC, "source_type": "Norma", "source_estremi": "Art. 1321 c.c.",
+            "definition_text": "Per contratto si intende l'accordo.",
+        }]),
+    ])
     tool = DefinitionLookupTool(graph_db=graph)
     direct = await tool._find_concept_definitions("buona fede", False, 5)
     related = await tool._find_related_definitions("buona fede", None, 5)
     via_relation = await tool._find_definitions_via_relation("buona fede", None, False, 5)
     in_text = await tool._find_definitions_in_text("buona fede", None, 5)
-    for found in (direct, related):
-        assert [(d["source_urn"], d["definition_text"]) for d in found] == [("concetto:buona_fede", "La buona fede e correttezza.")]
+    assert [(d["source_urn"], d["source_type"], d["definition_text"]) for d in direct] == [
+        ("concetto:buona_fede", "ConcettoGiuridico", "La buona fede e correttezza."),
+    ]
+    assert [(d["source_urn"], d["definition_text"]) for d in related] == [("concetto:correttezza", "Lealta nei rapporti.")]
+    # a source keyed by node_id only (a massima, doctrine) is a source too
+    assert [(d["source_urn"], d["source_type"], d["definition_text"], d["context"]) for d in via_relation] == [
+        ("massima_cass_1", "AttoGiudiziario", "Il dovere di lealta.", "La massima."),
+    ]
+    assert [(d["source_urn"], d["definition_text"]) for d in in_text] == [(CC, "Per contratto si intende l'accordo.")]
     direct_cypher, related_cypher, relation_cypher, text_cypher = graph.cyphers
     assert "coalesce(c.definizione, c.descrizione) IS NOT NULL" in direct_cypher
     assert "coalesce(c.URN, c.node_id) AS source_urn" in direct_cypher
@@ -536,7 +558,6 @@ async def test_concept_definitions_read_a_concept_as_the_seed_stores_it():
     assert "coalesce(n.URN, n.node_id) AS source_urn" in text_cypher
     for cypher in (direct_cypher, related_cypher, relation_cypher):
         assert ".definizione" not in _without_coalesced_pair(cypher, "definizione", "descrizione")
-    assert via_relation and in_text
 
 
 async def test_the_systemic_expansion_reads_a_nodes_text_whichever_writer_stored_it(_static_systemic_floor):

@@ -1,10 +1,12 @@
-"""Integration: the readers meet a graph written the way the writers write it, on a real FalkorDB.
+"""Integration: the readers meet a graph shaped like the ones the writers leave, on a real FalkorDB.
 
-The unit tests pin the Cypher text a reader sends; only a graph engine shows that the
-text is valid and finds what the writers put there. Every tool turns a query error into
-an empty answer, so each test here asserts a non-empty answer: a broken query string
-fails somewhere. The last tests feed injection-shaped arguments to the tools and read
-the graph afterwards: nothing changed.
+The graph is built here, node by node, in Cypher (`_seed` lists what it holds): it has those
+shapes and no others, and it is not the output of the writers. The unit tests pin the Cypher
+text a reader sends; only a graph engine shows that the text is valid and finds nodes of
+those shapes. Every tool turns a query error into an empty answer, so a test here asserts
+the answer it should find, not only that nothing raised: a broken query string fails
+somewhere. The last tests feed injection-shaped arguments to the tools and read the graph
+afterwards: nothing changed.
 
 Writes to an ISOLATED test graph (`merlt_test_readers`), wiped before and after, so the
 Libro IV graph is never touched.
