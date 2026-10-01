@@ -449,12 +449,27 @@ def stub_properties(urn: str, provenance: Provenance = Provenance.INGESTION) -> 
 
 
 # What an article must have in the graph to be complete in phase 1 (spec
-# 4.3; the doctrine layer and the vectors join in phase 2).
+# 4.3; the doctrine layer and the vectors join in phase 2). Its "fingerprint" is
+# `Norma.testo_sha256`, see the note below.
 ARTICLE_COMPLETENESS_PARTS: tuple[str, ...] = ("text", "commi", "hierarchy", "fingerprint")
+
+# Two fingerprints exist, and they are two properties:
+#
+# - `testo_sha256` is the SHA-256 of `article_text`, the text VisuaLex serves (what
+#   `text_fingerprint` computes, from the text the writers store as `testo`).
+# - `akn_sha256` is the per-article `fingerprint` that `/fetch_act_fingerprints` returns:
+#   the SHA-256 of the AKN article text (services/visualex/visualex_api/services/
+#   akn_fetch.py, `_fingerprints`).
+#
+# AKN and HTML text are never identical (root CLAUDE.md, rule 23: 0 of 19 measured), so
+# the two hashes of one article never match. `akn_sha256` never overwrites `testo_sha256`
+# and the two are never compared as if they were one hash. Which of them LingoLex
+# anchors on is decided in phase 3.
 
 
 def text_fingerprint(text: str) -> str:
-    """SHA-256 of the exact text (article_text is a data contract)."""
+    """SHA-256 of the exact text (article_text is a data contract): the value of
+    `testo_sha256`, never of the AKN fingerprint `akn_sha256`."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
