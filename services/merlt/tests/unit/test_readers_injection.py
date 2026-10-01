@@ -224,6 +224,76 @@ async def test_textual_reference_depth_is_an_integer_in_range():
     assert "*1..5]" in graph.cyphers[0] and "*1..1]" in graph.cyphers[1]
 
 
+# the ReAct loop's repair of the graph_search filter -----------------------------
+
+
+def _expert_with_graph(graph):
+    from merlt.experts.literal import LiteralExpert
+
+    tool = GraphSearchTool(graph_db=graph)
+    return LiteralExpert(tools=[tool]), tool
+
+
+def _repaired(expert, relation_types):
+    return expert._repair_graph_tool_params("graph_search", {"start_node": CC, "relation_types": relation_types}, None)
+
+
+async def test_a_malformed_relation_token_is_kept_for_the_tool_to_drop_it_and_never_widens_the_query():
+    # The repair used to DROP the whole filter on one token that is not an identifier, so the
+    # traversal ran over every relation: the opposite of "a filter that comes out empty answers empty".
+    graph = _Graph()
+    expert, tool = _expert_with_graph(graph)
+    repaired = _repaired(expert, ["RINVIA", RELATION_ATTACK, "contiene"])
+    assert repaired["relation_types"] == ["RINVIA", RELATION_ATTACK, "contiene"]
+    await tool.execute(**repaired)
+    assert "-[r:RINVIA|CONTIENE*1..2]-" in graph.cyphers[0]
+    _never_the_attack(graph, RELATION_ATTACK)
+
+
+async def test_a_filter_of_only_malformed_tokens_still_answers_empty_without_asking():
+    graph = _Graph()
+    expert, tool = _expert_with_graph(graph)
+    repaired = _repaired(expert, [RELATION_ATTACK, "A B", "1A"])
+    assert repaired["relation_types"] == [RELATION_ATTACK, "A B", "1A"]
+    result = await tool.execute(**repaired)
+    assert result.success and result.data["nodes"] == [] and graph.calls == []
+
+
+async def test_a_lone_string_becomes_a_one_item_list():
+    graph = _Graph()
+    expert, tool = _expert_with_graph(graph)
+    assert _repaired(expert, "RINVIA")["relation_types"] == ["RINVIA"]
+    assert _repaired(expert, RELATION_ATTACK)["relation_types"] == [RELATION_ATTACK]
+
+
+def test_a_hallucinated_list_is_cut_to_the_cap_not_dropped():
+    from merlt.experts import react_mixin
+
+    graph = _Graph()
+    expert, _ = _expert_with_graph(graph)
+    names = [f"REL_{i}" for i in range(300)]
+    assert _repaired(expert, names)["relation_types"] == names[: react_mixin._MAX_RELATION_TYPES]
+
+
+@pytest.mark.parametrize("junk", [5, {"RINVIA": 1}, True])
+async def test_a_filter_that_is_no_list_does_not_widen_the_query_either(junk):
+    graph = _Graph()
+    expert, tool = _expert_with_graph(graph)
+    result = await tool.execute(**_repaired(expert, junk))
+    assert result.data["nodes"] == [] and graph.calls == []
+
+
+def test_a_well_formed_list_and_the_absence_of_a_filter_are_left_alone():
+    graph = _Graph()
+    expert, _ = _expert_with_graph(graph)
+    assert _repaired(expert, ["RINVIA", "CONTIENE"])["relation_types"] == ["RINVIA", "CONTIENE"]
+    assert _repaired(expert, [])["relation_types"] == []
+    assert expert._repair_graph_tool_params("graph_search", {"start_node": CC}, None) == {"start_node": CC}
+    assert expert._repair_graph_tool_params("graph_search", {"start_node": CC, "relation_types": None}, None) == {
+        "start_node": CC, "relation_types": None,
+    }
+
+
 # definition_lookup -------------------------------------------------------------
 
 

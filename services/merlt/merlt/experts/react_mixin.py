@@ -136,9 +136,8 @@ _CODICE_MENTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# --- graph_search relation_types guard --------------------------------------
+# --- graph_search relation_types: shaped here, whitelisted by the tool -----------
 _MAX_RELATION_TYPES = 30
-_SAFE_REL_TOKEN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _normalize_article(raw: Any) -> Any:
@@ -397,14 +396,14 @@ class ReActMixin:
     def _repair_graph_tool_params(
         self, tool_name: str, params: Dict[str, Any], context: Any
     ) -> Dict[str, Any]:
-        """W1.5 — guard the ``relation_types`` arg of ``graph_search``.
+        """W1.5 — shape the ``relation_types`` arg of ``graph_search``.
 
         The LLM sometimes hallucinates a huge (300+) relation-type list, sometimes
-        with a corrupted char, which the tool interpolates into a Cypher pattern →
-        "Invalid input". When the list is absurdly long, non-list, or holds a
-        non-identifier token, DROP the key (not ``[]``) so the traversal runs over
-        ALL relations (valid Cypher). A single string is coerced to a list. A
-        well-formed list (all safe tokens, ≤ cap) is passed through unchanged.
+        with a corrupted char. A single string becomes a list of one and a list is
+        cut to ``_MAX_RELATION_TYPES``; nothing is dropped. The tool keeps the names
+        of the graph and drops the rest (``schema.cypher_rel_names``), and a filter
+        that comes out empty answers empty: dropping the key here would run the
+        traversal over ALL relations on one malformed token, the opposite.
         Best-effort: any error returns the params unchanged.
         """
         try:
@@ -420,20 +419,15 @@ class ReActMixin:
             rt = params.get("relation_types")
             if rt is None:
                 return params
-            if isinstance(rt, str):
-                rt = [rt]
-            bad = (
-                not isinstance(rt, list)
-                or len(rt) > _MAX_RELATION_TYPES
-                or any((not isinstance(x, str)) or not _SAFE_REL_TOKEN_RE.match(x) for x in rt)
-            )
-            repaired = dict(params)
-            if bad:
-                repaired.pop("relation_types", None)
-                log.debug("react.dropped_relation_types", tool=tool_name,
-                          count=(len(rt) if isinstance(rt, list) else "n/a"))
+            if isinstance(rt, (list, tuple, set, frozenset)):
+                rt = list(rt)
             else:
-                repaired["relation_types"] = rt
+                rt = [rt]  # a lone string is one name; any other value is one item the tool drops
+            if len(rt) > _MAX_RELATION_TYPES:
+                log.debug("react.cut_relation_types", tool=tool_name, count=len(rt))
+                rt = rt[:_MAX_RELATION_TYPES]
+            repaired = dict(params)
+            repaired["relation_types"] = rt
             return repaired
         except Exception as e:  # noqa: BLE001 - best-effort, never break the call
             log.debug("react.repair_graph_params_failed", tool=tool_name, error=str(e))
