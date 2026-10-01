@@ -135,3 +135,24 @@ async def test_a_proposal_for_an_existing_entity_links_the_new_article(graph):
         "MATCH (a:Norma)-[r:PREVEDE_SANZIONE]->(:Entity {id: 'sanzione:multa'}) RETURN a.URN AS u ORDER BY u", {}
     )
     assert [row["u"] for row in linked] == [ART_1322, ART_1325]
+
+
+async def test_the_stub_of_a_bare_urn_is_the_article_the_seed_keys(graph):
+    bare = f"{ACT}~art1322"
+    await graph.query("CREATE (:Norma {URN: $u, node_id: $u, provenance: 'seed'})", {"u": ART_1322})
+    writer = EntityGraphWriter(graph)
+
+    await writer.write_entity(_approved("pe-1", "principio", "Buona fede", bare))
+    await writer.write_entity(_approved("pe-2", "principio", "Equità", f"{ACT}~art1374!vig=2020-01-01"))
+
+    # The article that exists is reused, not shadowed by a bare-keyed stub ...
+    assert await _count(graph, "MATCH (a:Norma {URN: $u}) RETURN count(a) AS c", {"u": bare}) == 0
+    assert await _count(
+        graph, "MATCH (:Norma {URN: $u})-[:ESPRIME_PRINCIPIO]->(e:Entity) RETURN count(e) AS c", {"u": ART_1322}
+    ) == 1
+    # ... and one that does not exist is a stub keyed by its URL, in the one shape.
+    stub = await graph.query(
+        "MATCH (a:Norma {URN: $u}) RETURN a.is_stub AS stub, a.node_id AS nid, a.estremi AS e",
+        {"u": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374"},
+    )
+    assert stub == [{"stub": True, "nid": f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art1374", "e": "Art. 1374 c.c."}]

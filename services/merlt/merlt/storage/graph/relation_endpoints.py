@@ -54,6 +54,20 @@ def is_nir_reference(value: Optional[str]) -> bool:
     return "urn:nir:" in (value or "").lower()
 
 
+def wrapped_norm_key(value: Optional[str]) -> str:
+    """The Normattiva URL that wraps a bare ``urn:nir:`` URN; any other value
+    as it is.
+
+    The graph keys a norm by its full URL (the seed does), so a Norma stub made
+    for a bare URN is keyed this way too: a stub keyed by the bare URN is
+    unreachable from every reader and sits next to the article it stands for
+    once that is ingested. The version marker is not cut here
+    (``schema.canonical_urn`` does it).
+    """
+    v = (value or "").strip()
+    return NORMATTIVA_URL_PREFIX + v if v.lower().startswith("urn:nir:") else v
+
+
 def norm_key_candidates(value: str) -> List[str]:
     """The keys a norm may be stored under: the canonical form plus its
     bare/wrapped counterpart (the seed keys the URL form, callers may send
@@ -61,7 +75,7 @@ def norm_key_candidates(value: str) -> List[str]:
     key = canonical_norm_key(value)
     candidates = [key]
     if key.lower().startswith("urn:nir:"):
-        candidates.append(NORMATTIVA_URL_PREFIX + key)
+        candidates.append(wrapped_norm_key(key))
     elif key.startswith(NORMATTIVA_URL_PREFIX):
         candidates.append(key[len(NORMATTIVA_URL_PREFIX):])
     return candidates
@@ -99,4 +113,5 @@ __all__ = [
     "is_norm_reference",
     "looks_like_entity_id",
     "norm_key_candidates",
+    "wrapped_norm_key",
 ]

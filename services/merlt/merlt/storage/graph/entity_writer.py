@@ -59,6 +59,7 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
+from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import Provenance, Rel, SEED_TWIN, canonical_urn, stub_properties
 from merlt.storage.enrichment.models import PendingEntity, PendingRelation
 from merlt.pipeline.enrichment.models import EntityType, RelationType
@@ -492,7 +493,10 @@ class EntityGraphWriter:
         # Create relation (create Norma node if it doesn't exist). A Norma this
         # writer creates is the schema's one stub shape (`stub_properties`),
         # set ON CREATE only: an existing (seed/ingested) node is never touched.
-        # The relation itself carries the community's provenance.
+        # The graph keys a norm by its full Normattiva URL, so a bare `urn:nir:`
+        # URN is keyed so too, or its stub would sit next to the article the seed
+        # has. The relation itself carries the community's provenance.
+        article_key = canonical_urn(wrapped_norm_key(entity.article_urn))
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
         ON CREATE SET art += $stub, art.created_at = $timestamp
@@ -508,8 +512,8 @@ class EntityGraphWriter:
         """
 
         params = {
-            "article_urn": canonical_urn(entity.article_urn),
-            "stub": stub_properties(entity.article_urn),
+            "article_urn": article_key,
+            "stub": stub_properties(article_key),
             "entity_id": node_id,
             "provenance": Provenance.COMMUNITY_VALIDATED.value,
             "timestamp": self._timestamp,

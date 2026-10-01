@@ -191,16 +191,18 @@ async def test_urn_source_and_graph_entity_target_are_written(db):
 
     assert outcome.written is True
     [(cypher, params)] = graph.writes
-    # The NIR URN escape hatch: a missing norm is MERGEd as a stub, keyed
-    # without the version marker; the target is MATCHed, never created.
+    # The NIR URN escape hatch: a missing norm is MERGEd as a stub, keyed by its
+    # full Normattiva URL (the way the graph keys every norm) without the version
+    # marker; the target is MATCHed, never created.
     assert "MERGE (source:Norma {URN: $source_key})" in cypher
     assert "MATCH (target:Entity {id: $target_key})" in cypher
-    assert params["source_key"] == urn
+    assert params["source_key"] == NORMATTIVA_URL_PREFIX + urn
     assert params["target_key"] == "concetto:risoluzione_del_contratto"
     assert params["source_stub"]["numero_articolo"] == "3"
     # The stub is the schema's one shape, set only when the Norma is created.
     assert "ON CREATE SET source += $source_stub, source.created_at = $timestamp" in cypher
-    assert params["source_stub"]["is_stub"] is True and params["source_stub"]["URN"] == urn
+    assert params["source_stub"]["is_stub"] is True
+    assert params["source_stub"]["URN"] == params["source_stub"]["node_id"] == NORMATTIVA_URL_PREFIX + urn
     assert "target_stub" not in params
     async with factory() as session:
         assert (await _load(session, rid)).written_to_graph_at is not None
@@ -297,6 +299,22 @@ async def test_parte_di_is_never_written(db):
     assert graph.queries == [], "a refused type must not even look the endpoints up"
     async with factory() as session:
         assert (await _load(session, rid)).written_to_graph_at is None
+
+
+async def test_a_wrapped_urn_endpoint_is_not_wrapped_twice(db):
+    factory, created = db
+    marker = uuid.uuid4().hex[:8]
+    url = NORMATTIVA_URL_PREFIX + f"urn:nir:stato:legge:2020-01-01;{marker}~art5"
+    rid = await _relation(factory, created, url + "!vig=2020-01-01", "concetto:a")
+    graph = _FakeGraph(entities={"concetto:a"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is True
+    [(_, params)] = graph.writes
+    assert params["source_key"] == url
+    assert params["source_stub"]["URN"] == url and params["source_stub"]["numero_articolo"] == "5"
 
 
 async def test_pending_entity_endpoint_is_deferred_then_written(db):

@@ -277,3 +277,14 @@ async def test_a_failed_link_leaves_the_votes_uncounted():
     with pytest.raises(RuntimeError):
         await EntityGraphWriter(graph).write_entity(_approved())
     assert graph.with_text("e.votes_count") == []
+
+
+async def test_the_stub_of_a_bare_urn_is_keyed_by_its_normattiva_url():
+    writer, client = _writer()
+    bare = "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1322!vig=2020-01-01"
+    entity = SimpleNamespace(entity_type="concetto", article_urn=bare)
+    await writer._create_entity_relation(entity, "concetto:x")
+    cypher, params = client.query.await_args.args
+    assert params["article_urn"] == CC
+    assert params["stub"]["URN"] == CC and params["stub"]["node_id"] == CC
+    assert params["stub"]["estremi"] == "Art. 1322 c.c."

@@ -15,7 +15,9 @@ from merlt.storage.graph.relation_endpoints import (
     is_norm_reference,
     looks_like_entity_id,
     norm_key_candidates,
+    wrapped_norm_key,
 )
+from merlt.storage.graph.schema import canonical_urn
 
 URN = "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
 
@@ -36,6 +38,24 @@ def test_canonical_key_strips_only_the_version_marker():
 def test_norm_key_candidates_cover_bare_and_wrapped_forms():
     assert norm_key_candidates(URN + "!vig=") == [URN, NORMATTIVA_URL_PREFIX + URN]
     assert norm_key_candidates(NORMATTIVA_URL_PREFIX + URN) == [NORMATTIVA_URL_PREFIX + URN, URN]
+
+
+def test_wrapped_norm_key_gives_a_bare_urn_its_normattiva_url():
+    # The graph keys a norm by its full URL, so a stub made for a bare URN is keyed so too.
+    assert wrapped_norm_key(URN) == NORMATTIVA_URL_PREFIX + URN
+    assert wrapped_norm_key("  " + URN) == NORMATTIVA_URL_PREFIX + URN
+    assert wrapped_norm_key(NORMATTIVA_URL_PREFIX + URN) == NORMATTIVA_URL_PREFIX + URN  # never twice
+    assert wrapped_norm_key(wrapped_norm_key(URN)) == wrapped_norm_key(URN)
+    # Anything that is not a bare NIR URN keeps its form.
+    assert wrapped_norm_key("urn:test:art1") == "urn:test:art1"
+    assert wrapped_norm_key("concetto:risoluzione") == "concetto:risoluzione"
+    assert wrapped_norm_key("") == "" and wrapped_norm_key(None) == ""
+
+
+def test_wrapped_norm_key_leaves_the_version_marker_to_canonical_urn():
+    assert wrapped_norm_key(URN + "!vig=2024-01-01") == NORMATTIVA_URL_PREFIX + URN + "!vig=2024-01-01"
+    assert canonical_urn(wrapped_norm_key(URN + "!vig=2024-01-01")) == NORMATTIVA_URL_PREFIX + URN
+    assert canonical_urn(wrapped_norm_key(URN + "@originale")) == NORMATTIVA_URL_PREFIX + URN
 
 
 def test_entity_id_shape():

@@ -99,6 +99,7 @@ from merlt.storage.graph.relation_endpoints import (
     is_norm_reference,
     looks_like_entity_id,
     norm_key_candidates,
+    wrapped_norm_key,
 )
 from merlt.storage.graph.schema import canonical_urn, community_rel_to_graph, stub_properties
 from merlt.rlcf.domain_authority import (
@@ -1712,8 +1713,11 @@ async def _write_relation_to_graph(
         }
         for var, ep in (("source", source), ("target", target)):
             if ep.create_norma:
-                params[f"{var}_key"] = canonical_urn(ep.key)
-                params[f"{var}_stub"] = stub_properties(ep.key)
+                # The graph keys a norm by its full Normattiva URL: the stub of a bare
+                # `urn:nir:` endpoint is keyed, and built, from the wrapped form.
+                key = canonical_urn(wrapped_norm_key(ep.key))
+                params[f"{var}_key"] = key
+                params[f"{var}_stub"] = stub_properties(key)
 
         result = await falkordb.query(_relation_write_cypher(rel_type, source, target), params)
 
