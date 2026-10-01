@@ -17,6 +17,7 @@ from typing import Dict, List, Any, Optional
 from falkordb import FalkorDB, Graph
 
 from merlt.storage.graph.config import FalkorDBConfig
+from merlt.storage.graph.schema import node_type_cypher
 
 log = structlog.get_logger()
 
@@ -359,28 +360,29 @@ class FalkorDBClient:
         numero_articolo = match.group(1)
 
         # Query both outgoing and incoming relationships
-        cypher = """
-            MATCH (n:Norma {numero_articolo: $numero})
+        # `node_label` is what the node reads as: its first label that is not Entity.
+        cypher = f"""
+            MATCH (n:Norma {{numero_articolo: $numero}})
             OPTIONAL MATCH (n)-[r_out]->(m_out)
             WHERE m_out IS NOT NULL
-            WITH n, collect(DISTINCT {
+            WITH n, collect(DISTINCT {{
                 direction: 'outgoing',
                 rel_type: type(r_out),
-                node_label: labels(m_out)[0],
+                node_label: {node_type_cypher('m_out')},
                 node_urn: m_out.URN,
                 node_nome: m_out.nome,
                 node_estremi: m_out.estremi
-            }) AS outgoing
+            }}) AS outgoing
             OPTIONAL MATCH (m_in)-[r_in]->(n)
             WHERE m_in IS NOT NULL
-            WITH n, outgoing, collect(DISTINCT {
+            WITH n, outgoing, collect(DISTINCT {{
                 direction: 'incoming',
                 rel_type: type(r_in),
-                node_label: labels(m_in)[0],
+                node_label: {node_type_cypher('m_in')},
                 node_urn: m_in.URN,
                 node_nome: m_in.nome,
                 node_estremi: m_in.estremi
-            }) AS incoming
+            }}) AS incoming
             RETURN outgoing + incoming AS related_nodes
             LIMIT 1
         """

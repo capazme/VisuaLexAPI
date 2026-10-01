@@ -101,7 +101,7 @@ from merlt.storage.graph.relation_endpoints import (
     norm_key_candidates,
     wrapped_norm_key,
 )
-from merlt.storage.graph.schema import canonical_urn, community_rel_to_graph, stub_properties
+from merlt.storage.graph.schema import canonical_urn, community_rel_to_graph, node_type_cypher, stub_properties
 from merlt.rlcf.domain_authority import (
     get_user_authority_for_vote,
     recalculate_authorities_after_consensus,
@@ -3198,11 +3198,11 @@ async def report_issue(
                 else:
                     # Query per trovare il nodo nel grafo (entita' gia' approvate)
                     # In FalkorDB la proprieta' identificativa e' "node_id"
-                    cypher = """
+                    cypher = f"""
                         MATCH (n)
                         WHERE n.node_id = $entity_id
                         RETURN n.node_id as entity_id,
-                               labels(n)[0] as entity_type,
+                               {node_type_cypher('n')} as entity_type,
                                n.domain as domain,
                                n.ambito as ambito
                         LIMIT 1
@@ -3374,11 +3374,11 @@ async def vote_issue(
             graph_client = FalkorDBClient()
             await graph_client.connect()
 
-            cypher = """
+            cypher = f"""
                 MATCH (n)
                 WHERE n.node_id = $entity_id
                 RETURN n.node_id as entity_id,
-                       labels(n)[0] as entity_type,
+                       {node_type_cypher('n')} as entity_type,
                        n.domain as domain,
                        n.ambito as ambito,
                        n.nome as nome,
@@ -3690,11 +3690,11 @@ async def fetch_entity_details_from_graph(
     """
     try:
         # Prima prova come nodo
-        node_query = """
+        node_query = f"""
             MATCH (n)
             WHERE n.node_id = $entity_id
             RETURN
-                labels(n)[0] as node_type,
+                {node_type_cypher('n')} as node_type,
                 n.nome as nome,
                 n.label as label,
                 n.node_id as node_id,
@@ -3801,16 +3801,16 @@ async def fetch_entity_details_from_graph(
 
                 # Query per trovare i dettagli di source e target
                 # Prova sia con node_id che con url/urn
-                rel_query = """
+                rel_query = f"""
                     MATCH (s), (t)
                     WHERE (s.node_id = $source_id OR s.url = $source_id OR s.urn = $source_id)
                       AND (t.node_id = $target_id OR t.url = $target_id OR t.urn = $target_id)
                     RETURN
-                        labels(s)[0] as source_type,
+                        {node_type_cypher('s')} as source_type,
                         s.nome as source_nome,
                         s.label as source_label,
                         s.node_id as source_node_id,
-                        labels(t)[0] as target_type,
+                        {node_type_cypher('t')} as target_type,
                         t.nome as target_nome,
                         t.label as target_label,
                         t.node_id as target_node_id

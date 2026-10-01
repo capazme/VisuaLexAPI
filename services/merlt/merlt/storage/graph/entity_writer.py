@@ -9,7 +9,8 @@ Deduplication Strategy:
 2. **Peer-Reviewed**: Community validates no duplicates (via votes)
 
 Entity Node Schema:
-    (:Entity:{EntityType} {
+    (:Entity:{Label} {      # the schema label of its kind (`schema.ENTITY_LABEL_BY_TYPE`);
+                            # `:Entity` alone for a kind that has none
         id: "principio:legittima_difesa",
         nome: "Legittima difesa",
         tipo: "principio",
@@ -60,7 +61,7 @@ from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.relation_endpoints import wrapped_norm_key
-from merlt.storage.graph.schema import Provenance, Rel, SEED_TWIN, canonical_urn, stub_properties
+from merlt.storage.graph.schema import Label, Provenance, Rel, SEED_TWIN, canonical_urn, entity_label, stub_properties
 from merlt.storage.enrichment.models import PendingEntity, PendingRelation
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 
@@ -391,7 +392,8 @@ class EntityGraphWriter:
         """
         Create new Entity node in graph.
 
-        Node Labels: :Entity:{EntityType}
+        Node Labels: :Entity:{Label of its kind} (`schema.ENTITY_LABEL_BY_TYPE`), or
+            :Entity alone when the type has no label in the schema
         Node ID: {tipo}:{normalized_nome}
 
         Properties:
@@ -409,8 +411,12 @@ class EntityGraphWriter:
         normalized = self._normalize_nome(entity.entity_text)
         node_id = f"{entity.entity_type}:{normalized}"
 
-        # Entity type for label (capitalize first letter)
-        entity_label = entity.entity_type.capitalize()
+        # The labels of the node: Entity, then the schema label of its kind. The old
+        # `entity_type.capitalize()` made labels the schema does not have (`Concetto`,
+        # `Principio`, `Soggetto_giuridico`) for 19 of the 29 types, so the readers, which
+        # look for ConcettoGiuridico and PrincipioGiuridico, never met a community node.
+        kind = entity_label(entity.entity_type)
+        node_labels = Label.ENTITY.value + (f":{kind.value}" if kind else "")
 
         # Provenance / trust (Loop β, task B.1): entities written here have
         # already cleared community consensus, so they carry the highest trust.
@@ -421,9 +427,10 @@ class EntityGraphWriter:
         trust = 1.0
 
         # Cypher query with parameterized label (workaround: use format)
-        # FalkorDB doesn't support parameterized labels, must use string format
+        # FalkorDB doesn't support parameterized labels, must use string format; the
+        # labels come from the schema's map, never from the proposal's text.
         query = f"""
-        CREATE (e:Entity:{entity_label} {{
+        CREATE (e:{node_labels} {{
             id: $id,
             nome: $nome,
             tipo: $tipo,
@@ -464,7 +471,7 @@ class EntityGraphWriter:
         if not result or len(result) == 0:
             raise RuntimeError(f"Failed to create entity node: {node_id}")
 
-        log.debug("Created entity node", node_id=node_id, label=entity_label)
+        log.debug("Created entity node", node_id=node_id, labels=node_labels)
         return node_id
 
     async def _enrich_existing_entity(self, existing_id: str, entity: PendingEntity) -> None:

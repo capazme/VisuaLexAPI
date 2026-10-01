@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from merlt.storage.graph.schema import node_type_cypher
 from merlt.api.graph_router import (
     _build_label_search_cypher,
     _edge_properties,
@@ -167,8 +168,10 @@ async def test_subgraph_filters_compiled_into_cypher():
     assert "type(r) IN $allowed_rels" in cypher
     assert params["allowed_rels"] == ["DISCIPLINA", "ESPRIME_PRINCIPIO"]
     # Entity types stay case-insensitive: the labels are not normalized
-    assert "toLower(labels(connected)[0]) IN $allowed_types" in cypher
-    assert "toLower(labels(connected)[0]) = 'norma'" in cypher  # Norma carve-out
+    # a node's type is its first label that is not Entity (a community node is :Entity:<Label>)
+    connected_type = node_type_cypher("connected")
+    assert f"toLower({connected_type}) IN $allowed_types" in cypher
+    assert f"toLower({connected_type}) = 'norma'" in cypher  # Norma carve-out
     assert params["allowed_types"] == ["concettogiuridico"]
     # Ranked deterministic truncation: ORDER BY must precede LIMIT
     assert "ORDER BY hop ASC, COALESCE(r.certezza, 0.5) DESC" in cypher

@@ -138,3 +138,19 @@ def test_every_fonte_in_cypher_is_canonical():
 
 def test_every_provenance_in_cypher_is_canonical():
     _check("provenance", {p.value for p in Provenance}, set())
+
+
+# `labels(n)[0]` as a node's type is "Entity" for a community entity (`:Entity:<Label>`, and
+# FalkorDB orders a node's labels by label id): a type is read with `schema.node_type_cypher`.
+FIRST_LABEL_RE = re.compile(r"labels\(\w+\)\[0\]")
+
+
+def test_no_cypher_reads_a_nodes_type_as_its_first_label():
+    offenders = {}
+    for path in sorted(ROOT.rglob("*.py")):
+        if path in EXEMPT:
+            continue
+        for line, text in _units(ast.parse(path.read_text(encoding="utf-8"))):
+            if FIRST_LABEL_RE.search(text):
+                offenders.setdefault(str(path.relative_to(ROOT)), []).append(line)
+    assert not offenders, f"read a node's type with schema.node_type_cypher: {offenders}"

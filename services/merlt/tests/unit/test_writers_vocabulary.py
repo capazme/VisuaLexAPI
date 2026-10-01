@@ -397,3 +397,57 @@ async def test_the_stub_of_a_bare_urn_is_keyed_by_its_normattiva_url():
     assert params["article_urn"] == CC
     assert params["stub"]["URN"] == CC and params["stub"]["node_id"] == CC
     assert params["stub"]["estremi"] == "Art. 1322 c.c."
+
+
+# A new community entity carries a label of the schema -----------------------------------------
+
+
+def _proposal(entity_type, nome="Buona fede"):
+    return SimpleNamespace(
+        entity_type=entity_type, entity_text=nome, descrizione="d", ambito="civile", approval_score=2.5,
+        votes_count=3, article_urn=CC, contributed_by="u1", contributor_authority=0.5,
+    )
+
+
+@pytest.mark.parametrize("entity_type, written_as", [
+    ("principio", "(e:Entity:PrincipioGiuridico {"),
+    ("concetto", "(e:Entity:ConcettoGiuridico {"),
+    ("definizione", "(e:Entity:DefinizioneLegale {"),
+    ("definizione_legale", "(e:Entity:DefinizioneLegale {"),
+    ("soggetto_giuridico", "(e:Entity:SoggettoGiuridico {"),
+    ("precedente", "(e:Entity:AttoGiudiziario {"),
+    ("ruolo_giuridico", "(e:Entity:Ruolo {"),
+    ("brocardo", "(e:Entity:LocuzioneLatina {"),
+    ("sanzione", "(e:Entity:Sanzione {"),
+])
+async def test_a_new_community_entity_is_written_with_the_label_of_its_kind(entity_type, written_as):
+    # `entity_type.capitalize()` made `:Concetto`, `:Principio`, `:Soggetto_giuridico`...: labels the
+    # readers do not know, so a community principle was never a PrincipioGiuridico to them.
+    writer, client = _writer()
+    await writer._create_new_entity_node(_proposal(entity_type))
+    cypher, params = client.query.await_args.args
+    assert f"CREATE {written_as}" in cypher
+    assert params["tipo"] == entity_type  # the community's own word stays a property
+
+
+@pytest.mark.parametrize("entity_type", ["norma", "versione", "direttiva_ue", "organo", "regola", "comma"])
+async def test_a_new_community_entity_of_a_kind_with_no_schema_label_is_only_an_entity(entity_type):
+    writer, client = _writer()
+    await writer._create_new_entity_node(_proposal(entity_type))
+    cypher, _ = client.query.await_args.args
+    assert "CREATE (e:Entity {" in cypher
+    assert f":Entity:{entity_type.capitalize()}" not in cypher
+
+
+async def test_every_label_a_community_entity_is_written_with_is_a_label_of_the_schema():
+    import re
+
+    from merlt.pipeline.enrichment.models import EntityType
+    from merlt.storage.graph.schema import Label
+
+    known = {label.value for label in Label}
+    for entity_type in EntityType:
+        writer, client = _writer()
+        await writer._create_new_entity_node(_proposal(entity_type.value))
+        labels = re.search(r"CREATE \(e((?::\w+)+) \{", client.query.await_args.args[0]).group(1).split(":")[1:]
+        assert labels[0] == "Entity" and set(labels) <= known, (entity_type, labels)

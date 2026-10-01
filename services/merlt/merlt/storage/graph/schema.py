@@ -56,7 +56,7 @@ class Label(_Vocab):
     TERMINE = "Termine"
     SANZIONE = "Sanzione"
     RESPONSABILITA = "Responsabilita"
-    ENTITY = "Entity"  # a community entity, written as :Entity:<Tipo>
+    ENTITY = "Entity"  # a community entity, written as :Entity:<Label> (ENTITY_LABEL_BY_TYPE)
     LIVE_SOURCE = "LiveSource"  # a source the co-evolution retrieved live
 
 
@@ -473,3 +473,76 @@ SEED_TWIN: dict[str, tuple[Label, str]] = {
     "definizione_legale": (Label.DEFINIZIONE_LEGALE, "definizione"),
     "soggetto_giuridico": (Label.SOGGETTO_GIURIDICO, "soggetto"),
 }
+
+# A community entity type (`pipeline/enrichment/models.EntityType`, by value) → the schema
+# label its node carries next to `Entity`, so that it is written `:Entity:<Label>` and reads
+# as what it is: the seed's concept, principle, ruling... A type with no label of the schema
+# is `:Entity` alone, and that includes the structural types, whose labels belong to the
+# ingestion writers (a `:Comma` is a part of an article with a URN, a `:Norma` an article or
+# an act). Every EntityType value has a line here (`tests/unit/test_graph_schema.py`).
+ENTITY_LABEL_BY_TYPE: dict[str, Optional[Label]] = {
+    # normative sources and the textual structure
+    "norma": None,
+    "versione": None,
+    "direttiva_ue": None,
+    "regolamento_ue": None,
+    "comma": None,
+    "lettera": None,
+    "numero": None,
+    "definizione": Label.DEFINIZIONE_LEGALE,
+    "definizione_legale": Label.DEFINIZIONE_LEGALE,
+    # case law and doctrine
+    "atto_giudiziario": Label.ATTO_GIUDIZIARIO,
+    "caso": Label.CASO,
+    "dottrina": Label.DOTTRINA,
+    "precedente": Label.ATTO_GIUDIZIARIO,
+    "brocardo": Label.LOCUZIONE_LATINA,
+    # subjects and roles
+    "soggetto_giuridico": Label.SOGGETTO_GIURIDICO,
+    "ruolo_giuridico": Label.RUOLO,
+    "organo": None,
+    # legal concepts
+    "concetto": Label.CONCETTO_GIURIDICO,
+    "principio": Label.PRINCIPIO_GIURIDICO,
+    "diritto_soggettivo": None,
+    "interesse_legittimo": None,
+    "responsabilita": Label.RESPONSABILITA,
+    # dynamics
+    "fatto_giuridico": Label.FATTO_GIURIDICO,
+    "procedura": Label.PROCEDURA,
+    "sanzione": Label.SANZIONE,
+    "termine": Label.TERMINE,
+    # logic and reasoning
+    "regola": None,
+    "proposizione": None,
+    "modalita_giuridica": Label.MODALITA_GIURIDICA,
+}
+
+
+def entity_label(entity_type: str) -> Optional[Label]:
+    """The schema label a new community entity of this type is written with next to
+    `Entity`; None for a type that has none (it is written `:Entity` alone)."""
+    return ENTITY_LABEL_BY_TYPE.get(entity_type)
+
+
+def node_type_from_labels(labels: Optional[Iterable[str]], default: Optional[str] = None) -> Optional[str]:
+    """What a node reads as: its first label that is not `Entity`; `Entity` when that is
+    all it carries; `default` when it has no label.
+
+    FalkorDB orders a node's labels by label id, so `labels[0]` of a community entity
+    (`:Entity:PrincipioGiuridico`) is `Entity` on a graph where that label came first, and
+    the experts that look for a principle or a ruling by its type drop the node."""
+    names = [name for name in (labels or []) if isinstance(name, str)]
+    for name in names:
+        if name != Label.ENTITY.value:
+            return name
+    return names[0] if names else default
+
+
+def node_type_cypher(variable: str) -> str:
+    """The Cypher expression for `node_type_from_labels` on the node bound to `variable`:
+    its first label that is not `Entity`, else the first it has (null without labels).
+    `variable` is a name the calling code wrote, never a tool argument."""
+    return (
+        f"coalesce([lbl IN labels({variable}) WHERE lbl <> '{Label.ENTITY.value}'][0], labels({variable})[0])"
+    )

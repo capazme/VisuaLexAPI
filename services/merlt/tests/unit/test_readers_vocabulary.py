@@ -598,6 +598,7 @@ async def test_principle_text_search_reads_testo_before_testo_vigente():
 
 
 async def test_the_hierarchy_tells_partitions_apart_by_tipo_documento():
+    from merlt.storage.graph.schema import node_type_cypher
     from merlt.tools.hierarchy import HierarchyNavigationTool
 
     graph = _GraphRecorder()
@@ -607,14 +608,17 @@ async def test_the_hierarchy_tells_partitions_apart_by_tipo_documento():
     await tool._get_descendants(CC, 1, False, None)
     await tool._get_siblings(CC, False, ["sezione"])
     start, ancestors, descendants, siblings = (_squashed(cypher) for cypher in graph.cyphers)
-    assert "coalesce(n.tipo_documento, labels(n)[0]) AS tipo" in start
-    assert "coalesce(n.tipo_documento, labels(n)[0]) AS tipo" in ancestors
-    assert "coalesce(n.tipo_documento, labels(n)[0]) AS tipo" in descendants
-    assert "coalesce(sibling.tipo_documento, labels(sibling)[0]) AS tipo" in siblings
-    assert "AND coalesce(n.tipo_documento, labels(n)[0]) IN $tipi" in ancestors
-    assert "AND coalesce(sibling.tipo_documento, labels(sibling)[0]) IN $tipi" in siblings
+    # a partition's type is its tipo_documento; a node without one reads as its type (the first
+    # label that is not Entity), never as `labels(n)[0]`
+    of_n, of_sibling = node_type_cypher("n"), node_type_cypher("sibling")
+    assert f"coalesce(n.tipo_documento, {of_n}) AS tipo" in start
+    assert f"coalesce(n.tipo_documento, {of_n}) AS tipo" in ancestors
+    assert f"coalesce(n.tipo_documento, {of_n}) AS tipo" in descendants
+    assert f"coalesce(sibling.tipo_documento, {of_sibling}) AS tipo" in siblings
+    assert f"AND coalesce(n.tipo_documento, {of_n}) IN $tipi" in ancestors
+    assert f"AND coalesce(sibling.tipo_documento, {of_sibling}) IN $tipi" in siblings
     assert graph.params[1]["tipi"] == ["Capo", "capo", "articolo"]  # as given and in lower case
-    assert "labels(n)[0] AS tipo" not in ancestors.replace("coalesce(n.tipo_documento, labels(n)[0]) AS tipo", "")
+    assert "labels(n)[0] AS tipo" not in ancestors.replace(f"coalesce(n.tipo_documento, {of_n}) AS tipo", "")
 
 
 def test_the_hierarchy_examples_are_real_types():
@@ -675,6 +679,47 @@ async def test_an_article_nothing_modifies_is_checked_without_a_modification_que
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.modification_count) == ("vigente", 0)
     assert not any("type(r) AS event_type" in cypher for cypher in graph.cyphers)
+
+
+# A community node is `:Entity:<Label>`: it reads as the label, whichever label comes first ----------
+
+
+def _labelled_node(*labels, **props):
+    """A record the way FalkorDBClient hands a node over, with its labels in the order given."""
+    return {"node": {"properties": props, "labels": list(labels)}}
+
+
+@pytest.mark.parametrize("labels", [["Entity", "PrincipioGiuridico"], ["PrincipioGiuridico", "Entity"]])
+def test_a_community_node_reads_as_its_label_whichever_comes_first(labels):
+    # FalkorDB orders a node's labels by label id, so `labels[0]` of a node written
+    # `:Entity:PrincipioGiuridico` is "Entity" on a graph where Entity came first.
+    node = {"properties": {"id": "principio:buona_fede"}, "labels": labels}
+    assert GraphSearchTool(graph_db=None)._node_to_dict(node)["type"] == "PrincipioGiuridico"
+
+
+def test_a_node_with_no_label_but_entity_is_an_entity_and_one_with_none_is_unknown():
+    tool = GraphSearchTool(graph_db=None)
+    assert tool._node_to_dict({"properties": {}, "labels": ["Entity"]})["type"] == "Entity"
+    assert tool._node_to_dict({"properties": {}, "labels": []})["type"] == "Unknown"
+
+
+async def test_the_principles_expert_keeps_a_principle_the_community_wrote():
+    graph = _GraphRecorder(rows=[
+        _labelled_node("Entity", "PrincipioGiuridico", id="principio:buona_fede", descrizione="Le parti agiscono secondo buona fede."),
+    ])
+    expert = PrinciplesExpert(tools=[SemanticSearchTool(), GraphSearchTool(graph_db=graph)])
+    found = await expert._search_principles(_context(CC))
+    assert [p["text"] for p in found if p["source"] == "principle_graph"] == ["Le parti agiscono secondo buona fede."]
+
+
+async def test_the_precedent_expert_keeps_a_ruling_the_community_wrote():
+    graph = _GraphRecorder(rows=[
+        _labelled_node("Entity", "AttoGiudiziario", id="atto_giudiziario:x", massima="Una massima.", organo_emittente="Cass. civ."),
+    ])
+    expert = PrecedentExpert(tools=[SemanticSearchTool(), GraphSearchTool(graph_db=graph)])
+    found = await expert._search_jurisprudence(_context(CC))
+    cases = [entry for entry in found if entry["source"] == "jurisprudence_graph"]
+    assert [(c["text"], c["court"]) for c in cases] == [("Una massima.", "Cass. civ.")]
 
 
 # The policy and the static weights speak the schema ---------------------------------

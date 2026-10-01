@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from merlt.pipeline.enrichment.models import RelationType
+from merlt.pipeline.enrichment.models import EntityType, RelationType
 from merlt.storage.graph import schema as s
 
 CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043"
@@ -197,6 +197,72 @@ def test_node_text_reads_every_writers_property():
 def test_seed_twins_by_entity_type():
     assert s.SEED_TWIN["concetto"] == (s.Label.CONCETTO_GIURIDICO, "concetto")
     assert s.SEED_TWIN["soggetto_giuridico"] == (s.Label.SOGGETTO_GIURIDICO, "soggetto")
+
+
+# A community entity is written `:Entity:<Label>` -------------------------------------------
+
+
+def test_every_entity_type_is_mapped_to_a_schema_label_or_to_none():
+    # A type added to EntityType without a line in the map fails here, not in the graph.
+    assert set(s.ENTITY_LABEL_BY_TYPE) == {entity_type.value for entity_type in EntityType}
+    assert all(label is None or isinstance(label, s.Label) for label in s.ENTITY_LABEL_BY_TYPE.values())
+
+
+@pytest.mark.parametrize("entity_type, label", [
+    ("concetto", "ConcettoGiuridico"), ("principio", "PrincipioGiuridico"),
+    ("definizione", "DefinizioneLegale"), ("definizione_legale", "DefinizioneLegale"),
+    ("soggetto_giuridico", "SoggettoGiuridico"), ("atto_giudiziario", "AttoGiudiziario"),
+    ("precedente", "AttoGiudiziario"), ("dottrina", "Dottrina"), ("fatto_giuridico", "FattoGiuridico"),
+    ("procedura", "Procedura"), ("sanzione", "Sanzione"), ("termine", "Termine"),
+    ("responsabilita", "Responsabilita"), ("modalita_giuridica", "ModalitaGiuridica"),
+    ("ruolo_giuridico", "Ruolo"), ("caso", "Caso"), ("brocardo", "LocuzioneLatina"),
+])
+def test_a_community_entity_type_takes_the_label_the_seed_gives_its_kind(entity_type, label):
+    assert s.entity_label(entity_type).value == label
+
+
+@pytest.mark.parametrize("entity_type", [
+    "norma", "versione", "direttiva_ue", "regolamento_ue", "organo", "regola", "proposizione",
+    "diritto_soggettivo", "interesse_legittimo",
+    # the structural labels belong to the ingestion writers: a Comma is a part of an article with a URN
+    "comma", "lettera", "numero",
+])
+def test_a_type_with_no_seed_label_is_an_entity_and_nothing_else(entity_type):
+    assert s.entity_label(entity_type) is None
+
+
+def test_a_type_nobody_mapped_is_an_entity_and_nothing_else():
+    assert s.entity_label("tipo_inventato") is None
+
+
+def test_a_seed_twin_has_the_label_a_new_entity_of_its_type_gets():
+    for entity_type, (label, _prefix) in s.SEED_TWIN.items():
+        assert s.entity_label(entity_type) is label, entity_type
+
+
+@pytest.mark.parametrize("labels, type_", [
+    (["Entity", "PrincipioGiuridico"], "PrincipioGiuridico"),  # FalkorDB orders labels by label id: Entity may come first
+    (["PrincipioGiuridico", "Entity"], "PrincipioGiuridico"),
+    (["Entity", "AttoGiudiziario"], "AttoGiudiziario"),
+    (["Entity"], "Entity"),
+    (["Norma"], "Norma"),
+    (["LiveSource", "Norma"], "LiveSource"),
+    ([], None),
+    (None, None),
+])
+def test_a_node_reads_as_its_first_label_that_is_not_entity(labels, type_):
+    assert s.node_type_from_labels(labels) == type_
+
+
+def test_a_node_without_labels_reads_as_the_default():
+    assert s.node_type_from_labels([], "Unknown") == "Unknown"
+
+
+def test_the_cypher_for_a_nodes_type_asks_the_same_question():
+    cypher = s.node_type_cypher("n")
+    assert "labels(n)" in cypher and "<> 'Entity'" in cypher
+    assert cypher.count("labels(") == 2  # the first that is not Entity, else the first there is
+    assert s.node_type_cypher("sibling").count("labels(sibling)") == 2
 
 
 def test_vocabulary_members_render_as_their_values():

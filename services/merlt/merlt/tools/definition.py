@@ -22,7 +22,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import Label, cypher_labels
+from merlt.storage.graph.schema import Label, cypher_labels, node_type_cypher
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int, label_filter
 
 log = structlog.get_logger()
@@ -332,7 +332,7 @@ class DefinitionLookupTool(BaseTool):
             RETURN
                 concept.nome AS term,
                 coalesce(source.URN, source.node_id) AS source_urn,
-                labels(source)[0] AS source_type,
+                {node_type_cypher('source')} AS source_type,
                 source.estremi AS source_estremi,
                 coalesce(concept.definizione, concept.descrizione) AS definition_text,
                 coalesce(source.testo, source.testo_vigente) AS context
@@ -452,7 +452,7 @@ class DefinitionLookupTool(BaseTool):
               )
             RETURN
                 coalesce(n.URN, n.node_id) AS source_urn,
-                labels(n)[0] AS source_type,
+                {node_type_cypher('n')} AS source_type,
                 n.estremi AS source_estremi,
                 coalesce(n.testo, n.testo_vigente) AS definition_text
             LIMIT {limit}

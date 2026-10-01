@@ -276,5 +276,11 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   (`cypher_rel_names`, `cypher_labels`) or as a number clamped by
   `tools/base.bounded_int`; every other value is a parameter. A filter that comes
   out empty returns an empty result, never an unfiltered query.
+- A community entity is written `:Entity:<Label>`, the label of its kind from
+  `schema.ENTITY_LABEL_BY_TYPE` (`:Entity` alone when the type has none). FalkorDB
+  orders a node's labels by label id, so `labels(n)[0]` can be `Entity`: a node's
+  type is read with `schema.node_type_from_labels` (Python) or
+  `schema.node_type_cypher` (Cypher), the first label that is not `Entity`. A
+  contract test fails on `labels(x)[0]` in Cypher.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.

@@ -27,7 +27,7 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from merlt.storage.graph.schema import canonical_urn
+from merlt.storage.graph.schema import canonical_urn, node_type_cypher
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
@@ -317,7 +317,7 @@ class HierarchyNavigationTool(BaseTool):
         - Numero articolo (es. "1453")
         """
         identifier = canonical_urn(identifier)  # the graph's key has no version marker
-        cypher = """
+        cypher = f"""
             MATCH (n)
             WHERE n.URN = $id
                OR n.estremi = $id
@@ -325,7 +325,7 @@ class HierarchyNavigationTool(BaseTool):
                OR n.nome = $id
             RETURN
                 n.URN AS urn,
-                coalesce(n.tipo_documento, labels(n)[0]) AS tipo,
+                coalesce(n.tipo_documento, {node_type_cypher('n')}) AS tipo,
                 n.estremi AS estremi,
                 n.rubrica AS rubrica,
                 n.numero_articolo AS numero
@@ -364,7 +364,7 @@ class HierarchyNavigationTool(BaseTool):
         params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_where = "AND coalesce(n.tipo_documento, labels(n)[0]) IN $tipi"
+            tipo_where = f"AND coalesce(n.tipo_documento, {node_type_cypher('n')}) IN $tipi"
             params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
@@ -372,7 +372,7 @@ class HierarchyNavigationTool(BaseTool):
             WHERE start.URN = $urn {tipo_where}
             RETURN
                 n.URN AS urn,
-                coalesce(n.tipo_documento, labels(n)[0]) AS tipo,
+                coalesce(n.tipo_documento, {node_type_cypher('n')}) AS tipo,
                 n.estremi AS estremi,
                 n.rubrica AS rubrica,
                 length(path) AS depth
@@ -414,7 +414,7 @@ class HierarchyNavigationTool(BaseTool):
         params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_where = "AND coalesce(n.tipo_documento, labels(n)[0]) IN $tipi"
+            tipo_where = f"AND coalesce(n.tipo_documento, {node_type_cypher('n')}) IN $tipi"
             params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
@@ -422,7 +422,7 @@ class HierarchyNavigationTool(BaseTool):
             WHERE start.URN = $urn {tipo_where}
             RETURN
                 n.URN AS urn,
-                coalesce(n.tipo_documento, labels(n)[0]) AS tipo,
+                coalesce(n.tipo_documento, {node_type_cypher('n')}) AS tipo,
                 n.estremi AS estremi,
                 n.rubrica AS rubrica,
                 n.numero_articolo AS order_num,
@@ -462,7 +462,7 @@ class HierarchyNavigationTool(BaseTool):
         params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_where = "AND coalesce(sibling.tipo_documento, labels(sibling)[0]) IN $tipi"
+            tipo_where = f"AND coalesce(sibling.tipo_documento, {node_type_cypher('sibling')}) IN $tipi"
             params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
@@ -473,7 +473,7 @@ class HierarchyNavigationTool(BaseTool):
             WHERE sibling.URN <> $urn {tipo_where}
             RETURN
                 sibling.URN AS urn,
-                coalesce(sibling.tipo_documento, labels(sibling)[0]) AS tipo,
+                coalesce(sibling.tipo_documento, {node_type_cypher('sibling')}) AS tipo,
                 sibling.estremi AS estremi,
                 sibling.rubrica AS rubrica,
                 sibling.numero_articolo AS order_num

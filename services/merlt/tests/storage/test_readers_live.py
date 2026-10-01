@@ -77,7 +77,9 @@ async def _seed(client):
     concepts, principles, massime and doctrine keyed by node_id only; the seed's definitions
     (`Norma -[DEFINISCE]-> DefinizioneLegale {node_id, nome, descrizione}`, never to a
     ConcettoGiuridico) and one community definition that carries the old `:Entity:Definizione`
-    labels."""
+    labels; and the community's entities, as the entity writer leaves them: a principle and a
+    ruling written `:Entity:<Label>` (Entity first), and a seed concept the community adopted
+    (`:ConcettoGiuridico:Entity`, the domain label first)."""
     await client.query(
         """
         CREATE (cod:Norma {URN: 'urn:test:cod', node_id: 'urn:test:cod', estremi: 'Codice civile', tipo_documento: 'codice'})
@@ -116,6 +118,13 @@ async def _seed(client):
         CREATE (att)-[:INTERPRETA]->(a1)
         CREATE (dot:Dottrina {node_id: 'dottrina:1', descrizione: 'Una nota di dottrina.'})
         CREATE (dot)-[:COMMENTA]->(a1)
+        CREATE (cp:Entity:PrincipioGiuridico {id: 'principio:lealta', nome: 'lealta', descrizione: 'Chi agisce lo fa con lealta.', livello: 'generale'})
+        CREATE (a1)-[:ESPRIME_PRINCIPIO]->(cp)
+        CREATE (cm:Entity:AttoGiudiziario {id: 'atto_giudiziario:trib', nome: 'trib', massima: 'Una massima della community.', organo_emittente: 'Trib. Milano'})
+        CREATE (cm)-[:INTERPRETA]->(a1)
+        CREATE (tw:ConcettoGiuridico:Entity {node_id: 'concetto:lealta', id: 'concetto:lealta', nome: 'Lealta', descrizione: 'Un concetto del seed adottato dalla community.'})
+        CREATE (a1)-[:DISCIPLINA]->(tw)
+        CREATE (tw)-[:CORRELATO]->(cp)
         """,
         {"art1": ART1, "art2": ART2, "art3": ART3, "art4": ART4, "art5": ART5, "text1": TEXT1},
     )
@@ -334,11 +343,16 @@ async def test_the_experts_read_the_text_of_what_they_walk_to(graph):
 
     principles = PrinciplesExpert(tools=[SemanticSearchTool(), GraphSearchTool(graph_db=graph)])
     found = await principles._search_principles(_context(ART1))
-    assert [p["text"] for p in found if p["source"] == "principle_graph"] == ["Le parti agiscono con lealta."]
+    # the seed's principle and the one the community wrote (`:Entity:PrincipioGiuridico`)
+    assert {p["text"] for p in found if p["source"] == "principle_graph"} == {
+        "Le parti agiscono con lealta.", "Chi agisce lo fa con lealta.",
+    }
 
     precedent = PrecedentExpert(tools=[SemanticSearchTool(), GraphSearchTool(graph_db=graph)])
     cases = await precedent._search_jurisprudence(_context(ART1))
-    assert [(c["text"], c["court"]) for c in cases if c["source"] == "jurisprudence_graph"] == [("Una massima.", "Cass. civ.")]
+    assert {(c["text"], c["court"]) for c in cases if c["source"] == "jurisprudence_graph"} == {
+        ("Una massima.", "Cass. civ."), ("Una massima della community.", "Trib. Milano"),
+    }
 
 
 async def test_the_systemic_walk_reads_a_massimas_text(graph, monkeypatch):
@@ -352,6 +366,66 @@ async def test_the_systemic_walk_reads_a_massimas_text(graph, monkeypatch):
     finally:
         systemic._reset_neural_traversal_flag_for_tests()
     assert {"Una massima.", TEXT1, "Modificato dal rinvio."} <= {e["text"] for e in expanded}
+
+
+# a community node reads as its domain type --------------------------------------------------
+
+
+async def test_a_community_node_reads_as_its_domain_type_in_every_reader(graph):
+    labels = {
+        row["id"]: row["labels"] for row in await graph.query(
+            "MATCH (n) WHERE n.id IN ['principio:lealta', 'atto_giudiziario:trib', 'concetto:lealta'] "
+            "RETURN n.id AS id, labels(n) AS labels", {},
+        )
+    }
+    # what makes the checks below mean something: the community's nodes carry Entity first, an
+    # adopted seed concept last (FalkorDB orders a node's labels by label id)
+    assert labels["principio:lealta"][0] == "Entity" and labels["atto_giudiziario:trib"][0] == "Entity"
+    assert labels["concetto:lealta"][-1] == "Entity"
+
+    walked = await GraphSearchTool(graph_db=graph).execute(
+        start_node=ART1, relation_types=["ESPRIME_PRINCIPIO", "INTERPRETA", "DISCIPLINA"], direction="both",
+    )
+    types = {(n["properties"].get("id") or n["properties"].get("node_id")): n["type"] for n in walked.data["nodes"]}
+    assert types["principio:lealta"] == "PrincipioGiuridico"
+    assert types["atto_giudiziario:trib"] == "AttoGiudiziario"
+    assert types["concetto:lealta"] == "ConcettoGiuridico"
+
+    verification = VerificationTool(graph_db=graph, bridge=None)
+    checked = await verification.execute(source_ids=["lealta", "Lealta"], strict_mode=False)
+    assert checked.data["verification_results"]["lealta"]["node_type"] == "PrincipioGiuridico"
+    assert checked.data["verification_results"]["Lealta"]["node_type"] == "ConcettoGiuridico"
+
+    assert (await HierarchyNavigationTool(graph_db=graph)._find_start_node("lealta"))["tipo"] == "PrincipioGiuridico"
+
+    graph_router = importlib.import_module("merlt.api.graph_router")
+    with patch("merlt.api.graph_router.FalkorDBClient", return_value=_Lent(graph)):
+        relations = await graph_router.get_article_relations(ART1, relation_type=None, api_key=None)
+        entities = await graph_router.get_article_entities(ART1, validation_status=None, api_key=None)
+        detail = await graph_router.get_node_details("concetto:lealta", api_key=None)
+    # (a community node has no URN and no node_id: the routers name it by its `nome`)
+    assert {r["target_label"]: r["target_type"] for r in relations["relations"]}["lealta"] == "PrincipioGiuridico"
+    assert {e["entity_text"]: e["entity_type"] for e in entities["entities"]}["lealta"] == "PrincipioGiuridico"
+    assert [(r["target_id"], r["target_label"]) for r in detail["relations"]] == [("principio:lealta", "PrincipioGiuridico")]
+
+    # the subgraph keeps a community node whose domain type was asked for (it read as "entity" before)
+    with patch("merlt.api.graph_router.FalkorDBClient", return_value=_Lent(graph)):
+        subgraph = await graph_router.get_subgraph(
+            root_urn=ART1, depth=1, entity_types="PrincipioGiuridico", api_key=None,
+        )
+    assert {n.id: n.type for n in subgraph.nodes}["principio:lealta"] == "PrincipioGiuridico"
+
+    # the related nodes of an article name the type of what they found
+    related = await graph.get_related_nodes_for_article(ART1)
+    assert {n["node_nome"]: n["node_label"] for n in related if n["node_nome"]}["lealta"] == "PrincipioGiuridico"
+
+    # the issue context: a node (by node_id) and a relation (source and target by node_id)
+    from merlt.api.enrichment_router import fetch_entity_details_from_graph
+
+    node = await fetch_entity_details_from_graph("concetto:lealta", graph)
+    assert node.node_type == "ConcettoGiuridico"
+    relation = await fetch_entity_details_from_graph("rel_concetto:lealta_CORRELATO_concetto:buona_fede", graph)
+    assert (relation.source_type, relation.target_type) == ("ConcettoGiuridico", "ConcettoGiuridico")
 
 
 # the routers --------------------------------------------------------------------------------

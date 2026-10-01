@@ -21,7 +21,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import cypher_labels
+from merlt.storage.graph.schema import cypher_labels, node_type_cypher
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, label_filter
 
 log = structlog.get_logger()
@@ -312,7 +312,7 @@ class VerificationTool(BaseTool):
                OR n.nome = $source_id
                OR n.estremi = $source_id
                OR n.numero_articolo = $source_id) {type_clause}
-            RETURN labels(n)[0] AS node_type, n.URN AS urn
+            RETURN {node_type_cypher('n')} AS node_type, n.URN AS urn
             LIMIT 1
         """
 
@@ -329,10 +329,10 @@ class VerificationTool(BaseTool):
             # Fallback: Try partial URN match for article numbers (a Norma: not when
             # the caller restricted the types to others)
             if (not labels or "Norma" in labels) and (source_id.startswith("art") or source_id.isdigit()):
-                cypher_article = """
+                cypher_article = f"""
                     MATCH (n:Norma)
                     WHERE n.numero_articolo = $article_num
-                    RETURN labels(n)[0] AS node_type, n.URN AS urn
+                    RETURN {node_type_cypher('n')} AS node_type, n.URN AS urn
                     LIMIT 1
                 """
                 article_num = source_id.replace("art", "").strip()

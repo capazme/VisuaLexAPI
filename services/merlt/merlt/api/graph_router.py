@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from merlt.api.auth import verify_api_key, require_role
 from merlt.experts.models import ApiKey
 from merlt.storage.graph.client import FalkorDBClient
-from merlt.storage.graph.schema import resolve_rel, resolve_rels
+from merlt.storage.graph.schema import node_type_cypher, node_type_from_labels, resolve_rel, resolve_rels
 from merlt.storage.enrichment import get_db_session_dependency, PendingEntity
 from merlt.api.models.enrichment_models import NormResolveRequest, NormResolveResponse
 from merlt.pipeline.enrichment.models import EntityType
@@ -154,16 +154,16 @@ async def get_node_details(
     await graph_client.connect()
 
     try:
-        query = """
-        MATCH (n {id: $node_id})
+        query = f"""
+        MATCH (n {{id: $node_id}})
         OPTIONAL MATCH (n)-[r]->(m)
         RETURN
             n as node,
-            collect({
+            collect({{
                 type: type(r),
                 target_id: m.id,
-                target_label: labels(m)[0]
-            }) as relations
+                target_label: {node_type_cypher('m')}
+            }}) as relations
         """
 
         result = await graph_client.query(query, {"node_id": node_id})
@@ -258,10 +258,10 @@ async def get_article_entities(
         if validation_status:
             query += " AND e.validation_status = $status"
 
-        query += """
+        query += f"""
         RETURN
             COALESCE(e.node_id, e.URN, id(e)) as entity_id,
-            labels(e)[0] as entity_type,
+            {node_type_cypher('e')} as entity_type,
             COALESCE(e.nome, e.estremi, e.titolo, e.testo_vigente) as entity_text,
             COALESCE(e.validation_status, 'approved') as validation_status,
             COALESCE(e.approval_score, 0.0) as approval_score,
@@ -382,13 +382,13 @@ async def get_article_relations(
         if relation_type:
             query += " WHERE type(r) = $relation_type"
 
-        query += """
+        query += f"""
         RETURN
             type(r) as relation_type,
             COALESCE(target.URN, target.node_id) as target_urn,
             COALESCE(target.node_id, target.URN) as target_id,
             COALESCE(target.nome, target.rubrica, target.estremi, target.titolo) as target_label,
-            labels(target)[0] as target_node_type,
+            {node_type_cypher('target')} as target_node_type,
             COALESCE(r.certezza, r.confidence, 0.5) as confidence
         ORDER BY confidence DESC, relation_type ASC
         """
@@ -1466,9 +1466,10 @@ async def get_subgraph(
             allowed_types = [t.strip().lower() for t in entity_types.split(",") if t.strip()]
             if allowed_types:
                 # Norma nodes always pass (same carve-out as the old Python filter).
+                connected_type = node_type_cypher("connected")
                 filter_clauses.append(
-                    "(toLower(labels(connected)[0]) IN $allowed_types"
-                    " OR toLower(labels(connected)[0]) = 'norma')"
+                    f"(toLower({connected_type}) IN $allowed_types"
+                    f" OR toLower({connected_type}) = 'norma')"
                 )
                 params["allowed_types"] = allowed_types
         where_filter = ("WHERE " + " AND ".join(filter_clauses)) if filter_clauses else ""
@@ -1985,8 +1986,7 @@ async def search_graph(
                         if n_internal_id not in seen_node_ids and n_urn:
                             # Apply entity_type filter if specified
                             if request.filters and request.filters.entity_types:
-                                node_labels = n_data.get("labels", [])
-                                entity_type = node_labels[0] if node_labels else ""
+                                entity_type = node_type_from_labels(n_data.get("labels", []), "")
                                 if entity_type.lower() not in [t.lower() for t in request.filters.entity_types]:
                                     # Check if it's a Norma node (always include)
                                     if entity_type != "Norma" and entity_type != "Article":
@@ -2007,8 +2007,7 @@ async def search_graph(
                         if conn_internal_id not in seen_node_ids and conn_urn:
                             # Apply entity_type filter
                             if request.filters and request.filters.entity_types:
-                                conn_labels = conn_data.get("labels", [])
-                                entity_type = conn_labels[0] if conn_labels else ""
+                                entity_type = node_type_from_labels(conn_data.get("labels", []), "")
                                 if entity_type.lower() not in [t.lower() for t in request.filters.entity_types]:
                                     if entity_type != "Norma" and entity_type != "Article":
                                         continue
@@ -2106,8 +2105,8 @@ def _parse_graph_node_v2(node_data: Dict[str, Any], include_metadata: bool) -> S
         or str(node_data.get("id", ""))
     )
 
-    # Get node type from labels
-    node_type = labels[0] if labels else "Unknown"
+    # Get node type from labels (the first that is not Entity: a community node is :Entity:<Label>)
+    node_type = node_type_from_labels(labels, "Unknown")
 
     # Get display label (A1: nome→estremi→rubrica→titolo→Norma synth→
     # numero_articolo→testo→URN-derived "Art. N"→id, never the raw URL).
@@ -2150,13 +2149,10 @@ def _parse_graph_node(node_data: Dict[str, Any], include_metadata: bool) -> Subg
         or str(hash(str(node_data)))[:12]
     )
 
-    # Get node type from labels
+    # Get node type from labels: the first that is not Entity (a community node is
+    # :Entity:<Label>, and which label comes first depends on the graph)
     labels = node_data.get("labels", [])
-    node_type = labels[0] if labels else "Unknown"
-
-    # Handle Entity subtypes
-    if "Entity" in labels and len(labels) > 1:
-        node_type = labels[1]  # Use more specific label (Principio, Concetto, etc.)
+    node_type = node_type_from_labels(labels, "Unknown")
 
     # Get display label
     label = (
