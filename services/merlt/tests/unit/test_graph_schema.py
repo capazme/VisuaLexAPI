@@ -167,6 +167,21 @@ def test_estremi_use_the_one_abbreviation_table():
     assert s.format_estremi("3", "legge sulla privacy") == "Art. 3 legge sulla privacy"
 
 
+def test_an_act_outside_the_abbreviation_table_is_logged_at_debug_not_info():
+    # It runs several times per article for any act the table does not know (to_estremi() is called
+    # three times in the ingestion): at info it filled the log of every lazy ingestion.
+    from structlog.testing import capture_logs
+
+    with capture_logs() as logs:
+        assert s.act_abbreviation("legge sulla privacy") == "legge sulla privacy"
+        assert s.format_estremi("3", "legge sulla privacy") == "Art. 3 legge sulla privacy"
+    fallbacks = [entry for entry in logs if entry["event"] == "graph_schema.abbrev_fallback"]
+    assert len(fallbacks) == 2 and {entry["log_level"] for entry in fallbacks} == {"debug"}
+    with capture_logs() as logs:
+        s.act_abbreviation("codice civile")  # a known act logs nothing
+    assert logs == []
+
+
 def test_the_act_is_read_from_the_urn_only_for_known_codes():
     assert s.act_name_from_urn(CC + "!vig=") == "codice civile"
     assert s.act_name_from_urn(COST) == "costituzione"

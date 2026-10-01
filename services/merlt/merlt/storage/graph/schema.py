@@ -403,7 +403,8 @@ def act_abbreviation(act_type: str) -> str:
         return act_type.strip()
     hit = CODE_ABBREVIATIONS.get(key)
     if hit is None:
-        log.info("graph_schema.abbrev_fallback", act_type=act_type)
+        # debug: it runs several times per article for any act outside the table
+        log.debug("graph_schema.abbrev_fallback", act_type=act_type)
         return act_type.strip()
     return hit
 
