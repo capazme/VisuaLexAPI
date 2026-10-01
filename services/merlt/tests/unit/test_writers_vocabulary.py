@@ -126,7 +126,7 @@ async def test_a_twin_with_another_prefix_takes_the_community_id():
     # The seed keys a subject `soggetto:…`, the community `soggetto_giuridico:…`.
     writer, client = _writer()
     client.query = AsyncMock(side_effect=[[], [{"id": "soggetto_giuridico:conduttore"}]])
-    found = await writer._check_duplicate_mechanical("Il Conduttore", "soggetto_giuridico")
+    found = await writer._check_duplicate_mechanical("Conduttore", "soggetto_giuridico")
     assert found == "soggetto_giuridico:conduttore"
     cypher, params = client.query.await_args_list[1].args
     assert "MATCH (c:SoggettoGiuridico {node_id: $nid})" in cypher
@@ -182,7 +182,48 @@ def test_the_seed_slug_folds_the_accents_the_community_slug_drops():
     assert normalize_entity_name("Patto di non trasferibilità") == "patto_di_non_trasferibilit"
     assert seed_twin_slug("Patto di non trasferibilità") == "patto_di_non_trasferibilita"
     assert seed_twin_slug("trasferibilita\u0300") == "trasferibilita"  # a decomposed accent too
-    assert seed_twin_slug("Il Conduttore") == normalize_entity_name("Il Conduttore") == "conduttore"
+    assert seed_twin_slug("Conduttore") == normalize_entity_name("Conduttore") == "conduttore"
+
+
+def test_the_seed_slug_keeps_what_the_community_slug_strips():
+    # The seed keeps a leading article and drops a hyphen; the community id strips the
+    # article and spaces the hyphen. The twin is looked up by the seed's rule.
+    assert normalize_entity_name("La reticenza") == "reticenza"
+    assert seed_twin_slug("La reticenza") == "la_reticenza"
+    assert normalize_entity_name("quasi-usufrutto") == "quasi_usufrutto"
+    assert seed_twin_slug("quasi-usufrutto") == "quasiusufrutto"
+
+
+# Real concept names of the Libro IV seed, with the suffix of their `node_id` (`concetto:<suffix>`).
+SEED_NAMES = [
+    ("Patto di non trasferibilità", "patto_di_non_trasferibilita"),  # an accent is folded
+    ("quasi-usufrutto", "quasiusufrutto"),  # a hyphen is dropped, not spaced
+    ("Dolo-intenzione (o programma)", "dolointenzione_o_programma"),  # ... and so are brackets
+    ("La reticenza", "la_reticenza"),  # a leading article stays
+    ("L'inadempimento", "linadempimento"),  # ... the elided one too, its apostrophe gone
+    ("I vizi della volontà", "i_vizi_della_volonta"),  # ... with an accent folded after it
+    ("La rati\ufb01ca", "la_ratica"),  # a ligature NFD does not fold is dropped, not expanded
+]
+
+
+@pytest.mark.parametrize("nome, suffix", SEED_NAMES)
+def test_the_seed_slug_is_the_suffix_of_the_seed_node_id(nome, suffix):
+    assert seed_twin_slug(nome) == suffix
+
+
+@pytest.mark.parametrize(
+    "nome, nid, eid",
+    [
+        ("quasi-usufrutto", "concetto:quasiusufrutto", "concetto:quasi_usufrutto"),
+        ("La reticenza", "concetto:la_reticenza", "concetto:reticenza"),
+    ],
+)
+async def test_the_twin_is_found_by_the_seed_key_and_takes_the_community_id(nome, nid, eid):
+    writer, client = _writer()
+    client.query = AsyncMock(side_effect=[[], [{"id": eid}]])
+    assert await writer._check_duplicate_mechanical(nome, "concetto") == eid
+    assert client.query.await_args_list[0].args[1] == {"expected_id": eid}  # the community id, unchanged
+    assert client.query.await_args_list[1].args[1] == {"nid": nid, "eid": eid}  # the seed's key
 
 
 async def test_an_accented_name_finds_its_seed_twin():

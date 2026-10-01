@@ -88,6 +88,24 @@ async def test_an_accented_concept_becomes_its_seed_twin(graph):
     assert await _count(graph, "MATCH (n) WHERE n:ConcettoGiuridico OR n:Entity RETURN count(n) AS c") == 1
 
 
+@pytest.mark.parametrize(
+    "nome, seed_id, community_id",
+    [
+        ("quasi-usufrutto", "concetto:quasiusufrutto", "concetto:quasi_usufrutto"),
+        ("La reticenza", "concetto:la_reticenza", "concetto:reticenza"),
+    ],
+)
+async def test_a_hyphenated_or_article_keeping_seed_name_finds_its_twin(graph, nome, seed_id, community_id):
+    await _seed(graph, "ConcettoGiuridico", seed_id, nome)  # real names of the Libro IV seed
+
+    result = await EntityGraphWriter(graph).write_entity(_approved("pe-1", "concetto", nome))
+
+    assert (result.action, result.node_id) == ("enriched_existing", community_id)
+    rows = await graph.query("MATCH (c:ConcettoGiuridico:Entity) RETURN c.node_id AS nid, c.id AS id", {})
+    assert rows == [{"nid": seed_id, "id": community_id}]
+    assert await _count(graph, "MATCH (n) WHERE n:ConcettoGiuridico OR n:Entity RETURN count(n) AS c") == 1
+
+
 async def test_a_second_alias_keeps_the_id_the_first_gave(graph):
     await _seed(graph, "DefinizioneLegale", "definizione:contratto", "Contratto")
     writer = EntityGraphWriter(graph)

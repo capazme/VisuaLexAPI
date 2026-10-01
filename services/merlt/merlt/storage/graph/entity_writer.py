@@ -154,20 +154,30 @@ def normalize_entity_name(nome: str) -> str:
 
 
 def seed_twin_slug(nome: str) -> str:
-    """The slug of the seed's node id for a concept: the name, accents folded.
+    """The slug of the seed's node id for a concept: the seed's own rule.
 
-    The seed folds an accented letter to its base ("trasferibilità" ->
-    "trasferibilita"); `normalize_entity_name` deletes it ("trasferibilit"), and
-    the community id keeps that rule (the document parser and the router derive
-    it with it). A seed twin is therefore looked up by the folded name, never by
-    the community id: with the community slug no accented seed name matches.
+    The seed keys a concept `<prefix>:<slug>` (`SEED_TWIN`) and builds the slug
+    from its name: lowercase, each accented letter folded to its base
+    ("trasferibilità" -> "trasferibilita"), only letters, digits and spaces kept
+    (an apostrophe, a hyphen or a stop is dropped, not turned into a space:
+    "quasi-usufrutto" -> "quasiusufrutto"), each run of spaces one underscore. A
+    leading article stays ("La reticenza" -> "la_reticenza").
 
-    Known limit: the seed keeps a leading article and drops a hyphen
-    (`la_reticenza`, `quasiusufrutto`), `normalize_entity_name` the reverse, so
-    those names (about 1% of the seed) still miss their twin.
+    This is not `normalize_entity_name`, which makes the community id and is
+    shared by the document parser and the router: that one deletes an accented
+    letter ("trasferibilit"), turns a hyphen into a space and strips a leading
+    article. The slug exists only to meet the seed's keys, so a twin is looked up
+    by this one while the id it takes stays the community's. Checked on the Libro
+    IV seed: this rule reproduces the `node_id` of all 3909 of its concept-like
+    nodes; folding the accents and then applying `normalize_entity_name`
+    reproduced 3865.
+
+    The name is taken as it is spelt: a proposal that adds an article the seed's
+    name does not have ("Il conduttore" for `conduttore`) does not meet it.
     """
     decomposed = unicodedata.normalize("NFD", nome or "")
-    return normalize_entity_name("".join(ch for ch in decomposed if not unicodedata.combining(ch)))
+    folded = "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower().strip()
+    return re.sub(r"\s+", "_", re.sub(r"[^a-z0-9\s]", "", folded)).strip("_")
 
 
 def entity_node_id(entity_type: str, nome: str) -> str:
@@ -318,9 +328,9 @@ class EntityGraphWriter:
             label, prefix = twin
             # The seed already has this concept: it becomes the community entity
             # (one node, one key) instead of a twin next to it. It is found by the
-            # seed's own key (`seed_twin_slug`: accents folded), and keeps an id it
-            # already has: `definizione` and `definizione_legale` share one seed node,
-            # and the second alias must not re-key what the first one adopted.
+            # seed's own key (`seed_twin_slug`), and keeps an id it already has:
+            # `definizione` and `definizione_legale` share one seed node, and the
+            # second alias must not re-key what the first one adopted.
             rows = await self.falkordb.query(
                 f"MATCH (c:{label.value} {{node_id: $nid}}) "
                 "SET c:Entity, c.id = coalesce(c.id, $eid) RETURN c.id AS id",
