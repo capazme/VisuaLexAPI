@@ -439,6 +439,15 @@ async def test_a_new_community_entity_of_a_kind_with_no_schema_label_is_only_an_
     assert f":Entity:{entity_type.capitalize()}" not in cypher
 
 
+async def test_a_new_community_entity_carries_its_fonte():
+    # `community` is the fonte of every community-written thing: the relation it links by carries it already.
+    writer, client = _writer()
+    await writer._create_new_entity_node(_proposal("principio"))
+    cypher, params = client.query.await_args.args
+    assert "fonte: $fonte" in cypher
+    assert params["fonte"] == "community"
+
+
 async def test_every_label_a_community_entity_is_written_with_is_a_label_of_the_schema():
     import re
 

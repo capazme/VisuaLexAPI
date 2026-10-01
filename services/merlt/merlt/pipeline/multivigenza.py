@@ -994,9 +994,9 @@ class MultivigenzaPipeline:
                             comma.posizione = $posizione,
                             comma.estremi = $estremi,
                             comma.testo = $testo,
-                            comma.fonte = 'Normattiva',
                             comma.provenance = coalesce(comma.provenance, 'ingestion'),
                             comma.created_at = $timestamp
+                        SET comma.fonte = coalesce(comma.fonte, 'Normattiva')
                         """,
                         {
                             "urn": comma_urn,
@@ -1040,9 +1040,9 @@ class MultivigenzaPipeline:
                                 let.tipo = 'lettera',
                                 let.posizione = $posizione,
                                 let.estremi = $estremi,
-                                let.fonte = 'Normattiva',
                                 let.provenance = coalesce(let.provenance, 'ingestion'),
                                 let.created_at = $timestamp
+                            SET let.fonte = coalesce(let.fonte, 'Normattiva')
                             """,
                             {
                                 "urn": lettera_urn,
@@ -1085,9 +1085,9 @@ class MultivigenzaPipeline:
                                     num.tipo = 'numero',
                                     num.posizione = $posizione,
                                     num.estremi = $estremi,
-                                    num.fonte = 'Normattiva',
                                     num.provenance = coalesce(num.provenance, 'ingestion'),
                                     num.created_at = $timestamp
+                                SET num.fonte = coalesce(num.fonte, 'Normattiva')
                                 """,
                                 {
                                     "urn": numero_urn,

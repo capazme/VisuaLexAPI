@@ -30,7 +30,9 @@ EXEMPT = {
 }
 REL_RE = re.compile(r"-\[\w*:([A-Za-z_]+(?:\|:?[A-Za-z_]+)*)")
 LABEL_RE = re.compile(r"\(\w*:([A-Z][A-Za-z]+)")
-FONTE_RE = re.compile(r"\bfonte\s*[=:]\s*'([^']+)'")
+# `x.fonte = 'Normattiva'`, `{fonte: 'community'}` and the non-destructive
+# `x.fonte = coalesce(x.fonte, 'Normattiva')` that the lazy writers use for nodes that may exist.
+FONTE_RE = re.compile(r"\bfonte\s*[=:]\s*(?:coalesce\(\s*\w+\.fonte\s*,\s*)?'([^']+)'")
 # `x.provenance = 'seed'`, `{provenance: 'seed'}` and the non-destructive
 # `x.provenance = coalesce(x.provenance, 'ingestion')` that the ingestion writers use.
 PROVENANCE_RE = re.compile(r"\bprovenance\s*[=:]\s*(?:coalesce\(\s*\w+\.provenance\s*,\s*)?'([^']+)'")
@@ -134,6 +136,12 @@ def test_every_label_in_cypher_is_known():
 
 def test_every_fonte_in_cypher_is_canonical():
     _check("fonte", {f.value for f in Fonte}, KNOWN_LEGACY_FONTI)
+
+
+def test_the_fonte_scan_reads_the_coalesce_form_too():
+    assert FONTE_RE.search("SET c.fonte = coalesce(c.fonte, 'Nope')").group(1) == "Nope"
+    assert FONTE_RE.search("SET n.fonte = 'Nope'").group(1) == "Nope"
+    assert FONTE_RE.search("{fonte: 'Nope'}").group(1) == "Nope"
 
 
 def test_every_provenance_in_cypher_is_canonical():

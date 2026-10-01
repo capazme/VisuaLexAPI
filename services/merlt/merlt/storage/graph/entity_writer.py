@@ -61,7 +61,9 @@ from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.relation_endpoints import wrapped_norm_key
-from merlt.storage.graph.schema import Label, Provenance, Rel, SEED_TWIN, canonical_urn, entity_label, stub_properties
+from merlt.storage.graph.schema import (
+    Fonte, Label, Provenance, Rel, SEED_TWIN, canonical_urn, entity_label, stub_properties,
+)
 from merlt.storage.enrichment.models import PendingEntity, PendingRelation
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 
@@ -403,6 +405,7 @@ class EntityGraphWriter:
             - descrizione: Description
             - ambito: Legal domain
             - community_validated: True (always for approved entities)
+            - fonte: "community" (who wrote it, as the relation it links by says)
             - approval_score: Weighted approval score
             - votes_count: Number of votes
             - sources: Array of source URNs
@@ -437,6 +440,7 @@ class EntityGraphWriter:
             descrizione: $descrizione,
             ambito: $ambito,
             community_validated: true,
+            fonte: $fonte,
             provenance: $provenance,
             trust: $trust,
             approval_score: $approval_score,
@@ -456,6 +460,7 @@ class EntityGraphWriter:
             "tipo": entity.entity_type,
             "descrizione": entity.descrizione or "",
             "ambito": entity.ambito or "",
+            "fonte": Fonte.COMMUNITY.value,
             "provenance": provenance,
             "trust": trust,
             "approval_score": entity.approval_score or 0.0,

@@ -813,6 +813,7 @@ class IngestionPipelineV2:
                     c.token_count = $tokens,
                     c.provenance = coalesce(c.provenance, 'ingestion'),
                     c.created_at = $timestamp
+                SET c.fonte = coalesce(c.fonte, 'Normattiva')
                 """,
                 {
                     "urn": comma_urn,
@@ -850,6 +851,7 @@ class IngestionPipelineV2:
                         l.token_count = $tokens,
                         l.provenance = coalesce(l.provenance, 'ingestion'),
                         l.created_at = $timestamp
+                    SET l.fonte = coalesce(l.fonte, 'Normattiva')
                     """,
                     {
                         "urn": lettera_urn,

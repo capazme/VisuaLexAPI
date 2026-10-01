@@ -230,6 +230,27 @@ async def test_every_node_the_ingestion_merges_carries_provenance():
             assert f"{variable}.provenance = coalesce({variable}.provenance, 'ingestion')" in query
 
 
+async def test_every_lazy_comma_and_lettera_carries_a_fonte_even_when_it_already_exists():
+    # The seed's 1,755 ingestion-shaped Comma nodes have no `fonte`, and re-ingesting an article MERGEs
+    # onto them: a property set only ON CREATE would never reach them.
+    merges = [q for q in await _queries_of_a_rich_ingestion() if re.search(r"MERGE \((c|l):(Comma|Lettera)", q)]
+    assert {re.search(r"MERGE \((\w+):", q).group(1) for q in merges} == {"c", "l"}
+    for query in merges:
+        variable = re.search(r"MERGE \((\w+):", query).group(1)
+        assert re.search(rf"\n\s*SET {variable}\.fonte = coalesce\({variable}\.fonte, 'Normattiva'\)", query), query
+
+
+def test_every_comma_lettera_and_numero_multivigenza_merges_carries_a_fonte_even_when_it_exists():
+    multivigenza = importlib.import_module("merlt.pipeline.multivigenza")
+    statements = re.findall(r'MERGE \(\w+:[A-Z][^"]*', inspect.getsource(multivigenza))
+    parts = [s for s in statements if re.match(r"MERGE \((comma|let|num):(Comma|Lettera|Numero) ", s)]
+    assert {re.match(r"MERGE \((\w+):", s).group(1) for s in parts} == {"comma", "let", "num"}
+    for statement in parts:
+        variable = re.match(r"MERGE \((\w+):", statement).group(1)
+        assert re.search(rf"\n\s*SET {variable}\.fonte = coalesce\({variable}\.fonte, 'Normattiva'\)", statement), statement
+        assert f"{variable}.fonte = 'Normattiva'" not in statement  # one form: the non-destructive one
+
+
 def test_multivigenza_writes_no_lowercase_contiene():
     multivigenza = importlib.import_module("merlt.pipeline.multivigenza")
     assert ":contiene]" not in inspect.getsource(multivigenza)
