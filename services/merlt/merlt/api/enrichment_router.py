@@ -100,7 +100,7 @@ from merlt.storage.graph.relation_endpoints import (
     looks_like_entity_id,
     norm_key_candidates,
 )
-from merlt.utils.urn_labels import derive_article_fields_from_urn
+from merlt.storage.graph.schema import canonical_urn, community_rel_to_graph, stub_properties
 from merlt.rlcf.domain_authority import (
     get_user_authority_for_vote,
     recalculate_authorities_after_consensus,
@@ -1610,9 +1610,7 @@ def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _Graph
                 clauses.append("WITH " + ", ".join(bound))
             clauses.append(
                 "MERGE " + ep.pattern.format(var=var, param=f"{var}_key") + "\n"
-                f"ON CREATE SET {var}.created_at = $timestamp, "
-                f"{var}.numero_articolo = ${var}_numero_articolo, "
-                f"{var}.estremi = ${var}_estremi"
+                f"ON CREATE SET {var} += ${var}_stub, {var}.created_at = $timestamp"
             )
             bound.append(var)
     clauses.append("WITH source, target")
@@ -1620,7 +1618,7 @@ def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _Graph
         f"""MERGE (source)-[r:{rel_type}]->(target)
 ON CREATE SET
     r.certezza = $certezza,
-    r.fonte = 'community_validation',
+    r.fonte = 'community',
     r.evidence = $evidence,
     r.community_validated = true,
     r.approval_score = $approval_score,
@@ -1647,7 +1645,9 @@ async def _write_relation_to_graph(
     is a pending entity (or the forward id of one) is retried by
     `_write_deferred_relations_for_entity` once that entity is written.
     `article_urn` stands in for an empty source, never the `user_document`
-    placeholder.
+    placeholder. The community's relation type is written under the graph's
+    name (`community_rel_to_graph`): CITA arrives as RINVIA, and PARTE_DI, the
+    inverse of CONTIENE, is never written.
     """
     log.info(
         "Writing approved relation to graph",
@@ -1659,6 +1659,16 @@ async def _write_relation_to_graph(
     if not _RELATION_TYPE_RE.match(rel_type):
         log.error(
             "Relation not written to graph: invalid relation type",
+            relation_id=relation.relation_id,
+            relation_type=rel_type,
+        )
+        return RelationWriteOutcome(written=False, reason=f"invalid relation type {rel_type!r}")
+
+    try:
+        rel_type = community_rel_to_graph(rel_type).value
+    except ValueError:
+        log.error(
+            "Relation not written to graph: not a graph relation",
             relation_id=relation.relation_id,
             relation_type=rel_type,
         )
@@ -1702,9 +1712,8 @@ async def _write_relation_to_graph(
         }
         for var, ep in (("source", source), ("target", target)):
             if ep.create_norma:
-                numero_articolo, estremi = derive_article_fields_from_urn(ep.key)
-                params[f"{var}_numero_articolo"] = numero_articolo
-                params[f"{var}_estremi"] = estremi
+                params[f"{var}_key"] = canonical_urn(ep.key)
+                params[f"{var}_stub"] = stub_properties(ep.key)
 
         result = await falkordb.query(_relation_write_cypher(rel_type, source, target), params)
 
@@ -2448,7 +2457,7 @@ CONFIRM_SOURCE_EXCERPT_CHARS = 280
 # pending_entities.article_urn is NOT NULL. A ruling or a commentary is not
 # bound to one norm, so the entity takes the placeholder the graph writer keeps
 # off the graph (entity_writer.PLACEHOLDER_ARTICLE_URNS): it is written
-# stand-alone, and its provenance is the CITA edge to the LiveSource node.
+# stand-alone, and its provenance is the DERIVA_DA edge to the LiveSource node.
 NO_NORM_ARTICLE_URN = "user_document"
 
 # provisional_writer's domain label → entity type of the proposal.
@@ -2467,7 +2476,7 @@ _NORM_ARTICLE_RE = re.compile(r"urn:nir:\S*~art\w", re.IGNORECASE)
 _LOAD_LIVE_SOURCE_CYPHER = f"""
 MATCH (n:{PROVISIONAL_LABEL} {{node_id: $node_id}})
 RETURN n.node_id AS node_id, labels(n) AS labels, n.source_url AS source_url,
-       n.text AS text, n.provenance AS provenance, n.trust AS trust,
+       coalesce(n.testo, n.text) AS text, n.provenance AS provenance, n.trust AS trust,
        n.pending_entity_id AS pending_entity_id
 LIMIT 1
 """
@@ -2605,7 +2614,7 @@ async def confirm_source(
       (quality gate + duplicate check). Its description is a capped excerpt
       plus the source URL, never the full verbatim. The LiveSource node gets
       ``pending_entity_id`` (so the approved entity links back to it with a
-      CITA edge), the user in ``confirmed_by`` and a trust bump; its
+      DERIVA_DA edge), the user in ``confirmed_by`` and a trust bump; its
       provenance stays ``live_unconfirmed`` until community consensus:
       ``promoted_as='pending_entity'``.
 

@@ -279,7 +279,7 @@ async def _merge_provisional_node(
         n.source_tool = $source_tool,
         n.source_url = $source_url,
         n.expert_type = $expert_type,
-        n.text = $text,
+        n.testo = $text,
         n.retrieved_at = $timestamp,
         n.created_at = $timestamp,
         n.updated_at = $timestamp,
@@ -289,7 +289,7 @@ async def _merge_provisional_node(
         n.last_used_at = $timestamp
     ON MATCH SET
         n.source_url = CASE WHEN $source_url <> '' THEN $source_url ELSE n.source_url END,
-        n.text = $text,
+        n.testo = $text,
         n.retrieved_at = $timestamp,
         n.updated_at = $timestamp,
         n.provenance = CASE

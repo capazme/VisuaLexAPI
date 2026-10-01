@@ -31,13 +31,12 @@ PROVENANCE_RE = re.compile(r"\bprovenance\s*[=:]\s*(?:coalesce\(\s*\w+\.provenan
 CYPHER_RE = re.compile(r"\b(MATCH|MERGE)\b")
 
 KNOWN_LEGACY_RELS: set[str] = {
-    "CITA",  # Task 4
     "contiene", "abroga", "modifica", "sostituisce", "inserisce", "CONTENUTO_IN",  # Task 5
     "cita", "conferma", "supera", "DERIVA",  # Task 5 (unwired tools)
     "SPECIALIZZA", "GENERALIZZA",  # Task 5 (definition tool → SPECIES)
 }
 KNOWN_UNKNOWN_LABELS: set[str] = {"PendingValidation", "ValidationVote"}  # Task 5
-KNOWN_LEGACY_FONTI: set[str] = {"community_validation"}  # Task 4
+KNOWN_LEGACY_FONTI: set[str] = set()
 
 
 def _units(tree: ast.AST) -> list[tuple[int, str]]:

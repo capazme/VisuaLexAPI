@@ -94,15 +94,16 @@ async def db():
 
 
 async def _relation(factory, created, source: str, target: str, *, status: str = "approved",
-                    article_urn: str = "user_document", marker: Optional[str] = None) -> str:
-    rid = f"PRESUPPONE:zz{uuid.uuid4().hex[:10]}"
+                    article_urn: str = "user_document", marker: Optional[str] = None,
+                    relation_type: str = "PRESUPPONE") -> str:
+    rid = f"{relation_type}:zz{uuid.uuid4().hex[:10]}"
     async with factory() as session:
         session.add(
             PendingRelation(
                 relation_id=rid,
                 article_urn=article_urn,
                 source_type="manual",
-                relation_type="PRESUPPONE",
+                relation_type=relation_type,
                 source_node_urn=source,
                 target_entity_id=target,
                 relation_description=f"evidenza {marker or ''}",
@@ -196,7 +197,11 @@ async def test_urn_source_and_graph_entity_target_are_written(db):
     assert "MATCH (target:Entity {id: $target_key})" in cypher
     assert params["source_key"] == urn
     assert params["target_key"] == "concetto:risoluzione_del_contratto"
-    assert params["source_numero_articolo"] == "3"
+    assert params["source_stub"]["numero_articolo"] == "3"
+    # The stub is the schema's one shape, set only when the Norma is created.
+    assert "ON CREATE SET source += $source_stub, source.created_at = $timestamp" in cypher
+    assert params["source_stub"]["is_stub"] is True and params["source_stub"]["URN"] == urn
+    assert "target_stub" not in params
     async with factory() as session:
         assert (await _load(session, rid)).written_to_graph_at is not None
 
@@ -256,6 +261,42 @@ async def test_invalid_relation_type_is_refused(db):
         outcome = await _write_relation_to_graph(relation, session, _FakeGraph(entities={"concetto:a", "concetto:b"}))
     assert outcome.written is False
     assert "invalid relation type" in outcome.reason
+
+
+async def test_a_cita_relation_is_written_as_rinvia(db):
+    """The community says CITA; the graph's name for a reference is RINVIA."""
+    factory, created = db
+    rid = await _relation(factory, created, "concetto:a", "concetto:b", relation_type="CITA")
+    graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is True
+    [(cypher, _)] = graph.writes
+    assert "-[r:RINVIA]->" in cypher
+    assert "r:CITA" not in cypher
+    assert "r.fonte = 'community'" in cypher and "community_validation" not in cypher
+    async with factory() as session:
+        row = await _load(session, rid)
+        assert row.written_to_graph_at is not None
+        assert row.relation_type == "CITA"  # the staging row keeps the community's own word
+
+
+async def test_parte_di_is_never_written(db):
+    """PARTE_DI is the inverse of CONTIENE: the graph holds the one direction."""
+    factory, created = db
+    rid = await _relation(factory, created, "concetto:a", "concetto:b", relation_type="PARTE_DI")
+    graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is False and outcome.deferred is False
+    assert "invalid relation type 'PARTE_DI'" in outcome.reason
+    assert graph.queries == [], "a refused type must not even look the endpoints up"
+    async with factory() as session:
+        assert (await _load(session, rid)).written_to_graph_at is None
 
 
 async def test_pending_entity_endpoint_is_deferred_then_written(db):

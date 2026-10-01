@@ -26,6 +26,7 @@ Entity Node Schema:
 Relations Created:
     - (Norma)-[:DISCIPLINA|ESPRIME_PRINCIPIO|DEFINISCE|...]->(Entity)
     - (Entity)-[:SPECIES|IMPLICA|...]->(Entity)  # If applicable
+    - (Entity)-[:DERIVA_DA]->(LiveSource)  # If born of a confirmed live source
 
 Usage:
     from merlt.storage.graph.entity_writer import EntityGraphWriter
@@ -56,11 +57,31 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
+from merlt.storage.graph.schema import Provenance, Rel, SEED_TWIN, canonical_urn, stub_properties
 from merlt.storage.enrichment.models import PendingEntity, PendingRelation
-from merlt.utils.urn_labels import derive_article_fields_from_urn
 from merlt.pipeline.enrichment.models import EntityType, RelationType
 
 log = structlog.get_logger()
+
+# article → entity relation, by the entity's type: the seed's names.
+RELATION_BY_ENTITY_TYPE: dict[str, Rel] = {
+    "principio": Rel.ESPRIME_PRINCIPIO,
+    "definizione": Rel.DEFINISCE,
+    "definizione_legale": Rel.DEFINISCE,
+    "concetto": Rel.DISCIPLINA,
+    "diritto_soggettivo": Rel.CONFERISCE,
+    "interesse_legittimo": Rel.DISCIPLINA,
+    "soggetto_giuridico": Rel.APPLICA_A,
+    "ruolo_giuridico": Rel.APPLICA_A,
+    "organo": Rel.APPLICA_A,
+    "fatto_giuridico": Rel.PREVEDE,
+    "procedura": Rel.PREVEDE,
+    "termine": Rel.STABILISCE_TERMINE,
+    "sanzione": Rel.PREVEDE_SANZIONE,
+    "responsabilita": Rel.ATTRIBUISCE_RESPONSABILITA,
+    "modalita_giuridica": Rel.IMPONE,
+    "brocardo": Rel.ESPRIME,
+}
 
 
 @dataclass
@@ -216,7 +237,7 @@ class EntityGraphWriter:
 
         # Loop β D.2: if this approved entity originated from a confirmed live
         # source (Phase D.1 confirm-source stamped `pending_entity_id` on the
-        # provisional LiveSource node), link the two with a CITA edge so the
+        # provisional LiveSource node), link the two with a DERIVA_DA edge so the
         # provenance trail "questo claim nasce da questa fonte live" stays
         # navigable on /grafo. No-op for entities not born of a live source.
         await self._link_provisional_source(entity.entity_id, node_id)
@@ -247,6 +268,8 @@ class EntityGraphWriter:
         Logic:
             - Normalize: lowercase, strip, remove articles
             - Match on tipo:{normalized_nome}
+            - A concept the seed already has (its twin, `SEED_TWIN`) becomes the
+              community entity: the seed node gains `:Entity` and the id
         """
         normalized = self._normalize_nome(entity_text)
         expected_id = f"{entity_type}:{normalized}"
@@ -263,6 +286,18 @@ class EntityGraphWriter:
         if result and len(result) > 0:
             return result[0]["id"]
 
+        twin = SEED_TWIN.get(entity_type)
+        if twin:
+            label, prefix = twin
+            # The seed already has this concept: it becomes the community entity
+            # (one node, one key) instead of a twin next to it.
+            rows = await self.falkordb.query(
+                f"MATCH (c:{label.value} {{node_id: $nid}}) "
+                "SET c:Entity, c.id = $eid RETURN c.id AS id",
+                {"nid": f"{prefix}:{normalized}", "eid": expected_id},
+            )
+            if rows:
+                return rows[0]["id"]
         return None
 
     def _normalize_nome(self, nome: str) -> str:
@@ -368,17 +403,20 @@ class EntityGraphWriter:
         # `community_validated` / trust 1.0 — but only as an upgrade: a node that
         # is already at trust 1.0 (or higher, defensively) is left untouched so we
         # never downgrade provenance/trust (task B.1).
+        # `sources`, `approval_score` and `votes_count` are coalesced: a seed twin
+        # that became this entity (`_check_duplicate_mechanical`) never had them,
+        # and a null there would drop the contribution without a trace.
         query = """
         MATCH (e:Entity {id: $id})
         SET e.sources = CASE
-                WHEN $source IN e.sources THEN e.sources
-                ELSE e.sources + [$source]
+                WHEN $source IN coalesce(e.sources, []) THEN coalesce(e.sources, [])
+                ELSE coalesce(e.sources, []) + [$source]
             END,
             e.approval_score = CASE
-                WHEN $new_score > e.approval_score THEN $new_score
-                ELSE e.approval_score
+                WHEN $new_score > coalesce(e.approval_score, 0.0) THEN $new_score
+                ELSE coalesce(e.approval_score, 0.0)
             END,
-            e.votes_count = e.votes_count + $new_votes,
+            e.votes_count = coalesce(e.votes_count, 0) + $new_votes,
             e.provenance = CASE
                 WHEN coalesce(e.trust, 0.0) >= $trust THEN e.provenance
                 ELSE $provenance
@@ -408,70 +446,44 @@ class EntityGraphWriter:
         """
         Create semantic relation from article to entity.
 
-        Uses RelationType to determine relation type.
-        Defaults to DISCIPLINA if not specified.
+        The relation type comes from `RELATION_BY_ENTITY_TYPE` (the seed's
+        names); an entity type the table does not know gets DISCIPLINA.
 
         Examples:
             (Art. 52 CP)-[:ESPRIME_PRINCIPIO]->(Principio:Legittima difesa)
             (Art. 1453 CC)-[:DISCIPLINA]->(Concetto:Inadempimento)
+            (Art. 575 CP)-[:PREVEDE_SANZIONE]->(Sanzione:Reclusione)
         """
-        # Determine relation type based on entity type
-        # This mapping can be customized per domain
-        relation_mapping = {
-            "principio": "ESPRIME_PRINCIPIO",
-            "definizione": "DEFINISCE",
-            "concetto": "DISCIPLINA",
-            "soggetto": "DISCIPLINA",
-            "fatto": "PREVEDE",
-            "procedura": "REGOLA_PROCEDURA",
-            "termine": "STABILISCE_TERMINE",
-            "sanzione": "PREVEDE",
-            "rimedio": "PREVEDE",
-        }
-
-        relation_type = relation_mapping.get(entity.entity_type, "DISCIPLINA")
+        relation_type = RELATION_BY_ENTITY_TYPE.get(entity.entity_type, Rel.DISCIPLINA).value
 
         # Belt and braces for any other caller: the placeholder never becomes a node.
         if not is_real_article_urn(entity.article_urn):
             return
 
-        # A2: give a freshly-created Norma stub a minimal identity derived from
-        # the URN so it never renders as a raw URL. ON CREATE only — an existing
-        # (seed/community) node is never overwritten. Both may be None when the
-        # URN has no article segment; the SET then just writes null (harmless).
-        numero_articolo, estremi = derive_article_fields_from_urn(entity.article_urn)
-
-        # Create relation (create Norma node if it doesn't exist).
-        # Stamp provenance/trust on the (possibly stub) Norma node with coalesce
-        # so an existing seed/community node is never downgraded; the relation
-        # itself also carries `provenance` (best-effort, task B.1).
+        # Create relation (create Norma node if it doesn't exist). A Norma this
+        # writer creates is the schema's one stub shape (`stub_properties`),
+        # set ON CREATE only: an existing (seed/ingested) node is never touched.
+        # The relation itself carries the community's provenance.
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
-        ON CREATE SET
-            art.created_at = $timestamp,
-            art.numero_articolo = $numero_articolo,
-            art.estremi = $estremi
-        SET art.provenance = coalesce(art.provenance, $provenance),
-            art.trust = coalesce(art.trust, $trust)
+        ON CREATE SET art += $stub, art.created_at = $timestamp
         WITH art
         MATCH (e:Entity {{id: $entity_id}})
         MERGE (art)-[r:{relation_type}]->(e)
         ON CREATE SET
             r.certezza = 1.0,
-            r.fonte = 'community_validation',
+            r.fonte = 'community',
             r.provenance = $provenance,
             r.created_at = $timestamp
         RETURN r
         """
 
         params = {
-            "article_urn": entity.article_urn,
+            "article_urn": canonical_urn(entity.article_urn),
+            "stub": stub_properties(entity.article_urn),
             "entity_id": node_id,
-            "provenance": "community_validated",
-            "trust": 1.0,
+            "provenance": Provenance.COMMUNITY_VALIDATED.value,
             "timestamp": self._timestamp,
-            "numero_articolo": numero_articolo,
-            "estremi": estremi,
         }
 
         await self.falkordb.query(query, params)
@@ -481,11 +493,11 @@ class EntityGraphWriter:
         """
         Link an approved Entity to the provisional LiveSource it was born from.
 
-        Loop β, Phase D (decision: keep the source node distinct, link via CITA):
+        Loop β, Phase D (decision: keep the source node distinct, link via DERIVA_DA):
         Phase D.1 `confirm-source` stamps `pending_entity_id` on the provisional
         ``LiveSource`` node (the live-retrieved document the user vouched for).
         When that pending entity later clears community consensus and is written
-        here, we MERGE a ``(:Entity)-[:CITA]->(:LiveSource)`` edge so the
+        here, we MERGE a ``(:Entity)-[:DERIVA_DA]->(:LiveSource)`` edge so the
         provenance — "questo claim deriva da questa fonte recuperata live" —
         remains visible and navigable, and lift the source to
         ``community_validated`` / trust 1.0 (upgrade-only, never a downgrade).
@@ -498,9 +510,9 @@ class EntityGraphWriter:
         query = """
         MATCH (ls:LiveSource {pending_entity_id: $eid})
         MATCH (e:Entity {id: $nid})
-        MERGE (e)-[r:CITA]->(ls)
+        MERGE (e)-[r:DERIVA_DA]->(ls)
         ON CREATE SET
-            r.fonte = 'community_validation',
+            r.fonte = 'community',
             r.provenance = 'community_validated',
             r.created_at = $timestamp
         SET ls.provenance = 'community_validated',
