@@ -195,3 +195,16 @@ async def test_an_accented_name_finds_its_seed_twin():
         "eid": "concetto:patto_di_non_trasferibilit",
     }
     assert found == "concetto:patto_di_non_trasferibilit"
+
+
+async def test_a_second_alias_does_not_rekey_an_adopted_seed_node():
+    # `definizione` and `definizione_legale` share the seed's DefinizioneLegale and its
+    # `definizione:` prefix. The id the first alias gave is kept; a later alias gets it back.
+    writer, client = _writer()
+    client.query = AsyncMock(side_effect=[[], [{"id": "definizione:contratto"}]])
+    found = await writer._check_duplicate_mechanical("Contratto", "definizione_legale")
+    cypher, params = client.query.await_args_list[1].args
+    assert "MATCH (c:DefinizioneLegale {node_id: $nid})" in cypher
+    assert "c.id = coalesce(c.id, $eid)" in cypher
+    assert params == {"nid": "definizione:contratto", "eid": "definizione_legale:contratto"}
+    assert found == "definizione:contratto"

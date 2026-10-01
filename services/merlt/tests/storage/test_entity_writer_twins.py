@@ -86,3 +86,17 @@ async def test_an_accented_concept_becomes_its_seed_twin(graph):
         {"nid": "concetto:patto_di_non_trasferibilita", "id": "concetto:patto_di_non_trasferibilit", "p": "community_validated"}
     ]
     assert await _count(graph, "MATCH (n) WHERE n:ConcettoGiuridico OR n:Entity RETURN count(n) AS c") == 1
+
+
+async def test_a_second_alias_keeps_the_id_the_first_gave(graph):
+    await _seed(graph, "DefinizioneLegale", "definizione:contratto", "Contratto")
+    writer = EntityGraphWriter(graph)
+
+    first = await writer.write_entity(_approved("pe-1", "definizione", "Contratto"))
+    second = await writer.write_entity(_approved("pe-2", "definizione_legale", "Contratto"))
+
+    assert first.node_id == second.node_id == "definizione:contratto"
+    assert await _count(graph, "MATCH (e:Entity {id: 'definizione:contratto'}) RETURN count(e) AS c") == 1
+    assert await _count(graph, "MATCH (e:Entity {id: 'definizione_legale:contratto'}) RETURN count(e) AS c") == 0
+    # One node for the concept (the article it hangs off is a Norma, counted apart).
+    assert await _count(graph, "MATCH (n) WHERE n:DefinizioneLegale OR n:Entity RETURN count(n) AS c") == 1

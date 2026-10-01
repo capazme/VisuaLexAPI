@@ -309,10 +309,12 @@ class EntityGraphWriter:
             label, prefix = twin
             # The seed already has this concept: it becomes the community entity
             # (one node, one key) instead of a twin next to it. It is found by the
-            # seed's own key (`seed_twin_slug`: accents folded).
+            # seed's own key (`seed_twin_slug`: accents folded), and keeps an id it
+            # already has: `definizione` and `definizione_legale` share one seed node,
+            # and the second alias must not re-key what the first one adopted.
             rows = await self.falkordb.query(
                 f"MATCH (c:{label.value} {{node_id: $nid}}) "
-                "SET c:Entity, c.id = $eid RETURN c.id AS id",
+                "SET c:Entity, c.id = coalesce(c.id, $eid) RETURN c.id AS id",
                 {"nid": f"{prefix}:{seed_twin_slug(entity_text)}", "eid": expected_id},
             )
             if rows:
