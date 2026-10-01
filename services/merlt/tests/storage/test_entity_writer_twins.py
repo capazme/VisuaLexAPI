@@ -100,3 +100,38 @@ async def test_a_second_alias_keeps_the_id_the_first_gave(graph):
     assert await _count(graph, "MATCH (e:Entity {id: 'definizione_legale:contratto'}) RETURN count(e) AS c") == 0
     # One node for the concept (the article it hangs off is a Norma, counted apart).
     assert await _count(graph, "MATCH (n) WHERE n:DefinizioneLegale OR n:Entity RETURN count(n) AS c") == 1
+
+
+async def test_a_twin_merge_links_its_article_once_and_records_the_contribution(graph):
+    await _seed(graph, "ConcettoGiuridico", "concetto:crediti_futuri", "Crediti futuri")
+    await graph.query(
+        "CREATE (:Norma {URN: $u, node_id: $u, provenance: 'seed', estremi: 'Art. 1322 c.c.'})", {"u": ART_1322}
+    )
+    writer = EntityGraphWriter(graph)
+
+    await writer.write_entity(_approved("pe-1", "concetto", "Crediti futuri"))
+    await writer.write_entity(_approved("pe-2", "concetto", "Crediti futuri"))  # the same proposal again
+
+    assert await _count(
+        graph, "MATCH (:Norma {URN: $u})-[r:DISCIPLINA]->(:ConcettoGiuridico:Entity) RETURN count(r) AS c", {"u": ART_1322}
+    ) == 1
+    rows = await graph.query(
+        "MATCH (c:Entity {id: 'concetto:crediti_futuri'}) RETURN c.sources AS s, c.votes_count AS v", {}
+    )
+    assert rows == [{"s": [ART_1322], "v": 6}]
+    # The article it hangs off is the seed's, untouched.
+    norma = await graph.query("MATCH (a:Norma {URN: $u}) RETURN a.provenance AS p, a.is_stub AS stub", {"u": ART_1322})
+    assert norma == [{"p": "seed", "stub": None}]
+
+
+async def test_a_proposal_for_an_existing_entity_links_the_new_article(graph):
+    writer = EntityGraphWriter(graph)
+
+    created = await writer.write_entity(_approved("pe-1", "sanzione", "Multa", ART_1322))
+    again = await writer.write_entity(_approved("pe-2", "sanzione", "Multa", ART_1325))
+
+    assert (created.action, again.action) == ("created", "enriched_existing")
+    linked = await graph.query(
+        "MATCH (a:Norma)-[r:PREVEDE_SANZIONE]->(:Entity {id: 'sanzione:multa'}) RETURN a.URN AS u ORDER BY u", {}
+    )
+    assert [row["u"] for row in linked] == [ART_1322, ART_1325]

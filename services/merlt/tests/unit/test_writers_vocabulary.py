@@ -2,12 +2,15 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from merlt.api.enrichment_router import _LOAD_LIVE_SOURCE_CYPHER
 from merlt.pipeline.provisional_writer import _merge_provisional_node
 from merlt.pipeline.review import list_pending_review
 from merlt.storage.graph import entity_writer
 from merlt.storage.graph.entity_writer import (
     RELATION_BY_ENTITY_TYPE,
+    EntityGraphWriter,
     normalize_entity_name,
     seed_twin_slug,
 )
@@ -208,3 +211,69 @@ async def test_a_second_alias_does_not_rekey_an_adopted_seed_node():
     assert "c.id = coalesce(c.id, $eid)" in cypher
     assert params == {"nid": "definizione:contratto", "eid": "definizione_legale:contratto"}
     assert found == "definizione:contratto"
+
+
+# A proposal for an entity that exists still writes its article link ---------------
+
+
+def _approved(entity_type="concetto", name="Crediti futuri", article_urn=CC):
+    return SimpleNamespace(
+        entity_id="pe-1", entity_type=entity_type, entity_text=name, article_urn=article_urn,
+        consensus_reached=True, consensus_type="approved", validation_status="approved",
+        descrizione="", ambito="", approval_score=2.0, votes_count=3,
+        contributed_by="u1", contributor_authority=0.5,
+    )
+
+
+class _Graph:
+    """Answers the entity writer's lookups by what the Cypher asks; records every query."""
+
+    def __init__(self, entity=(), twin=(), fail_on=None):
+        self.entity, self.twin, self.fail_on = list(entity), list(twin), fail_on
+        self.queries = []
+
+    async def query(self, cypher, params=None):
+        self.queries.append((cypher, params or {}))
+        if self.fail_on and self.fail_on in cypher:
+            raise RuntimeError("graph down")
+        if "WHERE e.id = $expected_id" in cypher:
+            return self.entity
+        if "SET c:Entity" in cypher:
+            return self.twin
+        return [{"r": 1}]
+
+    def with_text(self, fragment):
+        return [(cypher, params) for cypher, params in self.queries if fragment in cypher]
+
+
+async def test_a_twin_merge_writes_the_article_link():
+    graph = _Graph(twin=[{"id": "concetto:crediti_futuri"}])
+    result = await EntityGraphWriter(graph).write_entity(_approved())
+    assert (result.action, result.node_id) == ("enriched_existing", "concetto:crediti_futuri")
+    [(cypher, params)] = graph.with_text("MERGE (art)-[r:DISCIPLINA]->(e)")
+    assert params["entity_id"] == "concetto:crediti_futuri" and params["article_urn"] == CC
+
+
+async def test_a_proposal_for_an_existing_entity_still_links_its_article():
+    graph = _Graph(entity=[{"id": "sanzione:multa"}])
+    result = await EntityGraphWriter(graph).write_entity(_approved("sanzione", "Multa"))
+    assert result.action == "enriched_existing"
+    [(cypher, params)] = graph.with_text("MERGE (art)-[r:PREVEDE_SANZIONE]->(e)")
+    assert params["entity_id"] == "sanzione:multa"
+    assert graph.with_text("e.votes_count"), "the duplicate is enriched as before"
+
+
+async def test_a_duplicate_proposed_without_a_real_article_gets_no_link():
+    graph = _Graph(entity=[{"id": "concetto:crediti_futuri"}])
+    await EntityGraphWriter(graph).write_entity(_approved(article_urn="user_document"))
+    assert graph.with_text("MERGE (art:Norma") == []
+    assert graph.with_text("e.votes_count"), "the duplicate is enriched as before"
+
+
+async def test_a_failed_link_leaves_the_votes_uncounted():
+    # The link is a MERGE (idempotent), the enrichment adds to votes_count (not): the
+    # link goes first, so a retry after a failure here counts the votes once.
+    graph = _Graph(entity=[{"id": "concetto:crediti_futuri"}], fail_on="MERGE (art:Norma")
+    with pytest.raises(RuntimeError):
+        await EntityGraphWriter(graph).write_entity(_approved())
+    assert graph.with_text("e.votes_count") == []

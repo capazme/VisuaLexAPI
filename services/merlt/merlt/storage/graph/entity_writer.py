@@ -25,6 +25,7 @@ Entity Node Schema:
 
 Relations Created:
     - (Norma)-[:DISCIPLINA|ESPRIME_PRINCIPIO|DEFINISCE|...]->(Entity)
+      (written for a duplicate too: the article that proposed it is linked)
     - (Entity)-[:SPECIES|IMPLICA|...]->(Entity)  # If applicable
     - (Entity)-[:DERIVA_DA]->(LiveSource)  # If born of a confirmed live source
 
@@ -232,6 +233,13 @@ class EntityGraphWriter:
 
             if duplicate_id:
                 log.info("Layer 1: Mechanical duplicate found", existing_id=duplicate_id)
+                # The community's validated link from this article is a graph edge, not
+                # only a `sources` entry: written for a duplicate too (an existing entity,
+                # or a seed twin that has just become one). It is a MERGE, so it is written
+                # once however often it is proposed, and it goes first: the enrichment adds
+                # to `votes_count`, which a retry after a failure here must not count twice.
+                if is_real_article_urn(entity.article_urn):
+                    await self._create_entity_relation(entity, duplicate_id)
                 await self._enrich_existing_entity(duplicate_id, entity)
                 await self._link_provisional_source(entity.entity_id, duplicate_id)
                 return WriteResult(
