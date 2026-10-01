@@ -179,6 +179,28 @@ async def test_the_hierarchy_finds_siblings_and_descendants_and_reads_their_text
     assert {n["urn"] for n in around_a_titolo.data["hierarchy"] if n["relation"] == "descendant"} == {ART1, ART2, ART3}
 
 
+async def test_the_hierarchy_cuts_a_very_large_subtree_at_the_limit(graph):
+    await graph.query(
+        "MATCH (t:Norma {URN: 'urn:test:titolo2'}) UNWIND range(1, 80) AS i "
+        "CREATE (t)-[:CONTIENE]->(:Norma {URN: 'urn:test:bulk' + toString(i), tipo_documento: 'articolo', numero_articolo: toString(i)})",
+        {},
+    )
+    tool = HierarchyNavigationTool(graph_db=graph)
+    descendants = await tool.execute(start_node="urn:test:titolo2", direction="descendants", max_depth=1)  # 83 below it
+    siblings = await tool.execute(start_node="urn:test:bulk1", direction="siblings")  # 82 others
+    context = await tool.execute(start_node="urn:test:bulk1", direction="context")
+    assert descendants.success and siblings.success and context.success
+    sizes = (
+        len(descendants.data["hierarchy"]),
+        len(siblings.data["hierarchy"]),
+        len([n for n in context.data["hierarchy"] if n["relation"] == "sibling"]),
+    )
+    assert max(sizes) < 80, sizes  # not the 83 below the titolo and the 82 beside the article
+    from merlt.tools.hierarchy import MAX_NODES
+
+    assert sizes == (MAX_NODES, MAX_NODES, MAX_NODES)
+
+
 # graph_search ---------------------------------------------------------------------------
 
 

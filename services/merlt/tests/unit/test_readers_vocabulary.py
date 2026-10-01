@@ -621,6 +621,50 @@ async def test_the_hierarchy_tells_partitions_apart_by_tipo_documento():
     assert "labels(n)[0] AS tipo" not in ancestors.replace(f"coalesce(n.tipo_documento, {of_n}) AS tipo", "")
 
 
+async def test_the_hierarchy_bounds_the_descendants_and_the_siblings_it_returns():
+    # The descendants of a code's root are about 2,800 rows once the graph is migrated, and the
+    # whole subtree went through the ReAct loop: ancestors are bounded by the depth, these were not.
+    import re
+
+    from merlt.tools.hierarchy import HierarchyNavigationTool
+
+    graph = _GraphRecorder()
+    tool = HierarchyNavigationTool(graph_db=graph)
+    await tool._get_descendants(CC, 5, False, None)
+    await tool._get_siblings(CC, False, None)
+    descendants, siblings = (_squashed(cypher) for cypher in graph.cyphers)
+    for cypher in (descendants, siblings):
+        assert re.search(r"ORDER BY [\w ,.]+ LIMIT \d+$", cypher), cypher  # the nearest nodes first, then the cut
+
+
+async def test_the_hierarchy_limit_is_a_clamped_integer_like_the_others():
+    from merlt.tools.hierarchy import MAX_NODES, HierarchyNavigationTool
+
+    graph = _GraphRecorder()
+    tool = HierarchyNavigationTool(graph_db=graph)
+    await tool._get_descendants(CC, 1, False, None)
+    await tool._get_siblings(CC, False, None)
+    await tool._get_descendants(CC, 1, False, None, limit=10 ** 9)  # out of range: clamped, not refused
+    await tool._get_siblings(CC, False, None, limit=0)
+    cyphers = [_squashed(cypher) for cypher in graph.cyphers]
+    assert [cypher.rsplit("LIMIT ", 1)[1] for cypher in cyphers] == [str(MAX_NODES), str(MAX_NODES), str(MAX_NODES), "1"]
+    for attack in ("2]->(n) DELETE n //", "2.5", None):
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            await tool._get_descendants(CC, 1, False, None, limit=attack)
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            await tool._get_siblings(CC, False, None, limit=attack)
+    assert len(graph.cyphers) == 4  # the refused ones never reached the graph
+
+
+async def test_the_context_navigation_asks_for_bounded_siblings_and_children():
+    from merlt.tools.hierarchy import HierarchyNavigationTool
+
+    graph = _GraphRecorder()
+    await HierarchyNavigationTool(graph_db=graph)._get_context(CC, 3, False, None)
+    siblings, children = (_squashed(cypher) for cypher in graph.cyphers[-2:])
+    assert "LIMIT" in siblings and "LIMIT" in children
+
+
 def test_the_hierarchy_examples_are_real_types():
     from merlt.tools.hierarchy import HierarchyNavigationTool
 

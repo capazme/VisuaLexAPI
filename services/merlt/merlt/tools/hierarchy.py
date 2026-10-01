@@ -37,6 +37,12 @@ log = structlog.get_logger()
 # the Cypher (`*1..N`), so it is always a clamped integer.
 MAX_DEPTH = 10
 
+# The most nodes the descendants or the siblings of a node return; interpolated into the
+# Cypher (`LIMIT N`), so always a clamped integer. The descendants of a code's root are
+# about 2,800 rows once the graph is migrated, and every row goes to the LLM: the rows are
+# ordered by depth, so the cut keeps the nearest levels.
+MAX_NODES = 50
+
 
 def _label(node: Dict[str, Any]) -> str:
     """How a node reads in a path: its estremi, else its rubrica (an ingested titolo or
@@ -402,14 +408,17 @@ class HierarchyNavigationTool(BaseTool):
         urn: str,
         max_depth: int,
         include_text: bool,
-        tipo_filter: Optional[List[str]]
+        tipo_filter: Optional[List[str]],
+        limit: int = MAX_NODES
     ) -> List[Dict[str, Any]]:
         """
         Scende la gerarchia verso le foglie.
 
-        Relazioni seguite: CONTIENE (parent → child)
+        Relazioni seguite: CONTIENE (parent → child). At most `limit` nodes (clamped
+        to `MAX_NODES`), the nearest levels first.
         """
         max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        limit = bounded_int(limit, "limit", 1, MAX_NODES)
         text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
         params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
@@ -429,6 +438,7 @@ class HierarchyNavigationTool(BaseTool):
                 length(path) AS depth
                 {text_field}
             ORDER BY depth ASC, order_num ASC
+            LIMIT {limit}
         """
 
         try:
@@ -453,11 +463,13 @@ class HierarchyNavigationTool(BaseTool):
         self,
         urn: str,
         include_text: bool,
-        tipo_filter: Optional[List[str]]
+        tipo_filter: Optional[List[str]],
+        limit: int = MAX_NODES
     ) -> List[Dict[str, Any]]:
         """
-        Trova i nodi fratelli (stesso genitore).
+        Trova i nodi fratelli (stesso genitore). At most `limit` (clamped to `MAX_NODES`).
         """
+        limit = bounded_int(limit, "limit", 1, MAX_NODES)
         text_field = ", coalesce(sibling.testo, sibling.testo_vigente) AS testo" if include_text else ""
         params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
@@ -479,6 +491,7 @@ class HierarchyNavigationTool(BaseTool):
                 sibling.numero_articolo AS order_num
                 {text_field}
             ORDER BY order_num ASC
+            LIMIT {limit}
         """
 
         try:
