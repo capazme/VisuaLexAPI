@@ -637,3 +637,95 @@ async def test_an_article_nothing_modifies_is_checked_without_a_modification_que
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.modification_count) == ("vigente", 0)
     assert not any("type(r) AS event_type" in cypher for cypher in graph.cyphers)
+
+
+# The policy and the static weights speak the schema ---------------------------------
+
+
+@pytest.mark.parametrize("rel", list(Rel), ids=lambda rel: rel.value)
+def test_every_relation_of_the_schema_reaches_the_policy_in_its_own_vocabulary(rel):
+    from structlog.testing import capture_logs
+
+    from merlt.rlcf.policy_gradient import TRAVERSAL_RELATION_TYPES, TraversalPolicy
+
+    for spelling in (rel.value, rel.value.lower()):
+        policy_name = normalize_relation_type(spelling)
+        assert policy_name in TRAVERSAL_RELATION_TYPES
+        # The policy warns about a name it does not know and falls back: it must not need to.
+        with capture_logs() as logs:
+            index = TraversalPolicy.get_relation_index(
+                SimpleNamespace(relation_types=list(TRAVERSAL_RELATION_TYPES)), policy_name,
+            )
+        assert logs == [] and TRAVERSAL_RELATION_TYPES[index] == policy_name
+
+
+@pytest.mark.parametrize("name, policy_name", [
+    ("ABROGA_TOTALMENTE", "ABROGA"), ("ABROGA_PARZIALMENTE", "ABROGA"), ("INTEGRA", "MODIFICA"),
+    ("SOSPENDE", "MODIFICA"), ("PROROGA", "MODIFICA"), ("ATTUA", "APPLIES_TO"), ("RECEPISCE", "APPLIES_TO"),
+    ("APPLICA", "APPLIES_TO"), ("APPLICA_NORMA_A_CASO", "APPLIES_TO"), ("DEROGA_PRINCIPIO", "DEROGA"),
+    ("SPIEGA", "INTERPRETED_BY"),
+    ("VERSIONE_DI", "RELATED_TO"), ("SPECIES", "RELATED_TO"), ("TITOLARE_DI", "RELATED_TO"),  # no nearer name
+])
+def test_the_policy_maps_the_rest_of_the_schema_to_its_nearest_name(name, policy_name):
+    assert normalize_relation_type(name) == policy_name
+
+
+def test_a_name_that_is_not_the_schemas_still_passes_through_unchanged():
+    assert normalize_relation_type("RELAZIONE_NUOVA") == "RELAZIONE_NUOVA"
+
+
+def test_the_feedback_endpoint_knows_every_relation_of_the_schema():
+    from merlt.rlcf.policy_gradient import KNOWN_RELATION_VOCABULARY
+
+    assert all(rel.value in KNOWN_RELATION_VOCABULARY for rel in Rel)
+
+
+async def test_the_neural_path_score_asks_the_policy_in_its_own_vocabulary():
+    from merlt.storage.retriever.models import GraphPath
+
+    class _Policy:
+        def __init__(self):
+            self.asked = []
+
+        async def compute_batch_weights(self, query_embedding, relation_types, expert_type, trace=None):
+            self.asked.append(list(relation_types))
+            return {name: (0.5 if name == "RELATED_TO" else 0.8, 0.0) for name in relation_types}
+
+    policy = _Policy()
+    retriever = GraphAwareRetriever(
+        vector_db=MagicMock(), graph_db=MagicMock(), bridge_table=MagicMock(), policy_manager=policy,
+    )
+    path = GraphPath(source_node="a", target_node="b", edges=["CONTIENE", "RINVIA", "DEROGA_A", "RINVIA"], length=4)
+    score = await retriever._score_path(path, expert_type="LiteralExpert", query_embedding=[0.1] * 4)
+    assert policy.asked == [["RELATED_TO", "RIFERIMENTO", "DEROGA"]]  # each once, in the policy's names
+    assert score == pytest.approx((1 / 5) * 0.5 * 0.8 * 0.8 * 0.8)
+
+
+def test_the_static_weight_tables_are_keyed_by_the_schemas_relations():
+    from merlt.storage.retriever.models import _get_default_weights
+
+    relations = {rel.value.lower() for rel in Rel}
+    tables = _get_default_weights()
+    assert tables
+    for expert, weights in tables.items():
+        assert "default" in weights, expert
+        assert set(weights) - {"default"} <= relations, expert
+
+
+@pytest.mark.parametrize("expert, relation, weight", [
+    ("LiteralExpert", "CONTIENE", 1.0), ("LiteralExpert", "RINVIA", 0.75),
+    ("SystemicExpert", "ATTUA", 0.95), ("SystemicExpert", "DEROGA_A", 0.90), ("SystemicExpert", "MODIFICA", 0.90),
+    ("PrinciplesExpert", "BILANCIA_CON", 0.95), ("PrinciplesExpert", "DEROGA_A", 0.95),
+    ("PrinciplesExpert", "ATTUA", 0.95),
+    ("PrecedentExpert", "INTERPRETA", 1.0), ("PrecedentExpert", "APPLICA_A", 1.0), ("PrecedentExpert", "RINVIA", 0.85),
+])
+def test_the_static_weights_are_found_by_the_graphs_relation_names(expert, relation, weight):
+    retriever = GraphAwareRetriever(vector_db=MagicMock(), graph_db=MagicMock(), bridge_table=MagicMock())
+    with patch("merlt.storage.retriever.retriever.EXPERT_TRAVERSAL_WEIGHTS", _default_weights()):
+        assert retriever._compute_static_relation_bonus([relation], expert) == weight
+
+
+def _default_weights():
+    from merlt.storage.retriever.models import _get_default_weights
+
+    return _get_default_weights()
