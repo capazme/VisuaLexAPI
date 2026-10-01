@@ -14,6 +14,9 @@
 
 - The graph round's first pull request (the schema module `services/merlt/merlt/storage/graph/schema.py` with `Label`, `Rel`, `SourceType`, `Fonte`, `Provenance`, `canonical_urn()`, `point_id()`, `stub_properties()` and the contract test `services/merlt/tests/unit/test_graph_vocabulary_contract.py`) is merged into `develop`. Nothing in Tasks 3–13 starts before that.
 - This branch is in sync with `develop` (Task 0).
+- **When to start** (owner's coordination, 1 October): at the orchestration session's signal, which names one of two cases.
+  - **(a) The graph round's pull requests A and B are merged into `develop`.** Everything as written: every branch starts from `develop`.
+  - **(b) The text-as-at-a-date round is merged first.** `feat/massimario-ingestion` (Tasks 3–13) starts from the graph round's published branch `origin/refactor/merlt-graph-vocabulary`, which carries `schema.py`. Pull request 3 is opened only once A and B are on `develop`, after merging `develop` into the branch (in the Claude desktop app with `sync_with_base_branch`) and running Task 13's suites again. Tasks 0–2 and 14–16 start from `develop` in both cases.
 
 ## Global Constraints
 
@@ -88,7 +91,7 @@ Four pull requests into `develop`, each merged with a merge commit `merge: <bran
 
 1. `docs/rassegne-massimario` — the spec and this plan (this branch, renamed in Task 0).
 2. `feat/massimario-sources` — Tasks 1–2 (`services/visualex`).
-3. `feat/massimario-ingestion` — Tasks 3–13 (`services/merlt`), after the graph round's first pull request.
+3. `feat/massimario-ingestion` — Tasks 3–13 (`services/merlt`), from `develop` after the graph round's pull requests A and B, or in case (b) from `origin/refactor/merlt-graph-vocabulary` (see Preconditions).
 4. `feat/massimario-reader` — Tasks 14–16 (`apps/server`, `apps/web`).
 
 Task 17 (pilot) runs on the development stack after 2–4 are merged. The changes to MERL-T's Postgres (`extras` column, source check, bridge indexes) are not Prisma and not `infra/`, but tell the other developer in pull request 3's description.
@@ -762,7 +765,7 @@ Open pull request 2 (`feat/massimario-sources` → `develop`).
 ---
 ### Task 3: MERL-T — schema names, decision identity, citation grammar
 
-Branch: `feat/massimario-ingestion` from `develop` (after the graph round's first pull request is merged). Tasks 3–13 commit here.
+Branch: `feat/massimario-ingestion` from `develop` once the graph round's pull requests A and B are merged, or in case (b) from `origin/refactor/merlt-graph-vocabulary` (Preconditions). Tasks 3–13 commit here.
 
 **Files:**
 - Modify: `services/merlt/merlt/storage/graph/schema.py` (`SourceType`, `Fonte`, `_FONTE_ALIASES`)
