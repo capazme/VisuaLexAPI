@@ -176,7 +176,8 @@ class TemporalValidityService:
         node_data = await self._query_norm_status(urn)
 
         modifications = []
-        if node_data and node_data.get("mod_count", 0) > 0:
+        # `n_modifiche` is set by the multivigenza run only: any other article answers null.
+        if node_data and (node_data.get("mod_count") or 0) > 0:
             modifications = await self._query_modifications(urn)
 
         result = self._build_validity_result(urn, node_data, modifications, as_of_date)

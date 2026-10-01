@@ -309,7 +309,7 @@ async def test_related_concepts_follow_correlato_and_the_communitys_is_a_relatio
     assert "SPECIALIZZA" not in cypher and "GENERALIZZA" not in cypher
 
 
-# The temporal validity service and the router --------------------------------------
+# The temporal validity service, the knowledge graph and the router ----------------
 
 
 async def test_the_validity_service_reads_the_graphs_modification_relations():
@@ -331,6 +331,55 @@ def test_the_validity_service_reports_lowercase_modification_types():
     modifications = [{"event_type": "MODIFICA", "by_urn": "u", "by_estremi": "L. 1/2020", "event_date": "2020-01-01"}]
     result = TemporalValidityService(graph_db=None)._build_validity_result(CC, node, modifications, None)
     assert [mod["type"] for mod in result.recent_modifications] == ["modifica"]
+
+
+async def test_a_norm_no_amendment_run_has_touched_is_checked():
+    # `n_modifiche` is set by the multivigenza run only: the graph answers null for every other article.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    row = {
+        "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
+        "abr_urn": None, "abr_estremi": None, "abr_date": None, "sost_urn": None, "sost_estremi": None, "sost_date": None,
+    }
+    graph = _GraphRecorder(rows=[row])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.is_valid) == ("vigente", True)
+    assert len(graph.cyphers) == 1  # no modification count, so no modification query
+
+
+async def test_an_abrogation_is_reported_without_a_modification_count():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    row = {
+        "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
+        "abr_urn": "act2", "abr_estremi": "L. 2/2021", "abr_date": "2021-02-01",
+        "sost_urn": None, "sost_estremi": None, "sost_date": None,
+    }
+    result = await TemporalValidityService(graph_db=_GraphRecorder(rows=[row])).check_validity(CC)
+    assert (result.status, result.abrogating_norm["urn"]) == ("abrogato", "act2")
+
+
+def _knowledge_graph_on(graph):
+    from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
+
+    knowledge_graph = LegalKnowledgeGraph.__new__(LegalKnowledgeGraph)
+    knowledge_graph._falkordb = graph
+    return knowledge_graph
+
+
+async def test_the_graph_context_reads_the_graphs_relations():
+    # FalkorDBClient.query() answers with a list of dicts keyed by the RETURN aliases.
+    row = {"parent_urn": "urn:libro", "parent_title": "Libro IV", "children": ["1", "2"], "modifiers": ["L. 1/2020"]}
+    graph = _GraphRecorder(rows=[row])
+    context = await _knowledge_graph_on(graph)._get_graph_context(CC)
+    cypher = graph.cyphers[0]
+    assert cypher.count("[:CONTIENE]") == 2
+    assert "[:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]" in cypher
+    assert context == row
+
+
+async def test_the_graph_context_of_an_unknown_article_is_empty():
+    assert await _knowledge_graph_on(_GraphRecorder())._get_graph_context(CC) == {}
 
 
 @pytest.mark.parametrize("asked, stored", [("CITA", "RINVIA"), ("cita", "RINVIA"), ("DISCIPLINA", "DISCIPLINA"), ("contiene", "CONTIENE")])
