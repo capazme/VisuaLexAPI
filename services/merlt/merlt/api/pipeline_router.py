@@ -808,10 +808,13 @@ async def export_dataset(
         await graph_client.connect()
 
         try:
-            # Build query con filtri opzionali
+            # Build query con filtri opzionali: the filter is a parameter, never part
+            # of the text (`limit` is a validated integer), and the read is read-only.
+            params = {}
             where_clause = ""
             if request.filter_tipo_atto:
-                where_clause = f"WHERE n.tipo_atto = '{request.filter_tipo_atto}'"
+                where_clause = "WHERE n.tipo_atto = $tipo_atto"
+                params["tipo_atto"] = request.filter_tipo_atto
 
             query = f"""
             MATCH (n)
@@ -820,7 +823,7 @@ async def export_dataset(
             LIMIT {request.limit}
             """
 
-            result = await graph_client.query(query)
+            result = await graph_client.ro_query(query, params)
 
             if not result:
                 return DatasetExportResponse(

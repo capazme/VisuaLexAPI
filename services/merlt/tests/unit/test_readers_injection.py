@@ -456,3 +456,19 @@ async def test_the_search_subgraph_without_a_relation_filter_has_no_clause():
     await graph_router._query_search_subgraph(client, {CC}, None, 50)
     cypher, params = client.ro_query.await_args.args
     assert "allowed_rels" not in cypher and "allowed_rels" not in params
+
+
+async def test_the_dataset_export_filter_is_a_parameter_and_the_read_is_read_only():
+    # Admin-only, but the filter was written into a quoted literal: `x' DETACH DELETE n //` deleted the graph.
+    pipeline_router = importlib.import_module("merlt.api.pipeline_router")
+    attack = "x' DETACH DELETE n //"
+    client = _router_client()
+    request = pipeline_router.DatasetExportRequest(filter_tipo_atto=attack, limit=5)
+    with patch("merlt.storage.graph.client.FalkorDBClient", return_value=client):
+        response = await pipeline_router.export_dataset(request, api_key=None)
+    client.query.assert_not_awaited()
+    cypher, params = client.ro_query.await_args.args
+    assert "WHERE n.tipo_atto = $tipo_atto" in cypher and "LIMIT 5" in cypher
+    assert attack not in cypher and "DELETE" not in cypher.upper()
+    assert params == {"tipo_atto": attack}
+    assert response.records_count == 0
