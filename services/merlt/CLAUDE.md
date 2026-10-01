@@ -264,7 +264,10 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   `except`.
 - The FalkorDB graph key for a norm is the full Normattiva URL, without the
   version marker. Strip only the marker (`!vig=`, `@originale`), never the URL
-  wrapper.
+  wrapper. `schema.canonical_urn` is the one function that does it, and every
+  writer and reader calls it (a `strip` goes around the call, not instead of it).
+  It cuts a norm reference and returns any other string as it is: a case-law URL
+  such as an Italgiure id holds `@` and is not a norm's key.
 - One graph name (`merl_t_legal`) and one Qdrant collection
   (`storage/vectors/collection.default_chunks_collection()`).
 - The tools the experts call, the temporal validity check, the graph context and the
