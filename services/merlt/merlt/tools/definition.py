@@ -317,7 +317,7 @@ class DefinitionLookupTool(BaseTool):
             WHERE {match_condition}
             RETURN
                 concept.nome AS term,
-                source.URN AS source_urn,
+                coalesce(source.URN, source.node_id) AS source_urn,
                 labels(source)[0] AS source_type,
                 source.estremi AS source_estremi,
                 coalesce(concept.definizione, concept.descrizione) AS definition_text,
@@ -365,13 +365,13 @@ class DefinitionLookupTool(BaseTool):
 
         cypher = f"""
             MATCH (c:ConcettoGiuridico)
-            WHERE {match_condition} AND c.definizione IS NOT NULL
+            WHERE {match_condition} AND coalesce(c.definizione, c.descrizione) IS NOT NULL
             RETURN
                 c.nome AS term,
-                c.URN AS source_urn,
+                coalesce(c.URN, c.node_id) AS source_urn,
                 'ConcettoGiuridico' AS source_type,
                 c.nome AS source_estremi,
-                c.definizione AS definition_text
+                coalesce(c.definizione, c.descrizione) AS definition_text
             LIMIT {limit}
         """
 
@@ -432,7 +432,7 @@ class DefinitionLookupTool(BaseTool):
                   OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'ai sensi'
               )
             RETURN
-                n.URN AS source_urn,
+                coalesce(n.URN, n.node_id) AS source_urn,
                 labels(n)[0] AS source_type,
                 n.estremi AS source_estremi,
                 coalesce(n.testo, n.testo_vigente) AS definition_text
@@ -477,13 +477,13 @@ class DefinitionLookupTool(BaseTool):
             MATCH (c1:ConcettoGiuridico)
             WHERE toLower(c1.nome) CONTAINS toLower($term)
             MATCH (c1)-[:CORRELATO|SPECIES]-(c2:ConcettoGiuridico)
-            WHERE c2.definizione IS NOT NULL
+            WHERE coalesce(c2.definizione, c2.descrizione) IS NOT NULL
             RETURN DISTINCT
                 c2.nome AS term,
-                c2.URN AS source_urn,
+                coalesce(c2.URN, c2.node_id) AS source_urn,
                 'ConcettoGiuridico' AS source_type,
                 c2.nome AS source_estremi,
-                c2.definizione AS definition_text,
+                coalesce(c2.definizione, c2.descrizione) AS definition_text,
                 'correlato a ' + c1.nome AS context
             LIMIT $limit
         """

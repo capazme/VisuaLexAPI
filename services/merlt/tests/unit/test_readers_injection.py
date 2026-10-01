@@ -322,6 +322,7 @@ async def _each_reader_query(graph):
     await VerificationTool(graph_db=graph, bridge=MagicMock()).execute(source_ids=["art12"], strict_mode=False)
     service = TemporalValidityService(graph_db=graph)
     await service._query_norm_status(CC)
+    await service._count_modifications(CC)
     await service._query_modifications(CC)
     knowledge_graph = LegalKnowledgeGraph.__new__(LegalKnowledgeGraph)
     knowledge_graph._falkordb = graph
@@ -331,7 +332,7 @@ async def _each_reader_query(graph):
 async def test_every_reader_query_is_read_only():
     graph = _Graph()
     await _each_reader_query(graph)
-    assert len(graph.calls) >= 20  # the drive reached every query, not just the first of each tool
+    assert len(graph.calls) >= 21  # the drive reached every query, not just the first of each tool
     assert set(graph.methods) == {"ro_query"}
 
 

@@ -23,7 +23,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import Rel, cypher_rel_names
+from merlt.storage.graph.schema import Rel, canonical_urn, cypher_rel_names
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
@@ -177,6 +177,9 @@ class TextualReferenceTool(BaseTool):
                 error="FalkorDB client non configurato",
                 tool_name=self.name
             )
+
+        # The graph's key has no version marker (`!vig=`, `@originale`)
+        article_urn = canonical_urn(article_urn)
 
         # Validate e clamp max_depth
         try:

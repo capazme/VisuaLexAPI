@@ -384,16 +384,16 @@ class PrincipleLookupTool(BaseTool):
 
         cypher = f"""
             MATCH (n:Norma)
-            WHERE n.testo_vigente IS NOT NULL
-              AND toLower(n.testo_vigente) CONTAINS toLower($query)
+            WHERE coalesce(n.testo, n.testo_vigente) IS NOT NULL
+              AND toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS toLower($query)
               AND (
-                  toLower(n.testo_vigente) CONTAINS 'principio'
-                  OR toLower(n.testo_vigente) CONTAINS 'generale'
+                  toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'principio'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'generale'
               )
             RETURN
                 n.URN as source_urn,
                 n.estremi as source_estremi,
-                n.testo_vigente as text
+                coalesce(n.testo, n.testo_vigente) as text
             LIMIT {limit}
         """
 

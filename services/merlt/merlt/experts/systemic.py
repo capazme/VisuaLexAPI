@@ -36,7 +36,7 @@ from merlt.experts.base import (
 )
 from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
-from merlt.storage.graph.schema import Rel
+from merlt.storage.graph.schema import Rel, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
@@ -575,7 +575,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                         target_urn = node.get("urn", "")
                         target_type = node.get("type", "")
                         expanded.append({
-                            "text": node.get("properties", {}).get("testo", ""),
+                            "text": node_text(node.get("properties", {})),
                             "urn": target_urn,
                             "type": target_type,
                             "source": "systemic_expansion",

@@ -23,7 +23,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import Rel, cypher_rel_names
+from merlt.storage.graph.schema import Rel, canonical_urn, cypher_rel_names
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
@@ -222,6 +222,8 @@ class HistoricalEvolutionTool(BaseTool):
 
         Query per trovare tutte le relazioni temporali in entrata.
         """
+        urn = canonical_urn(urn)  # the graph's key has no version marker
+
         # Build event type filter: the graph's names (the schema's), whatever
         # case the caller used. A name the graph does not have is dropped, and a
         # filter that comes out empty finds no events: it is never run unfiltered.
@@ -275,6 +277,8 @@ class HistoricalEvolutionTool(BaseTool):
         Returns:
             "vigente" | "abrogato" | "sostituito"
         """
+        urn = canonical_urn(urn)  # the graph's key has no version marker
+
         cypher = """
             MATCH (norma {URN: $urn})
             OPTIONAL MATCH (norma)<-[:ABROGA]-(abrogante)

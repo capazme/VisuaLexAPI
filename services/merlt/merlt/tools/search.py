@@ -667,10 +667,12 @@ class GraphSearchTool(BaseTool):
         # node is keyed URN=`live:<hash>` and carries the CANONICAL urn in
         # source_url, so a URN-only match silently missed every live-retrieved
         # norm — the traversal came back empty for anything outside the CC seed
-        # even when the node existed with real CORRELATO edges.
+        # even when the node existed with real CORRELATO edges. Most seed nodes
+        # (concepts, principles, massime, doctrine) have neither: their key is
+        # `node_id`, and that is the key the tool hands to the LLM.
         query = f"""
         MATCH (start)
-        WHERE start.URN = $start_urn OR start.source_url = $start_urn
+        WHERE start.URN = $start_urn OR start.source_url = $start_urn OR start.node_id = $start_urn
         MATCH path = (start){rel_pattern}(target{target_filter})
         UNWIND nodes(path) AS node
         UNWIND relationships(path) AS rel

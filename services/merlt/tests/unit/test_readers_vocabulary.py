@@ -25,16 +25,20 @@ class _GraphRecorder:
 
     `query` is the writer's call and `ro_query` the read-only one: the readers use the second."""
 
-    def __init__(self, rows=None):
+    def __init__(self, rows=None, answers=None):
         self.cyphers = []
         self.params = []
         self.methods = []
         self._rows = rows or []
+        self._answers = answers or []  # [(a piece of the Cypher, rows)]: the first that fits wins
 
     async def _ask(self, method, cypher, params):
         self.methods.append(method)
         self.cyphers.append(cypher)
         self.params.append(params)
+        for piece, rows in self._answers:
+            if piece in cypher:
+                return rows
         return self._rows
 
     async def query(self, cypher, params=None):
@@ -351,10 +355,10 @@ async def test_a_norm_no_amendment_run_has_touched_is_checked():
         "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
         "abr_urn": None, "abr_estremi": None, "abr_date": None, "sost_urn": None, "sost_estremi": None, "sost_date": None,
     }
-    graph = _GraphRecorder(rows=[row])
+    graph = _GraphRecorder(rows=[row], answers=[("count(r)", [{"n": 0}])])
     result = await TemporalValidityService(graph_db=graph).check_validity(CC)
     assert (result.status, result.is_valid) == ("vigente", True)
-    assert len(graph.cyphers) == 1  # no modification count, so no modification query
+    assert len(graph.cyphers) == 2  # the status and the count: no modification, so no modification query
 
 
 async def test_an_abrogation_is_reported_without_a_modification_count():
@@ -454,3 +458,182 @@ async def test_the_issue_context_parser_knows_the_graphs_relations_and_the_commu
     assert details.is_relation
     assert details.relation_type == rel_type
     assert (details.source_label, details.target_label) == ("concetto:buona_fede", "principio:correttezza")
+
+
+# The nodes as the seed stores them ------------------------------------------------
+
+
+def _squashed(cypher):
+    return " ".join(cypher.split())
+
+
+def _without_coalesced_pair(cypher, first, second):
+    """The Cypher with every `coalesce(x.<first>, x.<second>)` taken out."""
+    return re.sub(rf"coalesce\((\w+)\.{first},\s*\1\.{second}\)", "", cypher)
+
+
+async def test_concept_definitions_read_a_concept_as_the_seed_stores_it():
+    # A seed concept has no `definizione` and no `URN`: its text is `descrizione`, its key `node_id`.
+    row = {
+        "term": "Buona fede", "source_urn": "concetto:buona_fede", "source_estremi": "Buona fede",
+        "definition_text": "La buona fede e correttezza.", "context": "correlato a x",
+    }
+    from merlt.tools.definition import DefinitionLookupTool
+
+    graph = _GraphRecorder(rows=[row])
+    tool = DefinitionLookupTool(graph_db=graph)
+    direct = await tool._find_concept_definitions("buona fede", False, 5)
+    related = await tool._find_related_definitions("buona fede", None, 5)
+    via_relation = await tool._find_definitions_via_relation("buona fede", None, False, 5)
+    in_text = await tool._find_definitions_in_text("buona fede", None, 5)
+    for found in (direct, related):
+        assert [(d["source_urn"], d["definition_text"]) for d in found] == [("concetto:buona_fede", "La buona fede e correttezza.")]
+    direct_cypher, related_cypher, relation_cypher, text_cypher = graph.cyphers
+    assert "coalesce(c.definizione, c.descrizione) IS NOT NULL" in direct_cypher
+    assert "coalesce(c.URN, c.node_id) AS source_urn" in direct_cypher
+    assert "coalesce(c2.definizione, c2.descrizione) IS NOT NULL" in related_cypher
+    assert "coalesce(c2.URN, c2.node_id) AS source_urn" in related_cypher
+    # a source keyed by node_id only (a massima, doctrine) is a source too
+    assert "coalesce(source.URN, source.node_id) AS source_urn" in relation_cypher
+    assert "coalesce(n.URN, n.node_id) AS source_urn" in text_cypher
+    for cypher in (direct_cypher, related_cypher, relation_cypher):
+        assert ".definizione" not in _without_coalesced_pair(cypher, "definizione", "descrizione")
+    assert via_relation and in_text
+
+
+async def test_the_systemic_expansion_reads_a_nodes_text_whichever_writer_stored_it(_static_systemic_floor):
+    graph = _GraphRecorder(rows=[
+        _graph_node("ConcettoGiuridico", node_id="concetto:buona_fede", descrizione="Un concetto."),
+        _graph_node("AttoGiudiziario", node_id="massima_1", massima="Una massima."),
+        _graph_node("Norma", URN=CC, testo_vigente="Un articolo."),
+    ])
+    expert = SystemicExpert(tools=[GraphSearchTool(graph_db=graph)])
+    expanded = await expert._expand_systemic_relations(_context(CC), [])
+    assert [e["text"] for e in expanded] == ["Un concetto.", "Una massima.", "Un articolo."]
+
+
+def test_graph_search_finds_a_node_keyed_by_node_id_only():
+    # 15,377 seed nodes have no URN: the tool hands their node_id to the LLM, which hands it back.
+    query, params = GraphSearchTool(graph_db=None)._build_traversal_query(start_node="concetto:buona_fede")
+    assert "WHERE start.URN = $start_urn OR start.source_url = $start_urn OR start.node_id = $start_urn" in _squashed(query)
+    assert params == {"start_urn": "concetto:buona_fede"}
+
+
+@pytest.mark.parametrize("marker", ["!vig=2023-01-01", "@originale"])
+async def test_the_readers_start_from_the_graphs_key_not_from_a_marked_urn(marker):
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+    from merlt.tools.hierarchy import HierarchyNavigationTool
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+    from merlt.tools.textual_reference import TextualReferenceTool
+
+    marked = CC + marker
+    graph = _GraphRecorder()
+    await HierarchyNavigationTool(graph_db=graph)._find_start_node(marked)
+    history = HistoricalEvolutionTool(graph_db=graph)
+    await history._get_timeline(marked, False, None)
+    await history._get_current_status(marked)
+    await TextualReferenceTool(graph_db=graph).execute(article_urn=marked)
+    service = TemporalValidityService(graph_db=graph)
+    await service._query_norm_status(marked)
+    await service._query_modifications(marked)
+    assert graph.params == [{"id": CC}, {"urn": CC}, {"urn": CC}, {"urn": CC}, {"urn": CC}, {"urn": CC}]
+
+
+async def test_a_validity_answer_keeps_the_urn_that_was_asked():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    marked = CC + "!vig=2023-01-01"
+    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}])], rows=[{"mod_count": 0}])
+    result = await TemporalValidityService(graph_db=graph).check_validity(marked)
+    assert result.urn == marked  # the caller matches the answer to its own spelling
+    assert {params["urn"] for params in graph.params} == {CC}  # the graph is asked with its key
+
+
+async def test_principle_text_search_reads_testo_before_testo_vigente():
+    from merlt.tools.principle_lookup import PrincipleLookupTool
+
+    graph = _GraphRecorder()
+    await PrincipleLookupTool(graph_db=graph)._find_principles_in_text("buona fede", 5)
+    cypher = graph.cyphers[0]
+    assert "coalesce(n.testo, n.testo_vigente)" in cypher
+    assert "testo_vigente" not in _without_coalesced_pair(cypher, "testo", "testo_vigente")
+
+
+async def test_the_hierarchy_tells_partitions_apart_by_tipo_documento():
+    from merlt.tools.hierarchy import HierarchyNavigationTool
+
+    graph = _GraphRecorder()
+    tool = HierarchyNavigationTool(graph_db=graph)
+    await tool._find_start_node("1453")
+    await tool._get_ancestors(CC, 3, False, ["Capo", "articolo"])
+    await tool._get_descendants(CC, 1, False, None)
+    await tool._get_siblings(CC, False, ["sezione"])
+    start, ancestors, descendants, siblings = (_squashed(cypher) for cypher in graph.cyphers)
+    assert "coalesce(n.tipo_documento, labels(n)[0]) AS tipo" in start
+    assert "coalesce(n.tipo_documento, labels(n)[0]) AS tipo" in ancestors
+    assert "coalesce(n.tipo_documento, labels(n)[0]) AS tipo" in descendants
+    assert "coalesce(sibling.tipo_documento, labels(sibling)[0]) AS tipo" in siblings
+    assert "AND coalesce(n.tipo_documento, labels(n)[0]) IN $tipi" in ancestors
+    assert "AND coalesce(sibling.tipo_documento, labels(sibling)[0]) IN $tipi" in siblings
+    assert graph.params[1]["tipi"] == ["Capo", "capo", "articolo"]  # as given and in lower case
+    assert "labels(n)[0] AS tipo" not in ancestors.replace("coalesce(n.tipo_documento, labels(n)[0]) AS tipo", "")
+
+
+def test_the_hierarchy_examples_are_real_types():
+    from merlt.tools.hierarchy import HierarchyNavigationTool
+
+    description = next(p for p in HierarchyNavigationTool(graph_db=None).parameters if p.name == "tipo_filter").description
+    for tipo in ("libro", "titolo", "capo", "sezione", "articolo"):
+        assert tipo in description
+    assert "Articolo" not in description
+
+
+def test_a_path_through_partitions_without_estremi_is_still_a_path():
+    # An ingested titolo or capo has a rubrica but no estremi: the path must not raise.
+    from merlt.tools.hierarchy import HierarchyNavigationTool
+
+    nodes = [
+        {"urn": "capo1", "estremi": None, "rubrica": "Dei contratti in generale", "depth": 1},
+        {"urn": "titolo1", "estremi": None, "rubrica": None, "depth": 2},
+        {"urn": "cod", "estremi": "Codice civile", "rubrica": None, "depth": 3},
+    ]
+    tool = HierarchyNavigationTool(graph_db=None)
+    assert tool._build_path_string(nodes, "ancestors") == "Codice civile → titolo1 → Dei contratti in generale"
+    assert tool._build_path_string(nodes, "siblings") == "Dei contratti in generale | titolo1 | Codice civile"
+    assert tool._build_path_string(nodes, "descendants") == "Dei contratti in generale, titolo1, Codice civile"
+    context = [dict(node, relation="ancestor") for node in nodes]
+    assert "Dei contratti in generale" in tool._build_path_string(context, "context")
+
+
+async def test_modifications_are_found_by_counting_the_incoming_modifica_edges():
+    # `n_modifiche` is on 34 of 1,539 seed articles, and there are 54 MODIFICA edges.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    status = {
+        "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
+        "abr_urn": None, "abr_estremi": None, "abr_date": None, "sost_urn": None, "sost_estremi": None, "sost_date": None,
+    }
+    edges = [{"event_type": "MODIFICA", "by_urn": "act1", "by_estremi": "L. 1/2020", "event_date": "2020-02-01"}]
+    graph = _GraphRecorder(answers=[
+        ("count(r)", [{"n": 2}]),
+        ("type(r) AS event_type", edges),
+        ("AS is_abrogated", [status]),
+    ])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.modification_count) == ("modificato", 2)
+    assert [mod["type"] for mod in result.recent_modifications] == ["modifica"]
+    count_cypher = next(c for c in graph.cyphers if "count(r)" in c)
+    assert "<-[r:MODIFICA]-" in count_cypher
+
+
+async def test_an_article_nothing_modifies_is_checked_without_a_modification_query():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    status = {
+        "is_abrogated": None, "is_current": None, "mod_count": None, "last_modified": None, "effective_since": None,
+        "abr_urn": None, "abr_estremi": None, "abr_date": None, "sost_urn": None, "sost_estremi": None, "sost_date": None,
+    }
+    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [status])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.modification_count) == ("vigente", 0)
+    assert not any("type(r) AS event_type" in cypher for cypher in graph.cyphers)

@@ -28,6 +28,8 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from merlt.storage.graph.schema import canonical_urn
+
 log = structlog.get_logger()
 
 # Cache TTL: 24 hours
@@ -172,13 +174,22 @@ class TemporalValidityService:
                     log.debug("validity_cache_hit", urn=urn)
                     return result
 
-        # Query FalkorDB (outside lock — allow concurrent queries)
-        node_data = await self._query_norm_status(urn)
+        # Query FalkorDB (outside lock — allow concurrent queries). The graph is asked
+        # with its own key (no `!vig=`, `@originale`); the answer keeps the URN that
+        # was asked, so the caller matches it to its own spelling.
+        key = canonical_urn(urn)
+        node_data = await self._query_norm_status(key)
 
         modifications = []
-        # `n_modifiche` is set by the multivigenza run only: any other article answers null.
-        if node_data and (node_data.get("mod_count") or 0) > 0:
-            modifications = await self._query_modifications(urn)
+        if node_data is not None:
+            # The modifications are the incoming MODIFICA edges. `n_modifiche` is set
+            # by the multivigenza run only (measured on the seed: 34 of 1,539 articles
+            # carry it, and there are 54 MODIFICA edges), so it can only add to the
+            # count, never gate it.
+            edge_count = await self._count_modifications(key)
+            node_data["mod_count"] = max(node_data.get("mod_count") or 0, edge_count)
+            if node_data["mod_count"] > 0:
+                modifications = await self._query_modifications(key)
 
         result = self._build_validity_result(urn, node_data, modifications, as_of_date)
 
@@ -302,13 +313,32 @@ class TemporalValidityService:
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
             if not results:
                 return None
             return results[0]
         except Exception as e:
             log.error("validity_query_failed", urn=urn, error=str(e))
             return None
+
+    async def _count_modifications(self, urn: str) -> int:
+        """
+        Query Cypher per contare le modifiche in entrata (archi MODIFICA).
+
+        Returns:
+            Numero di archi MODIFICA verso la norma (0 se non leggibile)
+        """
+        cypher = """
+            MATCH (norma {URN: $urn})<-[r:MODIFICA]-()
+            RETURN count(r) AS n
+        """
+
+        try:
+            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
+            return int(results[0]["n"]) if results else 0
+        except Exception as e:
+            log.error("modification_count_failed", urn=urn, error=str(e))
+            return 0
 
     async def _query_modifications(self, urn: str) -> List[Dict[str, Any]]:
         """
@@ -329,7 +359,7 @@ class TemporalValidityService:
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
             return results
         except Exception as e:
             log.error("modifications_query_failed", urn=urn, error=str(e))
