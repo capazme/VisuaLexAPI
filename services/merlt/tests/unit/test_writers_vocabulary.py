@@ -6,7 +6,11 @@ from merlt.api.enrichment_router import _LOAD_LIVE_SOURCE_CYPHER
 from merlt.pipeline.provisional_writer import _merge_provisional_node
 from merlt.pipeline.review import list_pending_review
 from merlt.storage.graph import entity_writer
-from merlt.storage.graph.entity_writer import RELATION_BY_ENTITY_TYPE
+from merlt.storage.graph.entity_writer import (
+    RELATION_BY_ENTITY_TYPE,
+    normalize_entity_name,
+    seed_twin_slug,
+)
 from merlt.storage.graph.schema import Rel
 
 CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1322"
@@ -163,3 +167,31 @@ async def test_the_review_listing_reads_testo_before_text():
     rows = await list_pending_review(graph)
     assert "coalesce(n.testo, n.text) AS text" in graph.query.await_args.args[0]
     assert rows[0]["text_preview"] == "x" * 280 + "…"
+
+
+# The twin is looked up by the seed's key, and adopted without being re-keyed -----
+
+
+def test_the_seed_slug_folds_the_accents_the_community_slug_drops():
+    # `normalize_entity_name` deletes a non-ASCII letter; the seed folds it. The
+    # community id keeps the first rule (the document parser and the router
+    # derive it with it), the twin lookup uses the second.
+    assert normalize_entity_name("Patto di non trasferibilità") == "patto_di_non_trasferibilit"
+    assert seed_twin_slug("Patto di non trasferibilità") == "patto_di_non_trasferibilita"
+    assert seed_twin_slug("trasferibilita\u0300") == "trasferibilita"  # a decomposed accent too
+    assert seed_twin_slug("Il Conduttore") == normalize_entity_name("Il Conduttore") == "conduttore"
+
+
+async def test_an_accented_name_finds_its_seed_twin():
+    writer, client = _writer()
+    client.query = AsyncMock(side_effect=[[], [{"id": "concetto:patto_di_non_trasferibilit"}]])
+    found = await writer._check_duplicate_mechanical("Patto di non trasferibilità", "concetto")
+    # The Entity lookup and the id the twin takes stay the community's own slug ...
+    assert client.query.await_args_list[0].args[1] == {"expected_id": "concetto:patto_di_non_trasferibilit"}
+    # ... the twin is found by the seed's key.
+    cypher, params = client.query.await_args_list[1].args
+    assert params == {
+        "nid": "concetto:patto_di_non_trasferibilita",
+        "eid": "concetto:patto_di_non_trasferibilit",
+    }
+    assert found == "concetto:patto_di_non_trasferibilit"

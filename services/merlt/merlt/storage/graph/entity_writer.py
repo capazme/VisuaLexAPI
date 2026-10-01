@@ -52,6 +52,7 @@ Usage:
 
 import re
 import structlog
+import unicodedata
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
@@ -148,6 +149,23 @@ def normalize_entity_name(nome: str) -> str:
     normalized = normalized.strip("_")
 
     return normalized
+
+
+def seed_twin_slug(nome: str) -> str:
+    """The slug of the seed's node id for a concept: the name, accents folded.
+
+    The seed folds an accented letter to its base ("trasferibilità" ->
+    "trasferibilita"); `normalize_entity_name` deletes it ("trasferibilit"), and
+    the community id keeps that rule (the document parser and the router derive
+    it with it). A seed twin is therefore looked up by the folded name, never by
+    the community id: with the community slug no accented seed name matches.
+
+    Known limit: the seed keeps a leading article and drops a hyphen
+    (`la_reticenza`, `quasiusufrutto`), `normalize_entity_name` the reverse, so
+    those names (about 1% of the seed) still miss their twin.
+    """
+    decomposed = unicodedata.normalize("NFD", nome or "")
+    return normalize_entity_name("".join(ch for ch in decomposed if not unicodedata.combining(ch)))
 
 
 def entity_node_id(entity_type: str, nome: str) -> str:
@@ -290,11 +308,12 @@ class EntityGraphWriter:
         if twin:
             label, prefix = twin
             # The seed already has this concept: it becomes the community entity
-            # (one node, one key) instead of a twin next to it.
+            # (one node, one key) instead of a twin next to it. It is found by the
+            # seed's own key (`seed_twin_slug`: accents folded).
             rows = await self.falkordb.query(
                 f"MATCH (c:{label.value} {{node_id: $nid}}) "
                 "SET c:Entity, c.id = $eid RETURN c.id AS id",
-                {"nid": f"{prefix}:{normalized}", "eid": expected_id},
+                {"nid": f"{prefix}:{seed_twin_slug(entity_text)}", "eid": expected_id},
             )
             if rows:
                 return rows[0]["id"]
