@@ -88,8 +88,9 @@ jobs:
   merlt:
     name: MERL-T tests
     runs-on: ubuntu-latest
-    # Tests marked `integration` (live FalkorDB) are excluded by pyproject's
-    # addopts; the database ones run against this disposable Postgres.
+    # The suite runs against this disposable Postgres. Tests marked
+    # `integration` (live FalkorDB) are excluded from that run by pyproject's
+    # addopts, and run next against this disposable FalkorDB.
     services:
       postgres:
         image: postgres:16
@@ -101,6 +102,16 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U merlt -d merlt"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      falkordb:
+        # The image infra/compose.yml pins for the development graph.
+        image: falkordb/falkordb@sha256:d6aa9598b79cd54935864d56f971f3916156399a9ca38a5fae6c029ab1f2bce9
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli -p 6379 ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -135,6 +146,13 @@ jobs:
           asyncio.run(main())
           "
       - run: python -m pytest tests/ -q -p no:cacheprovider
+      # FalkorDBConfig reads its host and port from these (its default port is
+      # 6380); scoped to this step so no other test sees a live graph.
+      - name: Integration tests (live FalkorDB)
+        run: python -m pytest tests/ -q -p no:cacheprovider -m integration
+        env:
+          FALKORDB_HOST: localhost
+          FALKORDB_PORT: '6379'
 
   data:
     name: Data backup and restore
