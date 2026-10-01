@@ -313,6 +313,44 @@ async def test_definitions_read_the_text_whichever_writer_stored_it():
         assert "testo_vigente" not in _without_coalesced_text(cypher)
 
 
+# The seed's 498 DEFINISCE edges all end on a DefinizioneLegale {node_id, nome, descrizione}: none on a
+# ConcettoGiuridico, which is what the definition lookup used to ask for.
+SEED_DEFINITION_ROW = {
+    "term": "caparra confirmatoria", "source_urn": CC, "source_type": "Norma", "source_estremi": "Art. 1385 c.c.",
+    "definition_text": "La somma data a garanzia dell'adempimento.", "context": "Se al momento della conclusione...",
+}
+
+
+async def test_a_definition_is_found_whichever_label_the_defined_concept_has():
+    from merlt.tools.definition import DefinitionLookupTool
+
+    graph = _GraphRecorder(rows=[SEED_DEFINITION_ROW])
+    found = await DefinitionLookupTool(graph_db=graph)._find_definitions_via_relation("caparra", None, False, 5)
+    cypher = " ".join(graph.cyphers[0].split())
+    for label in ("DefinizioneLegale", "ConcettoGiuridico", "Entity"):
+        assert f"-[r:DEFINISCE]->(concept:{label})" in cypher
+    assert cypher.count("UNION") == 2  # one branch per label
+    # an `OR` of labels in the WHERE is an all-node scan (80 ms on 425,000 nodes, 1 ms for a label scan)
+    assert " OR concept:" not in cypher
+    assert [(d["source_urn"], d["definition_text"]) for d in found] == [(CC, SEED_DEFINITION_ROW["definition_text"])]
+
+
+async def test_a_seed_legal_definition_is_looked_up_as_a_concept_with_a_definition():
+    from merlt.tools.definition import DefinitionLookupTool
+
+    row = {
+        "term": "caparra confirmatoria", "source_urn": "definizione:caparra_confirmatoria",
+        "source_type": "DefinizioneLegale", "source_estremi": "caparra confirmatoria",
+        "definition_text": "La somma data a garanzia dell'adempimento.",
+    }
+    graph = _GraphRecorder(rows=[row])
+    found = await DefinitionLookupTool(graph_db=graph)._find_concept_definitions("caparra", False, 5)
+    cypher = " ".join(graph.cyphers[0].split())
+    assert "MATCH (c:ConcettoGiuridico)" in cypher and "MATCH (c:DefinizioneLegale)" in cypher
+    assert cypher.count("UNION") == 1 and " OR c:" not in cypher
+    assert [(d["source_urn"], d["source_type"]) for d in found] == [("definizione:caparra_confirmatoria", "DefinizioneLegale")]
+
+
 async def test_related_concepts_follow_correlato_and_the_communitys_is_a_relation():
     from merlt.tools.definition import DefinitionLookupTool
 

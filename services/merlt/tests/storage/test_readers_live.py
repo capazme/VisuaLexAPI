@@ -72,8 +72,12 @@ async def graph():
 
 
 async def _seed(client):
-    """The shapes the writers leave: partitions with a rubrica and no estremi, articles with
-    `testo`, `testo_vigente` or both, concepts and principles keyed by node_id only."""
+    """What this graph holds, node by node (hand-written Cypher, not the writers' output):
+    partitions with a rubrica and no estremi; articles with `testo`, `testo_vigente` or both;
+    concepts, principles, massime and doctrine keyed by node_id only; the seed's definitions
+    (`Norma -[DEFINISCE]-> DefinizioneLegale {node_id, nome, descrizione}`, never to a
+    ConcettoGiuridico) and one community definition that carries the old `:Entity:Definizione`
+    labels."""
     await client.query(
         """
         CREATE (cod:Norma {URN: 'urn:test:cod', node_id: 'urn:test:cod', estremi: 'Codice civile', tipo_documento: 'codice'})
@@ -100,7 +104,10 @@ async def _seed(client):
         CREATE (k:ConcettoGiuridico {node_id: 'concetto:buona_fede', nome: 'Buona fede', descrizione: 'La buona fede e correttezza.'})
         CREATE (k2:ConcettoGiuridico {node_id: 'concetto:correttezza', nome: 'Correttezza', descrizione: 'Lealta nei rapporti.'})
         CREATE (k3:ConcettoGiuridico {node_id: 'concetto:bf_oggettiva', nome: 'Buona fede oggettiva', descrizione: 'Regola di condotta.'})
-        CREATE (a1)-[:DEFINISCE]->(k)
+        CREATE (dl:DefinizioneLegale {node_id: 'definizione:buona_fede', nome: 'buona fede', descrizione: 'Il dovere di lealta tra le parti.'})
+        CREATE (a1)-[:DEFINISCE]->(dl)
+        CREATE (old:Entity:Definizione {id: 'definizione:mora', nome: 'mora', descrizione: 'Il ritardo colpevole nell adempimento.'})
+        CREATE (a3)-[:DEFINISCE]->(old)
         CREATE (k)-[:CORRELATO]->(k2)
         CREATE (k)-[:SPECIES]->(k3)
         CREATE (p:PrincipioGiuridico {node_id: 'principio:buona_fede', nome: 'buona fede', descrizione: 'Le parti agiscono con lealta.', livello: 'generale'})
@@ -190,13 +197,22 @@ async def test_graph_search_starts_from_a_node_id_and_follows_the_graphs_names(g
 
 async def test_definitions_are_found_by_every_strategy_on_what_the_seed_stores(graph):
     tool = DefinitionLookupTool(graph_db=graph)
+    # The seed's 498 DEFINISCE edges all end on a DefinizioneLegale, never on a ConcettoGiuridico.
     via_relation = await tool._find_definitions_via_relation("buona fede", None, False, 5)
-    assert [(d["source_urn"], d["definition_text"]) for d in via_relation] == [(ART1, "La buona fede e correttezza.")]
+    assert [(d["source_urn"], d["source_type"], d["definition_text"]) for d in via_relation] == [
+        (ART1, "Norma", "Il dovere di lealta tra le parti."),
+    ]
     assert via_relation[0]["context"].startswith("Per buona fede")  # the article's text, from `testo`
 
+    # a definition the community wrote under the labels it had before the schema (`:Entity:Definizione`)
+    community = await tool._find_definitions_via_relation("mora", None, False, 5)
+    assert [(d["source_urn"], d["definition_text"]) for d in community] == [(ART3, "Il ritardo colpevole nell adempimento.")]
+
     concepts = await tool._find_concept_definitions("buona fede", False, 5)
-    assert {d["source_urn"]: d["definition_text"] for d in concepts} == {  # keyed by node_id
-        "concetto:buona_fede": "La buona fede e correttezza.", "concetto:bf_oggettiva": "Regola di condotta.",
+    assert {d["source_urn"]: (d["source_type"], d["definition_text"]) for d in concepts} == {  # keyed by node_id
+        "concetto:buona_fede": ("ConcettoGiuridico", "La buona fede e correttezza."),
+        "concetto:bf_oggettiva": ("ConcettoGiuridico", "Regola di condotta."),
+        "definizione:buona_fede": ("DefinizioneLegale", "Il dovere di lealta tra le parti."),
     }
     related = await tool._find_related_definitions("buona fede", None, 5)
     assert {d["term"] for d in related} == {"Buona fede", "Buona fede oggettiva", "Correttezza"}  # CORRELATO and SPECIES
@@ -206,6 +222,10 @@ async def test_definitions_are_found_by_every_strategy_on_what_the_seed_stores(g
 
     everything = await tool.execute(term="buona fede", include_related=True, limit=10 ** 6)
     assert everything.success and everything.data["total"] >= 4
+    # the article that DEFINISCE the term is answered with the definition the edge points at
+    assert (ART1, "Il dovere di lealta tra le parti.") in {
+        (d["source_urn"], d["definition_text"]) for d in everything.data["definitions"]
+    }
 
 
 async def test_definition_source_types_are_any_of_the_labels_asked_for(graph):
@@ -310,7 +330,7 @@ async def test_the_experts_read_the_text_of_what_they_walk_to(graph):
     literal = LiteralExpert(tools=[GraphSearchTool(graph_db=graph)])
     sources = await literal._retrieve_sources(_context(ART1))
     texts = {s["text"] for s in sources if s["source"] == "graph_traversal"}
-    assert {TEXT1, "La buona fede e correttezza."} <= texts  # the article and its concept (`descrizione`)
+    assert {TEXT1, "Il dovere di lealta tra le parti."} <= texts  # the article and its definition (`descrizione`)
 
     principles = PrinciplesExpert(tools=[SemanticSearchTool(), GraphSearchTool(graph_db=graph)])
     found = await principles._search_principles(_context(ART1))

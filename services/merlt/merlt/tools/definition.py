@@ -22,13 +22,19 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import cypher_labels
+from merlt.storage.graph.schema import Label, cypher_labels
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int, label_filter
 
 log = structlog.get_logger()
 
 # The most definitions one call returns; interpolated into the Cypher (`LIMIT N`).
 MAX_LIMIT = 50
+
+# What a DEFINISCE edge ends on. The seed's 498 edges all end on a DefinizioneLegale; the
+# ConcettoGiuridico is what older writers linked, and a community entity carries Entity.
+DEFINED_LABELS = (Label.DEFINIZIONE_LEGALE.value, Label.CONCETTO_GIURIDICO.value, Label.ENTITY.value)
+# The nodes that hold a definition of their own (strategy 2).
+DEFINITION_LABELS = (Label.CONCETTO_GIURIDICO.value, Label.DEFINIZIONE_LEGALE.value)
 
 
 @dataclass
@@ -71,8 +77,9 @@ class DefinitionLookupTool(BaseTool):
     Tool per cercare definizioni legali nel knowledge graph.
 
     Cerca definizioni attraverso:
-    1. Relazione DEFINISCE (norme che definiscono concetti)
-    2. Match fuzzy su nomi di ConcettoGiuridico
+    1. Relazione DEFINISCE (norme che definiscono una DefinizioneLegale, un
+       ConcettoGiuridico o un'entita' della community)
+    2. Match fuzzy su nomi di ConcettoGiuridico e DefinizioneLegale
     3. Ricerca nel testo di norme contenenti "si intende", "si definisce"
 
     Particolarmente utile per:
@@ -226,7 +233,7 @@ class DefinitionLookupTool(BaseTool):
             )
             definitions.extend(graph_defs)
 
-            # Strategy 2: Look for ConcettoGiuridico nodes with matching name
+            # Strategy 2: Look for ConcettoGiuridico and DefinizioneLegale nodes with matching name
             concept_defs = await self._find_concept_definitions(
                 term, exact_match, limit - len(definitions)
             )
@@ -293,7 +300,11 @@ class DefinitionLookupTool(BaseTool):
         """
         Cerca definizioni tramite relazione DEFINISCE.
 
-        Pattern: (Source)-[:DEFINISCE]->(ConcettoGiuridico)
+        Pattern: (Source)-[:DEFINISCE]->(DefinizioneLegale | ConcettoGiuridico | Entity)
+
+        One query per label of the defined node, joined with UNION: an `OR` of labels
+        in the WHERE makes the engine scan every node (80 ms on 425,000 nodes, against
+        1 ms for a label scan), and the graph is about to grow to that size.
         """
         # Build match pattern
         if exact_match:
@@ -312,8 +323,11 @@ class DefinitionLookupTool(BaseTool):
         if source_where:
             match_condition = f"{match_condition} AND {source_where}"
 
-        cypher = f"""
-            MATCH (source{source_filter})-[r:DEFINISCE]->(concept:ConcettoGiuridico)
+        branches = []
+        for label in DEFINED_LABELS:
+            concept_filter, _ = label_filter("concept", [label])
+            branches.append(f"""
+            MATCH (source{source_filter})-[r:DEFINISCE]->(concept{concept_filter})
             WHERE {match_condition}
             RETURN
                 concept.nome AS term,
@@ -322,8 +336,8 @@ class DefinitionLookupTool(BaseTool):
                 source.estremi AS source_estremi,
                 coalesce(concept.definizione, concept.descrizione) AS definition_text,
                 coalesce(source.testo, source.testo_vigente) AS context
-            LIMIT {limit}
-        """
+            LIMIT {limit}""")
+        cypher = "\n            UNION".join(branches)
 
         try:
             results = await self.graph_db.ro_query(cypher, {"term": term})
@@ -340,7 +354,7 @@ class DefinitionLookupTool(BaseTool):
                 ).to_dict()
                 for r in results
                 if r.get("source_urn")
-            ]
+            ][:limit]
         except Exception as e:
             log.debug(f"DEFINISCE query failed: {e}")
             return []
@@ -352,7 +366,9 @@ class DefinitionLookupTool(BaseTool):
         limit: int
     ) -> List[Dict[str, Any]]:
         """
-        Cerca ConcettoGiuridico con definizione diretta.
+        Cerca ConcettoGiuridico e DefinizioneLegale con definizione diretta.
+
+        One query per label, joined with UNION (see `_find_definitions_via_relation`).
         """
         if exact_match:
             match_condition = "c.nome = $term"
@@ -363,17 +379,20 @@ class DefinitionLookupTool(BaseTool):
         if limit == 0:
             return []
 
-        cypher = f"""
-            MATCH (c:ConcettoGiuridico)
+        branches = []
+        for label in DEFINITION_LABELS:
+            node_filter, _ = label_filter("c", [label])
+            branches.append(f"""
+            MATCH (c{node_filter})
             WHERE {match_condition} AND coalesce(c.definizione, c.descrizione) IS NOT NULL
             RETURN
                 c.nome AS term,
                 coalesce(c.URN, c.node_id) AS source_urn,
-                'ConcettoGiuridico' AS source_type,
+                '{label}' AS source_type,
                 c.nome AS source_estremi,
                 coalesce(c.definizione, c.descrizione) AS definition_text
-            LIMIT {limit}
-        """
+            LIMIT {limit}""")
+        cypher = "\n            UNION".join(branches)
 
         try:
             results = await self.graph_db.ro_query(cypher, {"term": term})
@@ -382,16 +401,16 @@ class DefinitionLookupTool(BaseTool):
                 DefinitionEntry(
                     term=r.get("term", term),
                     source_urn=r.get("source_urn", r.get("term", "")),
-                    source_type="ConcettoGiuridico",
+                    source_type=r.get("source_type") or Label.CONCETTO_GIURIDICO.value,
                     source_estremi=r.get("source_estremi", ""),
                     definition_text=r.get("definition_text", ""),
                     confidence=0.9  # Concept node definition
                 ).to_dict()
                 for r in results
                 if r.get("definition_text")
-            ]
+            ][:limit]
         except Exception as e:
-            log.debug(f"ConcettoGiuridico query failed: {e}")
+            log.debug(f"Concept definition query failed: {e}")
             return []
 
     async def _find_definitions_in_text(
