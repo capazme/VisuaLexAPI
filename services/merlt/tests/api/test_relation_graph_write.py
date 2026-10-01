@@ -19,12 +19,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from merlt.api.enrichment_router import (
+    RelationWriteOutcome,
     _write_deferred_relations_for_entity,
     _write_relation_to_graph,
     get_pending,
@@ -332,8 +334,11 @@ async def test_parte_di_is_written_as_the_reversed_contiene(db):
 
 async def test_an_unresolved_parte_di_endpoint_is_reported_in_the_direction_it_was_stated(db):
     factory, created = db
-    rid = await _relation(factory, created, "concetto:esistente", "Una cosa qualunque", relation_type="PARTE_DI")
-    graph = _FakeGraph(entities={"concetto:esistente"})
+    marker = uuid.uuid4().hex[:8]
+    act = NORMATTIVA_URL_PREFIX + f"urn:nir:stato:legge:2020-01-01;{marker}"
+    # a norm reference the graph has not and cannot stub (it is not a NIR URN)
+    rid = await _relation(factory, created, act, f"urn:lex:it:stato:legge:2021-01-01;{marker}", relation_type="PARTE_DI")
+    graph = _FakeGraph(normas={act})
 
     async with factory() as session:
         outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
@@ -341,6 +346,40 @@ async def test_an_unresolved_parte_di_endpoint_is_reported_in_the_direction_it_w
     assert outcome.written is False
     assert outcome.reason.startswith("target:"), outcome.reason
     assert graph.writes == []
+
+
+@pytest.mark.parametrize("source, target", [
+    ("concetto:a", "concetto:b"),  # two entities
+    ("urn:nir:stato:legge:2020-01-01;1~art3", "concetto:b"),  # a norm part of an entity
+    ("concetto:a", "urn:nir:stato:legge:2020-01-01;1"),  # an entity part of a norm
+    ("Una cosa qualunque", "Un'altra cosa"),  # two names no endpoint resolves
+])
+async def test_a_parte_di_that_is_not_between_two_norms_is_refused_and_never_written(db, source, target):
+    """CONTIENE links norms (an act, an article, a comma). Reversing a PARTE_DI between concepts
+    would write `(B)-[:CONTIENE]->(A)` between two Entity nodes: an edge the graph never holds."""
+    factory, created = db
+    rid = await _relation(factory, created, source, target, relation_type="PARTE_DI")
+    graph = _FakeGraph(entities={"concetto:a", "concetto:b"})
+
+    async with factory() as session:
+        outcome = await _write_relation_to_graph(await _load(session, rid), session, graph)
+
+    assert outcome.written is False
+    assert outcome.deferred is False  # no entity written later makes it writable
+    assert "PARTE_DI" in outcome.reason and "norms" in outcome.reason
+    assert "yet" not in outcome.reason
+    assert graph.queries == [], "refused before any graph access, as a name the graph does not have is"
+    async with factory() as session:
+        assert (await _load(session, rid)).written_to_graph_at is None
+
+
+def test_the_vote_reply_says_yet_only_of_a_relation_that_can_still_be_written():
+    from merlt.api.enrichment_router import _not_written_message
+
+    waiting = RelationWriteOutcome(written=False, reason="pending entity 'x' is not in the graph yet", deferred=True)
+    refused = RelationWriteOutcome(written=False, reason="PARTE_DI is the inverse of CONTIENE")
+    assert _not_written_message(waiting) == " Not written to the graph yet: pending entity 'x' is not in the graph yet"
+    assert _not_written_message(refused) == " Not written to the graph: PARTE_DI is the inverse of CONTIENE"
 
 
 async def test_a_wrapped_urn_endpoint_is_not_wrapped_twice(db):

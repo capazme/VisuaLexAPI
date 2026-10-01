@@ -1649,7 +1649,8 @@ async def _write_relation_to_graph(
     placeholder. The community's relation type is written under the graph's
     name (`community_rel_to_graph`): CITA arrives as RINVIA, and PARTE_DI, the
     inverse of CONTIENE, as the reversed CONTIENE (the endpoints swap): the
-    graph holds the one direction.
+    graph holds the one direction. That holds between two norms only: a PARTE_DI
+    between anything else is refused for good (not deferred).
     """
     log.info(
         "Writing approved relation to graph",
@@ -1667,9 +1668,28 @@ async def _write_relation_to_graph(
         return RelationWriteOutcome(written=False, reason=f"invalid relation type {rel_type!r}")
 
     # PARTE_DI is the inverse of CONTIENE and the graph holds the one direction:
-    # "A is part of B" is written as B CONTIENE A, so the endpoints swap below.
+    # "A is part of B" is written as B CONTIENE A, so the endpoints swap below. CONTIENE
+    # links norms (an act, an article, a comma): reversed between concepts it would write
+    # an edge between two Entity nodes that the graph never holds. Only a PARTE_DI between
+    # two norms is written; any other is refused, before any graph access, and no entity
+    # that is written later makes it writable, so it is not deferred.
     reverse = rel_type == "PARTE_DI"
     if reverse:
+        if not (
+            is_norm_reference(relation.source_node_urn or relation.article_urn)
+            and is_norm_reference(relation.target_entity_id)
+        ):
+            reason = (
+                "PARTE_DI is the inverse of CONTIENE, which links norms only: "
+                "it is never written between anything else"
+            )
+            log.warning(
+                "Relation not written to graph: PARTE_DI is only written between norms",
+                relation_id=relation.relation_id,
+                source=relation.source_node_urn or relation.article_urn,
+                target=relation.target_entity_id,
+            )
+            return RelationWriteOutcome(written=False, reason=reason)
         rel_type = "CONTIENE"
 
     try:
@@ -1764,6 +1784,12 @@ async def _write_relation_to_graph(
     finally:
         if own_client:
             await falkordb.close()
+
+
+def _not_written_message(outcome: RelationWriteOutcome) -> str:
+    """What the vote reply says of a relation that did not reach the graph: "yet" only
+    when it still can (an endpoint that is a pending entity), never for a refusal."""
+    return f" Not written to the graph{' yet' if outcome.deferred else ''}: {outcome.reason}"
 
 
 async def _write_deferred_relations_for_entity(
@@ -2895,7 +2921,7 @@ async def validate_relation(
                 # Then write to FalkorDB (only between existing nodes, B1)
                 outcome = await _write_relation_to_graph(relation, session)
                 if not outcome.written:
-                    merge_message += f" Not written to the graph yet: {outcome.reason}"
+                    merge_message += _not_written_message(outcome)
 
             except Exception as e:
                 log.error(f"Failed to process relation consensus: {e}", exc_info=True)
