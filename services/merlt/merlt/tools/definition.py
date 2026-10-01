@@ -290,8 +290,8 @@ class DefinitionLookupTool(BaseTool):
                 source.URN AS source_urn,
                 labels(source)[0] AS source_type,
                 source.estremi AS source_estremi,
-                concept.definizione AS definition_text,
-                source.testo_vigente AS context
+                coalesce(concept.definizione, concept.descrizione) AS definition_text,
+                coalesce(source.testo, source.testo_vigente) AS context
             LIMIT {limit}
         """
 
@@ -382,19 +382,19 @@ class DefinitionLookupTool(BaseTool):
         # Search for definition patterns containing the term
         cypher = f"""
             MATCH (n{source_filter})
-            WHERE n.testo_vigente IS NOT NULL
-              AND toLower(n.testo_vigente) CONTAINS toLower($term)
+            WHERE coalesce(n.testo, n.testo_vigente) IS NOT NULL
+              AND toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS toLower($term)
               AND (
-                  toLower(n.testo_vigente) CONTAINS 'si intende'
-                  OR toLower(n.testo_vigente) CONTAINS 'si definisce'
-                  OR toLower(n.testo_vigente) CONTAINS 'è definito'
-                  OR toLower(n.testo_vigente) CONTAINS 'ai sensi'
+                  toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'si intende'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'si definisce'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'è definito'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'ai sensi'
               )
             RETURN
                 n.URN AS source_urn,
                 labels(n)[0] AS source_type,
                 n.estremi AS source_estremi,
-                n.testo_vigente AS definition_text
+                coalesce(n.testo, n.testo_vigente) AS definition_text
             LIMIT {limit}
         """
 
@@ -431,7 +431,7 @@ class DefinitionLookupTool(BaseTool):
         cypher = """
             MATCH (c1:ConcettoGiuridico)
             WHERE toLower(c1.nome) CONTAINS toLower($term)
-            MATCH (c1)-[:CORRELATO|:SPECIALIZZA|:GENERALIZZA]-(c2:ConcettoGiuridico)
+            MATCH (c1)-[:CORRELATO|SPECIES]-(c2:ConcettoGiuridico)
             WHERE c2.definizione IS NOT NULL
             RETURN DISTINCT
                 c2.nome AS term,

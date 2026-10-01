@@ -800,9 +800,9 @@ class LegalKnowledgeGraph:
         result = await self._falkordb.query(
             """
             MATCH (n:Norma {URN: $urn})
-            OPTIONAL MATCH (parent)-[:contiene]->(n)
-            OPTIONAL MATCH (n)-[:contiene]->(child)
-            OPTIONAL MATCH (modifier)-[:modifica|abroga|sostituisce|inserisce]->(n)
+            OPTIONAL MATCH (parent)-[:CONTIENE]->(n)
+            OPTIONAL MATCH (n)-[:CONTIENE]->(child)
+            OPTIONAL MATCH (modifier)-[:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]->(n)
             RETURN
                 parent.URN as parent_urn,
                 parent.titolo as parent_title,

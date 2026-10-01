@@ -23,6 +23,7 @@ import json
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
+from merlt.storage.graph.schema import canonical_urn, resolve_rels
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
@@ -215,9 +216,9 @@ class SemanticSearchTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Filtra per tipo di fonte. Specializzazione per expert: "
-                    "LiteralExpert=['norma'], "
-                    "SystemicExpert=['norma'], "
-                    "PrinciplesExpert=['ratio','spiegazione'], "
+                    "LiteralExpert=['norma','comma'], "
+                    "SystemicExpert=['norma','comma'], "
+                    "PrinciplesExpert=['ratio','spiegazione','dottrina','concetto'], "
                     "PrecedentExpert=['massima']"
                 ),
                 required=False
@@ -610,7 +611,9 @@ class GraphSearchTool(BaseTool):
 
         # Filtro per tipo relazione
         if relation_types:
-            rel_types = "|".join(relation_types)
+            # The graph's names, whichever vocabulary the caller spoke (legacy
+            # lowercase, traversal-weight keys, TraversalPolicy names).
+            rel_types = "|".join(resolve_rels(relation_types))
             rel_pattern = rel_pattern.replace("[r*", f"[r:{rel_types}*")
 
         # Target type filter
@@ -631,7 +634,7 @@ class GraphSearchTool(BaseTool):
         LIMIT 100
         """
 
-        params = {"start_urn": start_node}
+        params = {"start_urn": canonical_urn(start_node)}
 
         return query, params
 

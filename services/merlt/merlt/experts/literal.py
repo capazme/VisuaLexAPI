@@ -37,6 +37,7 @@ from merlt.experts.base import (
 )
 from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool, SemanticSearchTool, GraphSearchTool
+from merlt.storage.graph.schema import Rel, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
@@ -86,6 +87,10 @@ class LiteralExpert(BaseExpert, ReActMixin):
         "cita": 0.75,
         "default": 0.50
     }
+
+    # Relations the graph expansion follows: the graph's own names (the schema's
+    # `Rel`), which every writer writes.
+    GRAPH_RELATIONS = [Rel.CONTIENE.value, Rel.DEFINISCE.value, Rel.DISCIPLINA.value]
 
     def __init__(
         self,
@@ -267,7 +272,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
                 query=search_query,
                 top_k=5,
                 expert_type="LiteralExpert",
-                source_types=source_types  # ["norma"] - significato proprio delle parole
+                source_types=source_types  # ["norma", "comma"] - significato proprio delle parole
             )
             if result.success and result.data.get("results"):
                 semantic_results = result.data["results"]
@@ -294,7 +299,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
             for urn in list(urns_to_explore)[:3]:  # Limita a 3 per performance
                 result = await graph_tool(
                     start_node=urn,
-                    relation_types=["contiene", "DEFINISCE", "DISCIPLINA"],  # Relazioni reali nel grafo
+                    relation_types=self.GRAPH_RELATIONS,
                     max_hops=2
                 )
                 if result.success:
@@ -305,7 +310,7 @@ class LiteralExpert(BaseExpert, ReActMixin):
                     )
                     for node in graph_nodes:
                         sources.append({
-                            "text": node.get("properties", {}).get("testo", ""),
+                            "text": node_text(node.get("properties", {})),
                             "urn": node.get("urn", ""),
                             "type": node.get("type", ""),
                             "source": "graph_traversal",

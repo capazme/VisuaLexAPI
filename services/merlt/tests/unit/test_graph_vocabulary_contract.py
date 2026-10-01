@@ -8,7 +8,8 @@ never matches. Names built at runtime are invisible here: the writers and reader
 that build them test their values against the schema themselves.
 
 The KNOWN_* sets are a ratchet: they list what is still old, and a name must
-leave them as soon as the code stops using it.
+leave them as soon as the code stops using it. They are empty now: a name outside
+the schema fails the day it appears.
 """
 import ast
 import re
@@ -21,6 +22,11 @@ EXEMPT = {
     # The disagreement companion's offline collector reads relations between
     # decisions that no writer produces; it is not wired to the live graph.
     ROOT / "disagreement" / "data" / "collector.py",
+    # ConstitutionalBasisTool (ATTUA/RECEPISCE/DERIVA) and CitationChainTool
+    # (cita/conferma/supera between decisions) are not wired (api/engine_bootstrap.py):
+    # no writer produces those relations, so every call returned nothing.
+    ROOT / "tools" / "constitutional_basis.py",
+    ROOT / "tools" / "citation_chain.py",
 }
 REL_RE = re.compile(r"-\[\w*:([A-Za-z_]+(?:\|:?[A-Za-z_]+)*)")
 LABEL_RE = re.compile(r"\(\w*:([A-Z][A-Za-z]+)")
@@ -30,12 +36,8 @@ FONTE_RE = re.compile(r"\bfonte\s*[=:]\s*'([^']+)'")
 PROVENANCE_RE = re.compile(r"\bprovenance\s*[=:]\s*(?:coalesce\(\s*\w+\.provenance\s*,\s*)?'([^']+)'")
 CYPHER_RE = re.compile(r"\b(MATCH|MERGE)\b")
 
-KNOWN_LEGACY_RELS: set[str] = {
-    "contiene", "abroga", "modifica", "sostituisce", "inserisce", "CONTENUTO_IN",  # Task 5
-    "cita", "conferma", "supera", "DERIVA",  # Task 5 (unwired tools)
-    "SPECIALIZZA", "GENERALIZZA",  # Task 5 (definition tool → SPECIES)
-}
-KNOWN_UNKNOWN_LABELS: set[str] = {"PendingValidation", "ValidationVote"}  # Task 5
+KNOWN_LEGACY_RELS: set[str] = set()
+KNOWN_UNKNOWN_LABELS: set[str] = set()
 KNOWN_LEGACY_FONTI: set[str] = set()
 
 

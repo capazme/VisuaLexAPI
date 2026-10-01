@@ -3734,6 +3734,9 @@ async def fetch_entity_details_from_graph(
         # Il formato e': "rel_{source_id}_{rel_type}_{target_id}"
         if entity_id.startswith("rel_"):
             # Tutti i 65 tipi di relazione del Knowledge Graph (da RelationType enum)
+            # più i nomi che il grafo scrive al posto di quelli della community
+            # (RINVIA, DERIVA_DA). CITA resta: gli id delle proposte portano ancora
+            # il nome della community, che il grafo scrive come RINVIA.
             # Ordinati per lunghezza decrescente per matchare prima i più specifici
             known_rel_types = [
                 # Relazioni lunghe (evita match parziali)
@@ -3751,7 +3754,7 @@ async def fetch_entity_details_from_graph(
                 "BILANCIA_CON", "CONFORMA_A", "CONFORME_A",
                 "CLASSIFICA_IN", "TITOLARE_DI", "RIVESTE_RUOLO",
                 # Relazioni medie
-                "DIPENDE_DA", "PRESUPPONE", "HA_VERSIONE",
+                "DIPENDE_DA", "DERIVA_DA", "PRESUPPONE", "HA_VERSIONE",
                 "SOSTITUISCE", "INSERISCE", "SOSPENDE", "PROROGA",
                 "DEROGA_A", "CONSOLIDA", "DISCIPLINA", "APPLICA_A",
                 "DEFINISCE", "PREVEDE", "EMESSO_DA", "RIGUARDA",
@@ -3760,7 +3763,7 @@ async def fetch_entity_details_from_graph(
                 "ESTINGUE", "CONFERISCE", "CORRELATO",
                 # Relazioni corte
                 "CONTIENE", "PARTE_DI", "INTEGRA", "SPECIES",
-                "CITA", "INTERPRETA", "COMMENTA", "ATTUA",
+                "CITA", "RINVIA", "INTERPRETA", "COMMENTA", "ATTUA",
                 "RECEPISCE", "FONTE", "IMPONE", "APPLICA",
                 # Lowercase variants (per compatibilità)
                 "interpreta", "cita", "applica", "disciplina",

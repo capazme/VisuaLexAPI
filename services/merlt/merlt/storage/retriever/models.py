@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 
 
+from merlt.storage.graph.schema import EXPERT_SOURCE_TYPES as _BY_EXPERT
 from merlt.storage.vectors.collection import default_chunks_collection as _default_collection
 
 
@@ -130,8 +131,10 @@ def _load_expert_weights() -> Dict[str, Dict[str, float]]:
             config = yaml.safe_load(f)
             return config.get("expert_traversal_weights", _get_default_weights())
     except FileNotFoundError:
+        # Expected: the file exists in no deployment, so the defaults are the normal
+        # case. Not a warning: it would print on every interpreter start.
         import structlog
-        structlog.get_logger().warning(f"Config file not found: {config_path}, using default weights")
+        structlog.get_logger().debug(f"Config file not found: {config_path}, using default weights")
         return _get_default_weights()
     except Exception as e:
         import structlog
@@ -189,24 +192,11 @@ def _get_default_weights() -> Dict[str, Dict[str, float]]:
 EXPERT_TRAVERSAL_WEIGHTS = _load_expert_weights()
 
 
-# Expert-specific source type filters (Art. 12 Preleggi alignment)
-# Ogni Expert cerca SOLO i tipi di fonte rilevanti per il suo canone ermeneutico
+# Each expert searches only the chunks of its canon (art. 12 preleggi). The
+# schema holds the one list; here it is keyed by both the short and the class name.
 EXPERT_SOURCE_TYPES: Dict[str, List[str]] = {
-    # LiteralExpert: "Significato proprio delle parole" - solo norme
-    "LiteralExpert": ["norma"],
-    "literal": ["norma"],
-
-    # SystemicExpert: "Connessione tra norme" - norme + context sistematico
-    "SystemicExpert": ["norma"],
-    "systemic": ["norma"],
-
-    # PrinciplesExpert: "Principi generali" - ratio legis + dottrina
-    "PrinciplesExpert": ["ratio", "spiegazione"],
-    "principles": ["ratio", "spiegazione"],
-
-    # PrecedentExpert: "Diritto vivente" - massime giurisprudenziali
-    "PrecedentExpert": ["massima"],
-    "precedent": ["massima"],
+    **_BY_EXPERT,
+    **{f"{name.capitalize()}Expert": types for name, types in _BY_EXPERT.items()},
 }
 
 
@@ -218,6 +208,6 @@ def get_source_types_for_expert(expert_type: str) -> List[str]:
         expert_type: Nome dell'expert (es: "LiteralExpert", "literal")
 
     Returns:
-        Lista di source_types (es: ["norma"], ["massima"])
+        Lista di source_types (es: ["norma", "comma"], ["massima"])
     """
     return EXPERT_SOURCE_TYPES.get(expert_type, [])

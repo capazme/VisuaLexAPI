@@ -23,6 +23,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
+from merlt.storage.graph.schema import Rel, resolve_rels
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
@@ -221,12 +222,9 @@ class HistoricalEvolutionTool(BaseTool):
 
         Query per trovare tutte le relazioni temporali in entrata.
         """
-        # Build event type filter
-        rel_types = "modifica|abroga|sostituisce"
-        if event_types:
-            # Normalize to uppercase for Cypher
-            normalized = [e.upper() for e in event_types]
-            rel_types = "|".join(normalized)
+        # Build event type filter: the graph's names (the schema's), whatever
+        # case the caller used.
+        rel_types = "|".join(resolve_rels(event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value]))
 
         # Date filter for future events
         date_filter = ""

@@ -8,8 +8,7 @@ Struttura gerarchica tipica:
     Codice → Libro → Titolo → Capo → Sezione → Articolo
 
 Relazioni:
-    - CONTIENE: genitore → figlio
-    - CONTENUTO_IN: figlio → genitore (inversa)
+    - CONTIENE: genitore → figlio (la risalita la percorre a ritroso)
     - PRECEDE/SEGUE: ordine sequenziale
 
 Esempio:
@@ -330,16 +329,16 @@ class HierarchyNavigationTool(BaseTool):
         """
         Risale la gerarchia verso la radice.
 
-        Relazioni seguite: CONTENUTO_IN (child → parent)
+        Relazioni seguite: CONTIENE, a ritroso (child → parent)
         """
-        text_field = ", n.testo_vigente AS testo" if include_text else ""
+        text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
         tipo_where = ""
         if tipo_filter:
             tipo_list = "', '".join(tipo_filter)
             tipo_where = f"AND labels(n)[0] IN ['{tipo_list}']"
 
         cypher = f"""
-            MATCH path = (start)-[:CONTENUTO_IN*1..{max_depth}]->(n)
+            MATCH path = (n)-[:CONTIENE*1..{max_depth}]->(start)
             WHERE start.URN = $urn {tipo_where}
             RETURN
                 n.URN AS urn,
@@ -380,7 +379,7 @@ class HierarchyNavigationTool(BaseTool):
 
         Relazioni seguite: CONTIENE (parent → child)
         """
-        text_field = ", n.testo_vigente AS testo" if include_text else ""
+        text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
         tipo_where = ""
         if tipo_filter:
             tipo_list = "', '".join(tipo_filter)
@@ -427,15 +426,18 @@ class HierarchyNavigationTool(BaseTool):
         """
         Trova i nodi fratelli (stesso genitore).
         """
-        text_field = ", sibling.testo_vigente AS testo" if include_text else ""
+        text_field = ", coalesce(sibling.testo, sibling.testo_vigente) AS testo" if include_text else ""
         tipo_where = ""
         if tipo_filter:
             tipo_list = "', '".join(tipo_filter)
             tipo_where = f"AND labels(sibling)[0] IN ['{tipo_list}']"
 
         cypher = f"""
-            MATCH (start)-[:CONTENUTO_IN]->(parent)<-[:CONTENUTO_IN]-(sibling)
-            WHERE start.URN = $urn AND sibling.URN <> $urn {tipo_where}
+            MATCH (start)
+            WHERE start.URN = $urn
+            MATCH (parent)-[:CONTIENE]->(start)
+            MATCH (parent)-[:CONTIENE]->(sibling)
+            WHERE sibling.URN <> $urn {tipo_where}
             RETURN
                 sibling.URN AS urn,
                 labels(sibling)[0] AS tipo,

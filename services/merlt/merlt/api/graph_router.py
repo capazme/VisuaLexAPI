@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from merlt.api.auth import verify_api_key, require_role
 from merlt.experts.models import ApiKey
 from merlt.storage.graph.client import FalkorDBClient
+from merlt.storage.graph.schema import resolve_rel
 from merlt.storage.enrichment import get_db_session_dependency, PendingEntity
 from merlt.api.models.enrichment_models import NormResolveRequest, NormResolveResponse
 from merlt.pipeline.enrichment.models import EntityType
@@ -325,7 +326,7 @@ async def get_article_relations(
 
     Args:
         article_urn: URN dell'articolo
-        relation_type: Tipo relazione per filtrare (opzionale, es. "CITA", "DISCIPLINA")
+        relation_type: Tipo relazione per filtrare (opzionale, es. "RINVIA", "DISCIPLINA")
 
     Returns:
         {
@@ -360,8 +361,8 @@ async def get_article_relations(
             ]
         }
 
-        >>> GET /api/v1/graph/article/urn:lex:it:codice.civile:1942;art1218/relations?relation_type=CITA
-        # Solo relazioni di tipo CITA
+        >>> GET /api/v1/graph/article/urn:lex:it:codice.civile:1942;art1218/relations?relation_type=RINVIA
+        # Solo relazioni di tipo RINVIA
     """
     log.info("Fetching article relations", article_urn=article_urn, relation_type=relation_type)
 
@@ -394,7 +395,8 @@ async def get_article_relations(
 
         params = {"urn": article_urn}
         if relation_type:
-            params["relation_type"] = relation_type
+            # The graph's own name, whichever vocabulary the caller spoke (CITA is RINVIA).
+            params["relation_type"] = resolve_rel(relation_type)
 
         result = await graph_client.query(query, params)
 

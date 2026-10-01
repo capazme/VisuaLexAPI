@@ -36,6 +36,8 @@ from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from merlt.storage.graph.schema import node_text
+
 log = structlog.get_logger()
 
 
@@ -49,11 +51,11 @@ _CANON_STRATEGY: Dict[str, Dict[str, str]] = {
     },
     "systemic": {
         "canone": "sistematico (collegamento con le altre norme del sistema)",
-        "tools": "graph_search e hierarchy_navigation (relazioni e struttura nel grafo), citation_chain (catena di rinvii)",
+        "tools": "graph_search e hierarchy_navigation (relazioni e struttura nel grafo)",
     },
     "principles": {
         "canone": "teleologico / ratio legis (principî e finalità della norma)",
-        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici), constitutional_basis (base costituzionale), cerca_brocardi (dottrina e massime — solo per articoli di codici)",
+        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici), cerca_brocardi (dottrina e massime — solo per articoli di codici)",
     },
     "precedent": {
         "canone": "giurisprudenziale (orientamenti e precedenti)",
@@ -912,7 +914,7 @@ class ReActMixin:
         )
 
         # URNs already collected — feed these to URN-keyed tools (graph_search,
-        # citation_chain, giurisprudenza_su_norma, ...) instead of re-searching.
+        # giurisprudenza_su_norma, ...) instead of re-searching.
         urns: List[str] = []
         for s in current_sources:
             # Prefer the real graph node key (urn / metadata.article_urn) over the
@@ -963,7 +965,7 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
         if urns:
             prompt += (
                 "\nURN disponibili (passali agli strumenti che richiedono un URN, "
-                "es. graph_search / citation_chain / giurisprudenza_su_norma):\n  "
+                "es. graph_search / giurisprudenza_su_norma):\n  "
                 + ", ".join(urns[:10]) + "\n"
             )
 
@@ -1005,7 +1007,7 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
 ## REGOLE FORMATO IDENTIFICATORI (rispettale per non far fallire lo strumento)
 - Strumenti su riferimento testuale (cite_law, cerca_brocardi): passa la forma UMANA "art. N <atto>" (es. "art. 2043 codice civile"). NON passare un URL o un urn.
 - Per il TESTO di un articolo usa `fetch_law_article` (act_type + article): gestisce sia i codici sia le leggi/decreti NUMERATI (es. legge 241/1990, D.Lgs. 231/2001). `cite_law` risolve bene solo i codici e i testi unici noti — sugli atti numerati fallisce, quindi NON usarlo per leggi/decreti con un numero.
-- Strumenti sul grafo/nodo (graph_search, constitutional_basis, citation_chain): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
+- Strumenti sul grafo/nodo (graph_search): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
 - Usa SOLO gli identificatori elencati nei RIFERIMENTI/URN qui sopra. (semantic_search, definition_lookup e principle_lookup accettano invece testo libero.)
 - graph_search.relation_types: ometti (esplora tutte le relazioni) oppure indica al massimo 2-3 tipi.
 - `cerca_brocardi` funziona SOLO sugli articoli dei CODICI (es. "art. 2043 codice civile"); su leggi/decreti numerati o alias (es. "Statuto dei lavoratori", "GDPR") dà "atto non riconosciuto". Per quelle norme usa `fetch_law_article` per il testo, NON cerca_brocardi.
@@ -1076,7 +1078,7 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                 props = node.get("properties", {})
                 sources.append({
                     "urn": node.get("urn", props.get("URN", "")),
-                    "text": props.get("testo_vigente", props.get("testo", "")),
+                    "text": node_text(props),
                     "type": node.get("type", ""),
                     "source": "graph_search"
                 })

@@ -100,19 +100,11 @@ async def _build_tools() -> list:
         except Exception as e:
             log.warning("PrincipleLookupTool unavailable", error=str(e))
 
-        try:
-            from merlt.tools import ConstitutionalBasisTool
-            tools.append(ConstitutionalBasisTool(graph_db=falkordb))
-            log.info("✅ ConstitutionalBasisTool wired")
-        except Exception as e:
-            log.warning("ConstitutionalBasisTool unavailable", error=str(e))
-
-        try:
-            from merlt.tools import CitationChainTool
-            tools.append(CitationChainTool(graph_db=falkordb))
-            log.info("✅ CitationChainTool wired")
-        except Exception as e:
-            log.warning("CitationChainTool unavailable", error=str(e))
+        # ConstitutionalBasisTool (ATTUA/RECEPISCE/DERIVA) and CitationChainTool
+        # (cita/conferma/supera between decisions) are not wired: no writer
+        # produces those relations, so every call returned nothing. Phase 2 of
+        # docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md can
+        # rewire the first on RINVIA edges to the Constitution.
 
         try:
             from merlt.tools import TextualReferenceTool

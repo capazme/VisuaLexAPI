@@ -5,9 +5,8 @@ Textual Reference Tool
 Tool per seguire rinvii normativi espliciti nel testo.
 
 Traccia le connessioni testuali tra norme tramite relazioni:
-- RINVIA: rinvio normativo esplicito
-- richiama: richiamo generico
-- modifica: modifica di altra norma
+- RINVIA: rinvio normativo esplicito (il chiamante può dire anche "richiama" o "cita")
+- MODIFICA: modifica di altra norma
 
 Fondamento: Art. 12, I c.c. - "connessione di esse" a livello testuale
 
@@ -24,6 +23,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
+from merlt.storage.graph.schema import Rel, resolve_rels
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
@@ -38,7 +38,7 @@ class NormReference:
         from_urn: URN della norma di partenza
         to_urn: URN della norma referenziata
         to_estremi: Riferimento leggibile (es. "Art. 1455 c.c.")
-        reference_type: Tipo di relazione (RINVIA, richiama, modifica)
+        reference_type: Tipo di relazione (RINVIA, MODIFICA)
         excerpt: Estratto del testo referenziato
         depth: Profondità nella catena (1 = diretto)
     """
@@ -66,7 +66,7 @@ class TextualReferenceTool(BaseTool):
     Tool per seguire rinvii normativi espliciti nel testo.
 
     Segue le connessioni testuali tra norme attraverso relazioni
-    RINVIA, richiama, modifica per tracciare la catena di riferimenti.
+    RINVIA, MODIFICA per tracciare la catena di riferimenti.
 
     Rileva e gestisce riferimenti circolari per evitare loop infiniti.
 
@@ -83,7 +83,7 @@ class TextualReferenceTool(BaseTool):
         >>> result = await tool(
         ...     article_urn="urn:norma:cc:art1453",
         ...     max_depth=2,
-        ...     reference_types=["RINVIA", "richiama"]
+        ...     reference_types=["RINVIA", "MODIFICA"]
         ... )
         >>> print(f"Trovati {len(result.data['references'])} rinvii")
         >>> if result.data["circular_detected"]:
@@ -93,7 +93,7 @@ class TextualReferenceTool(BaseTool):
     name = "textual_reference"
     description = (
         "Segue rinvii normativi espliciti tra articoli. "
-        "Traccia catene di riferimenti (RINVIA, richiama, modifica) "
+        "Traccia catene di riferimenti (RINVIA, MODIFICA) "
         "per capire le connessioni testuali tra norme. "
         "Riferimento: Art. 12, I c.c. - interpretazione letterale."
     )
@@ -138,7 +138,7 @@ class TextualReferenceTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Tipi di relazione da seguire. "
-                    "Es: ['RINVIA', 'richiama', 'modifica']"
+                    "Es: ['RINVIA', 'MODIFICA']"
                 ),
                 required=False
             )
@@ -180,11 +180,11 @@ class TextualReferenceTool(BaseTool):
 
         # Default reference types
         if reference_types is None:
-            reference_types = ["RINVIA", "richiama", "modifica"]
+            reference_types = [Rel.RINVIA.value, Rel.MODIFICA.value]
 
         try:
-            # Build Cypher query
-            rel_pattern = "|".join(reference_types)
+            # Build Cypher query: the graph's relation names, whichever the caller used
+            rel_pattern = "|".join(resolve_rels(reference_types))
 
             cypher = f"""
                 MATCH path = (start:Norma {{URN: $urn}})-[:{rel_pattern}*1..{max_depth}]->(target:Norma)
@@ -193,7 +193,7 @@ class TextualReferenceTool(BaseTool):
                     start.URN as from_urn,
                     target.URN as to_urn,
                     target.estremi as to_estremi,
-                    target.testo_vigente as excerpt,
+                    coalesce(target.testo, target.testo_vigente) as excerpt,
                     length(path) as depth,
                     [r in relationships(path) | type(r)] as relation_types
                 ORDER BY depth ASC

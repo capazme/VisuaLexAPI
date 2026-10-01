@@ -122,11 +122,12 @@ class TemporalValidityService:
 
     Wrappa FalkorDBClient per query Cypher sulle proprietà
     di vigenza dei nodi Norma e sulle relazioni temporali
-    (modifica, abroga, sostituisce).
+    (MODIFICA, ABROGA, SOSTITUISCE).
 
-    Note: le relazioni nel grafo FalkorDB usano lowercase
-    (abroga, modifica, sostituisce, inserisce) come definito
-    in multivigenza.py RELATION_TYPES.
+    Note: le relazioni nel grafo FalkorDB usano i nomi dello schema
+    (storage/graph/schema.py: ABROGA, MODIFICA, SOSTITUISCE, INSERISCE),
+    come li scrive multivigenza.py RELATION_TYPES. Il campo `type` delle
+    modifiche recenti resta in minuscolo (modifica, abroga, sostituisce).
 
     Example:
         service = TemporalValidityService(graph_db=falkordb_client)
@@ -283,8 +284,8 @@ class TemporalValidityService:
         """
         cypher = """
             MATCH (norma {URN: $urn})
-            OPTIONAL MATCH (norma)<-[r_abr:abroga]-(abrogante)
-            OPTIONAL MATCH (norma)<-[r_sost:sostituisce]-(sostituto)
+            OPTIONAL MATCH (norma)<-[r_abr:ABROGA]-(abrogante)
+            OPTIONAL MATCH (norma)<-[r_sost:SOSTITUISCE]-(sostituto)
             RETURN
                 norma.abrogato AS is_abrogated,
                 norma.is_versione_vigente AS is_current,
@@ -316,7 +317,7 @@ class TemporalValidityService:
             Lista di eventi di modifica ordinati per data DESC (max 5)
         """
         cypher = """
-            MATCH (norma {URN: $urn})<-[r:modifica|abroga|sostituisce]-(modificante)
+            MATCH (norma {URN: $urn})<-[r:MODIFICA|ABROGA|SOSTITUISCE]-(modificante)
             RETURN
                 type(r) AS event_type,
                 modificante.URN AS by_urn,
@@ -380,7 +381,7 @@ class TemporalValidityService:
         recent_mods = []
         for mod in modifications:
             mod_entry = {
-                "type": mod.get("event_type", ""),
+                "type": (mod.get("event_type") or "").lower(),
                 "by_urn": mod.get("by_urn", ""),
                 "by_estremi": mod.get("by_estremi", ""),
                 "date": mod.get("event_date", ""),

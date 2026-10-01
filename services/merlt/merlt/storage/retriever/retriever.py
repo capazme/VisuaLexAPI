@@ -606,7 +606,8 @@ class GraphAwareRetriever:
             weights = EXPERT_TRAVERSAL_WEIGHTS[expert_type]
 
             for edge in edges:
-                edge_type = _edge_type(edge)
+                # The graph's names are upper case, the weight tables are keyed in lower case.
+                edge_type = _edge_type(edge).lower()
                 weight = weights.get(edge_type, weights.get("default", 0.5))
                 relation_bonus *= weight
 

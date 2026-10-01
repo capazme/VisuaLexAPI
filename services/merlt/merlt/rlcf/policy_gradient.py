@@ -167,11 +167,12 @@ TRAVERSAL_RELATION_TYPES = [
 # Same order as GATING_EXPERT_NAMES — index i = one-hot slot i.
 TRAVERSAL_EXPERT_TYPES = ["literal", "systemic", "principles", "precedent"]
 
-# Map the RAW relation names that actually exist in the FalkorDB graph (mixed
-# case, Italian — e.g. "modifica", "DISCIPLINA") to the TraversalPolicy embedding
-# vocabulary above, so per-query scoring does not collapse everything onto the
-# RELATED_TO fallback. Best-effort semantic mapping; unknown names still fall
-# back to RELATED_TO inside get_relation_index (existing behaviour).
+# Map the relation names of the FalkorDB graph (the schema's upper-case `Rel`
+# names; the keys here are lower case and normalize_relation_type looks them up
+# through .lower()) to the TraversalPolicy embedding vocabulary above, so
+# per-query scoring does not collapse everything onto the RELATED_TO fallback.
+# Best-effort semantic mapping; unknown names still fall back to RELATED_TO
+# inside get_relation_index (existing behaviour).
 GRAPH_TO_POLICY_RELATION = {
     "modifica": "MODIFICA",
     "modificato_da": "MODIFICATO_DA",
@@ -190,6 +191,22 @@ GRAPH_TO_POLICY_RELATION = {
     "contiene": "RELATED_TO",
     "disciplina": "APPLIES_TO",
     "impone": "APPLIES_TO",
+    # More of the schema's relations (storage/graph/schema.py `Rel`), each on its
+    # nearest policy name; any other name still falls back to RELATED_TO.
+    "commenta": "INTERPRETED_BY",
+    "deroga_a": "DEROGA",
+    "inserisce": "MODIFICA",
+    "sostituisce": "MODIFICA",
+    "esprime_principio": "APPLIES_TO",
+    "applica_a": "APPLIES_TO",
+    "definisce": "APPLIES_TO",
+    "prevede": "APPLIES_TO",
+    "prevede_sanzione": "APPLIES_TO",
+    "attribuisce_responsabilita": "APPLIES_TO",
+    "stabilisce_termine": "APPLIES_TO",
+    "esprime": "RELATED_TO",
+    "menziona": "RELATED_TO",
+    "deriva_da": "RELATED_TO",
 }
 
 
