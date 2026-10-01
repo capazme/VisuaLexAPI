@@ -131,10 +131,53 @@ class FalkorDBClient:
             params or {}
         )
 
-    def _query_sync(self, cypher: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def ro_query(
+        self,
+        cypher: str,
+        params: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute a READ-ONLY Cypher query (GRAPH.RO_QUERY).
+
+        The server refuses any write clause, so a reader that goes through here
+        cannot modify the graph even if the text of its query is wrong. The tools
+        the experts call, the temporal validity check, the graph context and the
+        graph router's relation and subgraph reads use it; the writers keep `query`.
+        The answer has the shape of `query`'s.
+
+        A graph that does not exist yet reads as an empty graph, as with `query`:
+        GRAPH.RO_QUERY refuses an empty key where GRAPH.QUERY answers with nothing.
+
+        Example:
+            results = await client.ro_query(
+                "MATCH (n:Norma {URN: $urn}) RETURN n.estremi",
+                {"urn": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"}
+            )
+        """
+        if not self._connected:
+            raise RuntimeError("Not connected to FalkorDB. Call connect() first.")
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._query_sync,
+            cypher,
+            params or {},
+            True
+        )
+
+    def _query_sync(
+        self,
+        cypher: str,
+        params: Dict[str, Any],
+        read_only: bool = False
+    ) -> List[Dict[str, Any]]:
         """Execute query synchronously (called in executor)."""
         try:
-            result = self._graph.query(cypher, params)
+            if read_only:
+                result = self._graph.ro_query(cypher, params)
+            else:
+                result = self._graph.query(cypher, params)
 
             # Convert result set to list of dicts
             records = []
@@ -180,6 +223,10 @@ class FalkorDBClient:
             return records
 
         except Exception as e:
+            if read_only and "empty key" in str(e):
+                # The graph has no key yet (a fresh instance): nothing to read.
+                log.debug(f"Read-only query on a graph that does not exist yet: {cypher[:100]}...")
+                return []
             log.error(f"Query failed: {cypher[:100]}... Error: {e}")
             raise
 

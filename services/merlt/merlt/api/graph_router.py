@@ -26,14 +26,14 @@ from rq import Queue, Retry
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 from fastapi import APIRouter, HTTPException, Depends
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, Iterable, List, Tuple
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from merlt.api.auth import verify_api_key, require_role
 from merlt.experts.models import ApiKey
 from merlt.storage.graph.client import FalkorDBClient
-from merlt.storage.graph.schema import resolve_rel
+from merlt.storage.graph.schema import resolve_rel, resolve_rels
 from merlt.storage.enrichment import get_db_session_dependency, PendingEntity
 from merlt.api.models.enrichment_models import NormResolveRequest, NormResolveResponse
 from merlt.pipeline.enrichment.models import EntityType
@@ -398,7 +398,7 @@ async def get_article_relations(
             # The graph's own name, whichever vocabulary the caller spoke (CITA is RINVIA).
             params["relation_type"] = resolve_rel(relation_type)
 
-        result = await graph_client.query(query, params)
+        result = await graph_client.ro_query(query, params)
 
         relations = [
             {
@@ -1430,7 +1430,7 @@ async def get_subgraph(
         RETURN root, indegree(root) + outdegree(root) as degree
         LIMIT 1
         """
-        root_result = await graph_client.query(root_cypher, {"root_urn": root_urn})
+        root_result = await graph_client.ro_query(root_cypher, {"root_urn": root_urn})
 
         if not root_result or not root_result[0].get("root"):
             query_time = (time.time() - start_time) * 1000
@@ -1454,13 +1454,14 @@ async def get_subgraph(
         params: Dict[str, Any] = {"root_urn": root_urn, "max_nodes": max_nodes}
         filter_clauses: List[str] = []
         if relation_types:
-            # Case-insensitive: the live graph mixes lowercase seed types
-            # ("commenta", "contiene") with uppercase enrichment types
-            # ("DISCIPLINA"), and the legacy Python filter uppercased both sides.
-            allowed_rels = [t.strip().lower() for t in relation_types.split(",") if t.strip()]
-            if allowed_rels:
-                filter_clauses.append("toLower(type(r)) IN $allowed_rels")
-                params["allowed_rels"] = allowed_rels
+            # The graph's own names, whichever vocabulary the caller spoke (`cita`
+            # meets RINVIA), as a parameter.
+            relation_clause, relation_params = _relation_filter(
+                [t.strip() for t in relation_types.split(",") if t.strip()]
+            )
+            if relation_clause:
+                filter_clauses.append(relation_clause)
+                params.update(relation_params)
         if entity_types:
             allowed_types = [t.strip().lower() for t in entity_types.split(",") if t.strip()]
             if allowed_types:
@@ -1557,7 +1558,7 @@ async def get_subgraph(
                    indegree(connected) + outdegree(connected) as node_degree
             """
 
-        result = await graph_client.query(edge_cypher, params)
+        result = await graph_client.ro_query(edge_cypher, params)
 
         nodes: List[SubgraphNode] = []
         edges: List[SubgraphEdge] = []
@@ -1653,6 +1654,49 @@ async def get_subgraph(
         raise HTTPException(status_code=500, detail=f"Subgraph query failed: {str(e)}")
     finally:
         await graph_client.close()
+
+
+# ====================================================
+# RELATION FILTER
+# ====================================================
+
+def _relation_filter(relation_types: Iterable[str]) -> Tuple[str, Dict[str, Any]]:
+    """`type(r) IN $allowed_rels` and its parameters, from the relation names a request carried.
+
+    The names are resolved to the graph's own (`cita` meets RINVIA) and passed as a
+    parameter: they are never part of the Cypher text. A name the graph does not
+    have stays in the list and matches nothing. No names: no clause."""
+    allowed = resolve_rels(relation_types)
+    if not allowed:
+        return "", {}
+    return "type(r) IN $allowed_rels", {"allowed_rels": allowed}
+
+
+async def _query_search_subgraph(
+    graph_client: FalkorDBClient,
+    node_urns: Iterable[str],
+    relation_types: Optional[List[str]],
+    max_results: int,
+) -> List[Dict[str, Any]]:
+    """The nodes the search found and their relations, optionally of the given types."""
+    relation_clause, relation_params = _relation_filter(relation_types or [])
+    relation_filter = f"AND {relation_clause}" if relation_clause else ""
+
+    cypher = f"""
+    MATCH (n)
+    WHERE n.URN IN $urns
+       OR n.urn IN $urns
+    WITH n
+    OPTIONAL MATCH (n)-[r]-(connected)
+    WHERE connected IS NOT NULL
+    {relation_filter}
+    RETURN n, type(r) as rel_type, connected
+    LIMIT $max_results
+    """
+    return await graph_client.ro_query(
+        cypher,
+        {"urns": list(node_urns), "max_results": max_results, **relation_params},
+    )
 
 
 # ====================================================
@@ -1916,32 +1960,12 @@ async def search_graph(
         await graph_client.connect()
 
         try:
-            # Build Cypher query to get nodes and their relations
-            # Filter by relation_types if specified
-            relation_filter = ""
-            if request.filters and request.filters.relation_types:
-                allowed_rels = request.filters.relation_types
-                relation_filter = f"AND type(r) IN {allowed_rels}"
-
-            cypher = f"""
-            MATCH (n)
-            WHERE n.URN IN $urns
-               OR n.urn IN $urns
-            WITH n
-            OPTIONAL MATCH (n)-[r]-(connected)
-            WHERE connected IS NOT NULL
-            {relation_filter}
-            RETURN n, type(r) as rel_type, connected
-            LIMIT $max_results
-            """
-
-            node_urns_list = list(node_urns)
-            result = await graph_client.query(
-                cypher,
-                {
-                    "urns": node_urns_list,
-                    "max_results": request.limit * 10,  # Allow for edges
-                }
+            # Nodes and their relations, filtered by relation_types if specified
+            result = await _query_search_subgraph(
+                graph_client,
+                node_urns,
+                request.filters.relation_types if request.filters else None,
+                request.limit * 10,  # Allow for edges
             )
 
             # Parse results into SubgraphResponse

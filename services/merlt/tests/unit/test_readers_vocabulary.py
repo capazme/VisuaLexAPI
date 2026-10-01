@@ -21,17 +21,27 @@ CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03
 
 
 class _GraphRecorder:
-    """A graph client that records the Cypher it is asked and answers with fixed rows."""
+    """A graph client that records the Cypher it is asked and answers with fixed rows.
+
+    `query` is the writer's call and `ro_query` the read-only one: the readers use the second."""
 
     def __init__(self, rows=None):
         self.cyphers = []
         self.params = []
+        self.methods = []
         self._rows = rows or []
 
-    async def query(self, cypher, params=None):
+    async def _ask(self, method, cypher, params):
+        self.methods.append(method)
         self.cyphers.append(cypher)
         self.params.append(params)
         return self._rows
+
+    async def query(self, cypher, params=None):
+        return await self._ask("query", cypher, params)
+
+    async def ro_query(self, cypher, params=None):
+        return await self._ask("ro_query", cypher, params)
 
 
 def _graph_node(label, **props):
@@ -390,9 +400,10 @@ async def test_the_article_relations_filter_asks_the_graph_for_its_own_name(aske
     client.connect = AsyncMock()
     client.close = AsyncMock()
     client.query = AsyncMock(return_value=[])
+    client.ro_query = AsyncMock(return_value=[])
     with patch("merlt.api.graph_router.FalkorDBClient", return_value=client):
         await graph_router.get_article_relations(CC, relation_type=asked, api_key=None)
-    assert client.query.await_args.args[1]["relation_type"] == stored
+    assert client.ro_query.await_args.args[1]["relation_type"] == stored
 
 
 # The engine ------------------------------------------------------------------

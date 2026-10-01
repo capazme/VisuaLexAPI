@@ -302,7 +302,7 @@ class TemporalValidityService:
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": urn})
             if not results:
                 return None
             return results[0]
@@ -329,7 +329,7 @@ class TemporalValidityService:
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": urn})
             return results
         except Exception as e:
             log.error("modifications_query_failed", urn=urn, error=str(e))

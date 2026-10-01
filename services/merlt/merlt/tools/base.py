@@ -23,11 +23,48 @@ Ogni tool:
 import structlog
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Sequence, Tuple, Union
 from enum import Enum
 from datetime import datetime
 
 log = structlog.get_logger()
+
+
+def bounded_int(value: Any, name: str, low: int, high: int) -> int:
+    """`value` as an integer inside [low, high]; out of range is clamped, not refused.
+
+    A tool interpolates such a number into Cypher (`*1..{n}`, `LIMIT {n}`), and its
+    argument comes from an LLM. Anything that is not an integer (a string with Cypher
+    in it, a float with a fraction, a bool, None) raises ValueError, which the tool
+    returns as an error result: the number never reaches the query as text."""
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be an integer")
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError(f"{name} must be an integer")
+        value = int(value)
+    elif isinstance(value, str):
+        try:
+            value = int(value.strip())
+        except ValueError:
+            raise ValueError(f"{name} must be an integer") from None
+    elif not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer")
+    return max(low, min(high, value))
+
+
+def label_filter(variable: str, labels: Sequence[str]) -> Tuple[str, str]:
+    """How to ask for nodes that carry ANY of `labels`, as `(pattern, predicate)`.
+
+    `labels` comes from `cypher_labels`: canonical names of the graph, safe to
+    interpolate. One label goes into the node pattern (`(n:Norma)`); several become a
+    predicate for the WHERE (`(n:Norma OR n:Dottrina)`), because `(n:A:B)` would ask
+    for a node that has both. No label: no filter."""
+    if len(labels) == 1:
+        return f":{labels[0]}", ""
+    if labels:
+        return "", "(" + " OR ".join(f"{variable}:{label}" for label in labels) + ")"
+    return "", ""
 
 
 class ParameterType(str, Enum):

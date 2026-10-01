@@ -23,10 +23,13 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import Rel, resolve_rels
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import Rel, cypher_rel_names
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The longest chain of references followed; interpolated into the Cypher (`*1..N`).
+MAX_DEPTH = 5
 
 
 @dataclass
@@ -176,15 +179,35 @@ class TextualReferenceTool(BaseTool):
             )
 
         # Validate e clamp max_depth
-        max_depth = min(max(1, max_depth), 5)
+        try:
+            max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
 
         # Default reference types
-        if reference_types is None:
+        if not reference_types:
             reference_types = [Rel.RINVIA.value, Rel.MODIFICA.value]
 
+        # The graph's relation names, whichever vocabulary the caller used. A name the
+        # graph does not have is dropped; if none is left nothing can match, and the
+        # query is not run unfiltered instead.
+        rel_names = cypher_rel_names(reference_types)
+        if not rel_names:
+            return ToolResult.ok(
+                data={
+                    "references": [],
+                    "chain_depth": 0,
+                    "circular_detected": False,
+                    "article_urn": article_urn
+                },
+                tool_name=self.name,
+                article_urn=article_urn,
+                references_found=0
+            )
+
         try:
-            # Build Cypher query: the graph's relation names, whichever the caller used
-            rel_pattern = "|".join(resolve_rels(reference_types))
+            # Build Cypher query
+            rel_pattern = "|".join(rel_names)
 
             cypher = f"""
                 MATCH path = (start:Norma {{URN: $urn}})-[:{rel_pattern}*1..{max_depth}]->(target:Norma)
@@ -200,7 +223,7 @@ class TextualReferenceTool(BaseTool):
                 LIMIT 50
             """
 
-            results = await self.graph_db.query(cypher, {"urn": article_urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": article_urn})
 
             if not results:
                 return ToolResult.ok(

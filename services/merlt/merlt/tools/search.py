@@ -23,10 +23,14 @@ import json
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import canonical_urn, resolve_rels
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import canonical_urn, cypher_labels, cypher_rel_names
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The deepest traversal graph_search will run. It is interpolated into the Cypher
+# (`*1..N`) and, in both directions, the number of paths grows with every hop.
+MAX_HOPS = 3
 
 
 @dataclass
@@ -540,6 +544,27 @@ class GraphSearchTool(BaseTool):
             )
 
         try:
+            max_hops = bounded_int(max_hops, "max_hops", 1, MAX_HOPS)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
+
+        if self._names_nothing_of_the_graph(relation_types, target_type):
+            # The caller filtered on names the graph does not have, so nothing can
+            # match; the traversal must not run unfiltered instead.
+            return ToolResult.ok(
+                data={
+                    "start_node": start_node,
+                    "nodes": [],
+                    "edges": [],
+                    "total_nodes": 0,
+                    "total_edges": 0
+                },
+                tool_name=self.name,
+                start_node=start_node,
+                max_hops=max_hops
+            )
+
+        try:
             # Costruisci query Cypher
             query, params = self._build_traversal_query(
                 start_node=start_node,
@@ -549,8 +574,8 @@ class GraphSearchTool(BaseTool):
                 direction=direction
             )
 
-            # Esegui query (FalkorDBClient usa .query(), non .execute_query())
-            result = await self.graph_db.query(query, params)
+            # Esegui query in sola lettura (FalkorDBClient.ro_query)
+            result = await self.graph_db.ro_query(query, params)
 
             # Processa risultati
             nodes = []
@@ -587,6 +612,14 @@ class GraphSearchTool(BaseTool):
                 tool_name=self.name
             )
 
+    @staticmethod
+    def _names_nothing_of_the_graph(relation_types: Optional[List[str]], target_type: Optional[str]) -> bool:
+        """True when the caller asked for a filter and none of its names is the graph's."""
+        return bool(
+            (relation_types and not cypher_rel_names(relation_types))
+            or (target_type and not cypher_labels(target_type))
+        )
+
     def _build_traversal_query(
         self,
         start_node: str,
@@ -598,9 +631,20 @@ class GraphSearchTool(BaseTool):
         """
         Costruisce query Cypher per il traversal.
 
+        Relation types, the target label and the hop count are the only parts
+        interpolated into the text: the first two only as names of the graph, the
+        third as a clamped integer. Everything else is a parameter.
+
         Returns:
             Tuple (query_string, params_dict)
+
+        Raises:
+            ValueError: max_hops is not an integer, or a filter names nothing of the graph
         """
+        max_hops = bounded_int(max_hops, "max_hops", 1, MAX_HOPS)
+        if self._names_nothing_of_the_graph(relation_types, target_type):
+            raise ValueError("relation_types or target_type names nothing the graph has")
+
         # Direzione della relazione
         if direction == "outgoing":
             rel_pattern = f"-[r*1..{max_hops}]->"
@@ -613,11 +657,11 @@ class GraphSearchTool(BaseTool):
         if relation_types:
             # The graph's names, whichever vocabulary the caller spoke (legacy
             # lowercase, traversal-weight keys, TraversalPolicy names).
-            rel_types = "|".join(resolve_rels(relation_types))
+            rel_types = "|".join(cypher_rel_names(relation_types))
             rel_pattern = rel_pattern.replace("[r*", f"[r:{rel_types}*")
 
-        # Target type filter
-        target_filter = f":{target_type}" if target_type else ""
+        # Target type filter: a label of the graph, in its canonical spelling
+        target_filter = f":{cypher_labels(target_type)[0]}" if target_type else ""
 
         # Match the seed by URN *or* source_url: a co-evolved (live_unconfirmed)
         # node is keyed URN=`live:<hash>` and carries the CANONICAL urn in

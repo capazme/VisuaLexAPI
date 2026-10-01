@@ -55,6 +55,42 @@ def test_resolve_rels_keeps_order_and_drops_repeats():
     assert s.resolve_rels(["cita", "RINVIA", "contiene"]) == ["RINVIA", "CONTIENE"]
 
 
+RELATION_ATTACK = "X]->(n) DETACH DELETE n //"
+LABEL_ATTACK = "Norma) DETACH DELETE n //"
+
+
+def test_cypher_rel_names_keeps_only_the_graphs_names_in_order():
+    asked = ["contiene", "cita", "RINVIA", "default", RELATION_ATTACK, "deroga", None, 7, "Contiene", ""]
+    assert s.cypher_rel_names(asked) == ["CONTIENE", "RINVIA", "DEROGA_A"]
+
+
+def test_cypher_rel_names_of_nothing_the_graph_has_is_empty():
+    assert s.cypher_rel_names([RELATION_ATTACK, "default", ""]) == []
+    assert s.cypher_rel_names([]) == []
+    assert s.cypher_rel_names("contiene") == ["CONTIENE"]  # a lone name is a list of one
+    assert s.cypher_rel_names([" deroga ", "\tRINVIA\n"]) == ["DEROGA_A", "RINVIA"]
+
+
+def test_cypher_labels_match_case_insensitively_and_return_the_canonical_spelling():
+    asked = ["norma", "ATTOGIUDIZIARIO", "ConcettoGiuridico", "Concetto", LABEL_ATTACK, "Norma", None, " dottrina "]
+    assert s.cypher_labels(asked) == ["Norma", "AttoGiudiziario", "ConcettoGiuridico", "Dottrina"]
+    assert s.cypher_labels([LABEL_ATTACK]) == []
+    assert s.cypher_labels("norma") == ["Norma"]
+
+
+@pytest.mark.parametrize("asked", [
+    RELATION_ATTACK, LABEL_ATTACK, "a b", "A-B", "A.B", "1A", "A;B", "A\nB", "A`B", "A'B", 'A"B', "A:B", "A|B", "A*B",
+])
+def test_nothing_that_is_not_a_name_of_the_graph_survives_into_cypher(asked):
+    assert s.cypher_rel_names([asked]) == [] and s.cypher_labels([asked]) == []
+
+
+def test_every_name_the_helpers_return_is_a_plain_identifier():
+    names = s.cypher_rel_names([r.value for r in s.Rel]) + s.cypher_labels([label.value for label in s.Label])
+    assert len(names) == len(s.Rel) + len(s.Label)
+    assert all(name.isidentifier() for name in names)
+
+
 def test_every_community_relation_reaches_the_graph():
     for member in RelationType:
         if member.value == "PARTE_DI":

@@ -22,9 +22,13 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import cypher_labels
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int, label_filter
 
 log = structlog.get_logger()
+
+# The most definitions one call returns; interpolated into the Cypher (`LIMIT N`).
+MAX_LIMIT = 50
 
 
 @dataclass
@@ -193,6 +197,27 @@ class DefinitionLookupTool(BaseTool):
             )
 
         try:
+            limit = bounded_int(limit, "limit", 1, MAX_LIMIT)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
+
+        if source_types and not cypher_labels(source_types):
+            # The caller filtered on types the graph does not have: nothing can match,
+            # and the lookup must not run unfiltered instead.
+            return ToolResult.ok(
+                data={
+                    "term": term,
+                    "definitions": [],
+                    "total": 0,
+                    "source_types": source_types,
+                    "include_related": include_related
+                },
+                tool_name=self.name,
+                term=term,
+                definitions_found=0
+            )
+
+        try:
             definitions = []
 
             # Strategy 1: Look for DEFINISCE relationships
@@ -276,11 +301,16 @@ class DefinitionLookupTool(BaseTool):
         else:
             match_condition = "toLower(concept.nome) CONTAINS toLower($term)"
 
-        # Source type filter
-        source_filter = ""
-        if source_types:
-            labels = ":".join(source_types)
-            source_filter = f":{labels}"
+        # Source type filter: labels of the graph only (any of them), or no query
+        labels = cypher_labels(source_types) if source_types else []
+        if source_types and not labels:
+            return []
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+        source_filter, source_where = label_filter("source", labels)
+        if source_where:
+            match_condition = f"{match_condition} AND {source_where}"
 
         cypher = f"""
             MATCH (source{source_filter})-[r:DEFINISCE]->(concept:ConcettoGiuridico)
@@ -296,7 +326,7 @@ class DefinitionLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term})
+            results = await self.graph_db.ro_query(cypher, {"term": term})
 
             return [
                 DefinitionEntry(
@@ -329,6 +359,10 @@ class DefinitionLookupTool(BaseTool):
         else:
             match_condition = "toLower(c.nome) CONTAINS toLower($term)"
 
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+
         cypher = f"""
             MATCH (c:ConcettoGiuridico)
             WHERE {match_condition} AND c.definizione IS NOT NULL
@@ -342,7 +376,7 @@ class DefinitionLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term})
+            results = await self.graph_db.ro_query(cypher, {"term": term})
 
             return [
                 DefinitionEntry(
@@ -375,9 +409,16 @@ class DefinitionLookupTool(BaseTool):
         - "è definito"
         - "per X si intende"
         """
+        labels = cypher_labels(source_types) if source_types else []
+        if source_types and not labels:
+            return []
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+
         source_filter = ":Norma"  # Default to Norma for text search
-        if source_types and len(source_types) == 1:
-            source_filter = f":{source_types[0]}"
+        if len(labels) == 1:
+            source_filter = f":{labels[0]}"
 
         # Search for definition patterns containing the term
         cypher = f"""
@@ -399,7 +440,7 @@ class DefinitionLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term})
+            results = await self.graph_db.ro_query(cypher, {"term": term})
 
             return [
                 DefinitionEntry(
@@ -428,6 +469,10 @@ class DefinitionLookupTool(BaseTool):
 
         Trova concetti collegati al termine e restituisce le loro definizioni.
         """
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+
         cypher = """
             MATCH (c1:ConcettoGiuridico)
             WHERE toLower(c1.nome) CONTAINS toLower($term)
@@ -444,7 +489,7 @@ class DefinitionLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term, "limit": limit})
+            results = await self.graph_db.ro_query(cypher, {"term": term, "limit": limit})
 
             return [
                 DefinitionEntry(

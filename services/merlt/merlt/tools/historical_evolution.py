@@ -23,7 +23,7 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import Rel, resolve_rels
+from merlt.storage.graph.schema import Rel, cypher_rel_names
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
 
 log = structlog.get_logger()
@@ -223,8 +223,12 @@ class HistoricalEvolutionTool(BaseTool):
         Query per trovare tutte le relazioni temporali in entrata.
         """
         # Build event type filter: the graph's names (the schema's), whatever
-        # case the caller used.
-        rel_types = "|".join(resolve_rels(event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value]))
+        # case the caller used. A name the graph does not have is dropped, and a
+        # filter that comes out empty finds no events: it is never run unfiltered.
+        names = cypher_rel_names(event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value])
+        if not names:
+            return []
+        rel_types = "|".join(names)
 
         # Date filter for future events
         date_filter = ""
@@ -245,7 +249,7 @@ class HistoricalEvolutionTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": urn})
 
             timeline = []
             for r in results:
@@ -282,7 +286,7 @@ class HistoricalEvolutionTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": urn})
 
             if not results:
                 return "unknown"

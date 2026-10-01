@@ -27,9 +27,22 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The deepest hierarchy walk: a code has about nine levels (codice, libro, titolo,
+# capo, sezione, articolo, comma, lettera, numero). The depth is interpolated into
+# the Cypher (`*1..N`), so it is always a clamped integer.
+MAX_DEPTH = 10
+
+
+def _tipi(tipo_filter: Optional[List[str]]) -> List[str]:
+    """The `tipo` values a filter asks for, as the parameter list of the query: each
+    as given and in lower case (a partition's type is lower case)."""
+    values = [tipo_filter] if isinstance(tipo_filter, str) else list(tipo_filter or [])
+    asked = [v for v in values if isinstance(v, str)]
+    return list(dict.fromkeys(name for v in asked for name in (v, v.lower())))
 
 
 class NavigationDirection(str, Enum):
@@ -207,6 +220,11 @@ class HierarchyNavigationTool(BaseTool):
             )
 
         try:
+            max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
+
+        try:
             # Find the starting node
             start_info = await self._find_start_node(start_node)
             if not start_info:
@@ -305,7 +323,7 @@ class HierarchyNavigationTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"id": identifier})
+            results = await self.graph_db.ro_query(cypher, {"id": identifier})
             if results:
                 return {
                     "urn": results[0].get("urn", ""),
@@ -331,11 +349,13 @@ class HierarchyNavigationTool(BaseTool):
 
         Relazioni seguite: CONTIENE, a ritroso (child → parent)
         """
+        max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
         text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
+        params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_list = "', '".join(tipo_filter)
-            tipo_where = f"AND labels(n)[0] IN ['{tipo_list}']"
+            tipo_where = "AND labels(n)[0] IN $tipi"
+            params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
             MATCH path = (n)-[:CONTIENE*1..{max_depth}]->(start)
@@ -351,7 +371,7 @@ class HierarchyNavigationTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
             return [
                 {
                     "urn": r.get("urn", ""),
@@ -379,11 +399,13 @@ class HierarchyNavigationTool(BaseTool):
 
         Relazioni seguite: CONTIENE (parent → child)
         """
+        max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
         text_field = ", coalesce(n.testo, n.testo_vigente) AS testo" if include_text else ""
+        params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_list = "', '".join(tipo_filter)
-            tipo_where = f"AND labels(n)[0] IN ['{tipo_list}']"
+            tipo_where = "AND labels(n)[0] IN $tipi"
+            params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
             MATCH path = (start)-[:CONTIENE*1..{max_depth}]->(n)
@@ -400,7 +422,7 @@ class HierarchyNavigationTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
             return [
                 {
                     "urn": r.get("urn", ""),
@@ -427,10 +449,11 @@ class HierarchyNavigationTool(BaseTool):
         Trova i nodi fratelli (stesso genitore).
         """
         text_field = ", coalesce(sibling.testo, sibling.testo_vigente) AS testo" if include_text else ""
+        params: Dict[str, Any] = {"urn": urn}
         tipo_where = ""
         if tipo_filter:
-            tipo_list = "', '".join(tipo_filter)
-            tipo_where = f"AND labels(sibling)[0] IN ['{tipo_list}']"
+            tipo_where = "AND labels(sibling)[0] IN $tipi"
+            params["tipi"] = _tipi(tipo_filter)
 
         cypher = f"""
             MATCH (start)
@@ -449,7 +472,7 @@ class HierarchyNavigationTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
             return [
                 {
                     "urn": r.get("urn", ""),

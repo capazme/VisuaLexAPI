@@ -24,9 +24,22 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The most principles one call returns; interpolated into the Cypher (`LIMIT N`).
+MAX_TOP_K = 50
+
+
+def _levels(principle_level: Any) -> Optional[List[str]]:
+    """The levels asked for, as the parameter list of the query (None: every level).
+
+    A level is compared with `p.livello` by value: it is never part of the Cypher text."""
+    if not principle_level:
+        return None
+    asked = [principle_level] if isinstance(principle_level, str) else list(principle_level)
+    return [str(level) for level in asked]
 
 
 @dataclass
@@ -173,6 +186,11 @@ class PrincipleLookupTool(BaseTool):
             )
 
         try:
+            top_k = bounded_int(top_k, "top_k", 1, MAX_TOP_K)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
+
+        try:
             principles = []
 
             # Strategy 1: Look for ESPRIME_PRINCIPIO relationships
@@ -242,13 +260,15 @@ class PrincipleLookupTool(BaseTool):
 
         Pattern: (Norma)-[:ESPRIME_PRINCIPIO]->(PrincipioGiuridico)
         """
-        # Build level filter
-        level_filter = ""
-        if principle_level:
-            level_conditions = " OR ".join([
-                f"p.livello = '{level}'" for level in principle_level
-            ])
-            level_filter = f"AND ({level_conditions})"
+        # Build level filter: the levels are a parameter, never part of the text
+        levels = _levels(principle_level)
+        level_filter = "AND p.livello IN $livelli" if levels else ""
+        params: Dict[str, Any] = {"query": query}
+        if levels:
+            params["livelli"] = levels
+        limit = bounded_int(limit, "limit", 0, MAX_TOP_K)
+        if limit == 0:
+            return []
 
         cypher = f"""
             MATCH (n:Norma)-[:ESPRIME_PRINCIPIO]->(p:PrincipioGiuridico)
@@ -268,7 +288,7 @@ class PrincipleLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"query": query})
+            results = await self.graph_db.ro_query(cypher, params)
 
             return [
                 LegalPrinciple(
@@ -296,13 +316,15 @@ class PrincipleLookupTool(BaseTool):
         """
         Cerca nodi PrincipioGiuridico con match diretto.
         """
-        # Build level filter
-        level_filter = ""
-        if principle_level:
-            level_conditions = " OR ".join([
-                f"p.livello = '{level}'" for level in principle_level
-            ])
-            level_filter = f"AND ({level_conditions})"
+        # Build level filter: the levels are a parameter, never part of the text
+        levels = _levels(principle_level)
+        level_filter = "AND p.livello IN $livelli" if levels else ""
+        params: Dict[str, Any] = {"query": query}
+        if levels:
+            params["livelli"] = levels
+        limit = bounded_int(limit, "limit", 0, MAX_TOP_K)
+        if limit == 0:
+            return []
 
         cypher = f"""
             MATCH (p:PrincipioGiuridico)
@@ -323,7 +345,7 @@ class PrincipleLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"query": query})
+            results = await self.graph_db.ro_query(cypher, params)
 
             return [
                 LegalPrinciple(
@@ -356,6 +378,10 @@ class PrincipleLookupTool(BaseTool):
         - "in base al principio"
         - "secondo il principio"
         """
+        limit = bounded_int(limit, "limit", 0, MAX_TOP_K)
+        if limit == 0:
+            return []
+
         cypher = f"""
             MATCH (n:Norma)
             WHERE n.testo_vigente IS NOT NULL
@@ -372,7 +398,7 @@ class PrincipleLookupTool(BaseTool):
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"query": query})
+            results = await self.graph_db.ro_query(cypher, {"query": query})
 
             principles = []
             for r in results:

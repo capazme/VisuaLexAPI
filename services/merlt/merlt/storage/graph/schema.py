@@ -12,7 +12,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from enum import Enum
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional, Union
 
 import structlog
 
@@ -148,6 +148,7 @@ class Rel(_Vocab):
 
 
 _REL_VALUES = frozenset(r.value for r in Rel)
+_LABEL_BY_LOWER: dict[str, Label] = {label.value.lower(): label for label in Label}
 
 # Names the graph and the code used before this module; the migration renames them.
 LEGACY_REL: dict[str, Rel] = {
@@ -203,6 +204,33 @@ def resolve_rel(name: str) -> str:
 def resolve_rels(names: Iterable[str]) -> list[str]:
     """`resolve_rel` over a list, keeping the order and dropping repeats."""
     return list(dict.fromkeys(resolve_rel(n) for n in names))
+
+
+def _as_names(names: Union[str, Iterable[Any]]) -> list[Any]:
+    """A lone name is a list of one: iterating a string would hand out its characters."""
+    return [names] if isinstance(names, str) else list(names)
+
+
+def cypher_rel_names(names: Union[str, Iterable[Any]]) -> list[str]:
+    """The relation types a Cypher pattern may name, from names a caller chose.
+
+    Relation types cannot be Cypher parameters, so a tool interpolates them into the
+    query text, and its argument comes from an LLM that reads retrieved text. Each
+    name goes through `resolve_rel` and only a `Rel` value survives: order kept,
+    repeats dropped, everything else (unknown names, anything that is not a string,
+    anything that could carry Cypher) dropped. An empty answer means the caller
+    named nothing the graph has: the tool must not run the query unfiltered."""
+    resolved = (resolve_rel(n.strip()) for n in _as_names(names) if isinstance(n, str))
+    return list(dict.fromkeys(r for r in resolved if r in _REL_VALUES))
+
+
+def cypher_labels(names: Union[str, Iterable[Any]]) -> list[str]:
+    """The node labels a Cypher pattern may name, from names a caller chose: matched
+    case-insensitively against `Label` and returned in the canonical spelling. Like
+    `cypher_rel_names`, anything else is dropped and an empty answer means "run no
+    query"."""
+    found = (_LABEL_BY_LOWER.get(n.strip().lower()) for n in _as_names(names) if isinstance(n, str))
+    return list(dict.fromkeys(label.value for label in found if label is not None))
 
 
 def community_rel_to_graph(value: str) -> Rel:

@@ -796,9 +796,9 @@ class LegalKnowledgeGraph:
         if not self._falkordb or not urn:
             return {}
 
-        # Get parent and related nodes. FalkorDBClient.query() answers with a list
-        # of dicts keyed by the RETURN aliases, not with a result set.
-        rows = await self._falkordb.query(
+        # Get parent and related nodes (a read: ro_query). The client answers with a
+        # list of dicts keyed by the RETURN aliases, not with a result set.
+        rows = await self._falkordb.ro_query(
             """
             MATCH (n:Norma {URN: $urn})
             OPTIONAL MATCH (parent)-[:CONTIENE]->(n)
