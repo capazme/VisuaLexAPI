@@ -63,7 +63,8 @@ class Label(_Vocab):
 class Rel(_Vocab):
     """Relation types, all upper case: the graph's own plus every community
     RelationType the graph can receive (CITA arrives as RINVIA; PARTE_DI, the
-    inverse of CONTIENE, is never written)."""
+    inverse of CONTIENE, is never written as such: the enrichment router writes
+    it as the reversed CONTIENE)."""
 
     # Structure
     CONTIENE = "CONTIENE"
@@ -205,9 +206,16 @@ def resolve_rels(names: Iterable[str]) -> list[str]:
 
 
 def community_rel_to_graph(value: str) -> Rel:
-    """The graph relation a community-validated RelationType value is written as."""
+    """The graph relation a community-validated RelationType value is written as.
+
+    PARTE_DI has none as such: it is the inverse of CONTIENE, so the writer that
+    knows the endpoints swaps them and writes CONTIENE
+    (`enrichment_router._write_relation_to_graph`)."""
     if value == "PARTE_DI":
-        raise ValueError("PARTE_DI is the inverse of CONTIENE and is never written")
+        raise ValueError(
+            "PARTE_DI is the inverse of CONTIENE and is never written as such: "
+            "write CONTIENE with the endpoints swapped"
+        )
     return canonical_rel(value)
 
 

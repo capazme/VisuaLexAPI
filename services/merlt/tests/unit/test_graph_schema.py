@@ -58,7 +58,9 @@ def test_resolve_rels_keeps_order_and_drops_repeats():
 def test_every_community_relation_reaches_the_graph():
     for member in RelationType:
         if member.value == "PARTE_DI":
-            with pytest.raises(ValueError):
+            # Never written as such: the writer swaps the endpoints and writes CONTIENE
+            # (`enrichment_router._write_relation_to_graph`), and the error says so.
+            with pytest.raises(ValueError, match="CONTIENE with the endpoints swapped"):
                 s.community_rel_to_graph(member.value)
         else:
             assert isinstance(s.community_rel_to_graph(member.value), s.Rel)
