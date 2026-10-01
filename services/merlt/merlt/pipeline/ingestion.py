@@ -216,12 +216,14 @@ class IngestionPipelineV2:
         meta = article.metadata
 
         # Get URNs from existing urngenerator, then CANONICALIZE for the graph:
-        # VisuaLex's `meta.to_urn()` returns the URL-wrapped form
-        # ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:…!vig="), but the
-        # Libro IV seed (and the BFF `normalizeGraphUrn` used by check-article
-        # / subgraph) index the bare canonical NIR form. Without this strip the
-        # nodes are unreachable from the read path → 0-records → infinite
-        # lazy-ingest loop. The full URL stays in `article.url` for display.
+        # VisuaLex's `meta.to_urn()` returns the URL-wrapped form with the version
+        # marker ("https://www.normattiva.it/uri-res/N2Ls?urn:nir:…!vig="). The
+        # Libro IV seed (and the BFF `normalizeGraphUrn` used by check-article /
+        # subgraph) key a norm by that same full URL WITHOUT the marker:
+        # `canonical_urn` cuts the marker and keeps the URL wrapper (the bare
+        # `urn:nir:…` form is not the key). Without the cut the nodes are
+        # unreachable from the read path → 0-records → infinite lazy-ingest loop.
+        # `article.url` keeps the URL as VisuaLex gave it, for display.
         article_urn = _canonical_urn(meta.to_urn())
         article_url = article.url
         codice_urn = _canonical_urn(meta.to_codice_urn())

@@ -2688,8 +2688,8 @@ async def confirm_source(
                 detail=f"Fonte provvisoria {node_id} non trovata: potrebbe essere stata rimossa o gia' consolidata",
             )
         node = rows[0]
-        # Graph key form: strip only the NIR version/annex marker (the `!vig=`
-        # trap), keep the URL wrapper.
+        # Graph key form: cut only the NIR version marker (the `!vig=` trap), keep
+        # the URL wrapper and the `:N` annex.
         source_url = _canonical_url((node.get("source_url") or "").strip())
 
         # (c) A Normattiva article enters the graph through the ingestion.

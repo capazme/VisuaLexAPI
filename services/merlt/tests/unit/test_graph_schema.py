@@ -177,6 +177,14 @@ def test_the_act_is_read_from_the_urn_only_for_known_codes():
     assert s.estremi_from_urn(CC.split("~")[0]) == (None, None)
 
 
+def test_an_act_the_urn_table_lists_without_an_abbreviation_is_named_in_full():
+    # `Art. N` alone is for an act the URN table does not list (a numbered law, above); the preleggi
+    # are in the table and have no abbreviation, so the estremi carry the act's own name.
+    preleggi = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:1~art5"
+    assert s.act_name_from_urn(preleggi) == "preleggi"
+    assert s.estremi_from_urn(preleggi) == ("5", "Art. 5 preleggi")
+
+
 def test_the_one_stub_shape():
     assert s.stub_properties(CC + "@originale") == {
         "URN": CC, "node_id": CC, "numero_articolo": "2043", "estremi": "Art. 2043 c.c.",

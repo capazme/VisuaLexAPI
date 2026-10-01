@@ -426,8 +426,11 @@ def act_name_from_urn(urn: Optional[str]) -> Optional[str]:
 
 
 def estremi_from_urn(urn: Optional[str]) -> tuple[Optional[str], Optional[str]]:
-    """`(numero_articolo, estremi)` from a URN: `Art. N <abbreviation>` for a
-    code the table knows, `Art. N` otherwise, `(None, None)` without an article."""
+    """`(numero_articolo, estremi)` from a URN, `(None, None)` without an article:
+    `Art. N <abbreviation>` for a code the abbreviation table knows (`Art. 2043 c.c.`);
+    `Art. N <the act's name>` for an act the URN table lists without an abbreviation
+    (`Art. 5 preleggi`); `Art. N` for an act the URN table does not list (a numbered
+    law)."""
     numero = article_number_from_urn(urn)
     if numero is None:
         return None, None
