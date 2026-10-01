@@ -106,6 +106,45 @@ async def test_a_hyphenated_or_article_keeping_seed_name_finds_its_twin(graph, n
     assert await _count(graph, "MATCH (n) WHERE n:ConcettoGiuridico OR n:Entity RETURN count(n) AS c") == 1
 
 
+@pytest.mark.parametrize(
+    "label, entity_type, nome, seed_id, seed_name, community_id",
+    [
+        ("ConcettoGiuridico", "concetto", "La buona fede", "concetto:buona_fede", "buona fede", "concetto:buona_fede"),
+        ("ConcettoGiuridico", "concetto", "L'inadempimento", "concetto:inadempimento", "inadempimento",
+         "concetto:inadempimento"),
+        ("SoggettoGiuridico", "soggetto_giuridico", "Il Conduttore", "soggetto:conduttore", "conduttore",
+         "soggetto_giuridico:conduttore"),
+    ],
+)
+async def test_an_article_bearing_proposal_finds_its_article_less_twin(
+    graph, label, entity_type, nome, seed_id, seed_name, community_id
+):
+    await _seed(graph, label, seed_id, seed_name)  # real names of the Libro IV seed, without an article
+    writer = EntityGraphWriter(graph)
+
+    result = await writer.write_entity(_approved("pe-1", entity_type, nome))
+    again = await writer.write_entity(_approved("pe-2", entity_type, nome))
+
+    assert (result.action, result.node_id) == ("enriched_existing", community_id)
+    assert again.node_id == community_id
+    rows = await graph.query(f"MATCH (c:{label}:Entity) RETURN c.node_id AS nid, c.id AS id", {})
+    assert rows == [{"nid": seed_id, "id": community_id}]
+    # A miss would have made a community Entity beside the seed's node, and that Entity would
+    # then answer every later proposal first: the seed's node would never be adopted.
+    assert await _count(graph, f"MATCH (n) WHERE n:{label} OR n:Entity RETURN count(n) AS c") == 1
+
+
+async def test_a_seed_name_with_its_own_article_is_adopted_as_spelt(graph):
+    await _seed(graph, "ConcettoGiuridico", "concetto:la_reticenza", "La reticenza")  # the seed has both
+    await _seed(graph, "ConcettoGiuridico", "concetto:reticenza", "reticenza")
+
+    result = await EntityGraphWriter(graph).write_entity(_approved("pe-1", "concetto", "La reticenza"))
+
+    assert result.node_id == "concetto:reticenza"  # the community id strips the article
+    rows = await graph.query("MATCH (c:ConcettoGiuridico:Entity) RETURN c.node_id AS nid", {})
+    assert rows == [{"nid": "concetto:la_reticenza"}]  # the node spelt like the proposal, not its neighbour
+
+
 async def test_a_second_alias_keeps_the_id_the_first_gave(graph):
     await _seed(graph, "DefinizioneLegale", "definizione:contratto", "Contratto")
     writer = EntityGraphWriter(graph)

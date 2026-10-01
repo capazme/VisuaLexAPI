@@ -9,10 +9,12 @@ from merlt.pipeline.provisional_writer import _merge_provisional_node
 from merlt.pipeline.review import list_pending_review
 from merlt.storage.graph import entity_writer
 from merlt.storage.graph.entity_writer import (
+    LEADING_ARTICLES,
     RELATION_BY_ENTITY_TYPE,
     EntityGraphWriter,
     normalize_entity_name,
     seed_twin_slug,
+    seed_twin_slugs,
 )
 from merlt.storage.graph.schema import Rel
 
@@ -123,12 +125,14 @@ async def test_no_entity_and_no_twin_is_no_duplicate():
 
 
 async def test_a_twin_with_another_prefix_takes_the_community_id():
-    # The seed keys a subject `soggetto:…`, the community `soggetto_giuridico:…`.
+    # The seed keys a subject `soggetto:…`, the community `soggetto_giuridico:…`. The proposal
+    # carries an article the seed's name ("conduttore") has not: the key as spelt misses, the
+    # name without its article meets the seed's node.
     writer, client = _writer()
-    client.query = AsyncMock(side_effect=[[], [{"id": "soggetto_giuridico:conduttore"}]])
-    found = await writer._check_duplicate_mechanical("Conduttore", "soggetto_giuridico")
+    client.query = AsyncMock(side_effect=[[], [], [{"id": "soggetto_giuridico:conduttore"}]])
+    found = await writer._check_duplicate_mechanical("Il Conduttore", "soggetto_giuridico")
     assert found == "soggetto_giuridico:conduttore"
-    cypher, params = client.query.await_args_list[1].args
+    cypher, params = client.query.await_args_list[2].args
     assert "MATCH (c:SoggettoGiuridico {node_id: $nid})" in cypher
     assert params == {"nid": "soggetto:conduttore", "eid": "soggetto_giuridico:conduttore"}
 
@@ -224,6 +228,70 @@ async def test_the_twin_is_found_by_the_seed_key_and_takes_the_community_id(nome
     assert await writer._check_duplicate_mechanical(nome, "concetto") == eid
     assert client.query.await_args_list[0].args[1] == {"expected_id": eid}  # the community id, unchanged
     assert client.query.await_args_list[1].args[1] == {"nid": nid, "eid": eid}  # the seed's key
+
+
+# An article-bearing proposal meets the seed's article-less name --------------------
+
+
+def test_the_seed_keys_to_try_are_the_name_as_spelt_then_without_its_article():
+    assert seed_twin_slugs("Il Conduttore") == ["il_conduttore", "conduttore"]
+    assert seed_twin_slugs("La buona fede") == ["la_buona_fede", "buona_fede"]
+    assert seed_twin_slugs("L'inadempimento") == ["linadempimento", "inadempimento"]
+    assert seed_twin_slugs("Crediti futuri") == ["crediti_futuri"]  # no article, one key
+    # Only an article makes a second key: a word that merely begins with the letters of one does not.
+    assert seed_twin_slugs("Lodo arbitrale") == ["lodo_arbitrale"]
+    assert seed_twin_slugs("Illecito civile") == ["illecito_civile"]
+    assert seed_twin_slugs("Unione civile") == ["unione_civile"]
+    # The name is folded like the seed folds it, with or without its article.
+    assert seed_twin_slugs("La capacità d'agire") == ["la_capacita_dagire", "capacita_dagire"]
+
+
+@pytest.mark.parametrize("article", LEADING_ARTICLES)
+def test_the_twin_lookup_strips_the_articles_the_community_id_strips(article):
+    # One list: whatever `normalize_entity_name` takes for an article, the lookup tries without.
+    nome = f"{article}conduttore"
+    assert normalize_entity_name(nome) == "conduttore"
+    assert seed_twin_slugs(nome)[1:] == ["conduttore"]
+
+
+@pytest.mark.parametrize(
+    "nome, tried, eid",
+    [
+        ("Il Conduttore", ["concetto:il_conduttore", "concetto:conduttore"], "concetto:conduttore"),
+        ("La buona fede", ["concetto:la_buona_fede", "concetto:buona_fede"], "concetto:buona_fede"),
+        ("L'inadempimento", ["concetto:linadempimento", "concetto:inadempimento"], "concetto:inadempimento"),
+    ],
+)
+async def test_an_article_bearing_proposal_finds_its_article_less_twin(nome, tried, eid):
+    writer, client = _writer()
+    client.query = AsyncMock(side_effect=[[], [], [{"id": eid}]])
+    assert await writer._check_duplicate_mechanical(nome, "concetto") == eid
+    twin_calls = client.query.await_args_list[1:]
+    assert [call.args[1]["nid"] for call in twin_calls] == tried  # as spelt first, then without the article
+    assert all(call.args[1]["eid"] == eid for call in twin_calls)  # the id the twin takes: the community's
+
+
+async def test_a_seed_name_with_its_own_article_finds_its_own_node():
+    # The seed has "La reticenza" (`la_reticenza`) next to "reticenza": the name as spelt is tried
+    # first, and a hit is not followed by a second query.
+    writer, client = _writer()
+    client.query = AsyncMock(side_effect=[[], [{"id": "concetto:reticenza"}]])
+    assert await writer._check_duplicate_mechanical("La reticenza", "concetto") == "concetto:reticenza"
+    assert client.query.await_count == 2
+    assert client.query.await_args_list[1].args[1] == {"nid": "concetto:la_reticenza", "eid": "concetto:reticenza"}
+
+
+async def test_an_article_bearing_name_with_no_twin_asks_twice_and_finds_nothing():
+    writer, client = _writer()
+    client.query = AsyncMock(side_effect=[[], [], []])
+    assert await writer._check_duplicate_mechanical("La nozione che il seed non ha", "concetto") is None
+    assert client.query.await_count == 3  # the Entity, the name as spelt, the name without its article
+
+
+async def test_an_article_bearing_name_of_a_type_with_no_seed_twin_looks_only_for_the_entity():
+    writer, client = _writer(rows=[])
+    assert await writer._check_duplicate_mechanical("La multa", "sanzione") is None
+    assert client.query.await_count == 1
 
 
 async def test_an_accented_name_finds_its_seed_twin():

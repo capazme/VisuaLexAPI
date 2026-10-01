@@ -111,6 +111,19 @@ def is_real_article_urn(urn: object) -> bool:
     return isinstance(urn, str) and urn.strip() not in PLACEHOLDER_ARTICLE_URNS
 
 
+# The leading Italian articles `normalize_entity_name` strips, in the order it
+# tries them. They are matched on a lowercase, stripped name.
+LEADING_ARTICLES = ("il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una ")
+
+
+def strip_leading_article(text: str) -> str:
+    """`text` (lowercase, stripped) without its leading Italian article, if it has one."""
+    for article in LEADING_ARTICLES:
+        if text.startswith(article):
+            return text[len(article) :]
+    return text
+
+
 def normalize_entity_name(nome: str) -> str:
     """
     Normalize an entity name into the slug of its graph node id.
@@ -128,12 +141,8 @@ def normalize_entity_name(nome: str) -> str:
     """
     normalized = (nome or "").lower().strip()
 
-    # Remove Italian articles
-    articles = ["il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una "]
-    for article in articles:
-        if normalized.startswith(article):
-            normalized = normalized[len(article) :]
-            break
+    # Remove a leading Italian article
+    normalized = strip_leading_article(normalized)
 
     # Replace hyphens with spaces (so "Legittima-difesa" → "Legittima difesa")
     normalized = normalized.replace("-", " ")
@@ -151,6 +160,17 @@ def normalize_entity_name(nome: str) -> str:
     normalized = normalized.strip("_")
 
     return normalized
+
+
+def _fold_lower(nome: str) -> str:
+    """The name with its accents folded, lowercase and stripped."""
+    decomposed = unicodedata.normalize("NFD", nome or "")
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower().strip()
+
+
+def _seed_slug(folded: str) -> str:
+    """The seed's rule on a name already folded, lowercase and stripped."""
+    return re.sub(r"\s+", "_", re.sub(r"[^a-z0-9\s]", "", folded)).strip("_")
 
 
 def seed_twin_slug(nome: str) -> str:
@@ -172,12 +192,32 @@ def seed_twin_slug(nome: str) -> str:
     nodes; folding the accents and then applying `normalize_entity_name`
     reproduced 3865.
 
-    The name is taken as it is spelt: a proposal that adds an article the seed's
-    name does not have ("Il conduttore" for `conduttore`) does not meet it.
+    This is the key of the name as it is spelt. A proposal may add an article the
+    seed's name does not have ("Il conduttore" for `conduttore`): `seed_twin_slugs`
+    also tries the name without it.
     """
-    decomposed = unicodedata.normalize("NFD", nome or "")
-    folded = "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower().strip()
-    return re.sub(r"\s+", "_", re.sub(r"[^a-z0-9\s]", "", folded)).strip("_")
+    return _seed_slug(_fold_lower(nome))
+
+
+def seed_twin_slugs(nome: str) -> List[str]:
+    """The seed keys a proposed name may meet, in the order to try them.
+
+    First the name as it is spelt (`seed_twin_slug`): the seed keeps an article of
+    its own ("La reticenza" is `la_reticenza`, next to `reticenza`). Then, when the
+    name starts with an article (the ones `normalize_entity_name` strips), the name
+    without it: a proposal says "Il conduttore" where the seed says "conduttore".
+    Only an article makes a second key, so only an article makes a second query.
+
+    A name that meets neither is no twin, and that is not harmless: the community
+    Entity written in its place answers every later proposal first, so the seed's
+    node is never adopted.
+    """
+    folded = _fold_lower(nome)
+    bare = strip_leading_article(folded)
+    slugs = [_seed_slug(folded)]
+    if bare != folded:
+        slugs.append(_seed_slug(bare))
+    return [slug for slug in dict.fromkeys(slugs) if slug]
 
 
 def entity_node_id(entity_type: str, nome: str) -> str:
@@ -328,16 +368,19 @@ class EntityGraphWriter:
             label, prefix = twin
             # The seed already has this concept: it becomes the community entity
             # (one node, one key) instead of a twin next to it. It is found by the
-            # seed's own key (`seed_twin_slug`), and keeps an id it already has:
-            # `definizione` and `definizione_legale` share one seed node, and the
-            # second alias must not re-key what the first one adopted.
-            rows = await self.falkordb.query(
-                f"MATCH (c:{label.value} {{node_id: $nid}}) "
-                "SET c:Entity, c.id = coalesce(c.id, $eid) RETURN c.id AS id",
-                {"nid": f"{prefix}:{seed_twin_slug(entity_text)}", "eid": expected_id},
-            )
-            if rows:
-                return rows[0]["id"]
+            # seed's own key, as the name is spelt and then, if it starts with an
+            # article, without it (`seed_twin_slugs`); a miss on both is no twin.
+            # It keeps an id it already has: `definizione` and `definizione_legale`
+            # share one seed node, and the second alias must not re-key what the
+            # first one adopted.
+            for slug in seed_twin_slugs(entity_text):
+                rows = await self.falkordb.query(
+                    f"MATCH (c:{label.value} {{node_id: $nid}}) "
+                    "SET c:Entity, c.id = coalesce(c.id, $eid) RETURN c.id AS id",
+                    {"nid": f"{prefix}:{slug}", "eid": expected_id},
+                )
+                if rows:
+                    return rows[0]["id"]
         return None
 
     def _normalize_nome(self, nome: str) -> str:
