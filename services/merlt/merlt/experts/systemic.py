@@ -36,7 +36,7 @@ from merlt.experts.base import (
 )
 from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
-from merlt.storage.graph.schema import Rel, node_text
+from merlt.storage.graph.schema import Rel, canonical_urn, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
@@ -522,10 +522,11 @@ class SystemicExpert(BaseExpert, ReActMixin):
             if u:
                 urns_to_expand.add(u)
         # I nodi del grafo sono seminati SENZA il marcatore di versione NIR
-        # (`...~art2043!vig=`): togliere tutto dal primo `!` per far combaciare i
-        # seed con gli URN dei nodi (stesso trap gestito lato BFF da normalizeGraphUrn).
+        # (`...~art2043!vig=`, `...@originale`): `canonical_urn` lo toglie per far
+        # combaciare i seed con gli URN dei nodi (stesso trap gestito lato BFF da
+        # normalizeGraphUrn).
         urns_to_expand = {
-            u.split("!", 1)[0] if isinstance(u, str) else u for u in urns_to_expand
+            canonical_urn(u) if isinstance(u, str) else u for u in urns_to_expand
         }
         urns_to_expand.discard("")
 

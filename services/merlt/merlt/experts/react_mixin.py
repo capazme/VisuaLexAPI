@@ -36,7 +36,7 @@ from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from merlt.storage.graph.schema import node_text
+from merlt.storage.graph.schema import canonical_urn, node_text
 
 log = structlog.get_logger()
 
@@ -877,7 +877,7 @@ class ReActMixin:
 
     def _format_query_references(self, context: Any) -> str:
         """W2.2: render the analyzer-parsed query references — the human form AND
-        the real graph key (``!vig=`` stripped) — so the LLM passes THESE
+        the real graph key (version marker stripped) — so the LLM passes THESE
         authoritative identifiers to the tools instead of inventing urns."""
         try:
             refs = [
@@ -892,7 +892,7 @@ class ReActMixin:
                 if not disp:
                     continue
                 urn = r.get("urn")
-                key = str(urn).split("!", 1)[0] if urn else None
+                key = canonical_urn(str(urn)) if urn else None
                 lines.append(f"  - {disp}" + (f"   [chiave-grafo: {key}]" if key else ""))
             return "\n".join(lines)
         except Exception:  # noqa: BLE001 - prompt helper, never raise
@@ -918,14 +918,14 @@ class ReActMixin:
         urns: List[str] = []
         for s in current_sources:
             # Prefer the real graph node key (urn / metadata.article_urn) over the
-            # chunk_id, and strip the NIR version marker (!vig=) so it matches the
-            # seed keys (the graph is seeded without the marker). Same rule as the
+            # chunk_id, and strip the NIR version marker (!vig=, @originale) so it matches
+            # the seed keys (the graph is seeded without the marker). Same rule as the
             # Slice-B served-URN capture. Guard metadata type — this builder is NOT
             # wrapped in try/except, so a non-dict metadata must not raise.
             md = s.get("metadata")
             u = s.get("urn") or (md.get("article_urn") if isinstance(md, dict) else None) or s.get("chunk_id")
             if u:
-                u = str(u).split("!", 1)[0]
+                u = canonical_urn(str(u))
                 if u and u not in urns:
                     urns.append(u)
         semantic_uses = sum(

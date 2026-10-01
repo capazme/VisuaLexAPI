@@ -681,6 +681,28 @@ async def test_an_article_nothing_modifies_is_checked_without_a_modification_que
     assert not any("type(r) AS event_type" in cypher for cypher in graph.cyphers)
 
 
+# One canonical URN for the experts' seeds and prompts -----------------------------------------------
+
+
+@pytest.mark.parametrize("marker", ["!vig=2023-01-01", "@originale"])
+async def test_the_systemic_expert_seeds_the_traversal_with_the_canonical_urn(_static_systemic_floor, marker):
+    tool = GraphSearchTool(graph_db=_GraphRecorder())
+    await SystemicExpert(tools=[tool])._expand_systemic_relations(_context(CC + marker), [])
+    assert [call["parameters"]["start_node"] for call in tool.collect_and_reset_traces()] == [CC]
+
+
+@pytest.mark.parametrize("marker", ["!vig=2023-01-01", "@originale"])
+def test_the_react_prompt_gives_the_llm_the_canonical_graph_key(marker):
+    expert = LiteralExpert()
+    context = ExpertContext(
+        query_text="Che cosa dice la norma?",
+        entities={"legal_references": [{"display": "art. 2043 c.c.", "urn": CC + marker}]},
+    )
+    assert f"[chiave-grafo: {CC}]" in expert._format_query_references(context)
+    prompt = expert._build_react_prompt(context, [], [{"urn": CC + marker, "text": "Testo."}], [])
+    assert f"\n  {CC}\n" in prompt and marker not in prompt
+
+
 # A community node is `:Entity:<Label>`: it reads as the label, whichever label comes first ----------
 
 

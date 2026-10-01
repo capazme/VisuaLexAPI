@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from merlt.api.enrichment_router import _LOAD_LIVE_SOURCE_CYPHER
-from merlt.pipeline.provisional_writer import _merge_provisional_node
+from merlt.pipeline.provisional_writer import _canonical_url, _merge_provisional_node
 from merlt.pipeline.review import list_pending_review
 from merlt.storage.graph import entity_writer
 from merlt.storage.graph.entity_writer import (
@@ -451,3 +451,20 @@ async def test_every_label_a_community_entity_is_written_with_is_a_label_of_the_
         await writer._create_new_entity_node(_proposal(entity_type.value))
         labels = re.search(r"CREATE \(e((?::\w+)+) \{", client.query.await_args.args[0]).group(1).split(":")[1:]
         assert labels[0] == "Entity" and set(labels) <= known, (entity_type, labels)
+
+
+# One canonical URN ----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("marker", ["!vig=", "!vig=2024-01-01", "!orig=1942-03-16", "@originale"])
+def test_a_provisional_source_is_keyed_by_the_schemas_canonical_urn(marker):
+    from merlt.storage.graph.schema import canonical_urn
+
+    assert _canonical_url(CC + marker) == canonical_urn(CC + marker) == CC
+
+
+def test_a_provisional_source_that_is_no_norm_keeps_its_whole_url():
+    # An Italgiure document id holds `@`: cut there, every ruling of that day and database would be one node.
+    url = "https://www.italgiure.giustizia.it/xway/nif/hc.dll?db=snciv&id=./20210630/snciv@s10@a2021@n18325@tS.clean.pdf"
+    assert _canonical_url(url) == url
+    assert _canonical_url("") == "" and _canonical_url(None) is None

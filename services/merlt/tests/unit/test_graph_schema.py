@@ -17,6 +17,23 @@ def test_canonical_urn_cuts_only_the_version_marker(marker):
     assert s.canonical_urn(CC + marker) == CC
 
 
+# An Italgiure document id holds `@` between its parts: it is a case-law URL, not a norm's key, and
+# cutting it at the first `@` would give every ruling of the same day and database one key.
+ITALGIURE = (
+    "https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll?verbo=attach&db=snciv"
+    "&id=./20210630/snciv@s10@a2021@n18325@tS.clean.pdf"
+)
+
+
+def test_canonical_urn_cuts_a_norm_and_leaves_any_other_string_alone():
+    assert s.canonical_urn(ITALGIURE) == ITALGIURE
+    assert s.canonical_urn("https://example.org/@autore/articolo!draft") == "https://example.org/@autore/articolo!draft"
+    assert s.canonical_urn("concetto:buona_fede") == "concetto:buona_fede"
+    # a bare NIR URN is a norm too
+    bare = CC.split("?", 1)[1]
+    assert s.canonical_urn(bare + "@originale") == bare and s.canonical_urn(bare + "!vig=2024-01-01") == bare
+
+
 def test_canonical_urn_keeps_the_url_and_passes_empty_values():
     assert s.canonical_urn(CC) == CC
     assert s.canonical_urn("") == ""

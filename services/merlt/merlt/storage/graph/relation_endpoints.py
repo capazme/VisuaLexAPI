@@ -13,14 +13,16 @@ A relation endpoint (``source_node_urn`` / ``target_entity_id`` on
     unresolved. It must never become a graph node: the consensus writer used to
     ``MERGE (:Norma {URN: <concept name>})`` and polluted the shared graph.
 
-Pure helpers (regex only), shared by the staging parser and the consensus
-writer so both sides classify an endpoint the same way.
+Pure helpers (no I/O), shared by the staging parser and the consensus writer
+so both sides classify an endpoint the same way.
 """
 
 from __future__ import annotations
 
 import re
 from typing import List, Optional
+
+from merlt.storage.graph.schema import canonical_urn
 
 NORMATTIVA_URL_PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
 
@@ -29,14 +31,10 @@ _ENTITY_ID_RE = re.compile(r"^[a-z][a-z0-9_]*:\S+$")
 
 
 def canonical_norm_key(value: str) -> str:
-    """Strip only the NIR version/annex marker (``!vig=``), keeping any wrapper.
-
-    Same rule as ``pipeline/ingestion.py::_canonical_urn``: the graph keys
-    norms without the marker.
-    """
-    value = (value or "").strip()
-    bang = value.find("!")
-    return value[:bang] if bang != -1 else value
+    """The graph key of a norm endpoint: `schema.canonical_urn` (the NIR version
+    marker, ``!vig=`` or ``@originale``, cut off; any wrapper kept) on the endpoint
+    stripped of its blanks."""
+    return canonical_urn((value or "").strip())
 
 
 def is_norm_reference(value: Optional[str]) -> bool:

@@ -35,6 +35,15 @@ def test_canonical_key_strips_only_the_version_marker():
     assert canonical_norm_key(NORMATTIVA_URL_PREFIX + URN + "!vig=") == NORMATTIVA_URL_PREFIX + URN
 
 
+def test_canonical_key_is_the_schemas_canonical_urn():
+    # The one function: `@originale` is a version marker too, and the endpoint is stripped of its blanks.
+    for marker in ("!vig=", "!orig=1942-03-16", "@originale"):
+        assert canonical_norm_key(URN + marker) == canonical_urn(URN + marker) == URN
+        assert canonical_norm_key("  " + NORMATTIVA_URL_PREFIX + URN + marker + " ") == NORMATTIVA_URL_PREFIX + URN
+    assert canonical_norm_key(None) == "" and canonical_norm_key("") == ""
+    assert norm_key_candidates(URN + "@originale") == [URN, NORMATTIVA_URL_PREFIX + URN]
+
+
 def test_norm_key_candidates_cover_bare_and_wrapped_forms():
     assert norm_key_candidates(URN + "!vig=") == [URN, NORMATTIVA_URL_PREFIX + URN]
     assert norm_key_candidates(NORMATTIVA_URL_PREFIX + URN) == [NORMATTIVA_URL_PREFIX + URN, URN]

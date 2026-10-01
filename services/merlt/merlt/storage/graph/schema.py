@@ -330,9 +330,17 @@ def normalize_fonte(value: Optional[str]) -> Optional[str]:
 def canonical_urn(urn: Optional[str]) -> Optional[str]:
     """The graph key of a norm: the full Normattiva URL with the version marker
     (`!vig=…`, `!orig=…`, `@originale`) cut off. The URL wrapper is never
-    stripped: the seed keys every node with it. Mirrors the BFF's
-    `graphClient.normalizeGraphUrn`."""
-    if not urn:
+    stripped: the seed keys every node with it.
+
+    This is the one function: every writer and reader that keys a norm calls it (a
+    caller that has more to do, a `strip`, does it around the call). The marker is a
+    NIR concept, so a string that is not a norm reference (a case-law URL, a node id)
+    is no norm's key and comes back as it is: an Italgiure document id holds `@`
+    between its parts (`…/snciv@s10@a2021@n18325@tS.clean.pdf`), and cutting there
+    would give every ruling of the same day and database one key. For a norm it does
+    what the BFF's `graphClient.normalizeGraphUrn` does; that one cuts any string at
+    the first `!` or `@`, and is only ever handed a norm."""
+    if not urn or not _is_norm_reference(urn):
         return urn
     cut = len(urn)
     for mark in ("!", "@"):
@@ -340,6 +348,12 @@ def canonical_urn(urn: Optional[str]) -> Optional[str]:
         if at != -1:
             cut = min(cut, at)
     return urn[:cut]
+
+
+def _is_norm_reference(value: str) -> bool:
+    """A NIR URN, bare or wrapped in the Normattiva URL (what a version marker follows)."""
+    lowered = value.lower()
+    return lowered.startswith("urn:") or "urn:nir:" in lowered
 
 
 # Abbreviations used in `estremi` ("Art. 1982 c.c."), keyed on the lowercased
