@@ -54,13 +54,7 @@ async def _build_tools() -> list:
     bridge = None
     try:
         from merlt.storage.bridge import BridgeTable, BridgeTableConfig
-        bridge = BridgeTable(BridgeTableConfig(
-            host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
-            port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
-            database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
-            user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
-            password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
-        ))
+        bridge = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await bridge.connect()
         log.info("✅ BridgeTable connected (chunk↔node mapping)")
     except Exception as e:

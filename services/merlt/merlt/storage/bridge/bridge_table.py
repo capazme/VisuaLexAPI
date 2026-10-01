@@ -13,6 +13,7 @@ Features:
 """
 
 import json
+import os
 import structlog
 from typing import List, Optional, Dict, Any, Type
 from uuid import UUID
@@ -47,6 +48,22 @@ class BridgeTableConfig:
     def get_connection_string(self) -> str:
         """Get async PostgreSQL connection string."""
         return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+
+    @classmethod
+    def from_enrichment_env(cls) -> "BridgeTableConfig":
+        """The bridge table on the enrichment database, as the deployment names it
+        (`ENRICHMENT_DB_*`, see infra/compose.yml): where the API reaches it from.
+
+        The dataclass defaults name a development container (localhost:5433/rlcf_dev)
+        that does not exist inside the compose network, so a bridge built from them
+        never connects there."""
+        return cls(
+            host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
+            port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
+            database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
+            user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
+            password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
+        )
 
     @classmethod
     def from_environment(cls, env_config: "EnvironmentConfig") -> "BridgeTableConfig":

@@ -20,6 +20,7 @@ Integrazione:
 import asyncio
 import hashlib
 import os
+import uuid
 import structlog
 from redis import Redis
 from rq import Queue, Retry
@@ -1673,6 +1674,29 @@ def _relation_filter(relation_types: Iterable[str]) -> Tuple[str, Dict[str, Any]
     return "type(r) IN $allowed_rels", {"allowed_rels": allowed}
 
 
+async def _bridge_mappings(bridge_table: Any, chunk_ids: Iterable[Any]) -> List[Dict[str, Any]]:
+    """The graph nodes the chunks map to, one entry per (chunk, node):
+    `{chunk_id, node_urn, mapping_confidence}` (a mapping without a confidence counts in full).
+
+    The bridge table keys a chunk by a UUID. A point id that is not one (a legacy integer id)
+    has no mapping there, and a query on it would fail the search for every other chunk: it is
+    skipped."""
+    mappings: List[Dict[str, Any]] = []
+    for chunk_id in chunk_ids:
+        try:
+            chunk_key = uuid.UUID(str(chunk_id))
+        except ValueError:
+            continue
+        for node in await bridge_table.get_nodes_for_chunk(chunk_key):
+            confidence = node.get("confidence")
+            mappings.append({
+                "chunk_id": chunk_id,
+                "node_urn": node["graph_node_urn"],
+                "mapping_confidence": 1.0 if confidence is None else confidence,
+            })
+    return mappings
+
+
 async def _query_search_subgraph(
     graph_client: FalkorDBClient,
     node_urns: Iterable[str],
@@ -1887,10 +1911,9 @@ async def search_graph(
             )
 
         # === 3. Map chunks → graph nodes via Bridge Table ===
-        from merlt.storage.bridge.bridge_table import BridgeTable
-        from merlt.rlcf.database import get_db_url
+        from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
 
-        bridge_table = BridgeTable(db_url=get_db_url())
+        bridge_table = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await bridge_table.connect()
 
         try:
@@ -1904,7 +1927,7 @@ async def search_graph(
             chunk_ids = list(chunk_id_to_score.keys())
 
             # Get graph node URNs from bridge table
-            mappings = await bridge_table.get_nodes_for_chunks(chunk_ids)
+            mappings = await _bridge_mappings(bridge_table, chunk_ids)
 
             log.debug(
                 "Bridge mappings retrieved",
