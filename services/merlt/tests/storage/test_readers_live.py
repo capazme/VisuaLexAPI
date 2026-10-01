@@ -50,6 +50,7 @@ ART2 = f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art2"
 ART3 = f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art3"
 ART4 = f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art4"
 ART5 = f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art5"
+ART6 = f"https://www.normattiva.it/uri-res/N2Ls?{ACT}~art6"
 TEXT1 = "Per buona fede si intende la correttezza ai sensi del codice."
 
 RELATION_ATTACK = "X]->(n) DETACH DELETE n //"
@@ -76,6 +77,7 @@ async def graph():
 async def _seed(client):
     """What this graph holds, node by node (hand-written Cypher, not the writers' output):
     partitions with a rubrica and no estremi; articles with `testo`, `testo_vigente` or both;
+    the acts that modify, repeal or replace three of them, and one that INSERISCE a comma into art. 6;
     concepts, principles, massime and doctrine keyed by node_id only; the seed's definitions
     (`Norma -[DEFINISCE]-> DefinizioneLegale {node_id, nome, descrizione}`, never to a
     ConcettoGiuridico) and one community definition that carries the old `:Entity:Definizione`
@@ -92,6 +94,9 @@ async def _seed(client):
         CREATE (a3:Norma {URN: $art3, tipo_documento: 'articolo', testo: 'Solo testo.'})
         CREATE (a4:Norma {URN: $art4, tipo_documento: 'articolo', testo: 'Modificato dal rinvio.'})
         CREATE (a5:Norma {URN: $art5, tipo_documento: 'articolo', testo: 'Mai toccato.'})
+        CREATE (a6:Norma {URN: $art6, tipo_documento: 'articolo', testo: 'Con un comma inserito.'})
+        CREATE (m4:Norma {URN: 'urn:test:act4', estremi: 'L. 4/2023', data_atto: '2023-01-01'})
+        CREATE (m4)-[:INSERISCE {data_efficacia: '2023-02-01'}]->(a6)
         CREATE (m1:Norma {URN: 'urn:test:act1', estremi: 'L. 1/2020', data_atto: '2020-01-01'})
         CREATE (m2:Norma {URN: 'urn:test:act2', estremi: 'L. 2/2021', data_atto: '2021-01-01'})
         CREATE (m3:Norma {URN: 'urn:test:act3', estremi: 'L. 3/2022', data_atto: '2022-01-01'})
@@ -128,7 +133,7 @@ async def _seed(client):
         CREATE (a1)-[:DISCIPLINA]->(tw)
         CREATE (tw)-[:CORRELATO]->(cp)
         """,
-        {"art1": ART1, "art2": ART2, "art3": ART3, "art4": ART4, "art5": ART5, "text1": TEXT1},
+        {"art1": ART1, "art2": ART2, "art3": ART3, "art4": ART4, "art5": ART5, "art6": ART6, "text1": TEXT1},
     )
 
 
@@ -306,6 +311,15 @@ async def test_validity_finds_modifications_by_their_edges_without_a_count_prope
     assert [m["type"] for m in results[ART1].recent_modifications] == ["modifica"]
     marked = await service.check_validity(ART1 + "!vig=2020-01-01")
     assert (marked.urn, marked.status) == (ART1 + "!vig=2020-01-01", "modificato")
+
+
+async def test_an_inserted_comma_is_an_amendment(graph):
+    history = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=ART6)
+    assert history.success, history.error
+    assert [(e["event"], e["by_urn"]) for e in history.data["timeline"]] == [("inserisce", "urn:test:act4")]
+    checked = await TemporalValidityService(graph_db=graph).check_validity(ART6)
+    assert (checked.status, checked.modification_count) == ("modificato", 1)
+    assert [(m["type"], m["by_urn"]) for m in checked.recent_modifications] == [("inserisce", "urn:test:act4")]
 
 
 async def test_the_graph_context_reads_the_parent_and_the_modifiers(graph):

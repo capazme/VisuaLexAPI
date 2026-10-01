@@ -36,7 +36,7 @@ class HistoricalEvent:
 
     Attributes:
         date: Data dell'evento (formato ISO o atto)
-        event: Tipo di evento ("modifica" | "abroga" | "sostituisce")
+        event: Tipo di evento ("modifica" | "abroga" | "sostituisce" | "inserisce")
         by_urn: URN della norma modificante
         by_estremi: Estremi della norma modificante (es. "L. 123/2020")
         description: Descrizione testuale dell'evento
@@ -66,6 +66,7 @@ class HistoricalEvolutionTool(BaseTool):
     - MODIFICA: modifiche parziali al testo
     - ABROGA: abrogazione della norma
     - SOSTITUISCE: sostituzione completa
+    - INSERISCE: inserimento di un comma o di una lettera (una modifica a tutti gli effetti)
 
     Applica il principio "tempus regit actum" (art. 14 c.c.):
     la norma vigente al momento del fatto è quella applicabile.
@@ -90,7 +91,7 @@ class HistoricalEvolutionTool(BaseTool):
     name = "historical_evolution"
     description = (
         "Ricostruisce l'evoluzione storica di una norma. "
-        "Trova tutte le modifiche, abrogazioni e sostituzioni nel tempo. "
+        "Trova tutte le modifiche, gli inserimenti, le abrogazioni e le sostituzioni nel tempo. "
         "Determina lo status corrente (vigente/abrogato/sostituito). "
         "Utile per applicare 'tempus regit actum' (art. 14 c.c.)."
     )
@@ -227,7 +228,10 @@ class HistoricalEvolutionTool(BaseTool):
         # Build event type filter: the graph's names (the schema's), whatever
         # case the caller used. A name the graph does not have is dropped, and a
         # filter that comes out empty finds no events: it is never run unfiltered.
-        names = cypher_rel_names(event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value])
+        # By default every amendment: an inserted comma or letter (INSERISCE) is one too.
+        names = cypher_rel_names(
+            event_types or [Rel.MODIFICA.value, Rel.ABROGA.value, Rel.SOSTITUISCE.value, Rel.INSERISCE.value]
+        )
         if not names:
             return []
         rel_types = "|".join(names)

@@ -124,12 +124,12 @@ class TemporalValidityService:
 
     Wrappa FalkorDBClient per query Cypher sulle proprietà
     di vigenza dei nodi Norma e sulle relazioni temporali
-    (MODIFICA, ABROGA, SOSTITUISCE).
+    (MODIFICA, ABROGA, SOSTITUISCE, INSERISCE).
 
     Note: le relazioni nel grafo FalkorDB usano i nomi dello schema
     (storage/graph/schema.py: ABROGA, MODIFICA, SOSTITUISCE, INSERISCE),
     come li scrive multivigenza.py RELATION_TYPES. Il campo `type` delle
-    modifiche recenti resta in minuscolo (modifica, abroga, sostituisce).
+    modifiche recenti resta in minuscolo (modifica, abroga, sostituisce, inserisce).
 
     Example:
         service = TemporalValidityService(graph_db=falkordb_client)
@@ -182,10 +182,10 @@ class TemporalValidityService:
 
         modifications = []
         if node_data is not None:
-            # The modifications are the incoming MODIFICA edges. `n_modifiche` is set
-            # by the multivigenza run only (measured on the seed: 34 of 1,539 articles
-            # carry it, and there are 54 MODIFICA edges), so it can only add to the
-            # count, never gate it.
+            # The modifications are the incoming MODIFICA and INSERISCE edges (an inserted
+            # comma is an amendment). `n_modifiche` is set by the multivigenza run only
+            # (measured on the seed: 34 of 1,539 articles carry it, and there are 54
+            # MODIFICA edges), so it can only add to the count, never gate it.
             edge_count = await self._count_modifications(key)
             node_data["mod_count"] = max(node_data.get("mod_count") or 0, edge_count)
             if node_data["mod_count"] > 0:
@@ -323,13 +323,14 @@ class TemporalValidityService:
 
     async def _count_modifications(self, urn: str) -> int:
         """
-        Query Cypher per contare le modifiche in entrata (archi MODIFICA).
+        Query Cypher per contare le modifiche in entrata (archi MODIFICA e INSERISCE:
+        un comma inserito e' una modifica; ABROGA e SOSTITUISCE hanno il loro stato).
 
         Returns:
-            Numero di archi MODIFICA verso la norma (0 se non leggibile)
+            Numero di archi MODIFICA o INSERISCE verso la norma (0 se non leggibile)
         """
         cypher = """
-            MATCH (norma {URN: $urn})<-[r:MODIFICA]-()
+            MATCH (norma {URN: $urn})<-[r:MODIFICA|INSERISCE]-()
             RETURN count(r) AS n
         """
 
@@ -348,7 +349,7 @@ class TemporalValidityService:
             Lista di eventi di modifica ordinati per data DESC (max 5)
         """
         cypher = """
-            MATCH (norma {URN: $urn})<-[r:MODIFICA|ABROGA|SOSTITUISCE]-(modificante)
+            MATCH (norma {URN: $urn})<-[r:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]-(modificante)
             RETURN
                 type(r) AS event_type,
                 modificante.URN AS by_urn,

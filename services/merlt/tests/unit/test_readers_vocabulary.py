@@ -250,7 +250,27 @@ async def test_the_history_follows_the_graphs_modification_relations():
 
     graph = _GraphRecorder()
     await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, False, None)
-    assert "<-[r:MODIFICA|ABROGA|SOSTITUISCE]-" in graph.cyphers[0]
+    assert "<-[r:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]-" in graph.cyphers[0]  # an inserted comma is an amendment
+
+
+async def test_an_inserted_comma_is_an_amendment_for_the_history_and_the_validity_check():
+    # multivigenza writes INSERISCE for an amendment that adds a comma or a letter. The history
+    # listed only MODIFICA, ABROGA and SOSTITUISCE, and the validity check counted only MODIFICA,
+    # so an article whose only change was an insertion read as never touched.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _GraphRecorder()
+    await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, False, None)
+    service = TemporalValidityService(graph_db=graph)
+    await service._count_modifications(CC)
+    await service._query_modifications(CC)
+    history, count, modifications = graph.cyphers
+    for cypher in (history, count, modifications):
+        assert "INSERISCE" in cypher
+    # a caller that names the events it wants still gets exactly those
+    await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, False, ["ABROGA"])
+    assert "<-[r:ABROGA]-" in graph.cyphers[-1] and "INSERISCE" not in graph.cyphers[-1]
 
 
 async def test_the_history_resolves_a_callers_legacy_names():
@@ -373,7 +393,7 @@ async def test_the_validity_service_reads_the_graphs_modification_relations():
     await service._query_modifications(CC)
     status, modifications = graph.cyphers
     assert "<-[r_abr:ABROGA]-" in status and "<-[r_sost:SOSTITUISCE]-" in status
-    assert "<-[r:MODIFICA|ABROGA|SOSTITUISCE]-" in modifications
+    assert "<-[r:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]-" in modifications
 
 
 def test_the_validity_service_reports_lowercase_modification_types():
@@ -730,7 +750,7 @@ async def test_modifications_are_found_by_counting_the_incoming_modifica_edges()
     assert (result.status, result.modification_count) == ("modificato", 2)
     assert [mod["type"] for mod in result.recent_modifications] == ["modifica"]
     count_cypher = next(c for c in graph.cyphers if "count(r)" in c)
-    assert "<-[r:MODIFICA]-" in count_cypher
+    assert "<-[r:MODIFICA|INSERISCE]-" in count_cypher  # an inserted comma is an amendment too
 
 
 async def test_an_article_nothing_modifies_is_checked_without_a_modification_query():
