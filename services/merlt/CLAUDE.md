@@ -267,5 +267,14 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   wrapper.
 - One graph name (`merl_t_legal`) and one Qdrant collection
   (`storage/vectors/collection.default_chunks_collection()`).
+- The tools the experts call, the temporal validity check, the graph context and the
+  graph router's relation and subgraph reads use `FalkorDBClient.ro_query`
+  (GRAPH.RO_QUERY: the server refuses a write). A new reader should too; a writer
+  uses `query`.
+- A tool argument is chosen by an LLM that reads retrieved text, so it reaches
+  Cypher text only as a relation or label name from `storage/graph/schema.py`
+  (`cypher_rel_names`, `cypher_labels`) or as a number clamped by
+  `tools/base.bounded_int`; every other value is a parameter. A filter that comes
+  out empty returns an empty result, never an unfiltered query.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.

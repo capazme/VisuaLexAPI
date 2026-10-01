@@ -729,3 +729,47 @@ def _default_weights():
     from merlt.storage.retriever.models import _get_default_weights
 
     return _get_default_weights()
+
+
+# What the tools tell the LLM ---------------------------------------------------------
+
+
+def _quoted_names(text):
+    return re.findall(r"'([A-Za-z_]+)'", text)
+
+
+@pytest.mark.parametrize("tool_name, parameter", [
+    ("search", "relation_types"), ("historical_evolution", "event_types"), ("textual_reference", "reference_types"),
+])
+def test_the_relations_a_tool_suggests_are_the_graphs_names(tool_name, parameter):
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+    from merlt.tools.textual_reference import TextualReferenceTool
+
+    tool = {
+        "search": GraphSearchTool(graph_db=None),
+        "historical_evolution": HistoricalEvolutionTool(graph_db=None),
+        "textual_reference": TextualReferenceTool(graph_db=None),
+    }[tool_name]
+    description = next(p for p in tool.parameters if p.name == parameter).description
+    names = _quoted_names(description)
+    assert names, description
+    assert all(name in {rel.value for rel in Rel} for name in names), names
+
+
+def test_the_source_types_the_semantic_tool_describes_come_from_the_schema():
+    import ast
+
+    from merlt.storage.graph.schema import EXPERT_SOURCE_TYPES as by_expert
+
+    description = next(p for p in SemanticSearchTool().parameters if p.name == "source_types").description
+    described = {
+        name.lower(): ast.literal_eval(types) for name, types in re.findall(r"(\w+?)Expert=(\[[^\]]*\])", description)
+    }
+    assert described == by_expert
+
+
+def test_the_source_types_description_follows_the_schemas_table(monkeypatch):
+    monkeypatch.setattr("merlt.tools.search.EXPERT_SOURCE_TYPES", {"literal": ["norma"], "precedent": ["massima", "dottrina"]})
+    description = next(p for p in SemanticSearchTool().parameters if p.name == "source_types").description
+    assert "LiteralExpert=['norma']" in description and "PrecedentExpert=['massima', 'dottrina']" in description
+    assert "Systemic" not in description

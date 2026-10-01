@@ -4,7 +4,7 @@ Historical Evolution Tool
 
 Tool per ricostruire l'evoluzione storica di una norma.
 
-Utilizza le relazioni temporali (modifica, abroga, sostituisce) per:
+Utilizza le relazioni temporali (MODIFICA, ABROGA, SOSTITUISCE) per:
 - Ricostruire la timeline di modifiche di un articolo
 - Determinare lo status corrente (vigente/abrogato/sostituito)
 - Applicare il principio "tempus regit actum"
@@ -135,8 +135,8 @@ class HistoricalEvolutionTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Filtra per tipo di evento. "
-                    "Es: ['modifica'] per solo modifiche, "
-                    "['abroga', 'sostituisce'] per solo cessazioni"
+                    "Es: ['MODIFICA'] per solo modifiche, "
+                    "['ABROGA', 'SOSTITUISCE'] per solo cessazioni"
                 ),
                 required=False
             )

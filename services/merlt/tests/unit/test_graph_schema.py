@@ -51,6 +51,24 @@ def test_resolve_rel_reads_every_callers_vocabulary(asked, meant):
     assert s.resolve_rel(asked) == meant
 
 
+@pytest.mark.parametrize("asked", ["CITA", "Cita", "cita", "RICHIAMA", "Richiama", "richiama", "rinvia", "Rinvia"])
+def test_resolve_rel_reads_a_legacy_name_in_any_case(asked):
+    assert s.resolve_rel(asked) == "RINVIA"
+
+
+@pytest.mark.parametrize("asked, meant", [
+    ("Versione_Di", "VERSIONE_DI"), ("CONTIENE", "CONTIENE"), ("Inserisce", "INSERISCE"), ("SoStituisce", "SOSTITUISCE"),
+])
+def test_resolve_rel_reads_the_other_legacy_names_in_any_case_too(asked, meant):
+    assert s.resolve_rel(asked) == meant
+
+
+def test_the_writers_stay_strict_about_a_legacy_name_s_case():
+    # `canonical_rel` is what a writer calls: a misspelt name is an error there, never a guess.
+    with pytest.raises(ValueError):
+        s.canonical_rel("Cita")
+
+
 def test_resolve_rels_keeps_order_and_drops_repeats():
     assert s.resolve_rels(["cita", "RINVIA", "contiene"]) == ["RINVIA", "CONTIENE"]
 

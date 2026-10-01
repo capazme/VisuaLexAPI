@@ -23,7 +23,7 @@ import json
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.storage.graph.schema import canonical_urn, cypher_labels, cypher_rel_names
+from merlt.storage.graph.schema import EXPERT_SOURCE_TYPES, canonical_urn, cypher_labels, cypher_rel_names
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
@@ -220,10 +220,10 @@ class SemanticSearchTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Filtra per tipo di fonte. Specializzazione per expert: "
-                    "LiteralExpert=['norma','comma'], "
-                    "SystemicExpert=['norma','comma'], "
-                    "PrinciplesExpert=['ratio','spiegazione','dottrina','concetto'], "
-                    "PrecedentExpert=['massima']"
+                    + ", ".join(
+                        f"{name.capitalize()}Expert={types}"
+                        for name, types in EXPERT_SOURCE_TYPES.items()
+                    )
                 ),
                 required=False
             )
@@ -433,7 +433,7 @@ class GraphSearchTool(BaseTool):
         >>> tool = GraphSearchTool(graph_db=falkordb_client)
         >>> result = await tool(
         ...     start_node="urn:norma:cp:art52",
-        ...     relation_types=["disciplina", "definisce"],
+        ...     relation_types=["DISCIPLINA", "DEFINISCE"],
         ...     max_hops=2
         ... )
     """
@@ -479,7 +479,7 @@ class GraphSearchTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Tipi di relazione da seguire. "
-                    "Es: ['disciplina', 'definisce', 'cita']"
+                    "Es: ['DISCIPLINA', 'DEFINISCE', 'RINVIA']"
                 ),
                 required=False
             ),

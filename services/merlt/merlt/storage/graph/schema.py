@@ -166,6 +166,8 @@ LEGACY_REL: dict[str, Rel] = {
     "richiama": Rel.RINVIA,
 }
 
+_LEGACY_BY_LOWER: dict[str, Rel] = {name.lower(): rel for name, rel in LEGACY_REL.items()}
+
 # Names readers pass that are neither graph nor legacy names: the experts'
 # traversal-weight keys and the TraversalPolicy vocabulary (lower-case keys).
 REL_ALIASES: dict[str, Rel] = {
@@ -191,10 +193,12 @@ def canonical_rel(name: str) -> Rel:
 
 
 def resolve_rel(name: str) -> str:
-    """The graph relation a reader means, whatever case or vocabulary it used.
+    """The graph relation a reader means, whatever case or vocabulary it used
+    (`CITA`, `Cita` and `richiama` are all RINVIA).
     An unknown name comes back unchanged: a filter on it matches nothing, as before."""
-    if name in LEGACY_REL:
-        return LEGACY_REL[name].value
+    legacy = _LEGACY_BY_LOWER.get(name.lower())
+    if legacy is not None:
+        return legacy.value
     if name.upper() in _REL_VALUES:
         return name.upper()
     alias = REL_ALIASES.get(name.lower())

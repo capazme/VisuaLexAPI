@@ -131,8 +131,9 @@ def _load_expert_weights() -> Dict[str, Dict[str, float]]:
             config = yaml.safe_load(f)
             return config.get("expert_traversal_weights", _get_default_weights())
     except FileNotFoundError:
-        # Expected: the file exists in no deployment, so the defaults are the normal
-        # case. Not a warning: it would print on every interpreter start.
+        # Expected: this YAML is not in the repository (nor in any deployment), so the
+        # defaults below are the normal case. Not a warning: it would print on every
+        # interpreter start.
         import structlog
         structlog.get_logger().debug(f"Config file not found: {config_path}, using default weights")
         return _get_default_weights()

@@ -2638,7 +2638,7 @@ async def confirm_source(
     node_id = (request.node_id or "").strip()
     if not node_id.startswith("live:"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=422,
             detail="node_id must be a provisional live source id (live:...)",
         )
 
@@ -2705,7 +2705,7 @@ async def confirm_source(
         entity_text = _clean_text(request.entity_text) or _label_from_live_text(node.get("text"))
         if not entity_text:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail="entity_text mancante e non ricavabile dalla fonte",
             )
         tipo = _confirm_entity_type(request.entity_type, node.get("labels"))
@@ -2733,7 +2733,7 @@ async def confirm_source(
             )
             if not (result.duplicate_action_required and exact is not None):
                 # Quality gate: the name looks like an identifier, not a source.
-                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=result.message)
+                raise HTTPException(status_code=422, detail=result.message)
             # The same source is already a proposal: link the node to it
             # instead of asking the user to create a twin.
             entity_id = exact.entity_id
@@ -3733,13 +3733,13 @@ async def fetch_entity_details_from_graph(
         # Se non trovato come nodo, prova come relazione
         # Il formato e': "rel_{source_id}_{rel_type}_{target_id}"
         if entity_id.startswith("rel_"):
-            # Tutti i 65 tipi di relazione del Knowledge Graph (da RelationType enum)
-            # più i nomi che il grafo scrive al posto di quelli della community
-            # (RINVIA, DERIVA_DA). CITA resta: gli id delle proposte portano ancora
-            # il nome della community, che il grafo scrive come RINVIA.
-            # Ordinati per lunghezza decrescente per matchare prima i più specifici
+            # Every relation type of the knowledge graph (the RelationType enum), plus
+            # the names the graph writes in place of the community's (RINVIA,
+            # DERIVA_DA). CITA stays: a proposal's id still carries the community's
+            # name, which the graph writes as RINVIA. Longest first, so the more
+            # specific name matches first.
             known_rel_types = [
-                # Relazioni lunghe (evita match parziali)
+                # Long names (avoid partial matches)
                 "ABROGA_PARZIALMENTE", "ABROGA_TOTALMENTE",
                 "VERSIONE_PRECEDENTE", "VERSIONE_SUCCESSIVA",
                 "HA_COMPETENZA_SU", "GERARCHICAMENTE_SUPERIORE",
@@ -3753,7 +3753,7 @@ async def fetch_entity_details_from_graph(
                 "INCOMPATIBILE_CON", "COMPATIBILE_CON",
                 "BILANCIA_CON", "CONFORMA_A", "CONFORME_A",
                 "CLASSIFICA_IN", "TITOLARE_DI", "RIVESTE_RUOLO",
-                # Relazioni medie
+                # Medium names
                 "DIPENDE_DA", "DERIVA_DA", "PRESUPPONE", "HA_VERSIONE",
                 "SOSTITUISCE", "INSERISCE", "SOSPENDE", "PROROGA",
                 "DEROGA_A", "CONSOLIDA", "DISCIPLINA", "APPLICA_A",
@@ -3761,11 +3761,11 @@ async def fetch_entity_details_from_graph(
                 "IMPLICA", "CONTRADICE", "GIUSTIFICA", "LIMITA",
                 "TUTELA", "VIOLA", "SPECIFICA", "ESEMPLIFICA",
                 "ESTINGUE", "CONFERISCE", "CORRELATO",
-                # Relazioni corte
+                # Short names
                 "CONTIENE", "PARTE_DI", "INTEGRA", "SPECIES",
                 "CITA", "RINVIA", "INTERPRETA", "COMMENTA", "ATTUA",
                 "RECEPISCE", "FONTE", "IMPONE", "APPLICA",
-                # Lowercase variants (per compatibilità)
+                # Lowercase variants (for compatibility)
                 "interpreta", "cita", "applica", "disciplina",
                 "definisce", "abroga", "modifica", "deroga",
                 "rinvia", "sostituisce", "integra", "prevede",
