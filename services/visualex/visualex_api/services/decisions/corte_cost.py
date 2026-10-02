@@ -21,6 +21,7 @@ import re
 import time
 import unicodedata
 import zipfile
+import zlib
 from collections import OrderedDict
 from collections.abc import Callable
 from datetime import date
@@ -168,7 +169,7 @@ class CorteCostReader:
         if key not in self._years:
             try:
                 records = await asyncio.to_thread(read_year, path, year)
-            except zipfile.BadZipFile:
+            except (zipfile.BadZipFile, zlib.error, EOFError):
                 async with self._locks.setdefault(found[0], asyncio.Lock()):
                     path.unlink(missing_ok=True)  # a damaged copy: fetched again next time
                 raise
