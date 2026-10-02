@@ -27,6 +27,7 @@ from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.services.akn_parser import normalize_article_key
+from visualex_api.services import massimario_portal
 from visualex_api.services.normattiva_validity import (
     is_historical_request,
     read_validity,
@@ -364,6 +365,9 @@ class NormaController:
         self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
         self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
+        # Internal: MERL-T's MassimarioAdapter only. Not routed by the ingress
+        # (infra/ingress/Caddyfile routes an allowlist of prefixes) nor proxied by Vite.
+        self.app.add_url_rule('/fetch_massimario', view_func=self.fetch_massimario, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
         self.app.add_url_rule('/history/<path:timestamp>', view_func=self.delete_history_item, methods=['DELETE'])
@@ -1022,6 +1026,16 @@ class NormaController:
             return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
         except Exception as exc:
             return self._error_response(exc, 'fetch_recitals')
+
+    async def fetch_massimario(self):
+        """One element of the Massimario portal, raw. Internal route (MERL-T only)."""
+        try:
+            kind = request.args.get('kind', '')
+            element_id = request.args.get('id', '')
+            data = await massimario_portal.fetch_element(kind, element_id)
+            return jsonify({'kind': kind, 'id': element_id, 'data': data})
+        except Exception as exc:
+            return self._error_response(exc, 'fetch_massimario')
 
     async def fetch_act_fingerprints(self):
         """Per-article change detectors for a Normattiva act.

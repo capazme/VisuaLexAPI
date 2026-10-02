@@ -142,6 +142,7 @@ POST unless noted, JSON bodies.
   everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
+- `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses.
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for

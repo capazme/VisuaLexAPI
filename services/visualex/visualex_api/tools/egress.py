@@ -23,6 +23,10 @@ from urllib.parse import urlparse
 ALLOWED_HOSTS: dict[str, str] = {
     # --- Italian State: legislation ---
     "www.normattiva.it": "Normattiva — Istituto Poligrafico e Zecca dello Stato",
+    # --- Italian State: case law ---
+    # The annual reviews of the Corte di cassazione's Ufficio del Massimario,
+    # fetched for MERL-T's ingestion through the internal /fetch_massimario route.
+    "www.portaledelmassimario.ipzs.it": "Portale del Massimario — Corte di cassazione (realizzazione IPZS)",
     # --- European Union ---
     "eur-lex.europa.eu": "EUR-Lex — Ufficio delle pubblicazioni UE",
     # --- Private ---
@@ -46,6 +50,7 @@ NON_NETWORK_HOSTS: dict[str, str] = {
         "the Akoma Ntoso 3.0 XML namespace URI, named in the akn_parser "
         "docstring; the parser resolves nothing (no_network=True)"
     ),
+    "github.com": "appears only in massimario_portal.USER_AGENT, which names the project; never fetched",
 }
 
 
