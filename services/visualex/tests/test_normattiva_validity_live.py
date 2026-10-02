@@ -16,7 +16,10 @@ import pytest
 from app import NormaController, normattiva_scraper
 from visualex_api.services.normattiva_validity import read_validity
 
-pytestmark = pytest.mark.live
+# The scraper's HTTP client keeps one aiohttp session for the life of the process,
+# so the six cases must share one event loop: with one loop per test the second case
+# finds the first one's loop closed ("Event loop is closed").
+pytestmark = [pytest.mark.live, pytest.mark.asyncio(loop_scope="module")]
 
 PAUSE = 3  # seconds between two requests to the portal
 
