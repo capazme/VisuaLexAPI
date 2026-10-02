@@ -173,3 +173,28 @@ class TestPersistentCacheDelete:
             cache.directory = tmp_path / "del_test2"
             cache.directory.mkdir(parents=True, exist_ok=True)
             await cache.delete("nonexistent")  # should not raise
+
+
+class TestPersistentCacheSweep:
+    """An expired entry is otherwise deleted only when its key is read again."""
+
+    @pytest.mark.parametrize("unreadable", [
+        b"{not json", b"\xff\xfe", b"[]", b'{"data": 1}', b'{"timestamp": "yesterday", "data": 1}',
+    ], ids=["not json", "not utf-8", "a list", "no timestamp", "a timestamp that is no number"])
+    def test_sweep_deletes_aged_and_unreadable_entries_and_keeps_fresh_ones(self, tmp_path,
+                                                                            unreadable):
+        with patch("visualex_api.tools.cache.PERSISTENT_CACHE_DIR", str(tmp_path)):
+            cache = PersistentCache("sweep_test", ttl=3600)
+        aged, fresh = cache._path_for_key("aged"), cache._path_for_key("fresh")
+        aged.write_text(json.dumps({"timestamp": time.time() - 7200, "data": "old"}))
+        fresh.write_text(json.dumps({"timestamp": time.time(), "data": "new"}))
+        broken = cache.directory / "broken.json"
+        broken.write_bytes(unreadable)
+        assert cache.sweep_expired() == 2
+        assert not aged.exists() and not broken.exists()
+        assert cache._read_from_disk("fresh") == "new"
+
+    def test_sweep_of_an_empty_cache(self, tmp_path):
+        with patch("visualex_api.tools.cache.PERSISTENT_CACHE_DIR", str(tmp_path)):
+            cache = PersistentCache("sweep_empty", ttl=3600)
+        assert cache.sweep_expired() == 0

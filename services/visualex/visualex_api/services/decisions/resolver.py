@@ -33,6 +33,7 @@ log = structlog.get_logger()
 ITALGIURE_TIMEOUT = 25.0
 CORTE_COST_TIMEOUT = 240.0  # covers the first download of a bundle
 FOUND_NS, ABSENT_NS, PENDING_NS = "decisions_found", "decisions_absent", "decisions_pending"
+DECISION_CACHE_SWEEP_SECONDS = 6 * 3600
 _SOURCE_ERRORS = (NetworkError, DocumentNotFoundError, asyncio.TimeoutError, ValueError,
                   zipfile.BadZipFile, zlib.error, EOFError, SourceAnswerError,
                   IntermediateCertificateMismatch, OSError)
@@ -205,6 +206,25 @@ class Resolver:
             except SourceUnavailable:
                 suggestion = None  # the answer stands without its suggestion
         return Outcome("non_trovata", motivo=motivo, archivio_dal=iso, suggerimento=suggestion)
+
+
+async def sweep_decision_caches(manager=None) -> int:
+    """Delete the expired entries of the three decision caches and return how many went.
+
+    The filesystem cache deletes an expired entry only when its key is read again: without
+    a sweep, `decisions_found` would keep whole texts (with whatever personal data the source
+    left) and `decisions_absent` a file per number ever missed, on disk for good. A backend
+    without `sweep_expired` (Redis) expires its keys itself. The app runs this at start and
+    every DECISION_CACHE_SWEEP_SECONDS.
+    """
+    manager = manager or get_cache_manager()
+    removed = 0
+    for namespace in (FOUND_NS, ABSENT_NS, PENDING_NS):
+        sweep = getattr(manager.get_persistent(namespace), "sweep_expired", None)
+        if sweep is not None:
+            removed += await asyncio.to_thread(sweep)
+    log.info("Decision caches swept", removed=removed)
+    return removed
 
 
 _resolver: Resolver | None = None

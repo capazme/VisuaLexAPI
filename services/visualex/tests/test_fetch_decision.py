@@ -1,4 +1,6 @@
 """POST /fetch_decision (design 2026-10-01 §3)."""
+import asyncio
+
 import pytest
 
 from app import NormaController
@@ -110,3 +112,54 @@ async def test_a_body_that_is_not_utf8_is_400(client, monkeypatch):
     assert resp.status_code == 400
     assert (await resp.get_json())["esito"] == "richiesta_non_valida"
     assert resolver.refs == []
+
+
+class _Log:
+    """Records every structlog call, whatever its level."""
+
+    def __init__(self):
+        self.events = []
+
+    def __getattr__(self, level):
+        return lambda event, **fields: self.events.append((level, event))
+
+
+async def test_the_decision_caches_are_swept_at_start_and_the_sweep_stops(monkeypatch):
+    sweeps = []
+
+    async def sweep():
+        sweeps.append("swept")
+        return 0
+
+    monkeypatch.setattr("app.sweep_decision_caches", sweep)
+    controller = NormaController()
+    await controller.start_background_services()
+    task = controller._decision_sweep
+    async with asyncio.timeout(2):
+        while not sweeps:  # at once, not after the first six hours
+            await asyncio.sleep(0)
+    await controller.stop_background_services()
+    assert sweeps == ["swept"]
+    assert task.cancelled() and controller._decision_sweep is None
+
+
+async def test_a_failed_sweep_is_logged_and_the_next_one_still_runs(monkeypatch):
+    sweeps = []
+
+    async def sweep():
+        sweeps.append("swept")
+        if len(sweeps) == 1:
+            raise OSError("disk full")
+        return 0
+
+    log = _Log()
+    monkeypatch.setattr("app.sweep_decision_caches", sweep)
+    monkeypatch.setattr("app.DECISION_CACHE_SWEEP_SECONDS", 0)
+    monkeypatch.setattr("app.log", log)
+    controller = NormaController()
+    await controller.start_background_services()
+    async with asyncio.timeout(2):
+        while len(sweeps) < 3:
+            await asyncio.sleep(0)
+    await controller.stop_background_services()
+    assert ("exception", "Decision cache sweep failed") in log.events

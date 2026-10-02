@@ -1,10 +1,15 @@
 """One reference in, one outcome out (design 2026-10-01 §2-§3)."""
+import threading
 from datetime import date
 
 import pytest
 
 from visualex_api.services.decisions.model import Decision, Identity, parse_reference
-from visualex_api.services.decisions.resolver import Resolver, SourceUnavailable
+from visualex_api.services.decisions.resolver import (
+    Resolver,
+    SourceUnavailable,
+    sweep_decision_caches,
+)
 from visualex_api.tools.exceptions import NetworkError
 
 TODAY = date(2026, 10, 1)
@@ -224,3 +229,33 @@ def test_the_outcomes_as_json():
     miss = Outcome("non_trovata", motivo="fuori_archivio", archivio_dal="2021-02-17").to_dict()
     assert miss == {"esito": "non_trovata", "motivo": "fuori_archivio",
                     "archivio_dal": "2021-02-17"}
+
+
+class SweptStore(FakeStore):
+    """A filesystem backend: it deletes its expired entries when asked."""
+
+    def __init__(self, expired):
+        super().__init__()
+        self.expired, self.threads = expired, []
+
+    def sweep_expired(self):
+        self.threads.append(threading.get_ident())
+        return self.expired
+
+
+async def test_the_sweep_reaches_the_decision_caches_only():
+    cache = FakeCache()
+    cache.stores.update({
+        "decisions_found": SweptStore(3),
+        "decisions_absent": SweptStore(2),
+        "decisions_pending": FakeStore(),  # like Redis, which expires its keys itself
+        "normattiva": SweptStore(7),
+    })
+    assert await sweep_decision_caches(cache) == 5
+    found, absent = cache.stores["decisions_found"], cache.stores["decisions_absent"]
+    assert len(found.threads) == len(absent.threads) == 1
+    # off the event loop: a sweep reads every file of the cache
+    assert threading.get_ident() not in found.threads + absent.threads
+    assert cache.stores["normattiva"].threads == []
+    assert set(cache.stores) == {"decisions_found", "decisions_absent", "decisions_pending",
+                                 "normattiva"}

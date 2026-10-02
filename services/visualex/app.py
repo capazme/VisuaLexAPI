@@ -36,7 +36,12 @@ from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
-from visualex_api.services.decisions.resolver import SourceUnavailable, get_resolver
+from visualex_api.services.decisions.resolver import (
+    DECISION_CACHE_SWEEP_SECONDS,
+    SourceUnavailable,
+    get_resolver,
+    sweep_decision_caches,
+)
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
@@ -181,7 +186,8 @@ class NormaController:
         self.app = Quart(__name__)
         self.app = cors(self.app, allow_origin=ALLOWED_ORIGINS)
         self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
-        
+        self._decision_sweep: asyncio.Task | None = None
+
         # Middleware per registrare il tempo di inizio della richiesta
         self.app.before_request(self.record_start_time)
         # Middleware per il rate limiting
@@ -199,12 +205,28 @@ class NormaController:
 
     async def start_background_services(self):
         await self.fetch_queue.start()
+        self._decision_sweep = asyncio.create_task(self._sweep_decision_caches())
         log.info("Background services started")
 
     async def stop_background_services(self):
         await self.fetch_queue.stop()
+        if self._decision_sweep is not None:
+            self._decision_sweep.cancel()
+            await asyncio.gather(self._decision_sweep, return_exceptions=True)
+            self._decision_sweep = None
         await cleanup_browser_pool()
         log.info("Background services stopped and browser pool cleaned up")
+
+    async def _sweep_decision_caches(self):
+        """Expired court-decision cache entries are deleted at start and then every
+        DECISION_CACHE_SWEEP_SECONDS: the filesystem cache deletes one only when its key is
+        read again. A failed sweep is logged and the next one runs on time."""
+        while True:
+            try:
+                await sweep_decision_caches()
+            except Exception:
+                log.exception("Decision cache sweep failed")
+            await asyncio.sleep(DECISION_CACHE_SWEEP_SECONDS)
 
 
     async def stream_article_text(self):
