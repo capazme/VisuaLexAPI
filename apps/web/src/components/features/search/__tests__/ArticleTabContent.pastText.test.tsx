@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArticleData, ArticleValidity, Highlight, NormaVisitata, SearchParams } from '../../../../types';
@@ -404,6 +404,28 @@ describe('ArticleTabContent — selecting words of the text', () => {
     expect(screen.queryByTitle(/^Evidenzia \(H\)/)).not.toBeInTheDocument();
     expect(screen.queryByTitle(/^Aggiungi nota \(N\)/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /discuti con i colleghi/i })).not.toBeInTheDocument();
+  });
+
+  it('does not copy the words of a version that does not contain the day, and says why', async () => {
+    const { container } = show(article({ ...MIDDLE, request_in_window: false }, { versione: 'vigente', data_versione: '2010-01-01' }));
+    select(container, WORDS);
+    fireEvent.click(await screen.findByTitle(/^Copia \(/));
+    await act(async () => { await Promise.resolve(); }); // the handler is async: let a write, if any, happen
+    expect(writeText).not.toHaveBeenCalled();
+    expect(await screen.findByText(UNRELIABLE_REASON)).toBeInTheDocument();
+    expect(screen.queryByText('Testo copiato con citazione')).not.toBeInTheDocument();
+  });
+
+  it('copies the words of a reliable past text with the citation first (the control)', async () => {
+    const { container } = show(article(MIDDLE, PAST));
+    select(container, WORDS);
+    fireEvent.click(await screen.findByTitle(/^Copia \(/));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied: string = writeText.mock.calls[0][0];
+    expect(copied.startsWith('art. 1284 c.c., nel testo in vigore dal 25 dicembre 2003 al 29 dicembre 2007 (Normattiva')).toBe(true);
+    expect(copied).toContain(WORDS);
+    expect(copied).not.toContain('Tratto da');
+    expect(await screen.findByText('Testo copiato con citazione')).toBeInTheDocument();
   });
 
   it('offers highlight, note and discussion on the text in force (the control)', async () => {

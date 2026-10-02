@@ -400,6 +400,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleAdvancedCopy = async (options: CopyOptions) => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
         try {
             let textToCopy = '';
 
@@ -429,6 +433,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleMobileCopy = async () => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
         try {
             const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
             await navigator.clipboard.writeText(withCitation(plainText, citationNow(), `\n\n---\n${formatCitation(norma_data)}`));
@@ -594,8 +602,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         setComposerRect(null);
     };
 
-    // Handler for SelectionPopup copy action
+    // Handler for SelectionPopup copy action. The popup stays on a text that may
+    // not be copied (a reading), so the table is asked here, and the click says why.
     const handlePopupCopy = async (text: string) => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
         try {
             await navigator.clipboard.writeText(withCitation(text, citationNow(), `\n\n---\nTratto da: ${formatCitation(norma_data)}`));
             showToast('Testo copiato con citazione', 'success');
