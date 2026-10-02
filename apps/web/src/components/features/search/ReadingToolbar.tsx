@@ -85,14 +85,14 @@ export function ReadingToolbar({
     // carries no version: anything that may not be copied, or is a reading, stays in.
     const exportLockedReason = copyLockedReason ?? lockedReason;
     return (
-        <div className={cn('glass-toolbar sticky top-0 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
+        <div className={cn('glass-toolbar sticky top-0 flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
             {/* Version Info & Annex Source Badge */}
-            <div className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div className="contents md:flex md:items-center md:gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}
                 {/* Annex Source Badge */}
                 {normaData.allegato && (
                     <>
-                        {versionChip && <span className="text-slate-300 dark:text-slate-700">|</span>}
+                        {versionChip && <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>}
                         <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
                             Allegato {normaData.allegato}
                         </span>
@@ -101,7 +101,7 @@ export function ReadingToolbar({
             </div>
 
             {/* Mobile: Quick Actions + Study Mode toggle */}
-            <div className="flex md:hidden items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
+            <div className="flex md:hidden ml-auto items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
                 <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}

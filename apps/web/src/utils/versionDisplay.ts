@@ -1,5 +1,5 @@
 import type { ArticleData, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
-import { addDaysToIsoDate, formatDateDashed, formatDateForDisplay, formatDateItalianLong } from './dateUtils';
+import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, withPreposition } from './dateUtils';
 
 /**
  * What a reader is told about the version of the text on screen.
@@ -171,15 +171,15 @@ function bannerFor(
     return {
       kind: 'not_yet',
       title: 'Articolo non ancora esistente',
-      body: `Questo articolo non esisteva${asOf ? ` al ${formatDateItalianLong(asOf)}` : ''}.`
-        + (firstDay ? ` È in vigore dal ${formatDateItalianLong(firstDay)}.` : ''),
+      body: `Questo articolo non esisteva${asOf ? ` ${withPreposition('al', formatDateForCitation(asOf))}` : ''}.`
+        + (firstDay ? ` È in vigore ${withPreposition('dal', formatDateForCitation(firstDay))}.` : ''),
       actions: firstDay ? ['open_next_day', 'pick_date'] : ['pick_date'],
       ...(firstDay ? { nextDay: firstDay } : {}),
     };
   }
   if (validity.state === 'historical') {
     const window = validity.valid_from && validity.valid_to
-      ? `In vigore dal ${formatDateItalianLong(validity.valid_from)} al ${formatDateItalianLong(validity.valid_to)}`
+      ? `In vigore ${withPreposition('dal', formatDateForCitation(validity.valid_from))} ${withPreposition('al', formatDateForCitation(validity.valid_to))}`
       : 'Testo di una versione passata';
     return {
       kind: 'historical',

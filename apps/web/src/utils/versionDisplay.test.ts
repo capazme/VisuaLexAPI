@@ -153,7 +153,7 @@ describe('describeVersion — an article that did not exist yet', () => {
     expect(shown.banner).toEqual({
       kind: 'not_yet',
       title: 'Articolo non ancora esistente',
-      body: 'Questo articolo non esisteva al 1 gennaio 2010. È in vigore dal 13 settembre 2014.',
+      body: 'Questo articolo non esisteva al 1° gennaio 2010. È in vigore dal 13 settembre 2014.',
       actions: ['open_next_day', 'pick_date'],
       nextDay: '2014-09-13',
     });
@@ -166,6 +166,37 @@ describe('describeVersion — an article that did not exist yet', () => {
   it('falls back to the last day without the article when no date was typed (the original text)', () => {
     expect(describeVersion(NOT_YET, { versione: 'originale' }).banner?.body)
       .toBe('Questo articolo non esisteva al 12 settembre 2014. È in vigore dal 13 settembre 2014.');
+  });
+});
+
+describe('describeVersion — banners elide before the 8th and the 11th', () => {
+  const body = (v: ArticleValidity, data_versione?: string) =>
+    describeVersion(v, { versione: 'vigente', data_versione }).banner?.body;
+
+  it("writes \"all'8\" for a not-yet article asked on the 8th", () => {
+    expect(body(NOT_YET, '2014-09-08')).toBe("Questo articolo non esisteva all'8 settembre 2014. È in vigore dal 13 settembre 2014.");
+  });
+
+  it("writes \"all'11\" for one asked on the 11th, and \"dall'11\" for the day it came into force", () => {
+    expect(body(NOT_YET, '2014-09-11')).toBe("Questo articolo non esisteva all'11 settembre 2014. È in vigore dal 13 settembre 2014.");
+    const elevenNext = validity({ state: 'not_yet', valid_from: null, valid_to: '2014-09-10', version_number: null, request_in_window: true });
+    expect(body(elevenNext, '2010-01-01')).toBe("Questo articolo non esisteva al 1° gennaio 2010. È in vigore dall'11 settembre 2014.");
+  });
+
+  it('writes the ordinal for the first of a month', () => {
+    expect(body(NOT_YET, '2014-01-01')).toBe('Questo articolo non esisteva al 1° gennaio 2014. È in vigore dal 13 settembre 2014.');
+    const firstNext = validity({ state: 'not_yet', valid_from: null, valid_to: '2014-08-31', version_number: null, request_in_window: true });
+    expect(body(firstNext, '2010-01-01')).toBe('Questo articolo non esisteva al 1° gennaio 2010. È in vigore dal 1° settembre 2014.');
+  });
+
+  it("elides a historical window that starts on the 11th and ends on the 8th", () => {
+    const window = validity({ state: 'historical', valid_from: '1970-06-11', valid_to: '1990-05-08', version_number: 1, request_in_window: true });
+    expect(body(window, '1980-01-01')).toMatch(/^In vigore dall'11 giugno 1970 all'8 maggio 1990, secondo il testo consolidato/);
+  });
+
+  it('keeps the plain preposition before the 18th and the 28th', () => {
+    const window = validity({ state: 'historical', valid_from: '1970-06-18', valid_to: '1990-05-28', version_number: 1, request_in_window: true });
+    expect(body(window, '1980-01-01')).toMatch(/^In vigore dal 18 giugno 1970 al 28 maggio 1990, secondo/);
   });
 });
 

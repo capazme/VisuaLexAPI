@@ -196,10 +196,33 @@ describe('computeNormaGroups — versions', () => {
   });
 });
 
+describe('computeNormaGroups — annexes', () => {
+  const n = (over: Partial<NormaVisitata>): DossierItem => item({ id: `i-${Math.random()}`, data: { ...norma, numero_articolo: '1', ...over } });
+
+  it('makes a group of its own of each annex of one act, not one request "1,1"', () => {
+    const groups = computeNormaGroups([n({ allegato: 'A' }), n({ allegato: 'B' }), n({})]);
+    expect(groups).toHaveLength(3);
+    expect(groups.map((g) => g.allegato)).toEqual(['A', 'B', '']);
+    expect(groups.map((g) => g.articles)).toEqual([['1'], ['1'], ['1']]);
+  });
+
+  it('keeps two articles of one annex in one group (the control)', () => {
+    const groups = computeNormaGroups([n({ allegato: 'A' }), n({ allegato: 'A', numero_articolo: '2' })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ allegato: 'A', articles: ['1', '2'] });
+  });
+
+  it('groups the items with no annex together as the empty string', () => {
+    const groups = computeNormaGroups([n({}), n({ numero_articolo: '2' }), n({ allegato: '', numero_articolo: '3' })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ allegato: '', articles: ['1', '2', '3'] });
+  });
+});
+
 describe('searchParamsFromGroup', () => {
   const group = (over: Partial<ReturnType<typeof computeNormaGroups>[number]> = {}) => ({
     key: 'k', tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
-    articles: ['1284', '1285'], versione: '', data_versione: '', ...over,
+    articles: ['1284', '1285'], versione: '', data_versione: '', allegato: '', ...over,
   });
 
   it('asks for the text in force with Brocardi, as the dossier always did', () => {
@@ -216,6 +239,11 @@ describe('searchParamsFromGroup', () => {
     expect(searchParamsFromGroup(group({ versione: 'originale' }))).toMatchObject({
       version: 'originale', version_date: '', show_brocardi_info: false,
     });
+  });
+
+  it('asks for the annex a group holds, and sends no annex key when it holds none', () => {
+    expect(searchParamsFromGroup(group({ allegato: 'A' }))).toMatchObject({ annex: 'A' });
+    expect(searchParamsFromGroup(group())).not.toHaveProperty('annex');
   });
 });
 
@@ -240,7 +268,7 @@ describe('dossierItemPdfTitle', () => {
 describe('tabLabelForGroup', () => {
   const group = (over: Partial<ReturnType<typeof computeNormaGroups>[number]> = {}) => ({
     key: 'k', tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
-    articles: ['1284'], versione: '', data_versione: '', ...over,
+    articles: ['1284'], versione: '', data_versione: '', allegato: '', ...over,
   });
 
   it('is the dossier\'s title for the text in force', () => {
@@ -259,7 +287,7 @@ describe('tabLabelForGroup', () => {
 describe('searchesForGroups', () => {
   const g = (over: Partial<ReturnType<typeof computeNormaGroups>[number]>) => ({
     key: `k${Math.random()}`, tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
-    articles: ['1284'], versione: '', data_versione: '', ...over,
+    articles: ['1284'], versione: '', data_versione: '', allegato: '', ...over,
   });
   const PAST = { versione: 'vigente', data_versione: '2007-12-29' };
 
@@ -276,6 +304,13 @@ describe('searchesForGroups', () => {
     expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica — testo al 29/12/2007']);
     expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
     expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
+  });
+
+  it('still routes the texts in force of two annexes to the one shared tab', () => {
+    const { created, searches } = run([g({ allegato: 'A' }), g({ allegato: 'B' })]);
+    expect(created).toEqual(['Pratica']);
+    expect(searches.map((x) => x.targetTabId)).toEqual(['tab-1', 'tab-1']);
+    expect(searches.map((x) => x.annex)).toEqual(['A', 'B']);
   });
 
   it('creates no shared tab when every group asks for a past text', () => {

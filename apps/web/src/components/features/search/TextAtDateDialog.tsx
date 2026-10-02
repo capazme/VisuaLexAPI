@@ -70,10 +70,10 @@ function TextAtDateForm({ onClose, onConfirm, euAct, today, initialDate, inputRe
                     aria-invalid={future || undefined}
                     aria-describedby={error ? 'text-at-date-error' : undefined}
                     onChange={(event) => setDate(event.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all disabled:opacity-50"
+                    className="w-full min-h-[44px] md:min-h-0 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all disabled:opacity-50"
                 />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+            <label className="flex min-h-[44px] md:min-h-0 items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <input
                     type="checkbox"
                     checked={original}
@@ -91,10 +91,10 @@ function TextAtDateForm({ onClose, onConfirm, euAct, today, initialDate, inputRe
                 </p>
             )}
             <div className="flex justify-end gap-2 pt-1">
-                <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+                <Button type="button" variant="ghost" size="sm" className="min-h-[44px] md:min-h-0" onClick={onClose}>
                     Annulla
                 </Button>
-                <Button type="submit" variant="primary" size="sm" disabled={!canSubmit}>
+                <Button type="submit" variant="primary" size="sm" className="min-h-[44px] md:min-h-0" disabled={!canSubmit}>
                     <Clock size={16} />
                     Mostra il testo
                 </Button>

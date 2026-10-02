@@ -5,7 +5,7 @@ import type { NormaGroup } from './dossierUtils';
 
 const group = (over: Partial<NormaGroup>): NormaGroup => ({
   key: 'k', tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
-  articles: ['1284'], versione: '', data_versione: '', ...over,
+  articles: ['1284'], versione: '', data_versione: '', allegato: '', ...over,
 });
 
 function renderPicker(groups: NormaGroup[]) {

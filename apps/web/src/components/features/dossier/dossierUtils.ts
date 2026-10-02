@@ -20,8 +20,9 @@ export function formatTimestampLong(ts: string | number | undefined | null): str
   return formatDateItalianLong(d.toISOString().slice(0, 10));
 }
 
-// One group = one norm (tipo + numero + data) in one version, and all its articles in the dossier.
-// Two versions of one article are two groups, never "1284,1284".
+// One group = one norm (tipo + numero + data) in one version and one annex, and all its
+// articles in the dossier. Two versions of one article are two groups, never "1284,1284";
+// nor are art. 1 of annex A and art. 1 of the body of the same decree one request "1,1".
 // Used both by the detail view ("Apri tutti su Dashboard") and the list view
 // ("apri rapido dalla card"). `triggerSearch` in the store overwrites any
 // previous search, so the consuming UI must pick a single group to open at
@@ -35,6 +36,8 @@ export interface NormaGroup {
   // The stored version of the group's articles ('' when absent): what a search for the group must ask.
   versione: string;
   data_versione: string;
+  // The stored annex of the group's articles ('' when absent): what a search for the group must ask.
+  allegato: string;
 }
 
 export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
@@ -42,7 +45,7 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   items
     .filter((i) => i.type === 'norma')
     .forEach((item) => {
-      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}|${versionKey(item.data)}`;
+      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}|${versionKey(item.data)}|${item.data.allegato || ''}`;
       const existing = groups.get(key);
       if (existing) {
         existing.articles.push(item.data.numero_articolo);
@@ -55,6 +58,7 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
           articles: [item.data.numero_articolo],
           versione: item.data.versione || '',
           data_versione: item.data.data_versione || '',
+          allegato: item.data.allegato || '',
         });
       }
     });
@@ -72,6 +76,7 @@ export function searchParamsFromGroup(group: NormaGroup): SearchParams {
     version: (group.versione as SearchParams['version']) || 'vigente',
     version_date: group.data_versione || '',
     show_brocardi_info: !requestIsHistorical({ versione: group.versione, data_versione: group.data_versione }),
+    ...(group.allegato ? { annex: group.allegato } : {}),
   };
 }
 

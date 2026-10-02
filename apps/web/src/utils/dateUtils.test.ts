@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, todayInRome } from './dateUtils';
+import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, todayInRome, withPreposition } from './dateUtils';
 
 describe('formatDateDashed', () => {
   it('writes a day the way Normattiva does, padded', () => {
@@ -28,6 +28,42 @@ describe('formatDateForCitation', () => {
   it('returns anything that is not an ISO day as it came', () => {
     expect(formatDateForCitation('2007')).toBe('2007');
     expect(formatDateForCitation('')).toBe('');
+  });
+});
+
+describe('withPreposition', () => {
+  const ELIDED = [
+    ['il', "l'"],
+    ['del', "dell'"],
+    ['dal', "dall'"],
+    ['al', "all'"],
+    ['nel', "nell'"],
+  ] as const;
+
+  it.each(ELIDED)('elides "%s" before the 8th and the 11th, glued to the date', (preposition, elided) => {
+    expect(withPreposition(preposition, '8 settembre 2014')).toBe(`${elided}8 settembre 2014`);
+    expect(withPreposition(preposition, '11 giugno 1970')).toBe(`${elided}11 giugno 1970`);
+  });
+
+  it('writes the examples a lawyer expects', () => {
+    expect(withPreposition('dal', '11 giugno 1970')).toBe("dall'11 giugno 1970");
+    expect(withPreposition('al', '8 settembre 2014')).toBe("all'8 settembre 2014");
+    expect(withPreposition('del', '11 settembre 2014')).toBe("dell'11 settembre 2014");
+    expect(withPreposition('nel', '8 marzo 2010')).toBe("nell'8 marzo 2010");
+    expect(withPreposition('il', '8 ottobre 2026')).toBe("l'8 ottobre 2026");
+  });
+
+  it.each(['1° gennaio 2010', '1 gennaio 2010', '18 aprile 2019', '28 dicembre 2000', '31 dicembre 2016', '80 maggio 2000', '111 maggio 2000'])(
+    'keeps the plain preposition before "%s"', (date) => {
+      expect(withPreposition('dal', date)).toBe(`dal ${date}`);
+      expect(withPreposition('il', date)).toBe(`il ${date}`);
+    },
+  );
+
+  it('keeps the plain preposition before a string that does not start with a day', () => {
+    expect(withPreposition('al', '2014')).toBe('al 2014');
+    expect(withPreposition('al', 'non leggibile')).toBe('al non leggibile');
+    expect(withPreposition('al', '')).toBe('al ');
   });
 });
 

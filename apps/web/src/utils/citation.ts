@@ -1,5 +1,5 @@
 import type { ArticleValidity, NormaVisitata } from '../types';
-import { abbreviateActType, formatDateForCitation } from './dateUtils';
+import { abbreviateActType, formatDateForCitation, withPreposition } from './dateUtils';
 import { isEuropeanAct } from './versionDisplay';
 
 /**
@@ -87,12 +87,12 @@ export function formatNormCitation(context: CitationContext): NormCitation | nul
   if (isEuropeanAct(norma.tipo_atto)) return null;
 
   const head = articleHead(norma);
-  const source = `Normattiva, testo consolidato${consultedAt ? `, consultato il ${formatDateForCitation(consultedAt)}` : ''}`;
+  const source = `Normattiva, testo consolidato${consultedAt ? `, consultato ${withPreposition('il', formatDateForCitation(consultedAt))}` : ''}`;
   const from = validity?.valid_from ? formatDateForCitation(validity.valid_from) : undefined;
   const to = validity?.valid_to ? formatDateForCitation(validity.valid_to) : undefined;
   const repealed = validity?.state === 'abrogated';
   // For a repealed article `valid_from` is the day of the REPEAL, not the day the text came into force.
-  const window = !repealed && (from || to) ? `in vigore${from ? ` dal ${from}` : ''}${to ? ` al ${to}` : ''}` : undefined;
+  const window = !repealed && (from || to) ? `in vigore${from ? ` ${withPreposition('dal', from)}` : ''}${to ? ` ${withPreposition('al', to)}` : ''}` : undefined;
 
   if (!requestedDate && !original) {
     // Reached with no day: a past version still goes out with its window.
@@ -103,18 +103,19 @@ export function formatNormCitation(context: CitationContext): NormCitation | nul
 
   if (repealed && requestedDate) {
     if (!from) return null;
-    const short = `${head}, abrogato dal ${from}`;
+    const short = `${head}, abrogato ${withPreposition('dal', from)}`;
     return { short, long: `${short} (${source})` };
   }
 
   const asked = requestedDate ? formatDateForCitation(requestedDate) : undefined;
-  const short = `${head}, ${asked ? `nel testo in vigore al ${asked}` : 'nel testo originale'}`;
+  const inForceAt = asked ? `nel testo in vigore ${withPreposition('al', asked)}` : 'nel testo originale';
+  const short = `${head}, ${inForceAt}`;
 
   const clause = original
     ? `nel testo originale${window ? `, ${window}` : ''}`
     : window
       ? `nel testo ${window}`
-      : `nel testo in vigore al ${asked}`;
+      : inForceAt;
 
   return { short, long: `${head}, ${clause} (${source})` };
 }

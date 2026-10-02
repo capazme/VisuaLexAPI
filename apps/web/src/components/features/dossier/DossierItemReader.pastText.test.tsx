@@ -242,7 +242,7 @@ describe('DossierItemReader — an article that did not exist yet', () => {
     const { container } = read(
       { ...PAST_ITEM, data_versione: '2010-01-01' }, NOT_YET, 'Art. 183-bis\n\nARTICOLO NON ANCORA ESISTENTE O VIGENTE',
     );
-    expect(await screen.findByText(/Questo articolo non esisteva al 1 gennaio 2010/)).toBeInTheDocument();
+    expect(await screen.findByText(/Questo articolo non esisteva al 1° gennaio 2010/)).toBeInTheDocument();
     expect(container.querySelector('.vlx-art')).toBeNull();
     expect(screen.getByRole('button', { name: /Copia citazione/ })).toBeDisabled();
   });

@@ -105,6 +105,15 @@ describe('TextAtDateDialog', () => {
         expect(onConfirm).not.toHaveBeenCalled();
     });
 
+    it('keeps a 44px touch target on mobile on every control', () => {
+        setup();
+        const target = ['min-h-[44px]', 'md:min-h-0'];
+        expect(dateField()).toHaveClass(...target);
+        expect(screen.getByLabelText('Testo originale').closest('label')).toHaveClass(...target);
+        expect(screen.getByRole('button', { name: 'Annulla' })).toHaveClass(...target);
+        expect(confirm()).toHaveClass(...target);
+    });
+
     it('closes on cancel', () => {
         const { onClose } = setup();
         fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));

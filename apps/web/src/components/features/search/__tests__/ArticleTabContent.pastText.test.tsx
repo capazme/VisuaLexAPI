@@ -33,8 +33,14 @@ vi.mock('../../../../plugins/PluginSlot', () => ({
   },
 }));
 vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi" /> }));
+// The real comparison state, with the call to open it recorded.
+vi.mock('../../../../hooks/useCompare', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../hooks/useCompare')>();
+  return { ...actual, openCompareWithArticle: vi.fn(actual.openCompareWithArticle) };
+});
 
 import { ArticleTabContent } from '../ArticleTabContent';
+import { closeCompare, openCompareWithArticle } from '../../../../hooks/useCompare';
 import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
@@ -274,7 +280,7 @@ describe('ArticleTabContent — an article that did not exist yet', () => {
     const { container } = show(notYet());
     expect(container.querySelector('.vlx-art')).toBeNull();
     expect(screen.queryByText(/NON ANCORA ESISTENTE/)).not.toBeInTheDocument();
-    expect(screen.getByText('Questo articolo non esisteva al 1 gennaio 2010. È in vigore dal 13 settembre 2014.')).toBeInTheDocument();
+    expect(screen.getByText('Questo articolo non esisteva al 1° gennaio 2010. È in vigore dal 13 settembre 2014.')).toBeInTheDocument();
   });
 
   it('opens the text of the first day it existed', () => {
@@ -471,5 +477,31 @@ describe('ArticleTabContent — selecting words of the text', () => {
     await waitFor(() => expect(screen.getByTitle(/^Aggiungi nota \(N\)/)).toBeInTheDocument());
     expect(screen.getByTitle(/^Evidenzia \(H\)/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /discuti con i colleghi/i })).toBeInTheDocument();
+  });
+});
+
+describe('ArticleTabContent — "Confronta con..." names the version it compares', () => {
+  const compareLabel = (data: ArticleData): string => {
+    show(data);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confronta con...' }));
+    expect(openCompareWithArticle).toHaveBeenCalledTimes(1);
+    return (openCompareWithArticle as Mock).mock.calls[0][0].label;
+  };
+
+  afterEach(() => closeCompare());
+
+  it('labels the text in force with the plain article and act, as it always did', () => {
+    expect(compareLabel(article(CURRENT, { versione: 'vigente', data_versione: '' }))).toBe('Art. 1284 (All. 2) - codice civile n. 262');
+  });
+
+  it('labels a past text with its day, so it cannot pass for the text in force', () => {
+    expect(compareLabel(article(MIDDLE, { versione: 'vigente', data_versione: '2007-12-29' })))
+      .toBe('Art. 1284 (All. 2) - codice civile n. 262 — testo al 29/12/2007');
+  });
+
+  it('labels the original text as such', () => {
+    expect(compareLabel(article(MIDDLE, { versione: 'originale' })))
+      .toBe('Art. 1284 (All. 2) - codice civile n. 262 — testo originale');
   });
 });

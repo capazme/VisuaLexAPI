@@ -1,7 +1,7 @@
 import { AlertTriangle, Info } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { cn } from '../../../lib/utils';
-import { formatDateItalianLong } from '../../../utils/dateUtils';
+import { formatDateForCitation, withPreposition } from '../../../utils/dateUtils';
 import type { BannerAction, VersionBanner as BannerData } from '../../../utils/versionDisplay';
 
 const TONE: Record<BannerData['kind'], string> = {
@@ -17,7 +17,7 @@ function labelOf(action: BannerAction, banner: BannerData): string {
         case 'copy_citation': return 'Copia citazione';
         case 'pick_date': return 'Scegli un’altra data';
         case 'open_next_day':
-            return banner.nextDay ? `Vai al testo del ${formatDateItalianLong(banner.nextDay)}` : 'Vai al testo successivo';
+            return banner.nextDay ? `Vai al testo ${withPreposition('del', formatDateForCitation(banner.nextDay))}` : 'Vai al testo successivo';
     }
 }
 
@@ -41,7 +41,7 @@ export function VersionBanner({ banner, onAction, variant = 'banner' }: VersionB
             role={banner.kind === 'unreliable' ? 'alert' : 'status'}
             className={cn(
                 'mb-4 flex gap-3 rounded-lg border p-3 text-sm',
-                variant === 'state' && 'py-8 justify-center text-center',
+                variant === 'state' && 'py-8 flex-col items-center gap-2 text-center',
                 TONE[banner.kind],
             )}
         >
@@ -53,7 +53,7 @@ export function VersionBanner({ banner, onAction, variant = 'banner' }: VersionB
                 {onAction && banner.actions.length > 0 && (
                     <div className={cn('flex flex-wrap gap-2 pt-1', variant === 'state' && 'justify-center')}>
                         {banner.actions.map((action) => (
-                            <Button key={action} variant="secondary" size="sm" onClick={() => onAction(action)}>
+                            <Button key={action} variant="secondary" size="sm" className="min-h-[44px] md:min-h-0" onClick={() => onAction(action)}>
                                 {labelOf(action, banner)}
                             </Button>
                         ))}
