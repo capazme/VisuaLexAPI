@@ -320,6 +320,10 @@ Duplicating any of these is a defect, not a shortcut.
   `expandTwoDigitYear` (the one two-digit-year pivot, same as the backend's
   `_expand_year`: "90" → 1990, "23" → 2023), `formatDateDashed` ("29-12-2007",
   the way Normattiva writes a day), `formatDateForCitation` ("1° ottobre 2026"),
+  `withPreposition` (a preposition and the date it governs, elided before 8 and
+  11: "dall'11 giugno", "all'8 settembre"; the version banners, the citations and
+  the cards' "Edizione del …" go through it, and so does any new sentence that
+  puts a spelled-out date after "il", "del", "dal", "al" or "nel"),
   `addDaysToIsoDate`, and `todayInRome` (the day the server compares a
   `version_date` with; the browser's own day can differ).
 - `utils/versionDisplay.ts` — `describeVersion(validity, request)` (chip, banner,
@@ -679,5 +683,7 @@ meant to stay split; add new features as new files, not inside the shells:
     `copyBlockedReason`) and `canCite` before it copies, exports, saves or
     cites, the way `ArticleTabContent` and `DossierItemReader` do; and anything
     that caches, groups or compares texts by article adds `versionKey` to the
-    item key, which has no version; the banner and the chip sit beside the
-    text, never in it (root rule 23).
+    item key, which has no version, and one that labels a text for another
+    surface (a tab, a dossier row, the comparison) names its version
+    (`versionTabSuffix`, `historicalItemLabel`); the banner and the chip sit
+    beside the text, never in it (root rule 23).

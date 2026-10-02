@@ -380,5 +380,9 @@ Breaking one of these breaks the product. Read before editing.
     with `valid_to` as stated, and `request_in_window` still judges the request against it.
     The window says which text was in force, not which discipline
     governs a fact: transitional provisions and retroactive rules are not on the page.
+    `version` is read stripped and lower-cased wherever it is read
+    (`is_historical_request`, `append_version_info`): a spelling that keeps Brocardi
+    out must also build the URN of the past text, or the text in force goes out
+    labelled as a past one.
     `tests/test_normattiva_validity_live.py` (`-m live`) re-checks the extraction
     against the portal.

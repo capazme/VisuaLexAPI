@@ -320,9 +320,11 @@ text, because for delegated values (art. 1284's rate) the rule is in the notes. 
 - `dossierContainsArticle` compares `versione` (default `vigente`) and `data_versione` (default
   empty) as well, so a legacy item without them is a current-text item.
 - `searchParamsFromNorma` sets `show_brocardi_info: false` for a historical item.
-- A dossier row and the dossier reader show "Testo al {dd/mm/yyyy}" for a historical item. Two
-  typed dates inside one window are two items with the same text: harmless, and the dossier does
-  not try to merge them.
+- A dossier row shows "Testo al {dd/mm/yyyy}" for a historical item. The dossier reader says it
+  with the same banner as the tab (the window the source states) and shows the "Testo al …" line
+  only when the source could not be read and the banner has nothing to say. Two typed dates inside
+  one window are two items with the same text: harmless, and the dossier does not try to merge
+  them.
 - Items already saved from a historical tab through the window button lost their version and
   cannot be repaired (§8).
 
@@ -371,7 +373,9 @@ could not test on a real counter-example (§2, last bullet).
 | Disabled | Non disponibile su un testo storico |
 
 Dates in the interface are written `25-12-2003` (as Normattiva writes them, but padded) or, in
-sentences and citations, `25 dicembre 2003`.
+sentences and citations, `25 dicembre 2003`, with `1° ottobre 2026` for the first of a month and
+the elision Italian asks for before an 8 or an 11 (`dall'11 giugno 1970`, `all'8 settembre 2014`,
+`consultato l'8 ottobre 2026`); the `{d}` of the table above is written that way.
 
 ### 5.4 Cost, quota and cache
 
