@@ -1,9 +1,10 @@
 # The text as at a date — Design
 
 **Date:** 2026-10-01
-**Status:** APPROVED by the owner on 1 October 2026, with the questions of §10 answered; nothing
-here is built yet. The citation style is the owner's (§5.2); the wording of the Massimario row
-(§9, P4) was decided by the owner on 1 October.
+**Status:** APPROVED by the owner on 1 October 2026, with the questions of §10 answered; built on
+1–2 October 2026 in three pull requests (the server states the window, the reader shows it, the
+dossier keeps it), as the plan describes. The citation style is the owner's (§5.2); the wording of
+the Massimario row (§9, P4) was decided by the owner on 1 October.
 **Plan:** `docs/superpowers/plans/2026-10-01-testo-alla-data.md`.
 **Branch:** `docs/testo-alla-data`
 **Round:** the reading surface, after rounds A–C (`2026-09-25-lettura-testo-design.md`,
