@@ -10,5 +10,7 @@ bound, not a target.
 stands in `ocr`): `test_a_civil_decision` expects no text.
 
 `corte_cost_2014_sample.json`: three records from the Corte costituzionale's open data
-(dati.cortecostituzionale.it, bundle P_json2001_oggi.zip), texts cut to 600 characters.
-Source: Corte costituzionale — licence CC BY-SA 3.0; this file is under the same licence.
+(dati.cortecostituzionale.it, bundle P_json2001_oggi.zip), texts cut to at most 600 characters,
+and before the first name of a private person.
+Source: Corte costituzionale — licence CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/);
+this file is under the same licence.

@@ -13,11 +13,13 @@ names and the nested layout are its findings. Here the text is never cut.
 from __future__ import annotations
 
 import asyncio
+import html
 import io
 import json
 import os
 import re
 import time
+import unicodedata
 import zipfile
 from collections import OrderedDict
 from collections.abc import Callable
@@ -46,14 +48,27 @@ _TIPI = {"S": "sentenza", "O": "ordinanza"}
 SOURCE = {"nome": "Corte costituzionale — dati aperti", "licenza": "CC BY-SA 3.0"}
 
 
+# Windows-1252 characters that the latin-1 decoding turned into C1 controls (measured: "Š"
+# and "š" in nine records). Same length, so no offset moves.
+_CP1252 = {cp: bytes([cp]).decode("cp1252") for cp in range(0x80, 0xA0)
+           if cp not in (0x81, 0x8D, 0x8F, 0x90, 0x9D)}
+_REFERENCE = re.compile(r"&(?:#\d+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);")
+
+
 def clean(text: object) -> str:
     """The upstream text as the page receives it: `&#13;` and carriage returns become line
-    breaks, runs of spaces collapse, longer blank runs shrink to one empty line. Once notes on
-    decisions exist this output is a data contract (gotcha 23): change it and they move."""
+    breaks, the other character references are decoded (only the ones closed by ";") and
+    composed (NFC), C1 controls left by the latin-1 decoding become their Windows-1252
+    characters, runs of spaces collapse, spaces before a line break go, and longer blank runs
+    shrink to one empty line. Once notes on decisions exist this output is a data contract
+    (gotcha 23): change it and they move."""
     if not text:
         return ""
-    s = str(text).replace("&#13;", "\n").replace("\r\n", "\n").replace("\r", "\n")
+    s = str(text).replace("&#13;", "\n")
+    s = _REFERENCE.sub(lambda m: html.unescape(m.group(0)), s).translate(_CP1252)
+    s = unicodedata.normalize("NFC", s.replace("\r\n", "\n").replace("\r", "\n"))
     s = re.sub(r"[ \t]{2,}", " ", s)
+    s = re.sub(r"[ \t]+\n", "\n", s)
     s = re.sub(r"\n{3,}", "\n\n", s)
     return s.strip()
 
@@ -83,22 +98,24 @@ def to_decision(rec: dict) -> Decision:
     )
 
 
-def read_year(bundle: Path, year: int) -> list[dict]:
-    """The records of one year, read out of a range bundle (two nested zips, latin-1 JSON)."""
+def read_year(bundle: Path, year: int) -> list[dict] | None:
+    """The records of one year, read out of a range bundle (two nested zips, latin-1 JSON);
+    None when the bundle has no entry for that year. A year whose layout is not the court's
+    raises ValueError: a changed layout is never read as "no such decision"."""
     with zipfile.ZipFile(bundle) as outer:
         names = [n for n in outer.namelist() if n.endswith(_YEAR_ZIP.format(year=year))]
         if not names:
-            return []
+            return None
         inner_bytes = outer.read(names[0])
+    target = _YEAR_JSON.format(year=year)
     with zipfile.ZipFile(io.BytesIO(inner_bytes)) as inner:
-        members = inner.namelist()
-        target = _YEAR_JSON.format(year=year)
-        target = target if target in members else (members[0] if members else None)
-        if target is None:
-            return []
+        if target not in inner.namelist():
+            raise ValueError(f"{bundle.name}: manca {target}")
         obj = json.loads(inner.read(target).decode("latin-1"))
-    records = obj.get(_ROOT_KEY, []) if isinstance(obj, dict) else obj
-    return records if isinstance(records, list) else []
+    records = obj.get(_ROOT_KEY) if isinstance(obj, dict) else None
+    if not isinstance(records, list) or not all(isinstance(r, dict) for r in records):
+        raise ValueError(f"{bundle.name}: {target} non ha la forma attesa")
+    return records
 
 
 class CorteCostReader:
@@ -128,10 +145,18 @@ class CorteCostReader:
             data = result.text.encode("latin-1")
             if data[:2] != b"PK":
                 raise ValueError(f"{name}: la risposta non è un archivio zip")
+            try:
+                zipfile.ZipFile(io.BytesIO(data)).close()  # reads the end record: a cut file fails
+            except zipfile.BadZipFile as exc:
+                raise ValueError(f"{name}: l'archivio zip è incompleto") from exc
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             tmp = path.with_name(f"{name}.{os.getpid()}.tmp")
-            tmp.write_bytes(data)
-            os.replace(tmp, path)
+            try:
+                tmp.write_bytes(data)
+                os.replace(tmp, path)
+            except OSError:
+                tmp.unlink(missing_ok=True)
+                raise
             return path
 
     async def _records(self, year: int) -> list[dict]:
@@ -141,7 +166,17 @@ class CorteCostReader:
         path = await self._bundle_path(*found)
         key = (found[0], path.stat().st_mtime, year)
         if key not in self._years:
-            self._years[key] = await asyncio.to_thread(read_year, path, year)
+            try:
+                records = await asyncio.to_thread(read_year, path, year)
+            except zipfile.BadZipFile:
+                async with self._locks.setdefault(found[0], asyncio.Lock()):
+                    path.unlink(missing_ok=True)  # a damaged copy: fetched again next time
+                raise
+            if records is None:
+                if year < self.today().year:  # a past year its bundle should hold
+                    raise ValueError(f"{found[0]}: manca l'anno {year}")
+                records = []  # the current year before its first decision
+            self._years[key] = records
             while len(self._years) > self._max_years:
                 self._years.popitem(last=False)
         self._years.move_to_end(key)
