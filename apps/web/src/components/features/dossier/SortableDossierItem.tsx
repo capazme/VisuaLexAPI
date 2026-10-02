@@ -12,6 +12,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { cn } from '../../../lib/utils';
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { formatTimestampLong } from './dossierUtils';
+import { historicalItemLabel } from '../../../utils/versionDisplay';
 import { DossierItemReader } from './DossierItemReader';
 import type { DossierItem } from '../../../types';
 
@@ -60,6 +61,8 @@ export function SortableDossierItem({
     ? `${expandVerb} ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
     : `${expandVerb} nota`;
   const regionId = `dossier-item-content-${item.id}`;
+  // "Testo al 29/12/2007": a row that holds a past text says so.
+  const historicalLabel = item.type === 'norma' ? historicalItemLabel(item.data) : null;
 
   return (
     // Plain container: the expand affordance is the header sub-div below.
@@ -134,6 +137,11 @@ export function SortableDossierItem({
                   {item.data.tipo_atto} {item.data.numero_atto}
                 </h4>
                 <p className="text-xs md:text-sm text-slate-500 truncate">Art. {item.data.numero_articolo} • {formatDateItalianLong(item.data.data || '')}</p>
+                {historicalLabel && (
+                  <span className="mt-0.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    {historicalLabel}
+                  </span>
+                )}
               </>
             ) : (
               // Hidden while expanded: the full note is rendered below, and

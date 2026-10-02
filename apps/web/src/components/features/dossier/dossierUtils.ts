@@ -1,7 +1,8 @@
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import type { Dossier, DossierItem, NormaVisitata, SearchParams } from '../../../types';
+import { requestIsHistorical } from '../../../utils/versionDisplay';
+import type { ArticleData, Dossier, DossierItem, Norma, NormaVisitata, SearchParams } from '../../../types';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
@@ -65,8 +66,26 @@ export function searchParamsFromNorma(norma: NormaVisitata): SearchParams {
     article: norma.numero_articolo?.toString() || '',
     version: (norma.versione as SearchParams['version']) || 'vigente',
     version_date: norma.data_versione || '',
-    show_brocardi_info: true,
+    // Brocardi's commentary carries no date: a past text is read without it.
+    show_brocardi_info: !requestIsHistorical(norma),
     ...(norma.allegato ? { annex: norma.allegato } : {}),
+  };
+}
+
+// What the window header's "Aggiungi a dossier" stores for one article of a tab.
+// It rebuilds the item from the block's norma and the article, and used to drop
+// the version: a historical text was saved under the same label as the current
+// one and reopened as the text in force.
+export function normaForDossier(norma: Norma, article: ArticleData): NormaVisitata {
+  const { versione, data_versione } = article.norma_data;
+  return {
+    tipo_atto: norma.tipo_atto,
+    numero_atto: norma.numero_atto,
+    data: norma.data,
+    numero_articolo: article.norma_data.numero_articolo,
+    urn: norma.urn,
+    ...(versione ? { versione } : {}),
+    ...(data_versione ? { data_versione } : {}),
   };
 }
 
@@ -107,11 +126,20 @@ export function dossierRecency(d: Dossier): number {
   return times.length ? Math.max(...times) : 0;
 }
 
+// The text two items hold is the same text only when the version agrees too.
+// An item saved before versions were kept has no version fields and is the text
+// in force, as is one that says "vigente" with no date.
+function sameVersion(a: NormaVisitata, b: NormaVisitata): boolean {
+  return (a.versione || 'vigente') === (b.versione || 'vigente')
+    && (a.data_versione || '') === (b.data_versione || '');
+}
+
 // Whether a dossier already holds the given article, matching on act
-// (tipo_atto + numero_atto + data) and normalized article id so "1-bis" /
-// "1 bis" formatting differences between the tree API and the scraper don't
-// produce false negatives (see findArticleByNormalizedId in articleIds.ts
-// for the same tolerance applied to article lookups).
+// (tipo_atto + numero_atto + data), normalized article id and version, so
+// "1-bis" / "1 bis" formatting differences between the tree API and the
+// scraper don't produce false negatives (see findArticleByNormalizedId in
+// articleIds.ts for the same tolerance applied to article lookups) and two
+// versions of one article can sit side by side.
 export function dossierContainsArticle(dossier: Dossier, norma: NormaVisitata): boolean {
   const target = normalizeArticleId(uniqueArticleIdFromNorma(norma));
   return dossier.items.some((i) => {
@@ -120,6 +148,7 @@ export function dossierContainsArticle(dossier: Dossier, norma: NormaVisitata): 
     return d.tipo_atto === norma.tipo_atto
       && (d.numero_atto || '') === (norma.numero_atto || '')
       && (d.data || '') === (norma.data || '')
-      && normalizeArticleId(uniqueArticleIdFromNorma(d)) === target;
+      && normalizeArticleId(uniqueArticleIdFromNorma(d)) === target
+      && sameVersion(d, norma);
   });
 }
