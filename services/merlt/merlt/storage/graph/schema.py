@@ -603,5 +603,10 @@ def version_urn(urn: str, version_date: str) -> str:
     """The key of a past version of an article (multivigenza). A writer uses it
     as it is: `canonical_urn` folds it onto the live article, which is what a
     reader wants and a writer must not do. How versions are modelled for good
-    is open (spec section 11)."""
+    is open (spec section 11).
+
+    A version has a date: `<URL>!vig=` with nothing after it is the marker of the
+    live article, so an empty or missing date raises instead of building it."""
+    if not version_date or not isinstance(version_date, str):
+        raise ValueError(f"a version key needs a date, got {version_date!r}")
     return f"{canonical_urn(urn)}!vig={version_date}"

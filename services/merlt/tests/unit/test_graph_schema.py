@@ -331,3 +331,10 @@ def test_a_version_has_its_own_key_and_reads_back_to_the_article():
     key = s.version_urn(CC + "@originale", "2020-01-01")
     assert key == CC + "!vig=2020-01-01"
     assert s.canonical_urn(key) == CC  # a reader asking for the version lands on the article
+
+
+@pytest.mark.parametrize("date", ["", None, 2020])
+def test_a_version_needs_a_date(date):
+    # An empty date would give "<URL>!vig=": the marker of the live article, a broken key.
+    with pytest.raises(ValueError):
+        s.version_urn(CC, date)
