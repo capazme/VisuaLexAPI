@@ -27,6 +27,11 @@ from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.services.akn_parser import normalize_article_key
+from visualex_api.services.normattiva_validity import (
+    is_historical_request,
+    read_validity,
+    reject_future_version_date,
+)
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
@@ -234,7 +239,12 @@ class NormaController:
                 try:
                     # Fetch article text and Brocardi info in parallel if requested
                     tasks = [scraper.get_document(nv)]
-                    if show_brocardi and isinstance(scraper, NormattivaScraper):
+                    # Brocardi is current doctrine with no date: never asked for a past text.
+                    if (
+                        show_brocardi
+                        and isinstance(scraper, NormattivaScraper)
+                        and not is_historical_request(nv.versione, nv.data_versione)
+                    ):
                         tasks.append(brocardi_scraper.get_info(nv))
 
                     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -249,6 +259,9 @@ class NormaController:
                             'norma_data': nv.to_dict(),
                             'url': url
                         }
+                        validity = await self._validity_for(scraper, nv, url)
+                        if validity:
+                            result['validity'] = validity
 
                         # Add Brocardi info if available
                         if show_brocardi and len(results) > 1:
@@ -392,6 +405,11 @@ class NormaController:
             raise ValidationError("Campo obbligatorio mancante: act_type")
         if 'article' not in data or data.get('article') in (None, ''):
             raise ValidationError("Campo obbligatorio mancante: article")
+
+        # Normattiva answers a date after today with the current text and says
+        # nothing. Refused here, before any network call, so that no door skips
+        # it: every handler that reads an article starts from this method.
+        reject_future_version_date(data.get('version_date'))
 
         allowed_types = ['legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto']
         act_type = data.get('act_type')
@@ -654,6 +672,22 @@ class NormaController:
             return normattiva_scraper
 
     @staticmethod
+    async def _validity_for(scraper, nv, url):
+        """The window Normattiva's page states for this text, or None.
+
+        Read from the page `get_document` has just stored in the scraper's own
+        persistent cache (the key is the URN it returned), so it costs no request
+        and never touches the text. Only Normattiva pages carry the statement;
+        EUR-Lex answers None. Never raises.
+        """
+        if not isinstance(scraper, NormattivaScraper):
+            return None
+        return await read_validity(
+            getattr(scraper, 'cache', None), url,
+            article=nv.numero_articolo, requested_date=nv.data_versione,
+        )
+
+    @staticmethod
     def _error_response(exc, endpoint):
         """Map an exception to the status its class documents.
 
@@ -805,11 +839,15 @@ class NormaController:
                 try:
                     article_text, url = await scraper.get_document(nv)
                     log.info("Document fetched successfully", article_text=article_text, url=url)
-                    return {
+                    result = {
                         'article_text': article_text,
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
+                    validity = await self._validity_for(scraper, nv, url)
+                    if validity:
+                        result['validity'] = validity
+                    return result
                 except Exception as exc:
                     log.error("Error fetching article text", error=str(exc))
                     return {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -1076,6 +1114,9 @@ class NormaController:
                 act_type_normalized = nv.norma.tipo_atto.lower()
                 if act_type_normalized in ['tue', 'tfue', 'cdfue', 'regolamento ue', 'direttiva ue']:
                     return {'norma_data': nv.to_dict(), 'brocardi_info': None}
+                # Brocardi is current doctrine with no date: never asked for a past text.
+                if is_historical_request(nv.versione, nv.data_versione):
+                    return {'norma_data': nv.to_dict(), 'brocardi_info': None}
 
                 try:
                     brocardi_info = await brocardi_scraper.get_info(nv)
@@ -1134,12 +1175,14 @@ class NormaController:
 
                 try:
                     article_text, url = await scraper.get_document(nv)
+                    validity = await self._validity_for(scraper, nv, url)
                     brocardi_info = None
                     if scraper == normattiva_scraper:
                         # Skip Brocardi for dispositivo articles of codes that have their content in allegati
                         # Brocardi.it only has content for the actual code (allegato), not the dispositivo
-                        should_fetch_brocardi = True
-                        if explicit_dispositivo and nv.allegato is None:
+                        # Brocardi is current doctrine with no date: never asked for a past text.
+                        should_fetch_brocardi = not is_historical_request(nv.versione, nv.data_versione)
+                        if should_fetch_brocardi and explicit_dispositivo and nv.allegato is None:
                             # Check if this is a codice with a default allegato
                             normalized_type = normalize_act_type(nv.norma.tipo_atto)
                             codice_fragment = codice_urn(normalized_type)
@@ -1170,12 +1213,15 @@ class NormaController:
                             except Exception as exc:
                                 log.error("Error fetching Brocardi info", error=str(exc))
                                 brocardi_info = {'error': str(exc)}
-                    return {
+                    result = {
                         'article_text': article_text,
                         'url': url,
                         'norma_data': nv.to_dict(),
                         'brocardi_info': brocardi_info
                     }
+                    if validity:
+                        result['validity'] = validity
+                    return result
                 except Exception as exc:
                     log.error("Error fetching all data", error=str(exc))
                     return {'error': str(exc), 'norma_data': nv.to_dict()}

@@ -18,7 +18,9 @@ import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
-import { formatTimestampLong, computeNormaGroups, computeItemCounts, type NormaGroup } from './dossierUtils';
+import {
+  formatTimestampLong, computeNormaGroups, computeItemCounts, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, type NormaGroup,
+} from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { ImportDossierModal } from './ImportDossierModal';
 import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
@@ -134,37 +136,22 @@ export function DossierListView({ onSelect, showToast }: Props) {
   const openGroupOnDashboard = (dossier: Dossier, group: NormaGroup) => {
     // Pre-create the tab so we never merge into an orphan with the same label
     // (workspaceTabs is persisted in localStorage — stale tabs can linger).
-    const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
+    // A group asking for a past text has a tab of its own (see tabLabelForGroup).
+    const tabLabel = tabLabelForGroup(dossier.title, group);
+    const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
     navigate('/');
-    triggerSearch({
-      act_type: group.tipo_atto,
-      act_number: group.numero_atto,
-      date: group.data,
-      article: group.articles.join(','),
-      version: 'vigente',
-      version_date: '',
-      show_brocardi_info: true,
-      tabLabel: dossier.title,
-      targetTabId: tabId,
-    });
+    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
   };
 
   const openAllGroupsOnDashboard = (dossier: Dossier, groups: NormaGroup[]) => {
     if (groups.length === 0) return;
-    // Pre-create the empty dossier tab and thread its id to every search so
-    // SearchPanel's direct-merge path writes them all into the same tab.
-    const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
-    const paramsList = groups.map((g) => ({
-      act_type: g.tipo_atto,
-      act_number: g.numero_atto,
-      date: g.data,
-      article: g.articles.join(','),
-      version: 'vigente' as const,
-      version_date: '',
-      show_brocardi_info: true,
-      tabLabel: dossier.title,
-      targetTabId: tabId,
-    }));
+    // Pre-create the tabs and thread their ids to the searches so SearchPanel's
+    // direct-merge path writes each group where it belongs: the texts in force
+    // into the dossier's tab, every past group into a tab of its own.
+    const paramsList = searchesForGroups(
+      dossier.title, groups,
+      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
+    );
     navigate('/');
     triggerMultiSearch(paramsList);
   };

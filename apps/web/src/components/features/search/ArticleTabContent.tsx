@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
 import { BrocardiDisplay } from './BrocardiDisplay';
-import { ExternalLink, Clock } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,8 +9,6 @@ import { AddToDossierPopover } from '../dossier/AddToDossierPopover';
 import { Toast } from '../../ui/Toast';
 import { CopyModal, type CopyOptions } from '../../ui/CopyModal';
 import { AdvancedExportModal } from '../../ui/AdvancedExportModal';
-import { Modal } from '../../ui/Modal';
-import { Button } from '../../ui/Button';
 import { CitationPreviewPopup } from '../../ui/CitationPreviewPopup';
 import { useCitationPreview } from '../../../hooks/useCitationPreview';
 import { wrapCitationsInHtml, deserializeCitation, isSameCitationTarget, type ParsedCitationData } from '../../../utils/citationMatcher';
@@ -39,7 +37,7 @@ import { MissedCitationReporter } from '../../../features/merlt/ner/MissedCitati
 import { buildMissedNerPayload, MISSED_SELECTION_MAX } from '../../../features/merlt/ner/missedCitation';
 import type { NerReference } from '../../../features/merlt/ner/NerReferenceEditor';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, type LocatedThread } from '../../../utils/articleAnnotations';
-import type { Annotation, ThreadPassage } from '../../../types';
+import type { Annotation, Highlight, ThreadPassage } from '../../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { formatCitation } from '../../../utils/normaMeta';
 import { buildSearchDeepLink } from '../../../utils/deepLinks';
@@ -48,6 +46,26 @@ import { isAuthenticated } from '../../../services/authService';
 import { useArticlePassageThreads } from '../../../hooks/useArticlePassageThreads';
 import { plainText, locatePassage, buildPassage, textFingerprint } from '../../../utils/threadPassages';
 import { revealAnnotation } from '../../../utils/revealAnnotation';
+import { VersionBanner } from './VersionBanner';
+import { TextAtDateDialog } from './TextAtDateDialog';
+import { formatNormCitation, withCitation } from '../../../utils/citation';
+import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
+import {
+    READ_ONLY_REASON,
+    buildTextAtDateParams,
+    describeVersion,
+    isEuropeanAct,
+    requestIsHistorical,
+    versionTabSuffix,
+    type BannerAction,
+    type TextAtDateChoice,
+} from '../../../utils/versionDisplay';
+
+// What a past text is shown with in place of the reader's marks (stable, so the
+// memoised rendering does not run again for a fresh empty array).
+const NO_HIGHLIGHTS: Highlight[] = [];
+const NO_ANNOTATIONS: Annotation[] = [];
+const NO_THREADS: LocatedThread[] = [];
 
 interface ArticleTabContentProps {
     data: ArticleData;
@@ -125,7 +143,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
-    const [versionDate, setVersionDate] = useState('');
     const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
     const [isHighlightsPeekOpen, setIsHighlightsPeekOpen] = useState(false);
     const [highlightsButtonEl, setHighlightsButtonEl] = useState<HTMLButtonElement | null>(null);
@@ -155,8 +172,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         startOffset: number;
         rect: { x: number; y: number; width: number; height: number };
     } | null>(null);
-    const versionDateInputRef = useRef<HTMLInputElement>(null);
-
     // Citation preview hook - destructure to get stable function references
     const citationPreviewState = useCitationPreview();
     const { showPreview, hidePreview } = citationPreviewState;
@@ -176,6 +191,25 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     );
 
     const uniqueArticleId = useMemo(() => uniqueArticleIdFromNorma(norma_data), [norma_data]);
+
+    // What the source says about the text that came back, and what that switches
+    // off. A past text is a reading: notes, highlights and discussions are keyed
+    // by article, not by version, so they would attach to the wrong words, and
+    // Brocardi's commentary carries no date.
+    const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
+    const readOnly = display.readOnly;
+    const requestedDate = norma_data.data_versione?.trim() || undefined;
+    // "art. 1284 c.c., nel testo in vigore …" for a past text; null for the text in force.
+    const citationNow = () => (display.canCite
+        ? formatNormCitation({
+            norma: norma_data,
+            validity: data.validity,
+            requestedDate,
+            original: !requestedDate && requestIsHistorical(norma_data),
+            consultedAt: todayInRome(),
+        })
+        : null);
+
     const discussionAnchor = useMemo(() => ({
         normaKey: itemKey,
         articleId: uniqueArticleId,
@@ -188,7 +222,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         isLoading: passageThreadsLoading,
         error: passageThreadsError,
         reload: reloadPassageThreads,
-    } = useArticlePassageThreads(discussionAnchor.normaKey, discussionAnchor.articleId, Boolean(article_text));
+    } = useArticlePassageThreads(discussionAnchor.normaKey, discussionAnchor.articleId, Boolean(article_text) && !readOnly);
     const plainArticle = useMemo(() => plainText(article_text || ''), [article_text]);
     const passageLocations = useMemo(
         () => new Map(passageThreads.map((t) => [t.id, locatePassage(plainArticle, t.passage)])),
@@ -273,6 +307,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // stored text with the old one — a false alert on the way in and another
     // on the way back to vigente.
     const isCurrentText = !versionInfo?.isHistorical
+        && !readOnly
         && (norma_data.versione ?? 'vigente') === 'vigente'
         && !norma_data.data_versione;
     const latestSnapshotRef = useRef({ norma_data, article_text });
@@ -343,6 +378,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const isPinnedQuick = isQuickNorm(quickNormParams);
 
     const handleToggleQuickNorm = () => {
+        if (readOnly) return;
         if (isPinnedQuick) {
             removeQuickNormByParams(quickNormParams);
             publishMerltEvent({
@@ -364,6 +400,10 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleAdvancedCopy = async (options: CopyOptions) => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
         try {
             let textToCopy = '';
 
@@ -373,15 +413,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             }
 
             if (options.includeCitation) {
-                const citation = `\n\n---\nTratto da: ${formatCitation(norma_data)}`;
-                textToCopy += citation;
+                // A past text starts with its citation; the text in force keeps its trailer.
+                textToCopy = withCitation(textToCopy, citationNow(), `\n\n---\nTratto da: ${formatCitation(norma_data)}`);
             }
 
-            if (options.includeNotes && allPanelAnnotations.length > 0) {
+            if (options.includeNotes && !readOnly && allPanelAnnotations.length > 0) {
                 textToCopy += `\n\nNote personali:\n${allPanelAnnotations.map((n, i) => `${i + 1}. ${n.text}`).join('\n')}`;
             }
 
-            if (options.includeHighlights && allPanelHighlights.length > 0) {
+            if (options.includeHighlights && !readOnly && allPanelHighlights.length > 0) {
                 textToCopy += `\n\nEvidenziazioni:\n${allPanelHighlights.map((h, i) => `${i + 1}. "${h.text}"`).join('\n')}`;
             }
 
@@ -393,10 +433,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleMobileCopy = async () => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
         try {
             const plainText = (article_text || '').replace(/<[^>]+>/g, '').replace(/\n/g, ' ');
-            const citation = `\n\n---\n${formatCitation(norma_data)}`;
-            await navigator.clipboard.writeText(plainText + citation);
+            await navigator.clipboard.writeText(withCitation(plainText, citationNow(), `\n\n---\n${formatCitation(norma_data)}`));
             showToast('Testo copiato', 'success');
         } catch {
             showToast('Errore durante la copia', 'error');
@@ -489,7 +532,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 annex: norma_data.allegato,
                 version: (norma_data.versione as 'vigente' | 'originale') || 'vigente',
                 version_date: norma_data.data_versione || '',
-                show_brocardi_info: true
+                show_brocardi_info: !requestIsHistorical(norma_data)
             };
             const shareUrl = buildSearchDeepLink(params, uniqueArticleId);
             await navigator.clipboard.writeText(shareUrl);
@@ -501,6 +544,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // Handler for SelectionPopup highlight action
     const handlePopupHighlight = (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
+        if (readOnly) return;
         const alreadyHighlighted = articleHighlights.some(h =>
             h.text.toLowerCase() === text.toLowerCase() && h.startOffset === startOffset
         );
@@ -526,6 +570,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // Shows a tooltip-style composer anchored on the selection itself; the
     // full Peek panel stays reserved for the toolbar button (list + free compose).
     const handlePopupAddNote = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
+        if (readOnly) return;
         publishMerltEvent({
             interaction_type: MERLT_EVENT_TYPES.textSelected,
             article_urn: norma_data.urn,
@@ -557,11 +602,15 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         setComposerRect(null);
     };
 
-    // Handler for SelectionPopup copy action
+    // Handler for SelectionPopup copy action. The popup stays on a text that may
+    // not be copied (a reading), so the table is asked here, and the click says why.
     const handlePopupCopy = async (text: string) => {
+        if (!display.canCopyOrSave) {
+            showToast(display.copyBlockedReason ?? '', 'info');
+            return;
+        }
         try {
-            const citation = `\n\n---\nTratto da: ${formatCitation(norma_data)}`;
-            await navigator.clipboard.writeText(text + citation);
+            await navigator.clipboard.writeText(withCitation(text, citationNow(), `\n\n---\nTratto da: ${formatCitation(norma_data)}`));
             showToast('Testo copiato con citazione', 'success');
         } catch {
             showToast('Errore durante la copia', 'error');
@@ -569,6 +618,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handlePopupDiscuss = (text: string, startOffset: number) => {
+        if (readOnly) return;
         const passage = buildPassage(plainArticle, startOffset, text);
         if (!passage) {
             showToast('Non è possibile aprire una discussione su questa selezione', 'error');
@@ -682,7 +732,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleCompare = () => {
-        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
         openCompareWithArticle({
             article: data,
             sourceNorma: {
@@ -700,32 +750,72 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         }
     };
 
+    const handleTextAtDate = (choice: TextAtDateChoice) => {
+        setShowVersionInput(false);
+        showToast(
+            choice.kind === 'original' ? 'Ricerca del testo originale' : `Ricerca del testo al ${formatDateForDisplay(choice.date)}`,
+            'info',
+        );
+        triggerSearch(buildTextAtDateParams(norma_data, choice));
+    };
+
+    const handleBannerAction = async (action: BannerAction) => {
+        switch (action) {
+            case 'go_current':
+                triggerSearch(quickNormParams);
+                break;
+            case 'pick_date':
+                setShowVersionInput(true);
+                break;
+            case 'open_next_day':
+                if (display.banner?.nextDay) {
+                    triggerSearch(buildTextAtDateParams(norma_data, { kind: 'date', date: display.banner.nextDay }));
+                }
+                break;
+            case 'copy_citation': {
+                const citation = citationNow();
+                if (!citation) return;
+                try {
+                    await navigator.clipboard.writeText(citation.long);
+                    showToast('Citazione copiata', 'success');
+                } catch {
+                    showToast('Errore durante la copia', 'error');
+                }
+                break;
+            }
+        }
+    };
+
     // The structure (heading, rubric, commi, items, Normattiva's modifications
     // and update notes) is read once per text; the shared useArticleMarkers
     // hook renders it with the highlights and note anchors (the dossier reader
     // and Study Mode use the same pair). Citation wrapping is article-specific
     // and happens after.
     const structure = useMemo(() => parseArticleStructure(article_text || ''), [article_text]);
+    // A past text carries none of the reader's marks (see `display`).
+    const shownHighlights = readOnly ? NO_HIGHLIGHTS : articleHighlights;
+    const shownAnnotations = readOnly ? NO_ANNOTATIONS : itemAnnotations;
+    const shownThreads = readOnly ? NO_THREADS : locatedThreads;
     const markedHtml = useArticleMarkers({
         rawText: article_text || '',
-        highlights: articleHighlights,
-        annotations: itemAnnotations,
+        highlights: shownHighlights,
+        annotations: shownAnnotations,
         structure,
-        signs: true,
-        threads: locatedThreads,
-        focusedThreadId,
+        signs: !readOnly,
+        threads: shownThreads,
+        focusedThreadId: readOnly ? null : focusedThreadId,
     });
     // What each block's sign counts, for the popover it opens (the renderer
     // derives the signs from the same inputs, through the same module).
     const blockGroups = useMemo(
-        () => groupAnnotationsByBlock(article_text || '', structure, articleHighlights, itemAnnotations, locatedThreads),
-        [article_text, structure, articleHighlights, itemAnnotations, locatedThreads],
+        () => groupAnnotationsByBlock(article_text || '', structure, shownHighlights, shownAnnotations, shownThreads),
+        [article_text, structure, shownHighlights, shownAnnotations, shownThreads],
     );
     // Highlights no sign can reach — the Brocardi sections', and those whose
     // text changed — keep a list of their own, so they can still be removed.
     const looseHighlights = useMemo(
-        () => highlightsWithoutSign(allPanelHighlights, blockGroups),
-        [allPanelHighlights, blockGroups],
+        () => (readOnly ? NO_HIGHLIGHTS : highlightsWithoutSign(allPanelHighlights, blockGroups)),
+        [readOnly, allPanelHighlights, blockGroups],
     );
 
     const processedContent = useMemo(() => wrapCitationsInHtml(markedHtml, norma_data), [markedHtml, norma_data]);
@@ -734,6 +824,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // fold; an annotation sign opens its block's notes and highlights.
     const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(contentRef, itemKey, {
         contentKey: processedContent,
+        updatesOpenByDefault: display.updateNotesOpen,
     });
     const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
@@ -866,15 +957,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         <div className="animate-in fade-in duration-300 relative">
             <ReadingToolbar
                 normaData={norma_data}
-                versionInfo={versionInfo}
+                versionChip={display.chip}
+                lockedReason={readOnly ? READ_ONLY_REASON : undefined}
+                copyLockedReason={display.copyBlockedReason}
                 url={url}
                 articleText={article_text || ''}
                 isNotesPeekOpen={isPeekOpen}
                 notesButtonRef={setNotesButtonEl}
-                notesCount={allPanelAnnotations.length}
+                notesCount={readOnly ? 0 : allPanelAnnotations.length}
                 isHighlightsPeekOpen={isHighlightsPeekOpen}
                 highlightsButtonRef={setHighlightsButtonEl}
-                highlightsCount={allPanelHighlights.length}
+                highlightsCount={readOnly ? 0 : allPanelHighlights.length}
                 isDiscussionOpen={discussionOpen}
                 showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
@@ -905,7 +998,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 onUpdateNote={updateAnnotation}
                 onRemoveNote={removeAnnotation}
                 onClearAnchor={() => setNoteAnchor(null)}
-                onOpenStudyMode={onOpenStudyMode}
+                onOpenStudyMode={readOnly ? undefined : onOpenStudyMode}
                 onExportTxt={handleExportNotesTxt}
             />
 
@@ -947,17 +1040,28 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            <ArticleBody
-                contentRef={contentRef}
-                itemKey={itemKey}
-                processedContent={processedContent}
-                onPopupHighlight={handlePopupHighlight}
-                onPopupAddNote={handlePopupAddNote}
-                onPopupCopy={handlePopupCopy}
-                onPopupDiscuss={handlePopupDiscuss}
-                onPopupReportCitation={canContribute ? handlePopupReportCitation : undefined}
-                updatesOpen={updatesOpen}
-            />
+            {display.banner && (
+                <VersionBanner
+                    banner={display.banner}
+                    onAction={handleBannerAction}
+                    variant={display.textVisible ? 'banner' : 'state'}
+                />
+            )}
+
+            {display.textVisible && (
+                <ArticleBody
+                    contentRef={contentRef}
+                    itemKey={itemKey}
+                    processedContent={processedContent}
+                    onPopupHighlight={handlePopupHighlight}
+                    onPopupAddNote={handlePopupAddNote}
+                    onPopupCopy={handlePopupCopy}
+                    onPopupDiscuss={readOnly ? undefined : handlePopupDiscuss}
+                    onPopupReportCitation={canContribute && !readOnly ? handlePopupReportCitation : undefined}
+                    updatesOpen={updatesOpen}
+                    copyOnly={readOnly}
+                />
+            )}
 
             {!discussionOpen && passageThreadsError && (
                 <div role="alert" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
@@ -1042,22 +1146,27 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 }}
             />
 
-            <AskMerltEntry
-                merltEnabled={merltEnabled}
-                qaAskable={qaAskable}
-                consentNone={consentLevel === 'none'}
-                articleUrn={norma_data.urn}
-                articleNumber={norma_data.numero_articolo}
-                actType={norma_data.tipo_atto}
-                actNumber={norma_data.numero_atto}
-                annex={norma_data.allegato}
-            />
+            {/* It asks about the article by its URN: on a past text the answer would describe the current one. */}
+            {!readOnly && (
+                <AskMerltEntry
+                    merltEnabled={merltEnabled}
+                    qaAskable={qaAskable}
+                    consentNone={consentLevel === 'none'}
+                    articleUrn={norma_data.urn}
+                    articleNumber={norma_data.numero_articolo}
+                    actType={norma_data.tipo_atto}
+                    actNumber={norma_data.numero_atto}
+                    annex={norma_data.allegato}
+                />
+            )}
 
             <PluginSlot
                 slot="article_content_after"
                 props={{
                     articleUrn: data.norma_data.urn,
                     containerRef: contentRef,
+                    validity: data.validity,
+                    isHistorical: readOnly,
                 }}
             />
 
@@ -1066,7 +1175,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 props={{ articleUrn: data.norma_data.urn }}
             />
 
-            {brocardi_info !== undefined && (
+            {brocardi_info !== undefined && display.doctrineVisible && (
                 <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
                     <BrocardiDisplay
                         info={brocardi_info}
@@ -1135,80 +1244,26 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 isOpen={showCopyModal}
                 onClose={() => setShowCopyModal(false)}
                 onCopy={handleAdvancedCopy}
-                hasNotes={allPanelAnnotations.length > 0}
-                hasHighlights={allPanelHighlights.length > 0}
+                hasNotes={!readOnly && allPanelAnnotations.length > 0}
+                hasHighlights={!readOnly && allPanelHighlights.length > 0}
             />
 
             <AdvancedExportModal
                 isOpen={showAdvancedExport}
                 onClose={() => setShowAdvancedExport(false)}
                 articleData={data}
-                annotations={allPanelAnnotations}
-                highlights={allPanelHighlights}
+                annotations={readOnly ? NO_ANNOTATIONS : allPanelAnnotations}
+                highlights={readOnly ? NO_HIGHLIGHTS : allPanelHighlights}
             />
 
-            <Modal
+            <TextAtDateDialog
                 isOpen={showVersionInput}
-                onClose={() => {
-                    setShowVersionInput(false);
-                    setVersionDate('');
-                }}
-                title="Cerca Versione Storica"
-                description="Inserisci una data per visualizzare la versione dell'articolo vigente in quel momento."
-                size="sm"
-                variant="info"
-                icon={<Clock size={20} />}
-                initialFocusRef={versionDateInputRef}
-                footer={
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                setShowVersionInput(false);
-                                setVersionDate('');
-                            }}
-                        >
-                            Annulla
-                        </Button>
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            disabled={!versionDate}
-                            onClick={() => {
-                                if (!versionDate) {
-                                    showToast('Seleziona una data', 'error');
-                                    return;
-                                }
-                                const searchParams: SearchParams = {
-                                    act_type: norma_data.tipo_atto,
-                                    act_number: norma_data.numero_atto || '',
-                                    date: norma_data.data || '',
-                                    article: norma_data.numero_articolo,
-                                    version: 'vigente',
-                                    version_date: versionDate,
-                                    show_brocardi_info: true,
-                                };
-                                showToast(`Ricerca versione del ${versionDate}`, 'info');
-                                setShowVersionInput(false);
-                                setVersionDate('');
-                                triggerSearch(searchParams);
-                            }}
-                        >
-                            <Clock size={16} />
-                            Cerca versione
-                        </Button>
-                    </>
-                }
-            >
-                <input
-                    ref={versionDateInputRef}
-                    type="date"
-                    value={versionDate}
-                    onChange={(e) => setVersionDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
-                />
-            </Modal>
+                onClose={() => setShowVersionInput(false)}
+                onConfirm={handleTextAtDate}
+                euAct={isEuropeanAct(norma_data.tipo_atto)}
+                today={todayInRome()}
+                initialDate={requestedDate}
+            />
 
             {/* Citation Preview Popup */}
             <CitationPreviewPopup

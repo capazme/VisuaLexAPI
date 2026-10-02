@@ -16,6 +16,8 @@ export interface ArticleBodyProps {
     onPopupReportCitation?: (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
     /** Unfolds the AGGIORNAMENTO notes at the bottom of the text (useArticleTextInteractions). */
     updatesOpen?: boolean;
+    /** A past text: the selection popup offers only "Copia" (see SelectionPopup). */
+    copyOnly?: boolean;
 }
 
 export function ArticleBody({
@@ -28,6 +30,7 @@ export function ArticleBody({
     onPopupDiscuss,
     onPopupReportCitation,
     updatesOpen = false,
+    copyOnly = false,
 }: ArticleBodyProps) {
     // The text alone, without the selection popup: stored offsets are measured
     // from here (see SelectionPopup's textRootRef).
@@ -43,6 +46,7 @@ export function ArticleBody({
                 onCopy={onPopupCopy}
                 onDiscuss={onPopupDiscuss}
                 onReportCitation={onPopupReportCitation}
+                copyOnly={copyOnly}
             />
             {/* A size container: with room beside the 68ch column, each
                 block's annotation sign moves to the right margin (index.css). */}

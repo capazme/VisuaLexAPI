@@ -1,9 +1,10 @@
 # The text as at a date — Design
 
 **Date:** 2026-10-01
-**Status:** APPROVED by the owner on 1 October 2026, with the questions of §10 answered; nothing
-here is built yet. The citation style is the owner's (§5.2); the wording of the Massimario row
-(§9, P4) was decided by the owner on 1 October.
+**Status:** APPROVED by the owner on 1 October 2026, with the questions of §10 answered; built on
+1–2 October 2026 in three pull requests (the server states the window, the reader shows it, the
+dossier keeps it), as the plan describes. The citation style is the owner's (§5.2); the wording of
+the Massimario row (§9, P4) was decided by the owner on 1 October.
 **Plan:** `docs/superpowers/plans/2026-10-01-testo-alla-data.md`.
 **Branch:** `docs/testo-alla-data`
 **Round:** the reading surface, after rounds A–C (`2026-09-25-lettura-testo-design.md`,
@@ -107,8 +108,14 @@ kept outside the repository and none is committed; §7 recaptures trimmed fixtur
 - **Latency.** Normattiva alone answered in 0.18–2.26 s (median 0.66 s), pages from 90 KB to
   1.65 MB. The 15–25 s a reader waited for a historical text in the development stack (an audit run
   on 2026-09-30, not kept in the repository) is therefore not Normattiva's; the stream handler
-  also waits for Brocardi (§1.3). Not yet measured per
-  component; the plan measures it.
+  also waits for Brocardi (§1.3). Measured on 2 October 2026 with the app's own handlers
+  against the real portals, five cold requests each, median: the text in force with Brocardi
+  2.5 s; without it 2.6 s; a past text, Brocardi asked for and not fetched, 2.5 s (four cold
+  reads of 2.4–3.0 s and one answered from the cache in 0.2 s). Brocardi, fetched alongside the
+  text, did not lengthen the read in this sample, so leaving it out of a past text is a
+  correctness guard (doctrine is current and carries no date), not a speed-up, and the 15–25 s
+  of the audit run are not reproduced; the guard is checked by counting the fetches (five in
+  force, none for a past text).
 - **Which act produced a version.** The update table is reachable (needs a Normattiva session;
   0.1–0.6 s) and returns the article's *whole* list of amendments (24 rows for art. 1284,
   identical for versions 7 and 8). Attributing version N to row N−1 held 4 times out of 5
@@ -202,8 +209,9 @@ page, no `validity`: the field is simply absent. No network, no change to the ex
    punctuation, and nothing remains. A partial notice ("COMMA ABROGATO…") leaves text behind
    and is *not* this state. `valid_from` is the day the abrogation takes effect; `valid_to` may
    be set if the article came back later.
-3. `current` — an open-ended window (`al` absent).
-4. `historical` — a closed window.
+3. `current` — an open-ended window (`al` absent), or one that ends today or later (today in
+   Rome): on the last day of its window the text is still the one in force.
+4. `historical` — a window that ended before today (in Rome).
 
 *Read cheaply.* The window, the version link and the act line come from targeted regexes over
 the raw string (the page is up to 2.6 MB; the scraper already parses it once and it should not
@@ -312,9 +320,11 @@ text, because for delegated values (art. 1284's rate) the rule is in the notes. 
 - `dossierContainsArticle` compares `versione` (default `vigente`) and `data_versione` (default
   empty) as well, so a legacy item without them is a current-text item.
 - `searchParamsFromNorma` sets `show_brocardi_info: false` for a historical item.
-- A dossier row and the dossier reader show "Testo al {dd/mm/yyyy}" for a historical item. Two
-  typed dates inside one window are two items with the same text: harmless, and the dossier does
-  not try to merge them.
+- A dossier row shows "Testo al {dd/mm/yyyy}" for a historical item. The dossier reader says it
+  with the same banner as the tab (the window the source states) and shows the "Testo al …" line
+  only when the source could not be read and the banner has nothing to say. Two typed dates inside
+  one window are two items with the same text: harmless, and the dossier does not try to merge
+  them.
 - Items already saved from a historical tab through the window button lost their version and
   cannot be repaired (§8).
 
@@ -363,7 +373,9 @@ could not test on a real counter-example (§2, last bullet).
 | Disabled | Non disponibile su un testo storico |
 
 Dates in the interface are written `25-12-2003` (as Normattiva writes them, but padded) or, in
-sentences and citations, `25 dicembre 2003`.
+sentences and citations, `25 dicembre 2003`, with `1° ottobre 2026` for the first of a month and
+the elision Italian asks for before an 8 or an 11 (`dall'11 giugno 1970`, `all'8 settembre 2014`,
+`consultato l'8 ottobre 2026`); the `{d}` of the table above is written that way.
 
 ### 5.4 Cost, quota and cache
 
@@ -442,10 +454,23 @@ Recorded, not done here:
 - Items already saved from a historical tab through the window button lost their version.
 - The Italian extended date form is not calendar-checked (`31 febbraio 2019` passes the parser).
 - When the text comes from the AKN fallback (accents transliterated), nothing marks it
-  (`normattiva_scraper.py:57-67`); the plan checks whether it is distinguishable.
+  (`normattiva_scraper.py:57-67`). Checked while planning: `get_document` returns the same
+  `(text, urn)` pair whichever path produced the text, so it is not distinguishable without a
+  change to the scraper, which the other developer approves.
 - Reusing a known window for a second date (§5.4).
 - An act without history has not been met (§2).
 - A request for an article absent from a decree's own body answers 200 with the decree's page.
+- Inside a tab opened by "Testo alla data" the annex index and the arrows
+  (`useAnnexNavigation`) load the text in force, not the version of the tab, so the tab's label
+  ("… — testo al 29/12/2007") can sit over a different text (the article's own chip stays true
+  when `validity` is present). Carried over to v2, with the reader extracted from the window.
+- Decisions taken in review, beyond what this document says: a version that does not contain the
+  asked day is not copied, exported or saved; the export of a past text is off until its header
+  carries the citation; a repealed article is cited "abrogato dal …"; an act of the Union is
+  never cited as a text at a date; a historical version reached with no day is cited by its window;
+  a window that ends today or later is `current` (§5.1: the first rule called every closed window
+  `historical`, which labelled the text in force as past on the last day of its window).
+- The graph side rail (`article_sidebar`) still describes the current article on a past text.
 
 ## 9. The Massimario panel on the article page
 

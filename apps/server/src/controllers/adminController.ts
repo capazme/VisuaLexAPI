@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { hashPassword } from '../utils/password';
 import { AppError } from '../middleware/errorHandler';
+import { deleteUserAccount } from '../lingo/deleteUserAccount';
 
 // Validation schemas
 const createUserSchema = z.object({
@@ -262,10 +263,8 @@ export const deleteUser = async (req: Request, res: Response) => {
     throw new AppError(404, 'User not found');
   }
 
-  // Delete user (cascades to related data)
-  await prisma.user.delete({
-    where: { id },
-  });
+  // Delete user (cascades to related data; the community's study cards stay, anonymous)
+  await deleteUserAccount(id);
 
   res.status(204).send();
 };

@@ -1,7 +1,8 @@
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import type { Dossier, DossierItem, NormaVisitata, SearchParams } from '../../../types';
+import { historicalItemLabel, requestIsHistorical, versionKey, versionTabSuffix } from '../../../utils/versionDisplay';
+import type { ArticleData, Dossier, DossierItem, Norma, NormaVisitata, SearchParams } from '../../../types';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
 // items (server payloads and `AddItemsDialog` still reference the full type).
@@ -19,7 +20,9 @@ export function formatTimestampLong(ts: string | number | undefined | null): str
   return formatDateItalianLong(d.toISOString().slice(0, 10));
 }
 
-// One group = one norm (tipo + numero + data) and all its articles in the dossier.
+// One group = one norm (tipo + numero + data) in one version and one annex, and all its
+// articles in the dossier. Two versions of one article are two groups, never "1284,1284";
+// nor are art. 1 of annex A and art. 1 of the body of the same decree one request "1,1".
 // Used both by the detail view ("Apri tutti su Dashboard") and the list view
 // ("apri rapido dalla card"). `triggerSearch` in the store overwrites any
 // previous search, so the consuming UI must pick a single group to open at
@@ -30,6 +33,11 @@ export interface NormaGroup {
   numero_atto: string;
   data: string;
   articles: string[];
+  // The stored version of the group's articles ('' when absent): what a search for the group must ask.
+  versione: string;
+  data_versione: string;
+  // The stored annex of the group's articles ('' when absent): what a search for the group must ask.
+  allegato: string;
 }
 
 export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
@@ -37,7 +45,7 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   items
     .filter((i) => i.type === 'norma')
     .forEach((item) => {
-      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}`;
+      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}|${versionKey(item.data)}|${item.data.allegato || ''}`;
       const existing = groups.get(key);
       if (existing) {
         existing.articles.push(item.data.numero_articolo);
@@ -48,10 +56,68 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
           numero_atto: item.data.numero_atto || '',
           data: item.data.data || '',
           articles: [item.data.numero_articolo],
+          versione: item.data.versione || '',
+          data_versione: item.data.data_versione || '',
+          allegato: item.data.allegato || '',
         });
       }
     });
   return Array.from(groups.values());
+}
+
+// The search that opens a group on the dashboard: the version the group holds,
+// and Brocardi only for the text in force (its commentary carries no date).
+export function searchParamsFromGroup(group: NormaGroup): SearchParams {
+  return {
+    act_type: group.tipo_atto,
+    act_number: group.numero_atto,
+    date: group.data,
+    article: group.articles.join(','),
+    version: (group.versione as SearchParams['version']) || 'vigente',
+    version_date: group.data_versione || '',
+    show_brocardi_info: !requestIsHistorical({ versione: group.versione, data_versione: group.data_versione }),
+    ...(group.allegato ? { annex: group.allegato } : {}),
+  };
+}
+
+// The tab a group opens in: the dossier's own for the texts in force, and for a
+// group asking for a past text a tab of its own, named as the tabs of the "Testo
+// alla data" dialog are. A past text must not sit among the texts in force.
+export function tabLabelForGroup(dossierTitle: string, group: NormaGroup): string {
+  return requestIsHistorical(group)
+    ? `${dossierTitle}${versionTabSuffix({ version: group.versione, versionDate: group.data_versione })}`
+    : dossierTitle;
+}
+
+// One search per group, each routed to the tab it belongs to (`createTab` makes a
+// tab and returns its id). The texts in force share the dossier's tab, created
+// only when there is one to put in it; every past group gets a tab of its own.
+export function searchesForGroups(
+  dossierTitle: string,
+  groups: NormaGroup[],
+  createTab: (label: string) => string,
+): SearchParams[] {
+  let sharedTabId: string | undefined;
+  return groups.map((group) => {
+    const tabLabel = tabLabelForGroup(dossierTitle, group);
+    let targetTabId: string;
+    if (requestIsHistorical(group)) {
+      targetTabId = createTab(tabLabel);
+    } else {
+      sharedTabId ??= createTab(tabLabel);
+      targetTabId = sharedTabId;
+    }
+    return { ...searchParamsFromGroup(group), tabLabel, targetTabId };
+  });
+}
+
+// The heading of an item in the dossier's PDF: a past text says so, or the page
+// would pass it off as the text in force.
+export function dossierItemPdfTitle(item: DossierItem, index: number): string {
+  if (item.type !== 'norma') return `${index + 1}. Nota personale`;
+  const label = historicalItemLabel(item.data);
+  return `${index + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
+    + (label ? ` · ${label}` : '');
 }
 
 // Map a stored NormaVisitata back to the SearchParams shape triggerSearch()
@@ -65,8 +131,28 @@ export function searchParamsFromNorma(norma: NormaVisitata): SearchParams {
     article: norma.numero_articolo?.toString() || '',
     version: (norma.versione as SearchParams['version']) || 'vigente',
     version_date: norma.data_versione || '',
-    show_brocardi_info: true,
+    // Brocardi's commentary carries no date: a past text is read without it.
+    show_brocardi_info: !requestIsHistorical(norma),
     ...(norma.allegato ? { annex: norma.allegato } : {}),
+  };
+}
+
+// What the window header's "Aggiungi a dossier" stores for one article of a tab.
+// It rebuilds the item from the block's norma and the article, and used to drop
+// the version: a historical text was saved under the same label as the current
+// one and reopened as the text in force.
+export function normaForDossier(norma: Norma, article: ArticleData): NormaVisitata {
+  const { versione, data_versione } = article.norma_data;
+  return {
+    tipo_atto: norma.tipo_atto,
+    numero_atto: norma.numero_atto,
+    data: norma.data,
+    numero_articolo: article.norma_data.numero_articolo,
+    urn: norma.urn,
+    // The annex is part of the item's key and id: without it the item is not the article the tab shows.
+    ...(article.norma_data.allegato ? { allegato: article.norma_data.allegato } : {}),
+    ...(versione ? { versione } : {}),
+    ...(data_versione ? { data_versione } : {}),
   };
 }
 
@@ -107,11 +193,19 @@ export function dossierRecency(d: Dossier): number {
   return times.length ? Math.max(...times) : 0;
 }
 
+// The text two items hold is the same text only when the version agrees too.
+// An item saved before versions were kept has no version fields and is the text
+// in force, as is one that says "vigente" with no date.
+function sameVersion(a: NormaVisitata, b: NormaVisitata): boolean {
+  return versionKey(a) === versionKey(b);
+}
+
 // Whether a dossier already holds the given article, matching on act
-// (tipo_atto + numero_atto + data) and normalized article id so "1-bis" /
-// "1 bis" formatting differences between the tree API and the scraper don't
-// produce false negatives (see findArticleByNormalizedId in articleIds.ts
-// for the same tolerance applied to article lookups).
+// (tipo_atto + numero_atto + data), normalized article id and version, so
+// "1-bis" / "1 bis" formatting differences between the tree API and the
+// scraper don't produce false negatives (see findArticleByNormalizedId in
+// articleIds.ts for the same tolerance applied to article lookups) and two
+// versions of one article can sit side by side.
 export function dossierContainsArticle(dossier: Dossier, norma: NormaVisitata): boolean {
   const target = normalizeArticleId(uniqueArticleIdFromNorma(norma));
   return dossier.items.some((i) => {
@@ -120,6 +214,7 @@ export function dossierContainsArticle(dossier: Dossier, norma: NormaVisitata): 
     return d.tipo_atto === norma.tipo_atto
       && (d.numero_atto || '') === (norma.numero_atto || '')
       && (d.data || '') === (norma.data || '')
-      && normalizeArticleId(uniqueArticleIdFromNorma(d)) === target;
+      && normalizeArticleId(uniqueArticleIdFromNorma(d)) === target
+      && sameVersion(d, norma);
   });
 }

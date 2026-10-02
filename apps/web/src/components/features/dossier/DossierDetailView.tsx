@@ -42,7 +42,9 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import { SortableDossierItem } from './SortableDossierItem';
-import { formatTimestampLong, computeNormaGroups, searchParamsFromNorma, type NormaGroup } from './dossierUtils';
+import {
+  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchParamsFromGroup, searchesForGroups, tabLabelForGroup, dossierItemPdfTitle, type NormaGroup,
+} from './dossierUtils';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
@@ -221,38 +223,22 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   // into pre-existing custom tabs with the same label (e.g. orphans from past
   // sessions, workspaceTabs is persisted in localStorage).
   const openGroupOnDashboard = (group: NormaGroup) => {
-    const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
+    const tabLabel = tabLabelForGroup(dossier.title, group);
+    const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
     navigate('/');
-    triggerSearch({
-      act_type: group.tipo_atto,
-      act_number: group.numero_atto,
-      date: group.data,
-      article: group.articles.join(','),
-      version: 'vigente',
-      version_date: '',
-      show_brocardi_info: true,
-      tabLabel: dossier.title,
-      targetTabId: tabId,
-    });
+    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
   };
 
-  // Queue one search per norma-group. We pre-create an empty custom tab and
-  // pass its id as `targetTabId` in every params — this avoids any label-match
-  // timing races inside SearchPanel (each search knows exactly where to write).
+  // Queue one search per norma-group. The tabs are created up front (the texts
+  // in force share the dossier's, each past group has its own) and their ids
+  // passed as `targetTabId` — this avoids any label-match timing races inside
+  // SearchPanel (each search knows exactly where to write).
   const openAllGroupsOnDashboard = () => {
     if (normaGroups.length === 0) return;
-    const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
-    const paramsList = normaGroups.map((g) => ({
-      act_type: g.tipo_atto,
-      act_number: g.numero_atto,
-      date: g.data,
-      article: g.articles.join(','),
-      version: 'vigente' as const,
-      version_date: '',
-      show_brocardi_info: true,
-      tabLabel: dossier.title,
-      targetTabId: tabId,
-    }));
+    const paramsList = searchesForGroups(
+      dossier.title, normaGroups,
+      (label) => addWorkspaceTab(label, undefined, undefined, { isCustom: true }),
+    );
     navigate('/');
     triggerMultiSearch(paramsList);
   };
@@ -374,9 +360,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     y += 22;
 
     dossier.items.forEach((item, idx) => {
-      const title = item.type === 'norma'
-        ? `${idx + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
-        : `${idx + 1}. Nota personale`;
+      const title = dossierItemPdfTitle(item, idx);
       ensureSpace(32);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');

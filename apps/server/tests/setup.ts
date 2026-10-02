@@ -59,6 +59,9 @@ beforeEach(async () => {
       "folders",
       "search_history",
       "feedbacks",
+      "lingo_tracce",
+      "lingo_card_ancore",
+      "lingo_cards",
       "users"
     RESTART IDENTITY CASCADE;
   `);
