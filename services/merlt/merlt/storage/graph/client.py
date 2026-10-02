@@ -380,7 +380,7 @@ class FalkorDBClient:
 
         try:
             urn = canonical_urn(article_urn)
-            results = await self.query(cypher, {"urn": urn})
+            results = await self.ro_query(cypher, {"urn": urn})
 
             if not results or not results[0].get("related_nodes"):
                 log.debug(f"No related nodes for {urn}")

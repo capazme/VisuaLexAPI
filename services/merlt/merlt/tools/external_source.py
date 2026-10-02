@@ -29,15 +29,50 @@ log = structlog.get_logger()
 
 _NORMATTIVA_PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
 _ARTICLE = re.compile(
-    r"art(?:\.|icolo)?\s*(\d+(?:\s?-?(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)"
+    r"\bart(?:\.|icolo)?\s*(\d+(?:\s*-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)"
 )
-# Longer abbreviations first: "c.p." is inside "c.p.c." and "c.p.p.".
-_CODES = (
-    ("c.p.c.", "codice di procedura civile"), ("codice di procedura civile", "codice di procedura civile"),
-    ("c.p.p.", "codice di procedura penale"), ("codice di procedura penale", "codice di procedura penale"),
-    ("c.c.", "codice civile"), ("codice civile", "codice civile"),
-    ("c.p.", "codice penale"), ("codice penale", "codice penale"),
-)
+
+
+def _abbreviation(*letters: str) -> str:
+    """"c.p.c." however it is written: every dot and space optional, and not the tail of a
+    word or of a longer abbreviation ("c.p." in "c.p.c."; "c.p. c" in "c.p. c.c.")."""
+    return r"(?<![a-z.])" + r"\.?\s?".join(letters) + r"(?![a-z])(?!\.[a-z])"
+
+
+# Longer abbreviations first: at one position "c.p.c." must be tried before "c.p.".
+_CODES = re.compile("|".join((
+    rf"(?P<cpc>{_abbreviation('c', 'p', 'c')}|codice\s+di\s+procedura\s+civile)",
+    rf"(?P<cpp>{_abbreviation('c', 'p', 'p')}|codice\s+di\s+procedura\s+penale)",
+    rf"(?P<cc>{_abbreviation('c', 'c')}|codice\s+civile)",
+    rf"(?P<cp>{_abbreviation('c', 'p')}|codice\s+penale)",
+    r"(?P<cost>(?<![a-z])cost\b\.?|costituzione)",
+)))
+_ACTS = {
+    "cpc": "codice di procedura civile",
+    "cpp": "codice di procedura penale",
+    "cc": "codice civile",
+    "cp": "codice penale",
+    "cost": "costituzione",
+}
+# "art. 52 disp. att. c.c." cites the implementing provisions, not the code.
+_IMPLEMENTING = re.compile(r"\bdisp(?:\.|osizioni)?\s*(?:att|trans)")
+
+
+def _cited_article(text: str) -> Optional[Dict[str, str]]:
+    """The act and the article a citation names, or None. The code is the first one that
+    follows the article ("art. 1453 c.c. e c.p.c." is the civil code's)."""
+    lower = text.lower()
+    article = _ARTICLE.search(lower)
+    if not article:
+        return None
+    code = _CODES.search(lower, article.end())
+    if not code or _IMPLEMENTING.search(lower, article.end(), code.start()):
+        return None
+    return {
+        "tipo_atto": _ACTS[code.lastgroup],
+        # "2-bis", "2 bis" and "2 - bis" are all "2bis", the form the lazy path writes
+        "articolo": re.sub(r"[\s-]", "", article.group(1)),
+    }
 
 
 class ExternalSourceTool(BaseTool):
@@ -362,15 +397,11 @@ class ExternalSourceTool(BaseTool):
             return canonical_urn(_NORMATTIVA_PREFIX + text)
         if text.startswith(_NORMATTIVA_PREFIX):
             return canonical_urn(text)
-        lower = text.lower()
-        match = _ARTICLE.search(lower)
-        if not match:
+        cited = _cited_article(text)
+        # the Costituzione is read by Normattiva's fetch only: its graph key is not pinned yet
+        if not cited or cited["tipo_atto"] == "costituzione":
             return None
-        article = re.sub(r"[\s-]", "", match.group(1))  # "2-bis", "2 bis" -> "2bis"
-        for marker, act in _CODES:
-            if marker in lower:
-                return canonical_urn(generate_urn(act, article=article))
-        return None
+        return canonical_urn(generate_urn(cited["tipo_atto"], article=cited["articolo"]))
 
     def _parse_normattiva_query(self, query: str) -> Optional[Dict[str, str]]:
         """
@@ -382,33 +413,4 @@ class ExternalSourceTool(BaseTool):
         Returns:
             Dict con tipo_atto e articolo oppure None
         """
-        query_lower = query.lower().strip()
-
-        # Codice civile
-        if "c.c." in query_lower or "codice civile" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                return {
-                    "tipo_atto": "codice civile",
-                    "articolo": match.group(1),
-                }
-
-        # Codice penale
-        if "c.p." in query_lower or "codice penale" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                return {
-                    "tipo_atto": "codice penale",
-                    "articolo": match.group(1),
-                }
-
-        # Costituzione
-        if "cost." in query_lower or "costituzione" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                return {
-                    "tipo_atto": "costituzione",
-                    "articolo": match.group(1),
-                }
-
-        return None
+        return _cited_article(query)
