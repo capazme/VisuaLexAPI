@@ -1036,6 +1036,8 @@ Run: `(cd services/visualex && .venv/bin/python -m pytest tests/test_normattiva_
 
 Expected: `91 passed`. (If one of the three `TestRecapturedPages` tests fails against the real pages of Task 1, the page and not the test is the reference: read the message, compare with the block printed in Task 1 Step 4, and adjust `_WINDOW` or the sentinel, never the expected dates.)
 
+Execution note (2 October 2026): the PR-level review of PR 1 found that some of the patterns written in Step 3 are quadratic on a page the portal did not serve (`re` holds the GIL, so a stall freezes the single worker): `_TAG`, the two `div` finders and the label strip of `_is_abrogated`. The module as merged differs in exactly those places: `_TAG` cannot run past the next `<` or `>`; `_VIGORE_DIV` and `_BODY_DIV` are replaced by `_find_div` (a tag is found first, then its class attribute is read from that one tag's text); the blanks are collapsed before the label is stripped. `TestHostilePages` pins it (eight more tests than the 91 counted here). The module and tests in the repository are the reference, not the code blocks above.
+
 - [ ] **Step 5: The live test**
 
 `services/visualex/tests/test_normattiva_validity_live.py` repeats the main cases against the portal. It is excluded from the default run.
