@@ -30,13 +30,13 @@ _YEAR = re.compile(r"(\d{4})(?!\d)")
 _RV = re.compile(r"Rv\.?\s*(?:n\.\s*)?(\d{6})(?:\s*[-–]\s*(\d{2})|(\d{2})(?!\d))?")
 # Case-sensitive on purpose: citations write "Sez." with a capital, prose writes "sezione 3".
 _SEZ = re.compile(
-    r"Sez(?:ione|\.)?\s*"
-    r"(U(?:[Nn](?:ite)?)?\.?|un\.|VI\s*-\s*(?:[1-5]|III|II|IV|V|I)|[1-7](?:\s*-\s*[1-6])?|L\.?|T\.?|F\.?|VII|VI|IV|V|III|II|I)"
+    r"Sez(?:ione|[.,])?\s*"
+    r"(U(?:[Nn](?:ite)?)?\.?|un\.|VI\s*[-–]\s*(?:[1-5]|III|II|IV|V|I)|[1-7](?:\s*[-–]\s*(?:[1-6]|[LT]\.?))?|L\.?|T\.?|F\.?|VII|VI|IV|V|III|II|I)"
     r"(?![A-Za-z0-9])(?:\s*(civ|pen)\.?)?"
 )
 _NUM = re.compile(
     r"(?:\bn\.?[\s,]*|(?:sentenza|ordinanza|sent\.|ord\.)\s+(?:n\.\s*)?)"
-    r"0*(\d{1,6})(?:\s*/\s*(\d{4}|\d{2})(?!\d))?",
+    r"0*(\d{1,6})(?!\d|\s*[-–]\s*\d(?!\d))(?:\s*/\s*(\d{4}|\d{2})(?!\d))?",
     re.IGNORECASE,
 )
 _BARE = re.compile(r"\s*,\s*0*(\d{1,6})\s*/\s*(\d{4}|\d{2})(?!\d)")
@@ -44,12 +44,17 @@ _DEL = re.compile(r"[\s,]*del\s*", re.IGNORECASE)
 _DEP = re.compile(r"dep(?:\.|osit\w*)\s*(?:il\s*)?", re.IGNORECASE)
 _DEP_BEFORE = re.compile(r"dep(?:\.|osit\w*)\s*(?:il\s*)?$", re.IGNORECASE)
 _ACT_BEFORE = re.compile(
-    r"(?:\blegge|(?-i:\bl\.)|(?-i:\bL\.)|d\.\s*lgs\.?|d\.\s*l\.|\bdecreto|d\.\s*P\.\s*R\.|\bartt?\."
-    r"|\bregolamento|\bdirettiva|\breg\.|R\.\s*D\.|T\.\s*U\.|D\.\s*M\.|d\.\s*P\.\s*C\.\s*M\."
+    r"(?P<word>\blegge\b|(?-i:(?<!\.)\bl\.)|(?-i:(?<!\.)\bL\.)|d\.\s*lgs\.?|d\.\s*l\.|\bdecreto\b|d\.\s*P\.\s*R\.|\bartt?\."
+    r"|\bregolamento\b|\bdirettiva\b|\breg\.|R\.\s*D\.|T\.\s*U\.|D\.\s*M\.|d\.\s*P\.\s*C\.\s*M\."
     r"|\bdir\.|\bcirc\.|\bdelib\.)"
     # Up to six words after the act word, a word being a run of these characters: written
     # so that no run can be split in two ways (`(?:X+\s*){0,6}` is exponential in the run).
     r"\s*(?:[\w.(),/]+(?:\s+[\w.(),/]+){0,5}\s*)?$",
+    re.IGNORECASE,
+)
+# A word that names a decision: between an act's word and a number it makes the number a decision's.
+_DECISION_WORD = re.compile(
+    r"\b(?:cass(?:azione)?\b|sez(?:ione|ioni)?\b|s\.\s*u\.|sentenz[ae]\b|ordinanz[ae]\b|decision[ei]\b|pronunci[ae]\b)",
     re.IGNORECASE,
 )
 _CONSULTA = re.compile(
@@ -91,25 +96,27 @@ def _date_parts(match: re.Match) -> tuple[int, Optional[str]]:
 
 
 def _norm_section(raw: str) -> str:
-    section = re.sub(r"\s+", "", raw).rstrip(".").upper()
+    section = re.sub(r"\s+", "", raw).replace("–", "-").rstrip(".").upper()
     return "U" if section.startswith("UN") else section
 
 
 def _read_citation(window: str) -> Optional[dict]:
     """The last decision cited in `window`, or None; {'act_number': True} for a law's number."""
-    candidates = [(m.start(), m.end(), int(m.group(1)), m.group(2)) for m in _NUM.finditer(window)]
+    candidates = [(m.start(), m.end(), int(m.group(1)), m.group(2), m.group(0)[0] not in "nN")
+                  for m in _NUM.finditer(window)]
     for sez in _SEZ.finditer(window):
         bare = _BARE.match(window, sez.end())
         if bare:
-            candidates.append((bare.start(1), bare.end(), int(bare.group(1)), bare.group(2)))
+            candidates.append((bare.start(1), bare.end(), int(bare.group(1)), bare.group(2), False))
     if not candidates:
         return None
-    start, end, numero, slash = max(candidates, key=lambda c: c[0])
+    start, end, numero, slash, is_sentenza = max(candidates, key=lambda c: c[0])
     before = window[:start]
     tail60 = before[-60:]
     act = _ACT_BEFORE.search(tail60)
     # A section label that reaches past the act word ("Sez. L." holds an "L.") is no act's number.
-    if act and not any(s.end() > act.start() for s in _SEZ.finditer(tail60)):
+    if (act and not is_sentenza and not any(s.end() > act.start() for s in _SEZ.finditer(tail60))
+            and not _DECISION_WORD.search(tail60, act.end("word"))):
         return {"act_number": True}  # "legge n. 89 del 2001", "art. 360, n. 5": not a decision
 
     anno: Optional[int] = None

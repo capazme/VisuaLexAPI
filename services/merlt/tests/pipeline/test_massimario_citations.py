@@ -4,11 +4,15 @@ import time
 
 import pytest
 
-from merlt.pipeline.massimario.citations import parse_citations
+from merlt.pipeline.massimario.citations import _norm_section, parse_citations
 from merlt.pipeline.massimario.identity import DecisionIdentity
 from merlt.pipeline.massimario.rv_bands import RvBands
 
-BANDS = RvBands({("civile", 2012): (620000, 630000), ("civile", 2024): (669000, 673000)})
+BANDS = RvBands({
+    ("civile", 2012): (620000, 630000),
+    ("civile", 2013): (624000, 629000),
+    ("civile", 2024): (669000, 673000),
+})
 
 
 def scan(text, *, year=2024, archivio="civile", bands=BANDS):
@@ -197,6 +201,63 @@ class TestActForms:
     ])
     def test_a_real_citation_is_still_a_decision(self, text, key, year):
         assert only(text, year=year).identity.key == key
+
+
+AFTER_AN_ACT = [
+    ("ai sensi dell'art. 2087 cod. civ. (sez. L, n. 14375, Rv. 624033).", 2012, "civile",
+     "cassazione:civile:14375:2012"),
+    ("l'art. 4 della legge 23 luglio 1991, n. 223, Sez. n. 1315 (Rv. 625077), est. Rossi.", 2013, "civile",
+     "cassazione:civile:1315:2013"),
+    ("dell'art. 2389 cod. civ. (Sez. trib., n. 20265, Rv. 628116, est. Rossi).", 2013, "civile",
+     "cassazione:civile:20265:2013"),
+    ("dell'art. 8 d.lgs. 31 dicembre 1992, n. 546, la sentenza n. 4522 (Rv. 625683), est. Rossi, ha chiarito",
+     2013, "civile", "cassazione:civile:4522:2013"),
+    ("presso le A.S.L. Nel medesimo contesto, va ricordata la sentenza n. 3360 (Rv. 625267), est. Rossi.",
+     2013, "civile", "cassazione:civile:3360:2013"),
+    ("dall'art. 12 del d.lgs. 18 dicembre 1997, n. 472 (sentenza n. 5897, Rv. 625953, est. Rossi).",
+     2013, "civile", "cassazione:civile:5897:2013"),
+    ("è stato fatto proprio da Sez. 6 – L., n. 21986/2018, Rossi, Rv. 650500-01.", 2019, "civile",
+     "cassazione:civile:21986:2018"),
+    ("previsti dalla legge si è espressa Sez, 4, n. 53356 del 27/09/2016, Rossi, Rv. 268680-01.", 2017, "penale",
+     "cassazione:penale:53356:2016"),
+    ("dall'art. 16, comma primo, n. 3, l. fall., con la decisione n. 12946 del 25/2/2020, Rossi, Rv. 278887-01.",
+     2020, "penale", "cassazione:penale:12946:2020"),
+    ("dell'art. 9 L. FALL. (Cass., sez. 1, n. 4343/2020, Rossi, Rv. 657079-02).", 2020, "civile",
+     "cassazione:civile:4343:2020"),
+    ("ai sensi dell'art. 111 Cost. (Cass., sez. 1, n. 4346/2020, Bianchi, Rv. 657080-01).", 2020, "civile",
+     "cassazione:civile:4346:2020"),
+    ("dello stesso decreto. Secondo Sez, 2, n. 26701/2020, Rossi, Rv. 659687-01, il conducente", 2020, "civile",
+     "cassazione:civile:26701:2020"),
+    ("ex art. 108, comma 2, l.fall. (ratione temporis applicabile), S.U., n. 07337/2024, Rossi, Rv. 670507-02 hanno",
+     2024, "civile", "cassazione:civile:7337:2024"),
+    ("i cui prodromi si possono leggere tra le righe di n. 23846 del 2008, Rv. 604659) per cui", 2010, "civile",
+     "cassazione:civile:23846:2008"),
+]
+
+
+class TestAfterAnAct:
+    @pytest.mark.parametrize("text, year, archivio, key", AFTER_AN_ACT)
+    def test_a_decision_word_or_sentenza_after_an_act_is_still_a_decision(self, text, year, archivio, key):
+        result = scan(text, year=year, archivio=archivio)
+        assert key in [d.identity.key for d in result.decisions if d.identity], result.decisions
+
+    def test_a_section_with_a_subsection_is_one_label(self):
+        result = scan("è stato fatto proprio da Sez. 6 – L., n. 21986/2018, Rossi, Rv. 650500-01.", year=2019)
+        found = [d for d in result.decisions if d.identity and d.identity.key == "cassazione:civile:21986:2018"]
+        assert found and found[0].sezione == "6-L"
+
+    def test_a_section_typo_is_no_decision_number(self):
+        result = scan("(Sez. n. 6-2, 06820/2021, Rossi, Rv. 660941-01)", year=2021,
+                      bands=RvBands({("civile", 2021): (658000, 664000)}))
+        assert "cassazione:civile:6:2021" not in [d.identity.key for d in result.decisions if d.identity]
+
+    def test_an_act_number_after_a_section_label_stays_an_act_number(self):
+        result = scan("Sez. U, n. 13319/2024, sull'art. 360, n. 5 (Rv. 671516-02)")
+        assert 5 not in [d.numero for d in result.decisions]
+
+    def test_norm_section_writes_one_dash(self):
+        assert _norm_section("6 – L.") == "6-L"
+        assert _norm_section("6 - 3") == "6-3"
 
 
 HOSTILE = [
