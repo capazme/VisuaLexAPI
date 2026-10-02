@@ -49,7 +49,8 @@ NO_STUBS = {"reshaped": 0, "set": {}, "removed": {}, "reported": []}
 NOTHING = {
     "relations_collapsed": {}, "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
     "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": NO_STUBS, "provenance_reset": {}, "estremi": 0,
-    "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {}, "testo": 0, "stale_text": 0,
+    "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {},
+    "certezza": {"converted": 0, "reported": []}, "testo": 0, "stale_text": 0,
     "fingerprint": 0, "entity_labels": {}, "entity_node_id": 0, "twins": NO_TWINS,
 }
 
@@ -456,3 +457,24 @@ async def test_a_reported_stub_without_provenance_is_stamped_ingestion_even_with
         {"p": "ingestion"}
     ]
     assert (await _migrate(graph, seed_keys))["provenance"] == {}
+
+
+async def test_a_certezza_written_as_a_string_becomes_a_number(graph):
+    # The seed wrote certezza as a string ("0.9", "1"): a string never compares with a
+    # number, so ORDER BY certezza put seed edges apart from community ones.
+    await graph.query(
+        "MATCH (a:Norma {URN: $art}), (s:Norma {URN: $stub}) "
+        "CREATE (a)-[:RINVIA {certezza: '0.9'}]->(s), (a)-[:RINVIA {certezza: '1'}]->(s), "
+        "(a)-[:RINVIA {certezza: '0.9'}]->(s), (a)-[:RINVIA {certezza: 'alta'}]->(s), "
+        "(a)-[:RINVIA {certezza: true}]->(s), (a)-[:RINVIA {certezza: 0.5}]->(s)",
+        {"art": ART, "stub": STUB},
+    )
+    reported = [{"value": True, "count": 1}, {"value": "alta", "count": 1}]
+    dry = await mig.number_certezza(graph, apply=False, batch=2)
+    assert dry == {"converted": 3, "reported": reported}
+    assert await mig.number_certezza(graph, apply=True, batch=2) == dry
+    values = await graph.query("MATCH ()-[r:RINVIA]->() WHERE r.certezza IS NOT NULL RETURN r.certezza AS c")
+    assert sorted((row["c"] for row in values), key=repr) == sorted([0.9, 0.9, 1.0, 0.5, "alta", True], key=repr)
+    exact = await graph.query("MATCH ()-[r:RINVIA]->() WHERE r.certezza = 0.9 RETURN count(r) AS n")
+    assert exact == [{"n": 2}]  # 0.9 as a double, not FalkorDB's single-precision parse of '0.9'
+    assert await mig.number_certezza(graph, apply=True, batch=2) == {"converted": 0, "reported": reported}

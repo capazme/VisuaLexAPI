@@ -3031,7 +3031,7 @@ d. **Then the gate again:**
 run merlt.scripts.retrieval_gate                  # after
 ```
 
-**Retrieval gate:** no metric of the second `retrieval_gate` run is more than 0.02 below the first; a larger drop stops the round until it is explained. Record in pull request B, as a comment, the `--apply` report, the check's report, the second gate and the label and relation counts after.
+**Retrieval gate:** no metric of the second `retrieval_gate` run is more than 0.02 below the first; a larger drop stops the round until it is explained. A `retrieval_gate` run that exits non-zero (a missing or empty collection, no queries, or `hit_rate_at_5` of 0) stops the round too, before `--apply` as after it. Record in pull request B, as a comment, the `--apply` report, the check's report, the second gate and the label and relation counts after.
 
 ---
 

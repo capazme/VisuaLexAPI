@@ -34,7 +34,8 @@ from typing import Any, Optional
 import structlog
 
 from merlt.storage.graph.schema import (
-    Provenance, Rel, canonical_rel, canonical_source_type, normalize_fonte, point_id, text_fingerprint,
+    Provenance, Rel, canonical_rel, canonical_source_type, certezza_number, normalize_fonte, point_id,
+    text_fingerprint,
 )
 
 log = structlog.get_logger()
@@ -281,7 +282,11 @@ async def _merge_edges(client, edges: list[dict], id_to_key: dict[int, dict]) ->
         if not src or not dst:
             skipped += 1
             continue
-        props = e.get("properties") or {}
+        props = dict(e.get("properties") or {})
+        if isinstance(props.get("certezza"), str):  # the seed writes it as a string: a number orders
+            number = certezza_number(props["certezza"])
+            if number is not None:
+                props["certezza"] = number
         disposizione = str(props.get("disposizione", ""))
         data_eff = str(props.get("data_efficacia", ""))
         try:

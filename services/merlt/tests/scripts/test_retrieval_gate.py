@@ -65,3 +65,16 @@ def test_an_empty_collection_stops_the_gate():
 
 def test_a_collection_with_points_is_measured():
     assert gate.require_points(_qdrant(1), "chunks") == 1
+
+
+def test_a_gate_that_finds_nothing_stops_the_round():
+    # A "before" of 0 would let any "after" pass: retrieval is broken or the gold standard
+    # does not match the collection.
+    summary = summarize([[OTHER]], [[CC]], [{CC: 3}])
+    with pytest.raises(SystemExit, match="hit_rate_at_5 is 0"):
+        gate.require_hits(summary)
+
+
+def test_a_gate_that_finds_something_goes_on():
+    summary = summarize([[OTHER, CC]], [[CC]], [{CC: 3}])
+    assert gate.require_hits(summary) is summary

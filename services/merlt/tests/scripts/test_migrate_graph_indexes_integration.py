@@ -23,7 +23,9 @@ BROKEN = """
 CREATE (a:Norma {URN: 'x'}), (b:Norma {URN: 'x'}),
        (c:Norma {URN: 'y', tipo_documento: 'articolo'}),
        (d:Norma {estremi: 'senza chiave'}),
-       (a)-[:RINVIA {certezza: 2.0}]->(b)
+       (a)-[:RINVIA {certezza: 2.0}]->(b),
+       (b)-[:RINVIA {certezza: '2.0'}]->(a),
+       (a)-[:CORRELATO {certezza: '0.5'}]->(b)
 """
 
 CLEAN = {
@@ -84,7 +86,7 @@ async def test_integrity_counts_what_is_wrong(graph):
         "norma_without_urn": 1,
         "article_without_text": 1,
         "isolated_nodes": 2,
-        "certezza_out_of_range": 1,
+        "certezza_out_of_range": 2,  # 2.0 and '2.0'; '0.5' is in range
     }
 
 

@@ -10,10 +10,13 @@ It reads the stores the stack reads, with the stack's configuration: Qdrant at
 QDRANT_HOST/QDRANT_PORT, the collection `default_chunks_collection()` names, the
 embedding model EmbeddingService picks from the environment. It refuses to score
 nothing: a missing or empty collection, no queries, or a query with no relevant
-article stops it, because each would read as a score that is not one.
+article stops it, because each would read as a score that is not one. So does a
+hit rate of 0: a "before" of 0 would let any "after" pass. An exit that is not 0
+stops the round.
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import logging
@@ -73,6 +76,18 @@ def summarize(retrieved: list[list[str]], relevant: list[list[str]], graded: lis
     }
 
 
+def require_hits(summary: dict[str, Any]) -> dict[str, Any]:
+    """The summary, unless no query found a relevant article in its top 5: then
+    retrieval is broken or the gold standard does not match the collection, and a
+    "before" of 0 would let any "after" pass."""
+    if not summary["hit_rate_at_5"]:
+        raise SystemExit(
+            f"hit_rate_at_5 is 0 over {summary['queries']} queries: retrieval is broken or the gold "
+            f"standard does not match the collection. {json.dumps(summary)}"
+        )
+    return summary
+
+
 def require_points(qdrant, collection: str) -> int:
     """The number of points in the collection; stops the gate when there are none.
     Checked before LegalKnowledgeGraph connects: finding no collection, it would
@@ -125,10 +140,14 @@ async def run() -> dict[str, Any]:
             retrieved.append([hit["urn"] for hit in hits])
     finally:
         await kg.close()
-    return summarize(retrieved, [q.relevant_urns for q in gold], [q.relevance_scores for q in gold])
+    return require_hits(summarize(retrieved, [q.relevant_urns for q in gold], [q.relevance_scores for q in gold]))
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description="Score retrieval on the semantic gold standard (read-only); compare a run "
+        "before and after a change to the graph.",
+    ).parse_args()
     # stdout carries the numbers alone, as JSON; the log goes to stderr.
     structlog.configure(
         logger_factory=structlog.PrintLoggerFactory(sys.stderr),

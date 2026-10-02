@@ -45,6 +45,7 @@ from merlt.storage.graph.schema import (
     Rel,
     act_name_from_urn,
     canonical_urn,
+    certezza_number,
     entity_label,
     estremi_from_urn,
     normalize_fonte,
@@ -482,6 +483,39 @@ async def normalize_fonti(client, apply: bool, shaped: set[int]) -> dict[str, in
     return report
 
 
+def _value_order(value: Any) -> tuple[str, str]:
+    return (type(value).__name__, str(value))
+
+
+async def number_certezza(client, apply: bool, batch: int) -> dict[str, Any]:
+    """`certezza` as a number on every edge. The seed wrote it as a string ("0.9", "1"),
+    and the graph router orders edges by it: a string never compares with a number.
+    A value that is no number is reported and left as it is.
+
+    Grouped by value, so each SET matches its edges by the value (a parameter) and
+    writes the number parsed in Python (`schema.certezza_number`)."""
+    rows = await client.query(
+        "MATCH ()-[r]->() WHERE r.certezza IS NOT NULL AND NOT typeOf(r.certezza) IN ['Float', 'Integer'] "
+        "RETURN r.certezza AS value, count(r) AS n"
+    )
+    converted, reported = 0, []
+    for row in sorted(rows, key=lambda row: _value_order(row["value"])):
+        number = certezza_number(row["value"])
+        if number is None:
+            reported.append({"value": row["value"], "count": int(row["n"])})
+            continue
+        converted += int(row["n"])
+        while apply:
+            done = await _count(
+                client,
+                f"MATCH ()-[r]->() WHERE r.certezza = $old WITH r LIMIT {batch} SET r.certezza = $new RETURN count(r) AS n",
+                {"old": row["value"], "new": number},
+            )
+            if not done:
+                break
+    return {"converted": converted, "reported": reported}
+
+
 async def copy_text(client, apply: bool, batch: int) -> int:
     """`testo` on every article (spec §4.1); a live source's `text` moves to `testo`."""
     total = 0
@@ -628,8 +662,11 @@ INTEGRITY_CHECKS: dict[str, str] = {
         "AND n.testo IS NULL AND n.testo_vigente IS NULL RETURN count(n) AS n"
     ),
     "isolated_nodes": "MATCH (n) WHERE NOT (n)--() RETURN count(n) AS n",
+    # A string never compares with a number: the value is converted first, and one that is
+    # no number counts as out of range.
     "certezza_out_of_range": (
-        "MATCH ()-[r]->() WHERE r.certezza IS NOT NULL AND (r.certezza < 0 OR r.certezza > 1) RETURN count(r) AS n"
+        "MATCH ()-[r]->() WHERE r.certezza IS NOT NULL WITH r, toFloatOrNull(r.certezza) AS c "
+        "WHERE c IS NULL OR c < 0 OR c > 1 RETURN count(r) AS n"
     ),
 }
 
@@ -665,6 +702,7 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
         "provenance_legacy": await remap_provenance(client, apply, shaped),
         "provenance": await stamp_provenance(client, apply, batch, seed_keys, shaped),
         "fonte": await normalize_fonti(client, apply, shaped),
+        "certezza": await number_certezza(client, apply, batch),
         "testo": await copy_text(client, apply, batch),
         "stale_text": await drop_stale_text(client, apply),
         "fingerprint": await stamp_fingerprints(client, apply, batch),

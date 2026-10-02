@@ -10,6 +10,7 @@ section 4.
 from __future__ import annotations
 
 import hashlib
+import math
 import uuid
 from enum import Enum
 from typing import Any, Iterable, Mapping, Optional, Union
@@ -320,6 +321,27 @@ _FONTE_ALIASES: dict[str, Fonte] = {
     "mcp-legal-it": Fonte.MCP_LEGAL_IT,
     "italia_corpus": Fonte.ITALIA_CORPUS,
 }
+
+
+def certezza_number(value: Any) -> Optional[float]:
+    """A relation's `certezza` as the number it is written as, or None when it is none.
+
+    The seed wrote it as a string ("0.9", "1"); a string never compares with a number,
+    so edges ordered by it fell apart. Parsed in Python: FalkorDB's `toFloat` reads a
+    string in single precision ('0.9' becomes 0.899999976…), which would set a seed
+    edge just below a community edge of the same value."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+    elif isinstance(value, str) and "_" not in value:  # float() reads '1_0' as 10.0
+        try:
+            number = float(value)
+        except ValueError:
+            return None
+    else:
+        return None
+    return number if math.isfinite(number) else None
 
 
 def normalize_fonte(value: Optional[str]) -> Optional[str]:
