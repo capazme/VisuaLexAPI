@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from merlt.storage.graph.schema import node_type_cypher
 from merlt.api.graph_router import (
     _build_label_search_cypher,
     _edge_properties,
@@ -58,11 +59,13 @@ def _edge_row(
 
 
 def _fake_graph_client(query_results: list) -> MagicMock:
-    """FalkorDBClient mock: query() pops results in call order."""
+    """FalkorDBClient mock: ro_query() (the subgraph reader's read-only call) pops
+    results in call order; the writer's query() must never be used."""
     client = MagicMock()
     client.connect = AsyncMock()
     client.close = AsyncMock()
-    client.query = AsyncMock(side_effect=query_results)
+    client.ro_query = AsyncMock(side_effect=query_results)
+    client.query = AsyncMock(side_effect=AssertionError("a reader must use ro_query"))
     return client
 
 
@@ -159,13 +162,16 @@ async def test_subgraph_filters_compiled_into_cypher():
             api_key=None,
         )
 
-    edge_call = client.query.await_args_list[1]
+    edge_call = client.ro_query.await_args_list[1]
     cypher, params = edge_call.args
-    # Case-insensitive on both sides: the graph mixes "commenta" and "DISCIPLINA"
-    assert "toLower(type(r)) IN $allowed_rels" in cypher
-    assert "toLower(labels(connected)[0]) IN $allowed_types" in cypher
-    assert "toLower(labels(connected)[0]) = 'norma'" in cypher  # Norma carve-out
-    assert params["allowed_rels"] == ["disciplina", "esprime_principio"]
+    # Relations: the graph's own names, as a parameter, whatever vocabulary was asked
+    assert "type(r) IN $allowed_rels" in cypher
+    assert params["allowed_rels"] == ["DISCIPLINA", "ESPRIME_PRINCIPIO"]
+    # Entity types stay case-insensitive: the labels are not normalized
+    # a node's type is its first label that is not Entity (a community node is :Entity:<Label>)
+    connected_type = node_type_cypher("connected")
+    assert f"toLower({connected_type}) IN $allowed_types" in cypher
+    assert f"toLower({connected_type}) = 'norma'" in cypher  # Norma carve-out
     assert params["allowed_types"] == ["concettogiuridico"]
     # Ranked deterministic truncation: ORDER BY must precede LIMIT
     assert "ORDER BY hop ASC, COALESCE(r.certezza, 0.5) DESC" in cypher
@@ -241,7 +247,7 @@ async def test_subgraph_missing_root_returns_empty():
     assert response.edges == []
     assert response.metadata.truncated is False
     # only the root lookup ran — no edge query for a missing root
-    assert client.query.await_count == 1
+    assert client.ro_query.await_count == 1
 
 
 # ====================================================

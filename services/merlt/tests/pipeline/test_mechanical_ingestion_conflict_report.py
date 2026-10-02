@@ -279,9 +279,25 @@ async def test_batch_urn_with_vig_marker_matches_canonical_graph_urn():
 
 
 @pytest.mark.asyncio
+async def test_batch_urn_with_originale_marker_matches_canonical_graph_urn():
+    """`@originale` is a version marker too (urngenerator appends it for the original text): the
+    join cuts it, as `schema.canonical_urn` does for every other writer and reader."""
+    canonical = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1970-05-20;300~art1"
+    nodes = [_node(canonical + "@originale", estremi="Art. 1 Legge 20 maggio 1970, n. 300")]
+    falkordb = _fake_falkordb(
+        [[{"urn": canonical, "estremi": "Art. 1 Legge 20 maggio 1970, n. 300", "tipo_documento": "articolo"}], []]
+    )
+
+    report = await build_conflict_report(falkordb, nodes, edges=[])
+
+    assert report["node_updates"] == [canonical] and report["node_new"] == []
+    assert falkordb.query.call_args_list[0].args[1]["urns"] == [canonical]
+
+
+@pytest.mark.asyncio
 async def test_annex_marker_is_not_stripped_by_normalization():
-    """Adversarial-review item #4b: `_canonical_urn` strips ONLY the `!vig=`
-    marker, never the `:N` annex — an annex difference must still surface as
+    """Adversarial-review item #4b: `_canonical_urn` cuts only the version marker
+    (`!vig=`, `!orig=`, `@originale`), never the `:N` annex — an annex difference must still surface as
     a distinct URN rather than being silently collapsed into a false match
     (anti-regression: CLAUDE.md's "URN version-marker mismatch" gotcha)."""
     with_annex = (

@@ -36,7 +36,8 @@ async def list_pending_review(graph_client, *, limit: int = 100) -> List[Dict[st
         """
         MATCH (n:LiveSource)
         WHERE n.provenance = $prov AND n.review_status = $status
-        RETURN n.node_id AS node_id, n.source_url AS source_url, n.text AS text,
+        RETURN n.node_id AS node_id, n.source_url AS source_url,
+               coalesce(n.testo, n.text) AS text,
                n.trust AS trust, n.usage_count AS usage_count,
                n.positive_feedback_count AS positive_feedback_count,
                n.has_confirmed_citation AS has_confirmed_citation,

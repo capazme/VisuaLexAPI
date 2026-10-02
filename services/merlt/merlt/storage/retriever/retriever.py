@@ -553,17 +553,24 @@ class GraphAwareRetriever:
         # Se PolicyManager disponibile e abbiamo embedding, usa pesi neurali
         if self.policy_manager and query_embedding and edge_types:
             try:
+                # The policy knows its own relation names, not the graph's: map each
+                # edge (lazy import: the policy module is not needed without a policy)
+                from merlt.rlcf.policy_gradient import normalize_relation_type
+
+                policy_names = list(dict.fromkeys(normalize_relation_type(t) for t in edge_types))
+
                 # Compute batch weights per tutti gli edge types
                 weights_dict = await self.policy_manager.compute_batch_weights(
                     query_embedding=query_embedding,
-                    relation_types=edge_types,
+                    relation_types=policy_names,
                     expert_type=expert_type or "literal",
                     trace=trace
                 )
 
                 # Applica pesi neurali
                 for edge in path.edges:
-                    edge_type = _edge_type(edge)
+                    raw_type = _edge_type(edge)
+                    edge_type = normalize_relation_type(raw_type) if raw_type else ""
                     if edge_type in weights_dict:
                         weight, _ = weights_dict[edge_type]
                         relation_bonus *= weight
@@ -606,7 +613,8 @@ class GraphAwareRetriever:
             weights = EXPERT_TRAVERSAL_WEIGHTS[expert_type]
 
             for edge in edges:
-                edge_type = _edge_type(edge)
+                # The graph's names are upper case, the weight tables are keyed in lower case.
+                edge_type = _edge_type(edge).lower()
                 weight = weights.get(edge_type, weights.get("default", 0.5))
                 relation_bonus *= weight
 

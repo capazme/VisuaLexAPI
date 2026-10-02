@@ -36,6 +36,7 @@ from merlt.experts.base import (
 )
 from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
+from merlt.storage.graph.schema import Rel, canonical_urn, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
@@ -121,18 +122,22 @@ class SystemicExpert(BaseExpert, ReActMixin):
     # ------------------------------------------------------------------
     # SAFETY FLOOR (non-negotiable): this curated list is ALWAYS in the
     # traversed set. The TraversalPolicy can only ADD/reorder relations on
-    # top of it, never remove the proven ones. Relazioni reali nel grafo
-    # (verificate con: MATCH ()-[r]->() RETURN type(r), count(*)).
+    # top of it, never remove the proven ones. The names are the graph's own:
+    # the schema's `Rel` (storage/graph/schema.py), which every writer writes.
     # CORRELATO is the generic "systematically related" edge the co-evolution
     # writes for live-retrieved norms ((confirmed)-[:CORRELATO]->(provisional)).
     # Without it in the floor, every co-evolved node stayed unreachable (the
     # traversal relation-filter dropped it) — so a norm outside the CC seed
     # produced 0 hops even after being sedimented with real edges.
-    STATIC_SYSTEMIC_RELATIONS = ["DISCIPLINA", "modifica", "abroga", "interpreta", "IMPONE", "CORRELATO"]
+    STATIC_SYSTEMIC_RELATIONS = [r.value for r in (
+        Rel.DISCIPLINA, Rel.MODIFICA, Rel.ABROGA, Rel.INTERPRETA, Rel.IMPONE, Rel.CORRELATO,
+    )]
 
-    # Extra graph-native candidates the policy may promote (subset of
-    # DEFAULT_TRAVERSAL_WEIGHTS keys — plausible-but-unproven relations).
-    NEURAL_EXTRA_CANDIDATE_RELATIONS = ["deroga", "rinvia", "cita", "connesso_a", "contiene"]
+    # Extra graph-native candidates the policy may promote (plausible-but-unproven
+    # relations), again the schema's names. Each reaches the policy through
+    # normalize_relation_type: DEROGA_A → DEROGA, RINVIA → RIFERIMENTO,
+    # CONTIENE → RELATED_TO.
+    NEURAL_EXTRA_CANDIDATE_RELATIONS = [r.value for r in (Rel.DEROGA_A, Rel.RINVIA, Rel.CONTIENE)]
 
     # An extra is added only when its policy score clearly beats the best
     # floor score (+margin). An untrained/uniform policy scores everything
@@ -205,7 +210,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
         self._systemic_walk = []
 
         log.info(
-            f"SystemicExpert analyzing",
+            "SystemicExpert analyzing",
             query=context.query_text[:50],
             trace_id=context.trace_id,
             use_react=self.use_react,
@@ -221,7 +226,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
             )
             log.info(
-                f"SystemicExpert ReAct completed",
+                "SystemicExpert ReAct completed",
                 sources=len(all_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
@@ -275,7 +280,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
             response.metadata["execution_trace"] = self.get_trace_dict()
 
         log.info(
-            f"SystemicExpert completed",
+            "SystemicExpert completed",
             confidence=response.confidence,
             sources=len(response.legal_basis),
             time_ms=response.execution_time_ms,
@@ -333,7 +338,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 query=search_query,
                 top_k=5,
                 expert_type="SystemicExpert",
-                source_types=source_types  # ["norma"] - connessione tra norme
+                source_types=source_types  # ["norma", "comma"] - connessione tra norme
             )
             if result.success and result.data.get("results"):
                 sources.extend(result.data["results"])
@@ -344,7 +349,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                         self._extracted_urns.add(urn)
 
         log.debug(
-            f"SystemicExpert sources retrieved",
+            "SystemicExpert sources retrieved",
             total=len(sources),
             extracted_urns=len(self._extracted_urns)
         )
@@ -517,10 +522,11 @@ class SystemicExpert(BaseExpert, ReActMixin):
             if u:
                 urns_to_expand.add(u)
         # I nodi del grafo sono seminati SENZA il marcatore di versione NIR
-        # (`...~art2043!vig=`): togliere tutto dal primo `!` per far combaciare i
-        # seed con gli URN dei nodi (stesso trap gestito lato BFF da normalizeGraphUrn).
+        # (`...~art2043!vig=`, `...@originale`): `canonical_urn` lo toglie per far
+        # combaciare i seed con gli URN dei nodi (stesso trap gestito lato BFF da
+        # normalizeGraphUrn).
         urns_to_expand = {
-            u.split("!", 1)[0] if isinstance(u, str) else u for u in urns_to_expand
+            canonical_urn(u) if isinstance(u, str) else u for u in urns_to_expand
         }
         urns_to_expand.discard("")
 
@@ -535,7 +541,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
         systemic_relations = await self._select_traversal_relations(context)
 
         log.debug(
-            f"SystemicExpert graph expansion",
+            "SystemicExpert graph expansion",
             urns_count=len(urns_to_expand),
             urns=list(urns_to_expand)[:3]
         )
@@ -570,7 +576,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                         target_urn = node.get("urn", "")
                         target_type = node.get("type", "")
                         expanded.append({
-                            "text": node.get("properties", {}).get("testo", ""),
+                            "text": node_text(node.get("properties", {})),
                             "urn": target_urn,
                             "type": target_type,
                             "source": "systemic_expansion",
@@ -590,7 +596,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 log.warning(f"Failed to expand {urn}: {e}")
 
         log.info(
-            f"SystemicExpert systemic expansion",
+            "SystemicExpert systemic expansion",
             total_expanded=len(expanded)
         )
 
@@ -687,10 +693,10 @@ class SystemicExpert(BaseExpert, ReActMixin):
         ]
 
         if context.norm_references:
-            sections.append(f"\n## NORME CITATE\n" + ", ".join(context.norm_references))
+            sections.append("\n## NORME CITATE\n" + ", ".join(context.norm_references))
 
         if context.legal_concepts:
-            sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
+            sections.append("\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
             sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")

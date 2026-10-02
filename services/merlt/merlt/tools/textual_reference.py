@@ -5,9 +5,8 @@ Textual Reference Tool
 Tool per seguire rinvii normativi espliciti nel testo.
 
 Traccia le connessioni testuali tra norme tramite relazioni:
-- RINVIA: rinvio normativo esplicito
-- richiama: richiamo generico
-- modifica: modifica di altra norma
+- RINVIA: rinvio normativo esplicito (il chiamante può dire anche "richiama" o "cita")
+- MODIFICA: modifica di altra norma
 
 Fondamento: Art. 12, I c.c. - "connessione di esse" a livello testuale
 
@@ -24,9 +23,13 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import Rel, canonical_urn, cypher_rel_names
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
+
+# The longest chain of references followed; interpolated into the Cypher (`*1..N`).
+MAX_DEPTH = 5
 
 
 @dataclass
@@ -38,7 +41,7 @@ class NormReference:
         from_urn: URN della norma di partenza
         to_urn: URN della norma referenziata
         to_estremi: Riferimento leggibile (es. "Art. 1455 c.c.")
-        reference_type: Tipo di relazione (RINVIA, richiama, modifica)
+        reference_type: Tipo di relazione (RINVIA, MODIFICA)
         excerpt: Estratto del testo referenziato
         depth: Profondità nella catena (1 = diretto)
     """
@@ -66,7 +69,7 @@ class TextualReferenceTool(BaseTool):
     Tool per seguire rinvii normativi espliciti nel testo.
 
     Segue le connessioni testuali tra norme attraverso relazioni
-    RINVIA, richiama, modifica per tracciare la catena di riferimenti.
+    RINVIA, MODIFICA per tracciare la catena di riferimenti.
 
     Rileva e gestisce riferimenti circolari per evitare loop infiniti.
 
@@ -83,7 +86,7 @@ class TextualReferenceTool(BaseTool):
         >>> result = await tool(
         ...     article_urn="urn:norma:cc:art1453",
         ...     max_depth=2,
-        ...     reference_types=["RINVIA", "richiama"]
+        ...     reference_types=["RINVIA", "MODIFICA"]
         ... )
         >>> print(f"Trovati {len(result.data['references'])} rinvii")
         >>> if result.data["circular_detected"]:
@@ -93,7 +96,7 @@ class TextualReferenceTool(BaseTool):
     name = "textual_reference"
     description = (
         "Segue rinvii normativi espliciti tra articoli. "
-        "Traccia catene di riferimenti (RINVIA, richiama, modifica) "
+        "Traccia catene di riferimenti (RINVIA, MODIFICA) "
         "per capire le connessioni testuali tra norme. "
         "Riferimento: Art. 12, I c.c. - interpretazione letterale."
     )
@@ -138,7 +141,7 @@ class TextualReferenceTool(BaseTool):
                 param_type=ParameterType.ARRAY,
                 description=(
                     "Tipi di relazione da seguire. "
-                    "Es: ['RINVIA', 'richiama', 'modifica']"
+                    "Es: ['RINVIA', 'MODIFICA']"
                 ),
                 required=False
             )
@@ -175,16 +178,39 @@ class TextualReferenceTool(BaseTool):
                 tool_name=self.name
             )
 
+        # The graph's key has no version marker (`!vig=`, `@originale`)
+        article_urn = canonical_urn(article_urn)
+
         # Validate e clamp max_depth
-        max_depth = min(max(1, max_depth), 5)
+        try:
+            max_depth = bounded_int(max_depth, "max_depth", 1, MAX_DEPTH)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
 
         # Default reference types
-        if reference_types is None:
-            reference_types = ["RINVIA", "richiama", "modifica"]
+        if not reference_types:
+            reference_types = [Rel.RINVIA.value, Rel.MODIFICA.value]
+
+        # The graph's relation names, whichever vocabulary the caller used. A name the
+        # graph does not have is dropped; if none is left nothing can match, and the
+        # query is not run unfiltered instead.
+        rel_names = cypher_rel_names(reference_types)
+        if not rel_names:
+            return ToolResult.ok(
+                data={
+                    "references": [],
+                    "chain_depth": 0,
+                    "circular_detected": False,
+                    "article_urn": article_urn
+                },
+                tool_name=self.name,
+                article_urn=article_urn,
+                references_found=0
+            )
 
         try:
             # Build Cypher query
-            rel_pattern = "|".join(reference_types)
+            rel_pattern = "|".join(rel_names)
 
             cypher = f"""
                 MATCH path = (start:Norma {{URN: $urn}})-[:{rel_pattern}*1..{max_depth}]->(target:Norma)
@@ -193,14 +219,14 @@ class TextualReferenceTool(BaseTool):
                     start.URN as from_urn,
                     target.URN as to_urn,
                     target.estremi as to_estremi,
-                    target.testo_vigente as excerpt,
+                    coalesce(target.testo, target.testo_vigente) as excerpt,
                     length(path) as depth,
                     [r in relationships(path) | type(r)] as relation_types
                 ORDER BY depth ASC
                 LIMIT 50
             """
 
-            results = await self.graph_db.query(cypher, {"urn": article_urn})
+            results = await self.graph_db.ro_query(cypher, {"urn": article_urn})
 
             if not results:
                 return ToolResult.ok(

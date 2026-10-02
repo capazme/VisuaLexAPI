@@ -9,7 +9,8 @@ Deduplication Strategy:
 2. **Peer-Reviewed**: Community validates no duplicates (via votes)
 
 Entity Node Schema:
-    (:Entity:{EntityType} {
+    (:Entity:{Label} {      # the schema label of its kind (`schema.ENTITY_LABEL_BY_TYPE`);
+                            # `:Entity` alone for a kind that has none
         id: "principio:legittima_difesa",
         nome: "Legittima difesa",
         tipo: "principio",
@@ -25,7 +26,9 @@ Entity Node Schema:
 
 Relations Created:
     - (Norma)-[:DISCIPLINA|ESPRIME_PRINCIPIO|DEFINISCE|...]->(Entity)
+      (written for a duplicate too: the article that proposed it is linked)
     - (Entity)-[:SPECIES|IMPLICA|...]->(Entity)  # If applicable
+    - (Entity)-[:DERIVA_DA]->(LiveSource)  # If born of a confirmed live source
 
 Usage:
     from merlt.storage.graph.entity_writer import EntityGraphWriter
@@ -51,16 +54,39 @@ Usage:
 
 import re
 import structlog
+import unicodedata
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
-from merlt.storage.enrichment.models import PendingEntity, PendingRelation
-from merlt.utils.urn_labels import derive_article_fields_from_urn
-from merlt.pipeline.enrichment.models import EntityType, RelationType
+from merlt.storage.graph.relation_endpoints import wrapped_norm_key
+from merlt.storage.graph.schema import (
+    Fonte, Label, Provenance, Rel, SEED_TWIN, canonical_urn, entity_label, stub_properties,
+)
+from merlt.storage.enrichment.models import PendingEntity
 
 log = structlog.get_logger()
+
+# article → entity relation, by the entity's type: the seed's names.
+RELATION_BY_ENTITY_TYPE: dict[str, Rel] = {
+    "principio": Rel.ESPRIME_PRINCIPIO,
+    "definizione": Rel.DEFINISCE,
+    "definizione_legale": Rel.DEFINISCE,
+    "concetto": Rel.DISCIPLINA,
+    "diritto_soggettivo": Rel.CONFERISCE,
+    "interesse_legittimo": Rel.DISCIPLINA,
+    "soggetto_giuridico": Rel.APPLICA_A,
+    "ruolo_giuridico": Rel.APPLICA_A,
+    "organo": Rel.APPLICA_A,
+    "fatto_giuridico": Rel.PREVEDE,
+    "procedura": Rel.PREVEDE,
+    "termine": Rel.STABILISCE_TERMINE,
+    "sanzione": Rel.PREVEDE_SANZIONE,
+    "responsabilita": Rel.ATTRIBUISCE_RESPONSABILITA,
+    "modalita_giuridica": Rel.IMPONE,
+    "brocardo": Rel.ESPRIME,
+}
 
 
 @dataclass
@@ -87,6 +113,19 @@ def is_real_article_urn(urn: object) -> bool:
     return isinstance(urn, str) and urn.strip() not in PLACEHOLDER_ARTICLE_URNS
 
 
+# The leading Italian articles `normalize_entity_name` strips, in the order it
+# tries them. They are matched on a lowercase, stripped name.
+LEADING_ARTICLES = ("il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una ")
+
+
+def strip_leading_article(text: str) -> str:
+    """`text` (lowercase, stripped) without its leading Italian article, if it has one."""
+    for article in LEADING_ARTICLES:
+        if text.startswith(article):
+            return text[len(article) :]
+    return text
+
+
 def normalize_entity_name(nome: str) -> str:
     """
     Normalize an entity name into the slug of its graph node id.
@@ -104,12 +143,8 @@ def normalize_entity_name(nome: str) -> str:
     """
     normalized = (nome or "").lower().strip()
 
-    # Remove Italian articles
-    articles = ["il ", "lo ", "la ", "i ", "gli ", "le ", "l'", "un ", "uno ", "una "]
-    for article in articles:
-        if normalized.startswith(article):
-            normalized = normalized[len(article) :]
-            break
+    # Remove a leading Italian article
+    normalized = strip_leading_article(normalized)
 
     # Replace hyphens with spaces (so "Legittima-difesa" → "Legittima difesa")
     normalized = normalized.replace("-", " ")
@@ -127,6 +162,64 @@ def normalize_entity_name(nome: str) -> str:
     normalized = normalized.strip("_")
 
     return normalized
+
+
+def _fold_lower(nome: str) -> str:
+    """The name with its accents folded, lowercase and stripped."""
+    decomposed = unicodedata.normalize("NFD", nome or "")
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower().strip()
+
+
+def _seed_slug(folded: str) -> str:
+    """The seed's rule on a name already folded, lowercase and stripped."""
+    return re.sub(r"\s+", "_", re.sub(r"[^a-z0-9\s]", "", folded)).strip("_")
+
+
+def seed_twin_slug(nome: str) -> str:
+    """The slug of the seed's node id for a concept: the seed's own rule.
+
+    The seed keys a concept `<prefix>:<slug>` (`SEED_TWIN`) and builds the slug
+    from its name: lowercase, each accented letter folded to its base
+    ("trasferibilità" -> "trasferibilita"), only letters, digits and spaces kept
+    (an apostrophe, a hyphen or a stop is dropped, not turned into a space:
+    "quasi-usufrutto" -> "quasiusufrutto"), each run of spaces one underscore. A
+    leading article stays ("La reticenza" -> "la_reticenza").
+
+    This is not `normalize_entity_name`, which makes the community id and is
+    shared by the document parser and the router: that one deletes an accented
+    letter ("trasferibilit"), turns a hyphen into a space and strips a leading
+    article. The slug exists only to meet the seed's keys, so a twin is looked up
+    by this one while the id it takes stays the community's. Checked on the Libro
+    IV seed: this rule reproduces the `node_id` of all 3909 of its concept-like
+    nodes; folding the accents and then applying `normalize_entity_name`
+    reproduced 3865.
+
+    This is the key of the name as it is spelt. A proposal may add an article the
+    seed's name does not have ("Il conduttore" for `conduttore`): `seed_twin_slugs`
+    also tries the name without it.
+    """
+    return _seed_slug(_fold_lower(nome))
+
+
+def seed_twin_slugs(nome: str) -> List[str]:
+    """The seed keys a proposed name may meet, in the order to try them.
+
+    First the name as it is spelt (`seed_twin_slug`): the seed keeps an article of
+    its own ("La reticenza" is `la_reticenza`, next to `reticenza`). Then, when the
+    name starts with an article (the ones `normalize_entity_name` strips), the name
+    without it: a proposal says "Il conduttore" where the seed says "conduttore".
+    Only an article makes a second key, so only an article makes a second query.
+
+    A name that meets neither is no twin, and that is not harmless: the community
+    Entity written in its place answers every later proposal first, so the seed's
+    node is never adopted.
+    """
+    folded = _fold_lower(nome)
+    bare = strip_leading_article(folded)
+    slugs = [_seed_slug(folded)]
+    if bare != folded:
+        slugs.append(_seed_slug(bare))
+    return [slug for slug in dict.fromkeys(slugs) if slug]
 
 
 def entity_node_id(entity_type: str, nome: str) -> str:
@@ -193,6 +286,13 @@ class EntityGraphWriter:
 
             if duplicate_id:
                 log.info("Layer 1: Mechanical duplicate found", existing_id=duplicate_id)
+                # The community's validated link from this article is a graph edge, not
+                # only a `sources` entry: written for a duplicate too (an existing entity,
+                # or a seed twin that has just become one). It is a MERGE, so it is written
+                # once however often it is proposed, and it goes first: the enrichment adds
+                # to `votes_count`, which a retry after a failure here must not count twice.
+                if is_real_article_urn(entity.article_urn):
+                    await self._create_entity_relation(entity, duplicate_id)
                 await self._enrich_existing_entity(duplicate_id, entity)
                 await self._link_provisional_source(entity.entity_id, duplicate_id)
                 return WriteResult(
@@ -216,7 +316,7 @@ class EntityGraphWriter:
 
         # Loop β D.2: if this approved entity originated from a confirmed live
         # source (Phase D.1 confirm-source stamped `pending_entity_id` on the
-        # provisional LiveSource node), link the two with a CITA edge so the
+        # provisional LiveSource node), link the two with a DERIVA_DA edge so the
         # provenance trail "questo claim nasce da questa fonte live" stays
         # navigable on /grafo. No-op for entities not born of a live source.
         await self._link_provisional_source(entity.entity_id, node_id)
@@ -247,6 +347,8 @@ class EntityGraphWriter:
         Logic:
             - Normalize: lowercase, strip, remove articles
             - Match on tipo:{normalized_nome}
+            - A concept the seed already has (its twin, `SEED_TWIN`) becomes the
+              community entity: the seed node gains `:Entity` and the id
         """
         normalized = self._normalize_nome(entity_text)
         expected_id = f"{entity_type}:{normalized}"
@@ -263,6 +365,24 @@ class EntityGraphWriter:
         if result and len(result) > 0:
             return result[0]["id"]
 
+        twin = SEED_TWIN.get(entity_type)
+        if twin:
+            label, prefix = twin
+            # The seed already has this concept: it becomes the community entity
+            # (one node, one key) instead of a twin next to it. It is found by the
+            # seed's own key, as the name is spelt and then, if it starts with an
+            # article, without it (`seed_twin_slugs`); a miss on both is no twin.
+            # It keeps an id it already has: `definizione` and `definizione_legale`
+            # share one seed node, and the second alias must not re-key what the
+            # first one adopted.
+            for slug in seed_twin_slugs(entity_text):
+                rows = await self.falkordb.query(
+                    f"MATCH (c:{label.value} {{node_id: $nid}}) "
+                    "SET c:Entity, c.id = coalesce(c.id, $eid) RETURN c.id AS id",
+                    {"nid": f"{prefix}:{slug}", "eid": expected_id},
+                )
+                if rows:
+                    return rows[0]["id"]
         return None
 
     def _normalize_nome(self, nome: str) -> str:
@@ -273,16 +393,23 @@ class EntityGraphWriter:
         """
         Create new Entity node in graph.
 
-        Node Labels: :Entity:{EntityType}
+        Node Labels: :Entity:{Label of its kind} (`schema.ENTITY_LABEL_BY_TYPE`), or
+            :Entity alone when the type has no label in the schema
         Node ID: {tipo}:{normalized_nome}
 
         Properties:
             - id: Unique identifier
+            - node_id: the same value as `id`. The readers name a node by
+              `coalesce(URN, node_id)`; an entity with `id` alone had no key for them
+              (a null target_urn, FalkorDB's internal id). A seed twin the writer
+              adopts keeps the seed's own `node_id` (`_check_duplicate_mechanical`
+              does not touch it).
             - nome: Display name
             - tipo: Entity type
             - descrizione: Description
             - ambito: Legal domain
             - community_validated: True (always for approved entities)
+            - fonte: "community" (who wrote it, as the relation it links by says)
             - approval_score: Weighted approval score
             - votes_count: Number of votes
             - sources: Array of source URNs
@@ -291,27 +418,34 @@ class EntityGraphWriter:
         normalized = self._normalize_nome(entity.entity_text)
         node_id = f"{entity.entity_type}:{normalized}"
 
-        # Entity type for label (capitalize first letter)
-        entity_label = entity.entity_type.capitalize()
+        # The labels of the node: Entity, then the schema label of its kind. The old
+        # `entity_type.capitalize()` made labels the schema does not have (`Concetto`,
+        # `Principio`, `Soggetto_giuridico`) for 19 of the 29 types, so the readers, which
+        # look for ConcettoGiuridico and PrincipioGiuridico, never met a community node.
+        kind = entity_label(entity.entity_type)
+        node_labels = Label.ENTITY.value + (f":{kind.value}" if kind else "")
 
         # Provenance / trust (Loop β, task B.1): entities written here have
         # already cleared community consensus, so they carry the highest trust.
-        # `provenance` distinguishes them from `lazy_ingest` (auto-scraped) and
+        # `provenance` distinguishes them from `ingestion` (auto-scraped) and
         # `seed` (Libro IV snapshot) nodes; `trust` (0..1) feeds the
         # provenance-aware traversal scoring (task B.3).
         provenance = "community_validated"
         trust = 1.0
 
         # Cypher query with parameterized label (workaround: use format)
-        # FalkorDB doesn't support parameterized labels, must use string format
+        # FalkorDB doesn't support parameterized labels, must use string format; the
+        # labels come from the schema's map, never from the proposal's text.
         query = f"""
-        CREATE (e:Entity:{entity_label} {{
+        CREATE (e:{node_labels} {{
             id: $id,
+            node_id: $id,
             nome: $nome,
             tipo: $tipo,
             descrizione: $descrizione,
             ambito: $ambito,
             community_validated: true,
+            fonte: $fonte,
             provenance: $provenance,
             trust: $trust,
             approval_score: $approval_score,
@@ -331,6 +465,7 @@ class EntityGraphWriter:
             "tipo": entity.entity_type,
             "descrizione": entity.descrizione or "",
             "ambito": entity.ambito or "",
+            "fonte": Fonte.COMMUNITY.value,
             "provenance": provenance,
             "trust": trust,
             "approval_score": entity.approval_score or 0.0,
@@ -346,7 +481,7 @@ class EntityGraphWriter:
         if not result or len(result) == 0:
             raise RuntimeError(f"Failed to create entity node: {node_id}")
 
-        log.debug("Created entity node", node_id=node_id, label=entity_label)
+        log.debug("Created entity node", node_id=node_id, labels=node_labels)
         return node_id
 
     async def _enrich_existing_entity(self, existing_id: str, entity: PendingEntity) -> None:
@@ -368,17 +503,20 @@ class EntityGraphWriter:
         # `community_validated` / trust 1.0 — but only as an upgrade: a node that
         # is already at trust 1.0 (or higher, defensively) is left untouched so we
         # never downgrade provenance/trust (task B.1).
+        # `sources`, `approval_score` and `votes_count` are coalesced: a seed twin
+        # that became this entity (`_check_duplicate_mechanical`) never had them,
+        # and a null there would drop the contribution without a trace.
         query = """
         MATCH (e:Entity {id: $id})
         SET e.sources = CASE
-                WHEN $source IN e.sources THEN e.sources
-                ELSE e.sources + [$source]
+                WHEN $source IN coalesce(e.sources, []) THEN coalesce(e.sources, [])
+                ELSE coalesce(e.sources, []) + [$source]
             END,
             e.approval_score = CASE
-                WHEN $new_score > e.approval_score THEN $new_score
-                ELSE e.approval_score
+                WHEN $new_score > coalesce(e.approval_score, 0.0) THEN $new_score
+                ELSE coalesce(e.approval_score, 0.0)
             END,
-            e.votes_count = e.votes_count + $new_votes,
+            e.votes_count = coalesce(e.votes_count, 0) + $new_votes,
             e.provenance = CASE
                 WHEN coalesce(e.trust, 0.0) >= $trust THEN e.provenance
                 ELSE $provenance
@@ -408,70 +546,48 @@ class EntityGraphWriter:
         """
         Create semantic relation from article to entity.
 
-        Uses RelationType to determine relation type.
-        Defaults to DISCIPLINA if not specified.
+        The relation type comes from `RELATION_BY_ENTITY_TYPE` (the seed's
+        names); an entity type the table does not know gets DISCIPLINA.
 
         Examples:
             (Art. 52 CP)-[:ESPRIME_PRINCIPIO]->(Principio:Legittima difesa)
             (Art. 1453 CC)-[:DISCIPLINA]->(Concetto:Inadempimento)
+            (Art. 575 CP)-[:PREVEDE_SANZIONE]->(Sanzione:Reclusione)
         """
-        # Determine relation type based on entity type
-        # This mapping can be customized per domain
-        relation_mapping = {
-            "principio": "ESPRIME_PRINCIPIO",
-            "definizione": "DEFINISCE",
-            "concetto": "DISCIPLINA",
-            "soggetto": "DISCIPLINA",
-            "fatto": "PREVEDE",
-            "procedura": "REGOLA_PROCEDURA",
-            "termine": "STABILISCE_TERMINE",
-            "sanzione": "PREVEDE",
-            "rimedio": "PREVEDE",
-        }
-
-        relation_type = relation_mapping.get(entity.entity_type, "DISCIPLINA")
+        relation_type = RELATION_BY_ENTITY_TYPE.get(entity.entity_type, Rel.DISCIPLINA).value
 
         # Belt and braces for any other caller: the placeholder never becomes a node.
         if not is_real_article_urn(entity.article_urn):
             return
 
-        # A2: give a freshly-created Norma stub a minimal identity derived from
-        # the URN so it never renders as a raw URL. ON CREATE only — an existing
-        # (seed/community) node is never overwritten. Both may be None when the
-        # URN has no article segment; the SET then just writes null (harmless).
-        numero_articolo, estremi = derive_article_fields_from_urn(entity.article_urn)
-
-        # Create relation (create Norma node if it doesn't exist).
-        # Stamp provenance/trust on the (possibly stub) Norma node with coalesce
-        # so an existing seed/community node is never downgraded; the relation
-        # itself also carries `provenance` (best-effort, task B.1).
+        # Create relation (create Norma node if it doesn't exist). A Norma this
+        # writer creates is the schema's one stub shape (`stub_properties`) and
+        # nothing else (the migration reshapes any stub that differs from it), set
+        # ON CREATE only: an existing (seed/ingested) node is never touched.
+        # The graph keys a norm by its full Normattiva URL, so a bare `urn:nir:`
+        # URN is keyed so too, or its stub would sit next to the article the seed
+        # has. The relation itself carries the community's provenance.
+        article_key = canonical_urn(wrapped_norm_key(entity.article_urn))
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
-        ON CREATE SET
-            art.created_at = $timestamp,
-            art.numero_articolo = $numero_articolo,
-            art.estremi = $estremi
-        SET art.provenance = coalesce(art.provenance, $provenance),
-            art.trust = coalesce(art.trust, $trust)
+        ON CREATE SET art += $stub
         WITH art
         MATCH (e:Entity {{id: $entity_id}})
         MERGE (art)-[r:{relation_type}]->(e)
         ON CREATE SET
             r.certezza = 1.0,
-            r.fonte = 'community_validation',
+            r.fonte = 'community',
             r.provenance = $provenance,
             r.created_at = $timestamp
         RETURN r
         """
 
         params = {
-            "article_urn": entity.article_urn,
+            "article_urn": article_key,
+            "stub": stub_properties(article_key),
             "entity_id": node_id,
-            "provenance": "community_validated",
-            "trust": 1.0,
+            "provenance": Provenance.COMMUNITY_VALIDATED.value,
             "timestamp": self._timestamp,
-            "numero_articolo": numero_articolo,
-            "estremi": estremi,
         }
 
         await self.falkordb.query(query, params)
@@ -481,11 +597,11 @@ class EntityGraphWriter:
         """
         Link an approved Entity to the provisional LiveSource it was born from.
 
-        Loop β, Phase D (decision: keep the source node distinct, link via CITA):
+        Loop β, Phase D (decision: keep the source node distinct, link via DERIVA_DA):
         Phase D.1 `confirm-source` stamps `pending_entity_id` on the provisional
         ``LiveSource`` node (the live-retrieved document the user vouched for).
         When that pending entity later clears community consensus and is written
-        here, we MERGE a ``(:Entity)-[:CITA]->(:LiveSource)`` edge so the
+        here, we MERGE a ``(:Entity)-[:DERIVA_DA]->(:LiveSource)`` edge so the
         provenance — "questo claim deriva da questa fonte recuperata live" —
         remains visible and navigable, and lift the source to
         ``community_validated`` / trust 1.0 (upgrade-only, never a downgrade).
@@ -498,9 +614,9 @@ class EntityGraphWriter:
         query = """
         MATCH (ls:LiveSource {pending_entity_id: $eid})
         MATCH (e:Entity {id: $nid})
-        MERGE (e)-[r:CITA]->(ls)
+        MERGE (e)-[r:DERIVA_DA]->(ls)
         ON CREATE SET
-            r.fonte = 'community_validation',
+            r.fonte = 'community',
             r.provenance = 'community_validated',
             r.created_at = $timestamp
         SET ls.provenance = 'community_validated',

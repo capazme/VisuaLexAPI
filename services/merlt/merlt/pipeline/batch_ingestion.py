@@ -26,9 +26,9 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
-from merlt.pipeline.ingestion import IngestionPipelineV2, IngestionResult
+from merlt.pipeline.ingestion import IngestionResult
 from merlt.clients import NormaVisitata, Norma
-from merlt.models import BridgeMapping
+from merlt.storage.graph.schema import Fonte, SourceType, canonical_urn, point_id
 from merlt.pipeline.orchestrator import pipeline_orchestrator
 from merlt.pipeline.types import PipelineType
 
@@ -109,7 +109,7 @@ class BatchIngestionPipeline:
         self._fetch_semaphore = asyncio.Semaphore(max_concurrent_fetches)
 
         log.info(
-            f"BatchIngestionPipeline initialized",
+            "BatchIngestionPipeline initialized",
             batch_size=batch_size,
             max_concurrent=max_concurrent_fetches,
             embedding_batch=embedding_batch_size,
@@ -487,7 +487,7 @@ class BatchIngestionPipeline:
                 continue
 
             ingestion = ingestion_results[fetch.article_num]
-            article_urn = ingestion.article_urn
+            article_urn = canonical_urn(ingestion.article_urn)
 
             base_meta = {
                 "article_urn": article_urn,
@@ -500,8 +500,8 @@ class BatchIngestionPipeline:
                 texts_to_embed.append(fetch.article_text)
                 text_metadata.append({
                     **base_meta,
-                    "source_type": "norma",
-                    "point_id_suffix": "norma",
+                    "source_type": SourceType.NORMA.value,
+                    "fonte": Fonte.NORMATTIVA.value,
                     "text_preview": fetch.article_text[:2000],
                 })
 
@@ -513,8 +513,8 @@ class BatchIngestionPipeline:
                     texts_to_embed.append(spiegazione)
                     text_metadata.append({
                         **base_meta,
-                        "source_type": "spiegazione",
-                        "point_id_suffix": "spiegazione",
+                        "source_type": SourceType.SPIEGAZIONE.value,
+                        "fonte": Fonte.BROCARDI.value,
                         "text_preview": spiegazione[:2000],
                     })
 
@@ -524,8 +524,8 @@ class BatchIngestionPipeline:
                     texts_to_embed.append(ratio)
                     text_metadata.append({
                         **base_meta,
-                        "source_type": "ratio",
-                        "point_id_suffix": "ratio",
+                        "source_type": SourceType.RATIO.value,
+                        "fonte": Fonte.BROCARDI.value,
                         "text_preview": ratio[:2000],
                     })
 
@@ -544,9 +544,9 @@ class BatchIngestionPipeline:
                             texts_to_embed.append(testo)
                             text_metadata.append({
                                 **base_meta,
-                                "source_type": "massima",
+                                "source_type": SourceType.MASSIMA.value,
+                                "fonte": Fonte.BROCARDI.value,
                                 "massima_index": i,
-                                "point_id_suffix": f"massima:{i}",
                                 "text_preview": testo[:2000],
                             })
 
@@ -566,14 +566,17 @@ class BatchIngestionPipeline:
         from qdrant_client.models import PointStruct
 
         points = []
-        for i, (embedding, meta) in enumerate(zip(embeddings, text_metadata)):
-            point_id = hash(f"{meta['article_urn']}:{meta['point_id_suffix']}") % (2**63)
+        for embedding, meta in zip(embeddings, text_metadata):
+            # The same ids the lazy writer (`LegalKnowledgeGraph._upsert_embeddings_multi_source`)
+            # gives the same article: a re-run upserts, it never duplicates.
+            pid = point_id(meta["article_urn"], meta["source_type"], meta.get("massima_index", 0))
 
             payload = {
                 "article_urn": meta["article_urn"],
                 "tipo_atto": meta["tipo_atto"],
                 "numero_articolo": meta["numero_articolo"],
                 "source_type": meta["source_type"],
+                "fonte": meta["fonte"],
                 "text": meta["text_preview"],
             }
 
@@ -581,7 +584,7 @@ class BatchIngestionPipeline:
                 payload["massima_index"] = meta["massima_index"]
 
             points.append(PointStruct(
-                id=point_id,
+                id=pid,
                 vector=embedding,
                 payload=payload,
             ))

@@ -21,7 +21,8 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import cypher_labels, node_type_cypher
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, label_filter
 
 log = structlog.get_logger()
 
@@ -296,25 +297,27 @@ class VerificationTool(BaseTool):
         Returns:
             Dict con "exists": bool e "node_type": str opzionale
         """
-        # Build node type filter
-        type_filter = ""
-        if node_types:
-            labels = ":".join(node_types)
-            type_filter = f":{labels}"
+        # Build node type filter: labels of the graph only (any of them). A filter that
+        # names none of them finds nothing, and no query is run unfiltered instead.
+        labels = cypher_labels(node_types) if node_types else []
+        if node_types and not labels:
+            return {"exists": False, "node_type": None}
+        type_filter, type_where = label_filter("n", labels)
+        type_clause = f"AND {type_where}" if type_where else ""
 
         # Try multiple match strategies
         cypher = f"""
             MATCH (n{type_filter})
-            WHERE n.URN = $source_id
+            WHERE (n.URN = $source_id
                OR n.nome = $source_id
                OR n.estremi = $source_id
-               OR n.numero_articolo = $source_id
-            RETURN labels(n)[0] AS node_type, n.URN AS urn
+               OR n.numero_articolo = $source_id) {type_clause}
+            RETURN {node_type_cypher('n')} AS node_type, n.URN AS urn
             LIMIT 1
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"source_id": source_id})
+            results = await self.graph_db.ro_query(cypher, {"source_id": source_id})
 
             if results:
                 return {
@@ -323,16 +326,17 @@ class VerificationTool(BaseTool):
                     "urn": results[0].get("urn")
                 }
 
-            # Fallback: Try partial URN match for article numbers
-            if source_id.startswith("art") or source_id.isdigit():
-                cypher_article = """
+            # Fallback: Try partial URN match for article numbers (a Norma: not when
+            # the caller restricted the types to others)
+            if (not labels or "Norma" in labels) and (source_id.startswith("art") or source_id.isdigit()):
+                cypher_article = f"""
                     MATCH (n:Norma)
                     WHERE n.numero_articolo = $article_num
-                    RETURN labels(n)[0] AS node_type, n.URN AS urn
+                    RETURN {node_type_cypher('n')} AS node_type, n.URN AS urn
                     LIMIT 1
                 """
                 article_num = source_id.replace("art", "").strip()
-                results = await self.graph_db.query(
+                results = await self.graph_db.ro_query(
                     cypher_article,
                     {"article_num": article_num}
                 )

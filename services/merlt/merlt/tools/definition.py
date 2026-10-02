@@ -22,9 +22,19 @@ import structlog
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
-from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.storage.graph.schema import Label, cypher_labels, node_type_cypher
+from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int, label_filter
 
 log = structlog.get_logger()
+
+# The most definitions one call returns; interpolated into the Cypher (`LIMIT N`).
+MAX_LIMIT = 50
+
+# What a DEFINISCE edge ends on. The seed's 498 edges all end on a DefinizioneLegale; the
+# ConcettoGiuridico is what older writers linked, and a community entity carries Entity.
+DEFINED_LABELS = (Label.DEFINIZIONE_LEGALE.value, Label.CONCETTO_GIURIDICO.value, Label.ENTITY.value)
+# The nodes that hold a definition of their own (strategy 2).
+DEFINITION_LABELS = (Label.CONCETTO_GIURIDICO.value, Label.DEFINIZIONE_LEGALE.value)
 
 
 @dataclass
@@ -67,8 +77,9 @@ class DefinitionLookupTool(BaseTool):
     Tool per cercare definizioni legali nel knowledge graph.
 
     Cerca definizioni attraverso:
-    1. Relazione DEFINISCE (norme che definiscono concetti)
-    2. Match fuzzy su nomi di ConcettoGiuridico
+    1. Relazione DEFINISCE (norme che definiscono una DefinizioneLegale, un
+       ConcettoGiuridico o un'entita' della community)
+    2. Match fuzzy su nomi di ConcettoGiuridico e DefinizioneLegale
     3. Ricerca nel testo di norme contenenti "si intende", "si definisce"
 
     Particolarmente utile per:
@@ -193,6 +204,27 @@ class DefinitionLookupTool(BaseTool):
             )
 
         try:
+            limit = bounded_int(limit, "limit", 1, MAX_LIMIT)
+        except ValueError as e:
+            return ToolResult.fail(error=str(e), tool_name=self.name)
+
+        if source_types and not cypher_labels(source_types):
+            # The caller filtered on types the graph does not have: nothing can match,
+            # and the lookup must not run unfiltered instead.
+            return ToolResult.ok(
+                data={
+                    "term": term,
+                    "definitions": [],
+                    "total": 0,
+                    "source_types": source_types,
+                    "include_related": include_related
+                },
+                tool_name=self.name,
+                term=term,
+                definitions_found=0
+            )
+
+        try:
             definitions = []
 
             # Strategy 1: Look for DEFINISCE relationships
@@ -201,7 +233,7 @@ class DefinitionLookupTool(BaseTool):
             )
             definitions.extend(graph_defs)
 
-            # Strategy 2: Look for ConcettoGiuridico nodes with matching name
+            # Strategy 2: Look for ConcettoGiuridico and DefinizioneLegale nodes with matching name
             concept_defs = await self._find_concept_definitions(
                 term, exact_match, limit - len(definitions)
             )
@@ -268,7 +300,11 @@ class DefinitionLookupTool(BaseTool):
         """
         Cerca definizioni tramite relazione DEFINISCE.
 
-        Pattern: (Source)-[:DEFINISCE]->(ConcettoGiuridico)
+        Pattern: (Source)-[:DEFINISCE]->(DefinizioneLegale | ConcettoGiuridico | Entity)
+
+        One query per label of the defined node, joined with UNION: an `OR` of labels
+        in the WHERE makes the engine scan every node (80 ms on 425,000 nodes, against
+        1 ms for a label scan), and the graph is about to grow to that size.
         """
         # Build match pattern
         if exact_match:
@@ -276,27 +312,35 @@ class DefinitionLookupTool(BaseTool):
         else:
             match_condition = "toLower(concept.nome) CONTAINS toLower($term)"
 
-        # Source type filter
-        source_filter = ""
-        if source_types:
-            labels = ":".join(source_types)
-            source_filter = f":{labels}"
+        # Source type filter: labels of the graph only (any of them), or no query
+        labels = cypher_labels(source_types) if source_types else []
+        if source_types and not labels:
+            return []
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+        source_filter, source_where = label_filter("source", labels)
+        if source_where:
+            match_condition = f"{match_condition} AND {source_where}"
 
-        cypher = f"""
-            MATCH (source{source_filter})-[r:DEFINISCE]->(concept:ConcettoGiuridico)
+        branches = []
+        for label in DEFINED_LABELS:
+            concept_filter, _ = label_filter("concept", [label])
+            branches.append(f"""
+            MATCH (source{source_filter})-[r:DEFINISCE]->(concept{concept_filter})
             WHERE {match_condition}
             RETURN
                 concept.nome AS term,
-                source.URN AS source_urn,
-                labels(source)[0] AS source_type,
+                coalesce(source.URN, source.node_id) AS source_urn,
+                {node_type_cypher('source')} AS source_type,
                 source.estremi AS source_estremi,
-                concept.definizione AS definition_text,
-                source.testo_vigente AS context
-            LIMIT {limit}
-        """
+                coalesce(concept.definizione, concept.descrizione) AS definition_text,
+                coalesce(source.testo, source.testo_vigente) AS context
+            LIMIT {limit}""")
+        cypher = "\n            UNION".join(branches)
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term})
+            results = await self.graph_db.ro_query(cypher, {"term": term})
 
             return [
                 DefinitionEntry(
@@ -310,7 +354,7 @@ class DefinitionLookupTool(BaseTool):
                 ).to_dict()
                 for r in results
                 if r.get("source_urn")
-            ]
+            ][:limit]
         except Exception as e:
             log.debug(f"DEFINISCE query failed: {e}")
             return []
@@ -322,42 +366,51 @@ class DefinitionLookupTool(BaseTool):
         limit: int
     ) -> List[Dict[str, Any]]:
         """
-        Cerca ConcettoGiuridico con definizione diretta.
+        Cerca ConcettoGiuridico e DefinizioneLegale con definizione diretta.
+
+        One query per label, joined with UNION (see `_find_definitions_via_relation`).
         """
         if exact_match:
             match_condition = "c.nome = $term"
         else:
             match_condition = "toLower(c.nome) CONTAINS toLower($term)"
 
-        cypher = f"""
-            MATCH (c:ConcettoGiuridico)
-            WHERE {match_condition} AND c.definizione IS NOT NULL
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+
+        branches = []
+        for label in DEFINITION_LABELS:
+            node_filter, _ = label_filter("c", [label])
+            branches.append(f"""
+            MATCH (c{node_filter})
+            WHERE {match_condition} AND coalesce(c.definizione, c.descrizione) IS NOT NULL
             RETURN
                 c.nome AS term,
-                c.URN AS source_urn,
-                'ConcettoGiuridico' AS source_type,
+                coalesce(c.URN, c.node_id) AS source_urn,
+                '{label}' AS source_type,
                 c.nome AS source_estremi,
-                c.definizione AS definition_text
-            LIMIT {limit}
-        """
+                coalesce(c.definizione, c.descrizione) AS definition_text
+            LIMIT {limit}""")
+        cypher = "\n            UNION".join(branches)
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term})
+            results = await self.graph_db.ro_query(cypher, {"term": term})
 
             return [
                 DefinitionEntry(
                     term=r.get("term", term),
                     source_urn=r.get("source_urn", r.get("term", "")),
-                    source_type="ConcettoGiuridico",
+                    source_type=r.get("source_type") or Label.CONCETTO_GIURIDICO.value,
                     source_estremi=r.get("source_estremi", ""),
                     definition_text=r.get("definition_text", ""),
                     confidence=0.9  # Concept node definition
                 ).to_dict()
                 for r in results
                 if r.get("definition_text")
-            ]
+            ][:limit]
         except Exception as e:
-            log.debug(f"ConcettoGiuridico query failed: {e}")
+            log.debug(f"Concept definition query failed: {e}")
             return []
 
     async def _find_definitions_in_text(
@@ -375,31 +428,38 @@ class DefinitionLookupTool(BaseTool):
         - "è definito"
         - "per X si intende"
         """
+        labels = cypher_labels(source_types) if source_types else []
+        if source_types and not labels:
+            return []
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+
         source_filter = ":Norma"  # Default to Norma for text search
-        if source_types and len(source_types) == 1:
-            source_filter = f":{source_types[0]}"
+        if len(labels) == 1:
+            source_filter = f":{labels[0]}"
 
         # Search for definition patterns containing the term
         cypher = f"""
             MATCH (n{source_filter})
-            WHERE n.testo_vigente IS NOT NULL
-              AND toLower(n.testo_vigente) CONTAINS toLower($term)
+            WHERE coalesce(n.testo, n.testo_vigente) IS NOT NULL
+              AND toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS toLower($term)
               AND (
-                  toLower(n.testo_vigente) CONTAINS 'si intende'
-                  OR toLower(n.testo_vigente) CONTAINS 'si definisce'
-                  OR toLower(n.testo_vigente) CONTAINS 'è definito'
-                  OR toLower(n.testo_vigente) CONTAINS 'ai sensi'
+                  toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'si intende'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'si definisce'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'è definito'
+                  OR toLower(coalesce(n.testo, n.testo_vigente)) CONTAINS 'ai sensi'
               )
             RETURN
-                n.URN AS source_urn,
-                labels(n)[0] AS source_type,
+                coalesce(n.URN, n.node_id) AS source_urn,
+                {node_type_cypher('n')} AS source_type,
                 n.estremi AS source_estremi,
-                n.testo_vigente AS definition_text
+                coalesce(n.testo, n.testo_vigente) AS definition_text
             LIMIT {limit}
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term})
+            results = await self.graph_db.ro_query(cypher, {"term": term})
 
             return [
                 DefinitionEntry(
@@ -428,23 +488,27 @@ class DefinitionLookupTool(BaseTool):
 
         Trova concetti collegati al termine e restituisce le loro definizioni.
         """
+        limit = bounded_int(limit, "limit", 0, MAX_LIMIT)
+        if limit == 0:
+            return []
+
         cypher = """
             MATCH (c1:ConcettoGiuridico)
             WHERE toLower(c1.nome) CONTAINS toLower($term)
-            MATCH (c1)-[:CORRELATO|:SPECIALIZZA|:GENERALIZZA]-(c2:ConcettoGiuridico)
-            WHERE c2.definizione IS NOT NULL
+            MATCH (c1)-[:CORRELATO|SPECIES]-(c2:ConcettoGiuridico)
+            WHERE coalesce(c2.definizione, c2.descrizione) IS NOT NULL
             RETURN DISTINCT
                 c2.nome AS term,
-                c2.URN AS source_urn,
+                coalesce(c2.URN, c2.node_id) AS source_urn,
                 'ConcettoGiuridico' AS source_type,
                 c2.nome AS source_estremi,
-                c2.definizione AS definition_text,
+                coalesce(c2.definizione, c2.descrizione) AS definition_text,
                 'correlato a ' + c1.nome AS context
             LIMIT $limit
         """
 
         try:
-            results = await self.graph_db.query(cypher, {"term": term, "limit": limit})
+            results = await self.graph_db.ro_query(cypher, {"term": term, "limit": limit})
 
             return [
                 DefinitionEntry(

@@ -427,7 +427,6 @@ async def start_pipeline(
     """
     import asyncio
     from datetime import datetime, timezone
-    from uuid import uuid4
 
     try:
         # Genera run_id univoco
@@ -518,7 +517,6 @@ async def _run_batch_pipeline(run_id: str, request: StartPipelineRequest):
     Questo task viene avviato da start_pipeline e aggiorna il progresso
     via pipeline_orchestrator per WebSocket updates.
     """
-    import asyncio
 
     try:
         log.info("Background pipeline started", run_id=run_id)
@@ -720,15 +718,13 @@ async def get_dataset_stats() -> DatasetStats:
 
         # === Query Bridge Table (PostgreSQL) ===
         try:
-            from merlt.storage.bridge.bridge_table import BridgeTable
-            from merlt.rlcf.database import get_db_url
+            from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
 
-            bridge = BridgeTable(db_url=get_db_url())
+            bridge = BridgeTable(BridgeTableConfig.from_enrichment_env())
             await bridge.connect()
 
             try:
-                count = await bridge.count_mappings()
-                stats.bridge_mappings = count
+                stats.bridge_mappings = await bridge.count()
             finally:
                 await bridge.close()
 
@@ -788,7 +784,6 @@ async def export_dataset(
     """
     import json
     import csv
-    import os
     import tempfile
     from datetime import datetime, timezone
     from uuid import uuid4
@@ -808,10 +803,13 @@ async def export_dataset(
         await graph_client.connect()
 
         try:
-            # Build query con filtri opzionali
+            # Build query con filtri opzionali: the filter is a parameter, never part
+            # of the text (`limit` is a validated integer), and the read is read-only.
+            params = {}
             where_clause = ""
             if request.filter_tipo_atto:
-                where_clause = f"WHERE n.tipo_atto = '{request.filter_tipo_atto}'"
+                where_clause = "WHERE n.tipo_atto = $tipo_atto"
+                params["tipo_atto"] = request.filter_tipo_atto
 
             query = f"""
             MATCH (n)
@@ -820,7 +818,7 @@ async def export_dataset(
             LIMIT {request.limit}
             """
 
-            result = await graph_client.query(query)
+            result = await graph_client.ro_query(query, params)
 
             if not result:
                 return DatasetExportResponse(

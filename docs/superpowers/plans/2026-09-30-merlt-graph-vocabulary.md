@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md`, sections 4 and 6.5. Phase 2 (complete ingestion) and the rest of phase 3 get their own plans.
 
+**Amended 1 October** with what the December 2025 experiments (`services/merlt/docs/experiments/`) found: Tasks 1b (indexes, the key of a past version), 5b (an article found by its URN, not its number), 5c (the benchmark counts an article once) and 6b (indexes, integrity checks and a retrieval gate around the migration).
+
+**Amended 2 October** with the rulings of pull request A's reviews: the four tasks above move into pull request B; Task 6 renames relations with `MERGE`, resets the stamps of the old entity writer, reports twins both ways, labels and keys the community entities, re-keys the doubled version keys, drops stale live-source text and wraps bare keys; the controller, not the implementer, migrates the development graph; Task 7 carries the review's notes; a closing section lists what comes after phase 1.
+
 ## Global Constraints
 
 - Relation types are **UPPER CASE**. A reference between norms is `RINVIA` (never `CITA`, `cita`, `rinvia`, `richiama`); the structure is `CONTIENE` (partition → partition → article → comma → lettera); a community entity's link to the live source it came from is `DERIVA_DA`.
@@ -17,22 +21,30 @@
 - The canonical URN is the **full Normattiva URL** with the version marker (`!vig=…`, `!orig=…`, `@originale`) cut at the first `!` or `@`. The URL wrapper is never stripped: it is the seed's key.
 - `estremi`: `Art. <numero> <abbreviation>` from the one abbreviation table (`Art. 1 Cost.`, `Art. 1321 c.c.`); for an act the table does not know, `Art. <numero>` plus whatever the writer knows.
 - `fonte` values: `Normattiva`, `Brocardi.it`, `manuale:Torrente-libroiv`, `community`, `mcp-legal-it`, `italia_corpus`. `provenance` values: `seed`, `ingestion`, `community_validated`, `live_unconfirmed`, `confirmed`.
-- The text of a node is read through `schema.node_text()`; `Norma` carries `testo` (and `testo_vigente` as an alias) plus `testo_sha256`, the SHA-256 of the exact text.
+- The text of a node is read through `schema.node_text()`; `Norma` carries `testo` (and `testo_vigente` as an alias) plus `testo_sha256`, the SHA-256 of the exact text. The AKN fingerprint (`/fetch_act_fingerprints`, the SHA-256 of the AKN article text) is another property, `akn_sha256`: phase 1 writes none, and it never goes into `testo_sha256` (the two texts never match; `schema.py`, the note above `text_fingerprint`). "Fingerprint" in this plan means `testo_sha256`.
 - Qdrant point ids are `uuid5(namespace, "<canonical URN>|<source_type>|<key>")`, never Python `hash()`; `key` is `0` for the one norm/ratio/spiegazione point of an article and the massima's index for a massima.
 - `article_text` is a data contract (root `CLAUDE.md`, rule 23): the graph copies the text as it comes and never rewrites it.
-- MERL-T tests never touch the development stack's stores. Unit tests, from the repository root: `docker run --rm -v "$PWD/services/merlt:/app" -w /app --entrypoint python visualex-merlt-worker:latest -m pytest <paths> -q -p no:cacheprovider` (the mounted code shadows the image's; the pytest options in `pyproject.toml` exclude `integration`). FalkorDB integration tests use a throwaway `falkordb/falkordb` container on a free port, never `visualex-falkordb`.
+- MERL-T tests never touch the development stack's stores. Unit tests, from the repository root: `docker run --rm -v "$PWD/services/merlt:/app" -w /app --entrypoint python visualex-merlt-worker:latest -m pytest <paths> -q -p no:cacheprovider` (the mounted code shadows the image's; the pytest options in `pyproject.toml` exclude `integration`). FalkorDB integration tests use a throwaway `falkordb/falkordb` container on a free port, never `visualex-falkordb`; they reach it through `FALKORDB_HOST`/`FALKORDB_PORT` and write to a graph of their own (`merlt_test_*`). Since capazme/VisuaLexAPI#38, CI runs `-m integration` against a disposable FalkorDB with the same two variables, so every integration test in this plan runs in CI too.
 - MERL-T code is baked into its images: before any live check, `docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker` and `… up -d --force-recreate merlt-api merlt-worker`.
 - Data moves by export and import: `scripts/backup.sh` before the migration touches the development graph.
 - Code, comments, commits and docs in English; UI copy in Italian. Nothing private in the repository.
-- Git: one branch per pull request, from `develop`, Conventional Commits, merge commits titled `merge: <branch> — <what changes>` once CI is green.
+- Git: one branch per pull request, from `develop` (B from A's head, merged with `develop`), Conventional Commits, merge commits titled `merge: <branch> — <what changes>` once CI is green.
 
-Pull requests: **A** `refactor/merlt-graph-vocabulary` = Tasks 1–5. **B** `feat/merlt-graph-migration` = Task 6, after A. **C** `feat/merlt-article-completeness` = Task 7, after B **and after the migration has run on the development graph** (otherwise every article reads incomplete and is re-ingested on first view). **D** `feat/graph-validators-only` = Task 8, independent of A–C. Task 9 closes the round.
+Pull requests:
+
+- **A** `refactor/merlt-graph-vocabulary` = Tasks 1–5 and the fixes of its reviews. It is capazme/VisuaLexAPI#39, open as a draft.
+- **B** `feat/merlt-graph-migration`, cut from A's head = Tasks 1b, 5b, 5c, 6 and 6b, in that order.
+- **A merges only together with B, back to back**, and the controller migrates the development graph at once (Task 6, Step 6). Merged alone, A's readers would miss 16,866 of the seed's 43,936 edges, whose names only the migration changes.
+- **C** `feat/merlt-article-completeness` = Task 7, after B **and after the migration has run on the development graph** (otherwise every article reads incomplete and is re-ingested on first view).
+- **D** `feat/graph-validators-only` = Task 8, independent of A–C.
+- **Task 9** closes the round with the docs.
+- CI runs `-m integration` against a disposable FalkorDB since capazme/VisuaLexAPI#38.
 
 ## Review Focus
 
 1. **A URN that carries `@originale` or `!vig=…`** (the reader, the tracking payloads and the BFF all produce them) must reach the same node as the bare URL. Pinned by Task 1 (`canonical_urn`), Task 5 (the graph tool's start node) and Task 7 (check-article).
 2. **A relation name built at runtime** — a map value, a list handed to the graph tool, an f-string placeholder — is invisible to the static contract test. Pinned by Task 3 (multivigenza map, seed edges), Task 4 (entity-writer map, community relations) and Task 5 (the experts' lists, the graph tool's resolution of legacy and policy names).
-3. **The migration run twice, or restarted after a crash half-way,** must converge and report nothing the second time. Pinned by Task 6 (FalkorDB integration test, Qdrant in-memory tests, the upsert-then-crash case).
+3. **The migration run twice, or restarted after a crash half-way,** must converge and change nothing the second time (what it only reports — twins, a key two nodes would share — it reports again). Pinned by Task 6 (FalkorDB integration test, Qdrant in-memory tests, the upsert-then-crash case).
 4. **The same article ingested by two processes** must produce the same Qdrant ids (Python's `hash()` is salted per process). Pinned by Task 1 (subprocess test) and Task 3 (the lazy writer's ids).
 5. **A non-administrator calling the graph API directly** gets 403 even though the UI hides the graph — while contributors keep the entity search their picker needs; and **an article that stays incomplete** is not re-ingested on every view. Pinned by Task 8 and Task 7.
 
@@ -41,8 +53,9 @@ Pull requests: **A** `refactor/merlt-graph-vocabulary` = Tasks 1–5. **B** `fea
 - **A page for the Q&A without the graph** (spec 6.5, last sentence). The Q&A lives on `/grafo`; Task 8 hides it together with the graph for non-administrators. A graph-free "Assistente" page is its own UI round, once the owner chooses.
 - **Doctrine and vectors in the completeness check** (spec 4.3). Phase 1 checks text, commi, hierarchy and fingerprint. Adding the other two now would re-ingest all 889 seed articles on first view and duplicate their vectors, because seed and lazy points are keyed differently until phase 2 re-ingests.
 - **A stored, dated completeness record** (spec 4.3). Phase 1 derives completeness from the graph itself, which cannot go stale; the dated record comes with phase 2, together with the two parts above.
-- **Massime payload fields** (`autorita`, `numero`, `anno`) and the full doctrine layer: phase 2.
-- **Existing concept twins**: the migration reports them (the development graph has none); the entity writer merges new ones (Task 4).
+- **Massime and rulings** (spec 5.1) and the full doctrine layer: phase 2. `AttoGiudiziario` is the ruling (the pronuncia) and its massime are attributes of it, as the owner decided (1 October); a ruling is keyed by the identity it shares with the sentenze and massimario rounds (`cassazione:<archivio>:<numero>:<anno>`), and a massima by its ruling's key plus a fingerprint of its text.
+- **A massima's point key**: phase 1 keeps the massima's index (Global Constraints); the spec (5.1) keys it on the ruling plus a fingerprint of its text, and phase 2 re-keys those points with a migration of its own.
+- **Existing concept twins**: the migration reports them, never merges them (Task 6, `report_twins`); the entity writer merges new ones (Task 4). The development graph has no community twin, and 8 pairs (16 nodes) of seed nodes that are near-duplicates of each other ("La reticenza" / "reticenza").
 - **`Dottrina.descrizione`, `AttoGiudiziario.massima`** keep their names; `node_text()` reads them.
 - **`RINVIA` in the systemic floor**: it stays a policy-chosen extra until phase 2 writes the references and they can be measured.
 - **`ConstitutionalBasisTool`, `CitationChainTool`**: unwired (Task 5); phase 2 can rewire the first on `RINVIA` edges to the Constitution.
@@ -666,6 +679,118 @@ Expected: PASS (the parser's own tests import the old names and still pass).
 ```bash
 git add services/merlt/merlt/storage/graph/schema.py services/merlt/tests/unit/test_graph_schema.py services/merlt/merlt/pipeline/mechanical_ingestion/parser.py
 git commit -m "feat(merlt): one schema module for the graph's vocabulary"
+```
+
+---
+
+### Task 1b: Indexes and version keys in the schema
+
+Spec 4.1 (amended 1 October). FalkorDB has no index today, so every `MERGE` scans its label; and multivigenza keys a past version `<URN>!vig=<date>`, a key `canonical_urn` folds onto the live article. The schema owns both. The version key also fixes a live bug: the writer keys a version `…!vig=!vig=<date>` and its `VERSIONE_DI` matches no article. It keeps today's model (spec 11, question 5 stays open); Task 6 re-keys and links the versions already written. Pull request B starts here.
+
+**Files:**
+- Modify: `services/merlt/merlt/storage/graph/schema.py` (append)
+- Modify: `services/merlt/merlt/pipeline/multivigenza.py:~1233` (`_save_version`)
+- Test: `services/merlt/tests/unit/test_graph_schema.py` (append), `services/merlt/tests/pipeline/test_multivigenza_version_key.py` (new)
+
+**Interfaces:**
+- Consumes: `Label`, `canonical_urn` (Task 1).
+- Produces: `GRAPH_INDEXES: tuple[tuple[Label, str], ...]`; `QDRANT_PAYLOAD_INDEXES: dict[str, str]`; `version_urn(urn: str, version_date: str) -> str`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/unit/test_graph_schema.py`:
+
+```python
+def test_graph_indexes_cover_every_merge_key():
+    keys = set(s.GRAPH_INDEXES)
+    for label in (s.Label.NORMA, s.Label.COMMA, s.Label.LETTERA, s.Label.NUMERO):
+        assert (label, "URN") in keys
+    for label in s.Label:
+        assert (label, "node_id") in keys  # a community entity carries node_id too (Task 6)
+    assert (s.Label.ENTITY, "id") in keys  # the entity writer still looks it up by id
+    assert len(keys) == len(s.GRAPH_INDEXES)  # no index listed twice
+
+
+def test_qdrant_payload_indexes():
+    assert s.QDRANT_PAYLOAD_INDEXES == {"article_urn": "keyword", "source_type": "keyword"}
+
+
+def test_a_version_has_its_own_key_and_reads_back_to_the_article():
+    key = s.version_urn(CC + "@originale", "2020-01-01")
+    assert key == CC + "!vig=2020-01-01"
+    assert s.canonical_urn(key) == CC  # a reader asking for the version lands on the article
+```
+
+```python
+# services/merlt/tests/pipeline/test_multivigenza_version_key.py
+"""A past version is written under its own key, never the live article's."""
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+from merlt.pipeline.multivigenza import MultivigenzaPipeline
+
+CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043"
+
+
+async def test_a_version_is_merged_under_version_urn_and_linked_to_the_article():
+    client = AsyncMock()
+    client.query.return_value = []
+    pipeline = MultivigenzaPipeline(falkordb_client=client, scraper=MagicMock())
+    pipeline._timestamp = "2026-10-01T00:00:00+00:00"
+    # urngenerator appends "!vig=" to a vigente URN: today the key becomes "…!vig=!vig=2020-01-01"
+    # and VERSIONE_DI looks for an article keyed "…!vig=", which does not exist.
+    await pipeline._save_version(SimpleNamespace(urn=CC + "!vig="), version_label="v1", version_date="2020-01-01", testo="t")
+    merge_params, link_params = (call.args[1] for call in client.query.await_args_list[:2])
+    assert merge_params["urn"] == CC + "!vig=2020-01-01"
+    assert link_params == {"ver_urn": CC + "!vig=2020-01-01", "art_urn": CC}
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `… -m pytest tests/unit/test_graph_schema.py tests/pipeline/test_multivigenza_version_key.py -q -p no:cacheprovider`
+Expected: FAIL — `module 'merlt.storage.graph.schema' has no attribute 'GRAPH_INDEXES'`; the multivigenza test gets `…!vig=!vig=2020-01-01`.
+
+- [ ] **Step 3: Implement**
+
+Append to `schema.py`:
+
+```python
+# The keys every MERGE looks a node up by (spec 4.1). FalkorDB has no index
+# until the migration creates these (Task 6b); without them each MERGE scans
+# its whole label, which phase 2's volume cannot afford. A community entity
+# carries `node_id` (the same value as its `id`, Task 6) and is still looked
+# up by `id` by the entity writer: both are indexed.
+GRAPH_INDEXES: tuple[tuple[Label, str], ...] = (
+    *((label, "URN") for label in (Label.NORMA, Label.COMMA, Label.LETTERA, Label.NUMERO)),
+    *((label, "node_id") for label in Label),
+    (Label.ENTITY, "id"),
+)
+
+# Qdrant payload fields every reader filters on.
+QDRANT_PAYLOAD_INDEXES: dict[str, str] = {"article_urn": "keyword", "source_type": "keyword"}
+
+
+def version_urn(urn: str, version_date: str) -> str:
+    """The key of a past version of an article (multivigenza). A writer uses it
+    as it is: `canonical_urn` folds it onto the live article, which is what a
+    reader wants and a writer must not do. How versions are modelled for good
+    is open (spec section 11)."""
+    return f"{canonical_urn(urn)}!vig={version_date}"
+```
+
+In `pipeline/multivigenza.py`, import `canonical_urn` and `version_urn` from `merlt.storage.graph.schema`; in `_save_version` replace `versioned_urn = f"{base_urn}!vig={version_date}"` with `versioned_urn = version_urn(base_urn, version_date)`, and the link query's `"art_urn": base_urn` with `"art_urn": canonical_urn(base_urn)`.
+
+In `schema.py`, the comment on `Label.ATTO_GIUDIZIARIO` says only "a massima". Make it say what is true now and what changes: today the seed's node is a massima, keyed `massima_<corte>_<numero>`; phase 2 makes the node the ruling (the pronuncia), keyed by the shared decision identity, with its massime as attributes (the owner decided, 1 October; spec §5.1). A comment only: phase 1 changes no key.
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run the command of Step 2. Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add services/merlt/merlt/storage/graph/schema.py services/merlt/merlt/pipeline/multivigenza.py services/merlt/tests/unit/test_graph_schema.py services/merlt/tests/pipeline/test_multivigenza_version_key.py
+git commit -m "feat(merlt): the schema lists the graph's indexes and keys a past version"
 ```
 
 ---
@@ -1580,28 +1705,298 @@ Contract test: `KNOWN_LEGACY_RELS = set()`, `KNOWN_UNKNOWN_LABELS = set()`, and 
 Run: `… -m pytest tests -q -p no:cacheprovider` with a disposable Postgres for the DB-backed tests (`services/merlt/CLAUDE.md`, "Tests"); without one, `tests/unit tests/pipeline tests/rlcf tests/scripts` here and the rest in CI.
 Expected: PASS, with every `KNOWN_*` set empty.
 
-- [ ] **Step 5: Commit, then open pull request A**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A services/merlt
 git commit -m "refactor(merlt): the experts, tools, retriever and policy read the schema's vocabulary"
-git push -u origin refactor/merlt-graph-vocabulary
 ```
 
-Pull request into `develop` for Tasks 1–5; after CI and the review, merge with `merge: refactor/merlt-graph-vocabulary — one vocabulary for the graph's writers and readers`.
+Pull request A ends here: its whole-branch review and the fixes that followed are on capazme/VisuaLexAPI#39, open as a draft. It merges only together with B (header).
+
+---
+
+### Task 5b: Find an article by its URN, not its number
+
+Spec 4.5 (amended 1 October). `FalkorDBClient.get_related_nodes_for_article` (the retriever's and the hybrid retriever's graph enrichment) matches `Norma {numero_articolo}` taken from the URN with `~art(\d+)`: with two codes in the graph art. 52 c.p. gets art. 52 c.c.'s neighbours, and a `bis` article gets none. `ExternalSourceTool._parse_urn_from_query` builds `urn:nir:…;262~artN` and `…;1398~artN` — no URL wrapper, no annex — so its graph lookup never matches a key (the tool is exported, not registered; fixed so that it is right when it is).
+
+Touching `tools/external_source.py` brings its graph lookup into scope for the security rule Task 5's fix round applied to every reader the experts call (OWASP A03): no string the LLM chose reaches the Cypher text, values go in as parameters, and the reader runs `FalkorDBClient.ro_query`, which the server refuses to let write. The other readers do it with `cypher_rel_names`, `cypher_labels` (`storage/graph/schema.py`) and `bounded_int` (`tools/base.py`); this lookup names no relation, label or number, so it needs none of them. Read today: both of its statements already pass their values as parameters, and they run through `query`. Step 4 pins the first and moves them to `ro_query`.
+
+**Files:**
+- Modify: `services/merlt/merlt/storage/graph/client.py:~329-410` (`get_related_nodes_for_article`)
+- Modify: `services/merlt/merlt/tools/external_source.py:~192-246, 342-372` (`_search_graph`, `_parse_urn_from_query`)
+- Test: `services/merlt/tests/unit/test_article_lookup_by_urn.py` (new)
+
+**Interfaces:**
+- Consumes: `canonical_urn` (Task 1); `merlt.utils.urngenerator.generate_urn`; `FalkorDBClient.ro_query` (pull request A).
+- Produces: `get_related_nodes_for_article(article_urn, max_results)` queries with `{"urn": canonical_urn(article_urn)}`; `ExternalSourceTool._parse_urn_from_query` returns a canonical URN or None; `ExternalSourceTool._search_graph` reads through `graph_db.ro_query`.
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# services/merlt/tests/unit/test_article_lookup_by_urn.py
+"""An article is found by its canonical URN, never by its number alone."""
+from unittest.mock import AsyncMock
+
+import pytest
+
+from merlt.storage.graph.client import FalkorDBClient
+from merlt.tools.external_source import ExternalSourceTool
+
+BASE = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
+CP52 = BASE + "regio.decreto:1930-10-19;1398:1~art52"
+CC1453 = BASE + "regio.decreto:1942-03-16;262:2~art1453"
+
+
+async def test_related_nodes_are_looked_up_by_the_canonical_urn():
+    client = FalkorDBClient.__new__(FalkorDBClient)  # no connection: query is replaced
+    client.query = AsyncMock(return_value=[])
+    await client.get_related_nodes_for_article(CP52 + "!vig=2024-01-01")
+    cypher, params = client.query.await_args.args
+    assert params == {"urn": CP52}
+    assert "numero_articolo" not in cypher
+
+
+@pytest.mark.parametrize("query, urn", [
+    ("art. 52 c.p.", CP52),
+    ("articolo 1453 codice civile", CC1453),
+    ("art. 2-bis c.p.", BASE + "regio.decreto:1930-10-19;1398:1~art2bis"),
+    ("art. 2 bis c.p.", BASE + "regio.decreto:1930-10-19;1398:1~art2bis"),
+    ("art. 5 terzo comma c.p.", BASE + "regio.decreto:1930-10-19;1398:1~art5"),
+    ("art. 52 c.p.c.", BASE + "regio.decreto:1940-10-28;1443:1~art52"),
+    ("art. 52 c.p.p.", BASE + "decreto.del.presidente.della.repubblica:1988-09-22;447~art52"),
+    ("urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453", CC1453),
+    (CC1453 + "@originale", CC1453),
+])
+def test_a_citation_becomes_the_graph_key(query, urn):
+    assert ExternalSourceTool()._parse_urn_from_query(query) == urn
+
+
+def test_a_query_without_a_citation_has_no_urn():
+    assert ExternalSourceTool()._parse_urn_from_query("risoluzione per inadempimento") is None
+```
+
+(`generate_urn("codice penale", article="2-bis")` returns `…;1398:1~art2bis`, checked on 1 October: the form the lazy path writes.)
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `… -m pytest tests/unit/test_article_lookup_by_urn.py -q -p no:cacheprovider`
+Expected: FAIL — the client is called with `{"numero": "52"}`; the tool returns `urn:nir:…;1398~art52`.
+
+- [ ] **Step 3: Implement**
+
+`client.py`, in `get_related_nodes_for_article`: delete the `re` import and the `~art(\d+)` extraction; the Cypher starts `MATCH (n:Norma {URN: $urn})` and the call is `await self.query(cypher, {"urn": canonical_urn(article_urn)})` (import `canonical_urn` from `merlt.storage.graph.schema` at the top). The debug log names the URN instead of `art.{numero_articolo}`.
+
+`external_source.py`:
+
+```python
+from merlt.storage.graph.schema import canonical_urn
+from merlt.utils.urngenerator import generate_urn
+
+_NORMATTIVA_PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
+_ARTICLE = re.compile(
+    r"art(?:\.|icolo)?\s*(\d+(?:\s?-?(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)"
+)
+# Longer abbreviations first: "c.p." is inside "c.p.c." and "c.p.p.".
+_CODES = (("c.p.c.", "codice di procedura civile"), ("codice di procedura civile", "codice di procedura civile"),
+          ("c.p.p.", "codice di procedura penale"), ("codice di procedura penale", "codice di procedura penale"),
+          ("c.c.", "codice civile"), ("codice civile", "codice civile"),
+          ("c.p.", "codice penale"), ("codice penale", "codice penale"))
+
+    def _parse_urn_from_query(self, query: str) -> Optional[str]:
+        """The graph key of the article a query cites, or None."""
+        text = query.strip()
+        if text.startswith("urn:"):
+            return canonical_urn(_NORMATTIVA_PREFIX + text)
+        if text.startswith(_NORMATTIVA_PREFIX):
+            return canonical_urn(text)
+        lower = text.lower()
+        match = _ARTICLE.search(lower)
+        if not match:
+            return None
+        article = re.sub(r"[\s-]", "", match.group(1))  # "2-bis", "2 bis" → "2bis"
+        for marker, act in _CODES:
+            if marker in lower:
+                return canonical_urn(generate_urn(act, article=article))
+        return None
+```
+
+(Today "art. 52 c.p.c." resolves to art. 52 of the codice penale: a wrong article, silently. The `\b` keeps "art. 5 terzo comma" from reading as art. 5-ter. The expected URNs of the c.p.c. and c.p.p. cases are `generate_urn`'s output, checked on 1 October.)
+
+- [ ] **Step 4: The graph lookup is read-only and takes the query as a parameter**
+
+Append to `tests/unit/test_article_lookup_by_urn.py`:
+
+```python
+class _Graph:
+    """A graph that answers read-only calls; a call to `query`, which may write, is recorded."""
+
+    def __init__(self):
+        self.ro_query = AsyncMock(return_value=[{"text": "t", "urn": CC1453, "estremi": "Art. 1453 c.c.", "numero": "1453"}])
+        self.query = AsyncMock(return_value=[])
+
+
+@pytest.mark.parametrize("query, params", [
+    ("art. 1453 c.c.", {"urn": CC1453}),
+    # the text an LLM could pass after reading a hostile document
+    ("x' }) DETACH DELETE a //", {"query": "x' }) DETACH DELETE a //"}),
+])
+async def test_the_graph_lookup_is_read_only_and_takes_the_query_as_a_parameter(query, params):
+    graph = _Graph()
+    found = await ExternalSourceTool(graph_db=graph)._search_graph(query)
+    graph.query.assert_not_awaited()
+    cypher, sent = graph.ro_query.await_args.args
+    assert sent == params
+    assert query not in cypher and "DETACH" not in cypher
+    assert "coalesce(a.testo, a.testo_vigente)" in cypher
+    assert found["urn"] == CC1453
+```
+
+Run it: FAIL — `_search_graph` calls `graph_db.query` (the tool's `except` turns the missing answer into None).
+
+In `_search_graph`, both statements read the text the way the schema's accessor expects and the call is `ro_query`:
+
+```python
+        if urn:
+            cypher = """
+            MATCH (a:Norma {URN: $urn})
+            RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
+                   a.estremi AS estremi, a.numero_articolo AS numero
+            """
+            params = {"urn": urn}
+        else:
+            cypher = """
+            MATCH (a:Norma)
+            WHERE a.estremi CONTAINS $query
+               OR a.numero_articolo = $query
+               OR toLower(coalesce(a.testo, a.testo_vigente, '')) CONTAINS toLower($query)
+            RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
+                   a.estremi AS estremi, a.numero_articolo AS numero
+            LIMIT 1
+            """
+            params = {"query": query}
+
+        try:
+            result = await self.graph_db.ro_query(cypher, params)
+```
+
+The comment above the call says why: the query is the LLM's text, it only ever travels as a parameter, and the read-only call is the second line of defence (Task 5's security ruling).
+
+- [ ] **Step 5: Run the tests to verify they pass**
+
+Run the command of Step 2, then `tests/unit` whole. Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add services/merlt/merlt/storage/graph/client.py services/merlt/merlt/tools/external_source.py services/merlt/tests/unit/test_article_lookup_by_urn.py
+git commit -m "fix(merlt): find an article by its canonical URN, not by its number"
+```
+
+---
+
+### Task 5c: The benchmark counts an article once
+
+Spec 9 (amended 1 October). The retrieval gate of Task 6b needs metrics that mean what they say. Several chunks of one article (its norma, its ratio, its massime) come back as several hits: graded NDCG goes above 1 (EXP-016 reports 1.02) and recall counts one article several times.
+
+**Files:**
+- Modify: `services/merlt/merlt/benchmark/metrics.py` (`distinct_in_order`; `compute_retrieval_metrics`, `compute_graded_relevance_metrics`)
+- Modify: `services/merlt/merlt/benchmark/rag_benchmark.py:~355` (`_run_queries_for_source`)
+- Test: `services/merlt/tests/unit/test_benchmark_metrics.py` (new)
+
+**Interfaces:**
+- Produces: `distinct_in_order(urns: list[str]) -> list[str]`; both aggregate functions score each retrieved list after `distinct_in_order`.
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# services/merlt/tests/unit/test_benchmark_metrics.py
+"""An article retrieved through several chunks counts once."""
+import pytest
+
+from merlt.benchmark.metrics import (
+    compute_graded_relevance_metrics,
+    compute_retrieval_metrics,
+    distinct_in_order,
+)
+
+A, B, C = "urn:a", "urn:b", "urn:c"
+
+
+def test_distinct_in_order_keeps_the_first_occurrence():
+    assert distinct_in_order([A, A, B, A, C]) == [A, B, C]
+
+
+def test_ndcg_never_exceeds_one():
+    metrics = compute_graded_relevance_metrics([[A, A, A, B]], [{A: 3, B: 2}])
+    assert metrics.ndcg_at_5 == pytest.approx(1.0)
+    assert metrics.ndcg_at_10 == pytest.approx(1.0)
+
+
+def test_a_repeated_article_does_not_push_another_out_of_the_top_five():
+    metrics = compute_retrieval_metrics([[A, A, A, A, A, B]], [[A, B]])
+    assert metrics.recall_at_5 == pytest.approx(1.0)
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `… -m pytest tests/unit/test_benchmark_metrics.py -q -p no:cacheprovider`
+Expected: FAIL — `cannot import name 'distinct_in_order'`.
+
+- [ ] **Step 3: Implement**
+
+In `metrics.py`:
+
+```python
+def distinct_in_order(urns: List[str]) -> List[str]:
+    """Each article once, at its best rank: a search returns chunks, the
+    benchmark scores articles."""
+    seen: Set[str] = set()
+    return [u for u in urns if not (u in seen or seen.add(u))]
+```
+
+First statement of `compute_retrieval_metrics` and of `compute_graded_relevance_metrics`: `all_retrieved = [distinct_in_order(r) for r in all_retrieved]`. In `rag_benchmark._run_queries_for_source`: `retrieved_urns = distinct_in_order([r.get("urn", "") for r in search_results])`; `scores` and `source_types` keep the raw lists (they describe the chunks).
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run the command of Step 2. Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add services/merlt/merlt/benchmark services/merlt/tests/unit/test_benchmark_metrics.py
+git commit -m "fix(merlt): the retrieval benchmark counts an article once"
+```
 
 ---
 
 ### Task 6: Migrate the existing graph and its vectors
 
+Spec 4.4. The script and its tests are the implementer's (Steps 1–5); the run on the development graph is the controller's, last, after Task 6b and the whole-branch review of pull request B (Step 6): it rewrites the development graph, reversible only through the backup, so it runs once, with the dry-run report read first.
+
+The window this task closes: code from A on a graph not yet migrated. The readers miss every edge still named the old way, and `POST /api/v1/graph/search` answers empty until `--apply` re-keys the Qdrant points (A's reader skips the points keyed by an integer; before A it answered 500). Hence A merges only together with B, and `--apply` runs at once (Step 6).
+
+Besides the spec's list, the migration repairs what pull request A's reviews found in the data the old writers left:
+
+- **The old entity writer's stamps.** Before Task 4 it ran `SET art.provenance = coalesce(art.provenance, 'community_validated'), art.trust = coalesce(art.trust, 1.0)` on every article it linked an entity to. The community validated the link, which carries its own provenance; the article gets back `seed` or `ingestion`, and no `trust`.
+- **Twins, both ways.** The seed key comes from the name by the writer's rule (`seed_twin_slugs`: `seed_twin_slug` as spelt, then without a leading article), never from the community id, which drops accents and hyphens. A seed name may keep its article where the proposal drops it (13 of the seed's 19 article-bearing names have no article-less node), so seed names are indexed under both their keys too. Seed nodes whose names give one community id ("La reticenza", "reticenza": 8 pairs, 16 nodes, on the Libro IV seed) are reported as near-duplicates.
+- **Community entity labels.** The writer before Task 4 labelled a community entity `:Entity:<tipo.capitalize()>` (`Concetto`, `Principio`). Each gains the label of its kind from `schema.ENTITY_LABEL_BY_TYPE` (`entity_label`), idempotently; the label is taken from the map, never from the node. The old label goes (controller's ruling): `LEGACY_ENTITY_LABELS` is a fixed set the script builds from `EntityType` (`tipo.capitalize()` for every type), and every name in it is removed from an `:Entity` node unless it is the label `entity_label(tipo)` gives that node. A reader takes a node's type from its first label that is not `Entity`, and FalkorDB orders labels by creation, so a left-over `Concetto` would read as the type in a graph where it was created before the seed's labels; and a community `norma` entity written `:Entity:Norma` would be matched as a norm by every `(n:Norma)` step. This step runs first, before any step that matches `Norma`. The names come from the code's set, never from the node; `tipo` goes in as a parameter. The development graph has no such node; another graph may.
+- **Provenance outside the schema.** The ingestion before this round stamped `lazy_ingest`: it becomes `ingestion`. Any other value outside `Provenance` is reported and left alone. The comment in `merlt/storage/graph/entity_writer.py` (~426) that names `lazy_ingest` is corrected to `ingestion`.
+- **Community entity key.** Community entities carry `id` only, so `get_article_relations` answers a null `target_urn` and `get_article_entities` FalkorDB's internal id. Every community entity also carries `node_id = id` (controller's ruling): the entity writer writes it, the migration sets `node_id = coalesce(e.node_id, e.id)`, and the readers that return a node's key read `coalesce(URN, node_id)`. Task 1b indexes `(Entity, node_id)`.
+- **Doubled version keys** (Task 1b). The versions multivigenza keyed `…!vig=!vig=<date>` get `version_urn`'s key and their `VERSIONE_DI` edge to the article.
+- **Stale live-source text.** A `LiveSource` the provisional writer refreshed after Task 4 has `testo` and still its old `text`: the old one goes.
+- **Bare keys.** A `Norma` keyed by a bare `urn:nir:` URN is unreachable. Its key becomes the full Normattiva URL when no node holds that URL; when one does, it is reported (two nodes for one norm: merging them is a decision, and FalkorDB has no APOC). The development graph has one: `urn:nir:stato:codice.penale:1930-10-19;1398~art52`.
+
 **Files:**
 - Create: `services/merlt/merlt/scripts/migrate_graph_vocabulary.py`
-- Test: `services/merlt/tests/scripts/test_migrate_graph_vocabulary.py` (unit: estremi plan, Qdrant in memory), `services/merlt/tests/scripts/test_migrate_graph_vocabulary_integration.py` (`integration`: throwaway FalkorDB)
+- Modify: `services/merlt/merlt/storage/graph/entity_writer.py` (`_create_new_entity_node` writes `node_id`)
+- Modify: `services/merlt/merlt/api/graph_router.py:~264` (`get_article_entities` returns `COALESCE(e.URN, e.node_id)`)
+- Test: `services/merlt/tests/scripts/test_migrate_graph_vocabulary.py` (unit: estremi plan, Qdrant in memory), `services/merlt/tests/scripts/test_migrate_graph_vocabulary_integration.py` (`integration`: throwaway FalkorDB), `services/merlt/tests/unit/test_writers_vocabulary.py` (append), `services/merlt/tests/api/test_article_entity_key.py` (new), `services/merlt/tests/storage/test_entity_writer_twins.py` (append, `integration`)
 - Modify: `services/merlt/tests/unit/test_graph_vocabulary_contract.py` (`EXEMPT` gains the script: it must name the old relations to rename them)
 
 **Interfaces:**
-- Consumes: `LEGACY_REL`, `LEGACY_SOURCE_TYPE`, `Label`, `Provenance`, `Rel`, `SEED_TWIN`, `canonical_urn`, `act_name_from_urn`, `estremi_from_urn`, `normalize_fonte`, `point_id`, `text_fingerprint` (Task 1); `FalkorDBClient`, `FalkorDBConfig`; `qdrant_client`; `merlt.scripts.load_seed_libro_iv.SEED_GRAPH_JSON`; `merlt.storage.vectors.collection.default_chunks_collection`.
-- Produces: `python -m merlt.scripts.migrate_graph_vocabulary [--apply] [--batch N]` printing `{"applied", "graph": {"relations", "stubs", "estremi", "provenance", "fonte", "testo", "fingerprint", "twins"}, "vectors": {"rekeyed", "duplicates_dropped", "retyped", "urns_canonicalized"}}`; `async migrate_graph(client, *, apply, batch, seed_keys) -> dict`; `migrate_qdrant(client, collection, *, apply, batch=256) -> dict`; `plan_estremi(rows) -> list[dict]`; `plan_qdrant(points) -> dict`.
+- Consumes: `LEGACY_REL`, `LEGACY_SOURCE_TYPE`, `Label`, `Provenance`, `Rel`, `SEED_TWIN`, `canonical_urn`, `act_name_from_urn`, `estremi_from_urn`, `normalize_fonte`, `point_id`, `text_fingerprint` (Task 1); `entity_label` (pull request A); `version_urn` (Task 1b); `normalize_entity_name`, `seed_twin_slugs` (`merlt.storage.graph.entity_writer`); `wrapped_norm_key` (`merlt.storage.graph.relation_endpoints`); `FalkorDBClient`; `qdrant_client`; `merlt.scripts.load_seed_libro_iv.SEED_GRAPH_JSON`; `merlt.storage.vectors.collection.default_chunks_collection`.
+- Produces: `python -m merlt.scripts.migrate_graph_vocabulary [--apply] [--batch N]` printing `{"applied", "graph": {"relations_collapsed", "relations", "legacy_entity_labels", "bare_keys", "versions", "stubs", "provenance_reset", "estremi", "provenance_legacy", "provenance", "fonte", "testo", "stale_text", "fingerprint", "entity_labels", "entity_node_id", "twins"}, "vectors": {"rekeyed", "duplicates_dropped", "retyped", "urns_canonicalized", "unkeyed"}}` (`stubs` is `{"reshaped", "set", "removed", "reported"}`); `async migrate_graph(client, *, apply, batch, seed_keys) -> dict`; `migrate_qdrant(client, collection, *, apply, batch=256) -> dict`; `plan_estremi(rows) -> list[dict]`; `plan_qdrant(points) -> dict`. A community entity carries `node_id` equal to its `id`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1676,24 +2071,29 @@ def test_a_crash_between_upsert_and_delete_converges():
 # services/merlt/tests/scripts/test_migrate_graph_vocabulary_integration.py
 """The migration against a real FalkorDB — a throwaway one, never the stack's.
 
-    docker run -d --rm --name vx-mig-falkor -p 127.0.0.1:6399:6379 falkordb/falkordb
-    MIGRATION_TEST_FALKORDB=host.docker.internal:6399 python -m pytest tests/scripts -m integration
-"""
-import os
+It writes to a graph of its own (`merlt_test_migration`), wiped before and after. The
+client reads FALKORDB_HOST and FALKORDB_PORT: CI sets them for its integration step;
+locally,
 
+    docker run -d --rm --name vx-mig-falkor -p 127.0.0.1:6399:6379 falkordb/falkordb
+    FALKORDB_HOST=host.docker.internal FALKORDB_PORT=6399 python -m pytest tests/scripts -m integration
+"""
 import pytest
+import pytest_asyncio
 
 from merlt.scripts import migrate_graph_vocabulary as mig
-from merlt.storage.graph import FalkorDBClient, FalkorDBConfig
+from merlt.storage.graph import FalkorDBClient
 from merlt.storage.graph.schema import text_fingerprint
 
 pytestmark = pytest.mark.integration
 
-CODE = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2"
-ART, STUB = CODE + "~art1321", CODE + "~art1322"
+PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
+CODE = PREFIX + "urn:nir:stato:regio.decreto:1942-03-16;262:2"
+ART, STUB, ART3 = CODE + "~art1321", CODE + "~art1322", CODE + "~art1323"
 TEXT = "Testo dell'articolo."
 DOTTRINA = "dottrina_brocardi_art1321_ratio"
 SEED_KEYS = {ART, DOTTRINA}
+BARE_CP = "urn:nir:stato:codice.penale:1930-10-19;1398~art52"  # the development graph's one bare key
 
 LEGACY = """
 CREATE (codice:Norma {URN: $code, tipo_documento: 'codice', fonte: 'VisualexAPI'}),
@@ -1710,17 +2110,32 @@ CREATE (codice:Norma {URN: $code, tipo_documento: 'codice', fonte: 'VisualexAPI'
        (e)-[:CITA {fonte: 'community_validation'}]->(ls)
 """
 
+NO_TWINS = {"community": [], "seed_near_duplicates": []}
 
-@pytest.fixture
+# What a run reports when it has nothing to change.
+NOTHING = {
+    "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
+    "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": 0, "provenance_reset": {}, "estremi": 0,
+    "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {}, "testo": 0, "stale_text": 0,
+    "fingerprint": 0, "entity_labels": {}, "entity_node_id": 0, "twins": NO_TWINS,
+}
+
+
+@pytest_asyncio.fixture
 async def graph():
-    host, port = os.environ["MIGRATION_TEST_FALKORDB"].rsplit(":", 1)
-    client = FalkorDBClient(FalkorDBConfig(host=host, port=int(port), graph_name="migration_test"))
+    client = FalkorDBClient(graph_name="merlt_test_migration")
     await client.connect()
     await client.query("MATCH (n) DETACH DELETE n")
     await client.query(LEGACY, {"code": CODE, "art": ART, "stub": STUB, "text": TEXT, "dottrina": DOTTRINA})
     yield client
-    await client.query("MATCH (n) DETACH DELETE n")
-    await client.close()
+    try:
+        await client.query("MATCH (n) DETACH DELETE n")
+    finally:
+        await client.close()
+
+
+async def _migrate(client, seed_keys=SEED_KEYS) -> dict:
+    return await mig.migrate_graph(client, apply=True, batch=2, seed_keys=seed_keys)
 
 
 async def _types(client) -> set[str]:
@@ -1728,8 +2143,9 @@ async def _types(client) -> set[str]:
 
 
 async def test_the_migration_converges_on_the_schema(graph):
-    report = await mig.migrate_graph(graph, apply=True, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
     assert report == {
+        **NOTHING,
         "relations": {"CITA→DERIVA_DA": 1, "contiene": 1, "commenta": 1, "CITA": 1},
         "stubs": 1,
         "estremi": 2,
@@ -1737,7 +2153,8 @@ async def test_the_migration_converges_on_the_schema(graph):
         "fonte": {"VisualexAPI": 2, "Brocardi": 1, "community_validation": 1},
         "testo": 2,
         "fingerprint": 1,
-        "twins": [],
+        "entity_labels": {"ConcettoGiuridico": 1},
+        "entity_node_id": 1,
     }
     assert await _types(graph) == {"CONTIENE", "COMMENTA", "RINVIA", "DERIVA_DA"}
     assert await graph.query("MATCH (:Dottrina)-[r:COMMENTA]->() RETURN r.certezza AS c, r.fonte AS f") == [{"c": 0.9, "f": "Brocardi.it"}]
@@ -1757,35 +2174,248 @@ async def test_the_migration_converges_on_the_schema(graph):
 async def test_a_dry_run_reports_the_same_and_writes_nothing(graph):
     dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
     assert await _types(graph) == {"contiene", "commenta", "CITA"}
-    assert dry == await mig.migrate_graph(graph, apply=True, batch=2, seed_keys=SEED_KEYS)
+    assert dry == await _migrate(graph)
 
 
 async def test_a_second_run_changes_nothing(graph):
-    await mig.migrate_graph(graph, apply=True, batch=2, seed_keys=SEED_KEYS)
-    assert await mig.migrate_graph(graph, apply=True, batch=2, seed_keys=SEED_KEYS) == {
-        "relations": {}, "stubs": 0, "estremi": 0, "provenance": {}, "fonte": {},
-        "testo": 0, "fingerprint": 0, "twins": [],
+    await _migrate(graph)
+    assert await _migrate(graph) == NOTHING
+
+
+async def test_an_edge_already_written_under_its_new_name_is_kept_and_the_legacy_one_goes(graph):
+    # Between the merge of A and B and --apply, a new writer may have linked the same two nodes.
+    await graph.query(
+        "MATCH (c:Norma {URN: $code}), (a:Norma {URN: $art}) CREATE (c)-[:CONTIENE {fonte: 'Normattiva'}]->(a)",
+        {"code": CODE, "art": ART},
+    )
+    assert (await _migrate(graph))["relations"]["contiene"] == 1
+    edges = await graph.query(
+        "MATCH (:Norma {URN: $code})-[r]->(:Norma {URN: $art}) RETURN type(r) AS t, r.fonte AS f",
+        {"code": CODE, "art": ART},
+    )
+    assert edges == [{"t": "CONTIENE", "f": "Normattiva"}]  # one edge, with its own properties
+
+
+async def test_an_article_the_old_entity_writer_stamped_gets_its_own_provenance_back(graph):
+    await graph.query(
+        "CREATE (:Norma {URN: $u, node_id: $u, tipo_documento: 'articolo', numero_articolo: '1323', "
+        "estremi: 'Art. 1323 c.c.', testo: 'Altro testo.', provenance: 'community_validated', trust: 1.0})",
+        {"u": ART3},
+    )
+    seed_keys = SEED_KEYS | {ART3}
+    # the fixture's stub carries the same stamp: unify_stubs resets it, not this step
+    assert (await _migrate(graph, seed_keys))["provenance_reset"] == {"seed": 1}
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.provenance AS p, n.trust AS t", {"u": ART3}) == [
+        {"p": "seed", "t": None}
+    ]
+    assert (await _migrate(graph, seed_keys))["provenance_reset"] == {}
+
+
+TWINS = """
+CREATE (:ConcettoGiuridico {node_id: 'concetto:la_convalida', nome: 'La convalida'}),
+       (:ConcettoGiuridico {node_id: 'concetto:conduttore', nome: 'conduttore'}),
+       (:ConcettoGiuridico {node_id: 'concetto:la_reticenza', nome: 'La reticenza'}),
+       (:ConcettoGiuridico {node_id: 'concetto:reticenza', nome: 'reticenza'}),
+       (:Entity:Concetto {id: 'concetto:convalida', nome: 'Convalida', tipo: 'concetto'}),
+       (:Entity:Concetto {id: 'concetto:conduttore', nome: 'Il conduttore', tipo: 'concetto'}),
+       (:Entity:Concetto {id: 'concetto:mora', nome: 'Mora', tipo: 'concetto'})
+"""
+
+
+async def test_twins_are_reported_both_ways_with_the_seeds_near_duplicates(graph):
+    await graph.query(TWINS)
+    report = await _migrate(graph)
+    assert report["twins"] == {
+        # the proposal drops the article the seed keeps; the proposal adds one the seed does not have
+        "community": [
+            {"id": "concetto:conduttore", "seed": ["concetto:conduttore"]},
+            {"id": "concetto:convalida", "seed": ["concetto:la_convalida"]},
+        ],
+        # two seed nodes the community names with one id: the writer adopts only the first it meets
+        "seed_near_duplicates": [["concetto:la_reticenza", "concetto:reticenza"]],
     }
+    # reported, never merged: the next run reports them again
+    assert (await _migrate(graph))["twins"] == report["twins"]
+
+
+async def test_community_entities_get_the_label_of_their_kind_and_a_node_id(graph):
+    await graph.query(
+        "CREATE (:Entity {id: 'principio:buona_fede', tipo: 'principio'}), "
+        "(:Entity {id: 'norma:x', tipo: 'norma'}), (:Entity {id: 'x:y', tipo: $attack})",
+        {"attack": "Concetto) DETACH DELETE n //"},
+    )
+    report = await _migrate(graph)
+    # the label comes from schema.ENTITY_LABEL_BY_TYPE; a type the map does not name gets none
+    assert report["entity_labels"] == {"ConcettoGiuridico": 1, "PrincipioGiuridico": 1}
+    assert report["entity_node_id"] == 4
+    rows = await graph.query("MATCH (e:Entity) RETURN e.id AS id, labels(e) AS labels, e.node_id AS nid")
+    assert {row["id"]: (set(row["labels"]), row["nid"]) for row in rows} == {
+        "concetto:accordo": ({"Entity", "ConcettoGiuridico"}, "concetto:accordo"),
+        "principio:buona_fede": ({"Entity", "PrincipioGiuridico"}, "principio:buona_fede"),
+        "norma:x": ({"Entity"}, "norma:x"),
+        "x:y": ({"Entity"}, "x:y"),
+    }
+    again = await _migrate(graph)
+    assert (again["entity_labels"], again["entity_node_id"]) == ({}, 0)
+
+
+async def test_a_community_entity_loses_the_label_the_old_writer_gave_it(graph):
+    await graph.query(
+        "CREATE (:Entity:Norma {id: 'norma:y', tipo: 'norma'}), "
+        "(:Entity:Sanzione {id: 'sanzione:z', tipo: 'sanzione'}), "
+        "(:Entity:Concetto {id: 'concetto:w', tipo: 'concetto'})"
+    )
+    report = await _migrate(graph)
+    # Norma and Concetto came from tipo.capitalize(); Sanzione is the schema label of its kind
+    assert report["legacy_entity_labels"] == {"Norma": 1, "Concetto": 1}
+    rows = await graph.query("MATCH (e:Entity) WHERE e.id IN ['norma:y', 'sanzione:z', 'concetto:w'] RETURN e.id AS id, labels(e) AS labels")
+    assert {row["id"]: set(row["labels"]) for row in rows} == {
+        "norma:y": {"Entity"},
+        "sanzione:z": {"Entity", "Sanzione"},
+        "concetto:w": {"Entity", "ConcettoGiuridico"},
+    }
+    # a community norma entity was never a norm: no Norma step touched it
+    assert await graph.query("MATCH (n:Norma) WHERE n.id = 'norma:y' RETURN n") == []
+    assert (await _migrate(graph))["legacy_entity_labels"] == {}
+
+
+async def test_a_provenance_from_before_this_round_becomes_the_schema_value(graph):
+    await graph.query(
+        "CREATE (:Norma {URN: $a, provenance: 'lazy_ingest'}), (:Norma {URN: $b, provenance: 'handmade'})",
+        {"a": ART + "-legacy-a", "b": ART + "-legacy-b"},
+    )
+    report = await _migrate(graph)
+    assert report["provenance_legacy"] == {"remapped": {"lazy_ingest": 1}, "unknown": {"handmade": 1}}
+    rows = await graph.query("MATCH (n:Norma) WHERE n.URN IN [$a, $b] RETURN n.URN AS u, n.provenance AS p", {"a": ART + "-legacy-a", "b": ART + "-legacy-b"})
+    assert {row["u"]: row["p"] for row in rows} == {ART + "-legacy-a": "ingestion", ART + "-legacy-b": "handmade"}
+    assert (await _migrate(graph))["provenance_legacy"] == {"remapped": {}, "unknown": {"handmade": 1}}
+
+
+async def test_a_doubled_version_key_is_rekeyed_and_linked_to_its_article(graph):
+    doubled = ART + "!vig=!vig=2020-01-01"
+    await graph.query(
+        "CREATE (:Norma {URN: $u, node_id: $u, tipo_documento: 'versione_storica', testo_storico: 'Vecchio testo.'})",
+        {"u": doubled},
+    )
+    assert (await _migrate(graph))["versions"] == {"rekeyed": 1, "linked": 1, "reported": []}
+    assert await graph.query(
+        "MATCH (v:Norma {tipo_documento: 'versione_storica'})-[:VERSIONE_DI]->(a:Norma) "
+        "RETURN v.URN AS v, v.node_id AS id, a.URN AS a"
+    ) == [{"v": ART + "!vig=2020-01-01", "id": ART + "!vig=2020-01-01", "a": ART}]
+    assert (await _migrate(graph))["versions"] == {"rekeyed": 0, "linked": 0, "reported": []}
+
+
+async def test_a_live_source_keeps_only_its_current_text(graph):
+    await graph.query("CREATE (:LiveSource {node_id: 'live:def', testo: 'nuovo', text: 'vecchio'})")
+    assert (await _migrate(graph))["stale_text"] == 1
+    assert await graph.query("MATCH (n:LiveSource {node_id: 'live:def'}) RETURN n.testo AS t, n.text AS old") == [
+        {"t": "nuovo", "old": None}
+    ]
+
+
+async def test_a_bare_key_is_wrapped_unless_its_url_is_taken(graph):
+    held = "urn:nir:stato:regio.decreto:1942-03-16;262:2~art1324"
+    await graph.query(
+        "CREATE (:Norma {URN: $cp}), (:Norma {URN: $held}), "
+        "(:Norma {URN: $url, node_id: $url, tipo_documento: 'articolo', testo: 'Testo.'})",
+        {"cp": BARE_CP, "held": held, "url": PREFIX + held},
+    )
+    assert (await _migrate(graph))["bare_keys"] == {"wrapped": 1, "reported": [held]}
+    assert await graph.query(
+        "MATCH (n:Norma {URN: $u}) RETURN n.node_id AS id, n.is_stub AS s", {"u": PREFIX + BARE_CP}
+    ) == [{"id": PREFIX + BARE_CP, "s": True}]
+    # two nodes for one norm wait for a decision: reported on every run, changed by none
+    assert (await _migrate(graph))["bare_keys"] == {"wrapped": 0, "reported": [held]}
 ```
 
-- [ ] **Step 2: Run the unit tests; start a throwaway FalkorDB and run the integration test**
+Append to `tests/unit/test_writers_vocabulary.py`:
+
+```python
+async def test_a_new_community_entity_carries_its_id_as_node_id():
+    # Readers name a node by coalesce(URN, node_id): with `id` alone a community entity had no key.
+    writer, client = _writer(rows=[{"id": "principio:buona_fede"}])
+    await writer._create_new_entity_node(_proposal("principio"))
+    cypher, params = client.query.await_args.args
+    assert "node_id: $id" in cypher
+    assert params["id"] == "principio:buona_fede"
+```
+
+```python
+# services/merlt/tests/api/test_article_entity_key.py
+"""The article-entities reader names a node by its key, never by FalkorDB's internal id."""
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from merlt.api.graph_router import get_article_entities
+
+CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1322"
+
+
+async def test_article_entities_are_named_by_urn_or_node_id():
+    client = MagicMock(connect=AsyncMock(), close=AsyncMock(), query=AsyncMock(return_value=[]), ro_query=AsyncMock(return_value=[]))
+    with patch("merlt.api.graph_router.FalkorDBClient", return_value=client):
+        await get_article_entities(CC, validation_status=None, api_key=None)
+    cypher = (client.query.await_args or client.ro_query.await_args).args[0]
+    assert "COALESCE(e.URN, e.node_id) as entity_id" in cypher
+    assert "id(e)" not in cypher  # an internal id changes when a node is recreated: no client can keep it
+```
+
+Append to `tests/storage/test_entity_writer_twins.py` (add `import importlib` and `from unittest.mock import patch` to its imports):
+
+```python
+class _Lent:
+    """The router opens and closes its own client: lend it the test's connected one."""
+
+    def __init__(self, client):
+        self._client = client
+
+    async def connect(self):
+        pass
+
+    async def close(self):
+        pass
+
+    async def query(self, *args):
+        return await self._client.query(*args)
+
+    async def ro_query(self, *args):
+        return await self._client.ro_query(*args)
+
+
+async def test_the_article_readers_name_a_community_entity_by_its_key(graph):
+    await graph.query("CREATE (:Norma {URN: $u, node_id: $u, provenance: 'seed'})", {"u": ART_1322})
+    await EntityGraphWriter(graph).write_entity(_approved("pe-1", "sanzione", "Multa"))
+
+    assert await graph.query("MATCH (e:Entity {id: 'sanzione:multa'}) RETURN e.node_id AS nid", {}) == [
+        {"nid": "sanzione:multa"}
+    ]
+    graph_router = importlib.import_module("merlt.api.graph_router")
+    with patch("merlt.api.graph_router.FalkorDBClient", return_value=_Lent(graph)):
+        relations = await graph_router.get_article_relations(ART_1322, relation_type=None, api_key=None)
+        entities = await graph_router.get_article_entities(ART_1322, validation_status=None, api_key=None)
+    # before: a null target_urn, and FalkorDB's internal id
+    assert [r["target_urn"] for r in relations["relations"]] == ["sanzione:multa"]
+    assert [e["entity_id"] for e in entities["entities"]] == ["sanzione:multa"]
+```
+
+- [ ] **Step 2: Run the unit tests; start a throwaway FalkorDB and run the integration tests**
 
 ```bash
-docker run --rm -v "$PWD/services/merlt:/app" -w /app --entrypoint python visualex-merlt-worker:latest -m pytest tests/scripts/test_migrate_graph_vocabulary.py -q -p no:cacheprovider
+docker run --rm -v "$PWD/services/merlt:/app" -w /app --entrypoint python visualex-merlt-worker:latest -m pytest tests/scripts/test_migrate_graph_vocabulary.py tests/unit/test_writers_vocabulary.py tests/api/test_article_entity_key.py -q -p no:cacheprovider
 docker run -d --rm --name vx-mig-falkor -p 127.0.0.1:6399:6379 falkordb/falkordb
-docker run --rm -e MIGRATION_TEST_FALKORDB=host.docker.internal:6399 -v "$PWD/services/merlt:/app" -w /app --entrypoint python visualex-merlt-worker:latest -m pytest tests/scripts/test_migrate_graph_vocabulary_integration.py -m integration -q -p no:cacheprovider
+docker run --rm -e FALKORDB_HOST=host.docker.internal -e FALKORDB_PORT=6399 -v "$PWD/services/merlt:/app" -w /app --entrypoint python visualex-merlt-worker:latest -m pytest tests/scripts/test_migrate_graph_vocabulary_integration.py tests/storage/test_entity_writer_twins.py -m integration -q -p no:cacheprovider
 ```
 
-Expected: FAIL — no module `merlt.scripts.migrate_graph_vocabulary`.
+Expected: FAIL — no module `merlt.scripts.migrate_graph_vocabulary`; the entity writer writes no `node_id`; the article-entities reader still falls back to `id(e)`; live, the readers answer `None` and an integer. In CI the same integration tests run in the `-m integration` step, against the job's FalkorDB.
 
-- [ ] **Step 3: Write the script**
+- [ ] **Step 3: Write the script, the entity key and the reader**
 
 ```python
 # services/merlt/merlt/scripts/migrate_graph_vocabulary.py
 """Migrate the MERL-T graph and its vectors to the schema's vocabulary.
 
 Dry run by default: it reads and reports. `--apply` writes. Idempotent: a second
-run reports nothing. Run `scripts/backup.sh` first.
+run changes nothing; what it only reports (twins, a key two nodes would share)
+it reports again. Run `scripts/backup.sh` first.
 Design: docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md, §4.4.
 
     python -m merlt.scripts.migrate_graph_vocabulary            # report
@@ -1803,9 +2433,13 @@ from typing import Any, Iterable
 import structlog
 
 from merlt.storage.graph import FalkorDBClient
+from merlt.pipeline.enrichment.models import EntityType
+from merlt.storage.graph.entity_writer import normalize_entity_name, seed_twin_slugs
+from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import (
     LEGACY_REL, LEGACY_SOURCE_TYPE, SEED_TWIN, Label, Provenance, Rel,
-    act_name_from_urn, canonical_urn, estremi_from_urn, normalize_fonte, point_id, text_fingerprint,
+    act_name_from_urn, canonical_urn, entity_label, estremi_from_urn, normalize_fonte, point_id,
+    text_fingerprint, version_urn,
 )
 
 log = structlog.get_logger()
@@ -1813,6 +2447,10 @@ log = structlog.get_logger()
 # Every label that carries content; community entities and live sources stamp their own provenance.
 PROVENANCE_LABELS = [label for label in Label if label not in (Label.ENTITY, Label.LIVE_SOURCE)]
 _STUB_WHERE = "(n.is_stub = true OR (n.tipo_documento IS NULL AND n.testo IS NULL AND n.testo_vigente IS NULL))"
+# The same test, null-safe, negated: an article or an act, not a placeholder.
+_NOT_STUB_WHERE = (
+    "NOT (coalesce(n.is_stub, false) OR (n.tipo_documento IS NULL AND n.testo IS NULL AND n.testo_vigente IS NULL))"
+)
 
 
 def _chunks(items: list, size: int) -> Iterable[list]:
@@ -1825,10 +2463,18 @@ async def _count(client, cypher: str, params: dict | None = None) -> int:
     return int(rows[0]["n"]) if rows else 0
 
 
+async def _norma_holds(client, key: str) -> bool:
+    return bool(await _count(client, "MATCH (m:Norma {URN: $u}) RETURN count(m) AS n", {"u": key}))
+
+
 async def rename_relations(client, apply: bool, batch: int) -> dict[str, int]:
-    """FalkorDB cannot rename a relation type: each legacy edge is copied to its
-    canonical type with its properties, then deleted — in batches, one
-    statement each (atomic per batch)."""
+    """FalkorDB cannot rename a relation type: each legacy edge is merged into its
+    canonical type, then deleted — in batches, one statement each (atomic per batch).
+
+    MERGE, not CREATE: between the merge of pull requests A and B and `--apply`,
+    the new writers may already have linked the same two nodes under the new name.
+    That edge stays as it is, with its own properties; a new edge takes the legacy
+    edge's properties; the legacy edge goes in every case."""
     # A community entity's link to its live source was written CITA; it is DERIVA_DA.
     plans = [("CITA", Rel.DERIVA_DA, "WHERE a:Entity AND b:LiveSource", "CITA→DERIVA_DA")]
     plans += [
@@ -1846,11 +2492,75 @@ async def rename_relations(client, apply: bool, batch: int) -> dict[str, int]:
             moved = await _count(
                 client,
                 f"{match} WITH a, r, b LIMIT {batch} "
-                f"CREATE (a)-[n:`{new.value}`]->(b) SET n = properties(r) DELETE r RETURN count(n) AS n",
+                f"MERGE (a)-[nr:`{new.value}`]->(b) ON CREATE SET nr = properties(r) "
+                "DELETE r RETURN count(*) AS n",
             )
             if not moved:
                 break
     return report
+
+
+async def wrap_bare_keys(client, apply: bool) -> dict[str, Any]:
+    """A Norma keyed by a bare `urn:nir:` URN is unreachable: the graph keys a norm by
+    its full Normattiva URL (the seed does). The key becomes that URL when no node
+    holds it; when one does, the bare key is reported (two nodes for one norm:
+    merging them is a decision, and FalkorDB has no APOC). Versions are
+    `rekey_versions`' job."""
+    rows = await client.query(
+        "MATCH (n:Norma) WHERE n.URN STARTS WITH 'urn:nir:' "
+        "AND coalesce(n.tipo_documento, '') <> 'versione_storica' RETURN id(n) AS id, n.URN AS urn"
+    )
+    wrapped, reported = 0, []
+    for row in rows:
+        new = canonical_urn(wrapped_norm_key(row["urn"]))
+        if await _norma_holds(client, new):
+            reported.append(row["urn"])
+            continue
+        wrapped += 1
+        if apply:
+            await client.query(
+                "MATCH (n) WHERE id(n) = $id SET n.URN = $new, "
+                "n.node_id = CASE WHEN n.node_id IS NULL OR n.node_id = $old THEN $new ELSE n.node_id END",
+                {"id": row["id"], "old": row["urn"], "new": new},
+            )
+    return {"wrapped": wrapped, "reported": sorted(reported)}
+
+
+async def rekey_versions(client, apply: bool) -> dict[str, Any]:
+    """Past versions (multivigenza). Before Task 1b the writer keyed one
+    `<URN>!vig=!vig=<date>` and linked it to an article keyed `<URN>!vig=`, which no
+    node has. Each such version gets `version_urn`'s key (reported instead when a node
+    holds it already), and every version without its VERSIONE_DI edge is linked to its
+    article when the article is in the graph."""
+    rekeyed, linked, reported = 0, 0, []
+    for row in await client.query("MATCH (v:Norma) WHERE v.URN CONTAINS '!vig=!vig=' RETURN id(v) AS id, v.URN AS urn"):
+        old = row["urn"]
+        date = old.rsplit("!vig=", 1)[1]
+        new = version_urn(old, date)
+        if not date or await _norma_holds(client, new):
+            reported.append(old)
+            continue
+        rekeyed += 1
+        if apply:
+            await client.query(
+                "MATCH (v) WHERE id(v) = $id SET v.URN = $new, "
+                "v.node_id = CASE WHEN v.node_id IS NULL OR v.node_id = $old THEN $new ELSE v.node_id END",
+                {"id": row["id"], "old": old, "new": new},
+            )
+    for row in await client.query(
+        "MATCH (v:Norma {tipo_documento: 'versione_storica'}) WHERE NOT (v)-[:VERSIONE_DI]->() RETURN v.URN AS urn"
+    ):
+        article = canonical_urn(row["urn"])
+        if not article or article == row["urn"] or not await _norma_holds(client, article):
+            continue
+        linked += 1
+        if apply:
+            await client.query(
+                "MATCH (v:Norma {URN: $ver_urn}) MATCH (a:Norma {URN: $art_urn}) "
+                "MERGE (v)-[r:VERSIONE_DI]->(a) ON CREATE SET r.certezza = 1.0",
+                {"ver_urn": row["urn"], "art_urn": article},
+            )
+    return {"rekeyed": rekeyed, "linked": linked, "reported": sorted(reported)}
 
 
 async def unify_stubs(client, apply: bool) -> int:
@@ -1867,6 +2577,31 @@ async def unify_stubs(client, apply: bool) -> int:
             "THEN 'ingestion' ELSE n.provenance END"
         )
     return count
+
+
+async def reset_entity_writer_stamps(client, apply: bool, batch: int, seed_keys: set[str]) -> dict[str, int]:
+    """Before Task 4 the entity writer stamped the article it linked an entity to:
+    `provenance = coalesce(provenance, 'community_validated')`, `trust = coalesce(trust,
+    1.0)`. The community validated the link, which carries its own provenance, not the
+    article. Stubs are unify_stubs' job; an article or an act gets what stamp_provenance
+    would give it (`seed` or `ingestion`) and no trust. Written here, not left to
+    stamp_provenance, so that a dry run reports what --apply does."""
+    rows = await client.query(
+        f"MATCH (n:Norma) WHERE n.provenance = 'community_validated' AND {_NOT_STUB_WHERE} "
+        "RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key"
+    )
+    by_value: dict[str, list[int]] = {}
+    for row in rows:
+        value = Provenance.SEED.value if row["key"] in seed_keys else Provenance.INGESTION.value
+        by_value.setdefault(value, []).append(row["id"])
+    if apply:
+        for value, ids in by_value.items():
+            for chunk in _chunks(ids, batch):
+                await client.query(
+                    "UNWIND $ids AS i MATCH (n) WHERE id(n) = i SET n.provenance = $p, n.trust = NULL",
+                    {"ids": chunk, "p": value},
+                )
+    return {value: len(ids) for value, ids in by_value.items()}
 
 
 def plan_estremi(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1896,12 +2631,68 @@ async def rewrite_estremi(client, apply: bool, batch: int) -> int:
     return len(changes)
 
 
+# Every label the writer before Task 4 could give a community entity: `tipo.capitalize()`.
+# A fixed set from the code; a label name is never read from a node.
+LEGACY_ENTITY_LABELS: tuple[str, ...] = tuple(sorted({t.value.capitalize() for t in EntityType}))
+
+# Provenance values written before this round, and the schema value each one means.
+LEGACY_PROVENANCE: dict[str, Provenance] = {"lazy_ingest": Provenance.INGESTION}
+
+
+async def drop_legacy_entity_labels(client, apply: bool) -> dict[str, int]:
+    """A community entity loses the `tipo.capitalize()` label the old writer gave it,
+    unless that is the schema label of its kind (`Sanzione`, `Caso`, `Dottrina`...).
+    Runs before every step that matches `Norma`: a community `norma` entity written
+    `:Entity:Norma` is no norm."""
+    report: dict[str, int] = {}
+    for row in await client.query("MATCH (e:Entity) WHERE e.tipo IS NOT NULL RETURN DISTINCT e.tipo AS tipo"):
+        tipo = row["tipo"]
+        if not isinstance(tipo, str):
+            continue
+        keep = entity_label(tipo)
+        for legacy in LEGACY_ENTITY_LABELS:
+            if keep is not None and legacy == keep.value:
+                continue
+            match = f"MATCH (e:Entity:`{legacy}`) WHERE e.tipo = $tipo"
+            count = await _count(client, f"{match} RETURN count(e) AS n", {"tipo": tipo})
+            if not count:
+                continue
+            report[legacy] = report.get(legacy, 0) + count
+            if apply:
+                await client.query(f"{match} REMOVE e:`{legacy}`", {"tipo": tipo})
+    return report
+
+
+async def remap_provenance(client, apply: bool) -> dict[str, dict[str, int]]:
+    """A provenance written before this round becomes the schema value it means
+    (`LEGACY_PROVENANCE`); any other value outside `Provenance` is reported, unchanged."""
+    known = {p.value for p in Provenance}
+    report: dict[str, dict[str, int]] = {"remapped": {}, "unknown": {}}
+    for row in await client.query("MATCH (n) WHERE n.provenance IS NOT NULL RETURN DISTINCT n.provenance AS p"):
+        value = row["p"]
+        if value in known:
+            continue
+        count = await _count(client, "MATCH (n) WHERE n.provenance = $p RETURN count(n) AS n", {"p": value})
+        if value in LEGACY_PROVENANCE:
+            report["remapped"][value] = count
+            if apply:
+                await client.query(
+                    "MATCH (n) WHERE n.provenance = $p SET n.provenance = $new",
+                    {"p": value, "new": LEGACY_PROVENANCE[value].value},
+                )
+        else:
+            report["unknown"][str(value)] = count
+    return report
+
+
 async def stamp_provenance(client, apply: bool, batch: int, seed_keys: set[str]) -> dict[str, int]:
-    """`seed` for what the Libro IV seed brought, `ingestion` for the rest."""
+    """`seed` for what the Libro IV seed brought, `ingestion` for the rest. A community
+    entity is never stamped here, whatever label it carries: its provenance is its own."""
     report: dict[str, int] = {}
     for label in PROVENANCE_LABELS:
         rows = await client.query(
-            f"MATCH (n:{label.value}) WHERE n.provenance IS NULL RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key"
+            f"MATCH (n:{label.value}) WHERE n.provenance IS NULL AND NOT n:Entity "
+            "RETURN id(n) AS id, coalesce(n.URN, n.node_id) AS key"
         )
         by_value: dict[str, list[int]] = {}
         for row in rows:
@@ -1947,6 +2738,17 @@ async def copy_text(client, apply: bool, batch: int) -> int:
     return total
 
 
+async def drop_stale_text(client, apply: bool) -> int:
+    """A live source the provisional writer refreshed after Task 4 has `testo` and still
+    its old `text`. `node_text` reads `testo` first, so the old one is never read, only
+    stale: it goes."""
+    match = "MATCH (n:LiveSource) WHERE n.testo IS NOT NULL AND n.text IS NOT NULL"
+    count = await _count(client, f"{match} RETURN count(n) AS n")
+    if apply and count:
+        await client.query(f"{match} SET n.text = NULL")
+    return count
+
+
 async def stamp_fingerprints(client, apply: bool, batch: int) -> int:
     rows = await client.query(
         "MATCH (n:Norma) WHERE n.testo_sha256 IS NULL AND coalesce(n.testo, n.testo_vigente) IS NOT NULL "
@@ -1959,33 +2761,98 @@ async def stamp_fingerprints(client, apply: bool, batch: int) -> int:
     return len(rows)
 
 
-async def report_twins(client) -> list[str]:
-    """Community entities with a seed twin. Reported, never merged here: the
-    entity writer merges new ones (Task 4); an existing pair needs a decision."""
-    twins = []
-    for row in await client.query("MATCH (e:Entity) RETURN e.id AS id, e.tipo AS tipo"):
-        twin = SEED_TWIN.get(row.get("tipo") or "")
-        if not twin or not row.get("id"):
+async def label_entities(client, apply: bool) -> dict[str, int]:
+    """Community entities written before Task 4 (`:Entity:Concetto`, from
+    `tipo.capitalize()`) gain the schema label of their kind, as a new one gets it
+    (`entity_label`, `schema.ENTITY_LABEL_BY_TYPE`). The label is the map's, never the
+    node's: `tipo` only picks the entry, and a type the map does not name gets none.
+    The old label is removed first, by `drop_legacy_entity_labels`."""
+    report: dict[str, int] = {}
+    for row in await client.query("MATCH (e:Entity) WHERE e.tipo IS NOT NULL RETURN DISTINCT e.tipo AS tipo"):
+        label = entity_label(row["tipo"]) if isinstance(row["tipo"], str) else None
+        if label is None:
             continue
-        label, prefix = twin
-        slug = row["id"].split(":", 1)[-1]
-        if await _count(
-            client, f"MATCH (c:{label.value} {{node_id: $nid}}) WHERE NOT c:Entity RETURN count(c) AS n",
-            {"nid": f"{prefix}:{slug}"},
-        ):
-            twins.append(row["id"])
-    return twins
+        match = f"MATCH (e:Entity) WHERE e.tipo = $tipo AND NOT e:{label.value}"
+        count = await _count(client, f"{match} RETURN count(e) AS n", {"tipo": row["tipo"]})
+        if not count:
+            continue
+        report[label.value] = report.get(label.value, 0) + count
+        if apply:
+            await client.query(f"{match} SET e:{label.value}", {"tipo": row["tipo"]})
+    return report
+
+
+async def key_entities(client, apply: bool) -> int:
+    """Every community entity carries `node_id` next to its `id`, the same value, so
+    the readers that return a node's key, `coalesce(URN, node_id)`, name it. An adopted
+    seed twin keeps the seed's `node_id`."""
+    match = "MATCH (e:Entity) WHERE e.node_id IS NULL AND e.id IS NOT NULL"
+    count = await _count(client, f"{match} RETURN count(e) AS n")
+    if apply and count:
+        await client.query(f"{match} SET e.node_id = coalesce(e.node_id, e.id)")
+    return count
+
+
+async def report_twins(client) -> dict[str, list]:
+    """Community entities that have a seed twin, and seed concepts that are twins of
+    each other. Reported, never merged here: the entity writer merges new ones (Task 4);
+    an existing pair needs a decision.
+
+    The seed key comes from the name by the writer's rule (`seed_twin_slugs`: as spelt,
+    then without a leading article), never from the community id, which drops accents
+    and hyphens. It is looked up both ways: a seed name may keep an article the proposal
+    drops ("La convalida"), so each seed name is indexed under both its keys too. Seed
+    nodes whose names give one community id ("La reticenza", "reticenza") are
+    near-duplicates: the writer adopts only the first it meets."""
+    index: dict[Label, dict[str, list[str]]] = {}
+    near: list[list[str]] = []
+    for label in dict.fromkeys(label for label, _ in SEED_TWIN.values()):
+        by_slug: dict[str, list[str]] = {}
+        by_community_id: dict[str, list[str]] = {}
+        rows = await client.query(
+            f"MATCH (c:{label.value}) WHERE NOT c:Entity AND c.node_id IS NOT NULL AND c.nome IS NOT NULL "
+            "RETURN c.node_id AS nid, c.nome AS nome"
+        )
+        for row in rows:
+            for slug in seed_twin_slugs(row["nome"]):
+                by_slug.setdefault(slug, []).append(row["nid"])
+            by_community_id.setdefault(normalize_entity_name(row["nome"]), []).append(row["nid"])
+        index[label] = by_slug
+        near += [sorted(nids) for nids in by_community_id.values() if len(nids) > 1]
+    twins = []
+    for row in await client.query(
+        "MATCH (e:Entity) WHERE e.id IS NOT NULL AND e.nome IS NOT NULL RETURN e.id AS id, e.tipo AS tipo, e.nome AS nome"
+    ):
+        twin = SEED_TWIN.get(row.get("tipo") or "")
+        if not twin:
+            continue
+        for slug in seed_twin_slugs(row["nome"]):
+            seeds = index[twin[0]].get(slug)
+            if seeds:
+                twins.append({"id": row["id"], "seed": sorted(seeds)})
+                break
+    return {"community": sorted(twins, key=lambda t: t["id"]), "seed_near_duplicates": sorted(near)}
 
 
 async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set[str]) -> dict[str, Any]:
+    # Keys first (the steps after them read URN and node_id), then shapes and stamps,
+    # then the community entities, whose provenance is their own, then the report.
     return {
         "relations": await rename_relations(client, apply, batch),
+        "legacy_entity_labels": await drop_legacy_entity_labels(client, apply),
+        "bare_keys": await wrap_bare_keys(client, apply),
+        "versions": await rekey_versions(client, apply),
         "stubs": await unify_stubs(client, apply),
+        "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys),
         "estremi": await rewrite_estremi(client, apply, batch),
+        "provenance_legacy": await remap_provenance(client, apply),
         "provenance": await stamp_provenance(client, apply, batch, seed_keys),
         "fonte": await normalize_fonti(client, apply),
         "testo": await copy_text(client, apply, batch),
+        "stale_text": await drop_stale_text(client, apply),
         "fingerprint": await stamp_fingerprints(client, apply, batch),
+        "entity_labels": await label_entities(client, apply),
+        "entity_node_id": await key_entities(client, apply),
         "twins": await report_twins(client),
     }
 
@@ -2016,6 +2883,9 @@ def plan_qdrant(points: list[tuple[Any, dict]]) -> dict[str, Any]:
 
 
 def migrate_qdrant(client, collection: str, *, apply: bool, batch: int = 256) -> dict[str, Any]:
+    """Re-key the lazy points to the schema's ids. Until this runs with --apply,
+    `POST /api/v1/graph/search` answers empty: since A it skips the points keyed by
+    an integer, which are the lazy ones."""
     from qdrant_client import models
 
     points, offset = [], None
@@ -2099,33 +2969,356 @@ if __name__ == "__main__":
     main()
 ```
 
-(FalkorDB's `SET n:Label`, `properties(r)` and the copy-then-delete statement were checked on the development FalkorDB, in a scratch graph deleted afterwards, on 30 September.)
+(FalkorDB's `SET n:Label`, `properties(r)`, `WHERE a:Label`, the id seek and `SET x = NULL` were checked on the development FalkorDB, in a scratch graph deleted afterwards, on 30 September. Not checked yet, and written to be checked on the throwaway FalkorDB of Step 2, where the integration tests run them: the `MERGE … ON CREATE SET nr = properties(r) … DELETE r` rename, `NOT (v)-[:VERSIONE_DI]->()`, `STARTS WITH`, and `SET e:<Label>` with `NOT e:<Label>`. A statement FalkorDB refuses is rewritten there to what it accepts, and the change is noted in this paragraph. One case no test covers: two legacy edges of one type between the same two nodes in one batch. Check it by hand on the throwaway FalkorDB: the second must meet the edge the first merged, so that one edge is left.)
+
+`storage/graph/entity_writer.py`, in `_create_new_entity_node`: the `CREATE` gains `node_id: $id,` after `id: $id,`, and the docstring's property list says why — the readers name a node by `coalesce(URN, node_id)`, and an entity with `id` alone had no key for them. A seed twin the writer adopts keeps the seed's `node_id` (`_check_duplicate_mechanical` does not touch it).
+
+`api/graph_router.py`, in `get_article_entities`: `COALESCE(e.node_id, e.URN, id(e)) as entity_id` becomes `COALESCE(e.URN, e.node_id) as entity_id` — a node's key, never FalkorDB's internal id, which changes when a node is deleted and recreated. `get_article_relations` already reads `COALESCE(target.URN, target.node_id)` and needs only the data.
 
 Add `ROOT / "scripts" / "migrate_graph_vocabulary.py"` to the contract test's `EXEMPT`.
 
 - [ ] **Step 4: Run the tests to verify they pass; stop the throwaway FalkorDB**
 
-Run both test commands of Step 2 again. Expected: PASS. Then `docker stop vx-mig-falkor`.
+Run the commands of Step 2 again, then `tests/unit tests/pipeline tests/rlcf tests/scripts` whole (the contract test among them) and, with a disposable Postgres, `tests/api` (`services/merlt/CLAUDE.md`, "Tests"). Expected: PASS. Then `docker stop vx-mig-falkor`.
 
-- [ ] **Step 5: Migrate the development graph**
+- [ ] **Step 5: Commit**
 
-Rebuild and recreate `merlt-api` and `merlt-worker` from this branch, then:
+```bash
+git add services/merlt/merlt/scripts/migrate_graph_vocabulary.py services/merlt/merlt/storage/graph/entity_writer.py services/merlt/merlt/api/graph_router.py services/merlt/tests
+git commit -m "feat(merlt): migrate the graph and its vectors to the one vocabulary"
+```
+
+The implementer's part ends here. Task 6b follows; Step 6 is the controller's and comes last.
+
+- [ ] **Step 6 (controller, last): migrate the development graph**
+
+Not the implementer's: it rewrites the development graph, reversible only through the backup. It runs after Task 6b (whose indexes, integrity checks and retrieval gate it uses) and after the whole-branch review of pull request B.
+
+The two scripts are in B's code, not in the images built from `develop`. Run them from the main checkout, which holds `services/merlt/data` (the seed keys come from it; worktrees lack it) and `infra/.env`, with B's package mounted over the image's; after step b the main checkout's `develop` holds B, and the mount can point at it.
+
+```bash
+MAIN=<the main checkout>
+B=<checkout holding pull request B's code>
+B_HEAD=<pull request B's head commit, the one its CI and review passed>
+run() { docker compose -f infra/compose.yml --profile merlt run --rm --no-deps -v "$B/services/merlt/merlt:/app/merlt:ro" merlt-worker python -m "$@"; }
+points() { docker compose -f infra/compose.yml --profile merlt run --rm --no-deps -v "$B/services/merlt/merlt:/app/merlt:ro" merlt-worker python -c '
+import collections, os
+from qdrant_client import QdrantClient
+from merlt.storage.vectors.collection import default_chunks_collection
+qdrant, collection = QdrantClient(host=os.environ["QDRANT_HOST"], port=int(os.environ["QDRANT_PORT"])), default_chunks_collection()
+counts, offset = collections.Counter(), None
+while True:
+    page, offset = qdrant.scroll(collection, limit=1000, offset=offset, with_payload=["source_type"], with_vectors=False)
+    counts.update(str((p.payload or {}).get("source_type")) for p in page)
+    if offset is None:
+        break
+print(collection, dict(sorted(counts.items())))'; }
+```
+
+a. **After B's whole-branch review**, with pull request B open and its CI green:
 
 ```bash
 scripts/backup.sh
-docker exec visualex-merlt-worker python -m merlt.scripts.migrate_graph_vocabulary
-docker exec visualex-merlt-worker python -m merlt.scripts.migrate_graph_vocabulary --apply
-docker exec visualex-merlt-worker python -m merlt.scripts.migrate_graph_vocabulary
+points                                            # the Qdrant points per source_type
+run merlt.scripts.retrieval_gate                  # before
+run merlt.scripts.migrate_graph_vocabulary        # dry run
 ```
 
-Read the dry run before applying; the last run must report nothing. Record in the pull request the backup folder, the three reports, and the label and relation counts before and after (`MATCH (n) RETURN labels(n)[0], count(*)`, `MATCH ()-[r]->() RETURN type(r), count(*)`).
+Count the points before the first gate. A collection the seed load left without embeddings (`MERLT_SKIP_EMBEDDINGS`), or with only some source types, makes the gate exit non-zero or measure little: the counts say why, before the gate does. A missing collection fails `points`, the gate and the migration alike (the migration checks it before it touches the graph).
 
-- [ ] **Step 6: Commit and open pull request B**
+Read the dry-run report before going on: every number must be explainable. `graph.relations_collapsed` counts, per canonical type, the pairs of nodes where the rename leaves one edge for several (two legacy edges, or a legacy and a canonical one, between the same two nodes): the `MERGE` keeps the first edge's properties only. If it is not empty, decide before `--apply` whether the lost properties matter; the script never merges them. `graph.stubs.removed` names the properties the stub shape drops: check that none of them is content. `graph.provenance_seed_outside_seed` counts the nodes stamped `seed` that the seed never brought (the old seed backfill, run after a lazy ingestion): they become `ingestion`, without trust. The script writes each half's report on stderr as soon as it is ready (one JSON line, `"half": "graph"` then `"half": "vectors"`), the whole on stdout: keep stderr too, so that a failure of the vector half does not lose the graph's. Record in pull request B the backup folder, the dry-run report, the first gate and the label and relation counts before (`MATCH (n) RETURN labels(n)[0], count(*)`, `MATCH ()-[r]->() RETURN type(r), count(*)`).
+
+b. **Merge A and B back to back:** mark capazme/VisuaLexAPI#39 ready, merge it with `merge: refactor/merlt-graph-vocabulary — one vocabulary for the graph's writers and readers`, then merge B with `merge: feat/merlt-graph-migration — the graph and its vectors move to the one vocabulary`.
+
+c. **At once**, with the MERL-T containers stopped: between the merge and the rebuild, the running images carry the code from before A, which writes the old relation names and integer Qdrant ids. Update the main checkout first, then stop them, apply, rebuild, start, and apply once more as a check:
 
 ```bash
-git add services/merlt/merlt/scripts/migrate_graph_vocabulary.py services/merlt/tests
-git commit -m "feat(merlt): migrate the graph and its vectors to the one vocabulary"
+git -C "$MAIN" switch develop && git -C "$MAIN" pull --ff-only \
+  && git -C "$MAIN" merge-base --is-ancestor "$B_HEAD" HEAD \
+  && docker compose -f infra/compose.yml --profile merlt stop merlt-api merlt-worker \
+  && run merlt.scripts.migrate_graph_vocabulary --apply
+docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
+docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
+run merlt.scripts.migrate_graph_vocabulary --apply     # the check
 ```
+
+The pull and the ancestry check come before anything is stopped or applied, joined with `&&`: if `B=$MAIN`, `--apply` runs on the pulled code, and the images are built from it. Without the pull both would carry the code from before A, the old writers, and the check would find their writes. If the pull or `merge-base --is-ancestor` fails, the line stops there and so does the round: `develop` there does not hold B. The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `certezza.reported`, `booleans.reported`, `provenance_legacy.unknown`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
+
+d. **Then the gate again:**
+
+```bash
+run merlt.scripts.retrieval_gate                  # after
+```
+
+**Retrieval gate:** no metric of the second `retrieval_gate` run is more than 0.02 below the first; a larger drop stops the round until it is explained. A `retrieval_gate` run that exits non-zero (a missing or empty collection, no queries, or `hit_rate_at_5` of 0) stops the round too, before `--apply` as after it. Record in pull request B, as a comment, the `--apply` report, the check's report, the second gate and the label and relation counts after.
+
+---
+
+### Task 6b: Indexes, integrity checks and the retrieval gate
+
+Spec 4.4 and 9 (amended 1 October). Implement this task after Task 6's Step 5 (its commit). Its code lands **before Task 6's Step 6**, which the controller runs last, after the whole-branch review of pull request B: that run creates the indexes, reports the integrity checks, and runs the retrieval gate before and after `--apply`.
+
+**Files:**
+- Modify: `services/merlt/merlt/scripts/migrate_graph_vocabulary.py` (`ensure_graph_indexes`, `INTEGRITY_CHECKS`, `integrity_report`, `ensure_payload_indexes`; `_run`)
+- Create: `services/merlt/merlt/scripts/retrieval_gate.py`
+- Test: `services/merlt/tests/scripts/test_migrate_graph_indexes.py` (unit), `services/merlt/tests/scripts/test_migrate_graph_indexes_integration.py` (`integration`: throwaway FalkorDB), `services/merlt/tests/scripts/test_retrieval_gate.py` (unit)
+
+**Interfaces:**
+- Consumes: `GRAPH_INDEXES`, `QDRANT_PAYLOAD_INDEXES`, `canonical_urn` (Tasks 1, 1b); `distinct_in_order`, `compute_retrieval_metrics`, `compute_graded_relevance_metrics` (Task 5c); `create_semantic_gold_standard`, `RAGBenchmark`, `LegalKnowledgeGraph`.
+- Produces: `async ensure_graph_indexes(client, apply) -> int` (indexes missing before the call); `async integrity_report(client) -> dict[str, int]`; `ensure_payload_indexes(client, collection, apply) -> list[str]`; the script's JSON gains `"indexes": {"graph", "vectors"}` and `"integrity"` next to `"graph"` and `"vectors"` — `migrate_graph`'s own report is unchanged, so Task 6's tests stand. `python -m merlt.scripts.retrieval_gate` prints `{"queries", "recall_at_5", "mrr", "hit_rate_at_5", "ndcg_at_10"}`; `summarize(retrieved, relevant, graded) -> dict`.
+
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# services/merlt/tests/scripts/test_migrate_graph_indexes.py
+"""Qdrant payload indexes are created once."""
+from unittest.mock import MagicMock
+
+from merlt.scripts import migrate_graph_vocabulary as mig
+
+
+def test_payload_indexes_are_created_only_when_missing():
+    client = MagicMock()
+    client.get_collection.return_value.payload_schema = {"article_urn": object()}
+    assert mig.ensure_payload_indexes(client, "chunks", apply=True) == ["source_type"]
+    client.create_payload_index.assert_called_once()
+    assert client.create_payload_index.call_args.kwargs["field_name"] == "source_type"
+
+
+def test_a_dry_run_creates_no_payload_index():
+    client = MagicMock()
+    client.get_collection.return_value.payload_schema = {}
+    assert mig.ensure_payload_indexes(client, "chunks", apply=False) == ["article_urn", "source_type"]
+    client.create_payload_index.assert_not_called()
+```
+
+```python
+# services/merlt/tests/scripts/test_migrate_graph_indexes_integration.py
+"""Indexes and integrity checks against a throwaway FalkorDB (see Task 6, Step 2), in a
+graph of their own (`merlt_test_indexes`). The client reads FALKORDB_HOST and FALKORDB_PORT."""
+import pytest
+import pytest_asyncio
+
+from merlt.scripts import migrate_graph_vocabulary as mig
+from merlt.storage.graph import FalkorDBClient
+from merlt.storage.graph.schema import GRAPH_INDEXES
+
+pytestmark = pytest.mark.integration
+
+BROKEN = """
+CREATE (a:Norma {URN: 'x'}), (b:Norma {URN: 'x'}),
+       (c:Norma {URN: 'y', tipo_documento: 'articolo'}),
+       (d:Norma {estremi: 'senza chiave'}),
+       (a)-[:RINVIA {certezza: 2.0}]->(b)
+"""
+
+
+@pytest_asyncio.fixture
+async def graph():
+    client = FalkorDBClient(graph_name="merlt_test_indexes")
+    await client.connect()
+    await client.query("MATCH (n) DETACH DELETE n")
+    yield client
+    try:
+        await client.query("MATCH (n) DETACH DELETE n")
+    finally:
+        await client.close()
+
+
+async def test_indexes_are_created_once(graph):
+    await mig.ensure_graph_indexes(graph, apply=True)
+    assert await mig.ensure_graph_indexes(graph, apply=True) == 0
+    rows = await graph.query("CALL db.indexes() YIELD label, properties RETURN label, properties")
+    present = {(row["label"], prop) for row in rows for prop in row["properties"]}
+    assert {(label.value, prop) for label, prop in GRAPH_INDEXES} <= present
+
+
+async def test_integrity_counts_what_is_wrong(graph):
+    await graph.query(BROKEN)
+    assert await mig.integrity_report(graph) == {
+        "duplicate_urn": 1,
+        "norma_without_urn": 1,
+        "article_without_text": 1,
+        "isolated_nodes": 2,
+        "certezza_out_of_range": 1,
+    }
+```
+
+```python
+# services/merlt/tests/scripts/test_retrieval_gate.py
+"""The gate scores articles in their canonical form."""
+import pytest
+
+from merlt.scripts.retrieval_gate import summarize
+
+CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
+
+
+def test_a_versioned_urn_and_its_repetition_are_one_article():
+    summary = summarize([[CC + "!vig=2020-01-01", CC]], [[CC]], [{CC: 3}])
+    assert summary == {
+        "queries": 1, "recall_at_5": pytest.approx(1.0), "mrr": pytest.approx(1.0),
+        "hit_rate_at_5": pytest.approx(1.0), "ndcg_at_10": pytest.approx(1.0),
+    }
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+The unit tests with the first command of Task 6, Step 2 (with this task's test paths); the integration test against a throwaway FalkorDB started again as there (`vx-mig-falkor`, port 6399, reached through `FALKORDB_HOST=host.docker.internal FALKORDB_PORT=6399`; Task 6's Step 4 stopped it). CI runs it in its integration step.
+Expected: FAIL — `module 'merlt.scripts.migrate_graph_vocabulary' has no attribute 'ensure_payload_indexes'`; `No module named 'merlt.scripts.retrieval_gate'`.
+
+- [ ] **Step 3: Implement**
+
+In `migrate_graph_vocabulary.py` (import `GRAPH_INDEXES`, `QDRANT_PAYLOAD_INDEXES` with the other schema names):
+
+```python
+async def ensure_graph_indexes(client, apply: bool) -> int:
+    """Create the schema's FalkorDB indexes that are missing. FalkorDB refuses
+    to index an attribute twice, so the existing indexes are listed first."""
+    rows = await client.query("CALL db.indexes() YIELD label, properties RETURN label, properties")
+    present = {(row["label"], prop) for row in rows for prop in (row["properties"] or [])}
+    missing = [(label.value, prop) for label, prop in GRAPH_INDEXES if (label.value, prop) not in present]
+    if apply:
+        for label, prop in missing:
+            await client.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
+    return len(missing)
+
+
+# Reported, never fixed: the numbers go into the pull request (spec 4.4).
+INTEGRITY_CHECKS: dict[str, str] = {
+    "duplicate_urn": "MATCH (n:Norma) WHERE n.URN IS NOT NULL WITH n.URN AS urn, count(*) AS c WHERE c > 1 RETURN count(urn) AS n",
+    "norma_without_urn": "MATCH (n:Norma) WHERE n.URN IS NULL RETURN count(n) AS n",
+    "article_without_text": (
+        "MATCH (n:Norma {tipo_documento: 'articolo'}) WHERE coalesce(n.is_stub, false) = false "
+        "AND n.testo IS NULL AND n.testo_vigente IS NULL RETURN count(n) AS n"
+    ),
+    "isolated_nodes": "MATCH (n) WHERE NOT (n)--() RETURN count(n) AS n",
+    "certezza_out_of_range": (
+        "MATCH ()-[r]->() WHERE r.certezza IS NOT NULL AND (r.certezza < 0 OR r.certezza > 1) RETURN count(r) AS n"
+    ),
+}
+
+
+async def integrity_report(client) -> dict[str, int]:
+    return {name: await _count(client, cypher) for name, cypher in INTEGRITY_CHECKS.items()}
+
+
+def ensure_payload_indexes(client, collection: str, apply: bool) -> list[str]:
+    from qdrant_client import models
+
+    present = set((client.get_collection(collection).payload_schema or {}).keys())
+    missing = [field for field in QDRANT_PAYLOAD_INDEXES if field not in present]
+    if apply:
+        for field in missing:
+            client.create_payload_index(
+                collection_name=collection, field_name=field, field_schema=models.PayloadSchemaType.KEYWORD,
+            )
+    return missing
+```
+
+`_run` creates the graph indexes first (the migration's `MERGE`s and `MATCH`es use them), migrates, then reports integrity:
+
+```python
+    try:
+        indexes_graph = await ensure_graph_indexes(client, apply)
+        graph_report = await migrate_graph(client, apply=apply, batch=batch, seed_keys=load_seed_keys(SEED_GRAPH_JSON))
+        integrity = await integrity_report(client)
+    finally:
+        await client.close()
+    qdrant = _qdrant_client()
+    collection = default_chunks_collection()
+    indexes_vectors = ensure_payload_indexes(qdrant, collection, apply)
+    vectors_report = migrate_qdrant(qdrant, collection, apply=apply)
+    return {
+        "applied": apply, "graph": graph_report, "vectors": vectors_report,
+        "indexes": {"graph": indexes_graph, "vectors": indexes_vectors}, "integrity": integrity,
+    }
+```
+
+```python
+# services/merlt/merlt/scripts/retrieval_gate.py
+"""Retrieval before and after a change to the graph (spec section 9).
+
+The semantic gold standard (Libro IV, 30 graded queries), every source type,
+top 10, scored per article in canonical form. Read-only. Run it before and
+after the migration and compare.
+
+    python -m merlt.scripts.retrieval_gate
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+from typing import Any
+
+from merlt.benchmark.metrics import compute_graded_relevance_metrics, compute_retrieval_metrics
+from merlt.storage.graph.schema import canonical_urn
+
+TOP_K = 10
+
+
+def summarize(retrieved: list[list[str]], relevant: list[list[str]], graded: list[dict[str, int]]) -> dict[str, Any]:
+    retrieved = [[canonical_urn(u) for u in urns] for urns in retrieved]
+    plain = compute_retrieval_metrics(retrieved, relevant)
+    scored = compute_graded_relevance_metrics(retrieved, graded)
+    return {
+        "queries": len(retrieved),
+        "recall_at_5": plain.recall_at_5,
+        "mrr": plain.mrr,
+        "hit_rate_at_5": plain.hit_rate_at_5,
+        "ndcg_at_10": scored.ndcg_at_10,
+    }
+
+
+async def run() -> dict[str, Any]:
+    import dataclasses
+
+    from merlt import LegalKnowledgeGraph
+    from merlt.benchmark.gold_standard import create_semantic_gold_standard
+    from merlt.benchmark.rag_benchmark import RAGBenchmark
+    from merlt.scripts.migrate_graph_vocabulary import _qdrant_client
+    from merlt.storage.vectors.collection import default_chunks_collection
+    from merlt.worker.config import merlt_config_from_env
+
+    # The collection the migration migrates. LegalKnowledgeGraph() alone would use its
+    # hardcoded development defaults and, finding no collection, create an empty one:
+    # the gate would read 0 before and after and pass, and write while saying it reads.
+    collection = default_chunks_collection()
+    qdrant = _qdrant_client()
+    if not qdrant.collection_exists(collection_name=collection) or not qdrant.count(collection_name=collection).count:
+        raise SystemExit(f"Qdrant collection {collection!r} is missing or empty: nothing to measure")
+    gold = create_semantic_gold_standard()
+    kg = LegalKnowledgeGraph(dataclasses.replace(merlt_config_from_env(), qdrant_collection=collection))
+    await kg.connect()
+    try:
+        if kg._qdrant is None or kg._embedding_service is None:
+            raise SystemExit("no Qdrant or no embedding model after connect: nothing to measure")
+        bench = RAGBenchmark(kg, gold)
+        retrieved = []
+        for query in gold:
+            hits = await bench._search_with_source_filter(query.text, "all", TOP_K)
+            retrieved.append([hit["urn"] for hit in hits])
+    finally:
+        await kg.close()
+    return summarize(retrieved, [q.relevant_urns for q in gold], [q.relevance_scores for q in gold])
+
+
+if __name__ == "__main__":
+    print(json.dumps(asyncio.run(run()), indent=2))
+```
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run the commands of Step 2. Expected: PASS. Then `docker stop vx-mig-falkor`. If FalkorDB rejects `CREATE INDEX FOR (n:L) ON (n.p)` or `CALL db.indexes()` yields other column names, fix the two statements to what the throwaway FalkorDB accepts and note it here, as Task 6 did for its statements.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add services/merlt/merlt/scripts/migrate_graph_vocabulary.py services/merlt/merlt/scripts/retrieval_gate.py services/merlt/tests/scripts
+git commit -m "feat(merlt): the migration creates the indexes, reports integrity and has a retrieval gate"
+```
+
+Pull request B's code is complete. Its whole-branch review follows; then the controller runs Task 6's Step 6.
 
 ---
 
@@ -2136,13 +3329,20 @@ git commit -m "feat(merlt): migrate the graph and its vectors to the one vocabul
 - Modify: `apps/server/src/services/merlt/graphClient.ts:40-44` (`CheckArticleResponse`)
 - Modify: `apps/server/src/services/merlt/lazyIngest.ts` (`ingestedRecently`)
 - Modify: `apps/server/src/routes/merlt/events.ts:~121-139` (the lazy trigger)
-- Test: `services/merlt/tests/api/test_check_article_completeness.py` (new); `apps/server/tests/integration/merlt/graph/lazy-trigger-completeness.test.ts` (new)
+- Modify: `services/merlt/merlt/core/legal_knowledge_graph.py` (`ingest_norm`'s embedding step; new `_seed_article_has_points`)
+- Test: `services/merlt/tests/api/test_check_article_completeness.py` (new); `services/merlt/tests/pipeline/test_seed_article_vectors.py` (new); `apps/server/tests/integration/merlt/graph/lazy-trigger-completeness.test.ts` (new)
 
 **Interfaces:**
-- Consumes: `canonical_urn`, `ARTICLE_COMPLETENESS_PARTS` (Task 1); `testo`, `testo_sha256`, `CONTIENE` in the graph (Tasks 3–6).
-- Produces: `GET /api/v1/graph/check-article` → `{exists, complete, missing: string[], node_id?, pending_validation?}` with `missing ⊆ ["node", "text", "commi", "hierarchy", "fingerprint"]`; `graph_router.article_missing_parts(row) -> list[str]`; BFF `ingestedRecently(prisma, urn): Promise<boolean>`.
+- Consumes: `canonical_urn`, `ARTICLE_COMPLETENESS_PARTS`, `text_fingerprint`, `Provenance` (Task 1); `testo`, `testo_sha256`, `CONTIENE`, `provenance` in the graph (Tasks 3–6); `FalkorDBClient.ro_query` (pull request A).
+- Produces: `GET /api/v1/graph/check-article` → `{exists, complete, missing: string[], node_id?, pending_validation?}` with `missing ⊆ ["node", "text", "commi", "hierarchy", "fingerprint"]`; `graph_router.article_missing_parts(row) -> list[str]`; `LegalKnowledgeGraph._seed_article_has_points(article_urn) -> bool`; BFF `ingestedRecently(prisma, urn): Promise<boolean>`.
 
-Deploy after the migration has run (Task 6, Step 5): before it, no article has a fingerprint and every view would enqueue an ingestion.
+Deploy after the migration has run (Task 6, Step 6): before it, no article has a fingerprint and every view would enqueue an ingestion.
+
+From pull request A's review:
+
+- **Only a `Norma` is a parent.** The hierarchy is the chain of partitions and acts, all `Norma` nodes; anything else that `CONTIENE` an article is not its place in the act.
+- **The hash of empty text is no fingerprint.** The fingerprint is `testo_sha256`, the SHA-256 of `article_text` — never `akn_sha256`, the AKN fingerprint of `/fetch_act_fingerprints`. An article stored with empty text was fingerprinted all the same, and `sha256("")` proves nothing.
+- **A seed article keeps its vectors (M5).** On first view the trigger re-ingests the 45 seed articles and 469 stubs this check finds incomplete. The seed loader keyed its points by their text, the lazy writer keys them by position: re-embedding a seed article would put a second set of points next to the first. The embedding step is skipped for a seed article that already has points; phase 2 re-keys both and drops the skip.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2152,6 +3352,7 @@ Deploy after the migration has run (Task 6, Step 5): before it, no article has a
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from merlt.api.graph_router import _CHECK_ARTICLE_CYPHER, check_article_in_graph
+from merlt.storage.graph.schema import text_fingerprint
 
 CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1321"
 
@@ -2176,7 +3377,7 @@ async def test_a_stub_misses_every_part():
         body = await check_article_in_graph(article_urn=CC + "@originale", api_key=None)
     assert body["exists"] is True and body["complete"] is False
     assert body["missing"] == ["text", "commi", "hierarchy", "fingerprint"]
-    assert client.query.await_args.args[1] == {"urn": CC}  # the version marker never reaches the graph
+    assert client.query.await_args.args[1]["urn"] == CC  # the version marker never reaches the graph
 
 
 async def test_a_mechanical_article_without_commi_is_incomplete():
@@ -2199,7 +3400,58 @@ async def test_an_absent_article_misses_the_node():
 
 def test_commi_and_parents_are_counted_through_contiene():
     assert "-[:CONTIENE]->(c:Comma)" in _CHECK_ARTICLE_CYPHER
-    assert "(parent)-[:CONTIENE]->(a)" in _CHECK_ARTICLE_CYPHER
+    assert "(parent:Norma)-[:CONTIENE]->(a)" in _CHECK_ARTICLE_CYPHER  # only a partition or an act
+
+
+async def test_the_hash_of_empty_text_is_no_fingerprint():
+    client = _client([_row()])
+    with patch("merlt.api.graph_router.FalkorDBClient", return_value=client):
+        await check_article_in_graph(article_urn=CC, api_key=None)
+    cypher, params = client.query.await_args.args
+    assert params == {"urn": CC, "empty_sha": text_fingerprint("")}
+    assert "coalesce(a.testo_sha256, $empty_sha) <> $empty_sha AS has_fingerprint" in cypher
+```
+
+```python
+# services/merlt/tests/pipeline/test_seed_article_vectors.py
+"""A seed article read in VisuaLex is completed in the graph; its vectors stay the seed's (M5)."""
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
+
+CC = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1321"
+
+
+def _kg(provenance, points):
+    kg = LegalKnowledgeGraph.__new__(LegalKnowledgeGraph)
+    kg._falkordb = MagicMock(ro_query=AsyncMock(return_value=[{"p": provenance}] if provenance else []))
+    kg._qdrant = MagicMock()
+    kg._qdrant.count.return_value = SimpleNamespace(count=points)
+    kg.config = MagicMock(qdrant_collection="chunks")
+    return kg
+
+
+async def test_a_seed_article_with_points_keeps_them():
+    assert await _kg("seed", 3)._seed_article_has_points(CC) is True
+
+
+async def test_a_seed_article_without_points_gets_them():
+    assert await _kg("seed", 0)._seed_article_has_points(CC) is False
+
+
+async def test_an_ingested_or_absent_article_is_embedded_and_qdrant_is_not_asked():
+    for kg in (_kg("ingestion", 3), _kg(None, 3)):
+        assert await kg._seed_article_has_points(CC) is False
+        kg._qdrant.count.assert_not_called()
+
+
+async def test_the_points_are_counted_by_the_canonical_urn():
+    kg = _kg("seed", 1)
+    await kg._seed_article_has_points(CC + "!vig=")
+    assert kg._falkordb.ro_query.await_args.args[1] == {"urn": CC}
+    condition = kg._qdrant.count.call_args.kwargs["count_filter"].must[0]
+    assert (condition.key, condition.match.value) == ("article_urn", CC)
 ```
 
 ```ts
@@ -2320,30 +3572,33 @@ describe('lazy trigger: complete, not only existing', () => {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-MERL-T: `… -m pytest tests/api/test_check_article_completeness.py -q -p no:cacheprovider`. BFF: `npm --prefix apps/server test -- lazy-trigger-completeness` (its setup refuses a non-test database; `apps/server/CLAUDE.md`). Expected: FAIL.
+MERL-T: `… -m pytest tests/api/test_check_article_completeness.py tests/pipeline/test_seed_article_vectors.py -q -p no:cacheprovider`. BFF: `npm --prefix apps/server test -- lazy-trigger-completeness` (its setup refuses a non-test database; `apps/server/CLAUDE.md`). Expected: FAIL.
 
 - [ ] **Step 3: Implement**
 
 `api/graph_router.py`:
 
 ```python
-from merlt.storage.graph.schema import ARTICLE_COMPLETENESS_PARTS, canonical_urn
+from merlt.storage.graph.schema import ARTICLE_COMPLETENESS_PARTS, canonical_urn, text_fingerprint
 
+# Only a Norma (a partition or an act) is a parent. `testo_sha256` of empty text is
+# no fingerprint: `$empty_sha` is `text_fingerprint("")`.
 _CHECK_ARTICLE_CYPHER = """
 MATCH (a:Norma)
 WHERE a.URN = $urn OR a.node_id = $urn
 OPTIONAL MATCH (a)-[:CONTIENE]->(c:Comma)
 WITH a, count(c) AS commi
-OPTIONAL MATCH (parent)-[:CONTIENE]->(a)
+OPTIONAL MATCH (parent:Norma)-[:CONTIENE]->(a)
 RETURN
     COALESCE(a.node_id, a.URN) AS node_id,
     coalesce(a.is_stub, false) AS is_stub,
     coalesce(a.testo, a.testo_vigente, '') <> '' AS has_text,
     commi,
     count(parent) AS parents,
-    a.testo_sha256 IS NOT NULL AS has_fingerprint,
+    coalesce(a.testo_sha256, $empty_sha) <> $empty_sha AS has_fingerprint,
     false AS pending_validation
 """
+_EMPTY_TEXT_SHA = text_fingerprint("")
 
 
 def article_missing_parts(row: Dict[str, Any]) -> List[str]:
@@ -2357,7 +3612,7 @@ def article_missing_parts(row: Dict[str, Any]) -> List[str]:
     return [part for part in ARTICLE_COMPLETENESS_PARTS if not present[part]]
 ```
 
-In `check_article_in_graph`: the docstring says it answers "complete?" and lists the parts; it queries `_CHECK_ARTICLE_CYPHER` with `{"urn": canonical_urn(article_urn)}` and answers
+In `check_article_in_graph`: the docstring says it answers "complete?" and lists the parts; it queries `_CHECK_ARTICLE_CYPHER` with `{"urn": canonical_urn(article_urn), "empty_sha": _EMPTY_TEXT_SHA}` and answers
 
 ```python
         if result:
@@ -2374,6 +3629,31 @@ In `check_article_in_graph`: the docstring says it answers "complete?" and lists
         log.info("Article not found in graph", article_urn=article_urn)
         return {"exists": False, "complete": False, "missing": ["node"]}
 ```
+
+`core/legal_knowledge_graph.py` (import `Provenance` with the other schema names):
+
+```python
+    async def _seed_article_has_points(self, article_urn: str) -> bool:
+        """A seed article whose vectors the seed loader wrote. They are keyed by their
+        text, the lazy writer's by position: re-embedding the article would put a second
+        set next to the first. Phase 2 re-keys both and drops this check."""
+        urn = canonical_urn(article_urn)
+        rows = await self._falkordb.ro_query(
+            "MATCH (a:Norma {URN: $urn}) RETURN a.provenance AS p", {"urn": urn}
+        )
+        if not rows or rows[0].get("p") != Provenance.SEED.value:
+            return False
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        hits = self._qdrant.count(
+            collection_name=self.config.qdrant_collection,
+            count_filter=Filter(must=[FieldCondition(key="article_urn", match=MatchValue(value=urn))]),
+            exact=True,
+        )
+        return hits.count > 0
+```
+
+In `ingest_norm`, step 6 (embeddings), inside its `try`: when `await self._seed_article_has_points(ingestion_result.article_urn)`, log `"Seed article keeps its vectors"` with the URN and skip `_upsert_embeddings_multi_source`; otherwise call it as today. The graph part of the ingestion runs either way: that is what completes the article.
 
 BFF `graphClient.ts`:
 
@@ -2428,10 +3708,10 @@ Both commands of Step 2, then `npm --prefix apps/server test` (the whole BFF sui
 
 - [ ] **Step 5: Live check, commit and open pull request C**
 
-With the migrated development graph and rebuilt MERL-T images: `curl "http://127.0.0.1:8000/api/v1/graph/check-article?article_urn=<a seed article URL>"` answers `complete: true`; on a stub it answers `missing: ["text","commi","hierarchy","fingerprint"]`; reading that stub's article in the browser enqueues one job, and after it completes the check answers `complete: true`.
+With the migrated development graph and rebuilt MERL-T images: `curl "http://127.0.0.1:8000/api/v1/graph/check-article?article_urn=<a seed article URL>"` answers `complete: true`; on a stub it answers `missing: ["text","commi","hierarchy","fingerprint"]`; reading that stub's article in the browser enqueues one job, and after it completes the check answers `complete: true`. Reading a seed article the check finds incomplete enqueues one job too, and its Qdrant points (a `count` filtered on its `article_urn`) are as many after the job as before.
 
 ```bash
-git add services/merlt/merlt/api/graph_router.py services/merlt/tests/api apps/server/src apps/server/tests
+git add services/merlt/merlt/api/graph_router.py services/merlt/merlt/core/legal_knowledge_graph.py services/merlt/tests/api services/merlt/tests/pipeline/test_seed_article_vectors.py apps/server/src apps/server/tests
 git commit -m "feat(merlt): an article read in VisuaLex is completed, not only created"
 ```
 
@@ -2635,10 +3915,37 @@ git commit -m "feat: the knowledge graph is shown to validators only"
 
 **Files:**
 - Modify: `services/merlt/CLAUDE.md` ("Conventions": the schema module is the vocabulary and the contract test ratchets it; "Tests": the unit-test command with the mounted checkout; "Critical files": `storage/graph/schema.py`)
-- Modify: `docs/merlt/claude-notes.md` (a short "Vocabulary" section: canonical names, the migration and its report, the completeness check)
+- Modify: `docs/merlt/claude-notes.md` (a short "Vocabulary" section: canonical names, the migration and its report, the completeness check; and the community writer's rules below)
 - Modify: `docs/superpowers/specs/2026-09-30-merlt-graph-structure-design.md` (status line: phase 1 done, with the four pull requests)
+
+`claude-notes.md` also says, from pull request A's reviews:
+
+- a proposal for an entity that already exists (a community duplicate or a seed twin) still gets the link from its article to that entity;
+- a `Norma` stub made for a bare `urn:nir:` URN is keyed by its full Normattiva URL;
+- an approved `PARTE_DI` is written as the reversed `CONTIENE`, and only between two norms; `schema.py`'s "PARTE_DI is never written" holds only as an edge type;
+- the twin lookup folds accents and keeps the seed's own rule (`seed_twin_slug`), trying the name as spelt and then without a leading article (`seed_twin_slugs`);
+- a community entity carries `node_id` equal to its `id`, and the readers name a node by `coalesce(URN, node_id)`.
 
 - [ ] **Step 1:** Update the three documents. Every statement must be true of the merged code.
 - [ ] **Step 2:** Run every suite the round touched: MERL-T (`tests/unit tests/pipeline tests/rlcf tests/api tests/scripts`, DB-backed ones against a disposable Postgres), `npm --prefix apps/server test`, `npm --prefix apps/web run test -- --run`, `npm --prefix apps/web run build`, `npm --prefix apps/web run lint`, `node --test '.claude/hooks/*.test.mjs'`.
 - [ ] **Step 3:** Live check on the development stack (rebuilt images): a question to the experts on an article of Libro IV cites graph sources with their text (the literal expert's graph sources are no longer empty strings); a stub article read in the browser is completed with its commi; `MATCH ()-[r]->() RETURN DISTINCT type(r)` lists upper-case names only.
 - [ ] **Step 4:** Commit the docs on a `docs/` branch, open the pull request, merge it.
+
+---
+
+## After phase 1
+
+Not in this plan's four pull requests; each has its own place.
+
+- **Estremi in the citation style the owner decided (1 October):** «art. 2, l. 7 agosto 1990, n. 241», codes and the Costituzione without a comma («art. 1284 c.c.», «art. 81 Cost.»). A small pull request after B: the schema's one estremi function in that style, numbered acts from the URN, `hierarchy.py`'s `n.estremi = $id` lookup made case-insensitive, an idempotent migration step rewriting stored estremi. The reference strings are in `apps/web/src/utils/__fixtures__/citationGolden.ts`, which the «Testo alla data» round adds.
+- **`vendor/mcp-legal-it` to 2.15.0:** a separate pull request after the four of this plan.
+- **Phase 2 notes:**
+  - M6: abbreviations for the preleggi, the disposizioni di attuazione, the norme in materia ambientale, the protezione civile code and the military penal codes.
+  - M7: duplicates in the entity picker.
+  - The LLM enrichment writer stamps no provenance (reachable only from `cleanup_dottrina`).
+  - The start lookups of the tools scan every node.
+  - `FalkorDBClient.close()` does not release its connection pool.
+  - `POST /api/v1/graph/search` filters on an `entity_type` payload key no writer sets, opens a connection pool per request, and asks the bridge once per chunk.
+  - A label filter with several labels is a scan of every node (`definition_lookup`'s `source_types`, `verify_sources`' `node_types`).
+  - `merlt/api/models/ner_models.py` (imported by nothing) keeps a class-based Pydantic `Config`.
+- **The BFF's `normalizeGraphUrn`** (`apps/server/src/services/merlt/graphClient.ts`) cuts any string at its first `!` or `@`: it should cut only norm references, as `schema.canonical_urn` does. An Italgiure `LiveSource` used as a subgraph root is cut today (it was before this round too).

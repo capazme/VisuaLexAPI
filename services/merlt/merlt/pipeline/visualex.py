@@ -80,20 +80,10 @@ class NormaMetadata:
         )
 
     def to_estremi(self) -> str:
-        """
-        Generate 'estremi' (official identifier) as per schema.
+        """`Art. 1453 c.c.`, `Art. 1 Cost.`: the schema's one formatter."""
+        from merlt.storage.graph.schema import format_estremi
 
-        Example: "Art. 1453 c.c."
-        """
-        tipo_abbrev = {
-            "codice civile": "c.c.",
-            "codice penale": "c.p.",
-            "codice di procedura civile": "c.p.c.",
-            "codice di procedura penale": "c.p.p.",
-        }
-
-        tipo_str = tipo_abbrev.get(self.tipo_atto.lower(), self.tipo_atto)
-        return f"Art. {self.numero_articolo} {tipo_str}"
+        return format_estremi(str(self.numero_articolo), self.tipo_atto)
 
 
 @dataclass

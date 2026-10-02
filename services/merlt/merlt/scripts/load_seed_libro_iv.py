@@ -27,12 +27,16 @@ import hashlib
 import json
 import os
 import subprocess
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 import structlog
+
+from merlt.storage.graph.schema import (
+    BOOLEAN_PROPERTIES, Provenance, Rel, boolean_flag, canonical_rel, canonical_source_type, certezza_number,
+    normalize_fonte, point_id, text_fingerprint,
+)
 
 log = structlog.get_logger()
 
@@ -243,17 +247,29 @@ def _build_id_to_key(nodes: list[dict]) -> dict[int, dict[str, str]]:
 
 
 async def _merge_nodes(client, nodes: list[dict], id_to_key: dict[int, dict]) -> int:
-    """MERGE every node by its (label, key_field, key). Idempotent."""
+    """MERGE every node by its (label, key_field, key), in the schema's vocabulary. Idempotent."""
     merged = 0
     for n in nodes:
         entry = id_to_key.get(n["id"])
         if not entry:
             continue
+        props = dict(n.get("properties") or {})
+        if props.get("fonte"):
+            props["fonte"] = normalize_fonte(props["fonte"])
+        if entry["label"] == "Norma" and props.get("testo_vigente") and not props.get("testo"):
+            props["testo"] = props["testo_vigente"]
+        if entry["label"] == "Norma" and props.get("testo"):
+            props["testo_sha256"] = text_fingerprint(props["testo"])
+        for flag in BOOLEAN_PROPERTIES:  # the seed writes them as 'true'/'false': 'false' is truthy
+            value = boolean_flag(props.get(flag))
+            if value is not None:
+                props[flag] = value
+        props.setdefault("provenance", Provenance.SEED.value)  # a mechanical batch brings its own
         cypher = (
             f"MERGE (x:{entry['label']} {{{entry['key_field']}: $k}}) "
             f"SET x += $props"
         )
-        await client.query(cypher, {"k": entry["key"], "props": n.get("properties") or {}})
+        await client.query(cypher, {"k": entry["key"], "props": props})
         merged += 1
         if merged % NODE_BATCH == 0:
             log.info("seed_loader.nodes_progress", merged=merged, total=len(nodes))
@@ -270,19 +286,23 @@ async def _merge_edges(client, edges: list[dict], id_to_key: dict[int, dict]) ->
         if not src or not dst:
             skipped += 1
             continue
-        etype = e.get("type") or "RELATED"
-        props = e.get("properties") or {}
+        props = dict(e.get("properties") or {})
+        if isinstance(props.get("certezza"), str):  # the seed writes it as a string: a number orders
+            number = certezza_number(props["certezza"])
+            if number is not None:
+                props["certezza"] = number
         disposizione = str(props.get("disposizione", ""))
         data_eff = str(props.get("data_efficacia", ""))
-        key_material = f"{src['key']}|{dst['key']}|{etype}|{disposizione}|{data_eff}"
-        edge_key = hashlib.sha1(key_material.encode("utf-8")).hexdigest()
-        cypher = (
-            f"MATCH (a:{src['label']} {{{src['key_field']}: $sk}}), "
-            f"      (b:{dst['label']} {{{dst['key_field']}: $dk}}) "
-            f"MERGE (a)-[r:{etype} {{_seed_key: $ek}}]->(b) "
-            f"SET r += $props"
-        )
         try:
+            etype = canonical_rel(e["type"]).value if e.get("type") else Rel.CORRELATO.value
+            key_material = f"{src['key']}|{dst['key']}|{etype}|{disposizione}|{data_eff}"
+            edge_key = hashlib.sha1(key_material.encode("utf-8")).hexdigest()
+            cypher = (
+                f"MATCH (a:{src['label']} {{{src['key_field']}: $sk}}), "
+                f"      (b:{dst['label']} {{{dst['key_field']}: $dk}}) "
+                f"MERGE (a)-[r:{etype} {{_seed_key: $ek}}]->(b) "
+                f"SET r += $props"
+            )
             await client.query(cypher, {
                 "sk": src["key"], "dk": dst["key"], "ek": edge_key, "props": props,
             })
@@ -290,7 +310,7 @@ async def _merge_edges(client, edges: list[dict], id_to_key: dict[int, dict]) ->
         except Exception as exc:  # noqa: BLE001 — log and continue, integrity gate covers it
             skipped += 1
             log.warning("seed_loader.edge_failed",
-                        src=src["key"][:50], dst=dst["key"][:50], type=etype, error=str(exc))
+                        src=src["key"][:50], dst=dst["key"][:50], type=e.get("type"), error=str(exc))
         if (merged + skipped) % EDGE_BATCH == 0:
             log.info("seed_loader.edges_progress", merged=merged, skipped=skipped, total=len(edges))
     return merged, skipped
@@ -359,7 +379,7 @@ async def _generate_and_upsert_embeddings(
         vectors = await embedding_service.encode_batch_async(batch_texts, is_query=False)
         points = []
         for text, meta, vec in zip(batch_texts, batch_metas, vectors):
-            chunk_uuid = str(uuid.uuid4())
+            chunk_uuid = point_id(meta["article_urn"], meta["source_type"], text_fingerprint(text)[:16])
             chunk_text_to_uuid[text] = chunk_uuid
             points.append(qm.PointStruct(
                 id=chunk_uuid,
@@ -389,7 +409,7 @@ def _infer_source_type(label: str) -> str:
     if label == "Comma":
         return "comma"
     if label in ("ConcettoGiuridico", "PrincipioGiuridico", "DefinizioneLegale"):
-        return label.lower()
+        return canonical_source_type(label.lower()).value
     return "text"
 
 

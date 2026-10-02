@@ -80,6 +80,8 @@ class CacheManager:
             "decisions_found": _create_cache("decisions_found", ttl=30 * 24 * 3600),
             "decisions_absent": _create_cache("decisions_absent", ttl=3600),
             "decisions_pending": _create_cache("decisions_pending", ttl=24 * 3600),
+            # A found act date never changes: keep it a year (act_dates.py).
+            "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }
 
         self.stats: Dict[str, int] = {

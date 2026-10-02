@@ -26,12 +26,11 @@ Example:
 import asyncio
 import os
 import time
-import uuid
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime
+from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey
@@ -80,7 +79,10 @@ async def _check_falkordb_health() -> ServiceHealth:
         await client.connect()
 
         # Test with health_check method
-        is_healthy = await client.health_check()
+        try:
+            is_healthy = await client.health_check()
+        finally:
+            await client.close()
         latency = (time.time() - start) * 1000
 
         if is_healthy:
@@ -105,8 +107,30 @@ async def _check_falkordb_health() -> ServiceHealth:
         return ServiceHealth(
             name="FalkorDB",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
+
+
+def _without_userinfo(url: str) -> str:
+    """`url` without a `user:password@` in front of the host: a response must not carry one."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    return urlunsplit(parts._replace(netloc=parts.netloc.rpartition("@")[2]))
+
+
+def _qdrant_target() -> dict:
+    """The keyword arguments that reach Qdrant from where the API runs, for `QdrantClient`.
+
+    `QDRANT_URL` is an explicit override; otherwise `QDRANT_HOST` and `QDRANT_PORT`, as the
+    other routers resolve them: inside the container "localhost:6343" is nothing."""
+    qdrant_url = os.getenv("QDRANT_URL")
+    if qdrant_url:
+        return {"url": qdrant_url}
+    return {
+        "host": os.getenv("QDRANT_HOST", "localhost"),
+        "port": int(os.getenv("QDRANT_PORT", "6333")),
+    }
 
 
 async def _check_qdrant_health() -> ServiceHealth:
@@ -114,14 +138,16 @@ async def _check_qdrant_health() -> ServiceHealth:
     start = time.time()
     try:
         from qdrant_client import QdrantClient
-        import os
 
         # Connect directly to Qdrant
-        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6343")
-        client = QdrantClient(url=qdrant_url)
+        qdrant_target = _qdrant_target()
+        client = QdrantClient(**qdrant_target)
 
         # Check collections
-        collections = client.get_collections()
+        try:
+            collections = client.get_collections()
+        finally:
+            client.close()
         latency = (time.time() - start) * 1000
 
         return ServiceHealth(
@@ -130,7 +156,9 @@ async def _check_qdrant_health() -> ServiceHealth:
             latency_ms=latency,
             details={
                 "collections_count": len(collections.collections),
-                "url": qdrant_url,
+                "url": _without_userinfo(
+                    qdrant_target.get("url") or f"http://{qdrant_target['host']}:{qdrant_target['port']}"
+                ),
             }
         )
     except Exception as e:
@@ -138,7 +166,7 @@ async def _check_qdrant_health() -> ServiceHealth:
         return ServiceHealth(
             name="Qdrant",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
 
 
@@ -146,12 +174,16 @@ async def _check_postgres_health() -> ServiceHealth:
     """Check PostgreSQL connection."""
     start = time.time()
     try:
-        from merlt.storage.bridge.bridge_table import BridgeTable
-        bridge = BridgeTable()
+        from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
+        config = BridgeTableConfig.from_enrichment_env()
+        bridge = BridgeTable(config)
         await bridge.connect()
 
         # Test connection with count method
-        count = await bridge.count()
+        try:
+            count = await bridge.count()
+        finally:
+            await bridge.close()
         latency = (time.time() - start) * 1000
 
         return ServiceHealth(
@@ -159,7 +191,7 @@ async def _check_postgres_health() -> ServiceHealth:
             status=ServiceStatus.ONLINE,
             latency_ms=latency,
             details={
-                "database": "rlcf_dev",
+                "database": config.database,
                 "bridge_mappings": count,
             }
         )
@@ -168,7 +200,7 @@ async def _check_postgres_health() -> ServiceHealth:
         return ServiceHealth(
             name="PostgreSQL",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
 
 
@@ -183,12 +215,14 @@ async def _check_redis_health() -> ServiceHealth:
             db=0,
         )
 
-        # Ping
-        await client.ping()
-        latency = (time.time() - start) * 1000
+        try:
+            # Ping
+            await client.ping()
+            latency = (time.time() - start) * 1000
 
-        info = await client.info("memory")
-        await client.close()
+            info = await client.info("memory")
+        finally:
+            await client.aclose()
 
         return ServiceHealth(
             name="Redis",
@@ -203,8 +237,17 @@ async def _check_redis_health() -> ServiceHealth:
         return ServiceHealth(
             name="Redis",
             status=ServiceStatus.OFFLINE,
-            details={"error": str(e)}
+            details={"error": type(e).__name__}
         )
+
+
+def _bridge_public_config() -> dict:
+    """Where the bridge table is, as an API response may say it: host, port, database.
+    Never the user or the password."""
+    from merlt.storage.bridge.bridge_table import BridgeTableConfig
+
+    config = BridgeTableConfig.from_enrichment_env()
+    return {"host": config.host, "port": config.port, "db": config.database}
 
 
 async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
@@ -221,26 +264,28 @@ async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
         from merlt.storage.graph.client import FalkorDBClient
         client = FalkorDBClient()
         await client.connect()
+        try:
+            # Count nodes
+            nodes_result = await client.query("MATCH (n) RETURN count(n) as c")
+            total_nodes = nodes_result[0]["c"] if nodes_result else 0
 
-        # Count nodes
-        nodes_result = await client.query("MATCH (n) RETURN count(n) as c")
-        total_nodes = nodes_result[0]["c"] if nodes_result else 0
+            # Count edges
+            edges_result = await client.query("MATCH ()-[r]->() RETURN count(r) as c")
+            total_edges = edges_result[0]["c"] if edges_result else 0
 
-        # Count edges
-        edges_result = await client.query("MATCH ()-[r]->() RETURN count(r) as c")
-        total_edges = edges_result[0]["c"] if edges_result else 0
+            # Count articles (Norma nodes)
+            articles_result = await client.query(
+                "MATCH (n) WHERE n.tipo_atto IS NOT NULL RETURN count(n) as c"
+            )
+            articles_count = articles_result[0]["c"] if articles_result else 0
 
-        # Count articles (Norma nodes)
-        articles_result = await client.query(
-            "MATCH (n) WHERE n.tipo_atto IS NOT NULL RETURN count(n) as c"
-        )
-        articles_count = articles_result[0]["c"] if articles_result else 0
-
-        # Count entities
-        entities_result = await client.query(
-            "MATCH (n) WHERE n.entity_type IS NOT NULL RETURN count(n) as c"
-        )
-        entities_count = entities_result[0]["c"] if entities_result else 0
+            # Count entities
+            entities_result = await client.query(
+                "MATCH (n) WHERE n.entity_type IS NOT NULL RETURN count(n) as c"
+            )
+            entities_count = entities_result[0]["c"] if entities_result else 0
+        finally:
+            await client.close()
     except Exception as e:
         log.warning("Failed to get FalkorDB KPIs", error=str(e))
 
@@ -249,34 +294,30 @@ async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
         from qdrant_client import QdrantClient
         from merlt.storage.vectors.collection import default_chunks_collection
 
-        # Same host/port resolution as the other routers (QDRANT_URL kept as an
-        # explicit override): inside the container "localhost:6343" is nothing.
-        qdrant_url = os.getenv("QDRANT_URL")
-        qdrant = (
-            QdrantClient(url=qdrant_url)
-            if qdrant_url
-            else QdrantClient(
-                host=os.getenv("QDRANT_HOST", "localhost"),
-                port=int(os.getenv("QDRANT_PORT", "6333")),
-            )
-        )
+        qdrant = QdrantClient(**_qdrant_target())
 
         try:
-            collection_info = qdrant.get_collection(default_chunks_collection())
-            embeddings_count = collection_info.points_count or 0
-        except Exception as e:
-            log.debug("qdrant_collection_unavailable", error=str(e))
-            # Collection might not exist
-            embeddings_count = 0
+            try:
+                collection_info = qdrant.get_collection(default_chunks_collection())
+                embeddings_count = collection_info.points_count or 0
+            except Exception as e:
+                log.debug("qdrant_collection_unavailable", error=str(e))
+                # Collection might not exist
+                embeddings_count = 0
+        finally:
+            qdrant.close()
     except Exception as e:
         log.warning("Failed to get Qdrant KPIs", error=str(e))
 
     # Bridge mappings from PostgreSQL
     try:
-        from merlt.storage.bridge.bridge_table import BridgeTable
-        bridge = BridgeTable()
+        from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
+        bridge = BridgeTable(BridgeTableConfig.from_enrichment_env())
         await bridge.connect()
-        bridge_mappings = await bridge.count()
+        try:
+            bridge_mappings = await bridge.count()
+        finally:
+            await bridge.close()
     except Exception as e:
         log.warning("Failed to get Bridge KPIs", error=str(e))
 
@@ -787,7 +828,7 @@ async def get_node_details(
         "postgresql": {
             "label": "PostgreSQL",
             "description": "Database relazionale per Bridge Table e RLCF metadata.",
-            "config": {"host": "localhost", "port": 5433, "db": "rlcf_dev"},
+            "config": _bridge_public_config(),
             "links": {},
         },
         "redis": {

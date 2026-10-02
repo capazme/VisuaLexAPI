@@ -48,9 +48,11 @@ import os
 import warnings
 import structlog
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+from merlt.storage.graph.schema import Rel
 
 log = structlog.get_logger()
 
@@ -167,11 +169,14 @@ TRAVERSAL_RELATION_TYPES = [
 # Same order as GATING_EXPERT_NAMES — index i = one-hot slot i.
 TRAVERSAL_EXPERT_TYPES = ["literal", "systemic", "principles", "precedent"]
 
-# Map the RAW relation names that actually exist in the FalkorDB graph (mixed
-# case, Italian — e.g. "modifica", "DISCIPLINA") to the TraversalPolicy embedding
-# vocabulary above, so per-query scoring does not collapse everything onto the
-# RELATED_TO fallback. Best-effort semantic mapping; unknown names still fall
-# back to RELATED_TO inside get_relation_index (existing behaviour).
+# Map the relation names of the FalkorDB graph (the schema's upper-case `Rel`
+# names; the keys here are lower case and normalize_relation_type looks them up
+# through .lower()) to the TraversalPolicy embedding vocabulary above, so
+# per-query scoring does not collapse everything onto the RELATED_TO fallback.
+# Best-effort semantic mapping. A relation of the schema with no nearer name falls
+# back to RELATED_TO in normalize_relation_type, so the policy never has to warn
+# about one of the graph's own names; a name that is not the schema's still falls
+# back inside get_relation_index (existing behaviour).
 GRAPH_TO_POLICY_RELATION = {
     "modifica": "MODIFICA",
     "modificato_da": "MODIFICATO_DA",
@@ -190,15 +195,47 @@ GRAPH_TO_POLICY_RELATION = {
     "contiene": "RELATED_TO",
     "disciplina": "APPLIES_TO",
     "impone": "APPLIES_TO",
+    # More of the schema's relations (storage/graph/schema.py `Rel`), each on its
+    # nearest policy name; any other name still falls back to RELATED_TO.
+    "commenta": "INTERPRETED_BY",
+    "deroga_a": "DEROGA",
+    "inserisce": "MODIFICA",
+    "sostituisce": "MODIFICA",
+    "esprime_principio": "APPLIES_TO",
+    "applica_a": "APPLIES_TO",
+    "definisce": "APPLIES_TO",
+    "prevede": "APPLIES_TO",
+    "prevede_sanzione": "APPLIES_TO",
+    "attribuisce_responsabilita": "APPLIES_TO",
+    "stabilisce_termine": "APPLIES_TO",
+    "esprime": "RELATED_TO",
+    "menziona": "RELATED_TO",
+    "deriva_da": "RELATED_TO",
+    # Norms that end or alter another, norms that apply, doctrine that explains.
+    "abroga_totalmente": "ABROGA",
+    "abroga_parzialmente": "ABROGA",
+    "integra": "MODIFICA",
+    "sospende": "MODIFICA",
+    "proroga": "MODIFICA",
+    "attua": "APPLIES_TO",
+    "recepisce": "APPLIES_TO",
+    "applica": "APPLIES_TO",
+    "applica_norma_a_caso": "APPLIES_TO",
+    "deroga_principio": "DEROGA",
+    "spiega": "INTERPRETED_BY",
 }
+
+_SCHEMA_RELATIONS = frozenset(rel.value for rel in Rel)
 
 
 def normalize_relation_type(relation_type: str) -> str:
     """Map a graph-native relation name to the TraversalPolicy vocabulary.
 
     Resolution order: exact vocab match → lowercase mapping table → uppercase
-    vocab match → the raw name unchanged (``get_relation_index`` then applies its
-    existing RELATED_TO fallback). Never raises — the graph vocabulary evolves.
+    vocab match → RELATED_TO for any other relation of the schema (no nearer
+    policy name) → the raw name unchanged (``get_relation_index`` then applies its
+    existing RELATED_TO fallback, with a warning). Never raises — the graph
+    vocabulary evolves.
     """
     if not relation_type:
         return "RELATED_TO"
@@ -210,6 +247,8 @@ def normalize_relation_type(relation_type: str) -> str:
         return mapped
     if rel.upper() in TRAVERSAL_RELATION_TYPES:
         return rel.upper()
+    if rel.upper() in _SCHEMA_RELATIONS:
+        return "RELATED_TO"
     return rel
 
 
@@ -219,6 +258,7 @@ KNOWN_RELATION_VOCABULARY = (
     set(TRAVERSAL_RELATION_TYPES)
     | set(GRAPH_TO_POLICY_RELATION.keys())
     | {k.upper() for k in GRAPH_TO_POLICY_RELATION.keys()}
+    | _SCHEMA_RELATIONS
 )
 
 

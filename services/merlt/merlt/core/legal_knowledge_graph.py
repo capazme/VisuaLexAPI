@@ -49,8 +49,7 @@ Usage:
 
 import structlog
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
-from uuid import UUID
+from typing import TYPE_CHECKING, Dict, List, Optional, Any, Tuple
 
 # Storage
 from merlt.storage import (
@@ -66,12 +65,9 @@ from merlt.storage.bridge import BridgeBuilder
 # Pipeline
 from merlt.pipeline.ingestion import (
     IngestionPipelineV2,
-    IngestionResult,
-    BridgeMapping,
 )
 from merlt.pipeline.multivigenza import (
     MultivigenzaPipeline,
-    MultivigenzaResult,
 )
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 
@@ -84,6 +80,7 @@ from merlt.clients import (
     NormTree,
     get_hierarchical_tree,
 )
+from merlt.storage.graph.schema import Fonte, SourceType, canonical_urn, point_id
 from merlt.utils.urngenerator import generate_urn
 
 # Embeddings (optional, loaded lazily)
@@ -612,6 +609,7 @@ class LegalKnowledgeGraph:
             return 0
 
         points_to_upsert = []
+        article_urn = canonical_urn(article_urn)
         base_payload = {
             "article_urn": article_urn,
             "tipo_atto": metadata.tipo_atto,
@@ -621,13 +619,14 @@ class LegalKnowledgeGraph:
         # 1. Embedding del testo normativo (sempre)
         if article_text and len(article_text.strip()) > 20:
             embedding = await self._embedding_service.encode_document_async(article_text)
-            point_id = hash(f"{article_urn}:norma") % (2**63)
+            pid = point_id(article_urn, SourceType.NORMA.value)
             points_to_upsert.append(PointStruct(
-                id=point_id,
+                id=pid,
                 vector=embedding,
                 payload={
                     **base_payload,
                     "source_type": "norma",
+                    "fonte": Fonte.NORMATTIVA.value,
                     "text": article_text[:2000],
                 },
             ))
@@ -639,13 +638,14 @@ class LegalKnowledgeGraph:
             spiegazione = brocardi_info.get("Spiegazione", "")
             if spiegazione and len(spiegazione.strip()) > 50:
                 embedding = await self._embedding_service.encode_document_async(spiegazione)
-                point_id = hash(f"{article_urn}:spiegazione") % (2**63)
+                pid = point_id(article_urn, SourceType.SPIEGAZIONE.value)
                 points_to_upsert.append(PointStruct(
-                    id=point_id,
+                    id=pid,
                     vector=embedding,
                     payload={
                         **base_payload,
                         "source_type": "spiegazione",
+                        "fonte": Fonte.BROCARDI.value,
                         "text": spiegazione[:2000],
                     },
                 ))
@@ -655,13 +655,14 @@ class LegalKnowledgeGraph:
             ratio = brocardi_info.get("Ratio", "")
             if ratio and len(ratio.strip()) > 50:
                 embedding = await self._embedding_service.encode_document_async(ratio)
-                point_id = hash(f"{article_urn}:ratio") % (2**63)
+                pid = point_id(article_urn, SourceType.RATIO.value)
                 points_to_upsert.append(PointStruct(
-                    id=point_id,
+                    id=pid,
                     vector=embedding,
                     payload={
                         **base_payload,
                         "source_type": "ratio",
+                        "fonte": Fonte.BROCARDI.value,
                         "text": ratio[:2000],
                     },
                 ))
@@ -683,13 +684,14 @@ class LegalKnowledgeGraph:
 
                     if testo and len(testo.strip()) > 50:
                         embedding = await self._embedding_service.encode_document_async(testo)
-                        point_id = hash(f"{article_urn}:massima:{i}") % (2**63)
+                        pid = point_id(article_urn, SourceType.MASSIMA.value, i)
                         points_to_upsert.append(PointStruct(
-                            id=point_id,
+                            id=pid,
                             vector=embedding,
                             payload={
                                 **base_payload,
                                 "source_type": "massima",
+                                "fonte": Fonte.BROCARDI.value,
                                 "massima_index": i,
                                 "text": testo[:2000],
                             },
@@ -790,13 +792,14 @@ class LegalKnowledgeGraph:
         if not self._falkordb or not urn:
             return {}
 
-        # Get parent and related nodes
-        result = await self._falkordb.query(
+        # Get parent and related nodes (a read: ro_query). The client answers with a
+        # list of dicts keyed by the RETURN aliases, not with a result set.
+        rows = await self._falkordb.ro_query(
             """
             MATCH (n:Norma {URN: $urn})
-            OPTIONAL MATCH (parent)-[:contiene]->(n)
-            OPTIONAL MATCH (n)-[:contiene]->(child)
-            OPTIONAL MATCH (modifier)-[:modifica|abroga|sostituisce|inserisce]->(n)
+            OPTIONAL MATCH (parent)-[:CONTIENE]->(n)
+            OPTIONAL MATCH (n)-[:CONTIENE]->(child)
+            OPTIONAL MATCH (modifier)-[:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]->(n)
             RETURN
                 parent.URN as parent_urn,
                 parent.titolo as parent_title,
@@ -806,13 +809,13 @@ class LegalKnowledgeGraph:
             {"urn": urn}
         )
 
-        if result.result_set:
-            row = result.result_set[0]
+        if rows:
+            row = rows[0]
             return {
-                "parent_urn": row[0],
-                "parent_title": row[1],
-                "children": row[2] or [],
-                "modifiers": row[3] or [],
+                "parent_urn": row.get("parent_urn"),
+                "parent_title": row.get("parent_title"),
+                "children": row.get("children") or [],
+                "modifiers": row.get("modifiers") or [],
             }
 
         return {}
@@ -1175,10 +1178,8 @@ class LegalKnowledgeGraph:
 
 
 # Type hint for return type
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from merlt.pipeline.batch_ingestion import BatchIngestionResult
-    from typing import Tuple
 
 __all__ = [
     "LegalKnowledgeGraph",

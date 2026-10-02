@@ -38,9 +38,28 @@ from merlt.experts.base import (
 )
 from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
+from merlt.storage.graph.schema import Label, Rel, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
+
+
+def _case_law_from_node(node: Dict[str, Any], source_urn: str) -> Optional[Dict[str, Any]]:
+    """A graph node as a precedent, or None when it is not case law. The seed and
+    the ingestion write a massima as `AttoGiudiziario` (text in `massima`, court in
+    `organo_emittente`); the older names are still read."""
+    node_type = node.get("type", "")
+    if node_type != Label.ATTO_GIUDIZIARIO.value and "Massima" not in node_type and "Sentenza" not in node_type:
+        return None
+    props = node.get("properties", {})
+    return {
+        "text": node_text(props),
+        "urn": node.get("urn", ""),
+        "type": node_type,
+        "source": "jurisprudence_graph",
+        "court": props.get("organo_emittente") or props.get("autorita") or props.get("corte") or "unknown",
+        "source_urn": source_urn,
+    }
 
 
 class PrecedentExpert(BaseExpert, ReActMixin):
@@ -89,6 +108,11 @@ class PrecedentExpert(BaseExpert, ReActMixin):
         "disciplina": 0.70,    # Norme di riferimento
         "default": 0.50
     }
+
+    # Relations the graph expansion follows, incoming, from what interprets or
+    # comments a norm: the graph's own names (the schema's `Rel`). INTERPRETA:
+    # 11,343 and COMMENTA: 2,609 occurrences in the seed.
+    GRAPH_RELATIONS = [Rel.INTERPRETA.value, Rel.COMMENTA.value, Rel.DISCIPLINA.value, Rel.APPLICA_A.value]
 
     # Gerarchia delle fonti giurisprudenziali
     COURT_HIERARCHY = {
@@ -163,7 +187,7 @@ class PrecedentExpert(BaseExpert, ReActMixin):
         self._init_trace(context)
 
         log.info(
-            f"PrecedentExpert analyzing",
+            "PrecedentExpert analyzing",
             query=context.query_text[:50],
             trace_id=context.trace_id,
             use_react=self.use_react,
@@ -181,7 +205,7 @@ class PrecedentExpert(BaseExpert, ReActMixin):
             # Still apply authority ranking
             all_sources = self._rank_by_authority(all_sources)
             log.info(
-                f"PrecedentExpert ReAct completed",
+                "PrecedentExpert ReAct completed",
                 sources=len(all_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
@@ -225,7 +249,7 @@ class PrecedentExpert(BaseExpert, ReActMixin):
             response.metadata["execution_trace"] = self.get_trace_dict()
 
         log.info(
-            f"PrecedentExpert completed",
+            "PrecedentExpert completed",
             confidence=response.confidence,
             sources=len(response.legal_basis),
             time_ms=response.execution_time_ms,
@@ -294,7 +318,7 @@ class PrecedentExpert(BaseExpert, ReActMixin):
                         self._extracted_urns.add(urn)
 
         log.debug(
-            f"PrecedentExpert sources retrieved",
+            "PrecedentExpert sources retrieved",
             total=len(sources),
             extracted_urns=len(self._extracted_urns)
         )
@@ -342,11 +366,8 @@ class PrecedentExpert(BaseExpert, ReActMixin):
 
         graph_tool = self._tool_registry.get("graph_search")
         if graph_tool and urns_to_explore:
-            # Relazioni reali nel grafo (interpreta: 11,343, commenta: 2,609)
-            jur_relations = ["interpreta", "commenta", "DISCIPLINA", "APPLICA_A"]
-
             log.debug(
-                f"PrecedentExpert graph expansion",
+                "PrecedentExpert graph expansion",
                 urns_count=len(urns_to_explore),
                 urns=list(urns_to_explore)[:3]
             )
@@ -355,7 +376,7 @@ class PrecedentExpert(BaseExpert, ReActMixin):
                 try:
                     result = await graph_tool(
                         start_node=urn,
-                        relation_types=jur_relations,
+                        relation_types=self.GRAPH_RELATIONS,
                         max_hops=2,
                         direction="incoming"  # Sentenze che citano la norma
                     )
@@ -366,21 +387,14 @@ class PrecedentExpert(BaseExpert, ReActMixin):
                             nodes_found=len(graph_nodes)
                         )
                         for node in graph_nodes:
-                            node_type = node.get("type", "")
-                            if "Massima" in node_type or "Sentenza" in node_type:
-                                jurisprudence.append({
-                                    "text": node.get("properties", {}).get("testo", ""),
-                                    "urn": node.get("urn", ""),
-                                    "type": node_type,
-                                    "source": "jurisprudence_graph",
-                                    "court": node.get("properties", {}).get("corte", "unknown"),
-                                    "source_urn": urn
-                                })
+                            entry = _case_law_from_node(node, urn)
+                            if entry:
+                                jurisprudence.append(entry)
                 except Exception as e:
                     log.warning(f"Graph jurisprudence search failed: {e}")
 
         log.info(
-            f"PrecedentExpert jurisprudence found",
+            "PrecedentExpert jurisprudence found",
             total=len(jurisprudence)
         )
 
@@ -509,10 +523,10 @@ class PrecedentExpert(BaseExpert, ReActMixin):
         ]
 
         if context.norm_references:
-            sections.append(f"\n## NORME DI RIFERIMENTO\n" + ", ".join(context.norm_references))
+            sections.append("\n## NORME DI RIFERIMENTO\n" + ", ".join(context.norm_references))
 
         if context.legal_concepts:
-            sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
+            sections.append("\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
             sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")

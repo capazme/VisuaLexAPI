@@ -37,6 +37,7 @@ from merlt.experts.base import (
 )
 from merlt.experts.react_mixin import ReActMixin
 from merlt.tools import BaseTool
+from merlt.storage.graph.schema import Rel, node_text
 from merlt.storage.retriever.models import get_source_types_for_expert
 
 log = structlog.get_logger()
@@ -89,6 +90,10 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
         "disciplina": 0.75,     # Materie regolate
         "default": 0.50
     }
+
+    # Relations the graph expansion follows toward principles: the graph's own
+    # names (the schema's `Rel`). ESPRIME_PRINCIPIO: 740 occurrences in the seed.
+    GRAPH_RELATIONS = [Rel.ESPRIME_PRINCIPIO.value, Rel.DISCIPLINA.value, Rel.INTERPRETA.value, Rel.COMMENTA.value]
 
     def __init__(
         self,
@@ -150,7 +155,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
         self._init_trace(context)
 
         log.info(
-            f"PrinciplesExpert analyzing",
+            "PrinciplesExpert analyzing",
             query=context.query_text[:50],
             trace_id=context.trace_id,
             use_react=self.use_react,
@@ -166,7 +171,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                 novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
             )
             log.info(
-                f"PrinciplesExpert ReAct completed",
+                "PrinciplesExpert ReAct completed",
                 sources=len(all_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
@@ -210,7 +215,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
             response.metadata["execution_trace"] = self.get_trace_dict()
 
         log.info(
-            f"PrinciplesExpert completed",
+            "PrinciplesExpert completed",
             confidence=response.confidence,
             sources=len(response.legal_basis),
             time_ms=response.execution_time_ms,
@@ -266,7 +271,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                 query=search_query,
                 top_k=5,
                 expert_type="PrinciplesExpert",
-                source_types=source_types  # ["ratio", "spiegazione"] - principi generali
+                source_types=source_types  # ["ratio", "spiegazione", "dottrina", "concetto"] - principi generali
             )
             if result.success and result.data.get("results"):
                 sources.extend(result.data["results"])
@@ -277,7 +282,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                         self._extracted_urns.add(urn)
 
         log.debug(
-            f"PrinciplesExpert sources retrieved",
+            "PrinciplesExpert sources retrieved",
             total=len(sources),
             extracted_urns=len(self._extracted_urns)
         )
@@ -308,7 +313,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                     query=query,
                     top_k=3,
                     expert_type="PrinciplesExpert",
-                    source_types=source_types  # ["ratio", "spiegazione"]
+                    source_types=source_types  # ["ratio", "spiegazione", "dottrina", "concetto"]
                 )
                 if result.success and result.data.get("results"):
                     for r in result.data["results"]:
@@ -323,11 +328,8 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
 
         graph_tool = self._tool_registry.get("graph_search")
         if graph_tool and urns_to_explore:
-            # Relazioni reali nel grafo per principi (ESPRIME_PRINCIPIO: 740 occorrenze)
-            principle_relations = ["ESPRIME_PRINCIPIO", "DISCIPLINA", "interpreta", "commenta"]
-
             log.debug(
-                f"PrinciplesExpert graph expansion",
+                "PrinciplesExpert graph expansion",
                 urns_count=len(urns_to_explore),
                 urns=list(urns_to_explore)[:3]
             )
@@ -336,7 +338,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                 try:
                     result = await graph_tool(
                         start_node=urn,
-                        relation_types=principle_relations,
+                        relation_types=self.GRAPH_RELATIONS,
                         max_hops=2
                     )
                     if result.success:
@@ -349,7 +351,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                             node_type = node.get("type", "")
                             if "Principio" in node_type or "Costituzionale" in node_type:
                                 principles.append({
-                                    "text": node.get("properties", {}).get("testo", ""),
+                                    "text": node_text(node.get("properties", {})),
                                     "urn": node.get("urn", ""),
                                     "type": node_type,
                                     "source": "principle_graph",
@@ -359,7 +361,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
                     log.warning(f"Graph principle search failed: {e}")
 
         log.info(
-            f"PrinciplesExpert principles found",
+            "PrinciplesExpert principles found",
             total=len(principles)
         )
 
@@ -457,10 +459,10 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
         ]
 
         if context.norm_references:
-            sections.append(f"\n## NORME CITATE\n" + ", ".join(context.norm_references))
+            sections.append("\n## NORME CITATE\n" + ", ".join(context.norm_references))
 
         if context.legal_concepts:
-            sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
+            sections.append("\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
             sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")

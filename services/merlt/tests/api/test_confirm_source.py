@@ -52,6 +52,10 @@ from merlt.storage.graph.entity_writer import is_real_article_urn
 er = importlib.import_module("merlt.api.enrichment_router")
 gr = importlib.import_module("merlt.api.graph_router")
 
+# The router answers 422 with the literal: Starlette renamed its constant to
+# HTTP_422_UNPROCESSABLE_CONTENT, and the old name warns on every use.
+pytestmark = pytest.mark.filterwarnings("error:'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated")
+
 NORMATTIVA_ART = (
     "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262~art2043"
 )

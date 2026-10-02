@@ -6,7 +6,7 @@ Extended pipeline for temporal versioning (multivigenza) of Italian legal norms.
 
 This module:
 1. Tracks all amendments to articles over time
-2. Creates graph relations for modifications (:abroga, :sostituisce, :modifica, :inserisce)
+2. Creates graph relations for modifications (:ABROGA, :SOSTITUISCE, :MODIFICA, :INSERISCE)
 3. Creates COMPLETE Norma nodes for modifying acts (conformi a knowledge-graph.md)
 4. Stores version history with temporal properties
 
@@ -32,17 +32,17 @@ import structlog
 import re
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 from merlt.clients import (
     NormaVisitata,
-    Norma,
     Modifica,
     TipoModifica,
     StoriaArticolo,
     NormattivaScraper,
 )
+from merlt.storage.graph.schema import Rel, canonical_urn, version_urn
 from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
@@ -50,10 +50,10 @@ log = structlog.get_logger()
 
 # Graph relation types for modifications
 RELATION_TYPES = {
-    TipoModifica.ABROGA: "abroga",
-    TipoModifica.SOSTITUISCE: "sostituisce",
-    TipoModifica.MODIFICA: "modifica",
-    TipoModifica.INSERISCE: "inserisce",
+    TipoModifica.ABROGA: Rel.ABROGA.value,
+    TipoModifica.SOSTITUISCE: Rel.SOSTITUISCE.value,
+    TipoModifica.MODIFICA: Rel.MODIFICA.value,
+    TipoModifica.INSERISCE: Rel.INSERISCE.value,
 }
 
 # Mapping tipo atto da estremi a tipo_documento standardizzato
@@ -231,8 +231,12 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
         Dict con numero_articolo, commi, lettere, numeri (tutte liste)
 
     Examples:
-        "art. 4, comma 2" -> {art: "4", commi: ["2"], lettere: [], numeri: []}
-        "art. 22, comma 1, lettera b" -> {art: "22", commi: ["1"], lettere: ["b"], numeri: []}
+        "art. 4, comma 2" -> {numero_articolo: "4", commi: ["2"], lettere: [], numeri: []}
+        "art. 22, comma 1, lettera b" -> {numero_articolo: "22", commi: ["1"], lettere: ["b"], numeri: []}
+        "art. 12, comma 1, lettera b, numero 3" -> {numero_articolo: "12", commi: ["1"], lettere: ["b"], numeri: ["3"]}
+        "art. 5, comma 2, lettere a, b e c" -> lettere: ["a", "b", "c"]
+        "art. 7, comma 4, lettera b-bis)" -> lettere: ["b-bis"]
+        "art. 2, comma 1, lettere aa) e bb)" -> lettere: ["aa", "bb"]
     """
     result = {
         "numero_articolo": None,
@@ -244,7 +248,9 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
     if not disposizione:
         return result
 
-    disp_lower = disposizione.lower().strip()
+    # Every run of whitespace, a line break included, becomes one space: the `.` of the patterns below
+    # does not cross a line break, and the split on commas is quadratic in the length of a run.
+    disp_lower = " ".join(disposizione.lower().split())
 
     # Estrai numero articolo: "art. 12" o "art.12" o "art. 12-bis"
     art_match = re.search(r"art\.?\s*(\d+(?:-\w+)?)", disp_lower)
@@ -258,12 +264,20 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
         commi = re.findall(r"\d+", comma_str)
         result["commi"] = commi
 
-    # Estrai lettere: "lettera b" o "lettere a, b e c"
-    lettera_match = re.search(r"letter[ae]\s+([a-z,\s]+(?:e\s+[a-z])?)", disp_lower)
+    # Lettere: "lettera b", "lettere a, b e c", "lettera b-bis)", "lettere aa) e bb)".
+    # The clause runs to the next keyword (numero, comma, periodo, parole, art.) or to the end: in
+    # "lettera b, numero 3" the numero is not part of it. Its tokens are split on commas and on the
+    # conjunction "e", end at their closing parenthesis ("b) della tabella" is the lettera b), lose
+    # the punctuation that closes them ("b.", "b;", "b:"), and only a lettera is kept: `b`, `aa`
+    # (after z come aa, bb…) or `b-bis`.
+    lettera_match = re.search(
+        r"letter[ae]\s+(.*?)(?=\b(?:numer[oi]|comm[ai]|period[oi]|parol[ae]|art\w*)\b|$)", disp_lower
+    )
     if lettera_match:
-        lettera_str = lettera_match.group(1)
-        lettere = re.findall(r"[a-z]", lettera_str)
-        result["lettere"] = lettere
+        for token in re.split(r"\s*,\s*|\s+e\s+", lettera_match.group(1)):
+            token = token.split(")")[0].strip(" .;:")
+            if re.fullmatch(r"[a-z]{1,2}(?:-[a-z]+)?", token):
+                result["lettere"].append(token)
 
     # Estrai numeri: "numero 1" o "numeri 1, 2 e 3"
     numero_match = re.search(r"numer[oi]\s+([\d,\s]+(?:e\s+\d+)?)", disp_lower)
@@ -273,6 +287,12 @@ def parse_disposizione(disposizione: str) -> Dict[str, Any]:
         result["numeri"] = numeri
 
     return result
+
+
+def _lettera_place(lettera: str) -> int:
+    """Where a lettera sits in its comma: a=1 … z=26, then aa=27, bb=28 …; `b-bis` shares b's place."""
+    place = ord(lettera[0]) - ord("a") + 1
+    return place + 26 if len(lettera) == 2 and lettera[0] == lettera[1] else place
 
 
 def _format_destinazione(parsed: Dict[str, Optional[str]]) -> str:
@@ -631,7 +651,7 @@ class MultivigenzaPipeline:
     This pipeline:
     1. Fetches amendment history from Normattiva
     2. Creates Norma nodes for modifying acts
-    3. Creates modification relations (:abroga, :modifica, etc.)
+    3. Creates modification relations (:ABROGA, :MODIFICA, etc.)
     4. Optionally fetches and stores historical versions
 
     Graph Schema Extensions:
@@ -643,10 +663,10 @@ class MultivigenzaPipeline:
             - abrogato: Boolean, True if article was abrogated
 
         New relations:
-            - :abroga {disposizione, data_efficacia, data_gu, certezza}
-            - :sostituisce {disposizione, data_efficacia, data_gu, certezza}
-            - :modifica {disposizione, data_efficacia, data_gu, certezza}
-            - :inserisce {disposizione, data_efficacia, data_gu, certezza}
+            - :ABROGA {disposizione, data_efficacia, data_gu, certezza}
+            - :SOSTITUISCE {disposizione, data_efficacia, data_gu, certezza}
+            - :MODIFICA {disposizione, data_efficacia, data_gu, certezza}
+            - :INSERISCE {disposizione, data_efficacia, data_gu, certezza}
 
     Usage:
         pipeline = MultivigenzaPipeline(falkordb_client)
@@ -820,9 +840,9 @@ class MultivigenzaPipeline:
         Create COMPLETE hierarchical structure for modifying act and modification relation.
 
         Struttura creata (conforme a knowledge-graph.md):
-            (Atto Modificante) -[:contiene]-> (Articolo) -[:contiene]-> (Comma)
+            (Atto Modificante) -[:CONTIENE]-> (Articolo) -[:CONTIENE]-> (Comma)
                                                                             |
-                                                                       [:modifica]
+                                                                       [:MODIFICA]
                                                                             v
                                                                     (Articolo Modificato)
 
@@ -833,7 +853,7 @@ class MultivigenzaPipeline:
         1. Nodo Norma per l'atto modificante (legge, decreto, etc.)
         2. Nodo Norma per l'articolo specifico della disposizione
         3. Nodo Comma se presente nella disposizione
-        4. Relazioni :contiene per la gerarchia
+        4. Relazioni :CONTIENE per la gerarchia
         5. Relazione di modifica dal nodo più specifico
         """
         if not self.falkordb:
@@ -876,6 +896,7 @@ class MultivigenzaPipeline:
                 atto.autorita_emanante = $autorita,
                 atto.ambito_territoriale = 'nazionale',
                 atto.fonte = 'Normattiva',
+                atto.provenance = coalesce(atto.provenance, 'ingestion'),
                 atto.created_at = $timestamp,
                 atto.updated_at = $timestamp
             """,
@@ -925,6 +946,7 @@ class MultivigenzaPipeline:
                     art.data_pubblicazione = $data_gu,
                     art.data_entrata_vigore = $data_gu,
                     art.fonte = 'Normattiva',
+                    art.provenance = coalesce(art.provenance, 'ingestion'),
                     art.created_at = $timestamp,
                     art.updated_at = $timestamp
                 """,
@@ -939,12 +961,12 @@ class MultivigenzaPipeline:
                 }
             )
 
-            # Relazione :contiene dall'atto all'articolo
+            # Relazione :CONTIENE dall'atto all'articolo
             await self.falkordb.query(
                 """
                 MATCH (atto:Norma {URN: $atto_urn})
                 MATCH (art:Norma {URN: $art_urn})
-                MERGE (atto)-[r:contiene]->(art)
+                MERGE (atto)-[r:CONTIENE]->(art)
                 ON CREATE SET r.certezza = 1.0
                 """,
                 {"atto_urn": atto_urn, "art_urn": articolo_urn}
@@ -971,8 +993,9 @@ class MultivigenzaPipeline:
                             comma.posizione = $posizione,
                             comma.estremi = $estremi,
                             comma.testo = $testo,
-                            comma.fonte = 'Normattiva',
+                            comma.provenance = coalesce(comma.provenance, 'ingestion'),
                             comma.created_at = $timestamp
+                        SET comma.fonte = coalesce(comma.fonte, 'Normattiva')
                         """,
                         {
                             "urn": comma_urn,
@@ -983,12 +1006,12 @@ class MultivigenzaPipeline:
                         }
                     )
 
-                    # Relazione :contiene dall'articolo al comma
+                    # Relazione :CONTIENE dall'articolo al comma
                     await self.falkordb.query(
                         """
                         MATCH (art:Norma {URN: $art_urn})
                         MATCH (comma:Comma {URN: $comma_urn})
-                        MERGE (art)-[r:contiene]->(comma)
+                        MERGE (art)-[r:CONTIENE]->(comma)
                         ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                         """,
                         {"art_urn": articolo_urn, "comma_urn": comma_urn, "ord": int(comma_num)}
@@ -1016,8 +1039,9 @@ class MultivigenzaPipeline:
                                 let.tipo = 'lettera',
                                 let.posizione = $posizione,
                                 let.estremi = $estremi,
-                                let.fonte = 'Normattiva',
+                                let.provenance = coalesce(let.provenance, 'ingestion'),
                                 let.created_at = $timestamp
+                            SET let.fonte = coalesce(let.fonte, 'Normattiva')
                             """,
                             {
                                 "urn": lettera_urn,
@@ -1027,15 +1051,15 @@ class MultivigenzaPipeline:
                             }
                         )
 
-                        # Relazione :contiene dal comma alla lettera
+                        # Relazione :CONTIENE dal comma alla lettera
                         await self.falkordb.query(
                             """
                             MATCH (comma:Comma {URN: $comma_urn})
                             MATCH (let:Lettera {URN: $let_urn})
-                            MERGE (comma)-[r:contiene]->(let)
+                            MERGE (comma)-[r:CONTIENE]->(let)
                             ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                             """,
-                            {"comma_urn": first_comma_urn, "let_urn": lettera_urn, "ord": ord(lettera) - ord('a') + 1}
+                            {"comma_urn": first_comma_urn, "let_urn": lettera_urn, "ord": _lettera_place(lettera)}
                         )
 
                     # Usa la prima lettera come source
@@ -1060,8 +1084,9 @@ class MultivigenzaPipeline:
                                     num.tipo = 'numero',
                                     num.posizione = $posizione,
                                     num.estremi = $estremi,
-                                    num.fonte = 'Normattiva',
+                                    num.provenance = coalesce(num.provenance, 'ingestion'),
                                     num.created_at = $timestamp
+                                SET num.fonte = coalesce(num.fonte, 'Normattiva')
                                 """,
                                 {
                                     "urn": numero_urn,
@@ -1071,12 +1096,12 @@ class MultivigenzaPipeline:
                                 }
                             )
 
-                            # Relazione :contiene dalla lettera al numero
+                            # Relazione :CONTIENE dalla lettera al numero
                             await self.falkordb.query(
                                 """
                                 MATCH (let:Lettera {URN: $let_urn})
                                 MATCH (num:Numero {URN: $num_urn})
-                                MERGE (let)-[r:contiene]->(num)
+                                MERGE (let)-[r:CONTIENE]->(num)
                                 ON CREATE SET r.certezza = 1.0, r.ordinamento = $ord
                                 """,
                                 {"let_urn": first_lettera_urn, "num_urn": numero_urn, "ord": int(numero)}
@@ -1158,13 +1183,13 @@ class MultivigenzaPipeline:
         # Also get original version
         try:
             testo_orig, urn_orig = await self.scraper.get_original_version(normavisitata)
-            await self._save_version(
+            if await self._save_version(
                 normavisitata,
                 version_label="originale",
                 version_date=normavisitata.norma.data,
                 testo=testo_orig,
-            )
-            versions_saved += 1
+            ):
+                versions_saved += 1
         except Exception as e:
             result.errors.append(f"Could not fetch original version: {e}")
 
@@ -1176,13 +1201,13 @@ class MultivigenzaPipeline:
                 version_label = f"v{i+1}"
 
                 testo, urn = await self.scraper.get_version_at_date(normavisitata, date)
-                await self._save_version(
+                if await self._save_version(
                     normavisitata,
                     version_label=version_label,
                     version_date=date,
                     testo=testo,
-                )
-                versions_saved += 1
+                ):
+                    versions_saved += 1
 
             except Exception as e:
                 result.errors.append(f"Could not fetch version at {date}: {e}")
@@ -1195,17 +1220,26 @@ class MultivigenzaPipeline:
         version_label: str,
         version_date: str,
         testo: str,
-    ) -> None:
+    ) -> bool:
         """
         Save a historical version as a separate node.
 
         Creates a new Norma node with versioned URN and links to main article.
+        Returns True when the version was written. A version with no date has no
+        key (`<URL>!vig=` is the live article's marker): it is logged and skipped.
         """
         if not self.falkordb:
-            return
+            return False
 
         base_urn = normavisitata.urn
-        versioned_urn = f"{base_urn}!vig={version_date}"
+        if not version_date or not isinstance(version_date, str):
+            log.warning(
+                "multivigenza.version_without_date",
+                urn=base_urn,
+                version_label=version_label,
+            )
+            return False
+        versioned_urn = version_urn(base_urn, version_date)
 
         # A2: derive numero_articolo/estremi from the base article URN so a
         # freshly-created version stub carries a minimal identity instead of a
@@ -1225,6 +1259,7 @@ class MultivigenzaPipeline:
                 ver.estremi = $estremi,
                 ver.is_versione_vigente = false,
                 ver.fonte = 'Normattiva',
+                ver.provenance = coalesce(ver.provenance, 'ingestion'),
                 ver.created_at = $timestamp
             """,
             {
@@ -1243,13 +1278,14 @@ class MultivigenzaPipeline:
             """
             MATCH (ver:Norma {URN: $ver_urn})
             MATCH (art:Norma {URN: $art_urn})
-            MERGE (ver)-[r:versione_di]->(art)
+            MERGE (ver)-[r:VERSIONE_DI]->(art)
             ON CREATE SET r.certezza = 1.0
             """,
-            {"ver_urn": versioned_urn, "art_urn": base_urn}
+            {"ver_urn": versioned_urn, "art_urn": canonical_urn(base_urn)}
         )
 
         log.debug(f"Saved version: {versioned_urn}")
+        return True
 
 
 async def get_article_storia(

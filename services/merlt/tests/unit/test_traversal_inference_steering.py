@@ -163,8 +163,8 @@ def test_uniform_policy_returns_exactly_the_static_floor(monkeypatch):
 def test_skewed_policy_adds_extras_but_never_drops_the_floor(monkeypatch):
     monkeypatch.setenv("MERLT_NEURAL_TRAVERSAL_ENABLED", "true")
     pm = _FakePolicyManager(scores={
-        "DEROGA": (0.95, math.log(0.95)),       # graph name: deroga
-        "RIFERIMENTO": (0.90, math.log(0.90)),  # graph name: rinvia
+        "DEROGA": (0.95, math.log(0.95)),       # graph name: DEROGA_A
+        "RIFERIMENTO": (0.90, math.log(0.90)),  # graph name: RINVIA
     })
     expert = _make_expert(pm)
     chosen = _run(expert._select_traversal_relations(_ctx([0.1] * 8)))
@@ -173,25 +173,24 @@ def test_skewed_policy_adds_extras_but_never_drops_the_floor(monkeypatch):
     for rel in STATIC_FLOOR:
         assert rel in chosen
     # The two clearly-better extras were ADDED (score > floor_max + margin)
-    assert "deroga" in chosen
-    assert "rinvia" in chosen
+    assert "DEROGA_A" in chosen
+    assert "RINVIA" in chosen
     assert len(chosen) == len(STATIC_FLOOR) + 2
     # Reordered by score: the best-scoring relation leads
-    assert chosen[0] == "deroga"
+    assert chosen[0] == "DEROGA_A"
 
 
 def test_extras_are_capped_at_max_extra(monkeypatch):
     monkeypatch.setenv("MERLT_NEURAL_TRAVERSAL_ENABLED", "true")
     pm = _FakePolicyManager(scores={
-        "DEROGA": (0.99, math.log(0.99)),
-        "RIFERIMENTO": (0.98, math.log(0.98)),
-        "CITATO_DA": (0.97, math.log(0.97)),  # graph name: cita — third extra
+        "DEROGA": (0.99, math.log(0.99)),       # graph name: DEROGA_A
+        "RIFERIMENTO": (0.98, math.log(0.98)),  # graph name: RINVIA
     })
     expert = _make_expert(pm)
+    expert.NEURAL_TRAVERSAL_MAX_EXTRA = 1
     chosen = _run(expert._select_traversal_relations(_ctx([0.1] * 8)))
     extras = [r for r in chosen if r not in STATIC_FLOOR]
-    assert len(extras) == expert.NEURAL_TRAVERSAL_MAX_EXTRA
-    assert set(extras) == {"deroga", "rinvia"}  # top-2 by score
+    assert extras == ["DEROGA_A"]  # only the best one
 
 
 def test_floor_survives_even_when_policy_hates_it(monkeypatch):
@@ -286,8 +285,8 @@ def test_trace_records_scored_relations_with_log_probs(monkeypatch):
         assert a.metadata["selected"] == (rel in chosen)
         assert "policy_relation" in a.metadata
     # the floor is flagged as such (FE can distinguish curated vs learned)
-    assert by_rel["modifica"].metadata["static_floor"] is True
-    assert by_rel["deroga"].metadata["static_floor"] is False
+    assert by_rel["MODIFICA"].metadata["static_floor"] is True
+    assert by_rel["DEROGA_A"].metadata["static_floor"] is False
 
 
 def test_trace_records_fallback_when_policy_missing(monkeypatch):
@@ -545,7 +544,7 @@ def test_legacy_checkpoint_file_loads_through_policy_manager(tmp_path):
 
 
 def test_incompatible_state_dict_is_rejected():
-    torch = pytest.importorskip("torch")
+    pytest.importorskip("torch")
     import torch.nn as nn
 
     from merlt.rlcf.policy_gradient import TraversalPolicy

@@ -21,9 +21,103 @@ import re
 import structlog
 from typing import Any, Dict, List, Optional
 
+from merlt.storage.graph.schema import canonical_urn
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType
+from merlt.utils.urngenerator import generate_urn
 
 log = structlog.get_logger()
+
+_NORMATTIVA_PREFIX = "https://www.normattiva.it/uri-res/N2Ls?"
+_ARTICLE = re.compile(
+    r"\bart(?:\.|icolo)?\s*(\d+(?:\s*-?\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|novies|decies)\b)?)"
+)
+
+
+def _abbreviation(*letters: str) -> str:
+    """"c.p.c." however it is written: every dot and space optional, and not the tail of a
+    word or of a longer abbreviation ("c.p." in "c.p.c."; "c.p. c" in "c.p. c.c.")."""
+    return r"(?<![a-z.])" + r"\.?\s?".join(letters) + r"(?![a-z])(?!\.[a-z])"
+
+
+# Longer abbreviations first: at one position "c.p.c." must be tried before "c.p.".
+_CODES = re.compile("|".join((
+    rf"(?P<cpc>{_abbreviation('c', 'p', 'c')}|codice\s+di\s+procedura\s+civile)",
+    rf"(?P<cpp>{_abbreviation('c', 'p', 'p')}|codice\s+di\s+procedura\s+penale)",
+    rf"(?P<cc>{_abbreviation('c', 'c')}|codice\s+civile)",
+    rf"(?P<cp>{_abbreviation('c', 'p')}|codice\s+penale)",
+    r"(?P<cost>(?<![a-z])cost\b\.?|costituzione)",
+)))
+_ACTS = {
+    "cpc": "codice di procedura civile",
+    "cpp": "codice di procedura penale",
+    "cc": "codice civile",
+    "cp": "codice penale",
+    "cost": "costituzione",
+}
+# "art. 52 disp. att. c.c." cites the implementing provisions, not the code.
+_IMPLEMENTING = re.compile(r"\bdisp(?:\.|osizioni)?\s*(?:att|trans)")
+# Another article, or another act, between an article and a code: the code is not the article's.
+_ANOTHER_ARTICLE = re.compile(r"\bartt?(?:\.|icoli?)?(?![a-z])")
+# A closed list, and so never complete: the acts whose articles a code abbreviation must not
+# claim. An act it does not name ("art. 5 del d.m. 55/2014") can still be mistaken for the code's.
+_ANOTHER_ACT = re.compile(
+    r"\b(?:legge|decreto|d\.?\s?lgs|dlgs|d\.?\s?p\.?\s?r|dpr|regolamento|direttiva|testo\s+unico"
+    r"|t\.\s?u|tuf|tub|gdpr|codice\s+della\s+strada|codice\s+del\s+consumo)\b"
+    r"|(?<![a-z.])l\.|\d+\s*/\s*\d+"
+)
+# What may stand between a code written first and its article: "c.c. art. 1", "codice civile, art. 1".
+_BETWEEN_CODE_AND_ARTICLE = re.compile(r"[\s,:;.\-\u2013]*")
+# The parser looks at this much of the text and no more. Each article it meets scans the rest of
+# the text for a code, so the work grows with the square of the length; the LLM writes the text,
+# and the parser runs inside an async handler. A citation is short: it sits at the head.
+MAX_CITATION_TEXT = 1_000
+
+
+def _cited_article(text: str) -> Optional[Dict[str, str]]:
+    """The act and the article a citation names, or None.
+
+    An article takes the first code that follows it ("art. 1453 c.c. e c.p.c." is the civil
+    code's), as long as no other article and no other act stands between them ("art. 2 della
+    legge 241/1990, art. 3 c.c." is art. 3 of the code). With no such code, it takes the one
+    written right before it ("c.c. art. 1453", "codice civile, art. 1453"), unless the text after
+    the article turns to another act ("c.c. art. 5 del d.lgs. 196/2003"). The implementing
+    provisions are never the code, whichever side it stands ("art. 5 disp. att. c.c.",
+    "c.c. disp. att. art. 5"). An article that pairs with nothing gives way to the next.
+    Only the first `MAX_CITATION_TEXT` characters are read."""
+    lower = text[:MAX_CITATION_TEXT].lower()
+    articles = list(_ARTICLE.finditer(lower))
+    for at, article in enumerate(articles):
+        code = _CODES.search(lower, article.end())
+        if code:
+            between = lower[article.end():code.start()]
+            if _IMPLEMENTING.search(between):
+                continue  # the article is of the implementing provisions: no code is its own
+            if not (_ANOTHER_ARTICLE.search(between) or _ANOTHER_ACT.search(between)):
+                return _citation(article, code)
+        # What follows the article, up to the next one, must not turn to another act.
+        rest = lower[article.end():articles[at + 1].start() if at + 1 < len(articles) else len(lower)]
+        if _IMPLEMENTING.search(rest) or _ANOTHER_ACT.search(rest):
+            continue
+        code = _last_code_before(lower, article)
+        if code:
+            return _citation(article, code)
+    return None
+
+
+def _last_code_before(lower: str, article: "re.Match[str]") -> Optional["re.Match[str]"]:
+    """The code written right before the article, with nothing but punctuation between."""
+    codes = list(_CODES.finditer(lower, 0, article.start()))
+    if codes and _BETWEEN_CODE_AND_ARTICLE.fullmatch(lower, codes[-1].end(), article.start()):
+        return codes[-1]
+    return None
+
+
+def _citation(article: "re.Match[str]", code: "re.Match[str]") -> Dict[str, str]:
+    return {
+        "tipo_atto": _ACTS[code.lastgroup],
+        # "2-bis", "2 bis" and "2 - bis" are all "2bis", the form the lazy path writes
+        "articolo": re.sub(r"[\s-]", "", article.group(1)),
+    }
 
 
 class ExternalSourceTool(BaseTool):
@@ -142,8 +236,6 @@ class ExternalSourceTool(BaseTool):
             f"external_source - query='{query}', priority={source_priority}"
         )
 
-        first_source = source_priority[0] if source_priority else None
-
         for idx, source in enumerate(source_priority):
             try:
                 result = None
@@ -209,7 +301,7 @@ class ExternalSourceTool(BaseTool):
         if urn:
             cypher = """
             MATCH (a:Norma {URN: $urn})
-            RETURN a.testo_vigente AS text, a.URN AS urn,
+            RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
                    a.estremi AS estremi, a.numero_articolo AS numero
             """
             params = {"urn": urn}
@@ -219,15 +311,17 @@ class ExternalSourceTool(BaseTool):
             MATCH (a:Norma)
             WHERE a.estremi CONTAINS $query
                OR a.numero_articolo = $query
-               OR toLower(a.testo_vigente) CONTAINS toLower($query)
-            RETURN a.testo_vigente AS text, a.URN AS urn,
+               OR toLower(coalesce(a.testo, a.testo_vigente, '')) CONTAINS toLower($query)
+            RETURN coalesce(a.testo, a.testo_vigente) AS text, a.URN AS urn,
                    a.estremi AS estremi, a.numero_articolo AS numero
             LIMIT 1
             """
             params = {"query": query}
 
+        # The query is the LLM's text: it only ever travels as a parameter, and the
+        # read-only call is the second line of defence if that ever slips.
         try:
-            result = await self.graph_db.query(cypher, params)
+            result = await self.graph_db.ro_query(cypher, params)
 
             if result and len(result) > 0:
                 row = result[0]
@@ -340,36 +434,17 @@ class ExternalSourceTool(BaseTool):
         return None
 
     def _parse_urn_from_query(self, query: str) -> Optional[str]:
-        """
-        Estrae URN da query.
-
-        Args:
-            query: Query utente
-
-        Returns:
-            URN normalizzato oppure None
-        """
-        # Se query è già un URN, ritornalo
-        if query.startswith("urn:"):
-            return query
-
-        query_lower = query.lower().strip()
-
-        # Pattern codice civile: "art. 1453 c.c." → URN
-        if "c.c." in query_lower or "codice civile" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                num_art = match.group(1)
-                return f"urn:nir:stato:regio.decreto:1942-03-16;262~art{num_art}"
-
-        # Pattern codice penale: "art. 52 c.p." → URN
-        if "c.p." in query_lower or "codice penale" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                num_art = match.group(1)
-                return f"urn:nir:stato:regio.decreto:1930-10-19;1398~art{num_art}"
-
-        return None
+        """The graph key of the article a query cites, or None."""
+        text = query.strip()
+        if text.startswith("urn:"):
+            return canonical_urn(_NORMATTIVA_PREFIX + text)
+        if text.startswith(_NORMATTIVA_PREFIX):
+            return canonical_urn(text)
+        cited = _cited_article(text)
+        # the Costituzione is read by Normattiva's fetch only: its graph key is not pinned yet
+        if not cited or cited["tipo_atto"] == "costituzione":
+            return None
+        return canonical_urn(generate_urn(cited["tipo_atto"], article=cited["articolo"]))
 
     def _parse_normattiva_query(self, query: str) -> Optional[Dict[str, str]]:
         """
@@ -381,33 +456,4 @@ class ExternalSourceTool(BaseTool):
         Returns:
             Dict con tipo_atto e articolo oppure None
         """
-        query_lower = query.lower().strip()
-
-        # Codice civile
-        if "c.c." in query_lower or "codice civile" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                return {
-                    "tipo_atto": "codice civile",
-                    "articolo": match.group(1),
-                }
-
-        # Codice penale
-        if "c.p." in query_lower or "codice penale" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                return {
-                    "tipo_atto": "codice penale",
-                    "articolo": match.group(1),
-                }
-
-        # Costituzione
-        if "cost." in query_lower or "costituzione" in query_lower:
-            match = re.search(r'art(?:\.|icolo)?\s*(\d+)', query_lower)
-            if match:
-                return {
-                    "tipo_atto": "costituzione",
-                    "articolo": match.group(1),
-                }
-
-        return None
+        return _cited_article(query)

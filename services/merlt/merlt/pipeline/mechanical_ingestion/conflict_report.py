@@ -53,12 +53,13 @@ async def build_conflict_report(
     Returns a dict with keys `urn_conflicts`, `node_updates`, `node_new`,
     `orphan_edges`, `duplicates`, `coverage` — see design doc §5.
 
-    URNs are canonicalized (`_canonical_urn` — strips only the NIR `!vig=`/
-    `!orig=` version marker, keeps the `:N` annex) before every graph lookup
-    and set-membership check, on BOTH the batch side and the edge-endpoint
-    side. Without this, a batch URN carrying `!vig=` (or any future adapter
-    that emits one) would never match the graph's marker-less key, and the
-    join would silently misreport a live node as `node_new` instead of
+    URNs are canonicalized (`_canonical_urn`, which is `schema.canonical_urn`:
+    it cuts the NIR version marker, `!vig=…`, `!orig=…` or `@originale`, and
+    keeps the URL wrapper and the `:N` annex) before every graph lookup and
+    set-membership check, on BOTH the batch side and the edge-endpoint side.
+    Without this, a batch URN carrying a marker (or any future adapter that
+    emits one) would never match the graph's marker-less key, and the join
+    would silently misreport a live node as `node_new` instead of
     `node_updates`/`urn_conflicts`.
     """
     batch_urns_list = [

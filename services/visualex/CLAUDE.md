@@ -8,7 +8,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   alternative server with `/api/*` prefix and Swagger.
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
   `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool),
-  `http_client.py` (the shared throttled aiohttp client — TLS verification on).
+  `http_client.py` (the shared throttled aiohttp client — TLS verification on;
+  `request(..., max_retries=n)` lowers the retry budget for a caller that paces
+  itself, `None` keeps `HTTP_MAX_RETRIES`).
   - `brocardi_scraper.py` also emits `Glossario` (links to Brocardi's legal
     dictionary, `{termine, url, dizionario_id}`). Any new `brocardi_info` key
     must be whitelisted in **all three** wire literals in `app.py` (this folder)
@@ -45,9 +47,21 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     window ending today or later is `current` with its `valid_to` kept). Read
     from the raw page the scraper already keeps in its persistent cache (the key
     is the URN `get_document` returns), so it costs no request and never
-    touches `article_text` (gotcha 23). Best effort: a page it cannot read yields
-    no `validity` key at all, never a guess. It also holds the two request
-    guards, `reject_future_version_date` and `is_historical_request`.
+    touches `article_text` (gotcha 23). A repealed article keeps its update notes
+    and their markers on the page and they are not its text (art. 183-bis c.p.c.),
+    so `abrogated` does not require an empty body; a whole-article or whole-act notice
+    ("ARTICOLO ABROGATO", "PROVVEDIMENTO ABROGATO") is recognised by its words in any
+    `ins-akn`, not by the `art_abrogato-akn` class (the class only matters to the structural
+    fallback). Best effort: a page it cannot read yields no `validity` key at all, never a
+    guess. It also holds the two request guards, `reject_future_version_date` and
+    `is_historical_request`.
+  - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
+    portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
+    down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
+  - `act_dates.py` — internal (MERL-T only): acts cited by year only → the full URN
+    through Normattiva's resolver, verified by the page's title (type, year and
+    number; State acts of nine kinds only, because the resolver answers a regional
+    URN with the State's act of the same number), cached a year.
   - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
     `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
     `corte_cost.py` (Corte costituzionale open data, range bundles on disk), `resolver.py`
@@ -168,7 +182,11 @@ POST unless noted, JSON bodies.
   `oscuramento`), errors never. Expired entries are swept at start and every six hours
   (`sweep_decision_caches`). Design: docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
-  resolver already understands. The only GET among these; a POST answers 405
+  resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
+- `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
+- `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year. Only State acts of the nine kinds in
+  `act_dates._TITLES` are resolved; any other URN, a page whose title is not that act's, a network failure and
+  everything after the batch's first 120 s answer `null` for that act.
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
@@ -409,6 +427,11 @@ Breaking one of these breaks the product. Read before editing.
     cannot be read. A closed window is `historical` only when its last day is before
     today (Europe/Rome): a window ending today or later is the text in force, `current`
     with `valid_to` as stated, and `request_in_window` still judges the request against it.
+    A repealed article keeps its update notes and their markers on the page and they are
+    not its text (art. 183-bis c.p.c.): `abrogated` does not require an empty body. The
+    whole-article and whole-act notices ("ARTICOLO ABROGATO", "PROVVEDIMENTO ABROGATO") are
+    recognised by their words in any `ins-akn`: the portal does not always give them the
+    `art_abrogato-akn` class (art. 155-ter c.c., every article of a repealed act).
     The window says which text was in force, not which discipline
     governs a fact: transitional provisions and retroactive rules are not on the page.
     `version` is read stripped and lower-cased wherever it is read

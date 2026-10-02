@@ -13,15 +13,19 @@ Features:
 """
 
 import json
+import os
 import structlog
-from typing import List, Optional, Dict, Any, Type
+from typing import TYPE_CHECKING, List, Optional, Dict, Any
 from uuid import UUID
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from .models import Base, get_bridge_table_model
+from .models import get_bridge_table_model
+
+if TYPE_CHECKING:  # an annotation only
+    from merlt.config.environments import Environment
 
 log = structlog.get_logger()
 
@@ -45,11 +49,37 @@ class BridgeTableConfig:
     table_name: str = "bridge_table"  # Nome tabella (bridge_table_test, bridge_table_prod)
 
     def get_connection_string(self) -> str:
-        """Get async PostgreSQL connection string."""
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """Get async PostgreSQL connection string, the credentials escaped for a SQLAlchemy URL
+        (a password with `@`, `/`, `:`, `%` or `#` reads back as itself)."""
+        from sqlalchemy.engine import URL
+
+        return URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
+        ).render_as_string(hide_password=False)
 
     @classmethod
-    def from_environment(cls, env_config: "EnvironmentConfig") -> "BridgeTableConfig":
+    def from_enrichment_env(cls) -> "BridgeTableConfig":
+        """The bridge table on the enrichment database, as the deployment names it
+        (`ENRICHMENT_DB_*`, see infra/compose.yml): where the API reaches it from.
+
+        The dataclass defaults name a development container (localhost:5433/rlcf_dev)
+        that does not exist inside the compose network, so a bridge built from them
+        never connects there."""
+        return cls(
+            host=os.getenv("ENRICHMENT_DB_HOST", "localhost"),
+            port=int(os.getenv("ENRICHMENT_DB_PORT", "5432")),
+            database=os.getenv("ENRICHMENT_DB_NAME", "merlt"),
+            user=os.getenv("ENRICHMENT_DB_USER", "merlt"),
+            password=os.getenv("ENRICHMENT_DB_PASSWORD", "merlt"),
+        )
+
+    @classmethod
+    def from_environment(cls, env_config: "Environment") -> "BridgeTableConfig":
         """
         Crea configurazione da ambiente corrente.
 
@@ -60,12 +90,12 @@ class BridgeTableConfig:
             BridgeTableConfig con table_name appropriato
 
         Example:
-            >>> from merlt.config import get_current_environment
-            >>> config = BridgeTableConfig.from_environment(get_current_environment())
+            >>> from merlt.config import TEST_ENV
+            >>> config = BridgeTableConfig.from_environment(TEST_ENV)
             >>> print(config.table_name)  # "bridge_table_test" o "bridge_table_prod"
         """
         return cls(
-            table_name=f"bridge_table{env_config.bridge_table_suffix}"
+            table_name=f"bridge_table_{env_config.name}"
         )
 
     @classmethod
@@ -87,8 +117,8 @@ class BridgeTable:
 
     Example:
         # Uso con ambiente corrente
-        from merlt.config import get_current_environment
-        config = BridgeTableConfig.from_environment(get_current_environment())
+        from merlt.config import TEST_ENV
+        config = BridgeTableConfig.from_environment(TEST_ENV)
         bridge = BridgeTable(config)
         await bridge.connect()
 

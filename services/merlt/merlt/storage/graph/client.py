@@ -17,6 +17,7 @@ from typing import Dict, List, Any, Optional
 from falkordb import FalkorDB, Graph
 
 from merlt.storage.graph.config import FalkorDBConfig
+from merlt.storage.graph.schema import canonical_urn, node_type_cypher
 
 log = structlog.get_logger()
 
@@ -131,10 +132,53 @@ class FalkorDBClient:
             params or {}
         )
 
-    def _query_sync(self, cypher: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def ro_query(
+        self,
+        cypher: str,
+        params: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute a READ-ONLY Cypher query (GRAPH.RO_QUERY).
+
+        The server refuses any write clause, so a reader that goes through here
+        cannot modify the graph even if the text of its query is wrong. The tools
+        the experts call, the temporal validity check, the graph context and the
+        graph router's relation and subgraph reads use it; the writers keep `query`.
+        The answer has the shape of `query`'s.
+
+        A graph that does not exist yet reads as an empty graph, as with `query`:
+        GRAPH.RO_QUERY refuses an empty key where GRAPH.QUERY answers with nothing.
+
+        Example:
+            results = await client.ro_query(
+                "MATCH (n:Norma {URN: $urn}) RETURN n.estremi",
+                {"urn": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"}
+            )
+        """
+        if not self._connected:
+            raise RuntimeError("Not connected to FalkorDB. Call connect() first.")
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._query_sync,
+            cypher,
+            params or {},
+            True
+        )
+
+    def _query_sync(
+        self,
+        cypher: str,
+        params: Dict[str, Any],
+        read_only: bool = False
+    ) -> List[Dict[str, Any]]:
         """Execute query synchronously (called in executor)."""
         try:
-            result = self._graph.query(cypher, params)
+            if read_only:
+                result = self._graph.ro_query(cypher, params)
+            else:
+                result = self._graph.query(cypher, params)
 
             # Convert result set to list of dicts
             records = []
@@ -180,6 +224,10 @@ class FalkorDBClient:
             return records
 
         except Exception as e:
+            if read_only and "empty key" in str(e):
+                # The graph has no key yet (a fresh instance): nothing to read.
+                log.debug(f"Read-only query on a graph that does not exist yet: {cypher[:100]}...")
+                return []
             log.error(f"Query failed: {cypher[:100]}... Error: {e}")
             raise
 
@@ -188,7 +236,7 @@ class FalkorDBClient:
         start_node: str,
         end_node: str,
         max_hops: int = 3
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> Optional[Dict[str, Any]]:
         """
         Find shortest path between two nodes.
 
@@ -198,7 +246,7 @@ class FalkorDBClient:
             max_hops: Maximum path length
 
         Returns:
-            Path as list of nodes/edges, or None if no path
+            {"path": {"edges": [relation types]}, "length": N}, or None if no path
 
         Example:
             path = await client.shortest_path(
@@ -206,6 +254,8 @@ class FalkorDBClient:
                 "/eli/it/cc/1942/03/16/262/art1454/ita",
                 max_hops=3
             )
+
+        A reader: every query goes through `ro_query`.
         """
         # FalkorDB has limitations with undirected shortestPath
         # Use a simpler approach: check direct connection or shared neighbors
@@ -220,7 +270,7 @@ class FalkorDBClient:
         """
 
         try:
-            results = await self.query(cypher_direct, {
+            results = await self.ro_query(cypher_direct, {
                 "start_urn": start_node,
                 "end_urn": end_node
             })
@@ -240,7 +290,7 @@ class FalkorDBClient:
                 LIMIT 1
             """
 
-            results = await self.query(cypher_reverse, {
+            results = await self.ro_query(cypher_reverse, {
                 "start_urn": start_node,
                 "end_urn": end_node
             })
@@ -261,7 +311,7 @@ class FalkorDBClient:
                     LIMIT 1
                 """
 
-                results = await self.query(cypher_shared, {
+                results = await self.ro_query(cypher_shared, {
                     "start_urn": start_node,
                     "end_urn": end_node
                 })
@@ -275,7 +325,16 @@ class FalkorDBClient:
             return None
 
         except Exception as e:
-            # If nodes not found or no path exists, return None silently
+            # A node that is not found gives no rows, not an exception: an exception is a
+            # real failure (the graph is unreachable, a query is wrong). The caller reads
+            # None as "no path" and goes on, so the failure is said here.
+            log.warning(
+                "shortest_path failed",
+                start=start_node,
+                end=end_node,
+                error_type=type(e).__name__,
+                error=str(e),
+            )
             return None
 
     async def get_related_nodes_for_article(
@@ -302,47 +361,40 @@ class FalkorDBClient:
                 "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
             )
         """
-        # Extract numero_articolo from URN
-        import re
-        match = re.search(r'~art(\d+)', article_urn)
-        if not match:
-            log.warning(f"Could not extract article number from URN: {article_urn}")
-            return []
-
-        numero_articolo = match.group(1)
-
         # Query both outgoing and incoming relationships
-        cypher = """
-            MATCH (n:Norma {numero_articolo: $numero})
+        # `node_label` is what the node reads as: its first label that is not Entity.
+        cypher = f"""
+            MATCH (n:Norma {{URN: $urn}})
             OPTIONAL MATCH (n)-[r_out]->(m_out)
             WHERE m_out IS NOT NULL
-            WITH n, collect(DISTINCT {
+            WITH n, collect(DISTINCT {{
                 direction: 'outgoing',
                 rel_type: type(r_out),
-                node_label: labels(m_out)[0],
+                node_label: {node_type_cypher('m_out')},
                 node_urn: m_out.URN,
                 node_nome: m_out.nome,
                 node_estremi: m_out.estremi
-            }) AS outgoing
+            }}) AS outgoing
             OPTIONAL MATCH (m_in)-[r_in]->(n)
             WHERE m_in IS NOT NULL
-            WITH n, outgoing, collect(DISTINCT {
+            WITH n, outgoing, collect(DISTINCT {{
                 direction: 'incoming',
                 rel_type: type(r_in),
-                node_label: labels(m_in)[0],
+                node_label: {node_type_cypher('m_in')},
                 node_urn: m_in.URN,
                 node_nome: m_in.nome,
                 node_estremi: m_in.estremi
-            }) AS incoming
+            }}) AS incoming
             RETURN outgoing + incoming AS related_nodes
             LIMIT 1
         """
 
         try:
-            results = await self.query(cypher, {"numero": numero_articolo})
+            urn = canonical_urn(article_urn)
+            results = await self.ro_query(cypher, {"urn": urn})
 
             if not results or not results[0].get("related_nodes"):
-                log.debug(f"No related nodes for art.{numero_articolo}")
+                log.debug(f"No related nodes for {urn}")
                 return []
 
             related = results[0]["related_nodes"]
@@ -353,7 +405,7 @@ class FalkorDBClient:
                 if node.get("rel_type") and node.get("node_label")
             ][:max_results]
 
-            log.debug(f"Found {len(valid_nodes)} related nodes for art.{numero_articolo}")
+            log.debug(f"Found {len(valid_nodes)} related nodes for {urn}")
             return valid_nodes
 
         except Exception as e:
