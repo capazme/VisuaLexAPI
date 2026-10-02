@@ -163,6 +163,29 @@ article text changes, a discussion whose words moved re-attaches to the new loca
 a detached one stays listed in the panel with a notice and its original quotation,
 never hidden or deleted. Supported on the article tab for now.
 
+**A past text is a reading** (round "Testo alla data", spec
+`docs/superpowers/specs/2026-10-01-testo-alla-data-design.md`). The server
+states, next to `article_text`, the window the source's own page gives
+(`ArticleData.validity`: `state`, `valid_from`, `valid_to`, …).
+`utils/versionDisplay.ts` is the one table that turns it into what is shown —
+the status chip (`VersionStatusChip`: "In vigore dal …", "Testo storico · dal …
+al …"), the `VersionBanner`, and what is switched off — and it is tested without
+a DOM. `versionInfo.isHistorical` is what was ASKED for (a date, or the original
+text), never what came back. On a past text the tab, the dossier reader and
+Study Mode take no notes, highlights, discussions or quick-norm (the selection
+popup offers only "Copia"), Brocardi is not shown, and the update notes open;
+an article that did not exist yet draws no text, only the way forward. The
+"Testo alla data" dialog (`TextAtDateDialog`) replaces the old "Cerca versione"
+modal; the result opens in a tab of its own, labelled with the day asked for.
+`utils/citation.ts` writes how a lawyer cites it, in the owner's style ("art. 1284
+c.c., nel testo in vigore al 29 dicembre 2007"; "art. 2, l. 7 agosto 1990, n. 241,
+nel testo in vigore al …"; the golden file is `utils/__fixtures__/citationGolden.ts`),
+and a copy of a past text starts with it. A version that does not contain the day
+asked for (`request_in_window` false) is shown with a warning and is not cited,
+copied, exported or saved (`copyBlockedReason` says why); the update notes of a
+past text are open by default and can be closed (the `updatesOpenByDefault` option
+of `useArticleTextInteractions`).
+
 **Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
 free notes; `InlineNoteComposer` anchored on the selection when creating an
 anchored note; `InlineNotePopover` when clicking an existing wavy underline;
@@ -246,6 +269,18 @@ A dossier is where the articles needed for a task are aggregated and read.
 - **Rows** (`SortableDossierItem`): the expand toggle lives on a header-scoped
   sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
   star keeps a 44px touch target.
+- **Versions**: an item keeps the version it was added with (`versione`,
+  `data_versione`), whichever button added it (`normaForDossier` for the window
+  header's), and `dossierContainsArticle` tells two versions of one article apart,
+  so both can sit in one dossier. A row shows "Testo al 29/12/2007" for a past
+  text; the reader is read-only on it (gotcha 32) and reopens it without Brocardi.
+  The item key (`buildItemKey`) carries no version, by contract (annotations are
+  keyed on it), so whatever caches, groups or compares items by article adds
+  `versionKey` (`utils/versionDisplay.ts`): the reader's fetch cache
+  (`articleFetchCache`), `computeNormaGroups`, `dossierContainsArticle`. "Apri tutto"
+  and the quick-open of the list view build their searches from a group
+  (`searchParamsFromGroup`, `searchesForGroups`), and a group asking for a past text
+  opens in a tab of its own.
 
 ## Shared utilities — check before writing a new one
 
@@ -283,7 +318,23 @@ Duplicating any of these is a defect, not a shortcut.
   (**tolerant** lookup — required, see gotcha 9).
 - `utils/dateUtils.ts` — `parseItalianDate`, `formatDateItalianLong`,
   `expandTwoDigitYear` (the one two-digit-year pivot, same as the backend's
-  `_expand_year`: "90" → 1990, "23" → 2023).
+  `_expand_year`: "90" → 1990, "23" → 2023), `formatDateDashed` ("29-12-2007",
+  the way Normattiva writes a day), `formatDateForCitation` ("1° ottobre 2026"),
+  `addDaysToIsoDate`, and `todayInRome` (the day the server compares a
+  `version_date` with; the browser's own day can differ).
+- `utils/versionDisplay.ts` — `describeVersion(validity, request)` (chip, banner,
+  what is shown and what is off: `readOnly`, `doctrineVisible`, `textVisible`,
+  `canCite`, `canCopyOrSave` with its reason `copyBlockedReason`,
+  `updateNotesOpen`), `versionKey` (which text a request asks for, as one string),
+  `requestIsHistorical` (mirrors the server's
+  `is_historical_request`), `deriveVersionInfo`, `isEuropeanAct` (mirrors
+  `get_scraper_for_norma`), `buildTextAtDateParams`, `versionTabSuffix`,
+  `historicalItemLabel`. Every surface that renders article text goes through
+  it (gotcha 32).
+- `utils/citation.ts` — `formatNormCitation` (null when there is nothing honest
+  to cite: the text in force with no day, an act of the Union, an article that did
+  not exist, a version that does not contain the day) and `withCitation`; the
+  wording is the golden file's.
 - `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
   then number, "679/2016" the reverse, "2006/2004" number first), shared by
   the palette parser and the in-text matcher and mirrored by
@@ -335,7 +386,8 @@ Duplicating any of these is a defect, not a shortcut.
   never guesses: ambiguous or missing = `detached`).
 - `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
   `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
-  `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
+  `dossierContainsArticle`, `normaForDossier`, `computeNormaGroups`,
+  `formatTimestampLong`.
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
 - `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
   `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
@@ -609,3 +661,20 @@ meant to stay split; add new features as new files, not inside the shells:
     back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
     40, so a miss is the normal case, not the exception. Same trap as
     `codice_urn` on the backend.
+
+32. **"Vigente" is never a default, and a past text is read-only.** The status of
+    a text comes from `ArticleData.validity` (what the source's page says) and
+    from nothing else: `versionInfo` and `norma_data.data_versione` are what was
+    ASKED for, an echo, and must never be shown as a fact ("Aggiornato al" once
+    printed the typed date as if Normattiva had said it). With no `validity` the
+    toolbar shows no status. A text the source says is past, or one asked for by
+    date or as the original whose page could not be read, takes no notes,
+    highlights or discussions: `buildItemKey` has no version segment, so anything
+    made on it would appear on the text in force, on the wrong words. A new
+    surface that renders article text passes it through `describeVersion` and
+    honours `readOnly`, `doctrineVisible` and `textVisible`, and asks
+    `canCopyOrSave` (showing `copyBlockedReason`) and `canCite` before it copies,
+    exports, saves or cites, the way `ArticleTabContent` and `DossierItemReader` do; and
+    anything that caches, groups or compares texts by article adds `versionKey` to the
+    item key, which has no version; the banner and the chip sit
+    beside the text, never in it (root rule 23).

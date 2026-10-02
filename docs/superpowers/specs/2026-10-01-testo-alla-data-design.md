@@ -442,10 +442,21 @@ Recorded, not done here:
 - Items already saved from a historical tab through the window button lost their version.
 - The Italian extended date form is not calendar-checked (`31 febbraio 2019` passes the parser).
 - When the text comes from the AKN fallback (accents transliterated), nothing marks it
-  (`normattiva_scraper.py:57-67`); the plan checks whether it is distinguishable.
+  (`normattiva_scraper.py:57-67`). Checked while planning: `get_document` returns the same
+  `(text, urn)` pair whichever path produced the text, so it is not distinguishable without a
+  change to the scraper, which the other developer approves.
 - Reusing a known window for a second date (§5.4).
 - An act without history has not been met (§2).
 - A request for an article absent from a decree's own body answers 200 with the decree's page.
+- Inside a tab opened by "Testo alla data" the annex index and the arrows
+  (`useAnnexNavigation`) load the text in force, not the version of the tab, so the tab's label
+  ("… — testo al 29/12/2007") can sit over a different text (the article's own chip stays true
+  when `validity` is present). Carried over to v2, with the reader extracted from the window.
+- Decisions taken in review, beyond what this document says: a version that does not contain the
+  asked day is not copied, exported or saved; the export of a past text is off until its header
+  carries the citation; a repealed article is cited "abrogato dal …"; an act of the Union is
+  never cited as a text at a date; a historical version reached with no day is cited by its window.
+- The graph side rail (`article_sidebar`) still describes the current article on a past text.
 
 ## 9. The Massimario panel on the article page
 
