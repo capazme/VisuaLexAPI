@@ -5,8 +5,11 @@ Internal source for MERL-T's MassimarioAdapter: the route that serves it is not
 routed by the ingress. The portal sits behind a web application firewall, so
 this module is deliberately slow: one request at a time, at least MIN_INTERVAL
 seconds apart (the shared client's pacing is global and much shorter), an honest
-User-Agent, a pause before retrying a page that is not valid JSON, and a stop at
-the first firewall rejection.
+User-Agent, a pause before retrying a page that is not valid JSON or a request
+that failed, and a stop at the first firewall rejection. The shared client's own
+retries are switched off here: every attempt, retried or not, goes through the
+pacing of this module, and a 403 or 429 from the portal is the firewall's
+answer, not a transient error.
 """
 from __future__ import annotations
 
@@ -32,7 +35,8 @@ log = structlog.get_logger()
 
 PORTAL_BASE = "https://www.portaledelmassimario.ipzs.it"
 USER_AGENT = "VisuaLex (+https://github.com/capazme/VisuaLexAPI)"
-MIN_INTERVAL = float(os.getenv("MASSIMARIO_MIN_INTERVAL", "1.5"))
+# The environment can only slow the portal down: 1.5 s is the floor.
+MIN_INTERVAL = max(1.5, float(os.getenv("MASSIMARIO_MIN_INTERVAL", "1.5")))
 INVALID_RETRIES = 3
 INVALID_PAUSE = float(os.getenv("MASSIMARIO_INVALID_PAUSE", "10"))
 
@@ -43,6 +47,8 @@ _PATHS = {
 }
 # ASCII digits only: `\d` alone accepts other scripts' digits, which do not belong in a URL.
 _ID = re.compile(r"[0-9]{1,9}", re.ASCII)
+# What the portal's firewall answers with: it must not be asked again.
+_FIREWALL_STATUSES = {403, 429}
 
 _lock = asyncio.Lock()
 _last_request_at = 0.0
@@ -65,7 +71,7 @@ async def _paced_get(url: str) -> str:
             await asyncio.sleep(wait)
         try:
             result = await http_client.request(
-                "GET", url, source="massimario", headers={"User-Agent": USER_AGENT}
+                "GET", url, source="massimario", max_retries=0, headers={"User-Agent": USER_AGENT}
             )
         finally:
             _last_request_at = time.monotonic()
@@ -80,6 +86,17 @@ async def fetch_element(kind: str, element_id: str) -> dict[str, Any]:
             text = await _paced_get(url)
         except DocumentNotFoundError as exc:
             raise ResourceNotFoundError(f"elemento {kind} {element_id} non trovato sul portale") from exc
+        except NetworkError as exc:
+            if exc.status_code in _FIREWALL_STATUSES:
+                raise RateLimitExceededError("il firewall del portale ha rifiutato la richiesta") from exc
+            log.warning(
+                "massimario.network_error",
+                url=url, attempt=attempt + 1, status=exc.status_code, error=str(exc),
+            )
+            if attempt == INVALID_RETRIES:
+                raise
+            await asyncio.sleep(INVALID_PAUSE * (attempt + 1))
+            continue
         if "Request Rejected" in text[:500]:
             raise RateLimitExceededError("il firewall del portale ha rifiutato la richiesta")
         try:

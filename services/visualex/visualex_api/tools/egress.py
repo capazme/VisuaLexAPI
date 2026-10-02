@@ -13,7 +13,8 @@ redirect target. SECURITY.md ("Not yet covered") lists those three gaps; do not
 describe this list as an enforced boundary until they are closed.
 
 The server sends no telemetry and has no analytics endpoint. Every host below is
-a source consulted to answer a specific legal question.
+a source consulted to answer a legal question, or fetched for MERL-T's ingestion
+of the Massimario's reviews.
 """
 from __future__ import annotations
 
