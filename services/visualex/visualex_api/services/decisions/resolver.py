@@ -9,6 +9,7 @@ attributes (`testo_assente`), and only when the source said so.
 from __future__ import annotations
 
 import asyncio
+import re
 import zipfile
 import zlib
 from collections.abc import Awaitable, Callable
@@ -35,6 +36,8 @@ FOUND_NS, ABSENT_NS, PENDING_NS = "decisions_found", "decisions_absent", "decisi
 _SOURCE_ERRORS = (NetworkError, DocumentNotFoundError, asyncio.TimeoutError, ValueError,
                   zipfile.BadZipFile, zlib.error, EOFError, SourceAnswerError,
                   IntermediateCertificateMismatch, OSError)
+_CITATA = re.compile(r"[\w .\-/]+")
+_CITATA_MAX = 20
 
 
 class SourceUnavailable(Exception):
@@ -73,6 +76,15 @@ def _withheld(decision: Decision) -> list[dict[str, str]]:
     showing an empty text, and reads why from `attributi.testo_assente`, set only when the
     source said so."""
     return [] if decision.testo else [{"tipo": "testo_non_disponibile"}]
+
+
+def _citata(raw: str | None) -> str | None:
+    """The section as cited, when it can be echoed in a notice: short, and only the characters
+    a section is written with. The page builds the request from a shareable address, so
+    anything else would let a crafted link put its own text inside a VisuaLex notice."""
+    if raw is not None and len(raw) <= _CITATA_MAX and _CITATA.fullmatch(raw):
+        return raw
+    return None
 
 
 class Resolver:
@@ -149,8 +161,10 @@ class Resolver:
             if decision:
                 hits.append(decision)
         avvisi: list[dict[str, str]] = []
+        citata = _citata(ref.sezione.raw)
+        echo = {"citata": citata} if citata is not None else {}
         if ref.sezione.raw and not ref.sezione.recognised:
-            avvisi.append({"tipo": "sezione_non_riconosciuta", "citata": ref.sezione.raw})
+            avvisi.append({"tipo": "sezione_non_riconosciuta", **echo})
         if len(hits) == 2:
             matching = [d for d in hits if ref.sezione.code and d.sezione == ref.sezione.code]
             if len(matching) != 1:
@@ -163,8 +177,7 @@ class Resolver:
         if len(hits) == 1:
             decision = hits[0]
             if ref.sezione.code and decision.sezione and decision.sezione != ref.sezione.code:
-                avvisi.append({"tipo": "sezione_diversa", "citata": ref.sezione.raw,
-                               "effettiva": decision.sezione})
+                avvisi.append({"tipo": "sezione_diversa", **echo, "effettiva": decision.sezione})
             avvisi += _withheld(decision)
             return Outcome("trovata", decisione=decision, avvisi=avvisi)
         return await self._not_found(ref, archivi)

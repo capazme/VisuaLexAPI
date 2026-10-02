@@ -108,6 +108,23 @@ async def test_an_unreadable_section_is_ignored_with_a_notice():
     assert {"tipo": "sezione_non_riconosciuta", "citata": "6-3"} in out.avvisi
 
 
+@pytest.mark.parametrize("sezione", ["x" * 200, "<b>x</b>"], ids=["200 characters", "markup"])
+async def test_a_notice_never_echoes_text_that_is_not_a_section(sezione):
+    # the page builds the request from a shareable address: a crafted link must not put its
+    # own text inside a VisuaLex notice
+    out = await _resolver(FakeItalgiure(HOMONYMS)).resolve(
+        ref(numero=10787, anno=2024, archivio="civile", sezione=sezione))
+    assert out.esito == "trovata"
+    assert {"tipo": "sezione_non_riconosciuta"} in out.avvisi
+
+
+async def test_a_wrong_section_that_cannot_be_echoed_keeps_its_notice_without_it():
+    # read as the Sezioni Unite, but a control character is never echoed
+    out = await _resolver(FakeItalgiure(HOMONYMS)).resolve(
+        ref(numero=10787, anno=2024, archivio="civile", sezione="sezioni\tunite"))
+    assert out.avvisi == [{"tipo": "sezione_diversa", "effettiva": "3"}]
+
+
 async def test_tributaria_reads_the_civil_archive_only():
     italgiure = FakeItalgiure([_cass("civile", 5, 2022, "5")])
     out = await _resolver(italgiure).resolve(ref(numero=5, anno=2022, sezione="T"))
