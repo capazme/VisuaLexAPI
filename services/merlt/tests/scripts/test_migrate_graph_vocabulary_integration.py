@@ -386,3 +386,57 @@ async def test_a_bare_key_with_a_version_marker_is_reported_never_wrapped(graph)
     await graph.query("CREATE (:Norma {URN: $u, tipo_documento: 'articolo', testo: 'x'})", {"u": versioned})
     assert (await _migrate(graph))["bare_keys"] == {"wrapped": 0, "reported": [versioned]}
     assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN count(n) AS c", {"u": versioned}) == [{"c": 1}]
+
+
+async def test_a_stub_with_a_bare_versioned_key_is_reported_and_the_second_run_is_empty(graph):
+    # Cut, the marker would leave a bare key the next run wraps: the migration would never converge.
+    versioned = BARE_CP + "!vig=2020-01-01"
+    await graph.query("CREATE (:Norma {URN: $u, is_stub: true})", {"u": versioned})
+    first = await _migrate(graph)
+    assert (first["bare_keys"]["reported"], first["stubs"]["reported"]) == ([versioned], [versioned])
+    assert await _migrate(graph) == {
+        **NOTHING,
+        "bare_keys": {"wrapped": 0, "reported": [versioned]},
+        "stubs": {**NO_STUBS, "reported": [versioned]},
+    }
+
+
+async def test_a_reported_stub_still_gets_the_schema_provenance_and_fonte(graph):
+    # Reported stubs are only not reshaped: the other steps treat them as any node.
+    flagged = CODE + "~art1503"
+    await graph.query(
+        "CREATE (:Norma {URN: $u, is_stub: true, testo: 'Un testo.', provenance: 'lazy_ingest', fonte: 'VisualexAPI'})",
+        {"u": flagged},
+    )
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["stubs"]["reported"] == [flagged]
+    assert report["provenance_legacy"]["remapped"] == {"lazy_ingest": 1}
+    assert report["fonte"]["VisualexAPI"] == 3  # the fixture's code and article, and this stub
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.provenance AS p, n.fonte AS f", {"u": flagged}) == [
+        {"p": "ingestion", "f": "Normattiva"}
+    ]
+
+
+async def test_a_stub_by_absence_that_carries_a_rubrica_is_reported_and_keeps_it(graph):
+    candidate = CODE + "~art1504"
+    await graph.query("CREATE (:Norma {URN: $u, rubrica: 'Della vendita', url: 'https://example.org'})", {"u": candidate})
+    assert (await _migrate(graph))["stubs"]["reported"] == [candidate]
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.rubrica AS r", {"u": candidate}) == [
+        {"r": "Della vendita"}
+    ]
+
+
+async def test_a_stub_keeps_the_estremi_its_urn_cannot_give(graph):
+    # plan_estremi keeps them for an article of an act the URN table does not know; the stub shape too.
+    law = PREFIX + "urn:nir:stato:legge:1975-03-08;39~art5"
+    await graph.query(
+        "CREATE (:Norma {URN: $u, is_stub: true, estremi: 'Art. 5 LEGGE 8 marzo 1975, n. 39', created_at: 1})",
+        {"u": law},
+    )
+    await _migrate(graph)
+    rows = await graph.query("MATCH (n:Norma {URN: $u}) RETURN properties(n) AS p", {"u": law})
+    assert rows == [{"p": {**stub_properties(law, Provenance.INGESTION), "estremi": "Art. 5 LEGGE 8 marzo 1975, n. 39"}}]
+    # a code's stub still takes the derived estremi (the fixture's 'Art. 1322')
+    assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.estremi AS e", {"u": STUB}) == [{"e": "Art. 1322 c.c."}]

@@ -65,6 +65,9 @@ _STUB_WHERE = f"({_STUB_FLAG} OR {_PLACEHOLDER})"
 _NOT_STUB_WHERE = f"NOT {_STUB_WHERE}"
 # A stub among nodes of any label: a Norma that is no community entity and passes the test.
 _STUB_NODE = f"(n:Norma AND NOT n:Entity AND {_STUB_WHERE})"
+# What a stub candidate may carry that its shape would drop and nothing can rebuild: such
+# a node is reported, never reshaped (`url` follows from the URN, so it may go).
+_STUB_CONTENT = ("testo", "testo_vigente", "text", "titolo", "rubrica")
 
 # Every label the writer before Task 4 could give a community entity: `tipo.capitalize()`.
 # A fixed set from the code; a label name is never read from a node.
@@ -260,6 +263,7 @@ async def rekey_versions(client, apply: bool) -> dict[str, Any]:
 
 async def unify_stubs(
     client, apply: bool, batch: int, renames: dict[int, tuple[str, str]] | None = None,
+    shaped: set[int] | None = None,
 ) -> dict[str, Any]:
     """Every stub ends with exactly the properties `schema.stub_properties` gives it:
     the one definition of the shape (spec 4.1). The missing ones are set
@@ -268,11 +272,21 @@ async def unify_stubs(
     `ingestion`: a stub carries no seed content, and a `seed` stamp would survive the
     ingestion that completes it (backfill_provenance_seed stamped every node).
 
-    Reported, never reshaped: a stub without a URN; a flagged stub that carries text
-    (reshaping would delete it, and the two signals disagree); a stub whose canonical
-    key another node holds. A community entity still carrying a legacy `Norma` label
-    is no stub: on --apply `drop_legacy_entity_labels` has removed it already. A dry
-    run reads a bare key `wrap_bare_keys` would have wrapped (`renames`) as wrapped."""
+    The estremi are the shape's, except for an act the URN table does not know: there
+    the stored estremi ("Art. 5 LEGGE 8 marzo 1975, n. 39") say more than the URN, and
+    stay, as `plan_estremi` keeps them for an article.
+
+    Reported, never reshaped: a stub without a URN; a stub still keyed by a bare
+    `urn:nir:` URN (`wrap_bare_keys` reported it: shaped, it would lose its marker and
+    the next run would wrap it); a candidate carrying content the shape would drop
+    (`_STUB_CONTENT`: a flagged stub with text, a placeholder with a rubrica); a stub
+    whose canonical key another node holds. A reported stub goes through the later
+    steps like any other node; the ids of the stubs this step owns go into `shaped`,
+    for those steps to leave them alone.
+
+    A community entity still carrying a legacy `Norma` label is no stub: on --apply
+    `drop_legacy_entity_labels` has removed it already. A dry run reads a bare key
+    `wrap_bare_keys` would have wrapped (`renames`) as wrapped."""
     rows = await client.query(
         f"MATCH (n) WHERE {_STUB_NODE} RETURN id(n) AS id, properties(n) AS props ORDER BY id"
     )
@@ -287,15 +301,19 @@ async def unify_stubs(
             if props.get("node_id") is None or props.get("node_id") == old:
                 props["node_id"] = new
         urn = props.get("URN")
-        if not isinstance(urn, str) or not urn.strip() or props.get("testo") is not None \
-                or props.get("testo_vigente") is not None:
+        if not isinstance(urn, str) or not urn.strip() or urn.strip().lower().startswith("urn:nir:") \
+                or any(props.get(key) is not None for key in _STUB_CONTENT):
             report["reported"].append(str(urn or props.get("node_id") or f"id:{row['id']}"))
             continue
         shape = stub_properties(urn, Provenance.INGESTION)
+        if act_name_from_urn(urn) is None and isinstance(props.get("estremi"), str) and props["estremi"].strip():
+            shape["estremi"] = props["estremi"]
         if shape["URN"] != urn and (shape["URN"] in taken or await _norma_holds(client, shape["URN"])):
             report["reported"].append(urn)
             continue
         taken.add(shape["URN"])
+        if shaped is not None:
+            shaped.add(row["id"])
         if props == shape:
             continue
         report["reshaped"] += 1
@@ -352,12 +370,13 @@ def plan_estremi(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return changes
 
 
-async def rewrite_estremi(client, apply: bool, batch: int) -> int:
-    """The estremi of the articles. A stub's are `unify_stubs`' (its shape includes
-    them): counted here too, a dry run, which has not reshaped it, would count it twice."""
+async def rewrite_estremi(client, apply: bool, batch: int, shaped: set[int]) -> int:
+    """The estremi of the articles. A stub `unify_stubs` shaped (`shaped`) has its
+    shape's: counted here too, a dry run, which has not reshaped it, would count it twice."""
     rows = await client.query(
-        f"MATCH (n:Norma) WHERE n.numero_articolo IS NOT NULL AND NOT {_STUB_NODE} "
-        "RETURN id(n) AS id, n.URN AS urn, n.estremi AS estremi"
+        "MATCH (n:Norma) WHERE n.numero_articolo IS NOT NULL AND NOT id(n) IN $shaped "
+        "RETURN id(n) AS id, n.URN AS urn, n.estremi AS estremi",
+        {"shaped": sorted(shaped)},
     )
     changes = plan_estremi(rows)
     if apply:
@@ -366,28 +385,30 @@ async def rewrite_estremi(client, apply: bool, batch: int) -> int:
     return len(changes)
 
 
-async def remap_provenance(client, apply: bool) -> dict[str, dict[str, int]]:
+async def remap_provenance(client, apply: bool, shaped: set[int]) -> dict[str, dict[str, int]]:
     """A provenance written before this round becomes the schema value it means
     (`LEGACY_PROVENANCE`); any other value outside `Provenance` is reported, unchanged.
-    A stub's is `unify_stubs`' (always `ingestion`)."""
+    A stub `unify_stubs` shaped has its shape's (always `ingestion`); a reported one
+    is remapped like any node."""
     known = {p.value for p in Provenance}
     report: dict[str, dict[str, int]] = {"remapped": {}, "unknown": {}}
-    not_stub = f"NOT {_STUB_NODE}"
+    not_stub = "NOT id(n) IN $shaped"
+    ids = sorted(shaped)
     for row in await client.query(
-        f"MATCH (n) WHERE n.provenance IS NOT NULL AND {not_stub} RETURN DISTINCT n.provenance AS p"
+        f"MATCH (n) WHERE n.provenance IS NOT NULL AND {not_stub} RETURN DISTINCT n.provenance AS p", {"shaped": ids}
     ):
         value = row["p"]
         if value in known:
             continue
         count = await _count(
-            client, f"MATCH (n) WHERE n.provenance = $p AND {not_stub} RETURN count(n) AS n", {"p": value}
+            client, f"MATCH (n) WHERE n.provenance = $p AND {not_stub} RETURN count(n) AS n", {"p": value, "shaped": ids}
         )
         if value in LEGACY_PROVENANCE:
             report["remapped"][value] = count
             if apply:
                 await client.query(
                     f"MATCH (n) WHERE n.provenance = $p AND {not_stub} SET n.provenance = $new",
-                    {"p": value, "new": LEGACY_PROVENANCE[value].value},
+                    {"p": value, "new": LEGACY_PROVENANCE[value].value, "shaped": ids},
                 )
         else:
             report["unknown"][str(value)] = count
@@ -423,20 +444,22 @@ async def stamp_provenance(client, apply: bool, batch: int, seed_keys: set[str])
     return report
 
 
-async def normalize_fonti(client, apply: bool) -> dict[str, int]:
-    """The canonical `fonte` on nodes and edges. A stub has none: `unify_stubs` removes it."""
+async def normalize_fonti(client, apply: bool, shaped: set[int]) -> dict[str, int]:
+    """The canonical `fonte` on nodes and edges. A stub `unify_stubs` shaped has none;
+    a reported one is normalised like any node."""
     report: dict[str, int] = {}
-    for pattern, where in (("(n)", f"n.fonte IS NOT NULL AND NOT {_STUB_NODE}"), ("()-[n]->()", "n.fonte IS NOT NULL")):
-        rows = await client.query(f"MATCH {pattern} WHERE {where} RETURN DISTINCT n.fonte AS fonte")
+    ids = {"shaped": sorted(shaped)}
+    for pattern, where in (("(n)", "n.fonte IS NOT NULL AND NOT id(n) IN $shaped"), ("()-[n]->()", "n.fonte IS NOT NULL")):
+        rows = await client.query(f"MATCH {pattern} WHERE {where} RETURN DISTINCT n.fonte AS fonte", ids)
         for row in rows:
             old = row["fonte"]
             new = normalize_fonte(old) if isinstance(old, str) else old
             if new == old:
                 continue
             match = f"MATCH {pattern} WHERE {where} AND n.fonte = $old"
-            report[old] = report.get(old, 0) + await _count(client, f"{match} RETURN count(n) AS n", {"old": old})
+            report[old] = report.get(old, 0) + await _count(client, f"{match} RETURN count(n) AS n", {"old": old, **ids})
             if apply:
-                await client.query(f"{match} SET n.fonte = $new", {"old": old, "new": new})
+                await client.query(f"{match} SET n.fonte = $new", {"old": old, "new": new, **ids})
     return report
 
 
@@ -557,18 +580,19 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
     # the community entities, whose provenance is their own, then the report.
     batch = _batch_size(batch)
     renames: dict[int, tuple[str, str]] = {}
+    shaped: set[int] = set()  # the stubs unify_stubs owns: the later steps leave them alone
     return {
         "relations_collapsed": await collapsed_relations(client),
         "relations": await rename_relations(client, apply, batch),
         "legacy_entity_labels": await drop_legacy_entity_labels(client, apply),
         "bare_keys": await wrap_bare_keys(client, apply, renames),
         "versions": await rekey_versions(client, apply),
-        "stubs": await unify_stubs(client, apply, batch, renames),
+        "stubs": await unify_stubs(client, apply, batch, renames, shaped),
         "provenance_reset": await reset_entity_writer_stamps(client, apply, batch, seed_keys),
-        "estremi": await rewrite_estremi(client, apply, batch),
-        "provenance_legacy": await remap_provenance(client, apply),
+        "estremi": await rewrite_estremi(client, apply, batch, shaped),
+        "provenance_legacy": await remap_provenance(client, apply, shaped),
         "provenance": await stamp_provenance(client, apply, batch, seed_keys),
-        "fonte": await normalize_fonti(client, apply),
+        "fonte": await normalize_fonti(client, apply, shaped),
         "testo": await copy_text(client, apply, batch),
         "stale_text": await drop_stale_text(client, apply),
         "fingerprint": await stamp_fingerprints(client, apply, batch),
