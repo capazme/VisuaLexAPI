@@ -6,6 +6,7 @@ portal's own markup: a "Testo in vigore" block in front of a `div.bodyTesto`.
 `test_normattiva_validity_live.py` repeats the main cases against the portal
 (`-m live`).
 """
+import time
 from datetime import date
 
 import pytest
@@ -334,3 +335,41 @@ class TestRejectFutureVersionDate:
         reject_future_version_date("2000-01-01")
         with pytest.raises(ValidationError):
             reject_future_version_date("2999-01-01")
+
+
+class TestHostilePages:
+    """A page the portal did not serve must not stall the server.
+
+    `re` holds the GIL, so a quadratic pattern on a hostile page blocks the whole event
+    loop even when it runs in a thread. With the first version of the patterns each case
+    below took seconds; it takes milliseconds now, and the bound leaves a wide margin.
+    """
+
+    BOUND = 1.0  # seconds
+
+    @staticmethod
+    def _timed(call):
+        start = time.perf_counter()
+        result = call()
+        return result, time.perf_counter() - start
+
+    def test_a_run_of_unclosed_angle_brackets_in_the_window_block(self):
+        hostile = '<div class="vigore my-5">' + "<" * 100_000 + "</div>"
+        found, elapsed = self._timed(lambda: extract_validity(hostile))
+        assert found is None
+        assert elapsed < self.BOUND
+
+    def test_a_page_of_div_openings_that_never_close(self):
+        found, elapsed = self._timed(lambda: extract_validity("<div " * 20_000))
+        assert found is None
+        assert elapsed < self.BOUND
+
+    def test_a_long_run_of_blanks_after_the_article_label(self):
+        hostile = synthetic(
+            dal="25-12-2003",
+            label="Art. 7" + " " * 5_000 + ".",
+            content='<div class="ins-akn art_abrogato-akn">ARTICOLO ABROGATO</div>',
+        )
+        found, elapsed = self._timed(lambda: extract_validity(hostile))
+        assert found is not None and found["state"] == "abrogated"
+        assert elapsed < self.BOUND

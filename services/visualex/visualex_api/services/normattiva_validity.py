@@ -41,9 +41,13 @@ STATES = ("current", "historical", "not_yet", "abrogated")
 # abrogation notice all sit at the very start of the body.
 _BODY_SLICE = 200_000
 
-_VIGORE_DIV = re.compile(r"""<div[^>]*\bclass=["'][^"']*\bvigore\b[^"']*["'][^>]*>""", re.I)
-_BODY_DIV = re.compile(r"""<div[^>]*\bclass=["'][^"']*\bbodyTesto\b[^"']*["'][^>]*>""", re.I)
-_TAG = re.compile(r"<[^>]+>")
+# These patterns run on a page the portal served and must stay linear on one it did
+# not (a changed or compromised portal): `re` holds the GIL, so a quadratic pattern
+# stalls the whole event loop even from a thread. Hence no character class here may run
+# past the next "<" or ">".
+_VIGORE_DIV = re.compile(r"""<div[^<>]*\bclass=["'][^"'<>]*\bvigore\b[^"'<>]*["'][^<>]*>""", re.I)
+_BODY_DIV = re.compile(r"""<div[^<>]*\bclass=["'][^"'<>]*\bbodyTesto\b[^"'<>]*["'][^<>]*>""", re.I)
+_TAG = re.compile(r"<[^<>]+>")
 _DAY = r"(\d{1,2})\s*-\s*(\d{1,2})\s*-\s*(\d{4})"
 # "Testo in vigore dal: 25-12-2003 al: 29-12-2007", "... dal: 28-12-2025" or
 # "... al: 12-9-2014". Read from the block's text, so it does not depend on
@@ -153,7 +157,9 @@ def _is_abrogated(body: Tag) -> bool:
         return False
     for notice in notices:
         notice.extract()
-    rest = _UP_TO_LABEL.sub("", body.get_text(" ", strip=True), count=1)
+    # Blanks are collapsed first: a long run of them is quadratic for the label pattern.
+    text = " ".join(body.get_text(" ", strip=True).split())
+    rest = _UP_TO_LABEL.sub("", text, count=1)
     return not re.sub(r"[\W_]+", "", rest)
 
 
