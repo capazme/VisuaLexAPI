@@ -19,7 +19,7 @@ from tests.validity_pages import synthetic
 URN = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art3!vig=2007-12-29"
 # Odd on purpose: double spaces, a non-breaking space, CRLF and accents must
 # reach the client byte for byte.
-TEXT = "Art. 3\n\n1.  Ogni provvedimento è motivato.\r\n2. Fine del  testo. àèìòù"
+TEXT = "Art. 3\n\n1.  Ogni provvedimento è motivato.\r\n2. Fine del  testo. àèìòù"
 PAGE = synthetic(dal="25-12-2003", al="29-12-2007", label="Art. 3", version=7, updated="11/08/2026")
 BROCARDI = ("Libro I", {"Brocardi": ["Nemo iudex"]}, "https://www.brocardi.it/x")
 
