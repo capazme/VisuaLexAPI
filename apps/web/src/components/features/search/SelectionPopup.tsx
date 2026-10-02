@@ -29,6 +29,10 @@ interface SelectionPopupProps {
   // Optional "Discuti" action: rendered only when the host passes it.
   // Starts a discussion on the selected passage.
   onDiscuss?: (text: string, startOffset: number) => void;
+  // A past text takes no highlight, note or discussion (they are keyed by
+  // article, not by version): only "Copia" is offered, and the shortcuts of the
+  // others are off too.
+  copyOnly?: boolean;
 }
 
 interface PopupState {
@@ -52,6 +56,7 @@ export function SelectionPopup({
   onSearch,
   onReportCitation,
   onDiscuss,
+  copyOnly = false,
 }: SelectionPopupProps) {
   const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -159,12 +164,12 @@ export function SelectionPopup({
       if (e.key === 'Escape') {
         hidePopup();
         window.getSelection()?.removeAllRanges();
-      } else if (e.key === 'h' && !e.metaKey && !e.ctrlKey) {
+      } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey) {
         // Quick highlight with default color
         onHighlight(popup.text, 'yellow', popup.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
-      } else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) {
+      } else if (e.key === 'n' && !copyOnly && !e.metaKey && !e.ctrlKey) {
         const selRange = window.getSelection()?.rangeCount ? window.getSelection()!.getRangeAt(0).getBoundingClientRect() : null;
         const r = selRange ?? { x: popup.x, y: popup.y, width: 0, height: 0 };
         onAddNote(popup.text, popup.startOffset, { x: r.x, y: r.y, width: r.width, height: r.height });
@@ -178,7 +183,7 @@ export function SelectionPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, hidePopup]);
+  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup]);
 
   // The live selection rect (viewport coords), read BEFORE the popup hides
   // and the selection is cleared (gotcha 16); falls back to the popup anchor.
@@ -275,35 +280,39 @@ export function SelectionPopup({
         ) : (
           /* Main actions */
           <div className="flex items-center">
-            <button
-              onClick={() => handleAction('highlight')}
-              className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
-              title="Evidenzia (H)"
-            >
-              <Highlighter size={16} className="text-yellow-400" />
-            </button>
-            <div className="w-px h-5 bg-slate-700" />
-            <button
-              onClick={() => handleAction('note')}
-              className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
-              title="Aggiungi nota (N)"
-            >
-              <StickyNote size={16} className="text-blue-400" />
-            </button>
-            {onDiscuss && (
+            {!copyOnly && (
               <>
+                <button
+                  onClick={() => handleAction('highlight')}
+                  className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
+                  title="Evidenzia (H)"
+                >
+                  <Highlighter size={16} className="text-yellow-400" />
+                </button>
                 <div className="w-px h-5 bg-slate-700" />
                 <button
-                  onClick={() => handleAction('discuss')}
+                  onClick={() => handleAction('note')}
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
-                  title="Discuti con i colleghi"
-                  aria-label="Discuti con i colleghi"
+                  title="Aggiungi nota (N)"
                 >
-                  <MessageCircle size={16} className="text-sky-400" />
+                  <StickyNote size={16} className="text-blue-400" />
                 </button>
+                {onDiscuss && (
+                  <>
+                    <div className="w-px h-5 bg-slate-700" />
+                    <button
+                      onClick={() => handleAction('discuss')}
+                      className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
+                      title="Discuti con i colleghi"
+                      aria-label="Discuti con i colleghi"
+                    >
+                      <MessageCircle size={16} className="text-sky-400" />
+                    </button>
+                  </>
+                )}
+                <div className="w-px h-5 bg-slate-700" />
               </>
             )}
-            <div className="w-px h-5 bg-slate-700" />
             <button
               onClick={() => handleAction('copy')}
               className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
@@ -323,7 +332,7 @@ export function SelectionPopup({
                 </button>
               </>
             )}
-            {onReportCitation && (
+            {onReportCitation && !copyOnly && (
               <>
                 <div className="w-px h-5 bg-slate-700" />
                 <button

@@ -16,6 +16,7 @@ import { useTour } from '../../../hooks/useTour';
 import { useAnnexNavigation } from '../../../hooks/useAnnexNavigation';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { formatNormaMeta } from '../../../utils/normaMeta';
+import { READ_ONLY_REASON, describeVersion } from '../../../utils/versionDisplay';
 import { getUniqueArticleId, filterLoadedIdsForAnnex, findArticleByNormalizedId } from '../../../utils/articleIds';
 
 interface NormaBlockComponentProps {
@@ -111,6 +112,11 @@ export function NormaBlockComponent({
 
   // Active article: resolved tolerantly above, with fallback to first loaded.
   const activeArticle = resolvedActive ?? normaBlock.articles[0];
+  // Study Mode's tools create notes keyed by the article, not by the version:
+  // on a past text they would land on the wrong words.
+  const studyLocked = activeArticle
+    ? describeVersion(activeArticle.validity, activeArticle.norma_data).readOnly
+    : false;
 
   // Stable local reference so TypeScript can narrow the value inside the
   // button onClick closures below, and so the JSX reads cleaner.
@@ -283,12 +289,13 @@ export function NormaBlockComponent({
           <div className="flex items-center gap-2 ml-4 shrink-0">
             {/* Study Mode Button - Visible on all screen sizes */}
             <button
-              className="flex norma-study-mode-btn px-2 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 dark:text-purple-400 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/30 rounded-lg transition-colors items-center gap-1.5"
+              className="flex norma-study-mode-btn px-2 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 active:bg-purple-200 dark:text-purple-400 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/30 rounded-lg transition-colors items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={(e) => {
                 e.stopPropagation();
                 setStudyModeOpen(true);
               }}
-              title="Modalità studio"
+              disabled={studyLocked}
+              title={studyLocked ? `Modalità studio — ${READ_ONLY_REASON}` : 'Modalità studio'}
               aria-label="Modalità studio"
             >
               <BookOpen size={12} />

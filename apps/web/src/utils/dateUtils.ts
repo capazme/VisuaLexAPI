@@ -160,3 +160,56 @@ export function abbreviateActType(actType: string): string {
   const lower = actType.toLowerCase();
   return ACT_TYPE_ABBREVIATIONS[lower] || actType;
 }
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isRealDay(year: number, month: number, day: number): boolean {
+  const moved = new Date(Date.UTC(year, month - 1, day));
+  return moved.getUTCFullYear() === year && moved.getUTCMonth() === month - 1 && moved.getUTCDate() === day;
+}
+
+/**
+ * A day the way Normattiva writes it, padded: "2007-12-29" → "29-12-2007". Used
+ * on chips, where `7 agosto 1990` is too long. Anything else comes back as it
+ * came.
+ */
+export function formatDateDashed(isoDate: string): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : (isoDate || '');
+}
+
+/**
+ * A day as a lawyer cites it: "29 dicembre 2007", and "1° ottobre 2026" for the
+ * first of the month. `formatDateItalianLong` stays as it is (the rest of the
+ * interface prints "1 ottobre"); a citation is the one place the ordinal is
+ * expected.
+ */
+export function formatDateForCitation(isoDate: string): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  if (!match) return isoDate || '';
+  const long = formatDateItalianLong(isoDate);
+  return match[3] === '01' ? long.replace(/^1 /, '1° ') : long;
+}
+
+/** The ISO day `days` after `isoDate` (negative for before); the input unchanged when it is not a real day. */
+export function addDaysToIsoDate(isoDate: string, days: number): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  if (!match) return isoDate;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (!isRealDay(year, month, day)) return isoDate;
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * Today's ISO day in Rome, which is the day the server compares a
+ * `version_date` with (a date after it is refused). The browser's own day can
+ * differ for a reader in another time zone.
+ */
+export function todayInRome(now: Date = new Date()): string {
+  // From the parts, not from a locale's pattern: no locale is trusted to write YYYY-MM-DD.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const part = (type: 'year' | 'month' | 'day') => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}

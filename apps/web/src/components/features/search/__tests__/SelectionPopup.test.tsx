@@ -9,17 +9,27 @@ const RECT = { x: 40, y: 120, width: 90, height: 18 };
 type ReportFn = (text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => void;
 type DiscussFn = (text: string, startOffset: number) => void;
 
-function Harness({ onReportCitation, onDiscuss }: { onReportCitation?: ReportFn; onDiscuss?: DiscussFn }) {
+interface HarnessProps {
+  onReportCitation?: ReportFn;
+  onDiscuss?: DiscussFn;
+  copyOnly?: boolean;
+  onHighlight?: () => void;
+  onAddNote?: () => void;
+  onCopy?: (text: string) => void;
+}
+
+function Harness({ onReportCitation, onDiscuss, copyOnly, onHighlight, onAddNote, onCopy }: HarnessProps) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div ref={ref} data-testid="container">
       <SelectionPopup
         containerRef={ref}
-        onHighlight={vi.fn()}
-        onAddNote={vi.fn()}
-        onCopy={vi.fn()}
+        onHighlight={onHighlight ?? vi.fn()}
+        onAddNote={onAddNote ?? vi.fn()}
+        onCopy={onCopy ?? vi.fn()}
         onReportCitation={onReportCitation}
         onDiscuss={onDiscuss}
+        copyOnly={copyOnly}
       />
       <p>{TEXT}</p>
     </div>
@@ -27,7 +37,7 @@ function Harness({ onReportCitation, onDiscuss }: { onReportCitation?: ReportFn;
 }
 
 /** Select `needle` inside the paragraph and release the mouse, like a reader would. */
-async function selectText(needle: string) {
+async function selectText(needle: string, popupMarker: RegExp = /aggiungi nota/i) {
   const textNode = screen.getByText(TEXT).firstChild as Text;
   const start = TEXT.indexOf(needle);
   const range = document.createRange();
@@ -37,7 +47,7 @@ async function selectText(needle: string) {
   selection.removeAllRanges();
   selection.addRange(range);
   fireEvent.mouseUp(screen.getByTestId('container'));
-  await waitFor(() => expect(screen.getByTitle(/aggiungi nota/i)).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByTitle(popupMarker)).toBeInTheDocument());
 }
 
 const originalRect = Range.prototype.getBoundingClientRect;
@@ -94,5 +104,45 @@ describe('SelectionPopup: "Discuti con i colleghi"', () => {
     // The popup closes and the selection is cleared
     expect(screen.queryByRole('button', { name: /discuti con i colleghi/i })).not.toBeInTheDocument();
     expect(window.getSelection()?.toString()).toBe('');
+  });
+});
+
+describe('SelectionPopup: a past text (copyOnly)', () => {
+  it('offers only "Copia": no highlight, no note, no discussion, no citation report', async () => {
+    render(<Harness copyOnly onDiscuss={vi.fn<DiscussFn>()} onReportCitation={vi.fn<ReportFn>()} />);
+    await selectText('art. 2043 c.c.', /^copia/i);
+
+    expect(screen.getByTitle(/^copia/i)).toBeInTheDocument();
+    expect(screen.queryByTitle(/evidenzia/i)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/aggiungi nota/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /discuti con i colleghi/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /segnala come citazione/i })).not.toBeInTheDocument();
+  });
+
+  it('still copies the selection', async () => {
+    const onCopy = vi.fn();
+    render(<Harness copyOnly onCopy={onCopy} />);
+    await selectText('art. 2043 c.c.', /^copia/i);
+    fireEvent.click(screen.getByTitle(/^copia/i));
+    expect(onCopy).toHaveBeenCalledWith('art. 2043 c.c.');
+  });
+
+  it('does not highlight or annotate from the keyboard either', async () => {
+    const onHighlight = vi.fn();
+    const onAddNote = vi.fn();
+    render(<Harness copyOnly onHighlight={onHighlight} onAddNote={onAddNote} />);
+    await selectText('art. 2043 c.c.', /^copia/i);
+    fireEvent.keyDown(window, { key: 'h' });
+    fireEvent.keyDown(window, { key: 'n' });
+    expect(onHighlight).not.toHaveBeenCalled();
+    expect(onAddNote).not.toHaveBeenCalled();
+  });
+
+  it('keeps the shortcuts for a text in force (the control for the test above)', async () => {
+    const onHighlight = vi.fn();
+    render(<Harness onHighlight={onHighlight} />);
+    await selectText('art. 2043 c.c.');
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(onHighlight).toHaveBeenCalledWith('art. 2043 c.c.', 'yellow', TEXT.indexOf('art. 2043'));
   });
 });
