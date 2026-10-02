@@ -159,8 +159,9 @@ POST unless noted, JSON bodies.
   before the handler), and the framework's own 405 (a method other than POST or OPTIONS),
   408 (a stalled body) and 413 (over 16 MB; 1 MB behind the ingress, whose own page
   answers). Italgiure (TLS pinned, own client) and the Corte costituzionale open data
-  (bundle on disk; when its refresh fails, a year before the current one is read from the
-  copy on disk). The Corte costituzionale's decisions link to the court's page; the
+  (bundle on disk; when its refresh fails, the copy on disk still confirms a decision it
+  holds for an earlier year, and a number it does not hold is a 503, never `non_trovata`).
+  The Corte costituzionale's decisions link to the court's page; the
   Cassazione's have no source link. Lookups cached per archive: found 30 days, absent 1
   hour, a decision found without its text 24 hours (with the notice
   `testo_non_disponibile`; `attributi.testo_assente` says why only when the source did:

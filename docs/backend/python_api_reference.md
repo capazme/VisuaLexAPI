@@ -461,7 +461,9 @@ body is fixed and carries no detail: that stays in the server's log:
 - `inesistente`: the archive covers that year and holds no such number. For the Corte
   costituzionale the open data can lag up to about 48 hours (the court regenerates them daily,
   and the copy on disk is kept 24 hours): a decision deposited in the last two days may not be
-  there yet.
+  there yet. It is never said from a copy that could not be refreshed: such a copy may have
+  been written before the decision was deposited, so a number it does not hold is a
+  `fonte_non_raggiungibile`.
 - `fuori_archivio`: the year is before the start of Italgiure's public archive, a moving
   window; `archivio_dal`, when known, is the day it starts.
 - `anno_parziale`: the first year of that archive, which is only partly covered;
@@ -474,15 +476,19 @@ may be a different decision.
 
 **Notices (`avvisi`)**, one entry per notice, each with its `tipo`:
 - `sezione_diversa`: the section cited is not the decision's; the decision is returned all the
-  same (`citata`, `effettiva`).
+  same (`citata`, optional; `effettiva`).
 - `archivio_dedotto`: no archive was given, both held the number, and the section picked one
   (`archivio`, `sezione`).
 - `sezione_non_riconosciuta`: the section is in none of the accepted forms and was ignored
-  (`citata`).
+  (`citata`, optional).
 - `testo_non_disponibile`: the decision comes without its text; `testo` is `{}`. The reason,
   when the source gives one, is in `attributi.testo_assente`: `oscuramento` when the source
   withholds the text while it removes personal data (its own notice is never passed on as
   the text). Without it, the source said nothing about why.
+
+`citata` is the section as the caller wrote it, and it is present only when that is a short
+plain form: at most 20 characters, all of them letters, digits, `_`, spaces, `.`, `-` or `/`.
+Anything else is left out, so that a crafted address cannot put its own text into a notice.
 
 **Caches.** Each archive lookup is cached on its own and the answer is composed from them, so a
 homonym deposited later in the other archive is never hidden:
@@ -498,8 +504,11 @@ Expired entries are deleted at start and every six hours, not only when their ke
 again.
 
 A Corte costituzionale range bundle is kept on disk: 30 days for a closed range, 24 hours for
-the one that holds the current year. When a refresh fails, a year before the current one is
-read from the copy on disk, however old; the current year never is (`fonte_non_raggiungibile`).
+the one that holds the current year. When a refresh fails, the copy on disk still confirms a
+decision it holds for a year before the current one, however old. A number it does not hold
+is answered `fonte_non_raggiungibile` (503): it cannot be verified, since the copy may have
+been written before that decision was deposited, so it is never `non_trovata`. The current
+year is never read from a copy that could not be refreshed (`fonte_non_raggiungibile`).
 
 **Status Codes:**
 - `200`: `trovata` or `ambigua`

@@ -257,9 +257,12 @@ year may be a different decision.
 - **Cache.** The range bundle is downloaded into the API's cache directory and
   only the requested year is extracted.
   - **Expiry:** 30 days for closed years; 24 hours for the current year, since
-    the bundle is regenerated daily. When a refresh fails, a year before the
-    current one is read from the copy on disk, however old; the current year
-    never is.
+    the bundle is regenerated daily. When a refresh fails, the copy on disk
+    still confirms a decision it holds for a year before the current one,
+    however old. A number it does not hold is answered 503: it cannot be
+    verified, since the copy may have been written before that decision was
+    deposited, so it is never `non_trovata`. The current year is never read
+    from a copy that could not be refreshed.
   - **Downloads:** one per bundle at a time, so concurrent misses wait for the
     same download.
 - **Lookup.** The year's JSON is parsed once and indexed by number in memory,
@@ -295,7 +298,7 @@ year may be a different decision.
   |---|---|
   | found | 30 days: a deposited decision does not change |
   | not found | 1 hour: indexing lags, and the other series may reach that number later |
-  | found without its text | 24 hours: the source withholds it while personal data are removed |
+  | found without its text | 24 hours: withheld by the source while personal data are removed, or missing at the source |
   | error | never |
 
 - **Behind the login** with the per-user quota (ADR-001). The route is added
