@@ -43,8 +43,18 @@ class TraceStorageConfig:
     max_overflow: int = 20
 
     def get_connection_string(self) -> str:
-        """Get async PostgreSQL connection string."""
-        return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
+        """Get async PostgreSQL connection string, the credentials escaped for a SQLAlchemy URL
+        (a password with `@`, `/`, `:`, `%` or `#` reads back as itself)."""
+        from sqlalchemy.engine import URL
+
+        return URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            host=self.host,
+            port=self.port,
+            database=self.database,
+        ).render_as_string(hide_password=False)
 
     @classmethod
     def from_rlcf_env(cls) -> "TraceStorageConfig":

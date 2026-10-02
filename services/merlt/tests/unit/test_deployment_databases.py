@@ -12,6 +12,7 @@ No database, no graph, no Redis: every store is a stand-in.
 """
 import importlib
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import quote
 
 import pytest
 
@@ -134,3 +135,90 @@ async def test_the_citation_routers_service_is_built_from_the_rlcf_database(monk
         await citation_router.get_trace_service()
     (config,), _ = service_class.call_args
     assert config == TraceStorageConfig.from_rlcf_env()
+
+
+# Qdrant -----------------------------------------------------------------------------------------------
+
+
+def _qdrant_stand_in(**overrides):
+    client = MagicMock()
+    client.get_collections.return_value = MagicMock(collections=["a", "b"])
+    for name, value in overrides.items():
+        setattr(client, name, value)
+    return client
+
+
+async def test_the_qdrant_health_check_reaches_the_host_and_port_the_deployment_sets(monkeypatch):
+    monkeypatch.delenv("QDRANT_URL", raising=False)
+    monkeypatch.setenv("QDRANT_HOST", "qdrant")
+    monkeypatch.setenv("QDRANT_PORT", "6333")
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    client = _qdrant_stand_in()
+    with patch("qdrant_client.QdrantClient", return_value=client) as client_class:
+        health = await dashboard_router._check_qdrant_health()
+    assert client_class.call_args.kwargs == {"host": "qdrant", "port": 6333}
+    assert health.status.value == "online" and health.details["collections_count"] == 2
+    client.close.assert_called_once()
+
+
+async def test_an_explicit_qdrant_url_still_wins(monkeypatch):
+    monkeypatch.setenv("QDRANT_URL", "http://elsewhere:7000")
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    with patch("qdrant_client.QdrantClient", return_value=_qdrant_stand_in()) as client_class:
+        await dashboard_router._check_qdrant_health()
+    assert client_class.call_args.kwargs == {"url": "http://elsewhere:7000"}
+
+
+async def test_the_qdrant_health_check_closes_the_client_when_the_call_raises(monkeypatch):
+    monkeypatch.delenv("QDRANT_URL", raising=False)
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    client = _qdrant_stand_in(get_collections=MagicMock(side_effect=RuntimeError("no qdrant")))
+    with patch("qdrant_client.QdrantClient", return_value=client):
+        health = await dashboard_router._check_qdrant_health()
+    assert health.status.value == "offline"
+    client.close.assert_called_once()
+
+
+# Credentials in connection strings --------------------------------------------------------------------
+
+AWKWARD_PASSWORD = "p@ss/w:rd%40#x"
+AWKWARD_USER = "us@er:n/m#e"
+
+
+@pytest.mark.parametrize("config_class", [TraceStorageConfig, BridgeTableConfig])
+def test_a_connection_string_escapes_its_credentials(config_class):
+    from sqlalchemy.engine import make_url
+
+    config = config_class(host="db-host", port=6543, database="the-db", user=AWKWARD_USER, password=AWKWARD_PASSWORD)
+    url = make_url(config.get_connection_string())
+    assert url.drivername == "postgresql+asyncpg"
+    assert (url.username, url.password, url.host, url.port, url.database) == (
+        AWKWARD_USER, AWKWARD_PASSWORD, "db-host", 6543, "the-db",
+    )
+
+
+@pytest.mark.parametrize("config_class", [TraceStorageConfig, BridgeTableConfig])
+def test_a_plain_connection_string_reads_as_before(config_class):
+    config = config_class(host="h", port=5432, database="d", user="u", password="pw")
+    assert config.get_connection_string() == "postgresql+asyncpg://u:pw@h:5432/d"
+
+
+def test_the_trace_database_survives_an_escaped_password_in_the_rlcf_url(monkeypatch):
+    monkeypatch.setenv(
+        "RLCF_ASYNC_DATABASE_URL",
+        f"postgresql+asyncpg://u:{quote(AWKWARD_PASSWORD, safe='')}@db-host:6543/rlcf-db",
+    )
+    config = TraceStorageConfig.from_rlcf_env()
+    assert config.password == AWKWARD_PASSWORD
+    assert TraceStorageConfig.from_rlcf_env().get_connection_string().count("@") == 1
+
+
+async def test_the_knowledge_graph_kpis_close_the_qdrant_client(monkeypatch):
+    monkeypatch.delenv("QDRANT_URL", raising=False)
+    dashboard_router = importlib.import_module("merlt.api.dashboard_router")
+    client = _qdrant_stand_in(get_collection=MagicMock(side_effect=RuntimeError("no collection")))
+    with patch(FALKOR_CLASS, side_effect=RuntimeError("no graph")), \
+            patch("qdrant_client.QdrantClient", return_value=client), \
+            patch(BRIDGE_CLASS, autospec=True):
+        await dashboard_router._get_knowledge_graph_kpis()
+    client.close.assert_called_once()

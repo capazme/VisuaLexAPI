@@ -112,19 +112,35 @@ async def _check_falkordb_health() -> ServiceHealth:
         )
 
 
+def _qdrant_target() -> dict:
+    """The keyword arguments that reach Qdrant from where the API runs, for `QdrantClient`.
+
+    `QDRANT_URL` is an explicit override; otherwise `QDRANT_HOST` and `QDRANT_PORT`, as the
+    other routers resolve them: inside the container "localhost:6343" is nothing."""
+    qdrant_url = os.getenv("QDRANT_URL")
+    if qdrant_url:
+        return {"url": qdrant_url}
+    return {
+        "host": os.getenv("QDRANT_HOST", "localhost"),
+        "port": int(os.getenv("QDRANT_PORT", "6333")),
+    }
+
+
 async def _check_qdrant_health() -> ServiceHealth:
     """Check Qdrant connection and get metrics."""
     start = time.time()
     try:
         from qdrant_client import QdrantClient
-        import os
 
         # Connect directly to Qdrant
-        qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6343")
-        client = QdrantClient(url=qdrant_url)
+        qdrant_target = _qdrant_target()
+        client = QdrantClient(**qdrant_target)
 
         # Check collections
-        collections = client.get_collections()
+        try:
+            collections = client.get_collections()
+        finally:
+            client.close()
         latency = (time.time() - start) * 1000
 
         return ServiceHealth(
@@ -133,7 +149,7 @@ async def _check_qdrant_health() -> ServiceHealth:
             latency_ms=latency,
             details={
                 "collections_count": len(collections.collections),
-                "url": qdrant_url,
+                "url": qdrant_target.get("url") or f"http://{qdrant_target['host']}:{qdrant_target['port']}",
             }
         )
     except Exception as e:
@@ -269,25 +285,18 @@ async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
         from qdrant_client import QdrantClient
         from merlt.storage.vectors.collection import default_chunks_collection
 
-        # Same host/port resolution as the other routers (QDRANT_URL kept as an
-        # explicit override): inside the container "localhost:6343" is nothing.
-        qdrant_url = os.getenv("QDRANT_URL")
-        qdrant = (
-            QdrantClient(url=qdrant_url)
-            if qdrant_url
-            else QdrantClient(
-                host=os.getenv("QDRANT_HOST", "localhost"),
-                port=int(os.getenv("QDRANT_PORT", "6333")),
-            )
-        )
+        qdrant = QdrantClient(**_qdrant_target())
 
         try:
-            collection_info = qdrant.get_collection(default_chunks_collection())
-            embeddings_count = collection_info.points_count or 0
-        except Exception as e:
-            log.debug("qdrant_collection_unavailable", error=str(e))
-            # Collection might not exist
-            embeddings_count = 0
+            try:
+                collection_info = qdrant.get_collection(default_chunks_collection())
+                embeddings_count = collection_info.points_count or 0
+            except Exception as e:
+                log.debug("qdrant_collection_unavailable", error=str(e))
+                # Collection might not exist
+                embeddings_count = 0
+        finally:
+            qdrant.close()
     except Exception as e:
         log.warning("Failed to get Qdrant KPIs", error=str(e))
 
