@@ -62,6 +62,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     through Normattiva's resolver, verified by the page's title (type, year and
     number; State acts of nine kinds only, because the resolver answers a regional
     URN with the State's act of the same number), cached a year.
+  - `decisions/` (in `services/`) — court decisions behind `POST /fetch_decision`:
+    `model.py` (identity and reference), `italgiure.py` (Cassazione, Italgiure's Solr),
+    `corte_cost.py` (Corte costituzionale open data, range bundles on disk), `resolver.py`
+    (one outcome, lookups cached per archive), `http.py` (the readers' own
+    `ThrottledHttpClient` and honest User-Agent).
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -108,8 +113,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
     `ThrottledHttpClient.request`. `tests/test_egress_allowlist.py` fails the
     build when a URL literal names an undeclared host. The runtime check covers
-    the shared HTTP client only — `SECURITY.md` lists the three paths it does
-    not cover (treextractor's own session, Playwright, redirect targets).
+    every `ThrottledHttpClient` (the shared one and the decision readers' own)
+    and nothing else — `SECURITY.md` lists the three paths it does not cover
+    (treextractor's own session, Playwright, redirect targets).
+  - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
+    the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
+    pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
+    fails).
   - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
     exposed at `POST /parse_query`
   - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
@@ -154,6 +164,23 @@ POST unless noted, JSON bodies.
   whose hash moved. `available: false` with empty maps when there is no AKN
   index, or an index without fingerprints — the caller must then refetch
   everything, not conclude nothing changed
+- `/fetch_decision` — one court decision: `{corte: cassazione | corte_costituzionale,
+  numero, anno, archivio?, sezione?}` → `esito` trovata (identity, attributes, whole text,
+  source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
+  fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
+  body). That is every answer the handler writes; the others carry no `esito`: the per-IP
+  rate limit's 429 `{"error": …}` and the login gate's 401/429 through the ingress (both
+  before the handler), and the framework's own 405 (a method other than POST or OPTIONS),
+  408 (a stalled body) and 413 (over 16 MB; 1 MB behind the ingress, whose own page
+  answers). Italgiure (TLS pinned, own client) and the Corte costituzionale open data
+  (bundle on disk; when its refresh fails, the copy on disk still confirms a decision it
+  holds for an earlier year, and a number it does not hold is a 503, never `non_trovata`).
+  The Corte costituzionale's decisions link to the court's page; the
+  Cassazione's have no source link. Lookups cached per archive: found 30 days, absent 1
+  hour, a decision found without its text 24 hours (with the notice
+  `testo_non_disponibile`; `attributi.testo_assente` says why only when the source did:
+  `oscuramento`), errors never. Expired entries are swept at start and every six hours
+  (`sweep_decision_caches`). Design: docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
 - `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
@@ -180,9 +207,13 @@ or a `version_date`) never asks Brocardi, whose commentary carries no date.
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
 input), `ResourceNotFoundError` → 404 (the article is not in the act),
-`RateLimitExceededError` → 429, everything else 500. Before, every failure was a
-500 — and `stream_article_text` raised through to Quart and answered an HTML
-error page instead of NDJSON.
+`RateLimitExceededError` → 429, everything else 500, except `/fetch_decision`,
+whose handler answers every failure with `esito` and never with the exception's text.
+What the handler does not write is not its own, on that route too: the per-IP rate
+limit's 429 `{"error": …}`, the login gate's 401/429 through the ingress, and the
+framework's own 405, 408 and 413 pages.
+Before, every failure was a 500 — and `stream_article_text` raised through to
+Quart and answered an HTML error page instead of NDJSON.
 
 ```json
 {
@@ -270,7 +301,7 @@ Duplicating any of these is a defect, not a shortcut.
 `get_document(normavisitata) -> Tuple[str, str]`, register the act type in
 `NormaController.get_scraper_for_norma()`, extend `tools/map.py` if needed.
 
-**New API endpoint** — route in `NormaController._setup_routes()`, async handler,
+**New API endpoint** — route in `NormaController.setup_routes()`, async handler,
 `await request.get_json()`, return `jsonify()`, log with structlog.
 
 **Playwright work** —
@@ -409,3 +440,18 @@ Breaking one of these breaks the product. Read before editing.
     labelled as a past one.
     `tests/test_normattiva_validity_live.py` (`-m live`) re-checks the extraction
     against the portal.
+
+33. **A decision found is not a text found.** Italgiure answers many decisions with its own
+    notice in place of the text ("La sentenza richiesta è in fase di oscuramento": personal
+    data being removed; about 6% of civil records and 33,000 penal ones, in every year,
+    measured on 2026-10-02). `decisions/italgiure.py` returns such a decision with
+    `testo == {}` and `testo_assente == "oscuramento"`, which travels in `attributi` and
+    through the caches: the page reads why from it. A record with neither a text nor the
+    notice (a missing `ocr`, a renamed field) comes back with `testo == {}`, no
+    `testo_assente` and a logged warning: never present it as the source's anonymisation.
+    The resolver keeps a decision without its text 24 hours (`decisions_pending`), never 30
+    days, and adds the notice `testo_non_disponibile`. Never pass the notice on as
+    `motivazione`: the page would show it as the court's reasons and a note could anchor to
+    it. The decision caches hold whole texts, with whatever personal data the source left:
+    `sweep_decision_caches` deletes their expired entries at start and every six hours,
+    since the filesystem cache deletes one only when its key is read again.

@@ -5,8 +5,7 @@ Provides a singleton pattern for managing caches across all services.
 Uses Redis when available and enabled, falling back to filesystem cache.
 """
 
-import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 import structlog
 
 from .cache import PersistentCache
@@ -74,6 +73,13 @@ class CacheManager:
             "eurlex": _create_cache("eurlex", ttl=PERSISTENT_CACHE_TTL),
             "brocardi": _create_cache("brocardi", ttl=PERSISTENT_CACHE_TTL),
             "tree": _create_cache("tree", ttl=PERSISTENT_CACHE_TTL),
+            # Court decisions (design 2026-10-01 §3): a deposited decision does not change;
+            # "not found" is kept for an hour because indexing lags; a decision found without
+            # its text (withheld by the source while it removes personal data, or missing at
+            # the source) is kept for a day.
+            "decisions_found": _create_cache("decisions_found", ttl=30 * 24 * 3600),
+            "decisions_absent": _create_cache("decisions_absent", ttl=3600),
+            "decisions_pending": _create_cache("decisions_pending", ttl=24 * 3600),
             # A found act date never changes: keep it a year (act_dates.py).
             "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }

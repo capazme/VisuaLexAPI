@@ -1,0 +1,31 @@
+{
+ "response": {
+  "numFound": 1,
+  "start": 0,
+  "docs": [
+   {
+    "ocrdis": [
+     "P. Q. M."
+    ],
+    "numdec": "10787",
+    "szdec": "7",
+    "datdep": [
+     "20240314"
+    ],
+    "kind": "snpen",
+    "ocr": [
+     "seguente ORDINANZA sul ricorso proposto da:"
+    ],
+    "tipoprov": "Ordinanza",
+    "relatore": [
+     "GIORDANO EMILIA ANNA"
+    ],
+    "id": "snpen2024710787O",
+    "presidente": [
+     "CAPOZZI ANGELO"
+    ],
+    "anno": "2024"
+   }
+  ]
+ }
+}

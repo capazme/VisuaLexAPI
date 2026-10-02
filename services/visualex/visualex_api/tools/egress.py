@@ -6,11 +6,12 @@ here as data, `tests/test_egress_allowlist.py` fails the build if a URL literal
 appears for a host not listed, and `is_allowed()` is checked at request time in
 ThrottledHttpClient.
 
-That runtime check covers the shared HTTP client only. `POST /fetch_tree` reaches
-the network through treextractor's own aiohttp session, Playwright's
-`page.goto()` never consults this module, and the client does not re-check a
-redirect target. SECURITY.md ("Not yet covered") lists those three gaps; do not
-describe this list as an enforced boundary until they are closed.
+That runtime check covers the `ThrottledHttpClient` instances only (the shared
+one and the decision readers' own). `POST /fetch_tree` reaches the network
+through treextractor's own aiohttp session, Playwright's `page.goto()` never
+consults this module, and the client does not re-check a redirect target.
+SECURITY.md ("Not yet covered") lists those three gaps; do not describe this list
+as an enforced boundary until they are closed.
 
 The server sends no telemetry and has no analytics endpoint. Every host below is
 a source consulted to answer a legal question, or fetched for MERL-T's ingestion
@@ -30,6 +31,9 @@ ALLOWED_HOSTS: dict[str, str] = {
     "www.portaledelmassimario.ipzs.it": "Portale del Massimario — Corte di cassazione (realizzazione IPZS)",
     # --- European Union ---
     "eur-lex.europa.eu": "EUR-Lex — Ufficio delle pubblicazioni UE",
+    # --- Italian State: courts (decision pages, design 2026-10-01) ---
+    "www.italgiure.giustizia.it": "Ministero della Giustizia — CED, Corte di cassazione (SentenzeWeb)",
+    "dati.cortecostituzionale.it": "Corte costituzionale — dati aperti (CC BY-SA 3.0)",
     # --- Private ---
     # The only non-institutional source. Brocardi supplies doctrinal notes and
     # case-law abstracts, never the text of a norm: that always comes from
@@ -50,6 +54,18 @@ NON_NETWORK_HOSTS: dict[str, str] = {
     "docs.oasis-open.org": (
         "the Akoma Ntoso 3.0 XML namespace URI, named in the akn_parser "
         "docstring; the parser resolves nothing (no_network=True)"
+    ),
+    "visualex.org": (
+        "the contact URL in the decision readers' User-Agent; sent as a header value, "
+        "never fetched"
+    ),
+    "titrust.crt.sectigo.com": (
+        "the AIA URI named in tools/tls.py's rotation procedure; read by hand, never "
+        "fetched at run time"
+    ),
+    "www.cortecostituzionale.it": (
+        "the page of a Corte costituzionale decision: a link the reader's browser opens; "
+        "never fetched by the server"
     ),
     "github.com": "appears only in massimario_portal.USER_AGENT, which names the project; never fetched",
 }
