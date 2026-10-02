@@ -74,6 +74,8 @@ class CacheManager:
             "eurlex": _create_cache("eurlex", ttl=PERSISTENT_CACHE_TTL),
             "brocardi": _create_cache("brocardi", ttl=PERSISTENT_CACHE_TTL),
             "tree": _create_cache("tree", ttl=PERSISTENT_CACHE_TTL),
+            # A found act date never changes: keep it a year (act_dates.py).
+            "act_dates": _create_cache("act_dates", ttl=365 * 24 * 3600),
         }
 
         self.stats: Dict[str, int] = {

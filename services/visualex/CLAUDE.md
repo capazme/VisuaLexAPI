@@ -8,7 +8,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   alternative server with `/api/*` prefix and Swagger.
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
   `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool),
-  `http_client.py` (the shared throttled aiohttp client — TLS verification on).
+  `http_client.py` (the shared throttled aiohttp client — TLS verification on;
+  `request(..., max_retries=n)` lowers the retry budget for a caller that paces
+  itself, `None` keeps `HTTP_MAX_RETRIES`).
   - `brocardi_scraper.py` also emits `Glossario` (links to Brocardi's legal
     dictionary, `{termine, url, dizionario_id}`). Any new `brocardi_info` key
     must be whitelisted in **all three** wire literals in `app.py` (this folder)
@@ -48,6 +50,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     touches `article_text` (gotcha 23). Best effort: a page it cannot read yields
     no `validity` key at all, never a guess. It also holds the two request
     guards, `reject_future_version_date` and `is_historical_request`.
+  - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
+    portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
+    down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
+  - `act_dates.py` — internal (MERL-T only): acts cited by year only → the full URN
+    through Normattiva's resolver, verified by the page's title (type, year and
+    number; State acts of nine kinds only, because the resolver answers a regional
+    URN with the State's act of the same number), cached a year.
 - **`tools/`**:
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
@@ -141,7 +150,11 @@ POST unless noted, JSON bodies.
   index, or an index without fingerprints — the caller must then refetch
   everything, not conclude nothing changed
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
-  resolver already understands. The only GET among these; a POST answers 405
+  resolver already understands. A GET, like `/fetch_massimario`; a POST answers 405
+- `GET /fetch_massimario?kind=index|capitolo|sezione&id=<n>` — internal (MERL-T): one element of the Massimario portal, raw; paced at ≥1.5 s; 429 when the portal's firewall refuses (a 403 or 429 from the portal, or its "Request Rejected" page); a 5xx or a timeout is retried a few times by the module, then 500.
+- `POST /resolve_act_dates {"urns": [...]}` — internal (MERL-T): up to 20 year-only URNs (`urn:nir:stato:legge:1983;184`) → full URNs, through Normattiva's resolver; found dates cached a year. Only State acts of the nine kinds in
+  `act_dates._TITLES` are resolved; any other URN, a page whose title is not that act's, a network failure and
+  everything after the batch's first 120 s answer `null` for that act.
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
