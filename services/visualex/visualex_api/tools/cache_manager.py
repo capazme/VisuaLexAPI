@@ -5,8 +5,7 @@ Provides a singleton pattern for managing caches across all services.
 Uses Redis when available and enabled, falling back to filesystem cache.
 """
 
-import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 import structlog
 
 from .cache import PersistentCache
