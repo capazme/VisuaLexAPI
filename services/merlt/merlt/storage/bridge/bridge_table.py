@@ -87,12 +87,12 @@ class BridgeTableConfig:
             BridgeTableConfig con table_name appropriato
 
         Example:
-            >>> from merlt.config import get_current_environment
-            >>> config = BridgeTableConfig.from_environment(get_current_environment())
+            >>> from merlt.config import TEST_ENV
+            >>> config = BridgeTableConfig.from_environment(TEST_ENV)
             >>> print(config.table_name)  # "bridge_table_test" o "bridge_table_prod"
         """
         return cls(
-            table_name=f"bridge_table{env_config.bridge_table_suffix}"
+            table_name=f"bridge_table_{env_config.name}"
         )
 
     @classmethod
@@ -114,8 +114,8 @@ class BridgeTable:
 
     Example:
         # Uso con ambiente corrente
-        from merlt.config import get_current_environment
-        config = BridgeTableConfig.from_environment(get_current_environment())
+        from merlt.config import TEST_ENV
+        config = BridgeTableConfig.from_environment(TEST_ENV)
         bridge = BridgeTable(config)
         await bridge.connect()
 
