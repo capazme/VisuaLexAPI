@@ -1,0 +1,164 @@
+# EXP-022: Policy Gradient Simulation - Configuration
+
+experiment:
+  name: "EXP-022 Policy Gradient Simulation"
+  version: "1.0"
+  description: "Simulazione policy gradient vs rule-based routing"
+
+  phases:
+    baseline:
+      num_queries: 100
+      use_policy: false
+      description: "Routing rule-based deterministico"
+
+    training:
+      num_queries: 500
+      use_policy: true
+      feedback_rate: 0.8  # 80% delle query ricevono feedback
+      description: "Training policy gradient con feedback sintetici"
+
+    evaluation:
+      num_queries: 100
+      use_policy: true
+      description: "Valutazione policy finale (frozen)"
+
+# Policy Gradient Configuration
+policy:
+  input_dim: 768  # Embedding dimension (compatibile con sentence-transformers)
+  hidden_dim: 256
+  num_experts: 4  # literal, systemic, principles, precedent
+
+  learning_rate: 0.0001
+  baseline_decay: 0.99  # Exponential moving average per baseline
+
+  device: "cpu"  # Compatibilità universale
+
+  # Policy network architecture
+  architecture:
+    input_layer: 768
+    hidden_layers: [256]
+    output_layer: 4  # num_experts
+    activation: "relu"
+    dropout: 0.1
+
+# Simulation Configuration
+simulation:
+  random_seed: 42
+
+  # Expert Quality Scores (base success rate)
+  expert_quality:
+    literal: 0.75      # Interpretazione testuale/letterale
+    systemic: 0.70     # Analisi sistematica/relazioni
+    principles: 0.65   # Principi generali/ratio legis
+    precedent: 0.80    # Giurisprudenza/precedenti
+
+  # Synthetic Feedback Generation
+  synthetic_feedback:
+    noise_std: 0.1  # Standard deviation del rumore gaussiano
+
+    # Query-Expert Match Matrix (quanto una query è adatta per un expert)
+    # Simuliamo 4 tipi di query con affinità diverse
+    query_types:
+      definitional:  # Query su definizioni
+        literal: 0.9
+        systemic: 0.5
+        principles: 0.4
+        precedent: 0.6
+
+      relational:  # Query su relazioni tra norme
+        literal: 0.4
+        systemic: 0.9
+        principles: 0.6
+        precedent: 0.5
+
+      normative:  # Query su ratio/principi
+        literal: 0.3
+        systemic: 0.6
+        principles: 0.9
+        precedent: 0.4
+
+      jurisprudential:  # Query su giurisprudenza
+        literal: 0.5
+        systemic: 0.5
+        principles: 0.5
+        precedent: 0.9
+
+    # Distribuzione dei tipi di query
+    query_type_distribution:
+      definitional: 0.25
+      relational: 0.30
+      normative: 0.20
+      jurisprudential: 0.25
+
+# Metrics Configuration
+metrics:
+  # Expert Usage Distribution
+  target_balance:
+    min_usage: 0.15  # Nessun expert sotto 15%
+    max_usage: 0.35  # Nessun expert sopra 35%
+    ideal_usage: 0.25  # Ideale 25% per expert
+
+  # Routing Accuracy (se gold standard disponibile)
+  accuracy:
+    enabled: true
+    gold_standard_path: null  # Path opzionale a gold standard
+
+  # Reward Trend
+  reward:
+    moving_average_window: 50
+    target_improvement: 0.10  # +10% da baseline a evaluation
+
+  # Load Balance Score
+  load_balance:
+    target_score: 0.75  # LBS > 0.75
+
+  # Policy Convergence
+  convergence:
+    window: 100  # Ultime 100 iterazioni
+    max_variance: 0.05
+    min_entropy: 1.0
+
+# Output Configuration
+output:
+  base_dir: "docs/experiments/EXP-022_policy_gradient_simulation/results"
+
+  files:
+    metrics: "metrics.json"
+    reward_trend: "reward_trend.json"
+    expert_usage: "expert_usage.json"
+    convergence: "convergence.json"
+    routing_decisions: "routing_decisions.json"
+
+  logging:
+    level: "INFO"
+    file: "logs/exp022_policy_simulation.log"
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Visualization Configuration
+visualization:
+  enabled: true
+
+  plots:
+    - name: "reward_trend"
+      type: "line"
+      x: "iteration"
+      y: "reward"
+      title: "Average Reward Trend"
+
+    - name: "expert_usage"
+      type: "bar"
+      x: "expert"
+      y: "usage_percentage"
+      title: "Expert Usage Distribution"
+
+    - name: "load_balance"
+      type: "line"
+      x: "iteration"
+      y: "load_balance_score"
+      title: "Load Balance Score Over Time"
+
+    - name: "policy_convergence"
+      type: "line"
+      x: "iteration"
+      y: "entropy"
+      title: "Policy Entropy (Convergence Analysis)"

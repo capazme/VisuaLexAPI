@@ -55,6 +55,9 @@ export function decide(command, branchOf) {
     const call = gitCall(segment.split(/\s+/));
     if (!call) continue;
     const branch = branchOf(call.dir);
+    // Another repository: its main is not ours to guard, whether the command
+    // names it (`git push origin main`) or not.
+    if (branch === null) continue;
     if (call.sub === 'commit' && !call.args.includes('--dry-run') && PROTECTED.includes(branch)) {
       return `Commits do not go on ${branch}: create a branch from develop (feat/, fix/, refactor/, chore/, docs/) `
         + 'and open a pull request (docs/git-workflow.md).';
@@ -91,11 +94,13 @@ const OWN_REPO = commonDir(path.dirname(fileURLToPath(import.meta.url)));
 
 // The branch a git command acts on, but only inside this repository: a
 // session may also commit to another repository on the same disk, whose main
-// is not ours to guard. Anything else resolves to '', which nothing protects.
+// is not ours to guard. Another repository (or none) resolves to null, and
+// decide() then applies no git rule at all; '' means this repository, branch
+// unknown.
 export function branchResolver(cwd, ownRepo = OWN_REPO) {
   return (dir) => {
     const target = dir ? path.resolve(cwd, dir) : cwd;
-    if (!ownRepo || commonDir(target) !== ownRepo) return '';
+    if (!ownRepo || commonDir(target) !== ownRepo) return null;
     return git(target, ['rev-parse', '--abbrev-ref', 'HEAD']);
   };
 }

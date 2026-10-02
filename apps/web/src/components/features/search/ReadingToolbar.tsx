@@ -3,10 +3,24 @@ import type { ArticleData } from '../../../types';
 import { ExternalLink, Zap, FolderPlus, Copy, StickyNote, Highlighter, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import type { VersionChip } from '../../../utils/versionDisplay';
+import { VersionStatusChip } from './VersionStatusChip';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
-    versionInfo: ArticleData['versionInfo'];
+    /** What the source says about the version on screen; null shows nothing (no "Vigente" by default). */
+    versionChip: VersionChip | null;
+    /**
+     * Set on a past text: quick-norm, notes, highlights, discussions and Study Mode are
+     * switched off, with this as the reason.
+     */
+    lockedReason?: string;
+    /**
+     * Set when the text may not be copied, exported or saved (the article did not exist on the
+     * day, or the version does not contain it): copy, dossier and "Esporta..." are switched off
+     * with this as the reason.
+     */
+    copyLockedReason?: string;
     url?: string;
     articleText: string;
     isNotesPeekOpen: boolean;
@@ -36,7 +50,9 @@ export interface ReadingToolbarProps {
 
 export function ReadingToolbar({
     normaData,
-    versionInfo,
+    versionChip,
+    lockedReason,
+    copyLockedReason,
     url,
     isNotesPeekOpen,
     notesButtonRef,
@@ -62,30 +78,21 @@ export function ReadingToolbar({
     onOpenVersionInput,
     onCompare,
 }: ReadingToolbarProps) {
+    // A switched-off tool keeps its name and gains the reason in its tooltip.
+    const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
+    const lock = (reason?: string) => (reason ? { disabled: true } : {});
+    // Exporting writes the article out like a copy does, and the export header
+    // carries no version: anything that may not be copied, or is a reading, stays in.
+    const exportLockedReason = copyLockedReason ?? lockedReason;
     return (
-        <div className={cn('glass-toolbar sticky top-0 flex items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
+        <div className={cn('glass-toolbar sticky top-0 flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
             {/* Version Info & Annex Source Badge */}
-            <div className="flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {versionInfo?.isHistorical ? (
-                    <span className={cn("px-2 py-1 rounded-md",
-                        versionInfo.isHistorical ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300")}>
-                        {versionInfo.isHistorical ? "Storica" : "Vigente"}
-                    </span>
-                ) : (
-                    <span className="px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                        Vigente
-                    </span>
-                )}
-                {normaData.data_versione && (
-                    <>
-                        <span className="text-slate-300 dark:text-slate-700">|</span>
-                        <span>Aggiornato al: {normaData.data_versione}</span>
-                    </>
-                )}
+            <div className="contents md:flex md:items-center md:gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}
                 {/* Annex Source Badge */}
                 {normaData.allegato && (
                     <>
-                        <span className="text-slate-300 dark:text-slate-700">|</span>
+                        {versionChip && <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>}
                         <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
                             Allegato {normaData.allegato}
                         </span>
@@ -94,7 +101,7 @@ export function ReadingToolbar({
             </div>
 
             {/* Mobile: Quick Actions + Study Mode toggle */}
-            <div className="flex md:hidden items-center gap-1">
+            <div className="flex md:hidden ml-auto items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
                 <button
                     onClick={onToggleQuickNorm}
                     aria-pressed={isPinnedQuick}
@@ -104,7 +111,8 @@ export function ReadingToolbar({
                             ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
                             : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
                     )}
-                    title={isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide"}
+                    title={tip(isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <Zap size={20} className={cn(isPinnedQuick && "fill-amber-500")} />
                 </button>
@@ -113,22 +121,25 @@ export function ReadingToolbar({
                     aria-expanded={isDiscussionOpen}
                     aria-haspopup="dialog"
                     className={cn("p-2 lg:p-2.5 rounded-lg transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary-500")}
-                    title="Discussioni sull’articolo"
+                    title={tip("Discussioni sull’articolo", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <MessageCircle size={20} />
                 </button>
                 <button
                     onClick={() => { void onMobileCopy(); }}
                     className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
-                    title="Copia testo"
+                    title={tip("Copia testo", copyLockedReason)}
+                    {...lock(copyLockedReason)}
                 >
                     <Copy size={20} />
                 </button>
                 <button
                     onClick={onOpenDossier}
                     className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
-                    title="Aggiungi a dossier"
+                    title={tip("Aggiungi a dossier", copyLockedReason)}
                     aria-label="Aggiungi a dossier"
+                    {...lock(copyLockedReason)}
                 >
                     <FolderPlus size={20} />
                 </button>
@@ -136,7 +147,8 @@ export function ReadingToolbar({
                 <button
                     onClick={onOpenStudyMode}
                     className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
-                    title="Modalità studio"
+                    title={tip("Modalità studio", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <BookOpen size={20} />
                 </button>
@@ -154,7 +166,7 @@ export function ReadingToolbar({
             </div>
 
             {/* Desktop: Full Quick Actions */}
-            <div className="hidden md:flex items-center gap-1">
+            <div className="hidden md:flex items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
                 {/* Primary buttons */}
                 <button
                     onClick={onToggleQuickNorm}
@@ -165,7 +177,8 @@ export function ReadingToolbar({
                             ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
                             : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
                     )}
-                    title={isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide"}
+                    title={tip(isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
                 </button>
@@ -181,7 +194,8 @@ export function ReadingToolbar({
                                 ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                                 : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-amber-500"
                     )}
-                    title={isNotesPeekOpen ? "Chiudi note" : "Apri note"}
+                    title={tip(isNotesPeekOpen ? "Chiudi note" : "Apri note", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <StickyNote size={16} />
                     {notesCount > 0 && (
@@ -203,7 +217,8 @@ export function ReadingToolbar({
                                 ? "text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                                 : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-500"
                     )}
-                    title={isHighlightsPeekOpen ? "Chiudi evidenziazioni" : "Gestisci evidenziazioni"}
+                    title={tip(isHighlightsPeekOpen ? "Chiudi evidenziazioni" : "Gestisci evidenziazioni", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <Highlighter size={16} />
                     {highlightsCount > 0 && (
@@ -217,14 +232,16 @@ export function ReadingToolbar({
                     aria-expanded={isDiscussionOpen}
                     aria-haspopup="dialog"
                     className={cn("p-1.5 rounded-md transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500")}
-                    title="Discussioni sull’articolo"
+                    title={tip("Discussioni sull’articolo", lockedReason)}
+                    {...lock(lockedReason)}
                 >
                     <MessageCircle size={16} />
                 </button>
                 <button
                     onClick={onOpenCopyModal}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
-                    title="Copia"
+                    title={tip("Copia", copyLockedReason)}
+                    {...lock(copyLockedReason)}
                 >
                     <Copy size={16} />
                 </button>
@@ -232,8 +249,9 @@ export function ReadingToolbar({
                     ref={dossierButtonRef}
                     onClick={onOpenDossier}
                     className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
-                    title="Aggiungi a dossier"
+                    title={tip("Aggiungi a dossier", copyLockedReason)}
                     aria-label="Aggiungi a dossier"
+                    {...lock(copyLockedReason)}
                 >
                     <FolderPlus size={16} />
                 </button>
@@ -273,7 +291,9 @@ export function ReadingToolbar({
                                         onOpenAdvancedExport();
                                         onToggleMoreMenu(false);
                                     }}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    title={tip("Esporta...", exportLockedReason)}
+                                    {...lock(exportLockedReason)}
+                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                 >
                                     <Download size={14} className="text-slate-400" />
                                     Esporta...
@@ -289,7 +309,7 @@ export function ReadingToolbar({
                                     className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                                 >
                                     <Clock size={14} className="text-slate-400" />
-                                    Cerca versione...
+                                    Testo alla data...
                                 </button>
                                 <button
                                     onClick={() => {

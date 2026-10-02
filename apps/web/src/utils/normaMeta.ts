@@ -1,5 +1,5 @@
 import type { Norma, NormaVisitata } from '../types';
-import { abbreviateActType, formatDateItalianLong } from './dateUtils';
+import { abbreviateActType, formatDateItalianLong, withPreposition } from './dateUtils';
 
 /**
  * Visual context in which the meta line is rendered. The text differs
@@ -39,13 +39,16 @@ export function formatNormaMeta(norma: Norma, options: FormatNormaMetaOptions): 
     return result;
   }
 
-  const prefix =
-    variant === 'card-mobile' ? 'Data: '
-    : variant === 'card-desktop' ? 'Edizione del '
-    : '';
   const fallback = variant === 'card-desktop' ? 'Data non disponibile' : 'Estremi non disponibili';
 
-  let result = norma.data ? `${prefix}${formatDateItalianLong(norma.data)}` : fallback;
+  // "Edizione del 7 agosto" but "Edizione dell'8 marzo": the preposition elides before 8 and 11.
+  const date = norma.data ? formatDateItalianLong(norma.data) : '';
+  const dated =
+    variant === 'card-mobile' ? `Data: ${date}`
+    : variant === 'card-desktop' ? `Edizione ${withPreposition('del', date)}`
+    : date;
+
+  let result = norma.data ? dated : fallback;
   if (articleCount !== undefined) result += ` · ${articleCount} articoli`;
   return result;
 }

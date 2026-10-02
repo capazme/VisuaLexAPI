@@ -160,3 +160,72 @@ export function abbreviateActType(actType: string): string {
   const lower = actType.toLowerCase();
   return ACT_TYPE_ABBREVIATIONS[lower] || actType;
 }
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isRealDay(year: number, month: number, day: number): boolean {
+  const moved = new Date(Date.UTC(year, month - 1, day));
+  return moved.getUTCFullYear() === year && moved.getUTCMonth() === month - 1 && moved.getUTCDate() === day;
+}
+
+/**
+ * A day the way Normattiva writes it, padded: "2007-12-29" → "29-12-2007". Used
+ * on chips, where `7 agosto 1990` is too long. Anything else comes back as it
+ * came.
+ */
+export function formatDateDashed(isoDate: string): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : (isoDate || '');
+}
+
+/**
+ * A day as a lawyer cites it: "29 dicembre 2007", and "1° ottobre 2026" for the
+ * first of the month. `formatDateItalianLong` stays as it is (the rest of the
+ * interface prints "1 ottobre"); citations and the version banners are the
+ * places the ordinal is expected.
+ */
+export function formatDateForCitation(isoDate: string): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  if (!match) return isoDate || '';
+  const long = formatDateItalianLong(isoDate);
+  return match[3] === '01' ? long.replace(/^1 /, '1° ') : long;
+}
+
+const ELIDED_PREPOSITION = { il: "l'", del: "dell'", dal: "dall'", al: "all'", nel: "nell'" } as const;
+
+/**
+ * A preposition and the date it governs, the way Italian writes them: the article or
+ * preposition elides before a day that starts with a vowel sound, which among the days of
+ * a month are 8 (otto) and 11 (undici): "dall'11 giugno 1970", "all'8 settembre 2014",
+ * "consultato l'8 ottobre 2026". The 1st ("dal 1° gennaio"), 18, 28 and 31 do not elide.
+ * `formattedDate` is the spelled-out date ("11 giugno 1970"); a string that does not start
+ * with a day gets the plain preposition.
+ */
+export function withPreposition(preposition: keyof typeof ELIDED_PREPOSITION, formattedDate: string): string {
+  return /^(8|11)(?!\d)/.test(formattedDate)
+    ? `${ELIDED_PREPOSITION[preposition]}${formattedDate}`
+    : `${preposition} ${formattedDate}`;
+}
+
+/** The ISO day `days` after `isoDate` (negative for before); the input unchanged when it is not a real day. */
+export function addDaysToIsoDate(isoDate: string, days: number): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  if (!match) return isoDate;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (!isRealDay(year, month, day)) return isoDate;
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * Today's ISO day in Rome, which is the day the server compares a
+ * `version_date` with (a date after it is refused). The browser's own day can
+ * differ for a reader in another time zone.
+ */
+export function todayInRome(now: Date = new Date()): string {
+  // From the parts, not from a locale's pattern: no locale is trusted to write YYYY-MM-DD.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const part = (type: 'year' | 'month' | 'day') => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}

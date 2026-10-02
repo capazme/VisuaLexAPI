@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { useMemo, useRef } from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { createRoot } from 'react-dom/client';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { useArticleTextInteractions } from './useArticleTextInteractions';
 import { UpdateNotePopover } from '../components/features/search/UpdateNotePopover';
 
@@ -15,9 +16,14 @@ const BODY =
   '<div class="vlx-updates-body"><div class="vlx-b vlx-update-head">AGGIORNAMENTO (119)' +
   '<span class="vlx-sign" role="button" tabindex="0" data-block="1" data-notes="0" data-highlights="1"></span></div></div></div>';
 
-function Harness({ resetKey, contentKey = 'v1', withPopover = false }: { resetKey: string; contentKey?: string; withPopover?: boolean }) {
+function Harness({ resetKey, contentKey = 'v1', withPopover = false, updatesOpenByDefault }: {
+  resetKey: string; contentKey?: string; withPopover?: boolean; updatesOpenByDefault?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(ref, resetKey, { contentKey });
+  const { updatesOpen, openNote, closeNote, openUpdates, openBlock, closeBlock } = useArticleTextInteractions(ref, resetKey, {
+    contentKey,
+    updatesOpenByDefault,
+  });
   // Stable, like SafeHTML (memoised): a new object would make React re-set innerHTML.
   const html = useMemo(() => ({ __html: BODY }), []);
   return (
@@ -185,10 +191,104 @@ describe('useArticleTextInteractions', () => {
     expect(block()).toBe('');
   });
 
+  it('answers a press on a sign from the moment the sign is on screen', async () => {
+    // Outside act, as when a fetch settles in the app: React commits the markup
+    // and runs passive effects in a later task. Pressing the sign in between —
+    // a busy runner reaching the click before that task — must still open it.
+    const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const previous = actEnvironment.IS_REACT_ACT_ENVIRONMENT;
+    actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
+    const host = document.body.appendChild(document.createElement('div'));
+    const root = createRoot(host);
+    try {
+      const pressed = new Promise<void>((resolve) => {
+        const observer = new MutationObserver(() => {
+          const target = host.querySelector('.vlx-sign[data-block="0"]');
+          if (!target) return;
+          observer.disconnect();
+          target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          resolve();
+        });
+        observer.observe(host, { childList: true, subtree: true });
+      });
+      root.render(<Harness resetKey="a" />);
+      await pressed;
+      await waitFor(() => expect(block()).toBe('0'));
+    } finally {
+      root.unmount();
+      host.remove();
+      actEnvironment.IS_REACT_ACT_ENVIRONMENT = previous;
+    }
+  });
+
   it('ignores other keys and other elements', () => {
     render(<Harness resetKey="a" />);
     fireEvent.keyDown(chip('119'), { key: 'a' });
     fireEvent.click(screen.getByTestId('body').querySelector('.vlx-comma')!);
     expect(state()).toEqual({ updatesOpen: false, note: null });
+  });
+});
+
+describe('useArticleTextInteractions — update notes open by default (a past text)', () => {
+  it('starts open, tells the toggle so, and lets it close and open them', () => {
+    render(<Harness resetKey="a" updatesOpenByDefault />);
+    expect(state().updatesOpen).toBe(true);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle());
+    expect(state().updatesOpen).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle());
+    expect(state().updatesOpen).toBe(true);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('goes back to open, not to closed, on another article and when the reader comes back', () => {
+    const { rerender } = render(<Harness resetKey="a" updatesOpenByDefault />);
+    fireEvent.click(toggle());
+    expect(state().updatesOpen).toBe(false);
+    act(() => rerender(<Harness resetKey="b" updatesOpenByDefault />));
+    expect(state().updatesOpen).toBe(true);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle());
+    act(() => rerender(<Harness resetKey="a" updatesOpenByDefault />));
+    expect(state().updatesOpen).toBe(true);
+  });
+
+  it('keeps them open when a note or a block is closed, and when a note is opened', () => {
+    render(<Harness resetKey="a" updatesOpenByDefault />);
+    fireEvent.click(chip('119'));
+    expect(state()).toEqual({ updatesOpen: true, note: '119' });
+    fireEvent.click(screen.getByText('chiudi'));
+    expect(state().updatesOpen).toBe(true);
+    fireEvent.click(sign(0));
+    fireEvent.click(screen.getByText('chiudi blocco'));
+    expect(state().updatesOpen).toBe(true);
+    fireEvent.click(screen.getByText('apri note'));
+    expect(state().updatesOpen).toBe(true);
+  });
+
+  it('opens them on demand after the reader closed them', () => {
+    render(<Harness resetKey="a" updatesOpenByDefault />);
+    fireEvent.click(toggle());
+    fireEvent.click(screen.getByText('apri note'));
+    expect(state().updatesOpen).toBe(true);
+  });
+
+  it('follows the default when the same article is shown as another version', () => {
+    const { rerender } = render(<Harness resetKey="a" />);
+    expect(state().updatesOpen).toBe(false);
+    act(() => rerender(<Harness resetKey="a" updatesOpenByDefault />));
+    expect(state().updatesOpen).toBe(true);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+    act(() => rerender(<Harness resetKey="a" />));
+    expect(state().updatesOpen).toBe(false);
+  });
+
+  it('is closed by default when the option is absent or false', () => {
+    const { rerender } = render(<Harness resetKey="a" />);
+    expect(state().updatesOpen).toBe(false);
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    act(() => rerender(<Harness resetKey="b" updatesOpenByDefault={false} />));
+    expect(state().updatesOpen).toBe(false);
   });
 });

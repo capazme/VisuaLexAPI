@@ -69,6 +69,9 @@ model User {
   originalAuthorOfQuickNorms  QuickNorm[]   @relation("OriginalAuthorOfQuickNorms")
   originalAuthorOfAliases     CustomAlias[] @relation("OriginalAuthorOfAliases")
 
+  // LingoLex: the study cards this user wrote
+  lingoCards LingoCard[]
+
   @@map("users")
 }
 
@@ -895,4 +898,124 @@ model SharedEnvironmentVersion {
   @@unique([sharedEnvironmentId, version])
   @@index([sharedEnvironmentId])
   @@map("shared_environment_versions")
+}
+
+// ============================================
+// LINGOLEX — exam-trace bank
+// First slice of the study layer (decisions D-035, D-036). `LingoTraccia` is
+// the bank of traces and references no other model; the cards further down are
+// the only part of LingoLex that touches User. `LingoSimulazione` will add its
+// relation to LingoTraccia when it lands.
+// ============================================
+
+enum LingoMateria {
+  DIRITTO_CIVILE
+  DIRITTO_PENALE
+  DIRITTO_AMMINISTRATIVO
+  DIRITTO_PROCESSUALE_CIVILE
+  DIRITTO_PROCESSUALE_PENALE
+}
+
+enum LingoTipoProva {
+  ATTO_GIUDIZIARIO
+  PARERE_MOTIVATO
+}
+
+model LingoTraccia {
+  id                String         @id @default(uuid())
+  materia           LingoMateria
+  tipoProva         LingoTipoProva @default(ATTO_GIUDIZIARIO) @map("tipo_prova")
+  // e.g. "atto_citazione", "comparsa_risposta", "ricorso_700", "appello_penale", "ricorso_tar"
+  sottoTipoAtto     String         @map("sotto_tipo_atto")
+  titolo            String
+  testoTraccia      String         @map("testo_traccia") @db.Text
+  // Expected norms (URNs or key references) and the checkpoints of form and
+  // substance: arrays of strings, empty until a lawyer has written them.
+  normeRiferimento  Json           @map("norme_riferimento")
+  questioniForma    Json           @map("questioni_forma")
+  questioniSostanza Json           @map("questioni_sostanza")
+  // "sessione_<year>" | "scuola_forense" | "creata_validata"
+  fonteTraccia      String         @map("fonte_traccia")
+  attiva            Boolean        @default(true)
+  difficolta        Int            @default(3) // 1..5
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  @@index([materia, tipoProva, sottoTipoAtto])
+  @@map("lingo_tracce")
+}
+
+// LINGOLEX — study cards and their anchors in the norm text.
+// The card's state follows the lifecycle in `src/lingo/cardStates.ts`. Reviews
+// (`LingoRevisioneSRS`) and validations (`LingoValidazioneCard`) are not here yet:
+// they arrive with the routes that write them.
+
+enum LingoCardStato {
+  BOZZA_PERSONALE
+  PROPOSTA_COMMUNITY
+  VALIDATA
+  DA_RIVEDERE
+  ARCHIVIATA
+}
+
+// More kinds are expected: a new one is an additive ALTER TYPE … ADD VALUE.
+enum LingoCardTipo {
+  ISTITUTO_DEFINIZIONE
+  DISTINZIONE_CONCETTUALE
+  CASO_APPLICATIVO
+  REQUISITO_FORMA_ATTO
+}
+
+model LingoCard {
+  id             String         @id @default(uuid())
+  // Null once the author's account is gone: the card stays, anonymous.
+  autoreId       String?        @map("autore_id")
+  materia        LingoMateria
+  // e.g. "Risoluzione per inadempimento"
+  istituto       String
+  tipo           LingoCardTipo  @default(ISTITUTO_DEFINIZIONE)
+  domanda        String         @db.Text
+  risposta       String         @db.Text
+  spiegazione    String?        @db.Text
+  stato          LingoCardStato @default(BOZZA_PERSONALE)
+  authorityScore Float          @default(0) @map("authority_score")
+  // Set when the validators disagree beyond the threshold, so the minority view is kept.
+  isControversa  Boolean        @default(false) @map("is_controversa")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // SetNull, not Cascade: a card the community has taken up (proposed, validated,
+  // to review) is community property and outlives its author, anonymous. What
+  // belongs to the person alone (drafts, archived) is removed in
+  // `deleteUserAccount`, because only the application knows the card's state.
+  autore User?             @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  ancore LingoCardAncora[]
+
+  @@index([materia, istituto, stato])
+  @@index([stato])
+  @@index([autoreId])
+  @@map("lingo_cards")
+}
+
+// The norm a card rests on: the article, and the SHA-256 of its text when the
+// card was written. When the text of the article changes, the fingerprint no
+// longer matches and the card goes to review.
+model LingoCardAncora {
+  id             String   @id @default(uuid())
+  cardId         String   @map("card_id")
+  // e.g. "codice_civile"
+  normaKey       String   @map("norma_key")
+  // e.g. "art_1453"
+  articleId      String   @map("article_id")
+  urn            String
+  aknFingerprint String   @map("akn_fingerprint")
+  // False unless said otherwise: a card has exactly one primary anchor, and a writer
+  // that forgets the flag must not become a second one. `createLingoCard` sets it.
+  isPrimary      Boolean  @default(false) @map("is_primary")
+  ultimaVerifica DateTime @default(now()) @map("ultima_verifica")
+
+  card LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([normaKey, articleId, aknFingerprint])
+  @@index([cardId])
+  @@map("lingo_card_ancore")
 }

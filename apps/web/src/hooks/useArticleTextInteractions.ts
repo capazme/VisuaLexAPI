@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 
 export interface OpenUpdateNote {
   id: string;
@@ -14,7 +14,7 @@ interface State {
   openBlock: number | null;
 }
 
-const fresh = (key: string): State => ({ key, updatesOpen: false, openNote: null, openBlock: null });
+const fresh = (key: string, updatesOpen: boolean): State => ({ key, updatesOpen, openNote: null, openBlock: null });
 
 export interface ArticleTextInteractionOptions {
   /** False until the body is mounted (the dossier reader renders it after its fetch). */
@@ -25,6 +25,13 @@ export interface ArticleTextInteractionOptions {
    * the note closes instead of floating off a detached element.
    */
   contentKey?: string;
+  /**
+   * Whether the "Note di aggiornamento" start unfolded (default `false`): the
+   * state of an article starts with it, another `resetKey` returns to it, and
+   * the toggle still folds and unfolds them. A past text opens them because
+   * the rule that applies is often in them.
+   */
+  updatesOpenByDefault?: boolean;
 }
 
 /**
@@ -41,13 +48,13 @@ export interface ArticleTextInteractionOptions {
  * never replaces the text, so keyboard focus and any open selection survive.
  *
  * State belongs to one article: `resetKey` changing (another article in the
- * same component) returns to closed, adjusted during render rather than in an
+ * same component) returns to the default (`updatesOpenByDefault`), adjusted during render rather than in an
  * effect (CLAUDE.md gotcha 11); a changed `contentKey` closes an open note.
  */
 export function useArticleTextInteractions(
   containerRef: RefObject<HTMLElement | null>,
   resetKey: string,
-  { enabled = true, contentKey = '' }: ArticleTextInteractionOptions = {},
+  { enabled = true, contentKey = '', updatesOpenByDefault = false }: ArticleTextInteractionOptions = {},
 ): {
   updatesOpen: boolean;
   openNote: OpenUpdateNote | null;
@@ -62,32 +69,39 @@ export function useArticleTextInteractions(
   openBlock: number | null;
   closeBlock: () => void;
 } {
-  const [state, setState] = useState<State>(() => fresh(resetKey));
-  // Another article: start closed, and store it. Deriving alone would let an
+  // The default is part of the identity of the state: the same article shown
+  // as a past text and then as the text in force (or the reverse) keeps its
+  // `resetKey` but not its folding.
+  const scope = `${updatesOpenByDefault ? 'open' : 'closed'}:${resetKey}`;
+  const [state, setState] = useState<State>(() => fresh(scope, updatesOpenByDefault));
+  // Another article: start from the default, and store it. Deriving alone would let an
   // A → B → A round trip find its old state valid again and reopen a note or
   // a block nobody asked for (React's pattern for state that follows a prop).
-  if (state.key !== resetKey) setState(fresh(resetKey));
-  const current = state.key === resetKey ? state : fresh(resetKey);
+  if (state.key !== scope) setState(fresh(scope, updatesOpenByDefault));
+  const current = state.key === scope ? state : fresh(scope, updatesOpenByDefault);
   const openNote =
     current.openNote && current.openNote.contentKey === contentKey
       ? { id: current.openNote.id, anchorEl: current.openNote.anchorEl }
       : null;
   const closeNote = useCallback(() => {
-    setState((s) => (s.key === resetKey ? { ...s, openNote: null } : fresh(resetKey)));
-  }, [resetKey]);
+    setState((s) => (s.key === scope ? { ...s, openNote: null } : fresh(scope, updatesOpenByDefault)));
+  }, [scope, updatesOpenByDefault]);
 
   const closeBlock = useCallback(() => {
-    setState((s) => (s.key === resetKey ? { ...s, openBlock: null } : fresh(resetKey)));
-  }, [resetKey]);
+    setState((s) => (s.key === scope ? { ...s, openBlock: null } : fresh(scope, updatesOpenByDefault)));
+  }, [scope, updatesOpenByDefault]);
 
   const openUpdates = useCallback(() => {
-    setState((s) => ({ ...(s.key === resetKey ? s : fresh(resetKey)), updatesOpen: true }));
-  }, [resetKey]);
+    setState((s) => ({ ...(s.key === scope ? s : fresh(scope, updatesOpenByDefault)), updatesOpen: true }));
+  }, [scope, updatesOpenByDefault]);
 
-  useEffect(() => {
+  // A layout effect, not a passive one: the signs and chips are focusable
+  // buttons from the commit that draws them, and a passive effect runs in a
+  // later task — a press in between (a busy main thread) was silently lost.
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container || !enabled) return;
-    const base = (s: State): State => (s.key === resetKey ? s : fresh(resetKey));
+    const base = (s: State): State => (s.key === scope ? s : fresh(scope, updatesOpenByDefault));
 
     const activate = (target: Element): boolean => {
       const sign = target.closest<HTMLElement>('.vlx-sign');
@@ -141,7 +155,7 @@ export function useArticleTextInteractions(
       container.removeEventListener('click', onClick);
       container.removeEventListener('keydown', onKeyDown);
     };
-  }, [containerRef, resetKey, enabled, contentKey]);
+  }, [containerRef, scope, enabled, contentKey, updatesOpenByDefault]);
 
   // The toggle lives in SafeHTML's markup, which React does not own: keep its
   // aria-expanded in step with the state (a DOM write, not a state update).

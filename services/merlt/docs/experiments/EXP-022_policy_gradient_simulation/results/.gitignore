@@ -1,0 +1,5 @@
+# Ignore simulation results (generated files)
+*.json
+
+# Keep this .gitignore
+!.gitignore

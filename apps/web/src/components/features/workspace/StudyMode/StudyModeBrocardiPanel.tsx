@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import { SafeHTML } from '../../../../utils/sanitize';
 import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
+import { DOCTRINE_SOURCE_NAME, LATIN_MAXIMS_LABEL } from '../../../../utils/doctrineLabel';
 import type { StudyModeTheme } from './StudyMode';
 
 interface StudyModeBrocardiPanelProps {
@@ -274,7 +275,7 @@ export function StudyModeBrocardiPanel({
           <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             {hasContent ? (
               <>
-                <BrocardiSection title="Brocardi" content={brocardiInfo.Brocardi} theme={theme} />
+                <BrocardiSection title={LATIN_MAXIMS_LABEL} content={brocardiInfo.Brocardi} theme={theme} />
                 <BrocardiSection title="Ratio" content={brocardiInfo.Ratio} theme={theme} />
                 <BrocardiSection title="Spiegazione" content={brocardiInfo.Spiegazione} theme={theme} />
                 <BrocardiSection title="Massime" content={brocardiInfo.Massime} theme={theme} />
@@ -286,11 +287,11 @@ export function StudyModeBrocardiPanel({
                   <a
                     href={brocardiInfo.link}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 text-sm text-primary-600 hover:text-primary-700 hover:underline py-3 mt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
                   >
                     <ExternalLink size={14} />
-                    Vedi fonte su Brocardi.it
+                    {`Vedi fonte su ${DOCTRINE_SOURCE_NAME}`}
                   </a>
                 )}
               </>

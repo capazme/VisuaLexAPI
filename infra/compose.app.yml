@@ -85,10 +85,12 @@ services:
     build:
       context: ..
       dockerfile: infra/ingress/Dockerfile
-      # Key only: taken from the environment when set, and NOT passed when unset.
-      # An empty string would switch MERL-T off (the app reads "" as false).
+      # The app's MERL-T switch follows the server's: MERLT_ENABLED=false hides MERL-T in
+      # the app too (otherwise every MERL-T call answers 404), unless VITE_FEATURE_MERLT
+      # says otherwise. Never an empty string: the app reads "" as false.
+      # The graph flag is key only: taken from the environment when set, NOT passed when unset.
       args:
-        - VITE_FEATURE_MERLT
+        - VITE_FEATURE_MERLT=${VITE_FEATURE_MERLT:-${MERLT_ENABLED:-true}}
         - VITE_FEATURE_MERLT_GRAPH
     container_name: ${VISUALEX_STACK:-visualex}-ingress
     environment:

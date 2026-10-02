@@ -48,6 +48,7 @@ all="compose.yml compose.app.yml compose.scrapers.yml compose.prod.yml"
 (INGRESS_BIND=192.0.2.10; export INGRESS_BIND; scenario prod-lan 1 $all) || fail=1
 (scenario prod-default 1 $all) || fail=1
 (VITE_FEATURE_MERLT=false; export VITE_FEATURE_MERLT; scenario prod-flags 1 $all) || fail=1
+(MERLT_ENABLED=false; export MERLT_ENABLED; scenario prod-merlt-off 0 $all) || fail=1
 (SCRAPERS_ADDR=192.0.2.20:5000; export SCRAPERS_ADDR; scenario no-scrapers 1 compose.yml compose.app.yml compose.prod.yml) || fail=1
 (scenario scrapers-alone 0 compose.scrapers.yml) || fail=1
 

@@ -24,7 +24,7 @@ describe('LooseHighlightsList', () => {
     );
     expect(screen.getByText('Altre evidenziazioni')).toBeInTheDocument();
     expect(screen.getByText('Non più nel testo')).toBeInTheDocument();
-    expect(screen.getByText('Brocardi · Ratio')).toBeInTheDocument();
+    expect(screen.getByText('Dottrina · Ratio')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Rimuovi evidenziazione' })[1]);
     expect(onRemove).toHaveBeenCalledWith('b');
   });

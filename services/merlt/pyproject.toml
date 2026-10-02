@@ -140,6 +140,6 @@ python_files = "test_*.py"
 python_functions = "test_*"
 addopts = "-m 'not integration'"
 markers = [
-    "integration: marks tests as integration tests requiring external services (Normattiva, Brocardi, FalkorDB, Qdrant, PostgreSQL)",
+    "integration: needs a live FalkorDB (and the suite's Postgres); excluded by addopts, run with -m integration; CI runs them against disposable services",
     "benchmark: marks tests as performance benchmarks (use --benchmark-only to run)",
 ]

@@ -41,9 +41,12 @@ log = structlog.get_logger()
 
 router = APIRouter(prefix="/ingestion/mechanical", tags=["ingestion-mechanical"])
 
-# Reuses the ingest queue name already listened to by the worker (no new
-# queue -> no docker-compose change, per CLAUDE.md convention for this slice).
-_QUEUE_NAME = "merlt_ingest"
+# A queue of its own, which the worker names LAST: RQ takes jobs queue by queue
+# in the order the worker lists them, so a reader's lazy ingestion
+# (`merlt_ingest`) is served before the next bulk job instead of waiting behind
+# hours of codes (measured 30/09/2026: ~1.8 s an article under load, and a
+# lazy job queued behind them timed out in the BFF after 10 minutes).
+_QUEUE_NAME = "merlt_bulk"
 _rq_connection = None
 
 

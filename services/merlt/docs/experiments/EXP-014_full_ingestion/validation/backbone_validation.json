@@ -1,0 +1,69 @@
+{
+  "phase": "backbone",
+  "timestamp": "2025-12-14T12:00:17.470939",
+  "summary": {
+    "total": 7,
+    "passed": 5,
+    "failed": 1,
+    "warnings": 1,
+    "skipped": 0
+  },
+  "checks": [
+    {
+      "name": "article_count",
+      "description": "Numero articoli ingeriti (Libro IV CC)",
+      "status": "PASS",
+      "expected": 887,
+      "actual": 887,
+      "message": ""
+    },
+    {
+      "name": "comma_count",
+      "description": "Numero commi creati",
+      "status": "PASS",
+      "expected": "1500-3000",
+      "actual": 2546,
+      "message": ""
+    },
+    {
+      "name": "rubrica_not_in_comma",
+      "description": "Commi con rubrica come testo (bug fix verification)",
+      "status": "FAIL",
+      "expected": 0,
+      "actual": 802,
+      "message": "BUG: Rubriche erroneamente salvate come comma 1"
+    },
+    {
+      "name": "rubrica_on_norma",
+      "description": "Articoli con rubrica salvata (>90% expected)",
+      "status": "WARN",
+      "expected": ">90%",
+      "actual": "2.0% (18/887)",
+      "message": ""
+    },
+    {
+      "name": "contiene_relations",
+      "description": "Relazioni contiene = numero commi",
+      "status": "PASS",
+      "expected": 2546,
+      "actual": 2546,
+      "message": ""
+    },
+    {
+      "name": "comma_numbering",
+      "description": "Articoli con numerazione commi che non parte da 1",
+      "status": "PASS",
+      "expected": 0,
+      "actual": 0,
+      "message": ""
+    },
+    {
+      "name": "urn_format",
+      "description": "Commi con URN formato corretto (contiene ~art)",
+      "status": "PASS",
+      "expected": 0,
+      "actual": 0,
+      "message": ""
+    }
+  ]
+}
