@@ -105,6 +105,55 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   projection when the thread was opened); the title is optional only for passage
   threads; `GET /article-discussions/passages` lists an article's passage threads
   without bodies. The stored passage is never rewritten; the reader's browser locates it.
+- **LingoLex trace bank** (first slice of the study layer; plan in
+  `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
+  (`lingo_tracce`) holds exam traces and references no other model. Nothing
+  writes to it through the API; rows arrive by
+  `npx tsx src/utils/importLingoTracce.ts <file.json> [--apply]` (dry run
+  unless `--apply`; it prints the counts by subject, kind of test and
+  session). The file's contract is `schemas/lingo/traccia.ts`, strict
+  on purpose: every row carries a `provenienza` block that is checked and
+  **not stored**, and only `statoUtilizzo: "ufficiale_verificato"` rows
+  enter; material with `fonte: "terzi"` can never carry that state, so a
+  collection of someone else's work cannot pass by being labelled official.
+  One bad row refuses the whole file. The repository is public and the
+  collections of traces found around are mostly other people's work, so a
+  file of unknown origin never lands by omission. A row's id derives from its
+  `chiave` (`tracciaIdFromChiave`): importing again updates in place — the
+  text and classification always, but the answer key, the difficulty and
+  `attiva` only when the file names them, since they are curated after the
+  import and the contract's defaults would otherwise wipe them. `runImportCli`
+  returns the exit code (0 done or dry run, 1 file refused, 2 unreadable).
+- **LingoLex trace routes** (`routes/lingoSimulazioni.ts`, mounted in `app.ts`
+  at `/api/lingo/simulazioni` **before** the catch-all routers, like MERL-T's,
+  so a request authenticates once): `GET /tracce` (filters `materia`,
+  `tipoProva`, `sottoTipoAtto`; `limit` 1–100, default 50; `offset` 0–100000) and
+  `GET /tracce/:id`. They serialise an explicit `select`, never the answer key
+  (`normeRiferimento`, `questioniForma`, `questioniSostanza`: what the
+  correction compares an essay against) and never an inactive trace (404, like
+  a missing one). The list carries no text; the detail does. Keep it that way
+  when adding fields: a new column stays hidden until someone shows it.
+- **`src/srs/fsrsEngine.ts`** — the spaced-repetition engine: FSRS v4 as a pure
+  function (`review(previous, rating, elapsedDays, options)`), no database and
+  no dependency. Checked against `ts-fsrs@3.0.0`, which is FSRS v4 proper
+  (`ts-fsrs@3.5.x` is FSRS 4.5, another curve and other weights): bit-identical
+  over 100,000 random reviews. The stability update uses the *new* difficulty
+  and difficulty is rounded to two decimals at each step, as the reference does.
+  No learning steps in minutes. Every exported function refuses what is not a
+  finite number in range with a `RangeError`, including a custom set of weights
+  that overflows: a NaN must never reach a stored row.
+- **LingoLex cards** (data layer only; no route writes them yet): `LingoCard` and
+  `LingoCardAncora` (`lingo_cards`, `lingo_card_ancore`). `schemas/lingo/card.ts`
+  is the strict contract: one to ten anchors, a lower-case SHA-256 fingerprint,
+  at most one primary, and the caller cannot set state, score, author or id.
+  `is_primary` defaults to false in the database: the service is the only thing
+  that decides which anchor is the primary one.
+  `lingo/cards.ts` `createLingoCard(authorId, input)` is one nested write that
+  starts the card as `BOZZA_PERSONALE`; `lingo/cardStates.ts` holds the
+  lifecycle (`canTransition`). Deleting a user cascades to their cards and
+  anchors, and a test pins it: whether a validated card should survive its
+  author is an open decision (plan, decision 14), and `GET /auth/export` must
+  include the user's cards as soon as any exist.
 - **Account data**: `GET /auth/export` (the user's data, minus password and
   tokens) and `DELETE /auth/account` (password re-checked; every relation to
   `User` cascades). Reached from the Settings modal.
@@ -118,7 +167,11 @@ Write a migration by hand in `prisma/migrations/<timestamp>_<name>/migration.sql
 following Prisma's naming, then apply it with `npx prisma migrate deploy`, run
 `npx prisma generate`, and check with `npx prisma migrate status`. Never
 `prisma migrate dev`: on a drifted database it offers to reset it, and an agent
-can accept (the shared hook refuses it).
+can accept (the shared hook refuses it). To get the exact SQL without a
+database, `npx prisma migrate diff --from-schema-datamodel <copy of the old
+schema> --to-schema-datamodel prisma/schema.prisma --script`. Do not run
+`prisma format` on `schema.prisma`: it realigns about ninety untouched lines
+(measured) and buries the diff that the other developer has to review.
 
 ## Tests
 

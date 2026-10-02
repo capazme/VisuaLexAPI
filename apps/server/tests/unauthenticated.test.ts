@@ -18,6 +18,8 @@ describe('routes require authentication', () => {
     ['get', '/api/dossiers/does-not-exist/snapshots'],
     ['get', '/api/auth/export'],
     ['delete', '/api/auth/account'],
+    ['get', '/api/lingo/simulazioni/tracce'],
+    ['get', '/api/lingo/simulazioni/tracce/does-not-exist'],
   ] as const)('%s %s answers 401 without a token', async (method, path) => {
     const response = await (request(app) as any)[method](path);
     expect(response.status).toBe(401);

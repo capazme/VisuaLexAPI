@@ -22,6 +22,7 @@ import customAliasRoutes from './routes/customAliases';
 import notificationRoutes from './routes/notifications';
 import articleDiscussionRoutes from './routes/articleDiscussions';
 import merltRoutes from './routes/merlt';
+import lingoSimulazioniRoutes from './routes/lingoSimulazioni';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 
@@ -101,6 +102,9 @@ app.get('/api/health/detailed', async (_req, res) => {
 // merltRoutes and 404s the whole namespace when disabled; mount order here
 // is unchanged so the gotcha above still holds when enabled.
 app.use('/api/merlt', merltKillSwitch, merltRoutes);
+// Same reason for LingoLex: a prefixed router authenticates once, here, instead
+// of passing through every catch-all router below first.
+app.use('/api/lingo/simulazioni', lingoSimulazioniRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);
