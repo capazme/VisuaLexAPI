@@ -1241,7 +1241,7 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                     ]
 
                     log.info(
-                        f"Source verification completed",
+                        "Source verification completed",
                         original=len(sources),
                         verified=len(verified_sources),
                         removed=len(sources) - len(verified_sources)

@@ -49,8 +49,7 @@ Usage:
 
 import structlog
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
-from uuid import UUID
+from typing import TYPE_CHECKING, Dict, List, Optional, Any, Tuple
 
 # Storage
 from merlt.storage import (
@@ -66,12 +65,9 @@ from merlt.storage.bridge import BridgeBuilder
 # Pipeline
 from merlt.pipeline.ingestion import (
     IngestionPipelineV2,
-    IngestionResult,
-    BridgeMapping,
 )
 from merlt.pipeline.multivigenza import (
     MultivigenzaPipeline,
-    MultivigenzaResult,
 )
 from merlt.pipeline.visualex import VisualexArticle, NormaMetadata
 
@@ -1182,10 +1178,8 @@ class LegalKnowledgeGraph:
 
 
 # Type hint for return type
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from merlt.pipeline.batch_ingestion import BatchIngestionResult
-    from typing import Tuple
 
 __all__ = [
     "LegalKnowledgeGraph",

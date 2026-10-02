@@ -202,7 +202,7 @@ async def test_urn_source_and_graph_entity_target_are_written(db):
     assert params["target_key"] == "concetto:risoluzione_del_contratto"
     assert params["source_stub"]["numero_articolo"] == "3"
     # The stub is the schema's one shape, set only when the Norma is created.
-    assert "ON CREATE SET source += $source_stub, source.created_at = $timestamp" in cypher
+    assert "ON CREATE SET source += $source_stub\n" in cypher and "source.created_at" not in cypher
     assert params["source_stub"]["is_stub"] is True
     assert params["source_stub"]["URN"] == params["source_stub"]["node_id"] == NORMATTIVA_URL_PREFIX + urn
     assert "target_stub" not in params

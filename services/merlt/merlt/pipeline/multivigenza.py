@@ -32,18 +32,17 @@ import structlog
 import re
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 
 from merlt.clients import (
     NormaVisitata,
-    Norma,
     Modifica,
     TipoModifica,
     StoriaArticolo,
     NormattivaScraper,
 )
-from merlt.storage.graph.schema import Rel
+from merlt.storage.graph.schema import Rel, canonical_urn, version_urn
 from merlt.utils.urn_labels import derive_article_fields_from_urn
 
 log = structlog.get_logger()
@@ -1184,13 +1183,13 @@ class MultivigenzaPipeline:
         # Also get original version
         try:
             testo_orig, urn_orig = await self.scraper.get_original_version(normavisitata)
-            await self._save_version(
+            if await self._save_version(
                 normavisitata,
                 version_label="originale",
                 version_date=normavisitata.norma.data,
                 testo=testo_orig,
-            )
-            versions_saved += 1
+            ):
+                versions_saved += 1
         except Exception as e:
             result.errors.append(f"Could not fetch original version: {e}")
 
@@ -1202,13 +1201,13 @@ class MultivigenzaPipeline:
                 version_label = f"v{i+1}"
 
                 testo, urn = await self.scraper.get_version_at_date(normavisitata, date)
-                await self._save_version(
+                if await self._save_version(
                     normavisitata,
                     version_label=version_label,
                     version_date=date,
                     testo=testo,
-                )
-                versions_saved += 1
+                ):
+                    versions_saved += 1
 
             except Exception as e:
                 result.errors.append(f"Could not fetch version at {date}: {e}")
@@ -1221,17 +1220,26 @@ class MultivigenzaPipeline:
         version_label: str,
         version_date: str,
         testo: str,
-    ) -> None:
+    ) -> bool:
         """
         Save a historical version as a separate node.
 
         Creates a new Norma node with versioned URN and links to main article.
+        Returns True when the version was written. A version with no date has no
+        key (`<URL>!vig=` is the live article's marker): it is logged and skipped.
         """
         if not self.falkordb:
-            return
+            return False
 
         base_urn = normavisitata.urn
-        versioned_urn = f"{base_urn}!vig={version_date}"
+        if not version_date or not isinstance(version_date, str):
+            log.warning(
+                "multivigenza.version_without_date",
+                urn=base_urn,
+                version_label=version_label,
+            )
+            return False
+        versioned_urn = version_urn(base_urn, version_date)
 
         # A2: derive numero_articolo/estremi from the base article URN so a
         # freshly-created version stub carries a minimal identity instead of a
@@ -1273,10 +1281,11 @@ class MultivigenzaPipeline:
             MERGE (ver)-[r:VERSIONE_DI]->(art)
             ON CREATE SET r.certezza = 1.0
             """,
-            {"ver_urn": versioned_urn, "art_urn": base_urn}
+            {"ver_urn": versioned_urn, "art_urn": canonical_urn(base_urn)}
         )
 
         log.debug(f"Saved version: {versioned_urn}")
+        return True
 
 
 async def get_article_storia(

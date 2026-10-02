@@ -20,7 +20,9 @@ import os
 import re
 import structlog
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
+from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -47,7 +49,6 @@ from merlt.api.models.enrichment_models import (
     RelationProposalResponse,
     RelationValidationRequest,
     RelationValidationResponse,
-    ValidationResult,
     ValidationStatus,
     # Deduplication models
     DuplicateCheckRequest,
@@ -70,6 +71,14 @@ from merlt.api.models.enrichment_models import (
     GetEntityIssuesResponse,
     OpenIssuesRequest,
     OpenIssuesResponse,
+    # Dossier training set export
+    DossierArticleData,
+    DossierQASessionData,
+    DossierAnnotationData,
+    DossierTrainingSetExportRequest,
+    DossierTrainingSetExportResponse,
+    LoadDossierTrainingRequest,
+    LoadDossierTrainingResponse,
 )
 from merlt.storage.enrichment import (
     get_db_session,
@@ -118,8 +127,8 @@ from merlt.api.graph_router import IngestionQueueUnavailable, enqueue_article_in
 
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
-from merlt.api.auth import verify_api_key, require_role
-from merlt.experts.models import ApiKey
+from merlt.api.auth import verify_api_key
+from merlt.experts.models import ApiKey, QATrace, QAFeedback
 
 log = structlog.get_logger()
 
@@ -149,11 +158,6 @@ _processed_articles_cache: Dict[str, datetime] = {}
 # si disconnette - i dati vengono comunque salvati nel DB.
 #
 # {article_key: ExtractionState} - stato di ogni estrazione in corso
-
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Set
-import asyncio
 
 
 class ExtractionStatus(str, Enum):
@@ -1408,27 +1412,10 @@ async def validate_entity(
         "needs_revision": ValidationStatus.NEEDS_REVISION,
     }
 
-    # Build merged_edits dict from merge_result if available
-    merged_edits = {}
+    # The edits a consensus applied are reported in the message; the stored outcome is in `entity`
     merge_message = ""
     if merge_result is not None and merge_result.should_apply:
-        merged_edits = {
-            f.field_name: {
-                "original": f.original_value,
-                "merged": f.merged_value,
-                "confidence": f.confidence,
-            }
-            for f in merge_result.merged_fields.values()
-            if f.merged_value != f.original_value
-        }
         merge_message = f" Edits applied: {merge_result.message}"
-
-    # Build validation result
-    validation_result = ValidationResult(
-        status=status_map.get(entity.validation_status, ValidationStatus.PENDING),
-        score=net_score,
-        merged_edits=merged_edits,
-    )
 
     return EntityValidationResponse(
         entity_id=entity_id,
@@ -1611,7 +1598,9 @@ def _relation_write_cypher(rel_type: str, source: _GraphEndpoint, target: _Graph
                 clauses.append("WITH " + ", ".join(bound))
             clauses.append(
                 "MERGE " + ep.pattern.format(var=var, param=f"{var}_key") + "\n"
-                f"ON CREATE SET {var} += ${var}_stub, {var}.created_at = $timestamp"
+                # the schema's one stub shape and nothing else: the migration reshapes
+                # any stub that differs from `stub_properties`
+                f"ON CREATE SET {var} += ${var}_stub"
             )
             bound.append(var)
     clauses.append("WITH source, target")
@@ -1857,7 +1846,7 @@ async def _cascade_reset_relations_for_rejected_entity(
     # Find all relations that have this entity as target
     stmt = select(PendingRelation).where(
         PendingRelation.target_entity_id == rejected_entity_id,
-        PendingRelation.target_is_pending == True,  # Only relations pointing to pending entities
+        PendingRelation.target_is_pending.is_(True),  # Only relations pointing to pending entities
     )
 
     result = await session.execute(stmt)
@@ -3996,18 +3985,6 @@ async def get_open_issues(
 # DOSSIER TRAINING SET EXPORT (R5)
 # =============================================================================
 
-from merlt.api.models.enrichment_models import (
-    DossierArticleData,
-    DossierQASessionData,
-    DossierAnnotationData,
-    DossierTrainingSetExportRequest,
-    DossierTrainingSetExportResponse,
-    LoadDossierTrainingRequest,
-    LoadDossierTrainingResponse,
-)
-from merlt.experts.models import QATrace, QAFeedback
-
-
 @router.post(
     "/dossier-training-export",
     response_model=DossierTrainingSetExportResponse,
@@ -4128,7 +4105,6 @@ async def export_dossier_training_set_full(
         Training set completo
     """
     from uuid import uuid4
-    from datetime import timezone
 
     log.info(
         "API: export_dossier_training_set_full",

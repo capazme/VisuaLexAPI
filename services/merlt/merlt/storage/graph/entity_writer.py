@@ -56,7 +56,7 @@ import re
 import structlog
 import unicodedata
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from dataclasses import dataclass
 
 from merlt.storage.graph.client import FalkorDBClient
@@ -64,8 +64,7 @@ from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import (
     Fonte, Label, Provenance, Rel, SEED_TWIN, canonical_urn, entity_label, stub_properties,
 )
-from merlt.storage.enrichment.models import PendingEntity, PendingRelation
-from merlt.pipeline.enrichment.models import EntityType, RelationType
+from merlt.storage.enrichment.models import PendingEntity
 
 log = structlog.get_logger()
 
@@ -400,6 +399,11 @@ class EntityGraphWriter:
 
         Properties:
             - id: Unique identifier
+            - node_id: the same value as `id`. The readers name a node by
+              `coalesce(URN, node_id)`; an entity with `id` alone had no key for them
+              (a null target_urn, FalkorDB's internal id). A seed twin the writer
+              adopts keeps the seed's own `node_id` (`_check_duplicate_mechanical`
+              does not touch it).
             - nome: Display name
             - tipo: Entity type
             - descrizione: Description
@@ -423,7 +427,7 @@ class EntityGraphWriter:
 
         # Provenance / trust (Loop β, task B.1): entities written here have
         # already cleared community consensus, so they carry the highest trust.
-        # `provenance` distinguishes them from `lazy_ingest` (auto-scraped) and
+        # `provenance` distinguishes them from `ingestion` (auto-scraped) and
         # `seed` (Libro IV snapshot) nodes; `trust` (0..1) feeds the
         # provenance-aware traversal scoring (task B.3).
         provenance = "community_validated"
@@ -435,6 +439,7 @@ class EntityGraphWriter:
         query = f"""
         CREATE (e:{node_labels} {{
             id: $id,
+            node_id: $id,
             nome: $nome,
             tipo: $tipo,
             descrizione: $descrizione,
@@ -556,15 +561,16 @@ class EntityGraphWriter:
             return
 
         # Create relation (create Norma node if it doesn't exist). A Norma this
-        # writer creates is the schema's one stub shape (`stub_properties`),
-        # set ON CREATE only: an existing (seed/ingested) node is never touched.
+        # writer creates is the schema's one stub shape (`stub_properties`) and
+        # nothing else (the migration reshapes any stub that differs from it), set
+        # ON CREATE only: an existing (seed/ingested) node is never touched.
         # The graph keys a norm by its full Normattiva URL, so a bare `urn:nir:`
         # URN is keyed so too, or its stub would sit next to the article the seed
         # has. The relation itself carries the community's provenance.
         article_key = canonical_urn(wrapped_norm_key(entity.article_urn))
         query = f"""
         MERGE (art:Norma {{URN: $article_urn}})
-        ON CREATE SET art += $stub, art.created_at = $timestamp
+        ON CREATE SET art += $stub
         WITH art
         MATCH (e:Entity {{id: $entity_id}})
         MERGE (art)-[r:{relation_type}]->(e)

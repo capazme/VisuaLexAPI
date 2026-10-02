@@ -41,11 +41,10 @@ import structlog
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
 
-from merlt.api.auth import verify_api_key, require_role
+from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey
 from merlt.api.models.citation_models import (
     CitationFormat,
-    CitationSource,
     CitationExportRequest,
     CitationExportResponse,
     CitationFormatRequest,

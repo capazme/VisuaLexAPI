@@ -23,7 +23,7 @@ Ogni tool:
 import structlog
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List, Sequence, Tuple, Union
+from typing import Dict, Any, Optional, List, Sequence, Tuple
 from enum import Enum
 from datetime import datetime
 

@@ -18,10 +18,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-# Needs a live FalkorDB (the compose falkordb service): excluded by default through
-# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
-pytestmark = pytest.mark.integration
-
 from merlt.clients import Modifica, Norma, NormaVisitata, TipoModifica
 from merlt.pipeline.ingestion import IngestionPipelineV2
 from merlt.pipeline.multivigenza import MultivigenzaPipeline
@@ -30,6 +26,10 @@ from merlt.storage.enrichment.models import PendingEntity
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.entity_writer import EntityGraphWriter
 from merlt.storage.graph.schema import canonical_urn
+
+# Needs a live FalkorDB (the compose falkordb service): excluded by default through
+# pyproject's `-m 'not integration'`; run with `-m integration` in-container.
+pytestmark = pytest.mark.integration
 
 TEST_GRAPH = "merlt_test_writers"
 ARTICLE_TEXT = (

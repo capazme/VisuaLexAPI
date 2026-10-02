@@ -210,7 +210,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
         self._systemic_walk = []
 
         log.info(
-            f"SystemicExpert analyzing",
+            "SystemicExpert analyzing",
             query=context.query_text[:50],
             trace_id=context.trace_id,
             use_react=self.use_react,
@@ -226,7 +226,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 novelty_threshold=self.react_config.get("novelty_threshold", 0.1)
             )
             log.info(
-                f"SystemicExpert ReAct completed",
+                "SystemicExpert ReAct completed",
                 sources=len(all_sources),
                 react_metrics=self.get_react_metrics() if hasattr(self, '_react_result') else {}
             )
@@ -280,7 +280,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
             response.metadata["execution_trace"] = self.get_trace_dict()
 
         log.info(
-            f"SystemicExpert completed",
+            "SystemicExpert completed",
             confidence=response.confidence,
             sources=len(response.legal_basis),
             time_ms=response.execution_time_ms,
@@ -349,7 +349,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                         self._extracted_urns.add(urn)
 
         log.debug(
-            f"SystemicExpert sources retrieved",
+            "SystemicExpert sources retrieved",
             total=len(sources),
             extracted_urns=len(self._extracted_urns)
         )
@@ -541,7 +541,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
         systemic_relations = await self._select_traversal_relations(context)
 
         log.debug(
-            f"SystemicExpert graph expansion",
+            "SystemicExpert graph expansion",
             urns_count=len(urns_to_expand),
             urns=list(urns_to_expand)[:3]
         )
@@ -596,7 +596,7 @@ class SystemicExpert(BaseExpert, ReActMixin):
                 log.warning(f"Failed to expand {urn}: {e}")
 
         log.info(
-            f"SystemicExpert systemic expansion",
+            "SystemicExpert systemic expansion",
             total_expanded=len(expanded)
         )
 
@@ -693,10 +693,10 @@ class SystemicExpert(BaseExpert, ReActMixin):
         ]
 
         if context.norm_references:
-            sections.append(f"\n## NORME CITATE\n" + ", ".join(context.norm_references))
+            sections.append("\n## NORME CITATE\n" + ", ".join(context.norm_references))
 
         if context.legal_concepts:
-            sections.append(f"\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
+            sections.append("\n## CONCETTI GIURIDICI\n" + ", ".join(context.legal_concepts))
 
         if context.retrieved_chunks:
             sections.append("⚠️ USA ESATTAMENTE il source_id indicato per ogni fonte nel campo legal_basis!")

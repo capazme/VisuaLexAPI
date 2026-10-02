@@ -544,7 +544,7 @@ def test_legacy_checkpoint_file_loads_through_policy_manager(tmp_path):
 
 
 def test_incompatible_state_dict_is_rejected():
-    torch = pytest.importorskip("torch")
+    pytest.importorskip("torch")
     import torch.nn as nn
 
     from merlt.rlcf.policy_gradient import TraversalPolicy

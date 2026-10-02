@@ -27,11 +27,12 @@ from rq import Queue, Retry
 from rq.job import Job
 from rq.exceptions import NoSuchJobError
 from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, Iterable, List, Tuple
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from merlt.api.auth import verify_api_key, require_role
+from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.schema import node_type_cypher, node_type_from_labels, resolve_rel, resolve_rels
@@ -41,7 +42,7 @@ from merlt.pipeline.enrichment.models import EntityType
 
 # Import mapping from local utilities
 from merlt.utils import NORMATTIVA_URN_CODICI
-from merlt.utils.urn_labels import build_node_label, article_label_from_urn
+from merlt.utils.urn_labels import build_node_label
 from merlt.utils.urngenerator import generate_urn
 
 log = structlog.get_logger()
@@ -261,7 +262,7 @@ async def get_article_entities(
 
         query += f"""
         RETURN
-            COALESCE(e.node_id, e.URN, id(e)) as entity_id,
+            COALESCE(e.URN, e.node_id) as entity_id,
             {node_type_cypher('e')} as entity_type,
             COALESCE(e.nome, e.estremi, e.titolo, e.testo_vigente) as entity_text,
             COALESCE(e.validation_status, 'approved') as validation_status,
@@ -1046,10 +1047,6 @@ async def resolve_norm(
 # ====================================================
 # SUBGRAPH VISUALIZATION
 # ====================================================
-
-from pydantic import BaseModel, Field
-from typing import Literal
-
 
 class SubgraphNode(BaseModel):
     """Node in subgraph response."""

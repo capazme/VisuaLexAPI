@@ -172,6 +172,7 @@ async def check_validity(
                     replacing_norm=r.replacing_norm,
                     recent_modifications=r.recent_modifications,
                     checked_at=r.checked_at,
+                    pending=r.pending,
                 )
                 for r in results
             ],
