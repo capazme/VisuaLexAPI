@@ -80,7 +80,10 @@ async def _check_falkordb_health() -> ServiceHealth:
         await client.connect()
 
         # Test with health_check method
-        is_healthy = await client.health_check()
+        try:
+            is_healthy = await client.health_check()
+        finally:
+            await client.close()
         latency = (time.time() - start) * 1000
 
         if is_healthy:
@@ -147,7 +150,8 @@ async def _check_postgres_health() -> ServiceHealth:
     start = time.time()
     try:
         from merlt.storage.bridge.bridge_table import BridgeTable, BridgeTableConfig
-        bridge = BridgeTable(BridgeTableConfig.from_enrichment_env())
+        config = BridgeTableConfig.from_enrichment_env()
+        bridge = BridgeTable(config)
         await bridge.connect()
 
         # Test connection with count method
@@ -162,7 +166,7 @@ async def _check_postgres_health() -> ServiceHealth:
             status=ServiceStatus.ONLINE,
             latency_ms=latency,
             details={
-                "database": "rlcf_dev",
+                "database": config.database,
                 "bridge_mappings": count,
             }
         )
@@ -186,12 +190,14 @@ async def _check_redis_health() -> ServiceHealth:
             db=0,
         )
 
-        # Ping
-        await client.ping()
-        latency = (time.time() - start) * 1000
+        try:
+            # Ping
+            await client.ping()
+            latency = (time.time() - start) * 1000
 
-        info = await client.info("memory")
-        await client.close()
+            info = await client.info("memory")
+        finally:
+            await client.close()
 
         return ServiceHealth(
             name="Redis",
@@ -210,6 +216,15 @@ async def _check_redis_health() -> ServiceHealth:
         )
 
 
+def _bridge_public_config() -> dict:
+    """Where the bridge table is, as an API response may say it: host, port, database.
+    Never the user or the password."""
+    from merlt.storage.bridge.bridge_table import BridgeTableConfig
+
+    config = BridgeTableConfig.from_enrichment_env()
+    return {"host": config.host, "port": config.port, "db": config.database}
+
+
 async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
     """Get Knowledge Graph KPIs from FalkorDB and Qdrant."""
     total_nodes = 0
@@ -224,26 +239,28 @@ async def _get_knowledge_graph_kpis() -> KnowledgeGraphKPIs:
         from merlt.storage.graph.client import FalkorDBClient
         client = FalkorDBClient()
         await client.connect()
+        try:
+            # Count nodes
+            nodes_result = await client.query("MATCH (n) RETURN count(n) as c")
+            total_nodes = nodes_result[0]["c"] if nodes_result else 0
 
-        # Count nodes
-        nodes_result = await client.query("MATCH (n) RETURN count(n) as c")
-        total_nodes = nodes_result[0]["c"] if nodes_result else 0
+            # Count edges
+            edges_result = await client.query("MATCH ()-[r]->() RETURN count(r) as c")
+            total_edges = edges_result[0]["c"] if edges_result else 0
 
-        # Count edges
-        edges_result = await client.query("MATCH ()-[r]->() RETURN count(r) as c")
-        total_edges = edges_result[0]["c"] if edges_result else 0
+            # Count articles (Norma nodes)
+            articles_result = await client.query(
+                "MATCH (n) WHERE n.tipo_atto IS NOT NULL RETURN count(n) as c"
+            )
+            articles_count = articles_result[0]["c"] if articles_result else 0
 
-        # Count articles (Norma nodes)
-        articles_result = await client.query(
-            "MATCH (n) WHERE n.tipo_atto IS NOT NULL RETURN count(n) as c"
-        )
-        articles_count = articles_result[0]["c"] if articles_result else 0
-
-        # Count entities
-        entities_result = await client.query(
-            "MATCH (n) WHERE n.entity_type IS NOT NULL RETURN count(n) as c"
-        )
-        entities_count = entities_result[0]["c"] if entities_result else 0
+            # Count entities
+            entities_result = await client.query(
+                "MATCH (n) WHERE n.entity_type IS NOT NULL RETURN count(n) as c"
+            )
+            entities_count = entities_result[0]["c"] if entities_result else 0
+        finally:
+            await client.close()
     except Exception as e:
         log.warning("Failed to get FalkorDB KPIs", error=str(e))
 
@@ -793,7 +810,7 @@ async def get_node_details(
         "postgresql": {
             "label": "PostgreSQL",
             "description": "Database relazionale per Bridge Table e RLCF metadata.",
-            "config": {"host": "localhost", "port": 5433, "db": "rlcf_dev"},
+            "config": _bridge_public_config(),
             "links": {},
         },
         "redis": {

@@ -46,6 +46,27 @@ class TraceStorageConfig:
         """Get async PostgreSQL connection string."""
         return f"postgresql+asyncpg://{self.user}:{self.password}@{self.host}:{self.port}/{self.database}"
 
+    @classmethod
+    def from_rlcf_env(cls) -> "TraceStorageConfig":
+        """The database the traces are written to: the one the RLCF async session opens
+        (`RLCF_ASYNC_DATABASE_URL`, see infra/compose.yml), where the API reaches it from.
+
+        `qa_traces` rows are saved through that session, so a reader built on it sees them.
+        The dataclass defaults name a development container (localhost:5433/rlcf_dev) that
+        does not exist inside the compose network."""
+        from sqlalchemy.engine import make_url
+
+        from merlt.rlcf.database import get_async_database_url
+
+        url = make_url(get_async_database_url())
+        return cls(
+            host=url.host or cls.host,
+            port=url.port or 5432,
+            database=url.database or cls.database,
+            user=url.username or cls.user,
+            password=url.password or "",
+        )
+
 
 @dataclass
 class TraceFilter:

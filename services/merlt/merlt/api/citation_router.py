@@ -89,7 +89,7 @@ async def get_trace_service() -> TraceStorageService:
 
     Note: In production, this should be managed as a singleton or via dependency injection.
     """
-    service = TraceStorageService(TraceStorageConfig())
+    service = TraceStorageService(TraceStorageConfig.from_rlcf_env())
     await service.connect()
     return service
 

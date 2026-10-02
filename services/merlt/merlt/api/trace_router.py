@@ -136,7 +136,7 @@ async def get_trace_service() -> TraceStorageService:
     """
     global _trace_service
     if _trace_service is None:
-        _trace_service = TraceStorageService(TraceStorageConfig())
+        _trace_service = TraceStorageService(TraceStorageConfig.from_rlcf_env())
         await _trace_service.connect()
     return _trace_service
 
