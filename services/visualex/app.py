@@ -35,6 +35,8 @@ from visualex_api.services.normattiva_validity import (
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
+from visualex_api.services.decisions.model import InvalidReference, parse_reference
+from visualex_api.services.decisions.resolver import SourceUnavailable, get_resolver
 from visualex_api.tools.urngenerator import complete_date_or_parse_async, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import format_date_to_extended, parse_article_input, normalize_act_type
@@ -363,6 +365,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_rubriche', view_func=self.fetch_rubriche, methods=['POST'])
         self.app.add_url_rule('/fetch_recitals', view_func=self.fetch_recitals, methods=['POST'])
         self.app.add_url_rule('/fetch_act_fingerprints', view_func=self.fetch_act_fingerprints, methods=['POST'])
+        self.app.add_url_rule('/fetch_decision', view_func=self.fetch_decision, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.get_history, methods=['GET'])
         self.app.add_url_rule('/history', view_func=self.clear_history, methods=['DELETE'])
@@ -1022,6 +1025,23 @@ class NormaController:
             return jsonify({'recitals': recitals, 'count': len(recitals), 'url': url})
         except Exception as exc:
             return self._error_response(exc, 'fetch_recitals')
+
+    async def fetch_decision(self):
+        """One court decision by its reference (design 2026-10-01 §3). Always JSON with
+        `esito`: trovata and ambigua 200, non_trovata 404, fonte_non_raggiungibile 503,
+        richiesta_non_valida 400. A source that cannot be reached is never "non trovata"."""
+        body = await request.get_json(silent=True)
+        try:
+            reference = parse_reference(body)
+        except InvalidReference as exc:
+            return jsonify({'esito': 'richiesta_non_valida', 'errori': exc.errors}), 400
+        try:
+            outcome = await get_resolver().resolve(reference)
+        except SourceUnavailable as exc:
+            log.warning("Decision source unreachable", fonte=exc.fonte, error=str(exc))
+            return jsonify({'esito': 'fonte_non_raggiungibile', 'fonte': exc.fonte}), 503
+        status = 404 if outcome.esito == 'non_trovata' else 200
+        return jsonify(outcome.to_dict()), status
 
     async def fetch_act_fingerprints(self):
         """Per-article change detectors for a Normattiva act.

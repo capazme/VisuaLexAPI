@@ -7,13 +7,15 @@ import { createLimiter, getClientIp, sendTooManyRequests } from './rateLimiter';
 /**
  * What one scraping request costs against a user's quota, by route. Anything not listed
  * costs 1. The export starts a Chromium; the stream and the whole-act fetch carry many
- * articles in one request; the detailed health page reaches the three sources for real.
+ * articles in one request; the detailed health page reaches the three sources for real;
+ * a decision lookup reads two archives.
  */
 export const DEFAULT_SCRAPE_COSTS: Record<string, number> = {
   '/export_pdf': 20,
   '/stream_article_text': 3,
   '/fetch_all_data': 5,
   '/health/detailed': 5,
+  '/fetch_decision': 2,
 };
 
 /**
