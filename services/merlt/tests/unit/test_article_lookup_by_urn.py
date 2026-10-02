@@ -80,6 +80,22 @@ async def test_related_nodes_are_looked_up_by_the_canonical_urn():
     ("art. 2 del decreto ministeriale c.c.", None),
     ("art. 2 l. 241 c.c.", None),
     ("art. 2 e art. 3 c.c.", BASE + "regio.decreto:1942-03-16;262:2~art3"),
+    # a code before the article does not claim an article that turns to another act
+    ("c.c. art. 5 del d.lgs. 196/2003", None),
+    ("c.c. art. 5 d.lgs. 196/2003", None),
+    ("c.c. art. 5 della legge 241", None),
+    ("c.p. art. 2 della legge 241", None),
+    ("c.c. art. 5 del regolamento", None),
+    ("c.c. art. 5 della direttiva", None),
+    ("c.c. art. 5 del testo unico", None),
+    ("c.c. art. 5 del t.u. 385", None),
+    ("c.c. art. 5 del TUB", None),
+    ("c.c. art. 5 del GDPR", None),
+    ("c.c. art. 5 del codice della strada", None),
+    ("c.c. art. 5 del codice del consumo", None),
+    ("art. 5 del TUF; c.c. art. 3", BASE + "regio.decreto:1942-03-16;262:2~art3"),
+    ("art. 5 del regolamento, art. 3 c.c.", BASE + "regio.decreto:1942-03-16;262:2~art3"),
+    ("art. 5 del GDPR c.c.", None),
     # the article token
     ("part 5 c.c.", None),
     ("art. 2 - bis c.c.", CC2BIS),
@@ -105,6 +121,8 @@ def test_a_citation_becomes_the_graph_key(query, urn):
     ("art. 2 della legge 241/1990, art. 3 c.c.", {"tipo_atto": "codice civile", "articolo": "3"}),
     ("art. 2 della legge 241/1990 c.c.", None),
     ("articolo 2 della Costituzione", {"tipo_atto": "costituzione", "articolo": "2"}),
+    ("c.c. art. 5 del d.lgs. 196/2003", None),
+    ("art. 5 del TUF; c.c. art. 3", {"tipo_atto": "codice civile", "articolo": "3"}),
     ("risoluzione per inadempimento", None),
 ])
 def test_a_citation_becomes_a_normattiva_request(query, parsed):
