@@ -34,7 +34,8 @@ log = structlog.get_logger()
 
 RESOLVER = "https://www.normattiva.it/uri-res/N2Ls?"
 MAX_URNS = 20
-# The caller (MERL-T) waits at most 180 s for a batch: stop starting new requests at 120.
+# The caller (MERL-T) waits at most 180 s for a batch: stop starting new requests at 120,
+# and let each act cost one retry at most (two attempts plus one back-off).
 BATCH_BUDGET = 120.0
 _YEAR_ONLY = re.compile(r"urn:nir:([a-z.]{1,60}):([a-z.]{1,60}):([0-9]{4});([0-9]{1,6})", re.ASCII)
 _MESI = {
@@ -96,7 +97,7 @@ async def _resolve_one(urn: str) -> Optional[str]:
         return cached
     try:
         result = await http_client.request(
-            "GET", RESOLVER + urn, source="normattiva", headers={"User-Agent": USER_AGENT}
+            "GET", RESOLVER + urn, source="normattiva", max_retries=1, headers={"User-Agent": USER_AGENT}
         )
     except DocumentNotFoundError:
         return None

@@ -174,6 +174,13 @@ class TestResolve:
             "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1983;184"
         )
 
+    async def test_each_act_costs_at_most_one_retry(self, cache):
+        """Two attempts plus one back-off per act keep the batch inside MERL-T's 180 s."""
+        request = AsyncMock(return_value=HttpResult(text=PAGE, status=200, headers={}))
+        with patch.object(act_dates.http_client, "request", new=request):
+            await act_dates.resolve_many([LEGGE_184])
+        assert request.await_args.kwargs["max_retries"] == 1
+
     async def test_an_unreadable_page_is_none_and_not_cached(self, cache):
         request = AsyncMock(return_value=HttpResult(text="<html></html>", status=200, headers={}))
         with patch.object(act_dates.http_client, "request", new=request):
