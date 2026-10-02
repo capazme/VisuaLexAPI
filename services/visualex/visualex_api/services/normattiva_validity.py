@@ -21,7 +21,7 @@ import asyncio
 import html
 import re
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, Optional, Tuple, TypedDict
+from typing import Any, Optional, Tuple, TypedDict
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
