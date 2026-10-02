@@ -92,13 +92,14 @@ describe('createLingoCard', () => {
     expect(await prisma.lingoCardAncora.count()).toBe(0);
   });
 
-  it('goes away, with its anchors, when its author deletes the account', async () => {
-    await createLingoCard(author.id, cardInput());
-    expect(await prisma.lingoCard.count()).toBe(1);
+  it('is kept, without an author, when the user row goes: the database alone never takes a card with it', async () => {
+    const created = await createLingoCard(author.id, cardInput());
 
     await prisma.user.delete({ where: { id: author.id } });
 
-    expect(await prisma.lingoCard.count()).toBe(0);
-    expect(await prisma.lingoCardAncora.count()).toBe(0);
+    const kept = await prisma.lingoCard.findUniqueOrThrow({ where: { id: created.id }, include: { ancore: true } });
+    expect(kept.autoreId).toBeNull();
+    expect(kept.ancore).toHaveLength(1);
+    // What belongs to the person alone (drafts) is removed by `deleteUserAccount`, not by the database.
   });
 });

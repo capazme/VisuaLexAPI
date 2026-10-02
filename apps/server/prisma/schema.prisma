@@ -967,7 +967,8 @@ enum LingoCardTipo {
 
 model LingoCard {
   id             String         @id @default(uuid())
-  autoreId       String         @map("autore_id")
+  // Null once the author's account is gone: the card stays, anonymous.
+  autoreId       String?        @map("autore_id")
   materia        LingoMateria
   // e.g. "Risoluzione per inadempimento"
   istituto       String
@@ -982,10 +983,11 @@ model LingoCard {
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
-  // Cascade, as the specification says and as "every relation to User cascades"
-  // in DELETE /auth/account. A validated card is community property, so whether
-  // it should survive its author is an open question (see the plan, decision 14).
-  autore User              @relation(fields: [autoreId], references: [id], onDelete: Cascade)
+  // SetNull, not Cascade: a card the community has taken up (proposed, validated,
+  // to review) is community property and outlives its author, anonymous. What
+  // belongs to the person alone (drafts, archived) is removed in
+  // `deleteUserAccount`, because only the application knows the card's state.
+  autore User?             @relation(fields: [autoreId], references: [id], onDelete: SetNull)
   ancore LingoCardAncora[]
 
   @@index([materia, istituto, stato])
