@@ -57,6 +57,10 @@ NON_NETWORK_HOSTS: dict[str, str] = {
         "the AIA URI named in tools/tls.py's rotation procedure; read by hand, never "
         "fetched at run time"
     ),
+    "www.cortecostituzionale.it": (
+        "the page of a Corte costituzionale decision: a link the reader's browser opens; "
+        "never fetched by the server"
+    ),
 }
 
 
