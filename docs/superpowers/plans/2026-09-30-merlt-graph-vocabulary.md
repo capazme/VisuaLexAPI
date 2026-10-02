@@ -1981,7 +1981,7 @@ Besides the spec's list, the migration repairs what pull request A's reviews fou
 - **The old entity writer's stamps.** Before Task 4 it ran `SET art.provenance = coalesce(art.provenance, 'community_validated'), art.trust = coalesce(art.trust, 1.0)` on every article it linked an entity to. The community validated the link, which carries its own provenance; the article gets back `seed` or `ingestion`, and no `trust`.
 - **Twins, both ways.** The seed key comes from the name by the writer's rule (`seed_twin_slugs`: `seed_twin_slug` as spelt, then without a leading article), never from the community id, which drops accents and hyphens. A seed name may keep its article where the proposal drops it (13 of the seed's 19 article-bearing names have no article-less node), so seed names are indexed under both their keys too. Seed nodes whose names give one community id ("La reticenza", "reticenza": 8 pairs, 16 nodes, on the Libro IV seed) are reported as near-duplicates.
 - **Community entity labels.** The writer before Task 4 labelled a community entity `:Entity:<tipo.capitalize()>` (`Concetto`, `Principio`). Each gains the label of its kind from `schema.ENTITY_LABEL_BY_TYPE` (`entity_label`), idempotently; the label is taken from the map, never from the node. The old label goes (controller's ruling): `LEGACY_ENTITY_LABELS` is a fixed set the script builds from `EntityType` (`tipo.capitalize()` for every type), and every name in it is removed from an `:Entity` node unless it is the label `entity_label(tipo)` gives that node. A reader takes a node's type from its first label that is not `Entity`, and FalkorDB orders labels by creation, so a left-over `Concetto` would read as the type in a graph where it was created before the seed's labels; and a community `norma` entity written `:Entity:Norma` would be matched as a norm by every `(n:Norma)` step. This step runs first, before any step that matches `Norma`. The names come from the code's set, never from the node; `tipo` goes in as a parameter. The development graph has no such node; another graph may.
-- **Provenance outside the schema.** The ingestion before this round stamped `lazy_ingest` (trust 0.6, see `merlt/scripts/backfill_provenance_seed.py`): it becomes `ingestion`. Any other value outside `Provenance` is reported and left alone. The comment in `merlt/storage/graph/entity_writer.py` (~426) that names `lazy_ingest` is corrected to `ingestion`.
+- **Provenance outside the schema.** The ingestion before this round stamped `lazy_ingest`: it becomes `ingestion`. Any other value outside `Provenance` is reported and left alone. The comment in `merlt/storage/graph/entity_writer.py` (~426) that names `lazy_ingest` is corrected to `ingestion`.
 - **Community entity key.** Community entities carry `id` only, so `get_article_relations` answers a null `target_urn` and `get_article_entities` FalkorDB's internal id. Every community entity also carries `node_id = id` (controller's ruling): the entity writer writes it, the migration sets `node_id = coalesce(e.node_id, e.id)`, and the readers that return a node's key read `coalesce(URN, node_id)`. Task 1b indexes `(Entity, node_id)`.
 - **Doubled version keys** (Task 1b). The versions multivigenza keyed `…!vig=!vig=<date>` get `version_urn`'s key and their `VERSIONE_DI` edge to the article.
 - **Stale live-source text.** A `LiveSource` the provisional writer refreshed after Task 4 has `testo` and still its old `text`: the old one goes.
@@ -2997,19 +2997,36 @@ Not the implementer's: it rewrites the development graph, reversible only throug
 The two scripts are in B's code, not in the images built from `develop`. Run them from the main checkout, which holds `services/merlt/data` (the seed keys come from it; worktrees lack it) and `infra/.env`, with B's package mounted over the image's; after step b the main checkout's `develop` holds B, and the mount can point at it.
 
 ```bash
+MAIN=<the main checkout>
 B=<checkout holding pull request B's code>
+B_HEAD=<pull request B's head commit, the one its CI and review passed>
 run() { docker compose -f infra/compose.yml --profile merlt run --rm --no-deps -v "$B/services/merlt/merlt:/app/merlt:ro" merlt-worker python -m "$@"; }
+points() { docker compose -f infra/compose.yml --profile merlt run --rm --no-deps -v "$B/services/merlt/merlt:/app/merlt:ro" merlt-worker python -c '
+import collections, os
+from qdrant_client import QdrantClient
+from merlt.storage.vectors.collection import default_chunks_collection
+qdrant, collection = QdrantClient(host=os.environ["QDRANT_HOST"], port=int(os.environ["QDRANT_PORT"])), default_chunks_collection()
+counts, offset = collections.Counter(), None
+while True:
+    page, offset = qdrant.scroll(collection, limit=1000, offset=offset, with_payload=["source_type"], with_vectors=False)
+    counts.update(str((p.payload or {}).get("source_type")) for p in page)
+    if offset is None:
+        break
+print(collection, dict(sorted(counts.items())))'; }
 ```
 
 a. **After B's whole-branch review**, with pull request B open and its CI green:
 
 ```bash
 scripts/backup.sh
+points                                            # the Qdrant points per source_type
 run merlt.scripts.retrieval_gate                  # before
 run merlt.scripts.migrate_graph_vocabulary        # dry run
 ```
 
-Read the dry-run report before going on: every number must be explainable. `graph.relations_collapsed` counts, per canonical type, the pairs of nodes where the rename leaves one edge for several (two legacy edges, or a legacy and a canonical one, between the same two nodes): the `MERGE` keeps the first edge's properties only. If it is not empty, decide before `--apply` whether the lost properties matter; the script never merges them. `graph.stubs.removed` names the properties the stub shape drops: check that none of them is content. Record in pull request B the backup folder, the dry-run report, the first gate and the label and relation counts before (`MATCH (n) RETURN labels(n)[0], count(*)`, `MATCH ()-[r]->() RETURN type(r), count(*)`).
+Count the points before the first gate. A collection the seed load left without embeddings (`MERLT_SKIP_EMBEDDINGS`), or with only some source types, makes the gate exit non-zero or measure little: the counts say why, before the gate does. A missing collection fails `points`, the gate and the migration alike (the migration checks it before it touches the graph).
+
+Read the dry-run report before going on: every number must be explainable. `graph.relations_collapsed` counts, per canonical type, the pairs of nodes where the rename leaves one edge for several (two legacy edges, or a legacy and a canonical one, between the same two nodes): the `MERGE` keeps the first edge's properties only. If it is not empty, decide before `--apply` whether the lost properties matter; the script never merges them. `graph.stubs.removed` names the properties the stub shape drops: check that none of them is content. `graph.provenance_seed_outside_seed` counts the nodes stamped `seed` that the seed never brought (the old seed backfill, run after a lazy ingestion): they become `ingestion`, without trust. The script writes each half's report on stderr as soon as it is ready (one JSON line, `"half": "graph"` then `"half": "vectors"`), the whole on stdout: keep stderr too, so that a failure of the vector half does not lose the graph's. Record in pull request B the backup folder, the dry-run report, the first gate and the label and relation counts before (`MATCH (n) RETURN labels(n)[0], count(*)`, `MATCH ()-[r]->() RETURN type(r), count(*)`).
 
 b. **Merge A and B back to back:** mark capazme/VisuaLexAPI#39 ready, merge it with `merge: refactor/merlt-graph-vocabulary — one vocabulary for the graph's writers and readers`, then merge B with `merge: feat/merlt-graph-migration — the graph and its vectors move to the one vocabulary`.
 
@@ -3018,12 +3035,14 @@ c. **At once**, with the MERL-T containers stopped: between the merge and the re
 ```bash
 docker compose -f infra/compose.yml --profile merlt stop merlt-api merlt-worker
 run merlt.scripts.migrate_graph_vocabulary --apply
+git -C "$MAIN" switch develop && git -C "$MAIN" pull --ff-only
+git -C "$MAIN" merge-base --is-ancestor "$B_HEAD" HEAD   # the images are built from B's code, or not at all
 docker compose -f infra/compose.yml --profile merlt build merlt-api merlt-worker
 docker compose -f infra/compose.yml --profile merlt up -d --force-recreate merlt-api merlt-worker
 run merlt.scripts.migrate_graph_vocabulary --apply     # the check
 ```
 
-The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `certezza.reported`, `provenance_legacy.unknown`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
+The images are built from the main checkout: without the pull they would carry the code from before A, the old writers, and the check would find their writes. If `merge-base --is-ancestor` fails, stop: `develop` there does not hold B. The check changes nothing: every count is 0 and every map empty. What is reported, not fixed, stays as it was: `twins`, `bare_keys.reported`, `versions.reported`, `stubs.reported`, `certezza.reported`, `provenance_legacy.unknown`, `vectors.unkeyed`, and the `integrity` numbers (Task 6b); the pull request explains them. From the merge until the containers stop, `POST /api/v1/graph/search` answers empty on A's code (see the paragraph at the top of this task); `run` uses `--no-deps`, so the stopped containers stay stopped while the script runs.
 
 d. **Then the gate again:**
 
