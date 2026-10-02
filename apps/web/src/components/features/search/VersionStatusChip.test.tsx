@@ -18,6 +18,11 @@ describe('VersionStatusChip', () => {
         expect(button).toHaveAttribute('aria-haspopup', 'dialog');
     });
 
+    it('keeps its dates on one line and its 44px touch target', () => {
+        render(<VersionStatusChip chip={chip()} onClick={() => {}} />);
+        expect(screen.getByRole('button')).toHaveClass('whitespace-nowrap', 'min-h-[44px]', 'md:min-h-0');
+    });
+
     it('opens the date dialog when pressed', () => {
         const onClick = vi.fn();
         render(<VersionStatusChip chip={chip({ tone: 'current', label: 'In vigore dal 28-12-2025' })} onClick={onClick} />);

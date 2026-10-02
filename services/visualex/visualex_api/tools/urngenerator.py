@@ -241,6 +241,9 @@ def append_version_info(urn, version, version_date):
     Returns:
     str -- The URN with version information appended
     """
+    if isinstance(version, str):
+        # Read the word the way is_historical_request does: stripped, lower-cased.
+        version = version.strip().lower()
     if version == "originale":
         urn += "@originale"
     elif version == "vigente":

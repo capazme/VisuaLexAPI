@@ -234,6 +234,45 @@ export const CITATION_GOLDEN: CitationCase[] = [
     },
   },
   {
+    name: "the original text, a window that starts on the 11th, a consultation on the 8th: the article and the preposition elide (dall'11, l'8)",
+    context: {
+      norma: { tipo_atto: 'legge', numero_atto: '300', data: '1970-05-20', numero_articolo: '18' },
+      validity: { state: 'historical', valid_from: '1970-06-11', valid_to: '1990-05-25', version_number: 1, act_updated: null, request_in_window: null },
+      original: true,
+      consultedAt: '2026-10-08',
+    },
+    expected: {
+      short: 'art. 18, l. 20 maggio 1970, n. 300, nel testo originale',
+      long: "art. 18, l. 20 maggio 1970, n. 300, nel testo originale, in vigore dall'11 giugno 1970 al 25 maggio 1990 (Normattiva, testo consolidato, consultato l'8 ottobre 2026)",
+    },
+  },
+  {
+    name: "a code article asked for the 8th: \"all'8\", and a window that starts on the 11th: \"dall'11\"",
+    context: {
+      norma: { tipo_atto: 'codice civile', numero_articolo: '1284', allegato: '2' },
+      validity: { state: 'historical', valid_from: '2014-03-11', valid_to: '2014-12-28', version_number: 4, act_updated: null, request_in_window: true },
+      requestedDate: '2014-09-08',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: "art. 1284 c.c., nel testo in vigore all'8 settembre 2014",
+      long: "art. 1284 c.c., nel testo in vigore dall'11 marzo 2014 al 28 dicembre 2014 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)",
+    },
+  },
+  {
+    name: "a repealed article whose repeal takes effect on the 11th: \"abrogato dall'11\"",
+    context: {
+      norma: { tipo_atto: 'codice penale', numero_articolo: '594', allegato: '1' },
+      validity: { state: 'abrogated', valid_from: '2016-02-11', valid_to: null, version_number: 2, act_updated: null, request_in_window: true },
+      requestedDate: '2016-03-01',
+      consultedAt: CONSULTED,
+    },
+    expected: {
+      short: "art. 594 c.p., abrogato dall'11 febbraio 2016",
+      long: "art. 594 c.p., abrogato dall'11 febbraio 2016 (Normattiva, testo consolidato, consultato il 1° ottobre 2026)",
+    },
+  },
+  {
     name: 'the source could not be read: only the day that was asked for, never a window',
     context: {
       norma: { tipo_atto: 'codice civile', numero_articolo: '1284', allegato: '2' },

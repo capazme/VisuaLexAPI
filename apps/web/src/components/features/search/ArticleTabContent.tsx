@@ -56,6 +56,7 @@ import {
     describeVersion,
     isEuropeanAct,
     requestIsHistorical,
+    versionTabSuffix,
     type BannerAction,
     type TextAtDateChoice,
 } from '../../../utils/versionDisplay';
@@ -731,7 +732,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     };
 
     const handleCompare = () => {
-        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}`;
+        const label = `Art. ${norma_data.numero_articolo}${norma_data.allegato ? ` (All. ${norma_data.allegato})` : ''} - ${norma_data.tipo_atto}${norma_data.numero_atto ? ` n. ${norma_data.numero_atto}` : ''}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
         openCompareWithArticle({
             article: data,
             sourceNorma: {

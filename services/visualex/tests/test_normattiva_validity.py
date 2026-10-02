@@ -82,6 +82,62 @@ class TestWindowShapes:
         assert extract_validity(raw, article="7") is None
 
 
+class TestWindowEndingAgainstToday:
+    """A closed window is historical only when its last day is before today (Rome)."""
+
+    TODAY = date(2026, 10, 2)
+
+    def read(self, **kwargs):
+        today = kwargs.pop("today", self.TODAY)
+        return extract_validity(synthetic(**kwargs), article="7", today=today)
+
+    def test_a_window_ending_in_the_future_is_the_text_in_force(self):
+        v = self.read(dal="1-1-2026", al="31-12-2026")
+        assert v["state"] == "current"
+        assert (v["valid_from"], v["valid_to"]) == ("2026-01-01", "2026-12-31")
+
+    def test_a_window_ending_today_is_the_text_in_force(self):
+        v = self.read(dal="1-1-2026", al="2-10-2026")
+        assert v["state"] == "current"
+        assert v["valid_to"] == "2026-10-02"
+
+    def test_a_window_that_ended_yesterday_is_historical(self):
+        v = self.read(dal="1-1-2026", al="1-10-2026")
+        assert v["state"] == "historical"
+        assert v["valid_to"] == "2026-10-01"
+
+    def test_a_window_closed_long_ago_is_historical(self):
+        v = self.read(dal="25-12-2003", al="29-12-2007")
+        assert (v["state"], v["valid_to"]) == ("historical", "2007-12-29")
+
+    @pytest.mark.parametrize("requested,expected", [
+        ("2026-06-01", True),
+        ("2026-01-01", True),
+        ("2026-12-31", True),
+        ("2027-01-01", False),
+        ("2025-12-31", False),
+    ])
+    def test_the_request_is_still_judged_against_the_window_as_stated(self, requested, expected):
+        raw = synthetic(dal="1-1-2026", al="31-12-2026")
+        v = extract_validity(raw, article="7", requested_date=requested, today=self.TODAY)
+        assert v["state"] == "current"
+        assert v["request_in_window"] is expected
+
+    def test_an_abrogated_page_stays_abrogated_whatever_its_end(self):
+        content = '<div class="ins-akn art_abrogato-akn">((ARTICOLO ABROGATO DALLA L. 1 GENNAIO 2026, N. 1))</div>'
+        v = self.read(dal="1-1-2026", al="31-12-2026", content=content)
+        assert (v["state"], v["valid_to"]) == ("abrogated", "2026-12-31")
+
+    def test_a_not_yet_page_stays_not_yet_whatever_its_end(self):
+        v = self.read(al="31-12-2026", content="<span>ARTICOLO NON ANCORA ESISTENTE O VIGENTE</span>")
+        assert (v["state"], v["valid_to"]) == ("not_yet", "2026-12-31")
+
+    def test_without_a_day_given_today_is_the_clock_of_rome(self, monkeypatch):
+        monkeypatch.setattr(validity_module, "_today_in_rome", lambda: date(2026, 10, 2))
+        assert extract_validity(synthetic(dal="1-1-2026", al="2-10-2026"), article="7")["state"] == "current"
+        assert extract_validity(synthetic(dal="1-1-2026", al="1-10-2026"), article="7")["state"] == "historical"
+
+
 class TestCapturedPages:
     """Whole pages the repository already holds (August 2026)."""
 

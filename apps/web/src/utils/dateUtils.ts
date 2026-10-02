@@ -181,14 +181,30 @@ export function formatDateDashed(isoDate: string): string {
 /**
  * A day as a lawyer cites it: "29 dicembre 2007", and "1° ottobre 2026" for the
  * first of the month. `formatDateItalianLong` stays as it is (the rest of the
- * interface prints "1 ottobre"); a citation is the one place the ordinal is
- * expected.
+ * interface prints "1 ottobre"); citations and the version banners are the
+ * places the ordinal is expected.
  */
 export function formatDateForCitation(isoDate: string): string {
   const match = ISO_DAY.exec(isoDate || '');
   if (!match) return isoDate || '';
   const long = formatDateItalianLong(isoDate);
   return match[3] === '01' ? long.replace(/^1 /, '1° ') : long;
+}
+
+const ELIDED_PREPOSITION = { il: "l'", del: "dell'", dal: "dall'", al: "all'", nel: "nell'" } as const;
+
+/**
+ * A preposition and the date it governs, the way Italian writes them: the article or
+ * preposition elides before a day that starts with a vowel sound, which among the days of
+ * a month are 8 (otto) and 11 (undici): "dall'11 giugno 1970", "all'8 settembre 2014",
+ * "consultato l'8 ottobre 2026". The 1st ("dal 1° gennaio"), 18, 28 and 31 do not elide.
+ * `formattedDate` is the spelled-out date ("11 giugno 1970"); a string that does not start
+ * with a day gets the plain preposition.
+ */
+export function withPreposition(preposition: keyof typeof ELIDED_PREPOSITION, formattedDate: string): string {
+  return /^(8|11)(?!\d)/.test(formattedDate)
+    ? `${ELIDED_PREPOSITION[preposition]}${formattedDate}`
+    : `${preposition} ${formattedDate}`;
 }
 
 /** The ISO day `days` after `isoDate` (negative for before); the input unchanged when it is not a real day. */

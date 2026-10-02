@@ -66,6 +66,37 @@ describe('ReadingToolbar — the status', () => {
     });
 });
 
+describe('ReadingToolbar — it fits a 375 px screen', () => {
+    const WITH_CHIP_AND_ANNEX = {
+        versionChip: HISTORICAL_CHIP,
+        normaData: { tipo_atto: 'legge', data: '1990-08-07', numero_articolo: '1', allegato: '2' },
+    };
+
+    it('wraps instead of overflowing when a chip and the icons do not fit one row', () => {
+        const { container } = setup(WITH_CHIP_AND_ANNEX);
+        expect(container.firstElementChild).toHaveClass('flex-wrap');
+    });
+
+    it('lets the left cluster dissolve below md, so the chip takes a row of its own', () => {
+        const { container } = setup(WITH_CHIP_AND_ANNEX);
+        const cluster = screen.getByText('Allegato 2').parentElement!;
+        expect(cluster).toHaveClass('contents', 'md:flex');
+        expect(cluster.parentElement).toBe(container.firstElementChild);
+    });
+
+    it('pushes the mobile icons to the right edge of the row', () => {
+        const { container } = setup(WITH_CHIP_AND_ANNEX);
+        const mobile = container.querySelector('.md\\:hidden');
+        expect(mobile).not.toBeNull();
+        expect(mobile).toHaveClass('ml-auto');
+    });
+
+    it('hides the separator between the chip and the annex badge below md', () => {
+        setup(WITH_CHIP_AND_ANNEX);
+        expect(screen.getByText('|')).toHaveClass('hidden', 'md:inline');
+    });
+});
+
 describe('ReadingToolbar — a past text is a reading', () => {
     it('switches off the tools keyed by article, and says why in each tooltip', () => {
         setup({ lockedReason: READ_ONLY_REASON });

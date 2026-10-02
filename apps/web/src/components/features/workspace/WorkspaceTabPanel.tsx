@@ -14,6 +14,7 @@ import type { ArticleData } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useCompare } from '../../../hooks/useCompare';
 import { Z_INDEX_VALUES } from '../../../constants/zIndex';
+import { normaForDossier } from '../dossier/dossierUtils';
 
 interface WorkspaceTabPanelProps {
   tab: WorkspaceTab;
@@ -95,35 +96,14 @@ export function WorkspaceTabPanel({
       if (item.type === 'norma') {
         // Add each article from the norma block
         item.articles.forEach(article => {
-          const normaData = {
-            tipo_atto: item.norma.tipo_atto,
-            numero_atto: item.norma.numero_atto,
-            data: item.norma.data,
-            numero_articolo: article.norma_data.numero_articolo,
-            urn: item.norma.urn
-          };
-          addToDossier(dossierId, normaData, 'norma');
+          addToDossier(dossierId, normaForDossier(item.norma, article), 'norma');
         });
       } else if (item.type === 'loose-article') {
-        const normaData = {
-          tipo_atto: item.sourceNorma.tipo_atto,
-          numero_atto: item.sourceNorma.numero_atto,
-          data: item.sourceNorma.data,
-          numero_articolo: item.article.norma_data.numero_articolo,
-          urn: item.sourceNorma.urn
-        };
-        addToDossier(dossierId, normaData, 'norma');
+        addToDossier(dossierId, normaForDossier(item.sourceNorma, item.article), 'norma');
       } else if (item.type === 'collection') {
         // Add each article from the collection
         item.articles.forEach(({ article, sourceNorma }) => {
-          const normaData = {
-            tipo_atto: sourceNorma.tipo_atto,
-            numero_atto: sourceNorma.numero_atto,
-            data: sourceNorma.data,
-            numero_articolo: article.norma_data.numero_articolo,
-            urn: sourceNorma.urn
-          };
-          addToDossier(dossierId, normaData, 'norma');
+          addToDossier(dossierId, normaForDossier(sourceNorma, article), 'norma');
         });
       }
     });

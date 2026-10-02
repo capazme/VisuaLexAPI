@@ -1,5 +1,5 @@
 import type { ArticleData, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
-import { addDaysToIsoDate, formatDateDashed, formatDateForDisplay, formatDateItalianLong } from './dateUtils';
+import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, withPreposition } from './dateUtils';
 
 /**
  * What a reader is told about the version of the text on screen.
@@ -43,6 +43,16 @@ function asksForOriginal(version: unknown): boolean {
 export function requestIsHistorical(request: VersionRequest | null | undefined): boolean {
   if (!request) return false;
   return asksForOriginal(request.versione) || textOf(request.data_versione) !== undefined;
+}
+
+/**
+ * Which text a request asks for, as one string: two requests have the same key
+ * exactly when they ask for the same text. Read the way the table reads it
+ * (`requestIsHistorical`): case and whitespace do not matter, and a request with
+ * no version, or "vigente" with no day, is the text in force.
+ */
+export function versionKey(request: VersionRequest | null | undefined): string {
+  return `${textOf(request?.versione)?.toLowerCase() ?? 'vigente'}|${textOf(request?.data_versione) ?? ''}`;
 }
 
 /** `ArticleData.versionInfo` for a search: what was asked for, or nothing when the text in force was. */
@@ -161,15 +171,15 @@ function bannerFor(
     return {
       kind: 'not_yet',
       title: 'Articolo non ancora esistente',
-      body: `Questo articolo non esisteva${asOf ? ` al ${formatDateItalianLong(asOf)}` : ''}.`
-        + (firstDay ? ` È in vigore dal ${formatDateItalianLong(firstDay)}.` : ''),
+      body: `Questo articolo non esisteva${asOf ? ` ${withPreposition('al', formatDateForCitation(asOf))}` : ''}.`
+        + (firstDay ? ` È in vigore ${withPreposition('dal', formatDateForCitation(firstDay))}.` : ''),
       actions: firstDay ? ['open_next_day', 'pick_date'] : ['pick_date'],
       ...(firstDay ? { nextDay: firstDay } : {}),
     };
   }
   if (validity.state === 'historical') {
     const window = validity.valid_from && validity.valid_to
-      ? `In vigore dal ${formatDateItalianLong(validity.valid_from)} al ${formatDateItalianLong(validity.valid_to)}`
+      ? `In vigore ${withPreposition('dal', formatDateForCitation(validity.valid_from))} ${withPreposition('al', formatDateForCitation(validity.valid_to))}`
       : 'Testo di una versione passata';
     return {
       kind: 'historical',

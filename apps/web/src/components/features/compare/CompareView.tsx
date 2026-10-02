@@ -8,6 +8,7 @@ import { ArticleDiff } from './ArticleDiff';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
+import { versionTabSuffix } from '../../../utils/versionDisplay';
 import { SafeHTML } from '../../../utils/sanitize';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
@@ -22,6 +23,11 @@ function stripHtml(html: string): string {
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// A past text must not be listed, compared or diffed under the label of the text in force.
+function versionSuffixOf(article: ArticleData): string {
+  return versionTabSuffix({ version: article.norma_data.versione, versionDate: article.norma_data.data_versione });
 }
 
 // Available article item from tabs/history
@@ -82,7 +88,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
               data: item.norma.data,
               urn: item.norma.urn,
             },
-            label: `Art. ${article.norma_data.numero_articolo} - ${item.norma.tipo_atto}${item.norma.numero_atto ? ` n. ${item.norma.numero_atto}` : ''}`,
+            label: `Art. ${article.norma_data.numero_articolo} - ${item.norma.tipo_atto}${item.norma.numero_atto ? ` n. ${item.norma.numero_atto}` : ''}${versionSuffixOf(article)}`,
             source: 'tab',
             tabName: tab.label,
           });
@@ -92,7 +98,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
           id: `${tab.id}-${item.id}`,
           article: item.article,
           sourceNorma: item.sourceNorma,
-          label: `Art. ${item.article.norma_data.numero_articolo} - ${item.sourceNorma.tipo_atto}${item.sourceNorma.numero_atto ? ` n. ${item.sourceNorma.numero_atto}` : ''}`,
+          label: `Art. ${item.article.norma_data.numero_articolo} - ${item.sourceNorma.tipo_atto}${item.sourceNorma.numero_atto ? ` n. ${item.sourceNorma.numero_atto}` : ''}${versionSuffixOf(item.article)}`,
           source: 'tab',
           tabName: tab.label,
         });
@@ -102,7 +108,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
             id: `${tab.id}-${item.id}-${article.norma_data.numero_articolo}`,
             article,
             sourceNorma,
-            label: `Art. ${article.norma_data.numero_articolo} - ${sourceNorma.tipo_atto}${sourceNorma.numero_atto ? ` n. ${sourceNorma.numero_atto}` : ''}`,
+            label: `Art. ${article.norma_data.numero_articolo} - ${sourceNorma.tipo_atto}${sourceNorma.numero_atto ? ` n. ${sourceNorma.numero_atto}` : ''}${versionSuffixOf(article)}`,
             source: 'tab',
             tabName: tab.label,
           });

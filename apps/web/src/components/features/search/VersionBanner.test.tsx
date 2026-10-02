@@ -45,10 +45,48 @@ describe('VersionBanner — an article that did not exist yet', () => {
     it('stands where the text would be, with the way forward', () => {
         const onAction = vi.fn();
         render(<VersionBanner banner={bannerOf(NOT_YET, '2010-01-01')} onAction={onAction} variant="state" />);
-        expect(screen.getByText('Questo articolo non esisteva al 1 gennaio 2010. È in vigore dal 13 settembre 2014.')).toBeInTheDocument();
+        expect(screen.getByText('Questo articolo non esisteva al 1° gennaio 2010. È in vigore dal 13 settembre 2014.')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Vai al testo del 13 settembre 2014' }));
         fireEvent.click(screen.getByRole('button', { name: 'Scegli un’altra data' }));
         expect(onAction.mock.calls).toEqual([['open_next_day'], ['pick_date']]);
+    });
+});
+
+describe('VersionBanner — the way forward elides before the 11th', () => {
+    it("reads \"Vai al testo dell'11 settembre 2014\" and keeps \"del 13\" as it was", () => {
+        const elevenNext: ArticleValidity = { ...NOT_YET, valid_to: '2014-09-10' };
+        const { unmount } = render(<VersionBanner banner={bannerOf(elevenNext, '2010-01-01')} onAction={() => {}} variant="state" />);
+        expect(screen.getByRole('button', { name: "Vai al testo dell'11 settembre 2014" })).toBeInTheDocument();
+        unmount();
+        render(<VersionBanner banner={bannerOf(NOT_YET, '2010-01-01')} onAction={() => {}} variant="state" />);
+        expect(screen.getByRole('button', { name: 'Vai al testo del 13 settembre 2014' })).toBeInTheDocument();
+    });
+
+    it('writes the first of a month with its ordinal on the button too', () => {
+        const firstNext: ArticleValidity = { ...NOT_YET, valid_to: '2014-08-31' };
+        render(<VersionBanner banner={bannerOf(firstNext, '2010-01-01')} onAction={() => {}} variant="state" />);
+        expect(screen.getByRole('button', { name: 'Vai al testo del 1° settembre 2014' })).toBeInTheDocument();
+    });
+});
+
+describe('VersionBanner — touch targets and layout on a narrow screen', () => {
+    it('gives every action button a 44px target on mobile', () => {
+        render(<VersionBanner banner={bannerOf(NOT_YET, '2010-01-01')} onAction={() => {}} variant="state" />);
+        const buttons = screen.getAllByRole('button');
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const button of buttons) expect(button).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    });
+
+    it('stacks the icon above the text in the state variant', () => {
+        render(<VersionBanner banner={bannerOf(NOT_YET, '2010-01-01')} onAction={() => {}} variant="state" />);
+        const container = screen.getByRole('status');
+        expect(container).toHaveClass('flex-col', 'items-center');
+        expect(container).not.toHaveClass('justify-center');
+    });
+
+    it('keeps the icon beside the text in the banner variant', () => {
+        render(<VersionBanner banner={bannerOf(MIDDLE)} onAction={() => {}} />);
+        expect(screen.getByRole('status')).not.toHaveClass('flex-col');
     });
 });
 
