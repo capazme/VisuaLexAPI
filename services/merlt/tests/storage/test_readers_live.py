@@ -301,6 +301,38 @@ async def test_history_lists_the_events_and_the_status(graph):
     assert [await tool._get_current_status(urn) for urn in (ART1, ART2, ART3)] == ["vigente", "abrogato", "sostituito"]
 
 
+async def test_the_history_leaves_out_future_amendments_unless_asked(graph):
+    # Three amendments of one article: one in the past, one dated years ahead, one with no
+    # date at all. The future one is out by default and in with `include_future`; the undated
+    # one is never dropped. An act dated by `data_vigore` only is read the same way.
+    art = "urn:test:future-art"
+    await graph.query(
+        """
+        CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', testo: 'Un articolo.'})
+        CREATE (past:Norma {URN: 'urn:test:past', estremi: 'L. 1/2020', data_atto: '2020-01-01'})
+        CREATE (future:Norma {URN: 'urn:test:future', estremi: 'L. 9/2099', data_atto: '2099-01-01'})
+        CREATE (undated:Norma {URN: 'urn:test:undated', estremi: 'Atto senza data'})
+        CREATE (vigore:Norma {URN: 'urn:test:vigore', estremi: 'L. 8/2098', data_vigore: '2098-06-01'})
+        CREATE (past)-[:MODIFICA]->(a)
+        CREATE (future)-[:MODIFICA]->(a)
+        CREATE (undated)-[:INSERISCE]->(a)
+        CREATE (vigore)-[:SOSTITUISCE]->(a)
+        """,
+        {"art": art},
+    )
+    tool = HistoricalEvolutionTool(graph_db=graph)
+    default = await tool.execute(article_urn=art)
+    assert default.success, default.error
+    assert sorted(e["by_urn"] for e in default.data["timeline"]) == ["urn:test:past", "urn:test:undated"]
+    assert default.data["total_events"] == 2
+    everything = await tool.execute(article_urn=art, include_future=True)
+    assert sorted(e["by_urn"] for e in everything.data["timeline"]) == [
+        "urn:test:future", "urn:test:past", "urn:test:undated", "urn:test:vigore",
+    ]
+    no_future_replacement = await tool._get_timeline(art, False, ["sostituisce"])
+    assert no_future_replacement == []
+
+
 async def test_validity_finds_modifications_by_their_edges_without_a_count_property(graph):
     service = TemporalValidityService(graph_db=graph)
     results = {urn: await service.check_validity(urn) for urn in (ART1, ART2, ART3, ART5)}

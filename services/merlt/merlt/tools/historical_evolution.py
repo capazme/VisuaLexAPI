@@ -20,6 +20,7 @@ Esempio:
 """
 
 import structlog
+from datetime import date
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 
@@ -236,26 +237,32 @@ class HistoricalEvolutionTool(BaseTool):
             return []
         rel_types = "|".join(names)
 
-        # Date filter for future events
+        # An event is dated by its act (`data_atto`), else by its entry into force
+        # (`data_vigore`); the dates are ISO strings, so they compare as text. Without
+        # `include_future` an event dated after today is left out and an undated one is
+        # kept (it is not known to be in the future). Today is a parameter, and the first
+        # ten characters are compared so a date that carries a time still reads as a day.
+        params: Dict[str, Any] = {"urn": urn}
         date_filter = ""
         if not include_future:
-            # TODO: Filter by data_vigore < today
-            # For now, include all events
-            pass
+            date_filter = "WHERE event_date = '' OR left(event_date, 10) <= $today"
+            params["today"] = date.today().isoformat()
 
         cypher = f"""
             MATCH (norma {{URN: $urn}})<-[r:{rel_types}]-(modificante)
-            RETURN
+            WITH
                 type(r) AS event_type,
                 modificante.URN AS by_urn,
                 modificante.estremi AS by_estremi,
                 COALESCE(modificante.data_atto, modificante.data_vigore, '') AS event_date,
                 COALESCE(r.descrizione, '') AS description
+            {date_filter}
+            RETURN event_type, by_urn, by_estremi, event_date, description
             ORDER BY event_date ASC
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": urn})
+            results = await self.graph_db.ro_query(cypher, params)
 
             timeline = []
             for r in results:

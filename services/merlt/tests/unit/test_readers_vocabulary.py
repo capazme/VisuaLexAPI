@@ -291,6 +291,51 @@ async def test_the_history_reports_lowercase_events_from_the_graphs_names():
     assert [event["event"] for event in timeline] == ["modifica"]
 
 
+async def test_the_history_leaves_out_future_amendments_unless_asked():
+    # `include_future` was accepted and ignored: a norm's history listed an amendment that
+    # had not yet entered into force as if it had happened. Without the flag, an event dated
+    # after today is out and an undated one stays; today is a parameter, never Cypher text.
+    from datetime import date
+
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    today = SimpleNamespace(today=lambda: date(2026, 10, 2))
+    graph = _GraphRecorder()
+    with patch("merlt.tools.historical_evolution.date", today):
+        await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, False, None)
+    cypher, params, method = graph.cyphers[0], graph.params[0], graph.methods[0]
+    assert method == "ro_query"
+    assert params == {"urn": CC, "today": "2026-10-02"}
+    assert "$today" in cypher and "2026" not in cypher
+    # the filter reads the event's date as the query returns it, and an empty date passes
+    assert "WHERE event_date = '' OR left(event_date, 10) <= $today" in cypher
+    assert cypher.index("COALESCE(modificante.data_atto") < cypher.index("WHERE event_date")
+    assert cypher.index("WHERE event_date") < cypher.index("RETURN event_type")
+    assert "ORDER BY event_date ASC" in cypher
+
+
+async def test_the_history_with_include_future_is_not_filtered_by_date():
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _GraphRecorder()
+    await HistoricalEvolutionTool(graph_db=graph)._get_timeline(CC, True, None)
+    assert graph.params[0] == {"urn": CC}
+    assert "today" not in graph.cyphers[0] and "WHERE" not in graph.cyphers[0]
+    assert "<-[r:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]-" in graph.cyphers[0]
+    assert graph.methods == ["ro_query"]
+
+
+async def test_the_history_tool_passes_include_future_down_to_the_timeline():
+    from merlt.tools.historical_evolution import HistoricalEvolutionTool
+
+    graph = _GraphRecorder()
+    tool = HistoricalEvolutionTool(graph_db=graph)
+    await tool.execute(article_urn=CC)  # the default is no future
+    await tool.execute(article_urn=CC, include_future=True)
+    timeline_params = [p for c, p in zip(graph.cyphers, graph.params) if "RETURN event_type" in c]
+    assert "today" in timeline_params[0] and "today" not in timeline_params[1]
+
+
 async def test_textual_references_follow_the_graphs_relations():
     from merlt.tools.textual_reference import TextualReferenceTool
 
@@ -615,7 +660,9 @@ async def test_the_readers_start_from_the_graphs_key_not_from_a_marked_urn(marke
     service = TemporalValidityService(graph_db=graph)
     await service._query_norm_status(marked)
     await service._query_modifications(marked)
-    assert graph.params == [{"id": CC}, {"urn": CC}, {"urn": CC}, {"urn": CC}, {"urn": CC}, {"urn": CC}]
+    # the history's own timeline also carries `today` (the future filter): the key is what is pinned here
+    assert [p.get("id") or p["urn"] for p in graph.params] == [CC] * 6
+    assert set(graph.params[1]) == {"urn", "today"}
 
 
 async def test_a_validity_answer_keeps_the_urn_that_was_asked():
