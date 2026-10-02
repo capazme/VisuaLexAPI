@@ -51,6 +51,7 @@ async def test_a_civil_decision(monkeypatch):
     assert d.data_deposito and len(d.data_deposito) == 10  # ISO
     # recorded on 2026-10-02 while the source withheld the text: its notice is not the text
     assert d.testo == {}
+    assert d.testo_assente == "oscuramento"
     assert d.fonte["nome"].startswith("Corte di cassazione")
     get, post = calls[0], calls[1]
     assert get[0] == "GET" and post[0] == "POST"
@@ -137,11 +138,28 @@ def test_the_source_notice_is_never_the_text():
     d = to_decision({"numdec": "10787", "anno": "2024", "szdec": "3", "ocr": [notice],
                      "ocrdis": "P. Q. M."}, "civile")
     assert d.testo == {} and d.sezione == "3"
+    assert d.testo_assente == "oscuramento"
     quoted = "Motivi della decisione. " * 20 + "il ricorrente afferma che l'atto era in fase di oscuramento"
-    assert to_decision({"numdec": "1", "anno": "2024", "ocr": quoted}, "civile").testo == {
-        "motivazione": quoted}
+    long = to_decision({"numdec": "1", "anno": "2024", "ocr": quoted}, "civile")
+    assert long.testo == {"motivazione": quoted} and long.testo_assente is None
     split = {"numdec": "1", "anno": "2024", "ocr": ["La sentenza richiesta è in fase", "di  oscuramento"]}
     assert to_decision(split, "civile").testo == {}
+    assert to_decision(split, "civile").testo_assente == "oscuramento"
+
+
+def test_a_record_without_text_or_notice_gives_no_cause(monkeypatch):
+    warnings = []
+
+    class Log:
+        def warning(self, event, **fields):
+            warnings.append((event, fields))
+
+    monkeypatch.setattr(italgiure, "log", Log())
+    d = to_decision({"id": "snciv2024300001S", "numdec": "1", "anno": "2024", "szdec": "3"},
+                    "civile")
+    # never presented as the source's anonymisation: nothing said why
+    assert d.testo == {} and d.testo_assente is None
+    assert warnings == [("Italgiure record without text", {"id": "snciv2024300001S"})]
 
 
 @pytest.mark.live

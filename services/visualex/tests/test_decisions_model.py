@@ -96,3 +96,11 @@ def test_a_decision_survives_its_own_dict():
     assert Decision.from_dict(d.to_dict()) == d
     assert d.to_dict()["attributi"] == {"sezione": "3", "tipo": "ordinanza",
                                         "data_deposito": "2024-04-22"}
+
+
+def test_why_a_text_is_missing_travels_with_the_particulars():
+    d = Decision(identita=Identity("cassazione", 10787, 2024, "civile"), sezione="3",
+                 testo_assente="oscuramento", fonte={"nome": "f"})
+    assert Decision.from_dict(d.to_dict()) == d
+    assert d.to_dict()["attributi"]["testo_assente"] == "oscuramento"
+    assert d.to_dict()["testo"] == {}

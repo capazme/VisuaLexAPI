@@ -9,7 +9,9 @@ the lookup of one decision:
   source, which then leaves it at the end of the reasons).
 - a decision whose text the source withholds comes back with the source's own notice as its
   text ("La sentenza richiesta è in fase di oscuramento": personal data are being removed).
-  The notice is not the court's text: the decision is returned without one.
+  The notice is not the court's text: the decision is returned without one, and with
+  `testo_assente` "oscuramento". A record with neither a text nor the notice is returned
+  without a text and without a cause, and logged: the source said nothing about why.
 
 The archive is a moving window (in 2026 it starts in 2021); its start is read from the
 archive, never written here.
@@ -19,9 +21,13 @@ from __future__ import annotations
 import json
 import re
 
+import structlog
+
 from ...tools.tls import italgiure_ssl_context
 from .http import decisions_http_client, http_headers
 from .model import Decision, Identity
+
+log = structlog.get_logger()
 
 BASE = "https://www.italgiure.giustizia.it/sncass"
 SELECT = f"{BASE}/isapi/hc.dll/sn.solr/sn-collection/select?app.query"
@@ -65,13 +71,15 @@ def _iso(raw: str) -> str | None:
 def to_decision(doc: dict, archivio: str) -> Decision:
     motivazione = _text(doc.get("ocr")).strip()
     flat = " ".join(motivazione.lower().split())
+    testo_assente = None
     if len(flat) <= _WITHHELD_MAX and _WITHHELD in flat:
         testo: dict[str, str] = {}  # the source's notice, not the court's text
+        testo_assente = "oscuramento"
     else:
         testo = {key: value for key, value in (("motivazione", motivazione),
                                                 ("dispositivo", _text(doc.get("ocrdis")).strip()))
                  if value}
-    return Decision(
+    decision = Decision(
         identita=Identity("cassazione", int(_scalar(doc.get("numdec"))),
                           int(_scalar(doc.get("anno"))), archivio),
         sezione=_scalar(doc.get("szdec")).strip().upper() or None,
@@ -80,9 +88,15 @@ def to_decision(doc: dict, archivio: str) -> Decision:
         relatore=_scalar(doc.get("relatore")).strip() or None,
         presidente=_scalar(doc.get("presidente")).strip() or None,
         materia=_scalar(doc.get("materia")).strip() or None,
+        testo_assente=testo_assente,
         testo=testo,
         fonte=dict(SOURCE),
     )
+    if not testo and testo_assente is None:
+        # no text and no notice (a missing `ocr`, a renamed field): never presented as the
+        # source's anonymisation
+        log.warning("Italgiure record without text", id=_scalar(doc.get("id")))
+    return decision
 
 
 class ItalgiureReader:

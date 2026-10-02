@@ -161,7 +161,7 @@ async def test_found_and_absent_are_cached_per_archive_errors_are_not():
 
 async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
     withheld = Decision(identita=Identity("cassazione", 10787, 2024, "civile"), sezione="3",
-                        tipo="ordinanza", fonte={"nome": "f"})
+                        tipo="ordinanza", testo_assente="oscuramento", fonte={"nome": "f"})
     cache, italgiure = FakeCache(), FakeItalgiure([withheld])
     resolver = _resolver(italgiure, cache=cache)
     out = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
@@ -171,6 +171,9 @@ async def test_a_decision_without_its_text_says_so_and_is_kept_a_day():
     again = await resolver.resolve(ref(numero=10787, anno=2024, archivio="civile"))
     assert again.avvisi == [{"tipo": "testo_non_disponibile"}]
     assert italgiure.calls == [("civile", 10787, 2024)]
+    # read back from decisions_pending, it still says why the text is missing
+    assert again.decisione.testo_assente == "oscuramento"
+    assert again.to_dict()["attributi"]["testo_assente"] == "oscuramento"
 
 
 async def test_an_unreadable_archive_start_is_asked_again_on_the_next_miss():

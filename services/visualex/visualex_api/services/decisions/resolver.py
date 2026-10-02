@@ -3,8 +3,8 @@
 Lookups are cached per archive, and the answer is composed from them: caching a composed
 answer would hide a homonym deposited later in the other archive. Errors are never cached,
 and a source that cannot be reached is never reported as "not found". A decision found
-without its text (the source withholds it while personal data are removed) is kept for a day
-and says so in its notices.
+without its text is kept for a day and says so in its notices; why it has none travels in its
+attributes (`testo_assente`), and only when the source said so.
 """
 from __future__ import annotations
 
@@ -69,8 +69,9 @@ class Outcome:
 
 
 def _withheld(decision: Decision) -> list[dict[str, str]]:
-    """The notice for a decision whose text the source withholds: the page says so instead of
-    showing an empty text."""
+    """The notice for a decision that came without its text: the page says so instead of
+    showing an empty text, and reads why from `attributi.testo_assente`, set only when the
+    source said so."""
     return [] if decision.testo else [{"tipo": "testo_non_disponibile"}]
 
 
@@ -104,8 +105,9 @@ class Resolver:
         elif decision.testo:
             await self.found.set(key, decision.to_dict())
         else:
-            # found, but the source withholds the text (personal data being removed): kept
-            # for a day, not a month, so the text shows up once the source releases it
+            # found without its text (the source withholds it while personal data are
+            # removed, or the record lacks it): kept for a day, not a month, so the text shows
+            # up once the source releases it
             await self.pending.set(key, decision.to_dict())
         return decision
 

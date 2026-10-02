@@ -23,7 +23,7 @@ _NAMED = {"SU": "U", "U": "U", "UNITE": "U", "SEZIONIUNITE": "U", "SSUU": "U",
           "L": "L", "LAV": "L", "LAVORO": "L", "F": "F", "FER": "F", "FERIALE": "F"}
 _TRIBUTARIA = {"T", "TRIB", "TRIBUTARIA"}
 _ATTRIBUTES = ("sezione", "tipo", "data_deposito", "data_decisione", "ecli", "relatore",
-               "presidente", "materia")
+               "presidente", "materia", "testo_assente")
 
 
 @dataclass(frozen=True)
@@ -89,6 +89,8 @@ class Decision:
     relatore: str | None = None
     presidente: str | None = None
     materia: str | None = None
+    # why the source gives no text: "oscuramento" when it said so; None otherwise
+    testo_assente: str | None = None
     testo: dict[str, str] = field(default_factory=dict)  # epigrafe?, motivazione, dispositivo?
     fonte: dict[str, str] = field(default_factory=dict)  # nome, licenza?, url?
 
