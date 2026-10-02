@@ -35,6 +35,7 @@ from merlt.storage.graph import FalkorDBClient
 from merlt.storage.graph.entity_writer import normalize_entity_name, seed_twin_slugs
 from merlt.storage.graph.relation_endpoints import wrapped_norm_key
 from merlt.storage.graph.schema import (
+    BOOLEAN_PROPERTIES,
     GRAPH_INDEXES,
     LEGACY_REL,
     LEGACY_SOURCE_TYPE,
@@ -44,6 +45,7 @@ from merlt.storage.graph.schema import (
     Provenance,
     Rel,
     act_name_from_urn,
+    boolean_flag,
     canonical_urn,
     certezza_number,
     entity_label,
@@ -558,6 +560,39 @@ async def number_certezza(client, apply: bool, batch: int) -> dict[str, Any]:
     return {"converted": converted, "reported": reported}
 
 
+async def boolean_flags(client, apply: bool, batch: int, shaped: set[int]) -> dict[str, Any]:
+    """The flags the seed wrote as 'true'/'false' (`schema.BOOLEAN_PROPERTIES`) become
+    booleans: in Python the string 'false' is truthy, so art. 1284 c.c. read as abrogated.
+    A string that is no flag is reported and left as it is. A stub `unify_stubs` shaped has
+    its shape's properties only, so it is left alone, as by the other steps. The property
+    names come from the schema's set; the values go in as parameters."""
+    converted: dict[str, int] = {}
+    reported: list[dict[str, Any]] = []
+    ids = sorted(shaped)
+    for prop in BOOLEAN_PROPERTIES:
+        rows = await client.query(
+            f"MATCH (n) WHERE typeOf(n.{prop}) = 'String' AND NOT id(n) IN $shaped "
+            f"RETURN n.{prop} AS value, count(n) AS n",
+            {"shaped": ids},
+        )
+        for row in sorted(rows, key=lambda row: str(row["value"])):
+            flag = boolean_flag(row["value"])
+            if flag is None:
+                reported.append({"property": prop, "value": row["value"], "count": int(row["n"])})
+                continue
+            converted[prop] = converted.get(prop, 0) + int(row["n"])
+            while apply:
+                done = await _count(
+                    client,
+                    f"MATCH (n) WHERE n.{prop} = $old AND NOT id(n) IN $shaped "
+                    f"WITH n LIMIT {batch} SET n.{prop} = $new RETURN count(n) AS n",
+                    {"old": row["value"], "new": flag, "shaped": ids},
+                )
+                if not done:
+                    break
+    return {"converted": converted, "reported": reported}
+
+
 async def copy_text(client, apply: bool, batch: int) -> int:
     """`testo` on every article (spec §4.1); a live source's `text` moves to `testo`."""
     total = 0
@@ -749,6 +784,7 @@ async def migrate_graph(client, *, apply: bool, batch: int = 500, seed_keys: set
         "provenance": await stamp_provenance(client, apply, batch, seed_keys, shaped),
         "fonte": await normalize_fonti(client, apply, shaped),
         "certezza": await number_certezza(client, apply, batch),
+        "booleans": await boolean_flags(client, apply, batch, shaped),
         "testo": await copy_text(client, apply, batch),
         "stale_text": await drop_stale_text(client, apply),
         "fingerprint": await stamp_fingerprints(client, apply, batch),

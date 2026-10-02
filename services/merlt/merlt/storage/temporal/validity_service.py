@@ -28,7 +28,7 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
-from merlt.storage.graph.schema import canonical_urn
+from merlt.storage.graph.schema import boolean_flag, canonical_urn
 
 log = structlog.get_logger()
 
@@ -448,8 +448,9 @@ class TemporalValidityService:
                 checked_at=checked_at,
             )
 
-        # Extract node properties
-        is_abrogated = node_data.get("is_abrogated", False)
+        # Extract node properties. `abrogato` is a flag the seed writes as a string ('false'
+        # is truthy): only True or 'true' says abrogated.
+        is_abrogated = boolean_flag(node_data.get("is_abrogated")) is True
         mod_count = node_data.get("mod_count") or 0
         last_modified = node_data.get("last_modified")
 
@@ -463,6 +464,11 @@ class TemporalValidityService:
 
         # The ends that take effect after the reference date: reported, never the status
         pending = list(node_data.get("pending") or [])
+        # An ABROGA or SOSTITUISCE edge, in force or pending, decides: the undated `abrogato`
+        # flag counts only for a norm that has none (art. 1632 c.c. carries 'true' and an
+        # abrogation of 1971: as at 1960 it was in force).
+        if abr_urn or sost_urn or pending:
+            is_abrogated = False
 
         # Build recent modifications list
         recent_mods = []

@@ -338,3 +338,20 @@ def test_a_version_needs_a_date(date):
     # An empty date would give "<URL>!vig=": the marker of the live article, a broken key.
     with pytest.raises(ValueError):
         s.version_urn(CC, date)
+
+
+# Flags the seed wrote as strings ------------------------------------------------------
+
+
+@pytest.mark.parametrize("value, flag", [
+    (True, True), (False, False), ("true", True), ("false", False), (" TRUE ", True), ("False", False),
+    ("yes", None), ("1", None), (1, None), (0, None), (None, None), ("", None),
+])
+def test_a_flag_is_a_boolean_or_the_word_true_or_false(value, flag):
+    # In Python the string 'false' is truthy: read as a flag, it said the opposite.
+    assert s.boolean_flag(value) is flag
+
+
+def test_the_boolean_properties_are_the_seeds_flags_and_not_the_stub_flag():
+    # Found by scanning the seed for 'true'/'false' strings; is_stub is the stub shape's.
+    assert set(s.BOOLEAN_PROPERTIES) == {"abrogato", "community_validated", "is_versione_vigente", "multivigenza_enabled"}

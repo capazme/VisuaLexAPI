@@ -405,6 +405,35 @@ async def test_the_validity_check_reads_an_abrogation_from_the_day_it_takes_effe
         assert result.abrogating_norm is None
 
 
+@pytest.mark.parametrize("as_of, status, pending", [
+    ("1960-01-01", "vigente", ["abroga"]),
+    ("1972-01-01", "abrogato", []),
+    (None, "abrogato", []),
+])
+async def test_a_dated_abrogation_decides_over_the_seeds_string_flag(graph, as_of, status, pending):
+    # Art. 1632 c.c. as the seed has it: abrogato 'true', and an ABROGA dated 1971-02-22.
+    art = f"urn:test:art1632-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', abrogato: 'true', is_versione_vigente: 'true'}) "
+        "CREATE (act:Norma {URN: $act, estremi: 'L. 11/1971', tipo_documento: 'legge'}) "
+        "CREATE (act)-[:ABROGA {disposizione: 'art. 29, comma 2', data_efficacia: '1971-02-22', certezza: 1.0}]->(a)",
+        {"art": art, "act": art + "-act"},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert (result.status, [p["type"] for p in result.pending]) == (status, pending)
+
+
+async def test_the_seeds_string_false_is_not_an_abrogation(graph):
+    # Art. 1284 c.c. as the seed has it: abrogato 'false', and no ABROGA edge.
+    art = "urn:test:art1284"
+    await graph.query(
+        "CREATE (:Norma {URN: $art, tipo_documento: 'articolo', abrogato: 'false', is_versione_vigente: 'true'})",
+        {"art": art},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art)
+    assert (result.status, result.is_valid, result.pending) == ("vigente", True, [])
+
+
 async def test_an_inserted_comma_is_an_amendment(graph):
     history = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=ART6)
     assert history.success, history.error

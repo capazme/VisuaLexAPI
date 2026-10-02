@@ -632,6 +632,31 @@ async def test_an_abrogation_in_force_wins_over_a_pending_one_and_a_pending_repl
     assert [(p["type"], p["by_urn"]) for p in result.pending] == [("sostituisce", "act8"), ("abroga", "act9")]
 
 
+@pytest.mark.parametrize("flag, status", [
+    ("false", "vigente"), (False, "vigente"), ("forse", "vigente"), (None, "vigente"),
+    ("true", "abrogato"), (" TRUE ", "abrogato"), (True, "abrogato"),
+])
+async def test_the_abrogato_flag_counts_only_when_it_is_true(flag, status):
+    # The seed writes abrogato as a string, and 'false' is truthy in Python: art. 1284 c.c.
+    # (abrogato 'false', no ABROGA edge) read as abrogated.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [_validity_row(is_abrogated=flag)])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert result.status == status
+
+
+async def test_a_dated_abrogation_decides_over_the_abrogato_flag():
+    # Art. 1632 c.c.: abrogato 'true' and an ABROGA dated 1971-02-22. Checked as at 1960 it
+    # was in force, the abrogation still to come; the flag must not say otherwise.
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    row = _validity_row(is_abrogated="true", abr_urn="l11", abr_estremi="L. 11/1971", abr_date="1971-02-22", abr_pending=True)
+    graph = _GraphRecorder(answers=[("count(r)", [{"n": 0}]), ("AS is_abrogated", [row])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC, "1960-01-01")
+    assert (result.status, [p["type"] for p in result.pending]) == ("vigente", ["abroga"])
+
+
 def _knowledge_graph_on(graph):
     from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 

@@ -127,6 +127,25 @@ async def test_seed_nodes_carry_text_fingerprint_fonte_and_provenance():
     assert props["fonte"] == "Normattiva" and props["provenance"] == "seed"
 
 
+async def test_seed_nodes_carry_their_flags_as_booleans():
+    # The seed writes abrogato and its other flags as the strings 'true'/'false'; the
+    # stub flag is the stub shape's, and a value that is no flag stays as it is.
+    client = _Recorder()
+    flags = {"abrogato": "false", "is_versione_vigente": "true", "multivigenza_enabled": " TRUE ",
+             "community_validated": "true", "is_stub": "true", "vigenza": "vigente"}
+    nodes = [{"id": 1, "labels": ["Norma"], "properties": {"URN": "a", **flags}},
+             {"id": 2, "labels": ["Norma"], "properties": {"URN": "b", "abrogato": "forse"}}]
+    ids = {1: {"key": "a", "label": "Norma", "key_field": "URN"}, 2: {"key": "b", "label": "Norma", "key_field": "URN"}}
+    await seed._merge_nodes(client, nodes, ids)
+    first, second = (params["props"] for _, params in client.calls)
+    assert {key: first[key] for key in flags} == {
+        "abrogato": False, "is_versione_vigente": True, "multivigenza_enabled": True,
+        "community_validated": True, "is_stub": "true", "vigenza": "vigente",
+    }
+    assert second["abrogato"] == "forse"
+    assert nodes[0]["properties"]["abrogato"] == "false"  # the seed's own data is not rewritten
+
+
 def test_seed_source_types_are_canonical():
     assert seed._infer_source_type("ConcettoGiuridico") == "concetto"
     assert seed._infer_source_type("AttoGiudiziario") == "massima"

@@ -34,8 +34,8 @@ from typing import Any, Optional
 import structlog
 
 from merlt.storage.graph.schema import (
-    Provenance, Rel, canonical_rel, canonical_source_type, certezza_number, normalize_fonte, point_id,
-    text_fingerprint,
+    BOOLEAN_PROPERTIES, Provenance, Rel, boolean_flag, canonical_rel, canonical_source_type, certezza_number,
+    normalize_fonte, point_id, text_fingerprint,
 )
 
 log = structlog.get_logger()
@@ -260,6 +260,10 @@ async def _merge_nodes(client, nodes: list[dict], id_to_key: dict[int, dict]) ->
             props["testo"] = props["testo_vigente"]
         if entry["label"] == "Norma" and props.get("testo"):
             props["testo_sha256"] = text_fingerprint(props["testo"])
+        for flag in BOOLEAN_PROPERTIES:  # the seed writes them as 'true'/'false': 'false' is truthy
+            value = boolean_flag(props.get(flag))
+            if value is not None:
+                props[flag] = value
         props.setdefault("provenance", Provenance.SEED.value)  # a mechanical batch brings its own
         cypher = (
             f"MERGE (x:{entry['label']} {{{entry['key_field']}: $k}}) "

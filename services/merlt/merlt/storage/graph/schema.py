@@ -323,6 +323,24 @@ _FONTE_ALIASES: dict[str, Fonte] = {
 }
 
 
+# The node properties that are flags. The Libro IV seed writes them as the strings 'true' and
+# 'false' (abrogato 34, is_versione_vigente 34, multivigenza_enabled 34, community_validated 1;
+# no edge carries one), and in Python the string 'false' is truthy. `is_stub` is a flag too,
+# and the stub shape (`stub_properties`) owns it.
+BOOLEAN_PROPERTIES: tuple[str, ...] = ("abrogato", "community_validated", "is_versione_vigente", "multivigenza_enabled")
+
+
+def boolean_flag(value: Any) -> Optional[bool]:
+    """A flag as the boolean it means: a boolean as it is, the string 'true' or 'false' in
+    any case and with any surrounding space; None for anything else (a number included),
+    which is no flag."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return {"true": True, "false": False}.get(value.strip().lower())
+    return None
+
+
 def certezza_number(value: Any) -> Optional[float]:
     """A relation's `certezza` as the number it is written as, or None when it is none.
 

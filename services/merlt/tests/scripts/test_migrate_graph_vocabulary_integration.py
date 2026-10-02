@@ -50,7 +50,7 @@ NOTHING = {
     "relations_collapsed": {}, "relations": {}, "legacy_entity_labels": {}, "bare_keys": {"wrapped": 0, "reported": []},
     "versions": {"rekeyed": 0, "linked": 0, "reported": []}, "stubs": NO_STUBS, "provenance_reset": {}, "provenance_seed_outside_seed": 0, "estremi": 0,
     "provenance_legacy": {"remapped": {}, "unknown": {}}, "provenance": {}, "fonte": {},
-    "certezza": {"converted": 0, "reported": []}, "testo": 0, "stale_text": 0,
+    "certezza": {"converted": 0, "reported": []}, "booleans": {"converted": {}, "reported": []}, "testo": 0, "stale_text": 0,
     "fingerprint": 0, "entity_labels": {}, "entity_node_id": 0, "twins": NO_TWINS,
 }
 
@@ -535,3 +535,30 @@ async def test_an_empty_text_gets_no_fingerprint(graph):
     assert report["fingerprint"] == 1  # the fixture's article only
     assert await graph.query("MATCH (n:Norma {URN: $u}) RETURN n.testo_sha256 AS h", {"u": empty}) == [{"h": None}]
     assert (await _migrate(graph))["fingerprint"] == 0
+
+
+async def test_the_seeds_string_flags_become_booleans(graph):
+    # The seed writes abrogato, is_versione_vigente, multivigenza_enabled and
+    # community_validated as 'true'/'false', and 'false' is truthy in Python.
+    a1284, a1632 = CODE + "~art1284", CODE + "~art1632"
+    await graph.query(
+        "CREATE (:Norma {URN: $a, node_id: $a, tipo_documento: 'articolo', abrogato: 'false', is_versione_vigente: 'true', multivigenza_enabled: 'true'}), "
+        "(:Norma {URN: $b, node_id: $b, tipo_documento: 'articolo', abrogato: ' TRUE ', is_versione_vigente: true}), "
+        "(:Norma {URN: $c, node_id: $c, tipo_documento: 'articolo', abrogato: 'forse'}), "
+        "(:Entity:PrincipioGiuridico {id: 'principio:x', node_id: 'principio:x', community_validated: 'true'})",
+        {"a": a1284, "b": a1632, "c": CODE + "~art1633"},
+    )
+    dry = await mig.migrate_graph(graph, apply=False, batch=2, seed_keys=SEED_KEYS)
+    report = await _migrate(graph)
+    assert dry == report
+    assert report["booleans"] == {
+        "converted": {"abrogato": 2, "community_validated": 1, "is_versione_vigente": 1, "multivigenza_enabled": 1},
+        "reported": [{"property": "abrogato", "value": "forse", "count": 1}],
+    }
+    rows = await graph.query(
+        "MATCH (n) WHERE n.URN IN [$a, $b] RETURN n.URN AS u, n.abrogato AS ab, n.is_versione_vigente AS v, n.multivigenza_enabled AS m",
+        {"a": a1284, "b": a1632},
+    )
+    assert {row["u"]: (row["ab"], row["v"], row["m"]) for row in rows} == {a1284: (False, True, True), a1632: (True, True, None)}
+    assert await graph.query("MATCH (e:Entity {id: 'principio:x'}) RETURN e.community_validated AS c") == [{"c": True}]
+    assert (await _migrate(graph))["booleans"] == {"converted": {}, "reported": [{"property": "abrogato", "value": "forse", "count": 1}]}
