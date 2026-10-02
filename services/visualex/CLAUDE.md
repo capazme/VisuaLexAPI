@@ -154,11 +154,18 @@ POST unless noted, JSON bodies.
   numero, anno, archivio?, sezione?}` → `esito` trovata (identity, attributes, whole text,
   source) and ambigua 200, non_trovata 404 (with the reason and the archive's start),
   fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a fixed
-  body). Italgiure (TLS pinned, own client) and the Corte costituzionale open data (bundle
-  on disk). The Corte costituzionale's decisions link to the court's page; the Cassazione's
-  have no source link. Lookups cached per archive: found 30 days, absent 1 hour, a decision
-  found without its text 24 hours (with the notice `testo_non_disponibile`), errors never.
-  Design: docs/superpowers/specs/2026-10-01-sentenze-design.md
+  body). That is every answer the handler writes; the others carry no `esito`: the per-IP
+  rate limit's 429 `{"error": …}` and the login gate's 401/429 through the ingress (both
+  before the handler), and the framework's own 405 (a method other than POST or OPTIONS),
+  408 (a stalled body) and 413 (over 16 MB; 1 MB behind the ingress, whose own page
+  answers). Italgiure (TLS pinned, own client) and the Corte costituzionale open data
+  (bundle on disk; when its refresh fails, a year before the current one is read from the
+  copy on disk). The Corte costituzionale's decisions link to the court's page; the
+  Cassazione's have no source link. Lookups cached per archive: found 30 days, absent 1
+  hour, a decision found without its text 24 hours (with the notice
+  `testo_non_disponibile`; `attributi.testo_assente` says why only when the source did:
+  `oscuramento`), errors never. Expired entries are swept at start and every six hours
+  (`sweep_decision_caches`). Design: docs/superpowers/specs/2026-10-01-sentenze-design.md
 - `GET /fetch_alias_catalog` — the presets we ship plus the act names the
   resolver already understands. The only GET among these; a POST answers 405
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
@@ -182,7 +189,10 @@ Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
 input), `ResourceNotFoundError` → 404 (the article is not in the act),
 `RateLimitExceededError` → 429, everything else 500, except `/fetch_decision`,
-which answers every failure with `esito` and never with the exception's text.
+whose handler answers every failure with `esito` and never with the exception's text.
+What the handler does not write is not its own, on that route too: the per-IP rate
+limit's 429 `{"error": …}`, the login gate's 401/429 through the ingress, and the
+framework's own 405, 408 and 413 pages.
 Before, every failure was a 500 — and `stream_article_text` raised through to
 Quart and answered an HTML error page instead of NDJSON.
 
@@ -411,6 +421,13 @@ Breaking one of these breaks the product. Read before editing.
     notice in place of the text ("La sentenza richiesta è in fase di oscuramento": personal
     data being removed; about 6% of civil records and 33,000 penal ones, in every year,
     measured on 2026-10-02). `decisions/italgiure.py` returns such a decision with
-    `testo == {}`; the resolver keeps it 24 hours (`decisions_pending`), never 30 days, and
-    adds the notice `testo_non_disponibile`. Never pass the notice on as `motivazione`: the
-    page would show it as the court's reasons and a note could anchor to it.
+    `testo == {}` and `testo_assente == "oscuramento"`, which travels in `attributi` and
+    through the caches: the page reads why from it. A record with neither a text nor the
+    notice (a missing `ocr`, a renamed field) comes back with `testo == {}`, no
+    `testo_assente` and a logged warning: never present it as the source's anonymisation.
+    The resolver keeps a decision without its text 24 hours (`decisions_pending`), never 30
+    days, and adds the notice `testo_non_disponibile`. Never pass the notice on as
+    `motivazione`: the page would show it as the court's reasons and a note could anchor to
+    it. The decision caches hold whole texts, with whatever personal data the source left:
+    `sweep_decision_caches` deletes their expired entries at start and every six hours,
+    since the filesystem cache deletes one only when its key is read again.

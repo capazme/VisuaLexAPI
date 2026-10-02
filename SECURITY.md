@@ -49,10 +49,10 @@ open, not oversights:
   browser and never consults the allowlist. `POST /export_pdf` has its own,
   narrower guard (`is_allowed_pdf_urn`, Normattiva URNs only); the other two do
   not.
-- **Redirects.** The shared client checks the host of the URL it is given.
-  `aiohttp` follows redirects by default and the client does not re-check the
-  target, so an allowed host that answers with a 302 can move the request
-  somewhere unlisted.
+- **Redirects.** Every `ThrottledHttpClient` (the shared one and the
+  court-decision readers') checks the host of the URL it is given. `aiohttp`
+  follows redirects by default and none of them re-checks the target, so an
+  allowed host that answers with a 302 can move the request somewhere unlisted.
 
 If you are evaluating this server for client work, treat the table above as the
 list of sources it consults on its own initiative, and this section as the list

@@ -1049,10 +1049,16 @@ class NormaController:
             return self._error_response(exc, 'fetch_recitals')
 
     async def fetch_decision(self):
-        """One court decision by its reference (design 2026-10-01 §3). Always JSON with
-        `esito`: trovata and ambigua 200, non_trovata 404, fonte_non_raggiungibile 503,
-        richiesta_non_valida 400, errore_interno 500 (a bug: a fixed body). A source that
-        cannot be reached is never "non trovata"."""
+        """One court decision by its reference (design 2026-10-01 §3). Every answer this
+        handler writes is JSON with `esito`: trovata and ambigua 200, non_trovata 404,
+        fonte_non_raggiungibile 503, richiesta_non_valida 400, errore_interno 500 (a bug: a
+        fixed body). A source that cannot be reached is never "non trovata".
+
+        Answers this handler does not write are not: the per-IP rate limit (429
+        `{"error": …}`) and the login gate's 401 or 429, passed through by the ingress, come
+        before it; the framework answers with its own pages a method other than POST or
+        OPTIONS (405), a stalled body (408) and a body over 16 MB (413; 1 MB behind the
+        ingress, whose own page answers)."""
         try:
             body = await request.get_json(silent=True)
         except (RecursionError, UnicodeDecodeError):

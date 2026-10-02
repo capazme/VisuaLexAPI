@@ -258,7 +258,12 @@ Read one decision of the Corte di cassazione or of the Corte costituzionale from
 reference: the court, the number and the year a citation gives. The text comes back whole,
 never cut. Cassazione decisions come from Italgiure's public archive (SentenzeWeb), Corte
 costituzionale decisions from the court's open data. Behind the ingress the route needs a
-login like the other scraping routes, and a call costs two points of the user's quota.
+login like the other scraping routes, and a call costs two points of the user's quota,
+whatever it sends upstream. A Cassazione lookup sends a homepage `GET` and a Solr `POST` per
+query: a number below 10000 is queried in two forms, a reference without the archive queries
+both archives, and a miss adds the query for the archive's start (once a day per archive) and,
+for the penal archive, the next year's lookup. A Corte costituzionale call makes at most one
+download, shared by concurrent callers.
 Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
 
 **Request Body:**
@@ -281,9 +286,13 @@ Design: `docs/superpowers/specs/2026-10-01-sentenze-design.md`.
 }
 ```
 
-**Response:** always JSON with `esito`. Only the framework's own pages are not: a body over
-16 MB, or a method other than POST, gets the server's generic error page. Unlike the other
-endpoints, a failure is an `esito` body too, not `{"error": ...}`.
+**Response:** every answer the handler writes is JSON with `esito`. Unlike the other
+endpoints, a failure is an `esito` body too, not `{"error": ...}`. Answers the handler does
+not write are not: the per-IP rate limit answers 429 `{"error": ...}` and, behind the
+ingress, the login gate's 401 or 429 come back as the gate gives them, both before the
+handler runs; and the framework answers with its own error page a method other than POST or
+OPTIONS (405), a body that stalls (408) and a body over 16 MB (413; behind the ingress the
+limit is 1 MB, and the ingress's own page answers).
 
 | `esito` | Status | Content |
 |---------|--------|---------|
@@ -301,10 +310,16 @@ endpoints, a failure is an `esito` body too, not `{"error": ...}`.
 - `attributi`: the particulars the source has, and only those: `sezione`, `tipo` (sentenza,
   ordinanza, ordinanza interlocutoria, decreto), `data_deposito` and `data_decisione` (ISO
   dates; the second for the Corte costituzionale), `ecli` (Corte costituzionale), `relatore`,
-  `presidente`, `materia`.
+  `presidente`, `materia`; and `testo_assente`, why there is no text, present only when the
+  source said why: `oscuramento` (the source withholds the text while it removes personal
+  data).
 - `testo`: the blocks the source gives, each whole: `epigrafe` (Corte costituzionale),
   `motivazione`, `dispositivo` (a block the source leaves empty is absent). It is `{}` when
-  the source withholds the text (notice `testo_non_disponibile`).
+  the decision comes without its text (notice `testo_non_disponibile`). Most Corte
+  costituzionale ordinanze have no `motivazione`: measured on the 2001–today bundle, the
+  source's `testo` field is empty in 3,592 of 4,056 ordinanze (2001–2026), and in 3,579 of
+  them the "Ritenuto… / Considerato…" reasoning is inside `epigrafe`. The blocks are passed
+  on as the source gives them; how the page labels them is decided with the page.
 - `fonte`: `nome`; `licenza` (Corte costituzionale: CC BY-SA 3.0, credited wherever the text
   appears); `url` (Corte costituzionale only: the court's page for that decision, for the
   reader's browser, which this server never contacts). The Cassazione has no `url`.
@@ -367,7 +382,8 @@ and the magistrates' names are elided with `…`.
     "data_deposito": "2024-04-22",
     "relatore": "…",
     "presidente": "…",
-    "materia": "…"
+    "materia": "…",
+    "testo_assente": "oscuramento"
   },
   "testo": {},
   "fonte": {"nome": "Corte di cassazione — archivio pubblico SentenzeWeb (Italgiure)"},
@@ -389,7 +405,8 @@ and the magistrates' names are elided with `…`.
         "data_deposito": "2024-04-22",
         "relatore": "…",
         "presidente": "…",
-        "materia": "…"
+        "materia": "…",
+        "testo_assente": "oscuramento"
       }
     },
     {
@@ -441,7 +458,10 @@ body is fixed and carries no detail: that stays in the server's log:
 ```
 
 **`motivo`** of a `non_trovata`:
-- `inesistente`: the archive covers that year and holds no such number.
+- `inesistente`: the archive covers that year and holds no such number. For the Corte
+  costituzionale the open data can lag up to about 48 hours (the court regenerates them daily,
+  and the copy on disk is kept 24 hours): a decision deposited in the last two days may not be
+  there yet.
 - `fuori_archivio`: the year is before the start of Italgiure's public archive, a moving
   window; `archivio_dal`, when known, is the day it starts.
 - `anno_parziale`: the first year of that archive, which is only partly covered;
@@ -459,8 +479,10 @@ may be a different decision.
   (`archivio`, `sezione`).
 - `sezione_non_riconosciuta`: the section is in none of the accepted forms and was ignored
   (`citata`).
-- `testo_non_disponibile`: the source withholds the text while it removes personal data;
-  `testo` is `{}`. The source's own notice is never passed on as the text.
+- `testo_non_disponibile`: the decision comes without its text; `testo` is `{}`. The reason,
+  when the source gives one, is in `attributi.testo_assente`: `oscuramento` when the source
+  withholds the text while it removes personal data (its own notice is never passed on as
+  the text). Without it, the source said nothing about why.
 
 **Caches.** Each archive lookup is cached on its own and the answer is composed from them, so a
 homonym deposited later in the other archive is never hidden:
@@ -472,8 +494,12 @@ homonym deposited later in the other archive is never hidden:
 | found without its text | 24 hours |
 | error | never |
 
+Expired entries are deleted at start and every six hours, not only when their key is read
+again.
+
 A Corte costituzionale range bundle is kept on disk: 30 days for a closed range, 24 hours for
-the one that holds the current year.
+the one that holds the current year. When a refresh fails, a year before the current one is
+read from the copy on disk, however old; the current year never is (`fonte_non_raggiungibile`).
 
 **Status Codes:**
 - `200`: `trovata` or `ambigua`
@@ -861,13 +887,15 @@ interface BrocardiInfo {
 
 ## Error Responses
 
-All errors return JSON with a consistent structure, except `/fetch_decision`, which always answers with `esito` (see its section):
+Every error a handler gives is JSON with this structure, except `/fetch_decision`'s, which carry `esito` (see its section):
 
 ```json
 {
   "error": "Error message describing what went wrong"
 }
 ```
+
+Some answers are not a handler's: the per-IP rate limit answers 429 with the structure above on every route, `/fetch_decision` too, and behind the ingress the login gate's 401 or 429 come back as the gate gives them, both before the handler runs; the framework's own error pages answer a method a route does not take (405), a body that stalls (408) and a body over 16 MB (413; 1 MB behind the ingress, whose own page answers).
 
 **Common Error Codes:**
 
