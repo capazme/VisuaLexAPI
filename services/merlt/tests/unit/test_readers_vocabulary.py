@@ -782,6 +782,56 @@ async def test_last_modified_is_the_latest_amendment_in_force(latest, dated, nod
         assert "<-[r:MODIFICA|INSERISCE|ABROGA|SOSTITUISCE]-" in dated_cypher and "$as_of" not in dated_cypher
 
 
+async def test_recent_modifications_are_read_as_at_the_reference_date():
+    from datetime import date
+
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder()
+    service = TemporalValidityService(graph_db=graph)
+    with patch("merlt.storage.temporal.validity_service.date", SimpleNamespace(today=lambda: date(2026, 10, 2))):
+        await service._query_modifications(CC)
+    await service._query_modifications(CC, "1970-01-01")
+    assert graph.params == [{"urn": CC, "as_of": "2026-10-02"}, {"urn": CC, "as_of": "1970-01-01"}]
+    assert set(graph.methods) == {"ro_query"}
+    cypher = graph.cyphers[0]
+    assert "WHERE event_date = '' OR left(event_date, 10) <= $as_of" in cypher
+    assert "coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS event_date" in cypher
+    assert "1970" not in cypher and "2026" not in cypher
+
+
+def test_a_recent_modification_says_whether_it_is_dated():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    node = {"mod_count": 2}
+    modifications = [{"event_type": "MODIFICA", "by_urn": "a", "by_estremi": "L. 1/1980", "event_date": "1980-01-01"},
+                     {"event_type": "INSERISCE", "by_urn": "b", "by_estremi": "Atto", "event_date": ""}]
+    result = TemporalValidityService(graph_db=None)._build_validity_result(CC, node, modifications, None)
+    assert [(m["by_urn"], m["undated"]) for m in result.recent_modifications] == [("a", False), ("b", True)]
+
+
+@pytest.mark.parametrize("status, details, message", [
+    ("abrogato", {"date": "1971-02-22", "estremi": "L. 11/1971"}, "Norma abrogata il 1971-02-22 da L. 11/1971"),
+    ("abrogato", {"date": "", "estremi": ""}, "Norma abrogata (data e atto non indicati nei dati)"),
+    ("abrogato", {"date": "1971-02-22", "estremi": ""}, "Norma abrogata il 1971-02-22 (atto non indicato nei dati)"),
+    ("abrogato", {"date": "", "estremi": "L. 11/1971"}, "Norma abrogata da L. 11/1971 (data non indicata nei dati)"),
+    ("sostituito", {"date": "", "estremi": ""}, "Norma sostituita (data e atto non indicati nei dati)"),
+    ("sostituito", {"date": "2000-01-01", "estremi": "D.Lgs. 1/2000"}, "Norma sostituita il 2000-01-01 da D.Lgs. 1/2000"),
+])
+def test_an_end_without_its_date_or_act_says_so(status, details, message):
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    assert TemporalValidityService(graph_db=None)._format_warning(status, details) == message
+
+
+async def test_an_abrogation_by_the_flag_alone_leaves_no_gap_in_the_warning():
+    from merlt.storage.temporal.validity_service import TemporalValidityService
+
+    graph = _GraphRecorder(answers=[("count(*) AS n", [{"n": 0}]), ("AS is_abrogated", [_validity_row(is_abrogated="true")])])
+    result = await TemporalValidityService(graph_db=graph).check_validity(CC)
+    assert (result.status, result.warning_message) == ("abrogato", "Norma abrogata (data e atto non indicati nei dati)")
+
+
 def _knowledge_graph_on(graph):
     from merlt.core.legal_knowledge_graph import LegalKnowledgeGraph
 

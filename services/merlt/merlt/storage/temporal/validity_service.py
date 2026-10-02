@@ -248,7 +248,7 @@ class TemporalValidityService:
             elif node_data.get("last_modified") and await self._has_dated_amendments(key):
                 node_data["last_modified"] = None
             if node_data["mod_count"] > 0:
-                modifications = await self._query_modifications(key)
+                modifications = await self._query_modifications(key, reference)
 
         result = self._build_validity_result(urn, node_data, modifications, as_of_date)
 
@@ -473,26 +473,33 @@ class TemporalValidityService:
             log.debug("amendment_edges_exceed_n_modifiche", urn=urn, n_modifiche=events, edges=edges)
         return max(0, events - edges)
 
-    async def _query_modifications(self, urn: str) -> List[Dict[str, Any]]:
+    async def _query_modifications(self, urn: str, as_of: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Query Cypher per le modifiche recenti di una norma.
+        Query Cypher per le modifiche recenti di una norma, in vigore alla data di
+        riferimento `as_of` (a parameter; default today): an event dated after it is not
+        listed, an undated one is (marked `undated` by `_build_validity_result`).
 
         Returns:
             Lista di eventi di modifica ordinati per data DESC (max 5)
         """
         cypher = """
             MATCH (norma {URN: $urn})<-[r:MODIFICA|ABROGA|SOSTITUISCE|INSERISCE]-(modificante)
+            WITH r, modificante,
+                coalesce(r.data_efficacia, modificante.data_atto, modificante.data_vigore, '') AS event_date
+            WHERE event_date = '' OR left(event_date, 10) <= $as_of
             RETURN
                 type(r) AS event_type,
                 modificante.URN AS by_urn,
                 modificante.estremi AS by_estremi,
-                COALESCE(r.data_efficacia, modificante.data_atto, '') AS event_date
+                event_date
             ORDER BY event_date DESC
             LIMIT 5
         """
 
         try:
-            results = await self.graph_db.ro_query(cypher, {"urn": canonical_urn(urn)})
+            results = await self.graph_db.ro_query(
+                cypher, {"urn": canonical_urn(urn), "as_of": (as_of or date.today().isoformat())[:10]}
+            )
             return results
         except Exception as e:
             log.error("modifications_query_failed", urn=urn, error=str(e))
@@ -558,7 +565,8 @@ class TemporalValidityService:
                 "type": (mod.get("event_type") or "").lower(),
                 "by_urn": mod.get("by_urn", ""),
                 "by_estremi": mod.get("by_estremi", ""),
-                "date": mod.get("event_date", ""),
+                "date": mod.get("event_date") or "",
+                "undated": not mod.get("event_date"),
             }
             recent_mods.append(mod_entry)
 
@@ -671,15 +679,19 @@ class TemporalValidityService:
                 )
             return f"Norma modificata (ultima modifica: {date or 'data non disponibile'}) - verificare vigenza attuale"
 
-        if status == "abrogato":
-            date = details.get("date", "data non disponibile")
-            estremi = details.get("estremi", "norma non specificata")
-            return f"Norma abrogata il {date} da {estremi}"
-
-        if status == "sostituito":
-            date = details.get("date", "data non disponibile")
-            estremi = details.get("estremi", "norma non specificata")
-            return f"Norma sostituita il {date} da {estremi}"
+        if status in ("abrogato", "sostituito"):
+            # A norm the `abrogato` flag alone ends has neither date nor act: the message
+            # says what the data lacks, and leaves no gap.
+            verb = "Norma abrogata" if status == "abrogato" else "Norma sostituita"
+            date = details.get("date") or ""
+            estremi = details.get("estremi") or ""
+            if date and estremi:
+                return f"{verb} il {date} da {estremi}"
+            if date:
+                return f"{verb} il {date} (atto non indicato nei dati)"
+            if estremi:
+                return f"{verb} da {estremi} (data non indicata nei dati)"
+            return f"{verb} (data e atto non indicati nei dati)"
 
         return "Stato di vigenza non verificabile per questa norma"
 

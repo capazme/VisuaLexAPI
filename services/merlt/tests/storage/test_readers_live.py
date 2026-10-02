@@ -503,6 +503,23 @@ async def test_the_seeds_unrecorded_amendments_count_as_undated(graph, art, as_o
             assert "datata" not in result.warning_message
 
 
+@pytest.mark.parametrize("as_of, listed", [("1970-01-01", []), ("1990-01-01", ["1980-01-01"])])
+async def test_the_recent_modifications_are_those_in_force_at_the_date(graph, as_of, listed):
+    # n_modifiche 2 and one 1980 MODIFICA edge: one undated amendment the graph lacks, so the
+    # norm reads modified at both dates, and the list is read at each.
+    art = f"urn:test:recent-{as_of}"
+    await graph.query(
+        "CREATE (a:Norma {URN: $art, tipo_documento: 'articolo', n_modifiche: 2}) "
+        "CREATE (:Norma {URN: $act, estremi: 'L. 5/1980', tipo_documento: 'legge'})"
+        "-[:MODIFICA {data_efficacia: '1980-01-01', certezza: 1.0}]->(a)",
+        {"art": art, "act": art + "-act"},
+    )
+    result = await TemporalValidityService(graph_db=graph).check_validity(art, as_of)
+    assert result.status == "modificato"
+    assert [m["date"] for m in result.recent_modifications] == listed
+    assert all(m["undated"] is False for m in result.recent_modifications)
+
+
 async def test_an_inserted_comma_is_an_amendment(graph):
     history = await HistoricalEvolutionTool(graph_db=graph).execute(article_urn=ART6)
     assert history.success, history.error
