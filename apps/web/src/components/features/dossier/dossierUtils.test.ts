@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   searchParamsFromNorma, packItemContent, unpackItemContent,
   computeItemCounts, dossierRecency, dossierContainsArticle, normaForDossier,
+  computeNormaGroups, searchParamsFromGroup, dossierItemPdfTitle,
 } from './dossierUtils';
+import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
 
 const norma: NormaVisitata = {
@@ -112,6 +114,19 @@ describe('dossierContainsArticle', () => {
     expect(dossierContainsArticle(fromServer, { ...norma })).toBe(true);
     expect(dossierContainsArticle(fromServer, { ...norma, versione: 'vigente', data_versione: '2007-12-29' })).toBe(false);
   });
+  it('reads the original text and the text in force the way the table does', () => {
+    const original = dossier([item({ data: { ...norma, versione: ' Originale ' } })]);
+    expect(dossierContainsArticle(original, { ...norma, versione: 'originale' })).toBe(true);
+    const withDay = dossier([item({ data: { ...norma, versione: 'vigente', data_versione: ' 2007-12-29 ' } })]);
+    expect(dossierContainsArticle(withDay, { ...norma, versione: 'vigente', data_versione: '2007-12-29' })).toBe(true);
+    expect(dossierContainsArticle(withDay, { ...norma, versione: 'vigente' })).toBe(false);
+  });
+  it('finds the item the window header built, asked with the article\'s own norma_data', () => {
+    const block = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', urn: 'urn:x' };
+    const own: NormaVisitata = { ...norma, numero_articolo: '1284', allegato: '2', versione: 'vigente', data_versione: '2007-12-29' };
+    const built = normaForDossier(block, { article_text: 't', norma_data: own });
+    expect(dossierContainsArticle(dossier([item({ data: built })]), own)).toBe(true);
+  });
 });
 
 describe('normaForDossier', () => {
@@ -138,10 +153,86 @@ describe('normaForDossier', () => {
       .not.toHaveProperty('data_versione');
   });
 
+  it('carries the annex of the article: the key and the id of the item must be the tab\'s', () => {
+    const own = { ...norma, numero_articolo: '1284', allegato: '2' };
+    const built = normaForDossier(block, { article_text: 't', norma_data: own });
+    expect(built).toMatchObject({ allegato: '2' });
+    expect(buildItemKey(built)).toBe(buildItemKey(own));
+  });
+
+  it('gives no annex key to an article without one', () => {
+    expect(normaForDossier(block, article())).not.toHaveProperty('allegato');
+  });
+
   it('reopens the same version it stored', () => {
     const stored = normaForDossier(block, article({ versione: 'vigente', data_versione: '2007-12-29' }));
     expect(searchParamsFromNorma(stored)).toMatchObject({
       article: '1284', version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false,
     });
+  });
+});
+
+describe('computeNormaGroups — versions', () => {
+  const n = (over: Partial<NormaVisitata>): DossierItem => item({ id: `i-${Math.random()}`, data: { ...norma, numero_articolo: '1284', ...over } });
+
+  it('makes a group of its own of a version that is not the text in force, not "1284,1284"', () => {
+    const groups = computeNormaGroups([n({}), n({ versione: 'vigente', data_versione: '2007-12-29' })]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.articles)).toEqual([['1284'], ['1284']]);
+    expect(groups[0]).toMatchObject({ versione: '', data_versione: '' });
+    expect(groups[1]).toMatchObject({ versione: 'vigente', data_versione: '2007-12-29' });
+  });
+
+  it('keeps two articles of one act in one version in one group (the control)', () => {
+    const groups = computeNormaGroups([n({}), n({ numero_articolo: '1285' })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].articles).toEqual(['1284', '1285']);
+  });
+
+  it('groups items saved before versions were kept with the text in force', () => {
+    const groups = computeNormaGroups([n({}), n({ numero_articolo: '1285', versione: 'vigente', data_versione: '' })]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].articles).toEqual(['1284', '1285']);
+  });
+});
+
+describe('searchParamsFromGroup', () => {
+  const group = (over: Partial<ReturnType<typeof computeNormaGroups>[number]> = {}) => ({
+    key: 'k', tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16',
+    articles: ['1284', '1285'], versione: '', data_versione: '', ...over,
+  });
+
+  it('asks for the text in force with Brocardi, as the dossier always did', () => {
+    expect(searchParamsFromGroup(group())).toEqual({
+      act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284,1285',
+      version: 'vigente', version_date: '', show_brocardi_info: true,
+    });
+  });
+
+  it('asks for the past text a group holds, without Brocardi', () => {
+    expect(searchParamsFromGroup(group({ versione: 'vigente', data_versione: '2007-12-29' }))).toMatchObject({
+      version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false,
+    });
+    expect(searchParamsFromGroup(group({ versione: 'originale' }))).toMatchObject({
+      version: 'originale', version_date: '', show_brocardi_info: false,
+    });
+  });
+});
+
+describe('dossierItemPdfTitle', () => {
+  it('keeps the title of the text in force byte for byte', () => {
+    expect(dossierItemPdfTitle(item({}), 0)).toBe('1. codice civile n. 262 · Art. 2043');
+    expect(dossierItemPdfTitle(item({ data: { ...norma, numero_atto: '' } }), 2)).toBe('3. codice civile · Art. 2043');
+  });
+  it('keeps the title of a note', () => {
+    expect(dossierItemPdfTitle({ id: 'n1', type: 'note', data: 'appunto', addedAt: '2026-08-01' } as DossierItem, 1)).toBe('2. Nota personale');
+  });
+  it('says which day a past item holds', () => {
+    expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'vigente', data_versione: '2007-12-29' } }), 0))
+      .toBe('1. codice civile n. 262 · Art. 2043 · Testo al 29/12/2007');
+  });
+  it('says it is the original text', () => {
+    expect(dossierItemPdfTitle(item({ data: { ...norma, versione: 'originale' } }), 0))
+      .toBe('1. codice civile n. 262 · Art. 2043 · Testo originale');
   });
 });

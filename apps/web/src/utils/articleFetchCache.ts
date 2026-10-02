@@ -1,5 +1,6 @@
 import type { ArticleData, NormaVisitata } from '../types';
 import { buildItemKey } from './normaKeys';
+import { versionKey } from './versionDisplay';
 import { legalFetch } from '../services/legalFetch';
 
 // Session-only cache: deliberately NOT persisted and NOT in the Zustand store
@@ -21,7 +22,9 @@ function release(): void { active--; waiters.shift()?.(); }
 export function clearArticleCache(): void { cache.clear(); inFlight.clear(); }
 
 export function fetchArticleForNorma(norma: NormaVisitata): Promise<ArticleData> {
-  const key = buildItemKey(norma);
+  // The item key has no version by contract (notes and highlights are keyed on
+  // it), but two versions of one article are two different texts.
+  const key = `${buildItemKey(norma)}|${versionKey(norma)}`;
   const cached = cache.get(key);
   if (cached) return Promise.resolve(cached);
   const pending = inFlight.get(key);

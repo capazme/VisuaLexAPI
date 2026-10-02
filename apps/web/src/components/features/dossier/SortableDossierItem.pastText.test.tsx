@@ -31,6 +31,16 @@ describe('SortableDossierItem — a past text', () => {
     expect(screen.getByText('Testo al 29/12/2007')).toBeInTheDocument();
   });
 
+  it('names the version in the row\'s accessible name, so two versions of one article read differently', () => {
+    renderRow(item({ versione: 'vigente', data_versione: '2007-12-29' }));
+    expect(screen.getByLabelText(/^Espandi codice civile 262 articolo 1284, testo al 29\/12\/2007$/)).toBeInTheDocument();
+  });
+
+  it('leaves the accessible name of the text in force as it was', () => {
+    renderRow(item({}));
+    expect(screen.getByLabelText('Espandi codice civile 262 articolo 1284')).toBeInTheDocument();
+  });
+
   it('says it holds the original text', () => {
     renderRow(item({ versione: 'originale' }));
     expect(screen.getByText('Testo originale')).toBeInTheDocument();

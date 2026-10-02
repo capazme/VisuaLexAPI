@@ -42,7 +42,10 @@ import { EmptyState } from '../../ui/EmptyState';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import type { Dossier, DossierItem } from '../../../types';
 import { SortableDossierItem } from './SortableDossierItem';
-import { formatTimestampLong, computeNormaGroups, searchParamsFromNorma, type NormaGroup } from './dossierUtils';
+import {
+  formatTimestampLong, computeNormaGroups, searchParamsFromNorma, searchParamsFromGroup, dossierItemPdfTitle, type NormaGroup,
+} from './dossierUtils';
+import { requestIsHistorical, versionTabSuffix } from '../../../utils/versionDisplay';
 import { EditDossierModal } from './EditDossierModal';
 import { MoveToDossierModal } from './MoveToDossierModal';
 import { TreeNavigatorModal } from './TreeNavigatorModal';
@@ -221,20 +224,17 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   // into pre-existing custom tabs with the same label (e.g. orphans from past
   // sessions, workspaceTabs is persisted in localStorage).
   const openGroupOnDashboard = (group: NormaGroup) => {
-    const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
+    const tabLabel = tabLabelForGroup(group);
+    const tabId = addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true });
     navigate('/');
-    triggerSearch({
-      act_type: group.tipo_atto,
-      act_number: group.numero_atto,
-      date: group.data,
-      article: group.articles.join(','),
-      version: 'vigente',
-      version_date: '',
-      show_brocardi_info: true,
-      tabLabel: dossier.title,
-      targetTabId: tabId,
-    });
+    triggerSearch({ ...searchParamsFromGroup(group), tabLabel, targetTabId: tabId });
   };
+
+  // A group asking for a past text opens in a tab of its own, named as the
+  // "Testo alla data" dialog's tabs are: it must not sit among the texts in force.
+  const tabLabelForGroup = (group: NormaGroup) => requestIsHistorical(group)
+    ? `${dossier.title}${versionTabSuffix({ version: group.versione, versionDate: group.data_versione })}`
+    : dossier.title;
 
   // Queue one search per norma-group. We pre-create an empty custom tab and
   // pass its id as `targetTabId` in every params — this avoids any label-match
@@ -242,17 +242,15 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
   const openAllGroupsOnDashboard = () => {
     if (normaGroups.length === 0) return;
     const tabId = addWorkspaceTab(dossier.title, undefined, undefined, { isCustom: true });
-    const paramsList = normaGroups.map((g) => ({
-      act_type: g.tipo_atto,
-      act_number: g.numero_atto,
-      date: g.data,
-      article: g.articles.join(','),
-      version: 'vigente' as const,
-      version_date: '',
-      show_brocardi_info: true,
-      tabLabel: dossier.title,
-      targetTabId: tabId,
-    }));
+    const paramsList = normaGroups.map((g) => {
+      if (!requestIsHistorical(g)) return { ...searchParamsFromGroup(g), tabLabel: dossier.title, targetTabId: tabId };
+      const tabLabel = tabLabelForGroup(g);
+      return {
+        ...searchParamsFromGroup(g),
+        tabLabel,
+        targetTabId: addWorkspaceTab(tabLabel, undefined, undefined, { isCustom: true }),
+      };
+    });
     navigate('/');
     triggerMultiSearch(paramsList);
   };
@@ -374,9 +372,7 @@ export function DossierDetailView({ dossier, onBack, showToast }: Props) {
     y += 22;
 
     dossier.items.forEach((item, idx) => {
-      const title = item.type === 'norma'
-        ? `${idx + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
-        : `${idx + 1}. Nota personale`;
+      const title = dossierItemPdfTitle(item, idx);
       ensureSpace(32);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');

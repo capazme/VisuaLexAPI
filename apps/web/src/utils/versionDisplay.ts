@@ -45,6 +45,16 @@ export function requestIsHistorical(request: VersionRequest | null | undefined):
   return asksForOriginal(request.versione) || textOf(request.data_versione) !== undefined;
 }
 
+/**
+ * Which text a request asks for, as one string: two requests have the same key
+ * exactly when they ask for the same text. Read the way the table reads it
+ * (`requestIsHistorical`): case and whitespace do not matter, and a request with
+ * no version, or "vigente" with no day, is the text in force.
+ */
+export function versionKey(request: VersionRequest | null | undefined): string {
+  return `${textOf(request?.versione)?.toLowerCase() ?? 'vigente'}|${textOf(request?.data_versione) ?? ''}`;
+}
+
 /** `ArticleData.versionInfo` for a search: what was asked for, or nothing when the text in force was. */
 export function deriveVersionInfo(
   params: { version?: SearchParams['version']; version_date?: string },

@@ -57,12 +57,15 @@ export function SortableDossierItem({
   const isImportant = item.status === 'important';
 
   const expandVerb = isExpanded ? 'Comprimi' : 'Espandi';
-  const rowLabel = item.type === 'norma'
-    ? `${expandVerb} ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
-    : `${expandVerb} nota`;
-  const regionId = `dossier-item-content-${item.id}`;
   // "Testo al 29/12/2007": a row that holds a past text says so.
   const historicalLabel = item.type === 'norma' ? historicalItemLabel(item.data) : null;
+  // The accessible name replaces the row's content, so the version has to be in it
+  // (two versions of one article must not read alike).
+  const rowLabel = item.type === 'norma'
+    ? `${expandVerb} ${item.data.tipo_atto}${item.data.numero_atto ? ` ${item.data.numero_atto}` : ''} articolo ${item.data.numero_articolo}`
+      + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '')
+    : `${expandVerb} nota`;
+  const regionId = `dossier-item-content-${item.id}`;
 
   return (
     // Plain container: the expand affordance is the header sub-div below.

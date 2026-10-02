@@ -9,6 +9,7 @@ import {
   NOT_YET_REASON,
   requestIsHistorical,
   UNRELIABLE_REASON,
+  versionKey,
   versionTabSuffix,
 } from './versionDisplay';
 
@@ -314,5 +315,33 @@ describe('a day written the way a shared link may carry it ("12 ottobre 2007")',
   it('is still told in the banner of an article that did not exist yet', () => {
     expect(describeVersion(NOT_YET, { versione: 'vigente', data_versione: '12 ottobre 2007' }).banner?.body)
       .toBe('Questo articolo non esisteva al 12 ottobre 2007. È in vigore dal 13 settembre 2014.');
+  });
+});
+
+describe('versionKey', () => {
+  it('reads the original text the way the table does: case and whitespace do not matter', () => {
+    expect(versionKey({ versione: ' Originale ' })).toBe(versionKey({ versione: 'originale' }));
+  });
+  it('gives one key to every way of saying "the text in force"', () => {
+    const inForce = versionKey({ versione: 'vigente', data_versione: '' });
+    expect(versionKey({})).toBe(inForce);
+    expect(versionKey(null)).toBe(inForce);
+    expect(versionKey(undefined)).toBe(inForce);
+    expect(versionKey({ versione: null, data_versione: null })).toBe(inForce);
+    expect(versionKey({ versione: '' })).toBe(inForce);
+    expect(versionKey({ versione: '  ', data_versione: ' ' })).toBe(inForce);
+    expect(versionKey({ versione: 'vigente' })).toBe(inForce);
+  });
+  it('tells a day from the text in force, and two days from each other', () => {
+    expect(versionKey({ versione: 'vigente', data_versione: '2007-12-29' })).not.toBe(versionKey({ versione: 'vigente' }));
+    expect(versionKey({ versione: 'vigente', data_versione: '2007-12-29' }))
+      .not.toBe(versionKey({ versione: 'vigente', data_versione: '2015-01-01' }));
+  });
+  it('ignores the whitespace around a day', () => {
+    expect(versionKey({ versione: 'vigente', data_versione: ' 2007-12-29 ' }))
+      .toBe(versionKey({ versione: 'vigente', data_versione: '2007-12-29' }));
+  });
+  it('tells the original text from the text in force', () => {
+    expect(versionKey({ versione: 'originale' })).not.toBe(versionKey({ versione: 'vigente' }));
   });
 });

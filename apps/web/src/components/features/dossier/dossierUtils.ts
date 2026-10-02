@@ -1,7 +1,7 @@
 import { formatDateItalianLong } from '../../../utils/dateUtils';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
-import { requestIsHistorical } from '../../../utils/versionDisplay';
+import { historicalItemLabel, requestIsHistorical, versionKey } from '../../../utils/versionDisplay';
 import type { ArticleData, Dossier, DossierItem, Norma, NormaVisitata, SearchParams } from '../../../types';
 
 // Legacy 4-value status union kept for data + type compat with older dossier
@@ -20,7 +20,8 @@ export function formatTimestampLong(ts: string | number | undefined | null): str
   return formatDateItalianLong(d.toISOString().slice(0, 10));
 }
 
-// One group = one norm (tipo + numero + data) and all its articles in the dossier.
+// One group = one norm (tipo + numero + data) in one version, and all its articles in the dossier.
+// Two versions of one article are two groups, never "1284,1284".
 // Used both by the detail view ("Apri tutti su Dashboard") and the list view
 // ("apri rapido dalla card"). `triggerSearch` in the store overwrites any
 // previous search, so the consuming UI must pick a single group to open at
@@ -31,6 +32,9 @@ export interface NormaGroup {
   numero_atto: string;
   data: string;
   articles: string[];
+  // The stored version of the group's articles ('' when absent): what a search for the group must ask.
+  versione: string;
+  data_versione: string;
 }
 
 export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
@@ -38,7 +42,7 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   items
     .filter((i) => i.type === 'norma')
     .forEach((item) => {
-      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}`;
+      const key = `${item.data.tipo_atto}|${item.data.numero_atto || ''}|${item.data.data || ''}|${versionKey(item.data)}`;
       const existing = groups.get(key);
       if (existing) {
         existing.articles.push(item.data.numero_articolo);
@@ -49,10 +53,35 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
           numero_atto: item.data.numero_atto || '',
           data: item.data.data || '',
           articles: [item.data.numero_articolo],
+          versione: item.data.versione || '',
+          data_versione: item.data.data_versione || '',
         });
       }
     });
   return Array.from(groups.values());
+}
+
+// The search that opens a group on the dashboard: the version the group holds,
+// and Brocardi only for the text in force (its commentary carries no date).
+export function searchParamsFromGroup(group: NormaGroup): SearchParams {
+  return {
+    act_type: group.tipo_atto,
+    act_number: group.numero_atto,
+    date: group.data,
+    article: group.articles.join(','),
+    version: (group.versione as SearchParams['version']) || 'vigente',
+    version_date: group.data_versione || '',
+    show_brocardi_info: !requestIsHistorical({ versione: group.versione, data_versione: group.data_versione }),
+  };
+}
+
+// The heading of an item in the dossier's PDF: a past text says so, or the page
+// would pass it off as the text in force.
+export function dossierItemPdfTitle(item: DossierItem, index: number): string {
+  if (item.type !== 'norma') return `${index + 1}. Nota personale`;
+  const label = historicalItemLabel(item.data);
+  return `${index + 1}. ${item.data.tipo_atto}${item.data.numero_atto ? ` n. ${item.data.numero_atto}` : ''} · Art. ${item.data.numero_articolo}`
+    + (label ? ` · ${label}` : '');
 }
 
 // Map a stored NormaVisitata back to the SearchParams shape triggerSearch()
@@ -84,6 +113,8 @@ export function normaForDossier(norma: Norma, article: ArticleData): NormaVisita
     data: norma.data,
     numero_articolo: article.norma_data.numero_articolo,
     urn: norma.urn,
+    // The annex is part of the item's key and id: without it the item is not the article the tab shows.
+    ...(article.norma_data.allegato ? { allegato: article.norma_data.allegato } : {}),
     ...(versione ? { versione } : {}),
     ...(data_versione ? { data_versione } : {}),
   };
@@ -130,8 +161,7 @@ export function dossierRecency(d: Dossier): number {
 // An item saved before versions were kept has no version fields and is the text
 // in force, as is one that says "vigente" with no date.
 function sameVersion(a: NormaVisitata, b: NormaVisitata): boolean {
-  return (a.versione || 'vigente') === (b.versione || 'vigente')
-    && (a.data_versione || '') === (b.data_versione || '');
+  return versionKey(a) === versionKey(b);
 }
 
 // Whether a dossier already holds the given article, matching on act
