@@ -208,8 +208,9 @@ page, no `validity`: the field is simply absent. No network, no change to the ex
    punctuation, and nothing remains. A partial notice ("COMMA ABROGATO…") leaves text behind
    and is *not* this state. `valid_from` is the day the abrogation takes effect; `valid_to` may
    be set if the article came back later.
-3. `current` — an open-ended window (`al` absent).
-4. `historical` — a closed window.
+3. `current` — an open-ended window (`al` absent), or one that ends today or later (today in
+   Rome): on the last day of its window the text is still the one in force.
+4. `historical` — a window that ended before today (in Rome).
 
 *Read cheaply.* The window, the version link and the act line come from targeted regexes over
 the raw string (the page is up to 2.6 MB; the scraper already parses it once and it should not
@@ -461,7 +462,9 @@ Recorded, not done here:
 - Decisions taken in review, beyond what this document says: a version that does not contain the
   asked day is not copied, exported or saved; the export of a past text is off until its header
   carries the citation; a repealed article is cited "abrogato dal …"; an act of the Union is
-  never cited as a text at a date; a historical version reached with no day is cited by its window.
+  never cited as a text at a date; a historical version reached with no day is cited by its window;
+  a window that ends today or later is `current` (§5.1: the first rule called every closed window
+  `historical`, which labelled the text in force as past on the last day of its window).
 - The graph side rail (`article_sidebar`) still describes the current article on a past text.
 
 ## 9. The Massimario panel on the article page

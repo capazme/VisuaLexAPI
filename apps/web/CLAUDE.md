@@ -333,8 +333,8 @@ Duplicating any of these is a defect, not a shortcut.
   it (gotcha 32).
 - `utils/citation.ts` — `formatNormCitation` (null when there is nothing honest
   to cite: the text in force with no day, an act of the Union, an article that did
-  not exist, a version that does not contain the day) and `withCitation`; the
-  wording is the golden file's.
+  not exist, a version that does not contain the day, a repealed article with no
+  repeal day stated) and `withCitation`; the wording is the golden file's.
 - `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
   then number, "679/2016" the reverse, "2006/2004" number first), shared by
   the palette parser and the in-text matcher and mirrored by
@@ -666,15 +666,18 @@ meant to stay split; add new features as new files, not inside the shells:
     a text comes from `ArticleData.validity` (what the source's page says) and
     from nothing else: `versionInfo` and `norma_data.data_versione` are what was
     ASKED for, an echo, and must never be shown as a fact ("Aggiornato al" once
-    printed the typed date as if Normattiva had said it). With no `validity` the
-    toolbar shows no status. A text the source says is past, or one asked for by
-    date or as the original whose page could not be read, takes no notes,
-    highlights or discussions: `buildItemKey` has no version segment, so anything
-    made on it would appear on the text in force, on the wrong words. A new
-    surface that renders article text passes it through `describeVersion` and
-    honours `readOnly`, `doctrineVisible` and `textVisible`, and asks
-    `canCopyOrSave` (showing `copyBlockedReason`) and `canCite` before it copies,
-    exports, saves or cites, the way `ArticleTabContent` and `DossierItemReader` do; and
-    anything that caches, groups or compares texts by article adds `versionKey` to the
-    item key, which has no version; the banner and the chip sit
-    beside the text, never in it (root rule 23).
+    printed the typed date as if Normattiva had said it); a label built from
+    them (a tab's "testo al 29/12/2007", a dossier row's "Testo al …") says what
+    was asked for, and only that. With no `validity` the toolbar shows no status.
+    A text the source says is past, one whose window does not contain the day
+    asked for, and one asked for by date or as the original that is repealed or
+    whose page could not be read, takes no notes, highlights or discussions:
+    `buildItemKey` has no version segment, so anything made on it would appear
+    on the text in force, on the wrong words. A new surface that renders
+    article text passes it through `describeVersion` and honours `readOnly`,
+    `doctrineVisible` and `textVisible`, and asks `canCopyOrSave` (showing
+    `copyBlockedReason`) and `canCite` before it copies, exports, saves or
+    cites, the way `ArticleTabContent` and `DossierItemReader` do; and anything
+    that caches, groups or compares texts by article adds `versionKey` to the
+    item key, which has no version; the banner and the chip sit beside the
+    text, never in it (root rule 23).
